@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Order, ProductWithRating, User, Review } from '../../App';
 
 const StatCard: React.FC<{ title: string; value: string | number; change?: string; changeType?: 'increase' | 'decrease'; icon?: React.ReactNode; colorClass?: string }> = ({ title, value, change, changeType, icon, colorClass = "bg-white" }) => {
@@ -111,38 +111,44 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
 
     const averageOrderValue = completedOrders.length > 0 ? totalRevenue / completedOrders.length : 0;
 
-    // --- Product Engagement Metrics ---
-    // Explicitly ensure 0 fallback for sorting
+    // --- Product Engagement Metrics (Memoized for performance and accuracy) ---
     
-    // 1. Most Wishlisted
-    const sortedByWishlist = [...products]
-        .sort((a, b) => (b.wishlistCount || 0) - (a.wishlistCount || 0))
-        .slice(0, 5);
-    // Only show if count > 0
-    const visibleWishlist = sortedByWishlist.filter(p => (p.wishlistCount || 0) > 0);
-    const maxWishlistCount = sortedByWishlist[0]?.wishlistCount || 1;
+    const { visibleWishlist, maxWishlistCount, visibleReviews, maxReviewCount, visibleViews, maxViewCount } = useMemo(() => {
+        // 1. Most Wishlisted
+        const sortedByWishlist = [...products]
+            .sort((a, b) => (b.wishlistCount || 0) - (a.wishlistCount || 0))
+            .slice(0, 5);
+        const visibleWishlist = sortedByWishlist.filter(p => (p.wishlistCount || 0) > 0);
+        const maxWishlistCount = sortedByWishlist[0]?.wishlistCount || 1;
 
-    // 2. Top Rated (Rating > 0)
-    const sortedByRating = [...products]
+        // 2. Most Reviewed (Calculated directly from reviews prop source of truth)
+        const productReviewCounts = products.map(p => ({
+            ...p,
+            actualReviewCount: reviews[p.id] ? reviews[p.id].length : 0
+        }));
+        
+        const sortedByReviews = productReviewCounts
+            .sort((a, b) => b.actualReviewCount - a.actualReviewCount)
+            .slice(0, 5);
+        
+        const visibleReviews = sortedByReviews.filter(p => p.actualReviewCount > 0);
+        const maxReviewCount = sortedByReviews[0]?.actualReviewCount || 1;
+
+        // 3. Most Viewed
+        const sortedByViews = [...products]
+            .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
+            .slice(0, 5);
+        const visibleViews = sortedByViews.filter(p => (p.viewCount || 0) > 0);
+        const maxViewCount = sortedByViews[0]?.viewCount || 1;
+
+        return { visibleWishlist, maxWishlistCount, visibleReviews, maxReviewCount, visibleViews, maxViewCount };
+    }, [products, reviews]);
+
+    // 4. Top Rated (Rating > 0)
+    const sortedByRating = useMemo(() => [...products]
         .filter(p => (p.rating || 0) > 0)
         .sort((a, b) => (b.rating || 0) - (a.rating || 0))
-        .slice(0, 5);
-    
-    // 3. Most Viewed
-    const sortedByViews = [...products]
-        .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
-        .slice(0, 5);
-    // Only show if views > 0
-    const visibleViews = sortedByViews.filter(p => (p.viewCount || 0) > 0);
-    const maxViewCount = sortedByViews[0]?.viewCount || 1;
-
-    // 4. Most Reviewed
-    const sortedByReviews = [...products]
-        .sort((a, b) => (b.reviewCount || 0) - (a.reviewCount || 0))
-        .slice(0, 5);
-    // Only show if reviews > 0
-    const visibleReviews = sortedByReviews.filter(p => (p.reviewCount || 0) > 0);
-    const maxReviewCount = sortedByReviews[0]?.reviewCount || 1;
+        .slice(0, 5), [products]);
 
     // Inventory Health
     const outOfStockProducts = products.filter(p => !p.inStock);
@@ -334,10 +340,10 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                                 <VisualBar 
                                     key={product.id}
                                     label={product.title}
-                                    value={product.reviewCount || 0}
+                                    value={product.actualReviewCount}
                                     max={maxReviewCount}
                                     color="bg-gradient-to-r from-purple-500 to-fuchsia-400"
-                                    displayValue={product.reviewCount || 0}
+                                    displayValue={product.actualReviewCount}
                                 />
                             ))}
                         </div>

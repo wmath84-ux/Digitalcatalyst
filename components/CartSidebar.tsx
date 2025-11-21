@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { CartItem, ProductWithRating, Coupon } from '../App';
 
@@ -28,7 +29,7 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
         return acc + (price * item.quantity);
     }, 0);
 
-    const prevSubtotalRef = useRef<number>();
+    const prevSubtotalRef = useRef<number | undefined>(undefined);
     useEffect(() => {
         if (prevSubtotalRef.current !== undefined && subtotal !== prevSubtotalRef.current) {
             setFlash(true);

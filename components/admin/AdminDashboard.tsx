@@ -154,7 +154,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 {/* Mobile Header */}
-                <header className="md:hidden bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30">
+                <header className="md:hidden bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
                     <div className="flex items-center gap-3">
                         <button 
                             onClick={() => setIsMobileSidebarOpen(true)}

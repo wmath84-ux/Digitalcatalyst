@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from 'react';
 import { ProductWithRating, Announcement, WebsiteSettings } from '../App';
 import ProductCard from './ProductCard';
@@ -56,6 +57,7 @@ export const FreeProductsModal: React.FC<FreeProductsModalProps> = ({ isOpen, on
                                 onAddToCart={onAddToCart}
                                 onQuickView={() => {}} // No quick view from this modal
                                 animationDelay={0} // Stagger animation is disabled here
+                                coupons={[]} // Empty coupons for free products
                             />
                         </div>
                     )) : (

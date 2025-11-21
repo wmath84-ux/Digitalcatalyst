@@ -1514,7 +1514,15 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
-  const handleNavigateToAdminLogin = () => setCurrentView('adminLogin');
+  // FIX: Changed to check for existing admin session before showing login screen
+  const handleNavigateToAdminLogin = () => {
+    if (currentAdminUser) {
+      setCurrentView('admin');
+    } else {
+      setCurrentView('adminLogin');
+    }
+  };
+
   const handleAdminLogin = (email: string, password: string): boolean => {
     const admin = adminUsers.find(u => u.email === email && u.password === password);
     if (admin) {
