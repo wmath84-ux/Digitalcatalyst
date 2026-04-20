@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { ProductWithRating, User } from '../../App';
 import { GoogleGenAI, Modality } from '@google/genai';
+import { getGeminiApiKey } from '../../utils/gemini';
 
 interface NewProductEmailPreviewModalProps {
     product: ProductWithRating;
@@ -19,10 +20,11 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
         const generateMarketingImage = async () => {
             setIsLoadingImage(true);
             try {
-                if (!process.env.API_KEY) {
-                    throw new Error("API_KEY is not configured.");
+                const apiKey = getGeminiApiKey();
+                if (!apiKey) {
+                    throw new Error('Gemini API key is not configured.');
                 }
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                const ai = new GoogleGenAI({ apiKey });
                 const prompt = `Create a vibrant, eye-catching marketing banner for a new product announcement email. The product is called "${product.title}". It is described as: "${product.description}". The style should be modern, clean, and exciting, suitable for a digital product e-commerce store. Use a professional and dynamic color palette. Aspect ratio should be 2:1.`;
                 
                 const response = await ai.models.generateContent({

@@ -4,6 +4,7 @@ import React, { useState, useEffect } from 'react';
 import { GoogleGenAI, Modality } from '@google/genai';
 // FIX: Corrected import path for SupportTicket to resolve circular dependency and import error.
 import { SupportTicket } from '../../App';
+import { getGeminiApiKey } from '../../utils/gemini';
 
 interface EmailPreviewModalProps {
     ticket: SupportTicket;
@@ -21,10 +22,11 @@ const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({ ticket, replyText
         const generateHeaderImage = async () => {
             setIsLoadingImage(true);
             try {
-                if (!process.env.API_KEY) {
-                    throw new Error("API_KEY is not configured.");
+                const apiKey = getGeminiApiKey();
+                if (!apiKey) {
+                    throw new Error('Gemini API key is not configured.');
                 }
-                const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+                const ai = new GoogleGenAI({ apiKey });
                 const prompt = `Generate a professional and visually appealing abstract background image for a customer support email header. The topic is "${ticket.subject}". The image should evoke a sense of helpfulness and clarity. Use a calming blue and white color palette.`;
                 
                 const response = await ai.models.generateContent({
