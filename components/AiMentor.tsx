@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI } from '@google/genai';
+import { geminiSetupHint, getGeminiApiKey } from '../utils/gemini';
 
 interface AiMentorProps {
     productTitle: string;
@@ -39,10 +40,11 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName }) 
         setIsChatLoading(true);
 
         try {
-            if (!process.env.API_KEY) {
-                throw new Error("API_KEY not configured.");
+            const apiKey = getGeminiApiKey();
+            if (!apiKey) {
+                throw new Error(geminiSetupHint);
             }
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey });
             const systemInstruction = `You are a helpful AI Mentor for the product "${productTitle}". The user is currently viewing content titled "${activeContentName || 'the main product page'}". Your role is to answer questions about this topic, the product, and related subjects to help the user learn and succeed. Be encouraging and clear.`;
             
             const response = await ai.models.generateContent({
@@ -53,7 +55,8 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName }) 
             setMessages(prev => [...prev, { sender: 'ai', text: response.text }]);
         } catch (err) {
             console.error("Gemini API Error:", err);
-            setMessages(prev => [...prev, { sender: 'ai', text: "Sorry, I couldn't connect. Please check your API key or try again later." }]);
+            const fallbackMessage = err instanceof Error && err.message ? err.message : "Sorry, I couldn't connect. Please check your API key or try again later.";
+            setMessages(prev => [...prev, { sender: 'ai', text: fallbackMessage }]);
         } finally {
             setIsChatLoading(false);
         }

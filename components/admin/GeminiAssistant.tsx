@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { GoogleGenAI } from '@google/genai';
+import { geminiSetupHint, getGeminiApiKey } from '../../utils/gemini';
 
 interface Message {
     sender: 'user' | 'ai';
@@ -25,10 +26,11 @@ const GeminiAssistant: React.FC = () => {
         setError(null);
 
         try {
-            if (!process.env.API_KEY) {
-                throw new Error("API_KEY environment variable not set.");
+            const apiKey = getGeminiApiKey();
+            if (!apiKey) {
+                throw new Error(geminiSetupHint);
             }
-            const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+            const ai = new GoogleGenAI({ apiKey });
 
             const systemInstruction = "You are an expert senior frontend engineer assisting an admin with their React/TypeScript e-commerce site built with Tailwind CSS. Your goal is to provide helpful explanations and complete, ready-to-use code snippets to fulfill their requests for changes. Always format code blocks with markdown backticks (```tsx ... ```). Be concise and helpful.";
 
@@ -41,7 +43,9 @@ const GeminiAssistant: React.FC = () => {
             setMessages(prev => [...prev, aiMessage]);
 
         } catch (err: any) {
-            const errorMessage = "Sorry, I encountered an error. Please check the console for details or ensure your API key is correctly configured.";
+            const errorMessage = err instanceof Error && err.message
+                ? err.message
+                : "Sorry, I encountered an error. Please check the console for details or ensure your API key is correctly configured.";
             setError(errorMessage);
             setMessages(prev => [...prev, { sender: 'ai', text: errorMessage }]);
             console.error("Gemini API Error:", err);
