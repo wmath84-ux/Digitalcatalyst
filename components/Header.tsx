@@ -119,7 +119,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                          <div className="relative">
                             <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center space-x-2 text-text-muted">
                                 <UserIcon />
-                                <span className="text-sm font-medium">{currentUser.email.split('@')[0]}</span>
+                                <span className="text-sm font-medium">{currentUser.name || currentUser.email.split('@')[0]}</span>
                             </button>
                             {isUserMenuOpen && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20">

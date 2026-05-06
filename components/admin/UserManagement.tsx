@@ -23,8 +23,10 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onDeleteUser }) 
                         <thead>
                             <tr className="bg-slate-50 border-b border-slate-200">
                                 <th className="p-3 sm:p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">User ID</th>
-                                <th className="p-3 sm:p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">Email Address</th>
+                                <th className="p-3 sm:p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">Learner</th>
+                                <th className="p-3 sm:p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">Mobile</th>
                                 <th className="p-3 sm:p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">Joined Date</th>
+                                <th className="p-3 sm:p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">Last Login</th>
                                 <th className="p-3 sm:p-5 font-bold text-xs text-slate-500 uppercase tracking-wider text-right">Actions</th>
                             </tr>
                         </thead>
@@ -36,13 +38,20 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onDeleteUser }) 
                                         <td className="p-3 sm:p-5">
                                             <div className="flex items-center gap-3">
                                                 <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-white font-bold text-xs shadow-sm">
-                                                    {user.email.charAt(0).toUpperCase()}
+                                                    {(user.name || user.email).charAt(0).toUpperCase()}
                                                 </div>
-                                                <span className="font-bold text-slate-700">{user.email}</span>
+                                                <div>
+                                                    <span className="block font-bold text-slate-700">{user.name || 'Learner'}</span>
+                                                    <span className="block text-xs text-slate-500">{user.email}</span>
+                                                </div>
                                             </div>
                                         </td>
+                                        <td className="p-3 sm:p-5 text-sm text-slate-600 font-medium">{user.mobile ? `+91 ${user.mobile}` : 'Not added'}</td>
                                         <td className="p-3 sm:p-5 text-sm text-slate-600 font-medium">
                                             {new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
+                                        </td>
+                                        <td className="p-3 sm:p-5 text-sm text-slate-600 font-medium">
+                                            {user.lastLoginAt ? new Date(user.lastLoginAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'Never'}
                                         </td>
                                         <td className="p-3 sm:p-5 text-right">
                                             <button 
@@ -56,7 +65,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onDeleteUser }) 
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={4} className="text-center p-12 text-slate-400">
+                                    <td colSpan={6} className="text-center p-12 text-slate-400">
                                         No users found.
                                     </td>
                                 </tr>
