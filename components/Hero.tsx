@@ -12,6 +12,8 @@ interface HeroProps {
   realMetrics?: { revenue: number; users: number };
 }
 
+const fallbackHeroImage = 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1400&q=80';
+
 const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateToAllProducts, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, realMetrics }) => {
   const sectionRef = useRef<HTMLElement>(null);
 
@@ -64,6 +66,8 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
       }}></div>
       
       {/* Overlay Pattern */}
+      <div className="absolute -top-24 right-10 h-72 w-72 rounded-full bg-cyan-300/30 blur-3xl animate-pulse" />
+      <div className="absolute bottom-10 left-1/2 h-96 w-96 rounded-full bg-fuchsia-400/20 blur-3xl animate-icon-float" />
       <div className="absolute inset-0 -z-10 opacity-10" style={{
           backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
       }}></div>
@@ -124,11 +128,11 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
                     {/* Decorative Blob */}
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-indigo-500/30 rounded-full blur-3xl -z-10 animate-pulse"></div>
                     
-                    <div className="bg-white/5 backdrop-blur-sm rounded-2xl p-4 border border-white/20 shadow-2xl transform rotate-2 hover:rotate-0 transition-transform duration-500">
+                    <div className="bg-white/10 backdrop-blur-2xl rounded-[2rem] p-4 border border-white/25 shadow-2xl transform rotate-1 hover:rotate-0 transition-transform duration-500 animate-icon-float">
                         <img 
-                            src="https://picsum.photos/seed/online-business-growth/800/600" 
-                            alt="Digital Growth" 
-                            className="rounded-xl w-full h-auto shadow-inner"
+                            src={settings.content.heroImageUrl || fallbackHeroImage} 
+                            alt="Online learning workspace" 
+                            className="rounded-[1.4rem] w-full h-auto shadow-inner object-cover aspect-[4/3]"
                         />
                     </div>
                     
