@@ -324,26 +324,31 @@ export function CoursePlayer({ settings, product, onBack }: { settings: WebsiteS
     <div className="h-screen w-screen bg-gray-800 flex flex-col lg:flex-row">
       <header className="lg:hidden bg-black p-4 flex items-center space-x-4 text-white"><button onClick={() => setIsSidebarOpen(true)} className="p-1"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7"></path></svg></button><h1 className="font-semibold text-lg truncate">{activeFile?.name || product.title}</h1></header>
       <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 bg-black/60 z-30 lg:hidden transition ${isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} />
-      <aside className={`fixed inset-y-0 left-0 z-40 w-80 bg-white border-r transform transition lg:relative lg:translate-x-0 lg:flex-shrink-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+           <aside className={`fixed inset-y-0 left-0 z-40 w-80 bg-white border-r transform transition lg:relative lg:translate-x-0 lg:flex-shrink-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex flex-col h-full">
             <div className="p-4 border-b flex-shrink-0 bg-gradient-to-br from-slate-950 to-blue-950 text-white"><button onClick={onBack} className="text-blue-200 hover:text-white font-semibold mb-2">← Back</button><h2 className="text-xl font-black">{product.title}</h2><p className="text-xs text-blue-100 mt-2">Private video classroom with nested modules, AI chat, and learner notes.</p></div>
             <nav className="p-2 overflow-y-auto flex-grow">{product.courseContent?.map(m => <ModuleItem key={m.id} module={m} activeFile={activeFile} onSelectFile={onSelectFile} />) || <p className="p-4 text-center text-gray-500">No content added yet.</p>}</nav>
         </div>
       </aside>
+        
+      <main ref={mainContentRef} className="flex-1 relative flex flex-col min-w-0 bg-black">
+          <div className="flex-1 relative">
+             {renderMedia()}
+          </div>
 
-              <div className="absolute top-4 left-4 right-4 z-20 pointer-events-none hidden md:flex items-center justify-between text-white">
-                <div className="bg-black/45 backdrop-blur rounded-2xl px-4 py-2 border border-white/10">
-                  <p className="text-xs uppercase tracking-widest text-blue-200">Now learning</p>
-                  <p className="font-bold truncate max-w-[42rem]">{activeFile?.name || product.title}</p>
-                </div>
-                <div className="bg-emerald-500/20 backdrop-blur rounded-2xl px-4 py-2 border border-emerald-300/20 text-sm font-bold">Progress auto-saved locally</div>
-              </div>
+          <div className="absolute top-4 left-4 right-4 z-20 pointer-events-none hidden md:flex items-center justify-between text-white">
+            <div className="bg-black/45 backdrop-blur rounded-2xl px-4 py-2 border border-white/10">
+              <p className="text-xs uppercase tracking-widest text-blue-200">Now learning</p>
+              <p className="font-bold truncate max-w-[42rem]">{activeFile?.name || product.title}</p>
+            </div>
+            <div className="bg-emerald-500/20 backdrop-blur rounded-2xl px-4 py-2 border border-emerald-300/20 text-sm font-bold">Progress auto-saved locally</div>
+          </div>
+      </main>
 
-          </main>
-          <aside className="hidden lg:flex min-h-0 border-l border-white/10 bg-white/10 p-3 backdrop-blur-2xl">
-            <div className="h-full w-full rounded-[1.5rem] border border-white/15 bg-slate-950/80 p-2 shadow-2xl">{renderActionPanel()}</div>
-          </aside>
-      </div>
+      <aside className="hidden lg:flex min-h-0 border-l border-white/10 bg-white/10 p-3 backdrop-blur-2xl">
+        <div className="h-full w-full rounded-[1.5rem] border border-white/15 bg-slate-950/80 p-2 shadow-2xl">{renderActionPanel()}</div>
+      </aside>
+      
     </div>
   );
 }
