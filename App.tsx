@@ -30,8 +30,7 @@ import ComingSoonModal from './components/ComingSoonModal';
 import BlogModal from './components/Prerequisites';
 import { FreeProductsModal, AnnouncementsModal } from './components/ContentModals';
 import AnnouncementDetail from './components/AnnouncementDetail';
-import HomeSideDock from './components/HomeSideDock';
-import ProfilePage from './components/ProfilePage';
+
 import PlatformExperience from './components/PlatformExperience';
 
 // NOTE: Firebase imports removed to prevent "Service not available" crashes.
@@ -192,8 +191,7 @@ export interface User {
     password: string; // Legacy local-mode fallback; production should use secure OTP auth.
     createdAt: string;
     lastLoginAt?: string;
-    eduCoins?: number;
-    studyMinutes?: number;
+
 }
 
 // New Admin User structure for multi-user admin management
@@ -981,8 +979,7 @@ const App: React.FC = () => {
         ...user,
         name: user.name || user.email?.split('@')[0] || 'Learner',
         mobile: user.mobile || '',
-        eduCoins: user.eduCoins ?? 120,
-        studyMinutes: user.studyMinutes ?? 0,
+
     }));
     setUsers(loadedUsers);
     
@@ -1302,7 +1299,7 @@ const App: React.FC = () => {
 
   // --- Auth Handlers ---
   const completeUserSession = (user: User) => {
-      const sessionUser = { ...user, eduCoins: user.eduCoins ?? 120, studyMinutes: user.studyMinutes ?? 0, lastLoginAt: new Date().toISOString() };
+
       setCurrentUser(sessionUser);
       safeSetItem('currentUser', sessionUser);
 
@@ -1329,7 +1326,7 @@ const App: React.FC = () => {
       if (users.some(u => u.email === email)) {
           return { success: false, message: 'An account with this email already exists.' };
       }
-      const newUser: User = { id: Date.now(), name, email, mobile, password, createdAt: new Date().toISOString(), eduCoins: 120, studyMinutes: 0 };
+
       const updatedUsers = [...users, newUser];
       setUsers(updatedUsers);
       safeSetItem('siteUsers', updatedUsers);

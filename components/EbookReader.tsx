@@ -34,6 +34,7 @@ const defaultDoc = (product: ProductWithRating) => `
   <blockquote>${product.longDescription}</blockquote>
 `;
 
+
 const EbookReader: React.FC<{ settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; }> = ({ settings, product, onBack }) => {
     const files = useMemo(() => getAllFiles(product.courseContent || []), [product.courseContent]);
     const firstDoc = files.find(file => file.content || file.type === 'doc' || file.type === 'link');
@@ -80,7 +81,7 @@ const EbookReader: React.FC<{ settings: WebsiteSettings; product: ProductWithRat
                                 <button key={file.id} onClick={() => setActiveDoc(file)} className={`w-full text-left p-3 rounded-xl border transition-colors ${activeDoc?.id === file.id ? 'bg-blue-50 border-primary text-primary' : 'bg-white hover:bg-slate-50 border-slate-100 text-slate-700'}`}>
                                     <span className="block font-bold text-sm truncate">{file.name}</span>
                                     <span className="text-xs uppercase opacity-70">{file.content ? 'rich notes' : file.type}</span>
-                                    {!file.content && file.url && file.url !== '#' && <a href={file.url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="mt-2 inline-block text-xs font-bold text-primary underline">Open/download</a>}
+
                                 </button>
                             ))}
                             {files.length === 0 && <p className="text-sm text-slate-500">No files uploaded yet. Showing a sample learning document.</p>}
@@ -91,7 +92,7 @@ const EbookReader: React.FC<{ settings: WebsiteSettings; product: ProductWithRat
                 <section className="max-w-5xl w-full mx-auto">
                     <div className="bg-white border shadow-2xl rounded-sm min-h-[900px] px-8 sm:px-14 lg:px-20 py-14 print:shadow-none print:border-none">
                         <div
-                            key={activeDoc?.id || product.id}
+
                             ref={editorRef}
                             contentEditable
                             suppressContentEditableWarning
@@ -100,7 +101,7 @@ const EbookReader: React.FC<{ settings: WebsiteSettings; product: ProductWithRat
                         />
                     </div>
 
-                    <p className="mt-4 text-center text-sm text-slate-400">Select rich notes from the left panel. Download links now stay in the side panel for a cleaner Docs workspace.</p>
+
                 </section>
             </main>
         </div>
