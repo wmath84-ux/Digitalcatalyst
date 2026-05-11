@@ -30,6 +30,7 @@ import ComingSoonModal from './components/ComingSoonModal';
 import BlogModal from './components/Prerequisites';
 import { FreeProductsModal, AnnouncementsModal } from './components/ContentModals';
 import AnnouncementDetail from './components/AnnouncementDetail';
+
 import PlatformExperience from './components/PlatformExperience';
 
 // NOTE: Firebase imports removed to prevent "Service not available" crashes.
@@ -190,6 +191,7 @@ export interface User {
     password: string; // Legacy local-mode fallback; production should use secure OTP auth.
     createdAt: string;
     lastLoginAt?: string;
+
 }
 
 // New Admin User structure for multi-user admin management
@@ -258,7 +260,7 @@ export interface Order {
     customerEmail: string;
     date: string;
     total: string;
-    status: 'Pending' | 'Shipped' | 'Completed' | 'Cancelled';
+    status: 'Pending' | 'Awaiting Verification' | 'Shipped' | 'Completed' | 'Cancelled';
     items: OrderItem[];
     shippingAddress: string;
     billingAddress: string;
@@ -370,6 +372,7 @@ export interface WebsiteSettings {
     content: {
         heroTitle: string;
         heroSubtitle: string;
+        heroImageUrl?: string;
         heroMetrics: {
             enableRealData: boolean;
             customRevenue: string;
@@ -827,7 +830,8 @@ const defaultWebsiteSettings: WebsiteSettings = {
     },
     content: {
         heroTitle: "Elevate Your Digital Presence",
-        heroSubtitle: "We provide top-tier digital products, marketing services, and e-commerce solutions to help you grow your business online. From e-books to SEO, we've got you covered.",
+        heroSubtitle: "Learn premium notes, private courses, and focused study resources inside one beautiful learning workspace.",
+        heroImageUrl: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1400&q=80",
         heroMetrics: {
             enableRealData: false,
             customRevenue: "+128%",
@@ -975,6 +979,7 @@ const App: React.FC = () => {
         ...user,
         name: user.name || user.email?.split('@')[0] || 'Learner',
         mobile: user.mobile || '',
+
     }));
     setUsers(loadedUsers);
     
@@ -1294,7 +1299,7 @@ const App: React.FC = () => {
 
   // --- Auth Handlers ---
   const completeUserSession = (user: User) => {
-      const sessionUser = { ...user, lastLoginAt: new Date().toISOString() };
+
       setCurrentUser(sessionUser);
       safeSetItem('currentUser', sessionUser);
 
@@ -1321,7 +1326,7 @@ const App: React.FC = () => {
       if (users.some(u => u.email === email)) {
           return { success: false, message: 'An account with this email already exists.' };
       }
-      const newUser: User = { id: Date.now(), name, email, mobile, password, createdAt: new Date().toISOString() };
+
       const updatedUsers = [...users, newUser];
       setUsers(updatedUsers);
       safeSetItem('siteUsers', updatedUsers);
@@ -1366,6 +1371,8 @@ const App: React.FC = () => {
       handleBackToHome();
     }
   };
+
+  const handleNavigateToProfile = () => { setCurrentView('profile'); window.scrollTo(0, 0); };
 
   const handleNavigateToAuth = () => setCurrentView('auth');
 
@@ -1653,6 +1660,7 @@ const App: React.FC = () => {
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={handleBackToHome} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} coupons={coupons} />;
       case 'myPurchases': return <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
+      case 'profile': return <ProfilePage settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
       case 'home': default: return renderHomePageContent();
     }
@@ -1690,7 +1698,8 @@ const App: React.FC = () => {
     return (
        <ErrorBoundary>
          <div className="font-sans">
-            <Header settings={websiteSettings} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} activeTheme={activeTheme} onThemeChange={setActiveTheme} />
+            <Header settings={websiteSettings} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} activeTheme={activeTheme} onThemeChange={setActiveTheme} />
+            {currentView === 'home' && <HomeSideDock currentUser={currentUser} cartCount={cartItemCount} wishlistCount={wishlist.length} onOpenBlogModal={() => setIsBlogModalOpen(true)} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => setIsAnnouncementsModalOpen(true)} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} />}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
             {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null)} />}

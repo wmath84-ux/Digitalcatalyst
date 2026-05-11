@@ -34,21 +34,6 @@ const defaultDoc = (product: ProductWithRating) => `
   <blockquote>${product.longDescription}</blockquote>
 `;
 
-const DownloadCard: React.FC<{ file: ProductFile; onOpenDoc: () => void }> = ({ file, onOpenDoc }) => {
-    const isDoc = file.content || file.type === 'doc' || file.type === 'link';
-    return (
-        <div className="bg-white rounded-xl shadow-lg border p-8 flex flex-col items-center text-center transform hover:-translate-y-1 transition-transform duration-300 w-full max-w-sm mx-auto">
-            <FileIcon type={file.type} />
-            <h3 className="text-lg font-bold text-gray-800 mb-2 break-words w-full">{file.name}</h3>
-            <p className="text-xs text-gray-500 uppercase tracking-widest mb-6">{isDoc ? 'RICH NOTES' : file.type.toUpperCase()}</p>
-            {isDoc ? (
-                <button onClick={onOpenDoc} className="w-full bg-primary text-white font-bold py-3 px-6 rounded-lg hover:opacity-90 shadow-md transition-all">Open in Docs Reader</button>
-            ) : (
-                <a href={file.url} download={file.name} target="_blank" rel="noopener noreferrer" className="w-full bg-primary text-white font-bold py-3 px-6 rounded-lg hover:opacity-90 shadow-md transition-all flex items-center justify-center gap-2">Download</a>
-            )}
-        </div>
-    );
-};
 
 const EbookReader: React.FC<{ settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; }> = ({ settings, product, onBack }) => {
     const files = useMemo(() => getAllFiles(product.courseContent || []), [product.courseContent]);
@@ -96,6 +81,7 @@ const EbookReader: React.FC<{ settings: WebsiteSettings; product: ProductWithRat
                                 <button key={file.id} onClick={() => setActiveDoc(file)} className={`w-full text-left p-3 rounded-xl border transition-colors ${activeDoc?.id === file.id ? 'bg-blue-50 border-primary text-primary' : 'bg-white hover:bg-slate-50 border-slate-100 text-slate-700'}`}>
                                     <span className="block font-bold text-sm truncate">{file.name}</span>
                                     <span className="text-xs uppercase opacity-70">{file.content ? 'rich notes' : file.type}</span>
+
                                 </button>
                             ))}
                             {files.length === 0 && <p className="text-sm text-slate-500">No files uploaded yet. Showing a sample learning document.</p>}
@@ -106,6 +92,7 @@ const EbookReader: React.FC<{ settings: WebsiteSettings; product: ProductWithRat
                 <section className="max-w-5xl w-full mx-auto">
                     <div className="bg-white border shadow-2xl rounded-sm min-h-[900px] px-8 sm:px-14 lg:px-20 py-14 print:shadow-none print:border-none">
                         <div
+
                             ref={editorRef}
                             contentEditable
                             suppressContentEditableWarning
@@ -114,14 +101,7 @@ const EbookReader: React.FC<{ settings: WebsiteSettings; product: ProductWithRat
                         />
                     </div>
 
-                    {files.length > 0 && (
-                        <div className="mt-10">
-                            <h2 className="text-2xl font-black text-slate-800 mb-5">Downloads & resources</h2>
-                            <div className="grid sm:grid-cols-2 xl:grid-cols-3 gap-6">
-                                {files.map(file => <DownloadCard key={file.id} file={file} onOpenDoc={() => setActiveDoc(file)} />)}
-                            </div>
-                        </div>
-                    )}
+
                 </section>
             </main>
         </div>

@@ -330,8 +330,7 @@ export function CoursePlayer({ settings, product, onBack }: { settings: WebsiteS
             <nav className="p-2 overflow-y-auto flex-grow">{product.courseContent?.map(m => <ModuleItem key={m.id} module={m} activeFile={activeFile} onSelectFile={onSelectFile} />) || <p className="p-4 text-center text-gray-500">No content added yet.</p>}</nav>
         </div>
       </aside>
-      <div className="flex-1 flex flex-col min-w-0">
-          <main ref={mainContentRef} className="flex-1 bg-black relative flex flex-col overflow-hidden">
+
               <div className="absolute top-4 left-4 right-4 z-20 pointer-events-none hidden md:flex items-center justify-between text-white">
                 <div className="bg-black/45 backdrop-blur rounded-2xl px-4 py-2 border border-white/10">
                   <p className="text-xs uppercase tracking-widest text-blue-200">Now learning</p>
@@ -339,10 +338,11 @@ export function CoursePlayer({ settings, product, onBack }: { settings: WebsiteS
                 </div>
                 <div className="bg-emerald-500/20 backdrop-blur rounded-2xl px-4 py-2 border border-emerald-300/20 text-sm font-bold">Progress auto-saved locally</div>
               </div>
-              <div style={{ flexBasis: `${mediaPanelHeight}%` }} className="w-full bg-black flex-shrink-0 overflow-hidden"><div key={activeFile?.id} className="w-full h-full animate-fade-in">{renderMedia()}</div></div>
-              <div onMouseDown={handleDragStart} onTouchStart={handleDragStart} className="w-full h-2 bg-slate-700 hover:bg-primary cursor-ns-resize transition-colors flex-shrink-0 z-10" />
-              <div className="flex-1 min-h-0 flex flex-col rounded-t-lg overflow-hidden">{renderActionPanel()}</div>
+
           </main>
+          <aside className="hidden lg:flex min-h-0 border-l border-white/10 bg-white/10 p-3 backdrop-blur-2xl">
+            <div className="h-full w-full rounded-[1.5rem] border border-white/15 bg-slate-950/80 p-2 shadow-2xl">{renderActionPanel()}</div>
+          </aside>
       </div>
     </div>
   );

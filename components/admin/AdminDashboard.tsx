@@ -10,7 +10,6 @@ import SupportManagement from './SupportManagement';
 import Analytics from './Analytics';
 import AdminReviewManagement from './AdminReviewManagement';
 import Reports from './Reports';
-import GeminiAssistant from './GeminiAssistant';
 import WebsiteSettingsComponent from './WebsiteSettings';
 import AdminManagement from './AdminManagement';
 
@@ -36,7 +35,7 @@ interface AdminDashboardProps {
     onSwitchToHome: () => void;
 }
 
-export type AdminView = 'dashboard' | 'products' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'analytics' | 'gemini' | 'websiteSettings';
+export type AdminView = 'dashboard' | 'products' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'analytics' | 'websiteSettings';
 
 const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?: string; icon: React.ReactNode; gradient: string }> = ({ title, value, subtitle, icon, gradient }) => (
     <div className={`relative overflow-hidden rounded-2xl p-6 shadow-lg text-white ${gradient} transform transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl`}>
@@ -67,7 +66,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             case 'coupons': return <CouponManagement coupons={props.coupons} onUpdate={props.onCouponsUpdate} />;
             case 'support': return <SupportManagement tickets={props.tickets} onUpdate={props.onTicketsUpdate} />;
             case 'analytics': return <Analytics orders={props.orders} products={props.products} users={props.users} reviews={props.reviews} />;
-            case 'gemini': return <GeminiAssistant />;
             case 'websiteSettings': return <WebsiteSettingsComponent settings={props.websiteSettings} onSettingsChange={props.onWebsiteSettingsChange} />;
             case 'dashboard': default: 
                 const completedOrders = props.orders.filter(o => o.status === 'Completed');
