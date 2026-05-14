@@ -260,9 +260,15 @@ export function CoursePlayer({ settings, product, onBack }: { settings: WebsiteS
 
   const renderActionPanel = () => (
     <div className="flex flex-col h-full bg-[#0f172a] text-white overflow-hidden rounded-t-lg shadow-inner">
-      <div className="p-1 border-b border-gray-700 flex-shrink-0 flex items-center bg-[#1e293b]">
-        <button onClick={() => setActiveActionTab('mentor')} className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors w-1/2 ${activeActionTab === 'mentor' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}>AI Mentor</button>
-        <button onClick={() => setActiveActionTab('notes')} className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors w-1/2 ${activeActionTab === 'notes' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}>Notes</button>
+      <div className="p-2 border-b border-gray-700 flex-shrink-0 bg-[#1e293b]">
+        <div className="flex items-center justify-between gap-2 mb-2 px-2 text-xs text-blue-100">
+          <span className="font-bold uppercase tracking-wider">Study cockpit</span>
+          <span>AI + timestamp notes + PDF export</span>
+        </div>
+        <div className="flex items-center bg-slate-900/70 rounded-lg p-1">
+          <button onClick={() => setActiveActionTab('mentor')} className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors w-1/2 ${activeActionTab === 'mentor' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>AI Mentor</button>
+          <button onClick={() => setActiveActionTab('notes')} className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors w-1/2 ${activeActionTab === 'notes' ? 'bg-primary text-white shadow-lg' : 'text-gray-400 hover:text-white'}`}>Notes</button>
+        </div>
       </div>
       <div className="flex-1 min-h-0 relative">
         <div className={`w-full h-full absolute top-0 left-0 transition-opacity duration-300 ${activeActionTab === 'mentor' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
@@ -320,16 +326,25 @@ export function CoursePlayer({ settings, product, onBack }: { settings: WebsiteS
       <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 bg-black/60 z-30 lg:hidden transition ${isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} />
       <aside className={`fixed inset-y-0 left-0 z-40 w-80 bg-white border-r transform transition lg:relative lg:translate-x-0 lg:flex-shrink-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
         <div className="flex flex-col h-full">
-            <div className="p-4 border-b flex-shrink-0"><button onClick={onBack} className="text-primary font-semibold mb-2">← Back</button><h2 className="text-xl font-bold">{product.title}</h2></div>
+            <div className="p-4 border-b flex-shrink-0 bg-gradient-to-br from-slate-950 to-blue-950 text-white"><button onClick={onBack} className="text-blue-200 hover:text-white font-semibold mb-2">← Back</button><h2 className="text-xl font-black">{product.title}</h2><p className="text-xs text-blue-100 mt-2">Private video classroom with nested modules, AI chat, and learner notes.</p></div>
             <nav className="p-2 overflow-y-auto flex-grow">{product.courseContent?.map(m => <ModuleItem key={m.id} module={m} activeFile={activeFile} onSelectFile={onSelectFile} />) || <p className="p-4 text-center text-gray-500">No content added yet.</p>}</nav>
         </div>
       </aside>
-      <div className="flex-1 flex flex-col min-w-0">
-          <main ref={mainContentRef} className="flex-1 bg-black relative flex flex-col overflow-hidden">
-              <div style={{ flexBasis: `${mediaPanelHeight}%` }} className="w-full bg-black flex-shrink-0 overflow-hidden"><div key={activeFile?.id} className="w-full h-full animate-fade-in">{renderMedia()}</div></div>
-              <div onMouseDown={handleDragStart} onTouchStart={handleDragStart} className="w-full h-2 bg-slate-700 hover:bg-primary cursor-ns-resize transition-colors flex-shrink-0 z-10" />
-              <div className="flex-1 min-h-0 flex flex-col rounded-t-lg overflow-hidden">{renderActionPanel()}</div>
+      <div className="flex-1 grid min-w-0 lg:grid-cols-[1fr_420px]">
+          <main ref={mainContentRef} className="bg-black relative flex flex-col overflow-hidden">
+              <div className="absolute top-4 left-4 right-4 z-20 pointer-events-none hidden md:flex items-center justify-between text-white">
+                <div className="bg-black/45 backdrop-blur rounded-2xl px-4 py-2 border border-white/10">
+                  <p className="text-xs uppercase tracking-widest text-blue-200">Now learning</p>
+                  <p className="font-bold truncate max-w-[42rem]">{activeFile?.name || product.title}</p>
+                </div>
+                <div className="bg-emerald-500/20 backdrop-blur rounded-2xl px-4 py-2 border border-emerald-300/20 text-sm font-bold">Progress auto-saved locally</div>
+              </div>
+              <div className="w-full flex-1 bg-black overflow-hidden"><div key={activeFile?.id} className="w-full h-full animate-fade-in">{renderMedia()}</div></div>
+              <div className="lg:hidden flex-1 min-h-[320px] flex flex-col rounded-t-lg overflow-hidden">{renderActionPanel()}</div>
           </main>
+          <aside className="hidden lg:flex min-h-0 border-l border-white/10 bg-white/10 p-3 backdrop-blur-2xl">
+            <div className="h-full w-full rounded-[1.5rem] border border-white/15 bg-slate-950/80 p-2 shadow-2xl">{renderActionPanel()}</div>
+          </aside>
       </div>
     </div>
   );

@@ -42,6 +42,7 @@ interface HeaderProps {
     onNavigateToAllProducts: () => void;
     onNavigateToPurchases: () => void;
     onNavigateToWishlist: () => void;
+    onNavigateToProfile: () => void;
     onNavigateToHomeAndScroll: (sectionId: string) => void;
     currentUser: User | null;
     onLogout: () => void;
@@ -50,7 +51,7 @@ interface HeaderProps {
     onThemeChange: (themeName: ThemeName) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount, cartToastMessage, onHomeClick, onCartClick, onNavigateToAllProducts, onNavigateToPurchases, onNavigateToWishlist, onNavigateToHomeAndScroll, currentUser, onLogout, onLoginClick, activeTheme, onThemeChange }) => {
+const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount, cartToastMessage, onHomeClick, onCartClick, onNavigateToAllProducts, onNavigateToPurchases, onNavigateToWishlist, onNavigateToProfile, onNavigateToHomeAndScroll, currentUser, onLogout, onLoginClick, activeTheme, onThemeChange }) => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isToastVisible, setIsToastVisible] = useState(false);
@@ -119,11 +120,14 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                          <div className="relative">
                             <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center space-x-2 text-text-muted">
                                 <UserIcon />
-                                <span className="text-sm font-medium">{currentUser.email.split('@')[0]}</span>
+                                <span className="text-sm font-medium">{currentUser.name || currentUser.email.split('@')[0]}</span>
                             </button>
                             {isUserMenuOpen && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20">
-                                    <button onClick={onLogout} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    <button onClick={onNavigateToProfile} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                            Profile & EduCoins
+                                        </button>
+                                        <button onClick={onLogout} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                         Logout
                                     </button>
                                 </div>
@@ -234,9 +238,14 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                     </button>
                   )}
                    {currentUser ? (
+                     <>
+                        <button onClick={() => { onNavigateToProfile(); setIsMenuOpen(false); }} className="block mt-4 bg-indigo-600 text-white text-center font-semibold px-6 py-3 rounded-lg hover:bg-indigo-700 transition-colors duration-300">
+                            Profile & EduCoins
+                        </button>
                      <button onClick={() => { onLogout(); setIsMenuOpen(false); }} className="block mt-4 bg-red-500 text-white text-center font-semibold px-6 py-3 rounded-lg hover:bg-red-600 transition-colors duration-300">
                         Logout
                     </button>
+                     </>
                    ) : (
                     <button onClick={() => { onLoginClick(); setIsMenuOpen(false); }} className="block mt-4 bg-primary text-white text-center font-semibold px-6 py-3 rounded-lg hover:opacity-90 transition-colors duration-300">
                         Login / Sign Up

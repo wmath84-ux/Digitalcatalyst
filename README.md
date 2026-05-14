@@ -1,20 +1,57 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# Digital Catalyst
 
-# Run and deploy your AI Studio app
+A Vite + React learning marketplace prototype for notes, courses, coupons, subscriptions, profile/EduCoins, and admin management.
 
-This contains everything you need to run your app locally.
+## Demo mode deployment
 
-View your app in AI Studio: https://ai.studio/apps/drive/1TEik-gFDOzLvh61oWFZW0YYVzbwMkQZ4
+This project is intentionally safe to deploy on Vercel **without any environment variables** while you are focusing on design.
 
-## Run Locally
+You do **not** need these variables for the current demo-mode app to open:
 
-**Prerequisites:**  Node.js
+- `NEXTAUTH_URL`
+- `NEXTAUTH_SECRET`
+- `RAZORPAY_KEY_ID`
+- `RAZORPAY_SECRET`
+- `DATABASE_URL`
+- `MONGODB_URI`
+- `POSTGRES_URL`
+- `BLOB_READ_WRITE_TOKEN`
+- `CLOUDINARY_URL`
+- `GEMINI_API_KEY`
 
+Current behavior in demo mode:
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+- Auth/OTP is simulated locally in the browser.
+- Products, users, orders, coupons, settings, purchases, profile and EduCoins use browser `localStorage`.
+- Payment opens a Razorpay payment page link, but product delivery stays locked until manual/admin verification.
+- AI features show local placeholder/demo responses when `GEMINI_API_KEY` is not set.
+- Image/file uploads are stored as browser data URLs for preview/testing.
+
+## Optional variable
+
+Only add this if you want real Gemini responses instead of demo placeholder replies:
+
+```env
+GEMINI_API_KEY=your_gemini_key_here
+```
+
+## Run locally
+
+```bash
+npm install
+npm run dev
+```
+
+## Build
+
+```bash
+npm run build
+```
+
+## Vercel settings
+
+- Framework preset: Vite
+- Install command: `npm install`
+- Build command: `npm run build`
+- Output directory: `dist`
+- Environment variables: none required for demo mode
