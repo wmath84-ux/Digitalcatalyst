@@ -30,6 +30,9 @@ import ComingSoonModal from './components/ComingSoonModal';
 import BlogModal from './components/Prerequisites';
 import { FreeProductsModal, AnnouncementsModal } from './components/ContentModals';
 import AnnouncementDetail from './components/AnnouncementDetail';
+import HomeSideDock from './components/HomeSideDock';
+import ProfilePage from './components/ProfilePage';
+import PlatformExperience from './components/PlatformExperience';
 
 import PlatformExperience from './components/PlatformExperience';
 

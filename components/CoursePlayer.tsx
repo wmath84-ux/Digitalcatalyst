@@ -330,25 +330,7 @@ export function CoursePlayer({ settings, product, onBack }: { settings: WebsiteS
             <nav className="p-2 overflow-y-auto flex-grow">{product.courseContent?.map(m => <ModuleItem key={m.id} module={m} activeFile={activeFile} onSelectFile={onSelectFile} />) || <p className="p-4 text-center text-gray-500">No content added yet.</p>}</nav>
         </div>
       </aside>
-        
-      <main ref={mainContentRef} className="flex-1 relative flex flex-col min-w-0 bg-black">
-          <div className="flex-1 relative">
-             {renderMedia()}
-          </div>
 
-          <div className="absolute top-4 left-4 right-4 z-20 pointer-events-none hidden md:flex items-center justify-between text-white">
-            <div className="bg-black/45 backdrop-blur rounded-2xl px-4 py-2 border border-white/10">
-              <p className="text-xs uppercase tracking-widest text-blue-200">Now learning</p>
-              <p className="font-bold truncate max-w-[42rem]">{activeFile?.name || product.title}</p>
-            </div>
-            <div className="bg-emerald-500/20 backdrop-blur rounded-2xl px-4 py-2 border border-emerald-300/20 text-sm font-bold">Progress auto-saved locally</div>
-          </div>
-      </main>
-
-      <aside className="hidden lg:flex min-h-0 border-l border-white/10 bg-white/10 p-3 backdrop-blur-2xl">
-        <div className="h-full w-full rounded-[1.5rem] border border-white/15 bg-slate-950/80 p-2 shadow-2xl">{renderActionPanel()}</div>
-      </aside>
-      
     </div>
   );
 }

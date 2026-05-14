@@ -59,28 +59,6 @@ const EbookReader: React.FC<{ settings: WebsiteSettings; product: ProductWithRat
                         </div>
                     </div>
                     <button onClick={() => window.print()} className="px-4 py-2 rounded-lg bg-primary text-white font-bold hover:opacity-90">Print / Save PDF</button>
-                </div>
-                <div className="px-4 sm:px-6 py-2 border-t bg-slate-50 flex flex-wrap gap-2 items-center">
-                    <select onChange={e => runCommand('formatBlock', e.target.value)} className="px-3 py-2 rounded-lg border bg-white text-sm"><option value="p">Normal text</option><option value="h1">Heading 1</option><option value="h2">Heading 2</option><option value="h3">Heading 3</option></select>
-                    {[['bold', 'B'], ['italic', 'I'], ['underline', 'U']].map(([cmd, label]) => <button key={cmd} onClick={() => runCommand(cmd)} className="w-9 h-9 rounded-lg border bg-white font-black hover:bg-blue-50">{label}</button>)}
-                    <button onClick={() => runCommand('insertUnorderedList')} className="px-3 h-9 rounded-lg border bg-white font-bold hover:bg-blue-50">• List</button>
-                    <button onClick={() => runCommand('insertOrderedList')} className="px-3 h-9 rounded-lg border bg-white font-bold hover:bg-blue-50">1. List</button>
-                    <button onClick={() => runCommand('hiliteColor', '#fef08a')} className="px-3 h-9 rounded-lg border bg-yellow-100 font-bold hover:bg-yellow-200">Highlight</button>
-                    <button onClick={() => runCommand('justifyLeft')} className="px-3 h-9 rounded-lg border bg-white font-bold hover:bg-blue-50">Left</button>
-                    <button onClick={() => runCommand('justifyCenter')} className="px-3 h-9 rounded-lg border bg-white font-bold hover:bg-blue-50">Center</button>
-                    <button onClick={() => runCommand('justifyRight')} className="px-3 h-9 rounded-lg border bg-white font-bold hover:bg-blue-50">Right</button>
-                </div>
-            </header>
-
-            <main className="grid lg:grid-cols-[280px_1fr] gap-6 px-4 sm:px-6 py-8">
-                <aside className="space-y-4">
-                    <div className="bg-white rounded-2xl border shadow-sm p-4 sticky top-32">
-                        <h2 className="font-black text-slate-800 mb-3">Course files</h2>
-                        <div className="space-y-2 max-h-[55vh] overflow-y-auto pr-1">
-                            {files.map(file => (
-                                <button key={file.id} onClick={() => setActiveDoc(file)} className={`w-full text-left p-3 rounded-xl border transition-colors ${activeDoc?.id === file.id ? 'bg-blue-50 border-primary text-primary' : 'bg-white hover:bg-slate-50 border-slate-100 text-slate-700'}`}>
-                                    <span className="block font-bold text-sm truncate">{file.name}</span>
-                                    <span className="text-xs uppercase opacity-70">{file.content ? 'rich notes' : file.type}</span>
 
                                 </button>
                             ))}
@@ -101,7 +79,7 @@ const EbookReader: React.FC<{ settings: WebsiteSettings; product: ProductWithRat
                         />
                     </div>
 
-
+> main
                 </section>
             </main>
         </div>
