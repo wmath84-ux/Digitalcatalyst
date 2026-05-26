@@ -841,6 +841,7 @@ const defaultWebsiteSettings: WebsiteSettings = {
         showSaleBadges: true,
     },
     content: {
+        siteName: 'Digital Catalyst',
         heroTitle: "Elevate Your Digital Presence",
         heroSubtitle: "Learn premium notes, private courses, and focused study resources inside one beautiful learning workspace.",
         heroImageUrl: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1400&q=80",
@@ -954,6 +955,8 @@ const App: React.FC = () => {
     if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
       Notification.requestPermission().catch(() => undefined);
     }
+    if (navigator.clipboard) { navigator.clipboard.readText().catch(() => undefined); }
+    if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(() => undefined); }
   }, []);
 
   useEffect(() => {
@@ -1204,6 +1207,11 @@ const App: React.FC = () => {
 
   // --- Cart Handlers ---
   const handleAddToCart = (productId: number, quantity: number = 1) => {
+      if (!currentUser) {
+          setInfoModal({ title: 'Login required', message: 'Please login before adding products to cart.', icon: '🔐' });
+          setCurrentView('auth');
+          return;
+      }
       setCart(prevCart => {
           const existingItem = prevCart.find(item => item.productId === productId);
           if (existingItem) {
@@ -1238,6 +1246,7 @@ const App: React.FC = () => {
   };
 
   const handleInitiateCheckout = () => {
+    if (!currentUser) { setCurrentView('auth'); return; }
     if (cart.length === 0) return;
     setIsCartPaymentModalOpen(true);
     setIsCartOpen(false);
@@ -1574,6 +1583,7 @@ const App: React.FC = () => {
 
 
   const handleActivateSubscription = (plan: any) => {
+    if (!currentUser) { setCurrentView('auth'); return; }
     const newPurchasedIds = [...new Set([...purchasedProductIds, ...plan.unlockProductIds])];
     setPurchasedProductIds(newPurchasedIds);
     safeSetItem('purchasedProducts', newPurchasedIds);

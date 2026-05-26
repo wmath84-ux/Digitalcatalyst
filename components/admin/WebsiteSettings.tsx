@@ -413,6 +413,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, on
                     {/* Hero Section Text */}
                     <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
                         <h3 className="font-bold text-blue-800 mb-2">Hero Section Text</h3>
+                        <FormRow label="Website Name"><input type="text" value={(localSettings.content as any).siteName || 'Digital Catalyst'} onChange={e => handleNestedChange('content', 'siteName', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="Hero Title"><input type="text" value={localSettings.content.heroTitle} onChange={e => handleNestedChange('content', 'heroTitle', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="Hero Subtitle"><textarea value={localSettings.content.heroSubtitle} onChange={e => handleNestedChange('content', 'heroSubtitle', e.target.value)} className="w-full p-2 border rounded" rows={3}></textarea></FormRow>
                         <FormRow label="Hero Image" description="Upload a meaningful learning/course image from your local file.">

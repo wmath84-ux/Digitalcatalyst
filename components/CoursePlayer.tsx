@@ -79,6 +79,8 @@ export function CoursePlayer({ settings, product, onBack }: { settings: WebsiteS
 
   const [activeActionTab, setActiveActionTab] = useState<'mentor' | 'notes'>('mentor');
   const [notes, setNotes] = useState<Note[]>([]);
+  const [mobilePanel, setMobilePanel] = useState<'none' | 'mentor' | 'notes'>('none');
+
 
   // Find first piece of content on product load
   useEffect(() => {
@@ -349,5 +351,6 @@ export function CoursePlayer({ settings, product, onBack }: { settings: WebsiteS
     </div>
   );
 }
+
 
 export default CoursePlayer;

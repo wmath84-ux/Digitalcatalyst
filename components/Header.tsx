@@ -81,7 +81,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
           <div className="flex items-center justify-between">
             <button onClick={onHomeClick} className="flex items-center space-x-2 cursor-pointer" aria-label="Back to Homepage">
               <LogoIcon />
-              <span className="text-xl font-bold text-primary">Digital Catalyst</span>
+              <span className="text-xl font-bold text-primary">{(settings.content as any).siteName || "Digital Catalyst"}</span>
             </button>
             
             <nav className="hidden md:flex items-center space-x-8">
