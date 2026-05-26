@@ -89,15 +89,15 @@ const AddContentModal: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                         <button type="button" onClick={() => showForm('doc')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">📝 Add rich text notes for Docs Reader</button>
                     </div>
                  ) : (
-                    <form onSubmit={handleFormSubmit} className="space-y-4">
+                    <div className="space-y-4">
                         <input placeholder="Content name" value={formState.name} onChange={e => setFormState(prev => prev ? ({...prev, name: e.target.value}) : null)} className="w-full rounded-2xl border p-3" required />
                         {formState.type === 'doc' ? (
                             <textarea placeholder="Rich notes HTML or plain text" value={formState.content} onChange={e => setFormState(prev => prev ? ({...prev, content: e.target.value}) : null)} className="h-48 w-full rounded-2xl border p-3" />
                         ) : (
                             <input placeholder="YouTube URL" value={formState.url} onChange={e => setFormState(prev => prev ? ({...prev, url: e.target.value}) : null)} className="w-full rounded-2xl border p-3" required />
                         )}
-                        <div className="flex justify-end gap-3"><button type="button" onClick={() => setFormState(null)} className="rounded-xl px-4 py-2 font-bold text-slate-600">Back</button><button type="submit" className="rounded-xl bg-primary px-5 py-2 font-bold text-white">Add Content</button></div>
-                    </form>
+                        <div className="flex justify-end gap-3"><button type="button" onClick={() => setFormState(null)} className="rounded-xl px-4 py-2 font-bold text-slate-600">Back</button><button type="button" onClick={handleFormSubmit} className="rounded-xl bg-primary px-5 py-2 font-bold text-white">Add Content</button></div>
+                    </div>
                  )}
                  <input type="file" ref={fileInputRef} className="hidden" accept={uploadConfig?.accept} onChange={handleFileSelected} />
             </div>
@@ -218,7 +218,7 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
     };
 
     return (
-        <MacWindowModal title={product ? 'Edit Product' : 'Add New Product'} subtitle="Local images, nested course content, and pricing" onClose={onCancel} maxWidth="max-w-5xl" zIndex="z-[70]">
+        <MacWindowModal title={product ? 'Edit Product' : 'Add New Product'} subtitle="Local images, nested course content, and pricing" onClose={onCancel} maxWidth="max-w-4xl" zIndex="z-[95]">
                 <div className="p-8">
 
                     <form onSubmit={handleSubmit} className="space-y-8">
