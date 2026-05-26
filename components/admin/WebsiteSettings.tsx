@@ -339,6 +339,18 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, on
         }));
     };
     
+
+    const handleHeroImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            handleNestedChange('content', 'heroImageUrl', reader.result as string);
+        };
+        reader.readAsDataURL(file);
+        event.target.value = '';
+    };
+
     const handleLayoutChange = (newLayout: HomepageSection[]) => {
         setLocalSettings(prev => ({ ...prev, layout: newLayout }));
     };
@@ -403,6 +415,15 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, on
                         <h3 className="font-bold text-blue-800 mb-2">Hero Section Text</h3>
                         <FormRow label="Hero Title"><input type="text" value={localSettings.content.heroTitle} onChange={e => handleNestedChange('content', 'heroTitle', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="Hero Subtitle"><textarea value={localSettings.content.heroSubtitle} onChange={e => handleNestedChange('content', 'heroSubtitle', e.target.value)} className="w-full p-2 border rounded" rows={3}></textarea></FormRow>
+                        <FormRow label="Hero Image" description="Upload a meaningful learning/course image from your local file.">
+                            <div className="space-y-3">
+                                {localSettings.content.heroImageUrl && <img src={localSettings.content.heroImageUrl} alt="Hero preview" className="h-36 w-full rounded-xl object-cover shadow-inner" />}
+                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-primary">
+                                    Upload hero image
+                                    <input type="file" accept="image/*" onChange={handleHeroImageUpload} className="hidden" />
+                                </label>
+                            </div>
+                        </FormRow>
                     </div>
 
                     {/* Hero Metrics Configuration */}
