@@ -4,12 +4,12 @@ const WelcomeOverlay: React.FC = () => {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
-    const seen = localStorage.getItem('welcomeOverlaySeen');
+    const seen = sessionStorage.getItem('welcomeOverlaySeen');
     if (seen) return;
     setVisible(true);
     const t = setTimeout(() => {
       setVisible(false);
-      localStorage.setItem('welcomeOverlaySeen', '1');
+      sessionStorage.setItem('welcomeOverlaySeen', '1');
     }, 5200);
     return () => clearTimeout(t);
   }, []);

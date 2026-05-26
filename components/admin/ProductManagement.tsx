@@ -152,6 +152,20 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
     const [images, setImages] = useState<string[]>(product?.images || []);
     const productImageInputRef = useRef<HTMLInputElement>(null);
 
+    const [imageMode, setImageMode] = useState<'upload' | 'ai'>('upload');
+    const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+    const handleGenerateAiImage = async () => {
+        const prompt = encodeURIComponent(`${formData.title || 'Education course'} ${formData.description || 'learning notes'}`);
+        setIsGeneratingImage(true);
+        try {
+            const aiImageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=768&nologo=true`;
+            setImages(prev => [aiImageUrl, ...prev.filter(Boolean)]);
+            setImageMode('upload');
+        } finally {
+            setIsGeneratingImage(false);
+        }
+    };
+
     const handleProductImagesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(event.target.files || []);
         if (!files.length) return;
@@ -218,8 +232,9 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
                                 <div><label className="block text-sm font-bold text-slate-700 mb-1">SKU</label><input name="sku" value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value})} className="w-full p-3 border rounded-lg bg-slate-50" /></div>
                                 <div><label className="block text-sm font-bold text-slate-700 mb-1">Category</label><input name="category" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full p-3 border rounded-lg bg-slate-50" /></div>
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1">Product Images (local files only)</label>
-                                    <button type="button" onClick={() => productImageInputRef.current?.click()} className="w-full rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50 p-5 text-center font-bold text-blue-700 hover:bg-blue-100">Tap to upload product images</button>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">Product Images</label>
+                                    <div className="mb-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setImageMode('upload')} className={`rounded-xl px-3 py-2 text-sm font-bold ${imageMode === 'upload' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Upload Manually</button><button type="button" onClick={() => setImageMode('ai')} className={`rounded-xl px-3 py-2 text-sm font-bold ${imageMode === 'ai' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Generate with AI</button></div>
+                                    {imageMode === 'upload' ? <button type="button" onClick={() => productImageInputRef.current?.click()} className="w-full rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50 p-5 text-center font-bold text-blue-700 hover:bg-blue-100">Tap to upload product images</button> : <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-2xl border border-purple-300 bg-purple-50 p-5 text-center font-bold text-purple-700 hover:bg-purple-100 disabled:opacity-60">{isGeneratingImage ? 'Generating image...' : 'Generate image from title + description'}</button>}
                                     <input ref={productImageInputRef} type="file" accept="image/*" multiple onChange={handleProductImagesUpload} className="hidden" />
                                     <div className="mt-3 grid grid-cols-3 gap-2">
                                         {images.filter(Boolean).map((img, index) => (
