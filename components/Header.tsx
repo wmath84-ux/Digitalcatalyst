@@ -42,6 +42,7 @@ interface HeaderProps {
     onNavigateToAllProducts: () => void;
     onNavigateToPurchases: () => void;
     onNavigateToWishlist: () => void;
+    onNavigateToProfile: () => void;
     onNavigateToHomeAndScroll: (sectionId: string) => void;
     currentUser: User | null;
     onLogout: () => void;
@@ -50,8 +51,7 @@ interface HeaderProps {
     onThemeChange: (themeName: ThemeName) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount, cartToastMessage, onHomeClick, onCartClick, onNavigateToAllProducts, onNavigateToPurchases, onNavigateToWishlist, onNavigateToHomeAndScroll, currentUser, onLogout, onLoginClick, activeTheme, onThemeChange }) => {
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
+const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount, cartToastMessage, onHomeClick, onCartClick, onNavigateToAllProducts, onNavigateToPurchases, onNavigateToWishlist, onNavigateToProfile, onNavigateToHomeAndScroll, currentUser, onLogout, onLoginClick, activeTheme, onThemeChange }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isToastVisible, setIsToastVisible] = useState(false);
 
@@ -81,7 +81,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
           <div className="flex items-center justify-between">
             <button onClick={onHomeClick} className="flex items-center space-x-2 cursor-pointer" aria-label="Back to Homepage">
               <LogoIcon />
-              <span className="text-xl font-bold text-primary">Digital Catalyst</span>
+              <span className="text-xl font-bold text-primary">{(settings.content as any).siteName || "Digital Catalyst"}</span>
             </button>
             
             <nav className="hidden md:flex items-center space-x-8">
@@ -119,11 +119,14 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                          <div className="relative">
                             <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center space-x-2 text-text-muted">
                                 <UserIcon />
-                                <span className="text-sm font-medium">{currentUser.email.split('@')[0]}</span>
+                                <span className="text-sm font-medium">{currentUser.name || currentUser.email.split('@')[0]}</span>
                             </button>
                             {isUserMenuOpen && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white rounded-md shadow-lg py-1 z-20">
-                                    <button onClick={onLogout} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    <button onClick={onNavigateToProfile} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                            Profile & EduCoins
+                                        </button>
+                                        <button onClick={onLogout} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                         Logout
                                     </button>
                                 </div>
@@ -144,12 +147,6 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                             </span>
                         )}
                     </button>
-                    <button onClick={() => setIsMenuOpen(!isMenuOpen)} className="text-text-muted focus:outline-none" aria-expanded={isMenuOpen} aria-controls="mobile-menu-panel">
-                    <span className="sr-only">Open main menu</span>
-                    <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16m-7 6h7"></path>
-                    </svg>
-                    </button>
                 </div>
             </div>
           </div>
@@ -161,90 +158,6 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
           {cartToastMessage}
       </div>
 
-      {/* Mobile Menu Panel */}
-      <div 
-          className={`fixed inset-0 z-40 transition-opacity duration-300 ease-in-out md:hidden ${isMenuOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
-          onClick={() => setIsMenuOpen(false)}
-          aria-hidden="true"
-      >
-          <div className="absolute inset-0 bg-black/50"></div>
-      </div>
-      <div id="mobile-menu-panel" className={`fixed top-0 right-0 h-full w-full max-w-sm bg-background z-50 transform transition-transform duration-300 ease-in-out md:hidden ${isMenuOpen ? 'translate-x-0' : 'translate-x-full'}`}>
-          <div className="p-6">
-              <div className="flex justify-between items-center mb-8">
-                  <span className="text-xl font-bold text-primary">Digital Catalyst</span>
-                  <button onClick={() => setIsMenuOpen(false)} className="p-2" aria-label="Close menu">
-                      <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
-                  </button>
-              </div>
-              <nav className="flex flex-col space-y-1">
-                  {navItems.map((item) => (
-                    <button key={item.name} onClick={() => { item.action(); setIsMenuOpen(false); }} className="text-text hover:bg-gray-100 text-left p-3 rounded-md font-semibold transition-colors">
-                        {item.name}
-                    </button>
-                  ))}
-
-                  <div className="border-t my-3"></div>
-
-                    <div className="px-3 mb-2">
-                        <h3 className="text-xs font-semibold text-text-muted uppercase tracking-wider">Appearance</h3>
-                    </div>
-                    <div className="flex flex-col space-y-1">
-                        {Object.values(themes).map(theme => (
-                            <button
-                                key={theme.name}
-                                onClick={() => { onThemeChange(theme.name.toLowerCase() as ThemeName); }}
-                                className={`flex items-center p-3 rounded-md transition-colors ${activeTheme === theme.name.toLowerCase() ? 'bg-primary/10' : 'hover:bg-gray-100'}`}
-                            >
-                                <div className="flex -space-x-1">
-                                    <div className="w-5 h-5 rounded-full border-2 border-white" style={{ backgroundColor: theme.palette.primaryColor }}></div>
-                                    <div className="w-5 h-5 rounded-full border-2 border-white" style={{ backgroundColor: theme.palette.backgroundColor }}></div>
-                                </div>
-                                <span className={`ml-3 font-semibold ${activeTheme === theme.name.toLowerCase() ? 'text-primary' : 'text-text'}`}>
-                                    {theme.name}
-                                </span>
-                            </button>
-                        ))}
-                    </div>
-                    
-                    <div className="border-t my-3"></div>
-
-                   <button onClick={() => { onCartClick(); setIsMenuOpen(false); }} className="flex items-center relative text-text hover:bg-gray-100 p-3 rounded-md font-semibold transition-colors">
-                        <CartIcon />
-                        <span className="ml-3">My Cart</span>
-                        {cartItemCount > 0 && (
-                            <span className="ml-auto bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                {cartItemCount}
-                            </span>
-                        )}
-                    </button>
-                  <button onClick={() => { onNavigateToPurchases(); setIsMenuOpen(false); }} className="flex items-center text-text hover:bg-gray-100 p-3 rounded-md font-semibold transition-colors">
-                    <PurchasesIcon />
-                    <span className="ml-3">My Purchases</span>
-                  </button>
-                  {settings.features.showFavourites && (
-                    <button onClick={() => { onNavigateToWishlist(); setIsMenuOpen(false); }} className="flex items-center relative text-text hover:bg-gray-100 p-3 rounded-md font-semibold transition-colors">
-                        <HeartIcon />
-                        <span className="ml-3">Wishlist</span>
-                        {wishlistCount > 0 && (
-                            <span className="ml-auto bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                {wishlistCount}
-                            </span>
-                        )}
-                    </button>
-                  )}
-                   {currentUser ? (
-                     <button onClick={() => { onLogout(); setIsMenuOpen(false); }} className="block mt-4 bg-red-500 text-white text-center font-semibold px-6 py-3 rounded-lg hover:bg-red-600 transition-colors duration-300">
-                        Logout
-                    </button>
-                   ) : (
-                    <button onClick={() => { onLoginClick(); setIsMenuOpen(false); }} className="block mt-4 bg-primary text-white text-center font-semibold px-6 py-3 rounded-lg hover:opacity-90 transition-colors duration-300">
-                        Login / Sign Up
-                    </button>
-                   )}
-              </nav>
-          </div>
-      </div>
     </>
   );
 };

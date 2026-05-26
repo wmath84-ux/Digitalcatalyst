@@ -24,7 +24,10 @@ const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({ ticket, replyText
             try {
                 const apiKey = getGeminiApiKey();
                 if (!apiKey) {
-                    throw new Error('Gemini API key is not configured.');
+                    // Demo mode: no Vercel variables are required for preview/deployment.
+                    setHeaderImageUrl('https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=1200&q=80');
+                    setIsLoadingImage(false);
+                    return;
                 }
                 const ai = new GoogleGenAI({ apiKey });
                 const prompt = `Generate a professional and visually appealing abstract background image for a customer support email header. The topic is "${ticket.subject}". The image should evoke a sense of helpfulness and clarity. Use a calming blue and white color palette.`;
@@ -47,8 +50,8 @@ const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({ ticket, replyText
                 }
 
             } catch (err) {
-                console.error("Error generating header image:", err);
-                setHeaderImageUrl(null); // Fallback to no image on error
+                console.warn("Using demo support header image because AI generation failed:", err);
+                setHeaderImageUrl('https://images.unsplash.com/photo-1557804506-669a67965ba0?auto=format&fit=crop&w=1200&q=80');
             } finally {
                 setIsLoadingImage(false);
             }

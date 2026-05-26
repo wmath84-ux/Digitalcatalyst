@@ -1,338 +1,78 @@
-// components/CoursePlayer.tsx
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef } from 'react';
 import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile } from '../App';
 import AiMentor from './AiMentor';
+import { GoogleGenAI } from '@google/genai';
+import { getGeminiApiKey } from '../utils/gemini';
 
-declare global {
-    interface Window {
-        jspdf: any;
-    }
-}
-
-// New Note type
-interface Note {
-    id: string;
-    timestamp: number | null; // null for non-timestamped notes
-    text: string;
-    createdAt: string;
-}
-
-/* ---------- Reusable Placeholders ---------- */
-const VideoUnavailablePlaceholder: React.FC = () => (
-    <div className="w-full h-full bg-black flex flex-col items-center justify-center text-white p-4 text-center">
-        <div className="flex items-center justify-center w-16 h-16 rounded-full border-2 border-gray-500 mb-4">
-             <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-        </div>
-        <h3 className="text-xl font-semibold">Video unavailable</h3>
-        <p className="text-gray-400 mt-1">This video is unavailable in this environment.</p>
-    </div>
-);
-
-const ContentUnavailablePlaceholder: React.FC<{ file: ProductFile }> = ({ file }) => (
-    <div className="w-full h-full bg-black flex flex-col items-center justify-center text-white p-4 text-center">
-        <div className="flex items-center justify-center w-16 h-16 rounded-full border-2 border-gray-500 mb-4">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-        </div>
-        <h3 className="text-xl font-semibold">Content Preview Unavailable</h3>
-        <p className="text-gray-400 mt-1">This '{file.type}' file cannot be previewed.</p>
-         <a href={file.url} download={file.name} className="mt-6 bg-primary text-white font-semibold px-6 py-2 rounded-lg hover:opacity-90 transition-colors">Download File</a>
-    </div>
-);
+declare global { interface Window { jspdf: any; } }
+interface Note { id: string; timestamp: number | null; text: string; createdAt: string; }
+interface ChatMessage { id: string; sender: 'user' | 'ai'; text: string; createdAt: string; }
 
 const ModuleItem: React.FC<{ module: CourseModule; activeFile: ProductFile | null; onSelectFile: (file: ProductFile) => void; level?: number; }> = ({ module, activeFile, onSelectFile, level = 0 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
-  return (
-    <div className={`mt-2 ${level > 0 ? "pl-3 border-l-2 border-gray-200" : ""}`}>
-      <button onClick={() => setIsExpanded(!isExpanded)} className="w-full text-left flex items-center justify-between p-2 rounded hover:bg-gray-100" aria-expanded={isExpanded}>
-        <span className="font-bold text-gray-800">{module.title}</span>
-        <svg className={`w-5 h-5 text-gray-500 transform transition-transform ${isExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7"></path></svg>
-      </button>
-      {isExpanded && <div className="pl-2 mt-1">
-        {module.files.map((file) => <button key={file.id} onClick={() => onSelectFile(file)} className={`flex items-center w-full text-left p-2 my-1 rounded text-sm transition-colors ${activeFile?.id === file.id ? "bg-blue-100 text-primary font-semibold" : "hover:bg-gray-100 text-gray-700"}`}><svg className="w-4 h-4 mr-2 flex-shrink-0 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg><span>{file.name}</span></button>)}
-        {module.modules.map((subModule) => <ModuleItem key={subModule.id} module={subModule} activeFile={activeFile} onSelectFile={onSelectFile} level={level + 1} />)}
-      </div>}
-    </div>
-  );
+  return <div className={`mt-2 ${level > 0 ? 'pl-3 border-l-2 border-gray-200' : ''}`}>
+    <button onClick={() => setIsExpanded(!isExpanded)} className="w-full text-left flex items-center justify-between p-2 rounded hover:bg-gray-100"><span className="font-bold text-gray-800">{module.title}</span></button>
+    {isExpanded && <div className="pl-2 mt-1">{module.files.map(file => <button key={file.id} onClick={() => onSelectFile(file)} className={`flex w-full text-left p-2 my-1 rounded text-sm ${activeFile?.id === file.id ? 'bg-blue-100 text-primary font-semibold' : 'hover:bg-gray-100 text-gray-700'}`}>{file.name}</button>)}{module.modules.map(sub => <ModuleItem key={sub.id} module={sub} activeFile={activeFile} onSelectFile={onSelectFile} level={level + 1} />)}</div>}
+  </div>;
 };
 
 const extractYouTubeID = (url: string): string | null => {
-    if (!url) return null;
-    const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-    const match = url.match(regExp);
-    if (match && match[2].length === 11) return match[2];
-    try {
-        const matchIframe = url.match(/youtube\.com\/embed\/([^"?]+)/);
-        if (matchIframe && matchIframe[1]) return matchIframe[1];
-    } catch(e) {}
-    return null;
+  const match = url.match(/^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/);
+  return match && match[2].length === 11 ? match[2] : null;
 };
 
-/* ---------- MAIN COMPONENT ---------- */
-export function CoursePlayer({ settings, product, onBack }: { settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; }) {
+export default function CoursePlayer({ settings, product, onBack }: { settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; }) {
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
-  const [mediaError, setMediaError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [mediaPanelHeight, setMediaPanelHeight] = useState(60);
-  const [isDragging, setIsDragging] = useState(false);
-  const mainContentRef = useRef<HTMLElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
-
   const [activeActionTab, setActiveActionTab] = useState<'mentor' | 'notes'>('mentor');
   const [notes, setNotes] = useState<Note[]>([]);
+  const [mobileDockPanel, setMobileDockPanel] = useState<'none'|'mentor'|'notes'>('none');
+  const [mobileChatInput, setMobileChatInput] = useState('');
+  const [mobileChatLoading, setMobileChatLoading] = useState(false);
+  const [mobileChat, setMobileChat] = useState<ChatMessage[]>([]);
 
-  // Find first piece of content on product load
-  useEffect(() => {
-    const findFirst = (modules?: CourseModule[]): ProductFile | null => {
-      if (!modules) return null;
-      for (const m of modules) {
-        if (m.files.length) return m.files[0];
-        const found = findFirst(m.modules);
-        if (found) return found;
-      }
-      return null;
-    };
-    setActiveFile(findFirst(product.courseContent));
-  }, [product]);
+  useEffect(() => { const findFirst = (mods?: CourseModule[]): ProductFile | null => { if (!mods) return null; for (const m of mods) { if (m.files.length) return m.files[0]; const f = findFirst(m.modules); if (f) return f; } return null; }; setActiveFile(findFirst(product.courseContent)); }, [product]);
+  useEffect(() => { if (!activeFile?.id) return; const saved = localStorage.getItem(`video-notes-${activeFile.id}`); setNotes(saved ? JSON.parse(saved) : []); }, [activeFile?.id]);
+  useEffect(() => { if (activeFile?.id) localStorage.setItem(`video-notes-${activeFile.id}`, JSON.stringify(notes)); }, [notes, activeFile?.id]);
+  useEffect(() => { if (!activeFile?.id) return; const saved = localStorage.getItem(`video-chat-${activeFile.id}`); setMobileChat(saved ? JSON.parse(saved) : [{ id: `welcome-${activeFile.id}`, sender: 'ai', text: `Hi! I'm your AI mentor for ${product.title}. Ask your doubts from ${activeFile.name}.`, createdAt: new Date().toISOString() }]); }, [activeFile?.id, product.title]);
+  useEffect(() => { if (activeFile?.id) localStorage.setItem(`video-chat-${activeFile.id}`, JSON.stringify(mobileChat)); }, [mobileChat, activeFile?.id]);
 
-  // Load notes from localStorage when active file changes
-  useEffect(() => {
-    if (activeFile?.id) {
-      const savedNotes = localStorage.getItem(`video-notes-${activeFile.id}`);
-      setNotes(savedNotes ? JSON.parse(savedNotes) : []);
-    } else {
-      setNotes([]);
-    }
-  }, [activeFile]);
-
-  // Save notes to localStorage when they change
-  useEffect(() => {
-    if (activeFile?.id) {
-      localStorage.setItem(`video-notes-${activeFile.id}`, JSON.stringify(notes));
-    }
-  }, [notes, activeFile?.id]);
-
-  useEffect(() => {
-      setMediaError(false);
-  }, [activeFile]);
-
-  // Handle resizing the panel
-  useEffect(() => {
-    const mainEl = mainContentRef.current;
-    const handleMove = (e: MouseEvent | TouchEvent) => {
-        if (!isDragging || !mainEl) return;
-        const clientY = 'touches' in e ? e.touches[0].clientY : e.clientY;
-        const mainRect = mainEl.getBoundingClientRect();
-        if (mainRect.height === 0) return;
-        const newHeight = ((clientY - mainRect.top) / mainRect.height) * 100;
-        setMediaPanelHeight(Math.max(20, Math.min(newHeight, 80)));
-    };
-    const handleDragEnd = () => setIsDragging(false);
-    if (isDragging) {
-        window.addEventListener('mousemove', handleMove); window.addEventListener('touchmove', handleMove);
-        window.addEventListener('mouseup', handleDragEnd); window.addEventListener('touchend', handleDragEnd);
-        document.body.style.userSelect = 'none'; document.body.style.cursor = 'ns-resize';
-    }
-    return () => {
-        window.removeEventListener('mousemove', handleMove); window.removeEventListener('touchmove', handleMove);
-        window.removeEventListener('mouseup', handleDragEnd); window.removeEventListener('touchend', handleDragEnd);
-        document.body.style.userSelect = ''; document.body.style.cursor = '';
-    };
-  }, [isDragging]);
-
-  const onSelectFile = (file: ProductFile) => { setActiveFile(file); setIsSidebarOpen(false); };
-  const handleDragStart = (e: React.MouseEvent | React.TouchEvent) => { e.preventDefault(); setIsDragging(true); };
-
-  const formatTime = (seconds: number | null): string => {
-    if (seconds === null) return '';
-    const date = new Date(0);
-    date.setSeconds(seconds);
-    const timeString = date.toISOString().substr(11, 8);
-    return timeString.startsWith('00:') ? timeString.substr(3) : timeString;
+  const onSelectFile = (f: ProductFile) => { setActiveFile(f); setIsSidebarOpen(false); };
+  const addNote = () => setNotes(prev => [{ id: `n-${Date.now()}`, timestamp: videoRef.current ? Math.floor(videoRef.current.currentTime) : null, text: '', createdAt: new Date().toISOString() }, ...prev]);
+  const updateNote = (id: string, text: string) => setNotes(prev => prev.map(n => n.id === id ? { ...n, text } : n));
+  const deleteNote = (id: string) => setNotes(prev => prev.filter(n => n.id !== id));
+  const sendMobileChat = async () => {
+    if (!mobileChatInput.trim() || mobileChatLoading) return;
+    const text = mobileChatInput.trim();
+    setMobileChatInput('');
+    setMobileChat(prev => [...prev, { id: `${Date.now()}-u`, sender: 'user', text, createdAt: new Date().toISOString() }]);
+    setMobileChatLoading(true);
+    try {
+      const key = getGeminiApiKey();
+      if (!key) { setMobileChat(prev => [...prev, { id: `${Date.now()}-a`, sender: 'ai', text: `Demo AI: revise ${activeFile?.name || 'this lesson'} and write 3 key points.`, createdAt: new Date().toISOString() }]); return; }
+      const ai = new GoogleGenAI({ apiKey: key });
+      const r = await ai.models.generateContent({ model: 'gemini-2.5-flash', contents: `Mentor for ${product.title}. lesson ${activeFile?.name || ''}. User: ${text}` });
+      setMobileChat(prev => [...prev, { id: `${Date.now()}-a`, sender: 'ai', text: r.text, createdAt: new Date().toISOString() }]);
+    } catch { setMobileChat(prev => [...prev, { id: `${Date.now()}-a`, sender: 'ai', text: 'Please try again.', createdAt: new Date().toISOString() }]); } finally { setMobileChatLoading(false); }
   };
-
-  const handleAddTimestampedNote = () => {
-    if (videoRef.current) {
-        const currentTime = videoRef.current.currentTime;
-        const newNote: Note = { id: `note-${Date.now()}`, timestamp: currentTime, text: '', createdAt: new Date().toISOString() };
-        setNotes(prev => [newNote, ...prev]);
-        setActiveActionTab('notes');
-    }
-  };
-
-  const handleDeleteNote = (id: string) => setNotes(prev => prev.filter(note => note.id !== id));
-  const handleUpdateNoteText = (id: string, text: string) => setNotes(prev => prev.map(note => note.id === id ? { ...note, text } : note));
-  const handleSeekToTime = (time: number) => { if (videoRef.current) videoRef.current.currentTime = time; };
-
-    const handleDownloadNotes = () => {
-        if (notes.length === 0) return;
-        if (!window.jspdf) {
-            alert('PDF generation library is not loaded. Please try again.');
-            return;
-        }
-        
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF();
-        
-        const page_width = doc.internal.pageSize.getWidth();
-        const margin = 15;
-        const max_width = page_width - margin * 2;
-        let y = 20;
-
-        const checkPageEnd = (currentY: number) => {
-            if (currentY > 280) { // A4 height is 297mm
-                doc.addPage();
-                return 20; // Reset y for new page
-            }
-            return currentY;
-        };
-
-        // Document Title
-        doc.setFont("helvetica", "bold");
-        doc.setFontSize(16);
-        doc.text(product.title, page_width / 2, y, { align: 'center' });
-        y += 8;
-        
-        doc.setFontSize(12);
-        doc.setFont("helvetica", "italic");
-        doc.setTextColor(100);
-        doc.text(`Notes for: ${activeFile?.name || 'Content'}`, page_width / 2, y, { align: 'center' });
-        y += 15;
-
-        // Reset font for notes
-        doc.setFont("helvetica", "normal");
-        doc.setFontSize(11);
-        doc.setTextColor(0);
-
-        // Sort notes by timestamp
-        const sortedNotes = [...notes].sort((a, b) => (a.timestamp ?? Infinity) - (b.timestamp ?? Infinity));
-        
-        sortedNotes.forEach((note, index) => {
-            y = checkPageEnd(y);
-
-            let noteHeader = '';
-            if (note.timestamp !== null) {
-                noteHeader = `Note at ${formatTime(note.timestamp)}`;
-            } else {
-                noteHeader = `Note (created ${new Date(note.createdAt).toLocaleDateString()})`;
-            }
-
-            doc.setFont("helvetica", "bold");
-            doc.text(noteHeader, margin, y);
-            y += 6;
-            
-            y = checkPageEnd(y);
-
-            doc.setFont("helvetica", "normal");
-            const noteText = note.text || '(Empty note)';
-            const lines = doc.splitTextToSize(noteText, max_width);
-            doc.text(lines, margin, y);
-            
-            y += (lines.length * 5) + 10; // Line height + spacing
-            
-            // Add a separator line
-            if(index < sortedNotes.length - 1) {
-                y = checkPageEnd(y);
-                doc.setDrawColor(200);
-                doc.line(margin, y - 5, page_width - margin, y - 5);
-            }
-        });
-
-        const safeFilename = (name: string) => name.replace(/[^a-zA-Z0-9]/g, '_');
-        const fileName = `${safeFilename(product.title)}_${safeFilename(activeFile?.name || 'Notes')}.pdf`;
-        doc.save(fileName);
-    };
-
 
   const renderMedia = () => {
-    if (!activeFile) return <div className="flex items-center justify-center h-full bg-gray-900 text-gray-400">Select content to begin.</div>;
-    if (mediaError) return <ContentUnavailablePlaceholder file={activeFile} />;
-    switch (activeFile.type) {
-        case 'youtube': {
-            const videoId = extractYouTubeID(activeFile.url);
-            return videoId ? <div className="relative w-full h-full bg-black"><iframe key={activeFile.id} className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full max-w-full max-h-full aspect-video" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaError(true)}></iframe></div> : <VideoUnavailablePlaceholder />;
-        }
-        case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="w-full h-full bg-black object-contain" onError={() => setMediaError(true)} />;
-        case 'audio': return <div className="w-full h-full bg-black flex flex-col items-center justify-center p-8 text-white"><svg xmlns="http://www.w3.org/2000/svg" className="h-24 w-24 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z" /></svg><h3 className="text-xl font-semibold mb-6 truncate max-w-full">{activeFile.name}</h3><audio key={activeFile.id} src={activeFile.url} controls className="w-full max-w-md" onError={() => setMediaError(true)} /></div>;
-        case 'pdf': return <iframe src={activeFile.url} title={activeFile.name} className="w-full h-full border-0 bg-white" />;
-        default: return <ContentUnavailablePlaceholder file={activeFile} />;
-    }
+    if (!activeFile) return <div className="h-full flex items-center justify-center text-gray-400">Select content</div>;
+    if (activeFile.type === 'youtube') { const id = extractYouTubeID(activeFile.url); return id ? <iframe className="w-full h-full" src={`https://www.youtube.com/embed/${id}?autoplay=1&rel=0`} title={activeFile.name} allowFullScreen /> : <div className="h-full flex items-center justify-center text-white">Invalid YouTube link</div>; }
+    if (activeFile.type === 'video') return <video ref={videoRef} src={activeFile.url} controls className="w-full h-full object-contain bg-black" />;
+    if (activeFile.type === 'pdf') return <iframe src={activeFile.url} className="w-full h-full bg-white" title={activeFile.name} />;
+    return <div className="h-full flex items-center justify-center text-white">Preview unavailable</div>;
   };
 
-  const renderActionPanel = () => (
-    <div className="flex flex-col h-full bg-[#0f172a] text-white overflow-hidden rounded-t-lg shadow-inner">
-      <div className="p-1 border-b border-gray-700 flex-shrink-0 flex items-center bg-[#1e293b]">
-        <button onClick={() => setActiveActionTab('mentor')} className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors w-1/2 ${activeActionTab === 'mentor' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}>AI Mentor</button>
-        <button onClick={() => setActiveActionTab('notes')} className={`px-4 py-2 text-sm font-semibold rounded-md transition-colors w-1/2 ${activeActionTab === 'notes' ? 'bg-primary text-white' : 'text-gray-400 hover:text-white'}`}>Notes</button>
-      </div>
-      <div className="flex-1 min-h-0 relative">
-        <div className={`w-full h-full absolute top-0 left-0 transition-opacity duration-300 ${activeActionTab === 'mentor' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-          <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} />
-        </div>
-        <div className={`w-full h-full absolute top-0 left-0 flex flex-col transition-opacity duration-300 ${activeActionTab === 'notes' ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}>
-          <div className="p-3 border-b border-gray-700 flex-shrink-0 flex items-center gap-2">
-            <button
-              onClick={handleAddTimestampedNote}
-              disabled={activeFile?.type !== 'video'}
-              className="flex-1 bg-blue-600 text-white font-semibold py-2 rounded-md hover:bg-blue-700 disabled:bg-gray-500 disabled:cursor-not-allowed"
-            >+ Add Note at Current Time</button>
-            <button
-                onClick={handleDownloadNotes}
-                disabled={notes.length === 0}
-                className="flex-shrink-0 bg-green-600 text-white font-semibold py-2 px-4 rounded-md hover:bg-green-700 disabled:bg-gray-500 disabled:cursor-not-allowed flex items-center gap-2"
-                title="Download Notes as PDF"
-            >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-                PDF
-            </button>
-          </div>
-          <div className="flex-1 p-4 space-y-3 overflow-y-auto">
-            {notes.length === 0 && <p className="text-center text-gray-400 p-8">No notes yet for this content.</p>}
-            {notes.map(note => (
-              <div key={note.id} className="bg-slate-700 p-3 rounded-lg animate-fade-in">
-                <div className="flex justify-between items-center text-xs text-gray-400 mb-2">
-                  {note.timestamp !== null ? (
-                    <button onClick={() => handleSeekToTime(note.timestamp!)} className="font-mono bg-slate-800 px-2 py-1 rounded hover:bg-slate-900">
-                      {formatTime(note.timestamp)}
-                    </button>
-                  ) : <span />}
-                  <button onClick={() => handleDeleteNote(note.id)} className="text-red-400 hover:text-red-300 font-bold text-lg leading-none p-1">&times;</button>
-                </div>
-                <textarea
-                  value={note.text}
-                  onChange={(e) => handleUpdateNoteText(note.id, e.target.value)}
-                  placeholder="Type your note..."
-                  className="w-full bg-transparent text-sm text-gray-200 resize-none focus:outline-none"
-                  rows={3}
-                />
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
+  return <div className="h-screen w-screen bg-gray-900 flex flex-col lg:flex-row">
+    <header className="lg:hidden bg-black p-4 flex items-center gap-4 text-white"><button onClick={() => setIsSidebarOpen(true)}>☰</button><h1 className="font-semibold truncate">{activeFile?.name || product.title}</h1></header>
+    <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 bg-black/60 z-30 lg:hidden ${isSidebarOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`} />
+    <aside className={`fixed inset-y-0 left-0 z-40 w-80 bg-white border-r transform transition lg:relative lg:translate-x-0 ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}`}><div className="p-4 border-b bg-slate-900 text-white"><button onClick={onBack}>← Back</button><h2 className="font-black mt-2">{product.title}</h2></div><nav className="p-2 overflow-y-auto h-[calc(100%-80px)]">{product.courseContent?.map(m => <ModuleItem key={m.id} module={m} activeFile={activeFile} onSelectFile={onSelectFile} />)}</nav></aside>
+    <div className="flex-1 grid min-w-0 lg:grid-cols-[1fr_420px]"><main className="bg-black relative overflow-hidden">{renderMedia()}</main><aside className="hidden lg:block border-l border-white/10 bg-slate-950/85"><div className="p-2 border-b border-slate-700 flex"><button onClick={() => setActiveActionTab('mentor')} className={`flex-1 py-2 ${activeActionTab==='mentor'?'bg-primary text-white':'text-gray-300'}`}>AI</button><button onClick={() => setActiveActionTab('notes')} className={`flex-1 py-2 ${activeActionTab==='notes'?'bg-primary text-white':'text-gray-300'}`}>Notes</button></div>{activeActionTab==='mentor'?<AiMentor productTitle={product.title} activeContentName={activeFile?.name||null}/>:<div className="p-3 space-y-2"> <button onClick={addNote} className="w-full bg-emerald-600 text-white rounded py-2">+ Add Note</button>{notes.map(n=><textarea key={n.id} value={n.text} onChange={e=>updateNote(n.id,e.target.value)} className="w-full rounded p-2" rows={3}/>)}</div>}</aside></div>
 
-  return (
-    <div className="h-screen w-screen bg-gray-800 flex flex-col lg:flex-row">
-      <header className="lg:hidden bg-black p-4 flex items-center space-x-4 text-white"><button onClick={() => setIsSidebarOpen(true)} className="p-1"><svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7"></path></svg></button><h1 className="font-semibold text-lg truncate">{activeFile?.name || product.title}</h1></header>
-      <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 bg-black/60 z-30 lg:hidden transition ${isSidebarOpen ? "opacity-100" : "opacity-0 pointer-events-none"}`} />
-      <aside className={`fixed inset-y-0 left-0 z-40 w-80 bg-white border-r transform transition lg:relative lg:translate-x-0 lg:flex-shrink-0 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-        <div className="flex flex-col h-full">
-            <div className="p-4 border-b flex-shrink-0"><button onClick={onBack} className="text-primary font-semibold mb-2">← Back</button><h2 className="text-xl font-bold">{product.title}</h2></div>
-            <nav className="p-2 overflow-y-auto flex-grow">{product.courseContent?.map(m => <ModuleItem key={m.id} module={m} activeFile={activeFile} onSelectFile={onSelectFile} />) || <p className="p-4 text-center text-gray-500">No content added yet.</p>}</nav>
-        </div>
-      </aside>
-      <div className="flex-1 flex flex-col min-w-0">
-          <main ref={mainContentRef} className="flex-1 bg-black relative flex flex-col overflow-hidden">
-              <div style={{ flexBasis: `${mediaPanelHeight}%` }} className="w-full bg-black flex-shrink-0 overflow-hidden"><div key={activeFile?.id} className="w-full h-full animate-fade-in">{renderMedia()}</div></div>
-              <div onMouseDown={handleDragStart} onTouchStart={handleDragStart} className="w-full h-2 bg-slate-700 hover:bg-primary cursor-ns-resize transition-colors flex-shrink-0 z-10" />
-              <div className="flex-1 min-h-0 flex flex-col rounded-t-lg overflow-hidden">{renderActionPanel()}</div>
-          </main>
-      </div>
-    </div>
-  );
+    <div className="fixed inset-x-3 bottom-3 z-[55] lg:hidden rounded-2xl border border-white/20 bg-white/20 p-2 backdrop-blur-2xl"><div className="grid grid-cols-2 gap-2"><button onClick={() => setMobileDockPanel(mobileDockPanel === 'mentor' ? 'none' : 'mentor')} className="rounded-xl bg-white/70 py-2 text-sm font-black">🤖 AI Mentor</button><button onClick={() => setMobileDockPanel(mobileDockPanel === 'notes' ? 'none' : 'notes')} className="rounded-xl bg-white/70 py-2 text-sm font-black">📝 Notes</button></div></div>
+    <div className={`fixed inset-0 z-[54] lg:hidden bg-slate-950/35 backdrop-blur-md transition ${mobileDockPanel === 'none' ? 'pointer-events-none opacity-0' : 'opacity-100'}`} />
+    <section className={`fixed inset-x-3 bottom-20 z-[56] lg:hidden rounded-3xl border border-white/30 bg-white/75 backdrop-blur-2xl transition-all duration-300 ${mobileDockPanel === 'none' ? 'pointer-events-none translate-y-6 opacity-0' : 'translate-y-0 opacity-100'}`}><div className="max-h-[58vh] overflow-y-auto p-4">{mobileDockPanel === 'mentor' ? <div className="space-y-3"><div className="rounded-2xl bg-white/70 p-3"><p className="text-xs font-black uppercase tracking-widest text-indigo-500">AI Mentor</p><p className="mt-1 text-sm text-slate-600">Ask anything. Chat is auto-saved.</p></div><div className="space-y-2">{mobileChat.map(msg => <div key={msg.id} className={`rounded-2xl p-3 text-sm ${msg.sender === 'user' ? 'ml-8 bg-indigo-600 text-white' : 'mr-8 bg-white text-slate-800 border border-slate-200'}`}>{msg.text}</div>)}</div>{mobileChatLoading && <div className="mr-8 flex items-center gap-2 rounded-2xl border border-slate-200 bg-white p-3 text-sm"><span className="inline-block h-3 w-3 animate-ping rounded-full bg-indigo-500"></span><span>AI is thinking...</span></div>}<div className="flex gap-2"><input value={mobileChatInput} onChange={e => setMobileChatInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && sendMobileChat()} className="flex-1 rounded-xl border border-slate-300 bg-white px-3 py-2 text-sm" placeholder="Ask your doubt..." /><button onClick={sendMobileChat} className="rounded-xl bg-indigo-600 px-4 py-2 text-sm font-black text-white">Send</button></div></div> : <div className="space-y-3"><div className="rounded-2xl bg-white/70 p-3"><p className="text-xs font-black uppercase tracking-widest text-emerald-500">Quick Notes</p><p className="mt-1 text-sm text-slate-600">Auto-saved and resumed.</p></div><button onClick={addNote} className="w-full rounded-xl bg-emerald-600 py-2 text-sm font-black text-white">+ Add Note</button><div className="space-y-2">{notes.map(note => <div key={note.id} className="rounded-xl border border-slate-200 bg-white p-3"><div className="mb-2 flex justify-between text-xs text-slate-500"><span>{note.timestamp !== null ? `${Math.floor(note.timestamp/60)}:${String(note.timestamp%60).padStart(2,'0')}` : 'General note'}</span><button onClick={() => deleteNote(note.id)} className="font-bold text-red-500">Delete</button></div><textarea value={note.text} onChange={e => updateNote(note.id, e.target.value)} rows={3} className="w-full resize-none rounded-lg border border-slate-200 p-2 text-sm" /></div>)}</div></div>}</div></section>
+  </div>;
 }
-
-export default CoursePlayer;

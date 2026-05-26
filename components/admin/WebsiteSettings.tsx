@@ -339,6 +339,18 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, on
         }));
     };
     
+
+    const handleHeroImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = () => {
+            handleNestedChange('content', 'heroImageUrl', reader.result as string);
+        };
+        reader.readAsDataURL(file);
+        event.target.value = '';
+    };
+
     const handleLayoutChange = (newLayout: HomepageSection[]) => {
         setLocalSettings(prev => ({ ...prev, layout: newLayout }));
     };
@@ -401,8 +413,18 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, on
                     {/* Hero Section Text */}
                     <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
                         <h3 className="font-bold text-blue-800 mb-2">Hero Section Text</h3>
+                        <FormRow label="Website Name"><input type="text" value={(localSettings.content as any).siteName || 'Digital Catalyst'} onChange={e => handleNestedChange('content', 'siteName', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="Hero Title"><input type="text" value={localSettings.content.heroTitle} onChange={e => handleNestedChange('content', 'heroTitle', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="Hero Subtitle"><textarea value={localSettings.content.heroSubtitle} onChange={e => handleNestedChange('content', 'heroSubtitle', e.target.value)} className="w-full p-2 border rounded" rows={3}></textarea></FormRow>
+                        <FormRow label="Hero Image" description="Upload a meaningful learning/course image from your local file.">
+                            <div className="space-y-3">
+                                {localSettings.content.heroImageUrl && <img src={localSettings.content.heroImageUrl} alt="Hero preview" className="h-36 w-full rounded-xl object-cover shadow-inner" />}
+                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-primary">
+                                    Upload hero image
+                                    <input type="file" accept="image/*" onChange={handleHeroImageUpload} className="hidden" />
+                                </label>
+                            </div>
+                        </FormRow>
                     </div>
 
                     {/* Hero Metrics Configuration */}
@@ -455,6 +477,15 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, on
                         <FormRow label="About Us Title"><input type="text" value={localSettings.content.aboutUsTitle} onChange={e => handleNestedChange('content', 'aboutUsTitle', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="About Us Text"><textarea value={localSettings.content.aboutUsText} onChange={e => handleNestedChange('content', 'aboutUsText', e.target.value)} className="w-full p-2 border rounded" rows={4}></textarea></FormRow>
                         <FormRow label="About Us Image Seed"><input type="text" value={localSettings.content.aboutUsImageSeed} onChange={e => handleNestedChange('content', 'aboutUsImageSeed', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
+                    </div>
+
+
+                    <div className="bg-slate-50 rounded-lg p-4 mt-4">
+                        <h3 className="font-bold text-gray-800 mb-2">Gamification & Subscription (JSON)</h3>
+                        <FormRow label="EduCoin Rules" description="Example JSON with purchase and redeemRate"><textarea value={JSON.stringify((localSettings.content as any).eduCoinRules || { purchase: 25, redeemRate: 10 })} onChange={e => { try { handleNestedChange('content' as any, 'eduCoinRules' as any, JSON.parse(e.target.value)); } catch {} }} className="w-full p-2 border rounded font-mono text-xs" rows={2} /></FormRow>
+                        <FormRow label="Rewards" description="Example: [{id:'r1',title:'₹50 discount',cost:100}]"><textarea value={JSON.stringify((localSettings.content as any).redeemRewards || [])} onChange={e => { try { handleNestedChange('content' as any, 'redeemRewards' as any, JSON.parse(e.target.value)); } catch {} }} className="w-full p-2 border rounded font-mono text-xs" rows={4} /></FormRow>
+                        <FormRow label="Subscription Plans" description="Define plans and unlockProductIds"><textarea value={JSON.stringify((localSettings.content as any).subscriptionPlans || [])} onChange={e => { try { handleNestedChange('content' as any, 'subscriptionPlans' as any, JSON.parse(e.target.value)); } catch {} }} className="w-full p-2 border rounded font-mono text-xs" rows={5} /></FormRow>
+                        <FormRow label="Dock Items" description="Array of labels e.g. ['Store','Purchases']"><textarea value={JSON.stringify((localSettings.content as any).dockItems || [])} onChange={e => { try { handleNestedChange('content' as any, 'dockItems' as any, JSON.parse(e.target.value)); } catch {} }} className="w-full p-2 border rounded font-mono text-xs" rows={2} /></FormRow>
                     </div>
 
                     {/* Footer & Social */}

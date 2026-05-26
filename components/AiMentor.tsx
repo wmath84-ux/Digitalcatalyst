@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { geminiSetupHint, getGeminiApiKey } from '../utils/gemini';
+import { getGeminiApiKey } from '../utils/gemini';
 
 interface AiMentorProps {
     productTitle: string;
@@ -42,7 +42,9 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName }) 
         try {
             const apiKey = getGeminiApiKey();
             if (!apiKey) {
-                throw new Error(geminiSetupHint);
+                const demoReply = `Demo AI Mentor: I can help you study "${productTitle}". For now, focus on the current lesson, write 3 key points in notes, and revise them after watching. Add GEMINI_API_KEY later to enable live AI answers.`;
+                setMessages(prev => [...prev, { sender: 'ai', text: demoReply }]);
+                return;
             }
             const ai = new GoogleGenAI({ apiKey });
             const systemInstruction = `You are a helpful AI Mentor for the product "${productTitle}". The user is currently viewing content titled "${activeContentName || 'the main product page'}". Your role is to answer questions about this topic, the product, and related subjects to help the user learn and succeed. Be encouraging and clear.`;
