@@ -29,7 +29,7 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ currentUser, purchase
   ]), [onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenBlogModal, onOpenFreeModal, currentUser, onProfileClick]);
 
   return (
-    <div className="fixed inset-x-0 bottom-4 z-[65] hidden md:flex justify-center pointer-events-none">
+    <div className="fixed inset-x-0 bottom-2 md:bottom-4 z-[65] flex justify-center pointer-events-none">
       <div className="pointer-events-auto group max-w-[95vw] rounded-3xl border border-white/30 bg-white/20 px-4 py-3 shadow-2xl backdrop-blur-2xl transition-all duration-500 hover:translate-y-0 data-[hidden=true]:translate-y-24" id="main-bottom-dock">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
           {items.map((item) => (

@@ -1,7 +1,7 @@
 import React from 'react';
-import { Coupon, ProductWithRating, User, WebsiteSettings } from '../App';
+import { Coupon, ProductWithRating, ThemeName, themes, User, WebsiteSettings } from '../App';
 
-const ProfilePage: React.FC<{ settings: WebsiteSettings; currentUser: User | null; purchasedProducts: ProductWithRating[]; coupons: Coupon[]; onBack: () => void; onExplore: () => void; }> = ({ currentUser, purchasedProducts, coupons, onBack, onExplore }) => {
+const ProfilePage: React.FC<{ settings: WebsiteSettings; currentUser: User | null; purchasedProducts: ProductWithRating[]; coupons: Coupon[]; onBack: () => void; onExplore: () => void; activeTheme: ThemeName; onThemeChange: (themeName: ThemeName) => void; }> = ({ currentUser, purchasedProducts, coupons, onBack, onExplore, activeTheme, onThemeChange }) => {
   const activeCoupons = coupons.filter(c => c.isActive);
   const studyMinutes = currentUser?.studyMinutes ?? purchasedProducts.length * 25;
   return (
@@ -37,6 +37,19 @@ const ProfilePage: React.FC<{ settings: WebsiteSettings; currentUser: User | nul
             </div>
           </section>
         </div>
+        <section className="rounded-[2rem] border border-white/15 bg-white/95 p-6 text-slate-900 shadow-2xl">
+          <h2 className="text-2xl font-black">Appearance</h2>
+          <p className="mt-2 text-sm text-slate-600">Choose your app look from profile.</p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {Object.values(themes).map((theme) => {
+              const key = theme.name.toLowerCase() as ThemeName;
+              return <button key={theme.name} onClick={() => onThemeChange(key)} className={`rounded-2xl border p-3 text-left ${activeTheme === key ? 'border-primary bg-primary/10' : 'border-slate-200 bg-white'}`}>
+                <div className="flex -space-x-1"><span className="h-4 w-4 rounded-full border border-white" style={{ background: theme.palette.primaryColor }}></span><span className="h-4 w-4 rounded-full border border-white" style={{ background: theme.palette.backgroundColor }}></span></div>
+                <div className="mt-2 text-sm font-bold">{theme.name}</div>
+              </button>;
+            })}
+          </div>
+        </section>
       </div>
     </div>
   );
