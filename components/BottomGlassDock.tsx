@@ -27,10 +27,12 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
     { label: 'News', action: onOpenAnnouncementsModal, icon: '📢', badge: null },
     { label: 'Blog', action: onOpenBlogModal, icon: '📝', badge: null },
     { label: 'Free', action: onOpenFreeModal, icon: '🎁', badge: null },
-    { label: currentUser ? 'EduCoins' : 'Login', action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null },
+    { label: currentUser ? 'Profile' : 'Login', action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null },
   ]), [onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenBlogModal, onOpenFreeModal, currentUser, onProfileClick]);
   const configured = ((settings.content as any).dockItems || defaultItems.map(i => i.label)) as string[];
   const map: any = Object.fromEntries(defaultItems.map(i => [i.label, i]));
+  map['EduCoins'] = map['Profile'] || { label: 'Profile', action: onProfileClick, icon: '🪙', badge: null };
+  map['Profile'] = map['Profile'] || { label: 'Profile', action: onProfileClick, icon: '🪙', badge: null };
   map['Subscriptions'] = { label: 'Subscriptions', action: onSubscriptionClick, icon: '💎', badge: null };
   const items = configured.map((l) => map[l]).filter(Boolean);
 
