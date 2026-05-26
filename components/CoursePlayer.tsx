@@ -14,16 +14,6 @@ const ModuleItem: React.FC<{ module: CourseModule; activeFile: ProductFile | nul
     <button onClick={() => setIsExpanded(!isExpanded)} className="w-full text-left flex items-center justify-between p-2 rounded hover:bg-gray-100"><span className="font-bold text-gray-800">{module.title}</span></button>
     {isExpanded && <div className="pl-2 mt-1">{module.files.map(file => <button key={file.id} onClick={() => onSelectFile(file)} className={`flex w-full text-left p-2 my-1 rounded text-sm ${activeFile?.id === file.id ? 'bg-blue-100 text-primary font-semibold' : 'hover:bg-gray-100 text-gray-700'}`}>{file.name}</button>)}{module.modules.map(sub => <ModuleItem key={sub.id} module={sub} activeFile={activeFile} onSelectFile={onSelectFile} level={level + 1} />)}</div>}
 
-    {isNotesFullscreen && (
-      <div className="fixed inset-0 z-[70] bg-slate-950/70 backdrop-blur-xl p-3 md:p-6">
-        <div className="mx-auto flex h-full w-full max-w-5xl flex-col rounded-3xl border border-white/30 bg-white/90 shadow-2xl">
-          <div className="flex items-center justify-between border-b p-4"><h3 className="text-lg font-black text-slate-800">Full Notes Editor</h3><button onClick={() => setIsNotesFullscreen(false)} className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-bold text-white">Done</button></div>
-          <div className="flex-1 overflow-y-auto p-4 space-y-3">
-            {notes.map(note => <div key={`full-${note.id}`} className="rounded-xl border border-slate-200 bg-white p-3"><div className="mb-2 flex justify-between text-xs text-slate-500"><span>{note.timestamp !== null ? `${Math.floor(note.timestamp/60)}:${String(note.timestamp%60).padStart(2,'0')}` : 'General note'}</span><button onClick={() => deleteNote(note.id)} className="font-bold text-red-500">Delete</button></div><div contentEditable suppressContentEditableWarning onInput={e => updateNote(note.id, (e.target as HTMLDivElement).innerHTML)} className="min-h-[220px] rounded-lg border border-slate-200 p-4 text-base leading-7" dangerouslySetInnerHTML={{ __html: note.text || '' }} /></div>)}
-          </div>
-        </div>
-      </div>
-    )}
   </div>;
 };
 
