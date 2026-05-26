@@ -34,6 +34,7 @@ import BottomGlassDock from './components/BottomGlassDock';
 import ProfilePage from './components/ProfilePage';
 import PlatformExperience from './components/PlatformExperience';
 import WelcomeOverlay from './components/WelcomeOverlay';
+import SubscriptionPage from './components/SubscriptionPage';
 
 // NOTE: Firebase imports removed to prevent "Service not available" crashes.
 // The app now runs in "Local Mode" using browser storage.
@@ -391,6 +392,14 @@ export interface WebsiteSettings {
         upcomingFeatures: UpcomingFeatureItem[];
         newsArticles: NewsArticle[];
         announcements: Announcement[];
+        subscriptionPlans: [
+            { id: 'starter', name: 'Starter', price: 199, description: 'Best for beginners', unlockProductIds: [1] },
+            { id: 'pro', name: 'Pro', price: 499, description: 'Unlock premium notes + course', unlockProductIds: [1,2] },
+            { id: 'elite', name: 'Elite', price: 999, description: 'Full bundle access', unlockProductIds: [1,2,3,4] },
+        ],
+        eduCoinRules: { purchase: 25, redeemRate: 10 },
+        redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
+        dockItems: ['Store','Purchases','Wishlist','Cart','News','Blog','Free','EduCoins','Subscriptions'],
         socialLinks: {
             facebook: string;
             twitter: string;
@@ -863,6 +872,14 @@ const defaultWebsiteSettings: WebsiteSettings = {
         ],
         newsArticles: initialNewsArticles,
         announcements: initialAnnouncements,
+        subscriptionPlans: [
+            { id: 'starter', name: 'Starter', price: 199, description: 'Best for beginners', unlockProductIds: [1] },
+            { id: 'pro', name: 'Pro', price: 499, description: 'Unlock premium notes + course', unlockProductIds: [1,2] },
+            { id: 'elite', name: 'Elite', price: 999, description: 'Full bundle access', unlockProductIds: [1,2,3,4] },
+        ],
+        eduCoinRules: { purchase: 25, redeemRate: 10 },
+        redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
+        dockItems: ['Store','Purchases','Wishlist','Cart','News','Blog','Free','EduCoins','Subscriptions'],
         socialLinks: {
             facebook: "https://www.facebook.com/profile.php?viewas=100000686899395&id=61565419447036",
             twitter: "https://x.com/MathW12385",
@@ -1501,6 +1518,13 @@ const App: React.FC = () => {
         const robustFinalPrice = preDiscountTotal - finalDiscount;
 
         const newPurchasedIds = [...new Set([...purchasedProductIds, selectedProduct.id])];
+        const purchaseCoins = Number((websiteSettings.content as any).eduCoinRules?.purchase || 25);
+        if (currentUser) {
+          const u = { ...currentUser, eduCoins: (currentUser.eduCoins || 0) + purchaseCoins };
+          setCurrentUser(u);
+          const us = users.map(x => x.id === u.id ? u : x);
+          setUsers(us); safeSetItem('siteUsers', us);
+        }
         setPurchasedProductIds(newPurchasedIds);
         safeSetItem('purchasedProducts', newPurchasedIds);
 
@@ -1548,6 +1572,15 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
+
+  const handleActivateSubscription = (plan: any) => {
+    const newPurchasedIds = [...new Set([...purchasedProductIds, ...plan.unlockProductIds])];
+    setPurchasedProductIds(newPurchasedIds);
+    safeSetItem('purchasedProducts', newPurchasedIds);
+    setInfoModal({ title: 'Subscription active', message: `${plan.name} activated successfully.`, icon: '✅' });
+  };
+  const handleNavigateToSubscription = () => { setCurrentView('subscription'); window.scrollTo(0,0); };
+
   const handleNavigateToWishlist = () => {
     setCurrentView('wishlist');
     window.scrollTo(0, 0);
@@ -1564,6 +1597,9 @@ const App: React.FC = () => {
   };
 
   const handleSubscribe = (email: string) => {
+    const key = `subscribed:${email.toLowerCase()}`;
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, '1');
     console.log(`Subscribing ${email} to the newsletter.`);
     setSubscribedEmail(email);
     setIsSubscriptionModalOpen(true);
@@ -1690,13 +1726,14 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (currentView) {
-      case 'product': return selectedProduct && <ProductDetailPage settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToAllProducts} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} />;
+      case 'product': return selectedProduct && <ProductDetailPage settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToAllProducts} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} isPurchased={purchasedProductIds.includes(selectedProduct.id)} />;
       case 'coursePlayer': return selectedProduct && <CoursePlayer settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToPurchases} />;
       case 'ebookReader': return selectedProduct && <EbookReader settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToPurchases} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={handleBackToHome} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} coupons={coupons} />;
       case 'myPurchases': return <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
-      case 'profile': return <ProfilePage settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} />;
+      case 'profile': return <ProfilePage settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} />;
+      case 'subscription': return <SubscriptionPage settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={handleBackToHome} onActivatePlan={handleActivateSubscription} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
       case 'home': default: return renderHomePageContent();
     }
@@ -1736,7 +1773,7 @@ const App: React.FC = () => {
          <div className="font-sans">
             <WelcomeOverlay />
             <Header settings={websiteSettings} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} activeTheme={activeTheme} onThemeChange={setActiveTheme} />
-            {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onOpenBlogModal={() => setIsBlogModalOpen(true)} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => setIsAnnouncementsModalOpen(true)} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} />}
+            {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onOpenBlogModal={() => setIsBlogModalOpen(true)} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => setIsAnnouncementsModalOpen(true)} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} onSubscriptionClick={handleNavigateToSubscription} />}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
             {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null)} />}

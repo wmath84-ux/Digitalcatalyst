@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ProductWithRating, User } from '../App';
+import { ProductWithRating, User, WebsiteSettings } from '../App';
 
 interface BottomGlassDockProps {
   currentUser: User | null;
@@ -14,10 +14,12 @@ interface BottomGlassDockProps {
   onNavigateToPurchases: () => void;
   onCartClick: () => void;
   onProfileClick: () => void;
+  onSubscriptionClick: () => void;
+  settings: WebsiteSettings;
 }
 
-const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ currentUser, purchasedProducts, cartCount, wishlistCount, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick }) => {
-  const items = useMemo(() => ([
+const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser, purchasedProducts, cartCount, wishlistCount, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick }) => {
+  const defaultItems = useMemo(() => ([
     { label: 'Store', action: onNavigateToAllProducts, icon: '🛍️', badge: null },
     { label: 'Purchases', action: onNavigateToPurchases, icon: '📚', badge: purchasedProducts.length || null },
     { label: 'Wishlist', action: onNavigateToWishlist, icon: '❤️', badge: wishlistCount || null },
@@ -27,6 +29,10 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ currentUser, purchase
     { label: 'Free', action: onOpenFreeModal, icon: '🎁', badge: null },
     { label: currentUser ? 'EduCoins' : 'Login', action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null },
   ]), [onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenBlogModal, onOpenFreeModal, currentUser, onProfileClick]);
+  const configured = ((settings.content as any).dockItems || defaultItems.map(i => i.label)) as string[];
+  const map: any = Object.fromEntries(defaultItems.map(i => [i.label, i]));
+  map['Subscriptions'] = { label: 'Subscriptions', action: onSubscriptionClick, icon: '💎', badge: null };
+  const items = configured.map((l) => map[l]).filter(Boolean);
 
   return (
     <div className="fixed inset-x-0 bottom-2 md:bottom-4 z-[65] flex justify-center pointer-events-none">

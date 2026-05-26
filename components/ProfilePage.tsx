@@ -1,9 +1,22 @@
 import React from 'react';
 import { Coupon, ProductWithRating, ThemeName, themes, User, WebsiteSettings } from '../App';
 
-const ProfilePage: React.FC<{ settings: WebsiteSettings; currentUser: User | null; purchasedProducts: ProductWithRating[]; coupons: Coupon[]; onBack: () => void; onExplore: () => void; activeTheme: ThemeName; onThemeChange: (themeName: ThemeName) => void; }> = ({ currentUser, purchasedProducts, coupons, onBack, onExplore, activeTheme, onThemeChange }) => {
+const ProfilePage: React.FC<{ settings: WebsiteSettings; currentUser: User | null; purchasedProducts: ProductWithRating[]; coupons: Coupon[]; onBack: () => void; onExplore: () => void; activeTheme: ThemeName; onThemeChange: (themeName: ThemeName) => void; users: User[]; setUsers: (users: User[]) => void; setCurrentUser: (user: User | null) => void; }> = ({ settings, currentUser, purchasedProducts, coupons, onBack, onExplore, activeTheme, onThemeChange, users, setUsers, setCurrentUser }) => {
   const activeCoupons = coupons.filter(c => c.isActive);
   const studyMinutes = currentUser?.studyMinutes ?? purchasedProducts.length * 25;
+  const rewards = (settings.content as any).redeemRewards || [];
+  const [redeeming, setRedeeming] = React.useState<string | null>(null);
+  const redeem = (r:any) => {
+    if (!currentUser || redeeming) return;
+    if ((currentUser.eduCoins || 0) < r.cost) return;
+    setRedeeming(r.id);
+    const updated = { ...currentUser, eduCoins: (currentUser.eduCoins || 0) - r.cost };
+    const updatedUsers = users.map(u => u.id === updated.id ? updated : u);
+    setUsers(updatedUsers);
+    localStorage.setItem('siteUsers', JSON.stringify(updatedUsers));
+    setCurrentUser(updated);
+    setTimeout(() => setRedeeming(null), 500);
+  };
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 p-4 sm:p-8 text-white">
       <button onClick={onBack} className="mb-6 rounded-2xl bg-white/10 px-5 py-3 font-bold backdrop-blur hover:bg-white/20">← Back</button>
@@ -37,6 +50,10 @@ const ProfilePage: React.FC<{ settings: WebsiteSettings; currentUser: User | nul
             </div>
           </section>
         </div>
+        <section className="rounded-[2rem] border border-white/15 bg-white/95 p-6 text-slate-900 shadow-2xl">
+          <h2 className="text-2xl font-black">What You Can Claim</h2>
+          <div className="mt-4 grid gap-2">{rewards.map((r:any) => <button key={r.id} disabled={!!redeeming || (currentUser?.eduCoins||0)<r.cost} onClick={() => redeem(r)} className="flex items-center justify-between rounded-xl border p-3 disabled:opacity-50"><span>{r.title}</span><span className="font-black">🪙 {r.cost}</span></button>)}</div>
+        </section>
         <section className="rounded-[2rem] border border-white/15 bg-white/95 p-6 text-slate-900 shadow-2xl">
           <h2 className="text-2xl font-black">Appearance</h2>
           <p className="mt-2 text-sm text-slate-600">Choose your app look from profile.</p>
