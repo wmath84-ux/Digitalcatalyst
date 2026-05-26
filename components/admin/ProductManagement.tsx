@@ -218,7 +218,8 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
     };
 
     return (
-        <MacWindowModal title={product ? 'Edit Product' : 'Add New Product'} subtitle="Local images, nested course content, and pricing" onClose={onCancel} maxWidth="max-w-4xl" zIndex="z-[95]">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-950/70 p-6">
+          <div className="mx-auto max-w-5xl rounded-3xl border border-white/20 bg-white">
                 <div className="p-8">
 
                     <form onSubmit={handleSubmit} className="space-y-8">
@@ -322,7 +323,8 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
                         </div>
                     </form>
                 </div>
-        </MacWindowModal>
+          </div>
+        </div>
     );
 };
 
