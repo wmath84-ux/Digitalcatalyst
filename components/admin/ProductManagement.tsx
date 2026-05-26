@@ -2,6 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Product, ProductWithRating, ProductFile, CourseModule, ProductFileType, Coupon, User } from '../../App';
 import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
+import MacWindowModal from '../ui/MacWindowModal';
 
 // ... (Keep recursive functions recursiveUpdate, recursiveFileUpdate exactly as before)
 const recursiveUpdate = (
@@ -45,8 +46,7 @@ const recursiveFileUpdate = (
 const AddContentModal: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void; onClose: () => void; }> = ({ onAdd, onClose }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadConfig, setUploadConfig] = useState<{type: ProductFileType, accept: string} | null>(null);
-    const [view, setView] = useState<'selection' | 'form'>('selection');
-    const [formState, setFormState] = useState<{type: ProductFileType, url: string, name: string} | null>(null);
+    const [formState, setFormState] = useState<{type: ProductFileType, url: string, name: string, content: string} | null>(null);
     const [isUploading, setIsUploading] = useState(false);
 
     const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -62,34 +62,46 @@ const AddContentModal: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
             };
             reader.readAsDataURL(file);
         }
-        if (fileInputRef.current) fileInputRef.current.value = ""; setUploadConfig(null);
+        if (fileInputRef.current) fileInputRef.current.value = "";
+        setUploadConfig(null);
     };
     const triggerFileUpload = (type: ProductFileType, accept: string) => { setUploadConfig({ type, accept }); fileInputRef.current?.click(); };
-    const showLinkForm = (type: ProductFileType) => { setFormState({ type, url: '', name: type === 'youtube' ? 'YouTube Video' : ''}); setView('form'); };
-    const handleFormSubmit = (e: React.FormEvent) => { e.preventDefault(); if (formState?.url && formState?.name) { onAdd({ name: formState.name, type: formState.type, url: formState.url }); onClose(); }};
+    const showForm = (type: ProductFileType) => { setFormState({ type, url: '', name: type === 'youtube' ? 'YouTube Video' : type === 'doc' ? 'Rich Notes' : '', content: ''}); };
+    const handleFormSubmit = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!formState?.name) return;
+        if (formState.type === 'doc') {
+            onAdd({ name: formState.name, type: 'doc', url: '#', content: formState.content || '<h1>New Notes</h1><p>Start writing your rich notes here.</p>' });
+            onClose();
+            return;
+        }
+        if (formState.url) { onAdd({ name: formState.name, type: formState.type, url: formState.url }); onClose(); }
+    };
     
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6 relative">
-                 <button onClick={onClose} className="absolute top-3 right-3 text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
-                 {isUploading ? <p className="text-center py-10">Uploading...</p> : view === 'selection' ? (
-                    <div className="grid gap-4">
-                        <h3 className="text-xl font-bold text-center mb-4">Add Content</h3>
-                        <button onClick={() => triggerFileUpload('pdf', '.pdf')} className="p-3 border rounded hover:bg-gray-50">Upload PDF</button>
-                        <button onClick={() => triggerFileUpload('video', 'video/mp4')} className="p-3 border rounded hover:bg-gray-50">Upload Video</button>
-                        <button onClick={() => showLinkForm('youtube')} className="p-3 border rounded hover:bg-gray-50">YouTube Link</button>
+        <MacWindowModal title="Add Content" subtitle="Upload files or add private YouTube/rich notes" onClose={onClose} maxWidth="max-w-xl" zIndex="z-[95]">
+            <div className="p-6">
+                 {isUploading ? <p className="text-center py-10 font-bold text-slate-600">Uploading...</p> : !formState ? (
+                    <div className="grid gap-3">
+                        <button type="button" onClick={() => triggerFileUpload('pdf', '.pdf')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">📄 Upload PDF from local file</button>
+                        <button type="button" onClick={() => triggerFileUpload('video', 'video/mp4,video/webm')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">🎬 Upload Video from local file</button>
+                        <button type="button" onClick={() => showForm('youtube')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">▶️ Add private YouTube embed link</button>
+                        <button type="button" onClick={() => showForm('doc')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">📝 Add rich text notes for Docs Reader</button>
                     </div>
                  ) : (
-                    <form onSubmit={handleFormSubmit} className="space-y-4">
-                        <h3 className="text-xl font-bold text-center mb-4">Add Link</h3>
-                        <input placeholder="URL" value={formState?.url} onChange={e => setFormState(prev => prev ? ({...prev, url: e.target.value}) : null)} className="w-full p-2 border rounded" required />
-                        <input placeholder="Name" value={formState?.name} onChange={e => setFormState(prev => prev ? ({...prev, name: e.target.value}) : null)} className="w-full p-2 border rounded" required />
-                        <button type="submit" className="w-full bg-blue-600 text-white p-2 rounded">Add</button>
-                    </form>
+                    <div className="space-y-4">
+                        <input placeholder="Content name" value={formState.name} onChange={e => setFormState(prev => prev ? ({...prev, name: e.target.value}) : null)} className="w-full rounded-2xl border p-3" required />
+                        {formState.type === 'doc' ? (
+                            <textarea placeholder="Rich notes HTML or plain text" value={formState.content} onChange={e => setFormState(prev => prev ? ({...prev, content: e.target.value}) : null)} className="h-48 w-full rounded-2xl border p-3" />
+                        ) : (
+                            <input placeholder="YouTube URL" value={formState.url} onChange={e => setFormState(prev => prev ? ({...prev, url: e.target.value}) : null)} className="w-full rounded-2xl border p-3" required />
+                        )}
+                        <div className="flex justify-end gap-3"><button type="button" onClick={() => setFormState(null)} className="rounded-xl px-4 py-2 font-bold text-slate-600">Back</button><button type="button" onClick={handleFormSubmit} className="rounded-xl bg-primary px-5 py-2 font-bold text-white">Add Content</button></div>
+                    </div>
                  )}
                  <input type="file" ref={fileInputRef} className="hidden" accept={uploadConfig?.accept} onChange={handleFileSelected} />
             </div>
-        </div>
+        </MacWindowModal>
     );
 };
 
@@ -138,7 +150,33 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
     });
     const [modules, setModules] = useState<CourseModule[]>(product?.courseContent || []);
     const [images, setImages] = useState<string[]>(product?.images || []);
-    
+    const productImageInputRef = useRef<HTMLInputElement>(null);
+
+    const [imageMode, setImageMode] = useState<'upload' | 'ai'>('upload');
+    const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+    const handleGenerateAiImage = async () => {
+        const prompt = encodeURIComponent(`${formData.title || 'Education course'} ${formData.description || 'learning notes'}`);
+        setIsGeneratingImage(true);
+        try {
+            const aiImageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=768&nologo=true`;
+            setImages(prev => [aiImageUrl, ...prev.filter(Boolean)]);
+            setImageMode('upload');
+        } finally {
+            setIsGeneratingImage(false);
+        }
+    };
+
+    const handleProductImagesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files = Array.from(event.target.files || []);
+        if (!files.length) return;
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = () => setImages(prev => [...prev, reader.result as string]);
+            reader.readAsDataURL(file);
+        });
+        event.target.value = '';
+    };
+
     const [discountPercent, setDiscountPercent] = useState(0);
 
     useEffect(() => {
@@ -180,10 +218,10 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
     };
 
     return (
-        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex justify-center items-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto animate-scale-in-up custom-scrollbar">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-950/70 p-6">
+          <div className="mx-auto max-w-5xl rounded-3xl border border-white/20 bg-white">
                 <div className="p-8">
-                    <h2 className="text-3xl font-bold text-slate-800 mb-8 border-b pb-4">{product ? 'Edit Product' : 'Add New Product'}</h2>
+
                     <form onSubmit={handleSubmit} className="space-y-8">
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             <div className="space-y-4">
@@ -194,7 +232,20 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
                             <div className="space-y-4">
                                 <div><label className="block text-sm font-bold text-slate-700 mb-1">SKU</label><input name="sku" value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value})} className="w-full p-3 border rounded-lg bg-slate-50" /></div>
                                 <div><label className="block text-sm font-bold text-slate-700 mb-1">Category</label><input name="category" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full p-3 border rounded-lg bg-slate-50" /></div>
-                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Images (URLs, one per line)</label><textarea value={images.join('\n')} onChange={e => setImages(e.target.value.split('\n'))} className="w-full p-3 border rounded-lg bg-slate-50" rows={3} placeholder="http://..." /></div>
+                                <div>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">Product Images</label>
+                                    <div className="mb-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setImageMode('upload')} className={`rounded-xl px-3 py-2 text-sm font-bold ${imageMode === 'upload' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Upload Manually</button><button type="button" onClick={() => setImageMode('ai')} className={`rounded-xl px-3 py-2 text-sm font-bold ${imageMode === 'ai' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Generate with AI</button></div>
+                                    {imageMode === 'upload' ? <button type="button" onClick={() => productImageInputRef.current?.click()} className="w-full rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50 p-5 text-center font-bold text-blue-700 hover:bg-blue-100">Tap to upload product images</button> : <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-2xl border border-purple-300 bg-purple-50 p-5 text-center font-bold text-purple-700 hover:bg-purple-100 disabled:opacity-60">{isGeneratingImage ? 'Generating image...' : 'Generate image from title + description'}</button>}
+                                    <input ref={productImageInputRef} type="file" accept="image/*" multiple onChange={handleProductImagesUpload} className="hidden" />
+                                    <div className="mt-3 grid grid-cols-3 gap-2">
+                                        {images.filter(Boolean).map((img, index) => (
+                                            <div key={`${img}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border bg-slate-100">
+                                                <img src={img} alt={`Product ${index + 1}`} className="h-full w-full object-cover" />
+                                                <button type="button" onClick={() => setImages(prev => prev.filter((_, i) => i !== index))} className="absolute right-1 top-1 rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">×</button>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 
@@ -272,7 +323,7 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
                         </div>
                     </form>
                 </div>
-            </div>
+          </div>
         </div>
     );
 };

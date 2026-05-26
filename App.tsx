@@ -30,6 +30,11 @@ import ComingSoonModal from './components/ComingSoonModal';
 import BlogModal from './components/Prerequisites';
 import { FreeProductsModal, AnnouncementsModal } from './components/ContentModals';
 import AnnouncementDetail from './components/AnnouncementDetail';
+import BottomGlassDock from './components/BottomGlassDock';
+import ProfilePage from './components/ProfilePage';
+import PlatformExperience from './components/PlatformExperience';
+import WelcomeOverlay from './components/WelcomeOverlay';
+import SubscriptionPage from './components/SubscriptionPage';
 
 // NOTE: Firebase imports removed to prevent "Service not available" crashes.
 // The app now runs in "Local Mode" using browser storage.
@@ -183,9 +188,14 @@ export interface ProductWithRating extends Product {
 // User structure for authentication
 export interface User {
     id: number;
+    name: string;
     email: string;
-    password: string; // NOTE: In a real app, this should be hashed and never stored in plaintext.
+    mobile: string;
+    password: string; // Legacy local-mode fallback; production should use secure OTP auth.
     createdAt: string;
+    lastLoginAt?: string;
+    eduCoins?: number;
+    studyMinutes?: number;
 }
 
 // New Admin User structure for multi-user admin management
@@ -254,7 +264,7 @@ export interface Order {
     customerEmail: string;
     date: string;
     total: string;
-    status: 'Pending' | 'Shipped' | 'Completed' | 'Cancelled';
+    status: 'Pending' | 'Awaiting Verification' | 'Shipped' | 'Completed' | 'Cancelled';
     items: OrderItem[];
     shippingAddress: string;
     billingAddress: string;
@@ -366,6 +376,7 @@ export interface WebsiteSettings {
     content: {
         heroTitle: string;
         heroSubtitle: string;
+        heroImageUrl?: string;
         heroMetrics: {
             enableRealData: boolean;
             customRevenue: string;
@@ -381,6 +392,14 @@ export interface WebsiteSettings {
         upcomingFeatures: UpcomingFeatureItem[];
         newsArticles: NewsArticle[];
         announcements: Announcement[];
+        subscriptionPlans: [
+            { id: 'starter', name: 'Starter', price: 199, description: 'Best for beginners', unlockProductIds: [1] },
+            { id: 'pro', name: 'Pro', price: 499, description: 'Unlock premium notes + course', unlockProductIds: [1,2] },
+            { id: 'elite', name: 'Elite', price: 999, description: 'Full bundle access', unlockProductIds: [1,2,3,4] },
+        ],
+        eduCoinRules: { purchase: 25, redeemRate: 10 },
+        redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
+        dockItems: ['Store','Purchases','Wishlist','Cart','News','Blog','Free','Profile','Subscriptions'],
         socialLinks: {
             facebook: string;
             twitter: string;
@@ -822,8 +841,10 @@ const defaultWebsiteSettings: WebsiteSettings = {
         showSaleBadges: true,
     },
     content: {
+        siteName: 'Digital Catalyst',
         heroTitle: "Elevate Your Digital Presence",
-        heroSubtitle: "We provide top-tier digital products, marketing services, and e-commerce solutions to help you grow your business online. From e-books to SEO, we've got you covered.",
+        heroSubtitle: "Learn premium notes, private courses, and focused study resources inside one beautiful learning workspace.",
+        heroImageUrl: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1400&q=80",
         heroMetrics: {
             enableRealData: false,
             customRevenue: "+128%",
@@ -852,6 +873,14 @@ const defaultWebsiteSettings: WebsiteSettings = {
         ],
         newsArticles: initialNewsArticles,
         announcements: initialAnnouncements,
+        subscriptionPlans: [
+            { id: 'starter', name: 'Starter', price: 199, description: 'Best for beginners', unlockProductIds: [1] },
+            { id: 'pro', name: 'Pro', price: 499, description: 'Unlock premium notes + course', unlockProductIds: [1,2] },
+            { id: 'elite', name: 'Elite', price: 999, description: 'Full bundle access', unlockProductIds: [1,2,3,4] },
+        ],
+        eduCoinRules: { purchase: 25, redeemRate: 10 },
+        redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
+        dockItems: ['Store','Purchases','Wishlist','Cart','News','Blog','Free','Profile','Subscriptions'],
         socialLinks: {
             facebook: "https://www.facebook.com/profile.php?viewas=100000686899395&id=61565419447036",
             twitter: "https://x.com/MathW12385",
@@ -907,6 +936,40 @@ const App: React.FC = () => {
   const [quickViewProduct, setQuickViewProduct] = useState<ProductWithRating | null>(null);
   const [cartToastMessage, setCartToastMessage] = useState('');
   const [isCartPaymentModalOpen, setIsCartPaymentModalOpen] = useState(false);
+
+  useEffect(() => {
+    const onScroll = () => {
+      const dock = document.getElementById('main-bottom-dock');
+      if (!dock) return;
+      const y = window.scrollY;
+      const last = Number((dock as any).dataset.lastY || 0);
+      (dock as any).dataset.hidden = y > last && y > 120 ? 'true' : 'false';
+      (dock as any).dataset.lastY = String(y);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    onScroll();
+    return () => window.removeEventListener('scroll', onScroll);
+  }, []);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
+      Notification.requestPermission().catch(() => undefined);
+    }
+    if (navigator.clipboard) { navigator.clipboard.readText().catch(() => undefined); }
+    if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(() => undefined); }
+  }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
+    const played = localStorage.getItem('welcomeVoicePlayed');
+    if (played) return;
+    const msg = new SpeechSynthesisUtterance('Hello students, warm welcome to your own distraction free app, Eduvora Omaa.');
+    msg.rate = 0.95;
+    msg.pitch = 1.2;
+    msg.volume = 0.9;
+    window.speechSynthesis.speak(msg);
+    localStorage.setItem('welcomeVoicePlayed', '1');
+  }, []);
   const [appliedCartCoupon, setAppliedCartCoupon] = useState<Coupon | null>(null);
   const [cartCouponError, setCartCouponError] = useState<string | null>(null);
 
@@ -966,7 +1029,14 @@ const App: React.FC = () => {
     if (storedCart) setCart(JSON.parse(storedCart));
 
     const storedUsers = localStorage.getItem('siteUsers');
-    const loadedUsers: User[] = storedUsers ? JSON.parse(storedUsers) : [];
+    const parsedUsers: User[] = storedUsers ? JSON.parse(storedUsers) : [];
+    const loadedUsers: User[] = parsedUsers.map(user => ({
+        ...user,
+        name: user.name || user.email?.split('@')[0] || 'Learner',
+        mobile: user.mobile || '',
+        eduCoins: user.eduCoins ?? 120,
+        studyMinutes: user.studyMinutes ?? 0,
+    }));
     setUsers(loadedUsers);
     
     const storedAdminUsers = localStorage.getItem('adminUsers');
@@ -1137,6 +1207,11 @@ const App: React.FC = () => {
 
   // --- Cart Handlers ---
   const handleAddToCart = (productId: number, quantity: number = 1) => {
+      if (!currentUser) {
+          setInfoModal({ title: 'Login required', message: 'Please login before adding products to cart.', icon: '🔐' });
+          setCurrentView('auth');
+          return;
+      }
       setCart(prevCart => {
           const existingItem = prevCart.find(item => item.productId === productId);
           if (existingItem) {
@@ -1171,6 +1246,7 @@ const App: React.FC = () => {
   };
 
   const handleInitiateCheckout = () => {
+    if (!currentUser) { setCurrentView('auth'); return; }
     if (cart.length === 0) return;
     setIsCartPaymentModalOpen(true);
     setIsCartOpen(false);
@@ -1211,7 +1287,7 @@ const App: React.FC = () => {
 
       const newOrder: Order = {
         id: `DC-${Date.now()}`,
-        customerName: currentUser?.email.split('@')[0] || 'Valued Customer',
+        customerName: currentUser?.name || currentUser?.email.split('@')[0] || 'Valued Customer',
         customerEmail: currentUser?.email || 'customer@example.com',
         date: new Date().toISOString().split('T')[0],
         total: `₹${finalPrice.toFixed(2)}`,
@@ -1284,35 +1360,53 @@ const App: React.FC = () => {
   const cartItemCount = cart.reduce((total, item) => total + item.quantity, 0);
 
   // --- Auth Handlers ---
-  const handleLogin = (email: string, password: string): boolean => {
-      const user = users.find(u => u.email === email && u.password === password);
-      if (user) {
-          setCurrentUser(user);
-          safeSetItem('currentUser', user);
+  const completeUserSession = (user: User) => {
+      const sessionUser = { ...user, eduCoins: user.eduCoins ?? 120, studyMinutes: user.studyMinutes ?? 0, lastLoginAt: new Date().toISOString() };
+      setCurrentUser(sessionUser);
+      safeSetItem('currentUser', sessionUser);
 
-          if (productToBuyAfterLogin) {
-              setSelectedProduct(productToBuyAfterLogin);
-              setCurrentView('product');
-              setAutoOpenPaymentModalFor(productToBuyAfterLogin.id);
-              setProductToBuyAfterLogin(null);
-          } else {
-              setCurrentView('home');
-          }
+      if (productToBuyAfterLogin) {
+          setSelectedProduct(productToBuyAfterLogin);
+          setCurrentView('product');
+          setAutoOpenPaymentModalFor(productToBuyAfterLogin.id);
+          setProductToBuyAfterLogin(null);
+      } else {
+          setCurrentView('home');
+      }
+  };
+
+  const handleLogin = (email: string, password: string): boolean => {
+      const user = users.find(u => (u.email === email || u.mobile === email) && u.password === password);
+      if (user) {
+          completeUserSession(user);
           return true;
       }
       return false;
   };
 
-  const handleSignup = (email: string, password: string): { success: boolean, message: string } => {
+  const handleSignup = (email: string, password: string, name = email.split('@')[0], mobile = ''): { success: boolean, message: string } => {
       if (users.some(u => u.email === email)) {
           return { success: false, message: 'An account with this email already exists.' };
       }
-      const newUser: User = { id: Date.now(), email, password, createdAt: new Date().toISOString() };
+      const newUser: User = { id: Date.now(), name, email, mobile, password, createdAt: new Date().toISOString(), eduCoins: 120, studyMinutes: 0 };
       const updatedUsers = [...users, newUser];
       setUsers(updatedUsers);
       safeSetItem('siteUsers', updatedUsers);
-      handleLogin(email, password);
+      completeUserSession(newUser);
       return { success: true, message: 'Account created successfully!' };
+  };
+
+  const handleOtpAuthenticate = (profile: { name: string; email: string; mobile: string }): { success: boolean, message: string } => {
+      const existingUser = users.find(u => u.email === profile.email || u.mobile === profile.mobile);
+      if (existingUser) {
+          const updatedUser = { ...existingUser, name: profile.name || existingUser.name, email: profile.email || existingUser.email, mobile: profile.mobile || existingUser.mobile };
+          const updatedUsers = users.map(u => u.id === existingUser.id ? updatedUser : u);
+          setUsers(updatedUsers);
+          safeSetItem('siteUsers', updatedUsers);
+          completeUserSession(updatedUser);
+          return { success: true, message: 'Logged in successfully.' };
+      }
+      return handleSignup(profile.email, `otp-${profile.mobile}`, profile.name, profile.mobile);
   };
 
   const handleLogout = () => {
@@ -1339,6 +1433,8 @@ const App: React.FC = () => {
       handleBackToHome();
     }
   };
+
+  const handleNavigateToProfile = () => { setCurrentView('profile'); window.scrollTo(0, 0); };
 
   const handleNavigateToAuth = () => setCurrentView('auth');
 
@@ -1377,7 +1473,7 @@ const App: React.FC = () => {
   const handleAddReview = (productId: number, reviewData: Omit<Review, 'name' | 'date'>) => {
     const newReview: Review = {
         ...reviewData,
-        name: currentUser?.email.split('@')[0] || 'Customer',
+        name: currentUser?.name || currentUser?.email.split('@')[0] || 'Customer',
         date: 'Just now'
     };
     const updatedReviews = { ...reviews, [productId]: [newReview, ...(reviews[productId] || [])] };
@@ -1431,12 +1527,19 @@ const App: React.FC = () => {
         const robustFinalPrice = preDiscountTotal - finalDiscount;
 
         const newPurchasedIds = [...new Set([...purchasedProductIds, selectedProduct.id])];
+        const purchaseCoins = Number((websiteSettings.content as any).eduCoinRules?.purchase || 25);
+        if (currentUser) {
+          const u = { ...currentUser, eduCoins: (currentUser.eduCoins || 0) + purchaseCoins };
+          setCurrentUser(u);
+          const us = users.map(x => x.id === u.id ? u : x);
+          setUsers(us); safeSetItem('siteUsers', us);
+        }
         setPurchasedProductIds(newPurchasedIds);
         safeSetItem('purchasedProducts', newPurchasedIds);
 
         const newOrder: Order = {
             id: `DC-${Date.now()}`,
-            customerName: currentUser?.email.split('@')[0] || 'Valued Customer',
+            customerName: currentUser?.name || currentUser?.email.split('@')[0] || 'Valued Customer',
             customerEmail: currentUser?.email || 'customer@example.com',
             date: new Date().toISOString().split('T')[0],
             total: `₹${robustFinalPrice.toFixed(2)}`,
@@ -1478,6 +1581,16 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
+
+  const handleActivateSubscription = (plan: any) => {
+    if (!currentUser) { setCurrentView('auth'); return; }
+    const newPurchasedIds = [...new Set([...purchasedProductIds, ...plan.unlockProductIds])];
+    setPurchasedProductIds(newPurchasedIds);
+    safeSetItem('purchasedProducts', newPurchasedIds);
+    setInfoModal({ title: 'Subscription active', message: `${plan.name} activated successfully.`, icon: '✅' });
+  };
+  const handleNavigateToSubscription = () => { setCurrentView('subscription'); window.scrollTo(0,0); };
+
   const handleNavigateToWishlist = () => {
     setCurrentView('wishlist');
     window.scrollTo(0, 0);
@@ -1494,6 +1607,9 @@ const App: React.FC = () => {
   };
 
   const handleSubscribe = (email: string) => {
+    const key = `subscribed:${email.toLowerCase()}`;
+    if (localStorage.getItem(key)) return;
+    localStorage.setItem(key, '1');
     console.log(`Subscribing ${email} to the newsletter.`);
     setSubscribedEmail(email);
     setIsSubscriptionModalOpen(true);
@@ -1602,7 +1718,7 @@ const App: React.FC = () => {
           {websiteSettings.layout.map(section => {
               if (!section.visible) return null;
               switch(section.id) {
-                  case 'hero': return <Hero key={section.id} settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => setIsBlogModalOpen(true)} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => setIsAnnouncementsModalOpen(true)} realMetrics={realMetrics} />;
+                  case 'hero': return <React.Fragment key={section.id}><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => setIsBlogModalOpen(true)} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => setIsAnnouncementsModalOpen(true)} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} onLoginClick={handleNavigateToAuth} onExploreClick={handleNavigateToAllProducts} /></React.Fragment>;
                   case 'purchased': return purchasedProducts.length > 0 && <PurchasedProducts settings={websiteSettings} key={section.id} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
                   case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} coupons={coupons} />;
                   case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} coupons={coupons} />;
@@ -1620,12 +1736,14 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (currentView) {
-      case 'product': return selectedProduct && <ProductDetailPage settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToAllProducts} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} />;
+      case 'product': return selectedProduct && <ProductDetailPage settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToAllProducts} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} isPurchased={purchasedProductIds.includes(selectedProduct.id)} />;
       case 'coursePlayer': return selectedProduct && <CoursePlayer settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToPurchases} />;
       case 'ebookReader': return selectedProduct && <EbookReader settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToPurchases} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={handleBackToHome} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} coupons={coupons} />;
       case 'myPurchases': return <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
+      case 'profile': return <ProfilePage settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} />;
+      case 'subscription': return <SubscriptionPage settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={handleBackToHome} onActivatePlan={handleActivateSubscription} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
       case 'home': default: return renderHomePageContent();
     }
@@ -1633,7 +1751,7 @@ const App: React.FC = () => {
 
   const renderPage = () => {
     if (currentView === 'policies') return <PolicyPage settings={websiteSettings} onBack={handleBackToHome} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} />;
-    if (currentView === 'auth') return <AuthPage settings={websiteSettings} onLogin={handleLogin} onSignup={handleSignup} onBack={handleBackFromAuth} />;
+    if (currentView === 'auth') return <AuthPage settings={websiteSettings} onOtpAuthenticate={handleOtpAuthenticate} onBack={handleBackFromAuth} />;
     if (currentView === 'admin' && currentAdminUser) return <AdminDashboard websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} onTicketsUpdate={setTickets} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={setCoupons} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} />;
     if (currentView === 'adminLogin') return <AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={handleBackToHome} />;
     if (currentView === 'coursePlayer' || currentView === 'ebookReader') return renderContent();
@@ -1663,7 +1781,9 @@ const App: React.FC = () => {
     return (
        <ErrorBoundary>
          <div className="font-sans">
-            <Header settings={websiteSettings} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} activeTheme={activeTheme} onThemeChange={setActiveTheme} />
+            <WelcomeOverlay />
+            <Header settings={websiteSettings} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} activeTheme={activeTheme} onThemeChange={setActiveTheme} />
+            {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onOpenBlogModal={() => setIsBlogModalOpen(true)} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => setIsAnnouncementsModalOpen(true)} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} onSubscriptionClick={handleNavigateToSubscription} />}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
             {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null)} />}

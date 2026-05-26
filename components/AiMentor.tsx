@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { GoogleGenAI } from '@google/genai';
-import { geminiSetupHint, getGeminiApiKey } from '../utils/gemini';
+import { getGeminiApiKey } from '../utils/gemini';
 
 interface AiMentorProps {
     productTitle: string;
@@ -11,6 +11,20 @@ interface ChatMessage {
     sender: 'user' | 'ai';
     text: string;
 }
+
+const renderStructuredText = (text: string) => {
+    const blocks = text.split(/\n\n+/).filter(Boolean);
+    return blocks.map((b, i) => {
+        const lines = b.split('\n');
+        if (lines.every(l => /^[-*•]/.test(l.trim()))) {
+            return <ul key={i} className="list-disc pl-5 space-y-1">{lines.map((l,j)=><li key={j}>{l.replace(/^[-*•]\s*/, '')}</li>)}</ul>;
+        }
+        if (/^#{1,3}\s/.test(lines[0])) {
+            return <h4 key={i} className="font-black text-indigo-100">{lines[0].replace(/^#{1,3}\s*/, '')}</h4>;
+        }
+        return <p key={i} className="leading-7">{b}</p>;
+    });
+};
 
 const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName }) => {
     const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -42,7 +56,9 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName }) 
         try {
             const apiKey = getGeminiApiKey();
             if (!apiKey) {
-                throw new Error(geminiSetupHint);
+                const demoReply = `Demo AI Mentor: I can help you study "${productTitle}". For now, focus on the current lesson, write 3 key points in notes, and revise them after watching. Add GEMINI_API_KEY later to enable live AI answers.`;
+                setMessages(prev => [...prev, { sender: 'ai', text: demoReply }]);
+                return;
             }
             const ai = new GoogleGenAI({ apiKey });
             const systemInstruction = `You are a helpful AI Mentor for the product "${productTitle}". The user is currently viewing content titled "${activeContentName || 'the main product page'}". Your role is to answer questions about this topic, the product, and related subjects to help the user learn and succeed. Be encouraging and clear.`;
@@ -76,7 +92,7 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName }) 
                 {messages.map((msg, i) => (
                     <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-xl p-3 rounded-lg animate-fade-in ${msg.sender === 'user' ? 'bg-primary' : 'bg-slate-600'}`}>
-                            <pre className="whitespace-pre-wrap font-sans text-sm">{msg.text}</pre>
+                            <div className="text-sm space-y-2">{renderStructuredText(msg.text)}</div>
                         </div>
                     </div>
                 ))}

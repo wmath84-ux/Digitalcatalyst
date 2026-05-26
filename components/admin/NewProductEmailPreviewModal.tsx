@@ -22,7 +22,10 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
             try {
                 const apiKey = getGeminiApiKey();
                 if (!apiKey) {
-                    throw new Error('Gemini API key is not configured.');
+                    // Demo mode: no Vercel variables are required for preview/deployment.
+                    setMarketingImageUrl(product.images[0] || `https://picsum.photos/seed/${product.imageSeed}/1200/600`);
+                    setIsLoadingImage(false);
+                    return;
                 }
                 const ai = new GoogleGenAI({ apiKey });
                 const prompt = `Create a vibrant, eye-catching marketing banner for a new product announcement email. The product is called "${product.title}". It is described as: "${product.description}". The style should be modern, clean, and exciting, suitable for a digital product e-commerce store. Use a professional and dynamic color palette. Aspect ratio should be 2:1.`;
@@ -44,7 +47,7 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
                     }
                 }
             } catch (err) {
-                console.error("Error generating marketing image:", err);
+                console.warn("Using product image because AI generation is unavailable:", err);
                 // Fallback to product image if AI fails
                 setMarketingImageUrl(product.images[0] || `https://picsum.photos/seed/${product.imageSeed}/1200/600`);
             } finally {
