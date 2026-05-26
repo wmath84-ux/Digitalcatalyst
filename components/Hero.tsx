@@ -12,7 +12,7 @@ interface HeroProps {
   realMetrics?: { revenue: number; users: number };
 }
 
-const fallbackHeroImage = 'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=1400&q=80';
+const fallbackHeroVideo = 'https://cdn.coverr.co/videos/coverr-young-students-studying-together-1579/1080p.mp4';
 
 const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateToAllProducts, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, realMetrics }) => {
   const sectionRef = useRef<HTMLElement>(null);
@@ -129,11 +129,7 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
                     <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-indigo-500/30 rounded-full blur-3xl -z-10 animate-pulse"></div>
                     
                     <div className="bg-white/10 backdrop-blur-2xl rounded-[2rem] p-4 border border-white/25 shadow-2xl transform rotate-1 hover:rotate-0 transition-transform duration-500 animate-icon-float">
-                        <img 
-                            src={settings.content.heroImageUrl || fallbackHeroImage} 
-                            alt="Online learning workspace" 
-                            className="rounded-[1.4rem] w-full h-auto shadow-inner object-cover aspect-[4/3]"
-                        />
+                        <video src={fallbackHeroVideo} poster={settings.content.heroImageUrl} autoPlay muted loop playsInline className="rounded-[1.4rem] w-full h-auto shadow-inner object-cover aspect-[4/3]" />
                     </div>
                     
                     {/* Floating Cards */}
