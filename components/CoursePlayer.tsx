@@ -2,6 +2,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile } from '../App';
 import AiMentor from './AiMentor';
+import { GoogleGenAI } from '@google/genai';
+import { getGeminiApiKey } from '../utils/gemini';
 
 declare global {
     interface Window {
@@ -102,7 +104,6 @@ const getCourseBackground = (product: ProductWithRating, activeFile: ProductFile
 
 const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; }> = ({ settings, product, onBack }) => {
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
-  const [mediaError, setMediaError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 

@@ -63,7 +63,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
     // Mobile overlay classes vs Desktop static classes
     const containerClasses = isOpen 
         ? "fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-slate-900 to-slate-800 shadow-2xl transition-transform transform translate-x-0"
-        : "hidden md:flex md:w-72 bg-gradient-to-b from-slate-900 to-slate-800 shadow-2xl flex-col";
+        : "hidden md:flex md:w-72 bg-gradient-to-b from-slate-900 to-slate-800 shadow-2xl flex-col md:fixed md:left-0 md:top-0 md:bottom-0 md:z-40 md:translate-x-[-248px] md:hover:translate-x-0 md:transition-transform md:duration-300";
 
     return (
         <>

@@ -263,6 +263,7 @@ interface ProductDetailPageProps {
   wishlist: number[];
   onQuickView: (product: ProductWithRating) => void;
   onGoHome: () => void;
+  isPurchased?: boolean;
 }
 
 const ShareIcon = () => (
@@ -668,8 +669,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                         </button>
                     </div>
                     <div className="mt-4">
-                        <button onClick={handleBuyClick} className="w-full bg-green-500 text-white font-bold px-10 py-4 rounded-lg hover:bg-green-600 transition-all duration-300 transform hover:scale-105 active:scale-100 text-lg">
-                            Buy Now
+                        <button disabled={isPurchased} onClick={handleBuyClick} className="w-full bg-green-500 text-white font-bold px-10 py-4 rounded-lg hover:bg-green-600 transition-all duration-300 transform hover:scale-105 active:scale-100 text-lg disabled:opacity-50 disabled:cursor-not-allowed">
+                            {isPurchased ? 'Purchased' : 'Buy Now'}
                         </button>
                     </div>
                 </div>

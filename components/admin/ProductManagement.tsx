@@ -89,15 +89,15 @@ const AddContentModal: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                         <button type="button" onClick={() => showForm('doc')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">📝 Add rich text notes for Docs Reader</button>
                     </div>
                  ) : (
-                    <form onSubmit={handleFormSubmit} className="space-y-4">
+                    <div className="space-y-4">
                         <input placeholder="Content name" value={formState.name} onChange={e => setFormState(prev => prev ? ({...prev, name: e.target.value}) : null)} className="w-full rounded-2xl border p-3" required />
                         {formState.type === 'doc' ? (
                             <textarea placeholder="Rich notes HTML or plain text" value={formState.content} onChange={e => setFormState(prev => prev ? ({...prev, content: e.target.value}) : null)} className="h-48 w-full rounded-2xl border p-3" />
                         ) : (
                             <input placeholder="YouTube URL" value={formState.url} onChange={e => setFormState(prev => prev ? ({...prev, url: e.target.value}) : null)} className="w-full rounded-2xl border p-3" required />
                         )}
-                        <div className="flex justify-end gap-3"><button type="button" onClick={() => setFormState(null)} className="rounded-xl px-4 py-2 font-bold text-slate-600">Back</button><button type="submit" className="rounded-xl bg-primary px-5 py-2 font-bold text-white">Add Content</button></div>
-                    </form>
+                        <div className="flex justify-end gap-3"><button type="button" onClick={() => setFormState(null)} className="rounded-xl px-4 py-2 font-bold text-slate-600">Back</button><button type="button" onClick={handleFormSubmit} className="rounded-xl bg-primary px-5 py-2 font-bold text-white">Add Content</button></div>
+                    </div>
                  )}
                  <input type="file" ref={fileInputRef} className="hidden" accept={uploadConfig?.accept} onChange={handleFileSelected} />
             </div>
@@ -152,6 +152,20 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
     const [images, setImages] = useState<string[]>(product?.images || []);
     const productImageInputRef = useRef<HTMLInputElement>(null);
 
+    const [imageMode, setImageMode] = useState<'upload' | 'ai'>('upload');
+    const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+    const handleGenerateAiImage = async () => {
+        const prompt = encodeURIComponent(`${formData.title || 'Education course'} ${formData.description || 'learning notes'}`);
+        setIsGeneratingImage(true);
+        try {
+            const aiImageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=768&nologo=true`;
+            setImages(prev => [aiImageUrl, ...prev.filter(Boolean)]);
+            setImageMode('upload');
+        } finally {
+            setIsGeneratingImage(false);
+        }
+    };
+
     const handleProductImagesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const files = Array.from(event.target.files || []);
         if (!files.length) return;
@@ -204,7 +218,8 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
     };
 
     return (
-        <MacWindowModal title={product ? 'Edit Product' : 'Add New Product'} subtitle="Local images, nested course content, and pricing" onClose={onCancel} maxWidth="max-w-5xl" zIndex="z-[70]">
+        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-950/70 p-6">
+          <div className="mx-auto max-w-5xl rounded-3xl border border-white/20 bg-white">
                 <div className="p-8">
 
                     <form onSubmit={handleSubmit} className="space-y-8">
@@ -218,8 +233,9 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
                                 <div><label className="block text-sm font-bold text-slate-700 mb-1">SKU</label><input name="sku" value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value})} className="w-full p-3 border rounded-lg bg-slate-50" /></div>
                                 <div><label className="block text-sm font-bold text-slate-700 mb-1">Category</label><input name="category" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full p-3 border rounded-lg bg-slate-50" /></div>
                                 <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1">Product Images (local files only)</label>
-                                    <button type="button" onClick={() => productImageInputRef.current?.click()} className="w-full rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50 p-5 text-center font-bold text-blue-700 hover:bg-blue-100">Tap to upload product images</button>
+                                    <label className="block text-sm font-bold text-slate-700 mb-1">Product Images</label>
+                                    <div className="mb-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setImageMode('upload')} className={`rounded-xl px-3 py-2 text-sm font-bold ${imageMode === 'upload' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Upload Manually</button><button type="button" onClick={() => setImageMode('ai')} className={`rounded-xl px-3 py-2 text-sm font-bold ${imageMode === 'ai' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Generate with AI</button></div>
+                                    {imageMode === 'upload' ? <button type="button" onClick={() => productImageInputRef.current?.click()} className="w-full rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50 p-5 text-center font-bold text-blue-700 hover:bg-blue-100">Tap to upload product images</button> : <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-2xl border border-purple-300 bg-purple-50 p-5 text-center font-bold text-purple-700 hover:bg-purple-100 disabled:opacity-60">{isGeneratingImage ? 'Generating image...' : 'Generate image from title + description'}</button>}
                                     <input ref={productImageInputRef} type="file" accept="image/*" multiple onChange={handleProductImagesUpload} className="hidden" />
                                     <div className="mt-3 grid grid-cols-3 gap-2">
                                         {images.filter(Boolean).map((img, index) => (
@@ -307,7 +323,8 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
                         </div>
                     </form>
                 </div>
-        </MacWindowModal>
+          </div>
+        </div>
     );
 };
 
