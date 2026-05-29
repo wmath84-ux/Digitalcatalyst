@@ -21,12 +21,17 @@ const LogoIcon = () => (
 const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClick, onLoginClick, onNavigateToAllProducts, onNavigateToHomeAndScroll, onNavigateToPolicies, onSubscribe }) => {
   const footerText = settings.content.footerText.replace('{year}', new Date().getFullYear().toString());
   const [email, setEmail] = useState('');
+  const [isSubscribed, setIsSubscribed] = useState(false);
 
   const handleSubscribeSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (email.trim()) {
-        onSubscribe(email);
-        setEmail('');
+        const key = `subscribed:${email.toLowerCase()}`;
+        if (!localStorage.getItem(key)) {
+            onSubscribe(email);
+            localStorage.setItem(key, '1');
+        }
+        setIsSubscribed(true);
     }
   };
   
@@ -101,8 +106,8 @@ const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClic
                     required
                     className="w-full px-3 py-2 text-gray-800 rounded-l-md focus:outline-none"
                 />
-                <button type="submit" className="bg-accent text-white font-semibold px-4 py-2 rounded-r-md hover:opacity-90 transition-opacity">
-                    Subscribe
+                <button type="submit" disabled={isSubscribed} className="bg-accent text-white font-semibold px-4 py-2 rounded-r-md hover:opacity-90 transition-opacity disabled:opacity-50">
+                    {isSubscribed ? 'Subscribed' : 'Subscribe'}
                 </button>
             </form>
           </div>
