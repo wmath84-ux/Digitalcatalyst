@@ -1,6 +1,6 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Product, ProductWithRating, ProductFile, CourseModule, ProductFileType, Coupon, User } from '../../App';
+import { Product, ProductWithRating, ProductFile, CourseModule, ProductFileType, Coupon, User, QuizQuestion } from '../../App';
 import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
 import MacWindowModal from '../ui/MacWindowModal';
 
@@ -43,10 +43,38 @@ const recursiveFileUpdate = (
 };
 
 // ... (Keep AddContentModal, ModuleEditor, ProductForm components exactly as before)
+const AdminDocsEditor: React.FC<{ value: string; onChange: (value: string) => void; }> = ({ value, onChange }) => {
+    const editorRef = useRef<HTMLDivElement>(null);
+    useEffect(() => {
+        if (editorRef.current && editorRef.current.innerHTML !== value) editorRef.current.innerHTML = value;
+    }, [value]);
+    const runCommand = (command: string, commandValue?: string) => {
+        editorRef.current?.focus();
+        document.execCommand(command, false, commandValue);
+        onChange(editorRef.current?.innerHTML || '');
+    };
+    return (
+        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
+            <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-white p-2">
+                <button type="button" onClick={() => runCommand('bold')} className="rounded-lg border px-3 py-1 font-black">B</button>
+                <button type="button" onClick={() => runCommand('italic')} className="rounded-lg border px-3 py-1 font-black italic">I</button>
+                <button type="button" onClick={() => runCommand('formatBlock', '<h1>')} className="rounded-lg border px-3 py-1 font-black">H1</button>
+                <button type="button" onClick={() => runCommand('formatBlock', '<h2>')} className="rounded-lg border px-3 py-1 font-black">H2</button>
+                <button type="button" onClick={() => runCommand('insertUnorderedList')} className="rounded-lg border px-3 py-1 font-black">• List</button>
+                <button type="button" onClick={() => runCommand('justifyLeft')} className="rounded-lg border px-3 py-1 font-black">Left</button>
+                <button type="button" onClick={() => runCommand('justifyCenter')} className="rounded-lg border px-3 py-1 font-black">Center</button>
+                <button type="button" onClick={() => runCommand('justifyRight')} className="rounded-lg border px-3 py-1 font-black">Right</button>
+            </div>
+            <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={() => onChange(editorRef.current?.innerHTML || '')} className="min-h-56 bg-white p-5 text-slate-900 outline-none" />
+        </div>
+    );
+};
+
 const AddContentModal: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void; onClose: () => void; }> = ({ onAdd, onClose }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadConfig, setUploadConfig] = useState<{type: ProductFileType, accept: string} | null>(null);
     const [formState, setFormState] = useState<{type: ProductFileType, url: string, name: string, content: string} | null>(null);
+    const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
     const [isUploading, setIsUploading] = useState(false);
 
     const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,12 +94,29 @@ const AddContentModal: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
         setUploadConfig(null);
     };
     const triggerFileUpload = (type: ProductFileType, accept: string) => { setUploadConfig({ type, accept }); fileInputRef.current?.click(); };
-    const showForm = (type: ProductFileType) => { setFormState({ type, url: '', name: type === 'youtube' ? 'YouTube Video' : type === 'doc' ? 'Rich Notes' : '', content: ''}); };
+    const showForm = (type: ProductFileType) => {
+        setFormState({
+            type,
+            url: '',
+            name: type === 'youtube' ? 'YouTube Video' : type === 'doc' ? 'Smart Docs Workspace' : type === 'quiz' ? 'Interactive Quiz' : 'External Resource',
+            content: type === 'doc' ? '<h1>Smart Docs Workspace</h1><p>Start building the lesson document here.</p>' : ''
+        });
+    };
+    const updateQuestion = (index: number, updater: (question: QuizQuestion) => QuizQuestion) => setQuizQuestions(prev => prev.map((question, i) => i === index ? updater(question) : question));
     const handleFormSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         if (!formState?.name) return;
         if (formState.type === 'doc') {
-            onAdd({ name: formState.name, type: 'doc', url: '#', content: formState.content || '<h1>New Notes</h1><p>Start writing your rich notes here.</p>' });
+            onAdd({ name: formState.name, type: 'doc', url: '#', content: formState.content || '<h1>Smart Docs Workspace</h1><p>Start writing here.</p>' });
+            onClose();
+            return;
+        }
+        if (formState.type === 'quiz') {
+            const cleanQuestions = quizQuestions
+                .map(q => ({ ...q, options: q.options.map(option => option.trim()) }))
+                .filter(q => q.prompt.trim() && q.options.filter(Boolean).length >= 2);
+            if (!cleanQuestions.length) return;
+            onAdd({ name: formState.name, type: 'quiz', url: '#', quiz: { questions: cleanQuestions } });
             onClose();
             return;
         }
@@ -79,22 +124,46 @@ const AddContentModal: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
     };
     
     return (
-        <MacWindowModal title="Add Content" subtitle="Upload files or add private YouTube/rich notes" onClose={onClose} maxWidth="max-w-xl" zIndex="z-[95]">
+        <MacWindowModal title="Add Content" subtitle="Upload course files or build YouTube, Smart Docs, links, and quizzes" onClose={onClose} maxWidth="max-w-3xl" zIndex="z-[95]">
             <div className="p-6">
                  {isUploading ? <p className="text-center py-10 font-bold text-slate-600">Uploading...</p> : !formState ? (
-                    <div className="grid gap-3">
-                        <button type="button" onClick={() => triggerFileUpload('pdf', '.pdf')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">📄 Upload PDF from local file</button>
+                    <div className="grid gap-3 md:grid-cols-2">
+                        <button type="button" onClick={() => triggerFileUpload('pdf', '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">📄 Upload PDF / document for download UI</button>
                         <button type="button" onClick={() => triggerFileUpload('video', 'video/mp4,video/webm')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">🎬 Upload Video from local file</button>
-                        <button type="button" onClick={() => showForm('youtube')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">▶️ Add private YouTube embed link</button>
-                        <button type="button" onClick={() => showForm('doc')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">📝 Add rich text notes for Docs Reader</button>
+                        <button type="button" onClick={() => showForm('youtube')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">▶️ Add YouTube embed link</button>
+                        <button type="button" onClick={() => showForm('doc')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">📝 Add Smart Docs Workspace</button>
+                        <button type="button" onClick={() => showForm('link')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">🔗 Add External Resource / Link</button>
+                        <button type="button" onClick={() => showForm('quiz')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">❓ Create Interactive Quiz</button>
                     </div>
                  ) : (
                     <div className="space-y-4">
                         <input placeholder="Content name" value={formState.name} onChange={e => setFormState(prev => prev ? ({...prev, name: e.target.value}) : null)} className="w-full rounded-2xl border p-3" required />
                         {formState.type === 'doc' ? (
-                            <textarea placeholder="Rich notes HTML or plain text" value={formState.content} onChange={e => setFormState(prev => prev ? ({...prev, content: e.target.value}) : null)} className="h-48 w-full rounded-2xl border p-3" />
+                            <AdminDocsEditor value={formState.content} onChange={content => setFormState(prev => prev ? ({...prev, content}) : null)} />
+                        ) : formState.type === 'quiz' ? (
+                            <div className="space-y-4">
+                                {quizQuestions.map((question, qIndex) => (
+                                    <div key={qIndex} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                        <div className="mb-3 flex items-center justify-between gap-3">
+                                            <label className="font-black text-slate-700">Question {qIndex + 1}</label>
+                                            {quizQuestions.length > 1 && <button type="button" onClick={() => setQuizQuestions(prev => prev.filter((_, i) => i !== qIndex))} className="rounded-lg bg-red-50 px-3 py-1 text-sm font-bold text-red-600">Remove</button>}
+                                        </div>
+                                        <input placeholder="Question prompt" value={question.prompt} onChange={e => updateQuestion(qIndex, q => ({ ...q, prompt: e.target.value }))} className="mb-3 w-full rounded-xl border p-3" />
+                                        <div className="grid gap-2 md:grid-cols-2">
+                                            {question.options.map((option, oIndex) => (
+                                                <label key={oIndex} className="flex items-center gap-2 rounded-xl border bg-white p-2">
+                                                    <input type="radio" checked={question.correctAnswer === oIndex} onChange={() => updateQuestion(qIndex, q => ({ ...q, correctAnswer: oIndex }))} />
+                                                    <input placeholder={`Option ${oIndex + 1}`} value={option} onChange={e => updateQuestion(qIndex, q => ({ ...q, options: q.options.map((item, i) => i === oIndex ? e.target.value : item) }))} className="w-full bg-transparent outline-none" />
+                                                </label>
+                                            ))}
+                                        </div>
+                                        <p className="mt-2 text-xs font-semibold text-slate-500">Select the radio button beside the correct answer.</p>
+                                    </div>
+                                ))}
+                                <button type="button" onClick={() => setQuizQuestions(prev => [...prev, { prompt: '', options: ['', '', '', ''], correctAnswer: 0 }])} className="w-full rounded-xl border border-dashed border-blue-300 bg-blue-50 py-2 font-bold text-blue-700">+ Add Question</button>
+                            </div>
                         ) : (
-                            <input placeholder="YouTube URL" value={formState.url} onChange={e => setFormState(prev => prev ? ({...prev, url: e.target.value}) : null)} className="w-full rounded-2xl border p-3" required />
+                            <input placeholder={formState.type === 'youtube' ? 'YouTube URL' : 'https://example.com/resource'} value={formState.url} onChange={e => setFormState(prev => prev ? ({...prev, url: e.target.value}) : null)} className="w-full rounded-2xl border p-3" required />
                         )}
                         <div className="flex justify-end gap-3"><button type="button" onClick={() => setFormState(null)} className="rounded-xl px-4 py-2 font-bold text-slate-600">Back</button><button type="button" onClick={handleFormSubmit} className="rounded-xl bg-primary px-5 py-2 font-bold text-white">Add Content</button></div>
                     </div>
