@@ -104,6 +104,7 @@ const getCourseBackground = (product: ProductWithRating, activeFile: ProductFile
 
 const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; }> = ({ settings, product, onBack }) => {
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
+  const [mediaHasError, setMediaHasError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
 
@@ -139,7 +140,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
   }, [notes, activeFile?.id]);
 
   useEffect(() => {
-      setMediaError(false);
+      setMediaHasError(false);
   }, [activeFile]);
 
   const backgroundImage = useMemo(() => getCourseBackground(product, activeFile), [product, activeFile]);
@@ -229,7 +230,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
 
   const renderMedia = () => {
     if (!activeFile) return <div className="flex h-full items-center justify-center bg-black text-white/70">Select content to begin.</div>;
-    if (mediaError) return <ContentUnavailablePlaceholder file={activeFile} />;
+    if (mediaHasError) return <ContentUnavailablePlaceholder file={activeFile} />;
     switch (activeFile.type) {
       case 'youtube': {
         const videoId = extractYouTubeID(activeFile.url);
@@ -242,12 +243,12 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
             frameBorder="0"
             allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
             allowFullScreen
-            onError={() => setMediaError(true)}
+            onError={() => setMediaHasError(true)}
           />
         ) : <VideoUnavailablePlaceholder />;
       }
-      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-black object-contain" onError={() => setMediaError(true)} />;
-      case 'audio': return <div className="flex h-full w-full flex-col items-center justify-center bg-black p-8 text-white"><svg xmlns="http://www.w3.org/2000/svg" className="mb-4 h-24 w-24 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z" /></svg><h3 className="mb-6 max-w-full truncate text-xl font-semibold">{activeFile.name}</h3><audio key={activeFile.id} src={activeFile.url} controls className="w-full max-w-md" onError={() => setMediaError(true)} /></div>;
+      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-black object-contain" onError={() => setMediaHasError(true)} />;
+      case 'audio': return <div className="flex h-full w-full flex-col items-center justify-center bg-black p-8 text-white"><svg xmlns="http://www.w3.org/2000/svg" className="mb-4 h-24 w-24 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z" /></svg><h3 className="mb-6 max-w-full truncate text-xl font-semibold">{activeFile.name}</h3><audio key={activeFile.id} src={activeFile.url} controls className="w-full max-w-md" onError={() => setMediaHasError(true)} /></div>;
       case 'pdf': return <iframe src={activeFile.url} title={activeFile.name} className="h-full w-full border-0 bg-white" />;
       default: return <ContentUnavailablePlaceholder file={activeFile} />;
     }
