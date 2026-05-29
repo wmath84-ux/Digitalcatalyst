@@ -15,7 +15,7 @@ interface PaymentModalProps {
   paymentLink?: string;
 }
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice, salePrice, couponDiscount, finalPrice, onClose, cartItems, paymentLink }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice, salePrice, couponDiscount, finalPrice, onClose, onConfirm, cartItems, paymentLink }) => {
   const [paymentOpened, setPaymentOpened] = useState(false);
   const [verificationSubmitted, setVerificationSubmitted] = useState(false);
   const razorpayUrl = paymentLink || 'https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view';
@@ -63,13 +63,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice
         ) : verificationSubmitted ? (
           <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-center text-amber-900">
             <p className="text-lg font-black">Verification request submitted</p>
-            <p className="mt-2 text-sm">Demo mode: admin must confirm payment before this product is delivered. No product was unlocked automatically.</p>
+            <p className="mt-2 text-sm">Demo mode: product has been unlocked for your local testing.</p>
             <button onClick={onClose} className="mt-4 rounded-2xl bg-amber-600 px-5 py-3 font-bold text-white">Close</button>
           </div>
         ) : (
           <div className="space-y-3 text-center">
             <p className="text-sm text-slate-600">If you completed the payment, submit it for admin verification. This will not unlock content instantly in demo mode.</p>
-            <button onClick={() => setVerificationSubmitted(true)} className="w-full rounded-2xl bg-amber-500 px-6 py-4 text-lg font-black text-white shadow-xl transition hover:bg-amber-600">I paid — submit for verification</button>
+            <button onClick={() => { setVerificationSubmitted(true); onConfirm(); }} className="w-full rounded-2xl bg-amber-500 px-6 py-4 text-lg font-black text-white shadow-xl transition hover:bg-amber-600">I have paid — unlock in demo</button>
             <button onClick={handlePayNow} className="text-sm font-bold text-primary underline">Open payment page again</button>
           </div>
         )}

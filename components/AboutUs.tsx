@@ -75,7 +75,7 @@ const AboutUs: React.FC<AboutUsProps> = ({ settings, title, text, imageSeed }) =
             <div className="absolute bottom-0 left-0 w-64 h-64 bg-accent/10 rounded-full blur-3xl -z-10"></div>
 
             <div className="relative rounded-2xl shadow-2xl overflow-hidden border-8 border-white transform md:rotate-3 transition-all duration-500 hover:rotate-0 hover:scale-[1.02] group">
-                 <img src={`https://picsum.photos/seed/${imageSeed}/800/600`} alt="Digital Catalyst Team" className="w-full h-auto object-cover transform group-hover:scale-110 transition-transform duration-700" />
+                 <video src="https://cdn.coverr.co/videos/coverr-students-preparing-for-exams-1577/1080p.mp4" autoPlay muted loop playsInline className="w-full h-auto object-cover transform group-hover:scale-110 transition-transform duration-700" />
                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-60"></div>
                  <div className="absolute bottom-6 left-6 text-white">
                      <p className="font-bold text-xl">Our Mission</p>

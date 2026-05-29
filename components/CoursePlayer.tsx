@@ -2,6 +2,8 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile } from '../App';
 import AiMentor from './AiMentor';
+import { GoogleGenAI } from '@google/genai';
+import { getGeminiApiKey } from '../utils/gemini';
 
 declare global {
     interface Window {
