@@ -117,13 +117,23 @@ const safeSetItem = (key: string, value: any) => {
 };
 
 // Interface for uploaded product files with specific types
-export type ProductFileType = 'youtube' | 'video' | 'audio' | 'pdf' | 'doc' | 'sheet' | 'link' | 'ebook';
+export type ProductFileType = 'youtube' | 'video' | 'audio' | 'pdf' | 'doc' | 'sheet' | 'link' | 'ebook' | 'quiz';
+export interface QuizQuestion {
+  prompt: string;
+  options: string[];
+  correctAnswer: number;
+}
+export interface ProductQuiz {
+  questions: QuizQuestion[];
+}
+export type QuizAnswerState = Record<number, number>;
 export interface ProductFile {
   id: string;
   name: string;
   type: ProductFileType;
   url: string; // For uploads, this is a Base64 data URL. For links, it's the URL.
-  content?: string; // For rich text e-book content (HTML)
+  content?: string; // For Smart Docs Workspace / e-book HTML content
+  quiz?: ProductQuiz;
 }
 
 // Interface for a course module, now supporting nested modules
