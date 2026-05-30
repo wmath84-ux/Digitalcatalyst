@@ -33,7 +33,7 @@ import ProfilePage from './components/ProfilePage';
 import PlatformExperience from './components/PlatformExperience';
 import WelcomeOverlay from './components/WelcomeOverlay';
 import SubscriptionPage from './components/SubscriptionPage';
-import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { addDoc, collection, doc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
 import { db } from './firebase';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
 
@@ -1337,6 +1337,57 @@ const App: React.FC = () => {
     return true;
   };
 
+  const deductEduCoinsFromLiveDb = async (amount: number, metadata?: Partial<Omit<CoinTransaction, 'amount' | 'type' | 'createdAt'>>) => {
+    if (!currentUser || amount <= 0) return { success: false, balance: currentUser?.eduCoins || 0 };
+    const userRef = doc(db, 'users', String(currentUser.id));
+    let updatedUser: User | null = null;
+
+    try {
+      const result = await runTransaction(db, async transaction => {
+        const snapshot = await transaction.get(userRef);
+        const dbUser = snapshot.exists() ? snapshot.data() as Partial<User> : {};
+        const liveBalance = Number(dbUser.eduCoins ?? currentUser.eduCoins ?? 0);
+        if (liveBalance < amount) {
+          return { success: false, balance: liveBalance };
+        }
+
+        const nextBalance = liveBalance - amount;
+        const mergedUser: User = {
+          ...currentUser,
+          ...dbUser,
+          id: currentUser.id,
+          eduCoins: nextBalance,
+        };
+        transaction.set(userRef, { ...mergedUser, eduCoins: nextBalance }, { merge: true });
+        updatedUser = mergedUser;
+        return { success: true, balance: nextBalance };
+      });
+
+      if (!result.success || !updatedUser) return result;
+
+      const entry = recordCoinTransaction(updatedUser, {
+        amount: -amount,
+        type: 'debit',
+        source: metadata?.source || 'EduCoin redemption',
+        description: metadata?.description || `${amount} EduCoins redeemed`,
+        productId: metadata?.productId,
+        articleId: metadata?.articleId,
+      });
+      const userWithLedger = { ...updatedUser, coinTransactions: [entry, ...(updatedUser.coinTransactions || [])].slice(0, 25) };
+      setCurrentUser(userWithLedger);
+      localStorage.setItem('currentUser', JSON.stringify(userWithLedger));
+      const nextUsers = users.some(user => user.id === userWithLedger.id)
+        ? users.map(user => user.id === userWithLedger.id ? userWithLedger : user)
+        : [...users, userWithLedger];
+      setUsers(nextUsers);
+      safeSetItem('siteUsers', nextUsers);
+      return result;
+    } catch (error) {
+      console.warn('Live EduCoin database check failed; EduCoin checkout was not unlocked.', error);
+      return { success: false, balance: currentUser.eduCoins || 0 };
+    }
+  };
+
   const handleReadingReward = (article: NewsArticle) => {
     const rewardCoins = Math.max(0, Number(economySettings.coinPerArticleRead));
     if (!currentUser) return false;
@@ -1539,6 +1590,21 @@ const App: React.FC = () => {
     const newPurchasedIds = [...new Set([...purchasedProductIds, product.id])];
     setPurchasedProductIds(newPurchasedIds);
     safeSetItem('purchasedProducts', newPurchasedIds);
+    if (currentUser) {
+      void setDoc(doc(db, 'users', String(currentUser.id)), { purchasedProductIds: newPurchasedIds }, { merge: true }).catch(error => {
+        console.warn('Purchased product database sync failed; local unlock remains available.', error);
+      });
+      void setDoc(doc(db, 'users', String(currentUser.id), 'purchases', String(product.id)), {
+        productId: product.id,
+        title: product.title,
+        quantity,
+        total: totalLabel,
+        status,
+        unlockedAt: serverTimestamp(),
+      }, { merge: true }).catch(error => {
+        console.warn('Purchase database record failed; local unlock remains available.', error);
+      });
+    }
     setOrders(prevOrders => [{
       id: `DC-${Date.now()}`,
       customerName: currentUser?.name || currentUser?.email.split('@')[0] || 'Valued Customer',
@@ -1555,15 +1621,16 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
-  const handleProductCoinPurchase = (product: ProductWithRating, quantity: number): boolean => {
+  const handleProductCoinPurchase = async (product: ProductWithRating, quantity: number): Promise<boolean> => {
     if (!currentUser) { setCurrentView('auth'); window.scrollTo(0, 0); return false; }
     const totalCoinPrice = resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity;
     if (!totalCoinPrice) {
       setInfoModal({ title: 'EduCoin checkout unavailable', message: 'This product does not have an EduCoin price configured yet.', icon: '🪙' });
       return false;
     }
-    if (!deductEduCoins(totalCoinPrice, { source: 'Product EduCoin purchase', description: `Unlocked ${product.title} with EduCoins`, productId: product.id })) {
-      setInfoModal({ title: 'Not enough EduCoins', message: `You need ${totalCoinPrice} EduCoins to unlock this product.`, icon: '🪙' });
+    const debit = await deductEduCoinsFromLiveDb(totalCoinPrice, { source: 'Product EduCoin purchase', description: `Unlocked ${product.title} with EduCoins`, productId: product.id });
+    if (!debit.success) {
+      setInfoModal({ title: 'Not enough EduCoins', message: `Your latest wallet balance is ${debit.balance} EduCoins. You need ${totalCoinPrice} EduCoins to unlock this product.`, icon: '🪙' });
       return false;
     }
     completeProductUnlock(product, quantity, `🪙 ${totalCoinPrice}`);
