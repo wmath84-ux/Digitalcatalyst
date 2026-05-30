@@ -482,29 +482,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     );
   }
 
-  if (modalOpen) {
-    return (
-      <PaymentModal
-        settings={settings}
-        productTitle={product.title}
-        originalPrice={originalPriceNum * quantity}
-        salePrice={salePriceNum !== null ? salePriceNum * quantity : null}
-        couponDiscount={totalCouponDiscount}
-        finalPrice={finalTotalPrice}
-        eduCoinDiscount={eduCoinDiscount}
-        appliedEduCoins={activeCoinDiscount?.coins || 0}
-        coinRedeemRate={economySettings.coinToFiatRatio}
-        onClose={handleModalClose}
-        onConfirm={handleModalConfirm}
-        paymentLink={product.paymentLink}
-        currentUser={currentUser}
-        coinPrice={resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity}
-        onConfirmWithCoins={onCoinPurchase ? handleModalConfirmWithCoins : undefined}
-        presentation="page"
-      />
-    );
-  }
-
   const handleImageZoom = (e: React.MouseEvent<HTMLDivElement>) => {
     const zoomer = e.currentTarget.firstChild as HTMLElement;
     const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
@@ -744,22 +721,22 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             
             {/* --- ACTION BUTTONS SECTION --- */}
             <div className="mt-8 max-w-4xl mx-auto">
-                <div className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl sm:p-8">
-                    <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-indigo-200/50 blur-3xl" />
-                    <div className="absolute -bottom-16 -left-16 h-40 w-40 rounded-full bg-emerald-200/50 blur-3xl" />
-                    <div className="relative grid gap-5 lg:grid-cols-[1fr_1.4fr]">
-                        <div className="rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5">
-                            <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">Order quantity</p>
-                            <div className="mt-4 flex items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-inner">
-                                <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="px-5 py-4 text-2xl font-black text-slate-600 transition hover:text-primary" aria-label="Decrease quantity">-</button>
-                                <input type="number" value={quantity} onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} className="w-20 border-x border-slate-200 bg-transparent py-4 text-center text-xl font-black focus:outline-none" aria-label="Quantity" />
-                                <button onClick={() => setQuantity(q => q + 1)} className="px-5 py-4 text-2xl font-black text-slate-600 transition hover:text-primary" aria-label="Increase quantity">+</button>
+                <div className="relative overflow-hidden rounded-[2.25rem] border border-white/70 bg-white/80 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl sm:p-8">
+                    <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-indigo-200/50 blur-3xl" />
+                    <div className="absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-emerald-200/50 blur-3xl" />
+                    <div className="relative grid gap-6 lg:grid-cols-[1fr_1.25fr]">
+                        <div className="rounded-3xl border border-slate-200/70 bg-slate-50/85 p-5">
+                            <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">Ready to unlock</p>
+                            <h3 className="mt-3 text-2xl font-black text-slate-950">{product.title}</h3>
+                            <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">Buy once and access this digital product from My Purchases after verification.</p>
+                            <div className="mt-4 flex items-end justify-between rounded-2xl bg-white/80 p-4 shadow-inner">
+                                <span className="text-sm font-black uppercase tracking-widest text-slate-500">Checkout total</span>
+                                <span className="text-3xl font-black text-primary">₹{finalTotalPrice.toFixed(2)}</span>
                             </div>
-                            <p className="mt-3 text-center text-sm font-semibold text-slate-500">Instant digital access after verification.</p>
                         </div>
                         <div className="space-y-4">
                             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <button onClick={() => onAddToCart(product.id, quantity)} className="w-full rounded-2xl border border-indigo-200/70 bg-white/80 px-8 py-4 text-lg font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95">
+                                <button onClick={() => onAddToCart(product.id, 1)} className="w-full rounded-2xl border border-indigo-200/70 bg-white/85 px-8 py-4 text-lg font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95">
                                     Add to Cart
                                 </button>
                                 <button disabled={isPurchased} onClick={handleBuyClick} className="w-full rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 px-8 py-4 text-lg font-black text-white shadow-[0_14px_35px_rgba(34,197,94,0.25)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(34,197,94,0.32)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
@@ -767,14 +744,16 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                                 </button>
                             </div>
                             <div className="grid gap-3 text-sm font-bold text-slate-600 sm:grid-cols-3">
-                                <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-3 text-center">🔒 Secure Razorpay</div>
-                                <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-3 text-center">⚡ Fast verification</div>
-                                <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-3 text-center">📚 Lifetime access</div>
+                                <div className="rounded-2xl border border-slate-200/70 bg-white/75 p-3 text-center">🔒 Secure Razorpay</div>
+                                <div className="rounded-2xl border border-slate-200/70 bg-white/75 p-3 text-center">🪙 EduCoin option</div>
+                                <div className="rounded-2xl border border-slate-200/70 bg-white/75 p-3 text-center">📚 Lifetime access</div>
                             </div>
+                            <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-slate-400">No quantity selection needed for this digital unlock</p>
                         </div>
                     </div>
                 </div>
             </div>
+
 
         </div>
       </section>
