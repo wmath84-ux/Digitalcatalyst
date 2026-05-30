@@ -19,32 +19,39 @@ interface PaymentModalProps {
   currentUser?: User | null;
   coinPrice?: number;
   onConfirmWithCoins?: () => void;
+  onStartEarning?: () => void;
+  initialShowCoinGuide?: boolean;
   presentation?: 'modal' | 'page';
 }
 
 const coinEarnMethods = [
-  { icon: '▶️', title: 'Watch course videos', text: 'Play lessons in a focused tab to earn video watch-time EduCoins.' },
-  { icon: '🧠', title: 'Complete quizzes', text: 'Attempt course quizzes and claim rewards for correct progress.' },
-  { icon: '📰', title: 'Read learning updates', text: 'Use the reading/news hub when reading rewards are available.' },
-  { icon: '🎁', title: 'Claim profile rewards', text: 'Check profile milestones, purchase rewards, and limited coin offers.' },
+  { icon: '📺', title: 'Watch Videos', text: '1 Coin/min' },
+  { icon: '📝', title: 'Read Articles', text: '10 Coins' },
+  { icon: '🏆', title: 'Take Quizzes', text: '2 Coins/correct answer' },
 ];
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice, salePrice, couponDiscount, finalPrice, eduCoinDiscount = 0, appliedEduCoins = 0, coinRedeemRate = 10, onClose, onConfirm, cartItems, paymentLink, currentUser, coinPrice = 0, onConfirmWithCoins, presentation = 'modal' }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice, salePrice, couponDiscount, finalPrice, eduCoinDiscount = 0, appliedEduCoins = 0, coinRedeemRate = 10, onClose, onConfirm, cartItems, paymentLink, currentUser, coinPrice = 0, onConfirmWithCoins, onStartEarning, initialShowCoinGuide = false, presentation = 'modal' }) => {
   const [paymentOpened, setPaymentOpened] = useState(false);
   const [verificationSubmitted, setVerificationSubmitted] = useState(false);
-  const [showCoinGuide, setShowCoinGuide] = useState(false);
+  const [showCoinGuide, setShowCoinGuide] = useState(initialShowCoinGuide);
   const pageRef = useRef<HTMLDivElement>(null);
   const razorpayUrl = paymentLink || 'https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view';
   const isCartMode = !!cartItems && cartItems.length > 0;
-  const eduCoinBalance = currentUser?.eduCoins || 0;
+  const eduCoinBalance = (currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0;
   const canPayWithCoins = !!onConfirmWithCoins && coinPrice > 0 && eduCoinBalance >= coinPrice;
   const missingCoins = Math.max(0, coinPrice - eduCoinBalance);
 
   useEffect(() => {
     if (presentation === 'page') {
-      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      window.scrollTo(0, 0);
       pageRef.current?.scrollTo({ top: 0, left: 0, behavior: 'auto' });
     }
+
+    return () => {
+      document.body.classList.remove('overflow-hidden', 'pointer-events-none');
+      document.body.style.overflow = '';
+      document.body.style.pointerEvents = '';
+    };
   }, [presentation]);
 
   useEffect(() => {
@@ -74,15 +81,18 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice
   };
 
   const handleCoinCheckout = () => {
-    if (!canPayWithCoins) {
-      setShowCoinGuide(true);
-      if (presentation === 'page') {
-        window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-        pageRef.current?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-      }
+    const user = currentUser as (User & { coinBalance?: number }) | null | undefined;
+    const userCoinBalance = user?.coinBalance ?? user?.eduCoins ?? 0;
+    if (userCoinBalance >= coinPrice && onConfirmWithCoins) {
+      onConfirmWithCoins();
       return;
     }
-    onConfirmWithCoins?.();
+
+    setShowCoinGuide(true);
+    if (presentation === 'page') {
+      window.scrollTo(0, 0);
+      pageRef.current?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    }
   };
 
   const coinGuideContent = (
@@ -90,11 +100,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice
       <div className="rounded-[1.75rem] border border-amber-200 bg-gradient-to-br from-amber-50 via-white to-orange-50 p-6 text-center shadow-sm">
         <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-100 text-3xl">🪙</div>
         <p className="mt-4 text-xs font-black uppercase tracking-[0.28em] text-amber-600">EduCoin balance low</p>
-        <h3 className="mt-2 text-3xl font-black text-slate-950">Need {missingCoins} more EduCoins</h3>
-        <p className="mx-auto mt-3 max-w-lg text-sm font-semibold leading-6 text-slate-600">Your current balance is {eduCoinBalance} EduCoins, and this checkout needs {coinPrice} EduCoins. Earn more coins or use Razorpay to unlock now.</p>
+        <h3 className="mt-2 text-3xl font-black text-slate-950">Earn more EduCoins</h3>
+        <p className="mx-auto mt-3 max-w-lg text-sm font-semibold leading-6 text-slate-600">Your current balance is {eduCoinBalance} EduCoins, and this checkout needs {coinPrice} EduCoins. Here are the fastest ways to top up your learning wallet.</p>
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="grid gap-3 sm:grid-cols-3">
         {coinEarnMethods.map(method => (
           <div key={method.title} className="rounded-2xl border border-slate-200 bg-white/80 p-4 shadow-sm">
             <div className="text-2xl">{method.icon}</div>
@@ -106,7 +116,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice
 
       <div className="grid gap-3 sm:grid-cols-2">
         <button onClick={() => setShowCoinGuide(false)} className="rounded-2xl border border-slate-200 bg-white px-6 py-4 text-base font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-slate-50">Back to checkout</button>
-        <button onClick={handlePayNow} className="rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 text-base font-black text-white shadow-[0_12px_34px_rgba(79,70,229,0.22)] transition hover:-translate-y-0.5">Pay with Razorpay instead</button>
+        <button onClick={onStartEarning || (() => setShowCoinGuide(false))} className="rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 text-base font-black text-white shadow-[0_12px_34px_rgba(79,70,229,0.22)] transition hover:-translate-y-0.5">Start Earning</button>
       </div>
     </div>
   );
