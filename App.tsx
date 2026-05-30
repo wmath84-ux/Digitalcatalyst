@@ -253,6 +253,7 @@ export interface NewsArticle {
   content: string;
   type?: 'news' | 'blog';
   thumbnailImage?: string;
+  coverImage: string;
   createdAt?: string;
 }
 
@@ -516,6 +517,7 @@ const initialNewsArticles: NewsArticle[] = [
     imageSeed: "futuristic-seo-trends",
     type: "blog",
     thumbnailImage: "",
+    coverImage: "https://placehold.co/800x400/e0e7ff/312e81?text=SEO+Trends",
     createdAt: "2024-07-28T09:00:00.000Z",
     category: "SEO",
     title: "Top 5 SEO Trends to Watch in 2025",
@@ -528,6 +530,7 @@ const initialNewsArticles: NewsArticle[] = [
     imageSeed: "ecommerce-conversion-funnel",
     type: "blog",
     thumbnailImage: "",
+    coverImage: "https://placehold.co/800x400/e0e7ff/312e81?text=Ecommerce+Psychology",
     createdAt: "2024-07-25T09:00:00.000Z",
     category: "E-commerce",
     title: "The Psychology of Online Shopping: How to Convert More Customers",
@@ -540,6 +543,7 @@ const initialNewsArticles: NewsArticle[] = [
     imageSeed: "ai-writing-robot",
     type: "news",
     thumbnailImage: "",
+    coverImage: "https://placehold.co/800x400/e0e7ff/312e81?text=AI+Content+Marketing",
     createdAt: "2024-07-22T09:00:00.000Z",
     category: "Marketing",
     title: "AI in Content Marketing: A Practical Guide for Small Businesses",
