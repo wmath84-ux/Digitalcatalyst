@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { WebsiteSettings, HomepageSection, NewsArticle, Announcement } from '../../App';
+import { WebsiteSettings, HomepageSection, NewsArticle, Announcement, ProductWithRating } from '../../App';
 import { ServiceItem } from '../Services';
 import { FaqItem } from '../Faq';
 import { UpcomingFeatureItem } from '../UpcomingFeatures';
@@ -311,10 +311,14 @@ const AnnouncementFormModal: React.FC<{ announcement: Announcement, onSave: (a: 
 
 interface WebsiteSettingsProps {
     settings: WebsiteSettings;
+    products?: ProductWithRating[];
     onSettingsChange: (settings: WebsiteSettings) => void;
 }
 
-const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, onSettingsChange }) => {
+type EditableSubscriptionPlan = { id: string; name: string; price: number; description: string; unlockProductIds: number[]; badge?: string; };
+type EditableReward = { id: string; title: string; cost: number; };
+
+const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, products = [], onSettingsChange }) => {
     const [activeTab, setActiveTab] = useState<'theme' | 'layout' | 'content' | 'blog' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
     const [localSettings, setLocalSettings] = useState<WebsiteSettings>(settings);
     const [showSuccess, setShowSuccess] = useState(false);
@@ -355,6 +359,59 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, on
         setLocalSettings(prev => ({ ...prev, layout: newLayout }));
     };
     
+    const updateContentValue = (field: string, value: any) => {
+        handleNestedChange('content', field, value);
+    };
+
+    const subscriptionPlans = (((localSettings.content as any).subscriptionPlans || []) as EditableSubscriptionPlan[]).map(plan => ({
+        ...plan,
+        unlockProductIds: plan.unlockProductIds || [],
+    }));
+    const redeemRewards = (((localSettings.content as any).redeemRewards || []) as EditableReward[]);
+    const eduCoinRules = ((localSettings.content as any).eduCoinRules || { purchase: 25, redeemRate: 10 }) as { purchase: number; redeemRate: number };
+    const dockItems = (((localSettings.content as any).dockItems || []) as string[]);
+    const defaultDockItems = ['Store', 'Purchases', 'Wishlist', 'Cart', 'News', 'Blog', 'Free', 'Profile', 'Subscriptions'];
+
+    const updatePlan = (planIndex: number, updates: Partial<EditableSubscriptionPlan>) => {
+        const nextPlans = subscriptionPlans.map((plan, index) => index === planIndex ? { ...plan, ...updates } : plan);
+        updateContentValue('subscriptionPlans', nextPlans);
+    };
+
+    const addPlan = () => {
+        updateContentValue('subscriptionPlans', [
+            ...subscriptionPlans,
+            { id: `plan-${Date.now()}`, name: 'New Plan', price: 299, description: 'Describe this plan', unlockProductIds: [] },
+        ]);
+    };
+
+    const removePlan = (planIndex: number) => {
+        updateContentValue('subscriptionPlans', subscriptionPlans.filter((_, index) => index !== planIndex));
+    };
+
+    const togglePlanProduct = (planIndex: number, productId: number) => {
+        const plan = subscriptionPlans[planIndex];
+        const currentIds = plan.unlockProductIds || [];
+        const nextIds = currentIds.includes(productId) ? currentIds.filter(id => id !== productId) : [...currentIds, productId];
+        updatePlan(planIndex, { unlockProductIds: nextIds });
+    };
+
+    const updateReward = (rewardIndex: number, updates: Partial<EditableReward>) => {
+        updateContentValue('redeemRewards', redeemRewards.map((reward, index) => index === rewardIndex ? { ...reward, ...updates } : reward));
+    };
+
+    const addReward = () => {
+        updateContentValue('redeemRewards', [...redeemRewards, { id: `reward-${Date.now()}`, title: 'New Reward', cost: 100 }]);
+    };
+
+    const removeReward = (rewardIndex: number) => {
+        updateContentValue('redeemRewards', redeemRewards.filter((_, index) => index !== rewardIndex));
+    };
+
+    const toggleDockItem = (label: string) => {
+        const nextItems = dockItems.includes(label) ? dockItems.filter(item => item !== label) : [...dockItems, label];
+        updateContentValue('dockItems', nextItems);
+    };
+
     const moveSection = (index: number, direction: 'up' | 'down') => {
         const newLayout = [...localSettings.layout];
         const newIndex = direction === 'up' ? index - 1 : index + 1;
@@ -480,12 +537,97 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, on
                     </div>
 
 
-                    <div className="bg-slate-50 rounded-lg p-4 mt-4">
-                        <h3 className="font-bold text-gray-800 mb-2">Gamification & Subscription (JSON)</h3>
-                        <FormRow label="EduCoin Rules" description="Example JSON with purchase and redeemRate"><textarea value={JSON.stringify((localSettings.content as any).eduCoinRules || { purchase: 25, redeemRate: 10 })} onChange={e => { try { handleNestedChange('content' as any, 'eduCoinRules' as any, JSON.parse(e.target.value)); } catch {} }} className="w-full p-2 border rounded font-mono text-xs" rows={2} /></FormRow>
-                        <FormRow label="Rewards" description="Example: [{id:'r1',title:'₹50 discount',cost:100}]"><textarea value={JSON.stringify((localSettings.content as any).redeemRewards || [])} onChange={e => { try { handleNestedChange('content' as any, 'redeemRewards' as any, JSON.parse(e.target.value)); } catch {} }} className="w-full p-2 border rounded font-mono text-xs" rows={4} /></FormRow>
-                        <FormRow label="Subscription Plans" description="Define plans and unlockProductIds"><textarea value={JSON.stringify((localSettings.content as any).subscriptionPlans || [])} onChange={e => { try { handleNestedChange('content' as any, 'subscriptionPlans' as any, JSON.parse(e.target.value)); } catch {} }} className="w-full p-2 border rounded font-mono text-xs" rows={5} /></FormRow>
-                        <FormRow label="Dock Items" description="Array of labels e.g. ['Store','Purchases']"><textarea value={JSON.stringify((localSettings.content as any).dockItems || [])} onChange={e => { try { handleNestedChange('content' as any, 'dockItems' as any, JSON.parse(e.target.value)); } catch {} }} className="w-full p-2 border rounded font-mono text-xs" rows={2} /></FormRow>
+                    <div className="bg-slate-50 rounded-lg p-4 mt-4 border border-slate-200">
+                        <div className="mb-4">
+                            <h3 className="font-bold text-gray-800">Gamification & Subscription</h3>
+                            <p className="text-sm text-gray-500 mt-1">No JSON needed — edit rewards, coins, plans, unlocked products, and dock labels directly.</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <div className="rounded-xl border bg-white p-4">
+                                <h4 className="font-bold text-gray-800">EduCoin Rules</h4>
+                                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                    <label className="block text-sm font-semibold text-gray-700">Coins per purchase
+                                        <input type="number" min="0" value={eduCoinRules.purchase} onChange={e => updateContentValue('eduCoinRules', { ...eduCoinRules, purchase: Number(e.target.value) || 0 })} className="mt-1 w-full rounded border p-2" />
+                                    </label>
+                                    <label className="block text-sm font-semibold text-gray-700">Redeem rate
+                                        <input type="number" min="0" value={eduCoinRules.redeemRate} onChange={e => updateContentValue('eduCoinRules', { ...eduCoinRules, redeemRate: Number(e.target.value) || 0 })} className="mt-1 w-full rounded border p-2" />
+                                    </label>
+                                </div>
+                            </div>
+
+                            <div className="rounded-xl border bg-white p-4">
+                                <div className="flex items-center justify-between gap-3">
+                                    <h4 className="font-bold text-gray-800">Rewards</h4>
+                                    <button type="button" onClick={addReward} className="rounded-lg bg-green-600 px-3 py-2 text-sm font-bold text-white">+ Add Reward</button>
+                                </div>
+                                <div className="mt-3 space-y-3">
+                                    {redeemRewards.map((reward, rewardIndex) => (
+                                        <div key={reward.id || rewardIndex} className="grid grid-cols-1 gap-2 rounded-lg border bg-gray-50 p-3 sm:grid-cols-[1fr_7rem_auto]">
+                                            <input value={reward.title} onChange={e => updateReward(rewardIndex, { title: e.target.value })} placeholder="Reward title" className="rounded border p-2" />
+                                            <input type="number" min="0" value={reward.cost} onChange={e => updateReward(rewardIndex, { cost: Number(e.target.value) || 0 })} placeholder="Cost" className="rounded border p-2" />
+                                            <button type="button" onClick={() => removeReward(rewardIndex)} className="rounded border border-red-200 px-3 py-2 text-sm font-bold text-red-600">Remove</button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-5 rounded-xl border bg-white p-4">
+                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <h4 className="font-bold text-gray-800">Subscription Plans</h4>
+                                    <p className="text-sm text-gray-500">Plan name, price, description, badge, and products to unlock.</p>
+                                </div>
+                                <button type="button" onClick={addPlan} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">+ Add Plan</button>
+                            </div>
+                            <div className="mt-4 space-y-4">
+                                {subscriptionPlans.map((plan, planIndex) => (
+                                    <div key={plan.id || planIndex} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                                            <label className="text-sm font-semibold text-gray-700">Plan Name
+                                                <input value={plan.name} onChange={e => updatePlan(planIndex, { name: e.target.value })} className="mt-1 w-full rounded border p-2" />
+                                            </label>
+                                            <label className="text-sm font-semibold text-gray-700">Price (₹)
+                                                <input type="number" min="0" value={plan.price} onChange={e => updatePlan(planIndex, { price: Number(e.target.value) || 0 })} className="mt-1 w-full rounded border p-2" />
+                                            </label>
+                                            <label className="text-sm font-semibold text-gray-700">Badge Text
+                                                <input value={plan.badge || ''} onChange={e => updatePlan(planIndex, { badge: e.target.value })} placeholder="Popular / Best Value" className="mt-1 w-full rounded border p-2" />
+                                            </label>
+                                            <button type="button" onClick={() => removePlan(planIndex)} className="mt-6 rounded border border-red-200 px-3 py-2 text-sm font-bold text-red-600">Remove Plan</button>
+                                        </div>
+                                        <label className="mt-3 block text-sm font-semibold text-gray-700">Description
+                                            <textarea value={plan.description} onChange={e => updatePlan(planIndex, { description: e.target.value })} rows={2} className="mt-1 w-full rounded border p-2" />
+                                        </label>
+                                        <div className="mt-3">
+                                            <p className="text-sm font-semibold text-gray-700">Products unlocked by this plan</p>
+                                            {products.length ? (
+                                                <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
+                                                    {products.map(product => (
+                                                        <label key={product.id} className="flex items-center gap-2 rounded-lg border bg-white p-2 text-sm text-gray-700">
+                                                            <input type="checkbox" checked={(plan.unlockProductIds || []).includes(product.id)} onChange={() => togglePlanProduct(planIndex, product.id)} />
+                                                            <span className="font-semibold">{product.title}</span>
+                                                        </label>
+                                                    ))}
+                                                </div>
+                                            ) : (
+                                                <input value={(plan.unlockProductIds || []).join(', ')} onChange={e => updatePlan(planIndex, { unlockProductIds: e.target.value.split(',').map(value => Number(value.trim())).filter(Boolean) })} placeholder="Product IDs e.g. 1, 2, 3" className="mt-2 w-full rounded border p-2" />
+                                            )}
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+
+                        <div className="mt-5 rounded-xl border bg-white p-4">
+                            <h4 className="font-bold text-gray-800">Bottom Dock Items</h4>
+                            <p className="text-sm text-gray-500">Choose which labels should appear in the bottom dock.</p>
+                            <div className="mt-3 flex flex-wrap gap-2">
+                                {defaultDockItems.map(label => (
+                                    <button type="button" key={label} onClick={() => toggleDockItem(label)} className={`rounded-full border px-4 py-2 text-sm font-bold ${dockItems.includes(label) ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>{label}</button>
+                                ))}
+                            </div>
+                        </div>
                     </div>
 
                     {/* Footer & Social */}

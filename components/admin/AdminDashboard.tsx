@@ -66,7 +66,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             case 'coupons': return <CouponManagement coupons={props.coupons} onUpdate={props.onCouponsUpdate} />;
             case 'support': return <SupportManagement tickets={props.tickets} onUpdate={props.onTicketsUpdate} />;
             case 'analytics': return <Analytics orders={props.orders} products={props.products} users={props.users} reviews={props.reviews} />;
-            case 'websiteSettings': return <WebsiteSettingsComponent settings={props.websiteSettings} onSettingsChange={props.onWebsiteSettingsChange} />;
+            case 'websiteSettings': return <WebsiteSettingsComponent settings={props.websiteSettings} products={props.products} onSettingsChange={props.onWebsiteSettingsChange} />;
             case 'dashboard': default: 
                 const completedOrders = props.orders.filter(o => o.status === 'Completed');
                 const totalRevenue = completedOrders.reduce((sum, order) => sum + parseFloat(order.total.replace('₹', '').replace(/,/g, '') || '0'), 0);
