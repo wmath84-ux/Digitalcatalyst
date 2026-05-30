@@ -58,11 +58,29 @@ const createEmptyProductForm = (product?: ProductWithRating | null): ProductForm
     tagsText: (product?.tags || []).join(', '),
 });
 
+const normaliseQuizQuestions = (questions?: QuizQuestion[]): QuizQuestion[] => (questions || []).map(question => ({
+    prompt: question.prompt || '',
+    options: question.options || [],
+    correctAnswer: question.correctAnswer ?? 0,
+}));
+
+const normaliseFiles = (files?: ProductFile[]): ProductFile[] => (files || []).map(file => ({
+    ...file,
+    content: file.content || '',
+    quiz: file.quiz ? { questions: normaliseQuizQuestions(file.quiz.questions || []) } : file.type === 'quiz' ? { questions: [] } : undefined,
+}));
+
 const normaliseModules = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
     ...module,
-    files: module.files || [],
+    title: module.title || 'Untitled Module',
+    files: normaliseFiles(module.files || []),
     modules: normaliseModules(module.modules || []),
 }));
+
+const countModuleContent = (modules?: CourseModule[]): number => (modules || []).reduce(
+    (count, module) => count + (module.files || []).length + countModuleContent(module.modules || []),
+    0
+);
 
 const recursiveFileUpdate = (
     modules: CourseModule[],
@@ -379,7 +397,7 @@ const ProductForm: React.FC<{
     }, [formData.isFree]);
 
     const handleProductImagesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(event.target.files || []);
+        const files: File[] = event.currentTarget.files ? Array.from(event.currentTarget.files) as File[] : [];
         files.forEach(file => {
             const reader = new FileReader();
             reader.onload = () => setImages(prev => [...(prev || []), reader.result as string]);
@@ -445,6 +463,8 @@ const ProductForm: React.FC<{
             paymentLink: formData.paymentLink,
             courseContent: normaliseModules(modules || []),
             priceHistory: product?.priceHistory || [],
+            wishlistCount: product?.wishlistCount,
+            viewCount: product?.viewCount,
         });
     };
 
@@ -688,7 +708,7 @@ const ProductManagement: React.FC<{
                             <tbody className="divide-y divide-white/10">
                                 {safeProducts.length > 0 ? safeProducts.map(product => {
                                     const thumbnail = product.images?.[0] || `https://picsum.photos/seed/${product.imageSeed || product.id}/100/100`;
-                                    const contentCount = (product.courseContent || []).reduce((count, module) => count + (module.files || []).length + (module.modules || []).length, 0);
+                                    const contentCount = countModuleContent(product.courseContent || []);
                                     return (
                                         <tr key={product.id} className="group transition hover:bg-white/5">
                                             <td className="p-5">
