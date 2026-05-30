@@ -25,26 +25,26 @@ const smartDocToolbarCommands: Array<[string, string]> | undefined = [['bold', '
 const readingThemeOptions: Array<'dark' | 'sepia' | 'light'> | undefined = ['dark', 'sepia', 'light'];
 
 const VideoUnavailablePlaceholder: React.FC = () => (
-  <div className="flex h-full w-full flex-col items-center justify-center bg-slate-950/80 p-4 text-center text-white backdrop-blur-xl">
-    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-white/30 bg-white/10">
-      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white/70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+  <div className="flex h-full w-full flex-col items-center justify-center bg-white/70 p-4 text-center text-slate-900 backdrop-blur-xl">
+    <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-white/50 bg-white/70">
+      <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-slate-900/70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
     </div>
     <h3 className="text-xl font-semibold">Video unavailable</h3>
-    <p className="mt-1 text-white/60">This video is unavailable in this environment.</p>
+    <p className="mt-1 text-slate-900/60">This video is unavailable in this environment.</p>
   </div>
 );
 
 const GlassDownloadCard: React.FC<{ file: ProductFile; headline?: string }> = ({ file, headline = 'Your download is ready' }) => (
-  <div className="flex h-full w-full items-center justify-center overflow-hidden bg-slate-950/20 p-6 text-white">
+  <div className="flex h-full w-full items-center justify-center overflow-hidden bg-white/70 p-6 text-slate-900">
     <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.32),transparent_26%),radial-gradient(circle_at_75%_70%,rgba(125,211,252,0.28),transparent_24%)]" />
-    <div className="relative w-full max-w-lg rounded-[2rem] border border-white/25 bg-white/10 p-8 text-center shadow-[inset_0_1px_0_rgba(255,255,255,0.35),0_30px_80px_rgba(15,23,42,0.35)] backdrop-blur-xl">
-      <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-3xl border border-white/30 bg-white/15 shadow-[0_0_45px_rgba(255,255,255,0.22)]">
-        <FileIcon className="h-12 w-12 text-white" />
+    <div className="relative w-full max-w-lg rounded-[2rem] border border-white/50 bg-white/70 p-8 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl">
+      <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-3xl border border-white/50 bg-white/15 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+        <FileIcon className="h-12 w-12 text-slate-900" />
       </div>
-      <p className="text-sm font-black uppercase tracking-[0.3em] text-cyan-100/90">PDF / Document</p>
-      <h2 className="mt-3 text-3xl font-black leading-tight text-white">{headline}</h2>
-      <p className="mx-auto mt-3 max-w-sm truncate text-base font-semibold text-white/80" title={file.name}>{file.name}</p>
-      <a href={file.url} download={file.name} target="_blank" rel="noopener noreferrer" className="group mt-8 inline-flex items-center justify-center rounded-2xl bg-cyan-100 px-7 py-4 text-base font-black text-slate-950 shadow-[0_18px_45px_rgba(255,255,255,0.28)] transition duration-300 hover:-translate-y-1 hover:scale-[1.03] hover:bg-cyan-50 hover:shadow-[0_24px_70px_rgba(125,211,252,0.38)]">
+      <p className="text-sm font-black uppercase tracking-[0.3em] text-cyan-700/90">PDF / Document</p>
+      <h2 className="mt-3 text-3xl font-black leading-tight text-slate-900">{headline}</h2>
+      <p className="mx-auto mt-3 max-w-sm truncate text-base font-semibold text-slate-900/80" title={file.name}>{file.name}</p>
+      <a href={file.url} download={file.name} target="_blank" rel="noopener noreferrer" className="group mt-8 inline-flex items-center justify-center rounded-2xl bg-cyan-100 px-7 py-4 text-base font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition duration-300 hover:-translate-y-1 hover:scale-[1.03] hover:bg-cyan-50 hover:shadow-sm">
         Click here to download <span className="ml-2 transition group-hover:translate-y-0.5">↓</span>
       </a>
     </div>
@@ -54,15 +54,15 @@ const GlassDownloadCard: React.FC<{ file: ProductFile; headline?: string }> = ({
 const ModuleItem: React.FC<{ module: CourseModule; activeFile: ProductFile | null; onSelectFile: (file: ProductFile) => void; level?: number; }> = ({ module, activeFile, onSelectFile, level = 0 }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   return (
-    <div className={`${level > 0 ? "ml-4 border-l border-white/10 pl-3" : ""}`}>
-      <button onClick={() => setIsExpanded(!isExpanded)} className="flex w-full items-center gap-2 rounded-xl px-3 py-4 text-left text-slate-100 transition hover:bg-cyan-50/30" aria-expanded={isExpanded}>
+    <div className={`${level > 0 ? "ml-4 border-l border-white/50 pl-3" : ""}`}>
+      <button onClick={() => setIsExpanded(!isExpanded)} className="flex w-full items-center gap-2 rounded-xl px-3 py-4 text-left text-slate-900 transition hover:bg-cyan-50/30" aria-expanded={isExpanded}>
         <ModuleIcon className="h-5 w-5 shrink-0" />
         <span className="text-[15px] font-black leading-tight">{module.title}</span>
       </button>
       {isExpanded && (
         <div className="space-y-1 pb-2">
           {(module.files || []).map((file) => (
-            <button key={file.id} onClick={() => onSelectFile(file)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition ${activeFile?.id === file.id ? "border border-cyan-200/50 bg-cyan-200/15 font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_24px_rgba(34,211,238,0.14)]" : "font-medium text-slate-100/90 hover:bg-cyan-50/25"}`}>
+            <button key={file.id} onClick={() => onSelectFile(file)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition ${activeFile?.id === file.id ? "border border-cyan-200/50 bg-cyan-200/15 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)]" : "font-medium text-slate-900/90 hover:bg-cyan-50/25"}`}>
               <span className="min-w-0 flex-1 truncate">{file.name}</span>
               {file.type === 'quiz' ? <QuizIcon className="h-5 w-5 shrink-0" /> : <FileIcon className="h-5 w-5 shrink-0" />}
             </button>
@@ -120,8 +120,8 @@ const fontStyleClasses: Record<ReadingFontStyle, string> = {
 };
 
 const readingThemeClasses: Record<ReadingTheme, string> = {
-  dark: 'border-white/10 bg-slate-950/95 text-slate-100',
-  light: 'border-slate-200/80 bg-slate-50/95 text-slate-950',
+  dark: 'border-white/50 bg-white/70 text-slate-900',
+  light: 'border-slate-200/80 bg-slate-50/95 text-slate-900',
   sepia: 'border-amber-200/60 bg-[#f4ecd8]/95 text-[#352516]',
 };
 
@@ -131,7 +131,7 @@ const RichTextButton: React.FC<{ active?: boolean; children: React.ReactNode; on
     title={title}
     onMouseDown={(event) => event.preventDefault()}
     onClick={onClick}
-    className={`rounded-xl border px-3 py-2 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-white/20 ${active ? 'border-cyan-200 bg-cyan-300/25 shadow-[0_0_24px_rgba(125,211,252,0.25)]' : 'border-white/15 bg-white/10'}`}
+    className={`rounded-xl border px-3 py-2 text-sm font-black text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-sm ${active ? 'border-cyan-200 bg-cyan-300/25 shadow-sm' : 'border-white/50 bg-white/70'}`}
   >
     {children}
   </button>
@@ -169,24 +169,24 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   };
 
   const readingTheme = {
-    dark: 'bg-slate-950/95 text-slate-100',
+    dark: 'bg-white/70 text-slate-900',
     sepia: 'bg-[#2b2118]/95 text-[#f7e7c6]',
-    light: 'bg-slate-100/95 text-slate-950',
+    light: 'bg-slate-100/95 text-slate-900',
   }[theme];
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-white/[0.06] text-slate-100 backdrop-blur-xl">
-      <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-slate-950/35 p-3 shadow-sm backdrop-blur-xl">
-        <span className="mr-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-black uppercase tracking-widest text-cyan-100">Smart Docs Workspace</span>
-        {(smartDocToolbarCommands || []).map(([cmd, label]) => <button key={cmd} type="button" onClick={() => runCommand(cmd)} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white shadow-sm hover:bg-cyan-50/20">{label}</button>)}
-        <button type="button" onClick={() => runCommand('formatBlock', 'H1')} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white hover:bg-cyan-50/20">H1</button>
-        <button type="button" onClick={() => runCommand('formatBlock', 'H2')} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white hover:bg-cyan-50/20">H2</button>
-        <button type="button" onClick={() => runCommand('insertUnorderedList')} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white hover:bg-cyan-50/20">• List</button>
-        <button type="button" onClick={() => runCommand('justifyLeft')} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white hover:bg-cyan-50/20">Left</button>
-        <button type="button" onClick={() => runCommand('justifyCenter')} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white hover:bg-cyan-50/20">Center</button>
-        <button type="button" onClick={() => runCommand('justifyRight')} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white hover:bg-cyan-50/20">Right</button>
-        <span className="ml-auto text-xs font-bold text-slate-300/80">{savedAt}</span>
-        <button type="button" onClick={() => setIsReadingMode(true)} className="rounded-2xl border border-cyan-200/30 bg-cyan-200/15 px-4 py-2 font-black text-cyan-50 shadow-lg transition hover:-translate-y-0.5 hover:bg-cyan-200/25">Reading Mode</button>
+    <div className="relative flex h-full flex-col overflow-hidden bg-white/70 text-slate-900 backdrop-blur-xl">
+      <div className="flex flex-wrap items-center gap-2 border-b border-white/50 bg-white/70 p-3 shadow-sm backdrop-blur-xl">
+        <span className="mr-2 rounded-full border border-white/50 bg-white/70 px-3 py-2 text-xs font-black uppercase tracking-widest text-cyan-700">Smart Docs Workspace</span>
+        {(smartDocToolbarCommands || []).map(([cmd, label]) => <button key={cmd} type="button" onClick={() => runCommand(cmd)} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 shadow-sm hover:bg-white/80 hover:shadow-sm">{label}</button>)}
+        <button type="button" onClick={() => runCommand('formatBlock', 'H1')} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 hover:bg-white/80 hover:shadow-sm">H1</button>
+        <button type="button" onClick={() => runCommand('formatBlock', 'H2')} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 hover:bg-white/80 hover:shadow-sm">H2</button>
+        <button type="button" onClick={() => runCommand('insertUnorderedList')} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 hover:bg-white/80 hover:shadow-sm">• List</button>
+        <button type="button" onClick={() => runCommand('justifyLeft')} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 hover:bg-white/80 hover:shadow-sm">Left</button>
+        <button type="button" onClick={() => runCommand('justifyCenter')} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 hover:bg-white/80 hover:shadow-sm">Center</button>
+        <button type="button" onClick={() => runCommand('justifyRight')} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 hover:bg-white/80 hover:shadow-sm">Right</button>
+        <span className="ml-auto text-xs font-bold text-slate-600/80">{savedAt}</span>
+        <button type="button" onClick={() => setIsReadingMode(true)} className="rounded-2xl border border-cyan-200/30 bg-cyan-200/15 px-4 py-2 font-black text-cyan-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:bg-cyan-200/25">Reading Mode</button>
       </div>
       <div className="flex-1 overflow-y-auto p-5 md:p-10">
         <div
@@ -195,20 +195,20 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
           suppressContentEditableWarning
           onInput={persist}
           onBlur={persist}
-          className="smart-docs-page mx-auto min-h-full max-w-4xl rounded-[1.5rem] border border-white/10 bg-white/[0.08] px-8 py-10 text-lg leading-8 text-slate-50 shadow-[0_25px_80px_rgba(2,6,23,0.35)] outline-none backdrop-blur-xl md:px-14 [&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6"
+          className="smart-docs-page mx-auto min-h-full max-w-4xl rounded-[1.5rem] border border-white/50 bg-white/70 px-8 py-10 text-lg leading-8 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl md:px-14 [&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6"
         />
       </div>
       {isReadingMode && (
-        <div className="absolute inset-4 z-20 flex flex-col overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/70 shadow-[0_30px_100px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
-          <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-white/10 p-3">
-            <span className="mr-auto font-black text-white">Reading Mode</span>
-            <button type="button" onClick={() => setFontSize(value => Math.max(14, value - 2))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">A-</button>
-            <button type="button" onClick={() => setFontSize(value => Math.min(28, value + 2))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">A+</button>
-            <button type="button" onClick={() => setLineSpacing(value => Math.max(1.25, Number((value - 0.15).toFixed(2))))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">Line -</button>
-            <button type="button" onClick={() => setLineSpacing(value => Math.min(2.4, Number((value + 0.15).toFixed(2))))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">Line +</button>
-            <button type="button" onClick={() => setFontStyle(value => value === 'sans' ? 'serif' : 'sans')} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">{fontStyle === 'sans' ? 'Serif' : 'Sans'}</button>
-            {(readingThemeOptions || []).map(option => <button key={option} type="button" onClick={() => setTheme(option)} className={`rounded-xl px-3 py-2 font-black capitalize ${theme === option ? 'bg-cyan-200 text-slate-950' : 'bg-white/10 hover:bg-cyan-50/20'}`}>{option}</button>)}
-            <button type="button" onClick={() => setIsReadingMode(false)} className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 font-black hover:bg-cyan-50/20">Close</button>
+        <div className="absolute inset-4 z-20 flex flex-col overflow-hidden rounded-[2rem] border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
+          <div className="flex flex-wrap items-center gap-2 border-b border-white/50 bg-white/70 p-3">
+            <span className="mr-auto font-black text-slate-900">Reading Mode</span>
+            <button type="button" onClick={() => setFontSize(value => Math.max(14, value - 2))} className="rounded-xl bg-white/70 px-3 py-2 font-black hover:bg-white/80 hover:shadow-sm">A-</button>
+            <button type="button" onClick={() => setFontSize(value => Math.min(28, value + 2))} className="rounded-xl bg-white/70 px-3 py-2 font-black hover:bg-white/80 hover:shadow-sm">A+</button>
+            <button type="button" onClick={() => setLineSpacing(value => Math.max(1.25, Number((value - 0.15).toFixed(2))))} className="rounded-xl bg-white/70 px-3 py-2 font-black hover:bg-white/80 hover:shadow-sm">Line -</button>
+            <button type="button" onClick={() => setLineSpacing(value => Math.min(2.4, Number((value + 0.15).toFixed(2))))} className="rounded-xl bg-white/70 px-3 py-2 font-black hover:bg-white/80 hover:shadow-sm">Line +</button>
+            <button type="button" onClick={() => setFontStyle(value => value === 'sans' ? 'serif' : 'sans')} className="rounded-xl bg-white/70 px-3 py-2 font-black hover:bg-white/80 hover:shadow-sm">{fontStyle === 'sans' ? 'Serif' : 'Sans'}</button>
+            {(readingThemeOptions || []).map(option => <button key={option} type="button" onClick={() => setTheme(option)} className={`rounded-xl px-3 py-2 font-black capitalize ${theme === option ? 'bg-cyan-200 text-slate-900' : 'bg-white/70 hover:bg-white/80 hover:shadow-sm'}`}>{option}</button>)}
+            <button type="button" onClick={() => setIsReadingMode(false)} className="rounded-xl border border-white/50 bg-white/70 px-4 py-2 font-black hover:bg-white/80 hover:shadow-sm">Close</button>
           </div>
           <div className={`flex-1 overflow-y-auto p-6 md:p-10 ${readingTheme}`}>
             <style>{`.reader-content, .reader-content * { line-height: ${lineSpacing} !important; } .reader-content p, .reader-content li, .reader-content div, .reader-content span, .reader-content blockquote { font-size: ${fontSize}px !important; } .reader-content h1 { font-size: ${Math.round(fontSize * 2)}px !important; } .reader-content h2 { font-size: ${Math.round(fontSize * 1.65)}px !important; } .reader-content h3 { font-size: ${Math.round(fontSize * 1.35)}px !important; }`}</style>
@@ -221,13 +221,13 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
 };
 
 const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
-  <div className="flex h-full items-center justify-center p-6 text-white">
-    <div className="w-full max-w-2xl rounded-[2rem] border border-white/25 bg-white/10 p-8 text-center shadow-2xl backdrop-blur-xl">
+  <div className="flex h-full items-center justify-center p-6 text-slate-900">
+    <div className="w-full max-w-2xl rounded-[2rem] border border-white/50 bg-white/70 p-8 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl">
       <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-white/15 text-4xl">↗</div>
-      <p className="font-black uppercase tracking-[0.25em] text-cyan-100">External Resource</p>
+      <p className="font-black uppercase tracking-[0.25em] text-cyan-700">External Resource</p>
       <h2 className="mt-3 text-3xl font-black">{file.name}</h2>
-      <p className="mt-3 break-all text-white/75">{file.url}</p>
-      <a href={file.url} target="_blank" rel="noopener noreferrer" className="mt-8 inline-flex rounded-2xl bg-cyan-100 px-7 py-4 font-black text-slate-950 transition hover:-translate-y-1 hover:bg-cyan-50">Open resource</a>
+      <p className="mt-3 break-all text-slate-900/75">{file.url}</p>
+      <a href={file.url} target="_blank" rel="noopener noreferrer" className="mt-8 inline-flex rounded-2xl bg-cyan-100 px-7 py-4 font-black text-slate-900 transition hover:-translate-y-1 hover:bg-cyan-50">Open resource</a>
     </div>
   </div>
 );
@@ -245,22 +245,22 @@ const QuizPlayer: React.FC<{ file: ProductFile }> = ({ file }) => {
   const isLastQuestion = currentQuestion === questions.length - 1;
 
   return (
-    <div className="h-full overflow-y-auto p-4 text-white md:p-8 custom-scrollbar">
-      <div className="mx-auto w-full max-w-4xl rounded-[2rem] border border-white/10 bg-white/[0.05] p-6 shadow-[0_35px_110px_rgba(2,6,23,0.55)] backdrop-blur-3xl md:p-8">
+    <div className="h-full overflow-y-auto p-4 text-slate-900 md:p-8 custom-scrollbar">
+      <div className="mx-auto w-full max-w-4xl rounded-[2rem] border border-white/50 bg-white/70 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl md:p-8">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
-            <p className="font-black uppercase tracking-[0.3em] text-cyan-100">Interactive Quiz</p>
-            <h2 className="mt-2 text-3xl font-black text-white">{file.name}</h2>
+            <p className="font-black uppercase tracking-[0.3em] text-cyan-700">Interactive Quiz</p>
+            <h2 className="mt-2 text-3xl font-black text-slate-900">{file.name}</h2>
           </div>
-          <div className="rounded-2xl border border-white/15 bg-white/10 px-5 py-3 text-lg font-black text-white">Score: {score}/{questions.length}</div>
+          <div className="rounded-2xl border border-white/50 bg-white/70 px-5 py-3 text-lg font-black text-slate-900">Score: {score}/{questions.length}</div>
         </div>
 
-        <div className="mb-6 h-2 overflow-hidden rounded-full bg-white/10">
+        <div className="mb-6 h-2 overflow-hidden rounded-full bg-white/70">
           <div className="h-full rounded-full bg-cyan-200 transition-all" style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }} />
         </div>
 
         {questions.length > 1 && (
-          <div className="mb-6 flex flex-wrap gap-2 rounded-3xl border border-white/10 bg-slate-950/30 p-3">
+          <div className="mb-6 flex flex-wrap gap-2 rounded-3xl border border-white/50 bg-white/70 p-3">
             {questions.map((_, index) => {
               const isActive = currentQuestion === index;
               const isAnswered = answers[index] !== undefined;
@@ -269,7 +269,7 @@ const QuizPlayer: React.FC<{ file: ProductFile }> = ({ file }) => {
                   key={index}
                   type="button"
                   onClick={() => setCurrentQuestion(index)}
-                  className={`rounded-2xl px-4 py-2 text-sm font-black transition ${isActive ? 'bg-cyan-200 text-slate-950 shadow-lg shadow-cyan-500/20' : isAnswered ? 'border border-emerald-300/40 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/20' : 'border border-white/10 bg-white/[0.06] text-slate-200 hover:bg-cyan-50/15'}`}
+                  className={`rounded-2xl px-4 py-2 text-sm font-black transition ${isActive ? 'bg-cyan-200 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5' : isAnswered ? 'border border-emerald-300/40 bg-emerald-400/10 text-emerald-700 hover:bg-emerald-400/20' : 'border border-white/50 bg-white/70 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}
                   aria-current={isActive ? 'step' : undefined}
                 >
                   Q{index + 1}
@@ -279,29 +279,29 @@ const QuizPlayer: React.FC<{ file: ProductFile }> = ({ file }) => {
           </div>
         )}
 
-        <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] md:p-7">
-          <p className="mb-3 text-sm font-black uppercase tracking-[0.24em] text-slate-300">Question {currentQuestion + 1} of {questions.length}</p>
-          <h3 className="text-2xl font-black leading-tight text-white">{question.prompt}</h3>
+        <div className="rounded-3xl border border-white/50 bg-white/70 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] md:p-7">
+          <p className="mb-3 text-sm font-black uppercase tracking-[0.24em] text-slate-600">Question {currentQuestion + 1} of {questions.length}</p>
+          <h3 className="text-2xl font-black leading-tight text-slate-900">{question.prompt}</h3>
           <div className="mt-6 grid gap-3 md:grid-cols-2">
             {(question.options || []).map((option, oIndex) => {
               const isCorrect = oIndex === question.correctAnswer;
               const isSelected = selected === oIndex;
               const stateClass = !answered
-                ? 'border-white/15 bg-white/[0.07] text-slate-100 hover:bg-cyan-50/20 hover:shadow-[0_0_28px_rgba(255,255,255,0.12)]'
+                ? 'border-white/50 bg-white/70 text-slate-900 hover:bg-white/80 hover:shadow-sm hover:shadow-sm'
                 : isCorrect
-                  ? 'border-emerald-300/80 bg-emerald-400/25 text-emerald-50 shadow-[0_0_35px_rgba(52,211,153,0.24)]'
+                  ? 'border-emerald-300/80 bg-emerald-400/25 text-emerald-700 shadow-sm'
                   : isSelected
-                    ? 'border-rose-300/80 bg-rose-400/25 text-rose-50 shadow-[0_0_35px_rgba(251,113,133,0.24)]'
-                    : 'border-white/10 bg-white/[0.03] text-slate-300/70';
+                    ? 'border-rose-300/80 bg-rose-400/25 text-rose-700 shadow-sm'
+                    : 'border-white/50 bg-white/70 text-slate-600/70';
               return <button key={`${option}-${oIndex}`} type="button" onClick={() => !answered && setAnswers(prev => ({ ...prev, [currentQuestion]: oIndex }))} className={`rounded-2xl border px-5 py-4 text-left font-bold transition ${stateClass}`}>{option}</button>;
             })}
           </div>
-          {answered && <div className={`mt-6 rounded-2xl border p-4 font-black ${selected === question.correctAnswer ? 'border-emerald-300/50 bg-emerald-400/15 text-emerald-100' : 'border-rose-300/50 bg-rose-400/15 text-rose-100'}`}>{selected === question.correctAnswer ? 'Correct! Great work.' : `Incorrect. Correct answer: ${question.options[question.correctAnswer]}`}</div>}
+          {answered && <div className={`mt-6 rounded-2xl border p-4 font-black ${selected === question.correctAnswer ? 'border-emerald-300/50 bg-emerald-400/15 text-emerald-700' : 'border-rose-300/50 bg-rose-400/15 text-rose-100'}`}>{selected === question.correctAnswer ? 'Correct! Great work.' : `Incorrect. Correct answer: ${question.options[question.correctAnswer]}`}</div>}
         </div>
 
         <div className="mt-6 flex items-center justify-between gap-4">
-          <button type="button" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(index => Math.max(0, index - 1))} className="rounded-2xl border border-white/15 bg-white/10 px-5 py-3 font-black text-white transition hover:bg-cyan-50/20 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-          <button type="button" onClick={() => isLastQuestion ? setCurrentQuestion(0) : setCurrentQuestion(index => Math.min(questions.length - 1, index + 1))} className="rounded-2xl bg-cyan-200 px-6 py-3 font-black text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-50">{isLastQuestion ? 'Review Quiz' : 'Next Question'}</button>
+          <button type="button" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(index => Math.max(0, index - 1))} className="rounded-2xl border border-white/50 bg-white/70 px-5 py-3 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+          <button type="button" onClick={() => isLastQuestion ? setCurrentQuestion(0) : setCurrentQuestion(index => Math.min(questions.length - 1, index + 1))} className="rounded-2xl bg-cyan-200 px-6 py-3 font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50">{isLastQuestion ? 'Review Quiz' : 'Next Question'}</button>
         </div>
       </div>
     </div>
@@ -340,15 +340,15 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
   };
 
   const renderMedia = () => {
-    if (!activeFile) return <div className="flex h-full items-center justify-center bg-slate-950/60 text-white/70 backdrop-blur-xl">Select content to begin.</div>;
+    if (!activeFile) return <div className="flex h-full items-center justify-center bg-white/70 text-slate-900/70 backdrop-blur-xl">Select content to begin.</div>;
     if (mediaHasError) return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
     switch (activeFile.type) {
       case 'youtube': {
         const videoId = extractYouTubeID(activeFile.url);
-        return videoId ? <iframe key={activeFile.id} className="h-full w-full bg-slate-950/80" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaHasError(true)} /> : <VideoUnavailablePlaceholder />;
+        return videoId ? <iframe key={activeFile.id} className="h-full w-full bg-white/70" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaHasError(true)} /> : <VideoUnavailablePlaceholder />;
       }
-      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-slate-950/80 object-contain" onError={() => setMediaHasError(true)} />;
-      case 'audio': return <div className="flex h-full w-full flex-col items-center justify-center bg-slate-950/80 p-8 text-white"><svg xmlns="http://www.w3.org/2000/svg" className="mb-4 h-24 w-24 text-white/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z" /></svg><h3 className="mb-6 max-w-full truncate text-xl font-semibold">{activeFile.name}</h3><audio key={activeFile.id} src={activeFile.url} controls className="w-full max-w-md" onError={() => setMediaHasError(true)} /></div>;
+      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onError={() => setMediaHasError(true)} />;
+      case 'audio': return <div className="flex h-full w-full flex-col items-center justify-center bg-white/70 p-8 text-slate-900"><svg xmlns="http://www.w3.org/2000/svg" className="mb-4 h-24 w-24 text-slate-900/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z" /></svg><h3 className="mb-6 max-w-full truncate text-xl font-semibold">{activeFile.name}</h3><audio key={activeFile.id} src={activeFile.url} controls className="w-full max-w-md" onError={() => setMediaHasError(true)} /></div>;
       case 'pdf':
       case 'sheet': return <GlassDownloadCard file={activeFile} />;
       case 'doc':
@@ -360,41 +360,41 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
   };
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-slate-950 bg-gradient-to-br from-indigo-950 via-slate-900 to-black text-slate-100">
+    <div className="relative h-screen w-screen overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
       <div className="absolute inset-0 scale-110 bg-cover bg-center opacity-20 blur-2xl" style={{ backgroundImage: `url(${backgroundImage})` }} />
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(99,102,241,0.28),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.16),transparent_20%),linear-gradient(135deg,rgba(30,41,59,0.86),rgba(15,23,42,0.76),rgba(2,6,23,0.94))]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(99,102,241,0.28),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.16),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.82),rgba(238,242,255,0.72),rgba(248,250,252,0.94))]" />
       <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: accentGlow }} />
       <div className="absolute -top-12 right-12 h-72 w-72 rounded-full bg-indigo-300/15 blur-3xl" />
 
-      <header className="relative z-30 flex items-center gap-3 border-b border-white/10 bg-white/10 p-3 shadow-sm backdrop-blur-xl lg:hidden">
+      <header className="relative z-30 flex items-center gap-3 border-b border-white/50 bg-white/70 p-3 shadow-sm backdrop-blur-xl lg:hidden">
         <button onClick={() => setIsSidebarOpen(true)} className="rounded-lg border border-white/60 bg-white/40 p-2"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
         <h1 className="truncate text-lg font-black">{activeFile?.name || product.title}</h1>
         <button onClick={() => setIsMentorOpen(value => !value)} className="ml-auto rounded-xl border border-cyan-200/30 bg-cyan-200/15 px-3 py-2 text-sm font-black shadow-sm">🧠 AI</button>
       </header>
 
-      <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-slate-950/60 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
+      <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
       <main className="relative z-10 flex h-full flex-col gap-3 p-3 lg:p-3">
-        <div className="hidden shrink-0 grid-cols-[1fr_auto_1fr] items-center rounded-xl border border-white/10 bg-white/10 px-4 py-3 text-[22px] font-black leading-none shadow-[inset_0_1px_0_rgba(255,255,255,0.75),0_10px_30px_rgba(15,23,42,0.12)] backdrop-blur-xl lg:grid">
+        <div className="hidden shrink-0 grid-cols-[1fr_auto_1fr] items-center rounded-xl border border-white/50 bg-white/70 px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid">
           <span className="truncate">{activeFile?.name || product.title}</span>
-          <button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-cyan-200/30 bg-cyan-200/15 px-6 py-3 text-base font-black text-cyan-50 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_12px_30px_rgba(34,211,238,0.10)] transition hover:-translate-y-0.5 hover:bg-cyan-200/25">🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}</button>
-          <span className="truncate text-right text-sm font-bold text-slate-100/60">Welcome to the Course</span>
+          <button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-cyan-200/30 bg-cyan-200/15 px-6 py-3 text-base font-black text-cyan-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:bg-cyan-200/25">🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}</button>
+          <span className="truncate text-right text-sm font-bold text-slate-900/60">Welcome to the Course</span>
         </div>
 
         <section className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
-          <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform border-r border-white/10 bg-white/10 shadow-2xl backdrop-blur-2xl transition lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:shadow-[inset_0_1px_0_rgba(255,255,255,0.7),0_18px_45px_rgba(15,23,42,0.16)] ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+          <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform border-r border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl lg:border shadow-[0_8px_30px_rgb(0,0,0,0.04)] ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col">
-              <div className="shrink-0 border-b border-white/10 px-4 py-5">
-                <button onClick={onBack} className="mb-4 flex items-center gap-2 text-[22px] font-medium text-slate-100 hover:opacity-70">← <span>Back</span></button>
-                <h2 className="text-[25px] font-black leading-tight text-slate-100">{product.title}</h2>
+              <div className="shrink-0 border-b border-white/50 px-4 py-5">
+                <button onClick={onBack} className="mb-4 flex items-center gap-2 text-[22px] font-medium text-slate-900 hover:opacity-70">← <span>Back</span></button>
+                <h2 className="text-[25px] font-black leading-tight text-slate-900">{product.title}</h2>
               </div>
               <nav className="flex-1 overflow-y-auto p-3">
-                {(product.courseContent || []).length > 0 ? (product.courseContent || []).map(m => <ModuleItem key={m.id} module={m} activeFile={activeFile} onSelectFile={onSelectFile} />) : <p className="p-4 text-center font-semibold text-slate-100/60">No content added yet.</p>}
+                {(product.courseContent || []).length > 0 ? (product.courseContent || []).map(m => <ModuleItem key={m.id} module={m} activeFile={activeFile} onSelectFile={onSelectFile} />) : <p className="p-4 text-center font-semibold text-slate-900/60">No content added yet.</p>}
               </nav>
             </div>
           </aside>
 
-          <div className="min-h-0 overflow-hidden rounded-2xl border border-white/10 bg-white/[0.06] shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_20px_50px_rgba(2,6,23,0.42)] backdrop-blur-2xl">
+          <div className="min-h-0 overflow-hidden rounded-2xl border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>

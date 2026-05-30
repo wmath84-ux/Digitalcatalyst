@@ -43,7 +43,7 @@ const ComingSoonModal: React.FC<ComingSoonModalProps> = ({
     return (
         <div className="coming-soon-overlay" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="coming-soon-title">
             <div className="coming-soon-content" onClick={e => e.stopPropagation()}>
-                <button onClick={onClose} className="absolute top-3 right-4 text-gray-400 hover:text-gray-600 font-bold text-2xl" aria-label="Close modal">&times;</button>
+                <button onClick={onClose} className="absolute top-3 right-4 text-slate-600 hover:text-gray-600 font-bold text-2xl" aria-label="Close modal">&times;</button>
                 
                 <div className="text-center">
                     <div className="flex justify-center mb-6">
@@ -53,7 +53,7 @@ const ComingSoonModal: React.FC<ComingSoonModalProps> = ({
                     <p className="mt-4 text-base text-text-muted">
                         {message || defaultMessage}
                     </p>
-                    <button onClick={onClose} className="mt-8 bg-primary text-white font-bold px-8 py-3 rounded-lg hover:opacity-90 transition-all duration-300 transform active:scale-95">
+                    <button onClick={onClose} className="mt-8 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold px-8 py-3 rounded-lg hover:opacity-90 transition-all duration-300 transform active:scale-95">
                         Got It
                     </button>
                 </div>

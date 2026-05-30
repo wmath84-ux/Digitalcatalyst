@@ -40,7 +40,7 @@ const ShareModal: React.FC<ShareModalProps> = ({ url, title, onClose }) => {
     return (
         <div className="share-modal-overlay" onClick={onClose}>
             <div className="share-modal-content" onClick={e => e.stopPropagation()}>
-                <button onClick={onClose} className="absolute top-3 right-4 text-gray-400 hover:text-gray-600 font-bold text-2xl" aria-label="Close share modal">&times;</button>
+                <button onClick={onClose} className="absolute top-3 right-4 text-slate-600 hover:text-gray-600 font-bold text-2xl" aria-label="Close share modal">&times;</button>
                 <h2 className="text-2xl font-bold text-center text-primary">Share this Product</h2>
                 <p className="text-center text-text-muted mt-2">Spread the word and share this awesome product with your friends!</p>
                 <div className="mt-8 grid grid-cols-2 sm:grid-cols-4 gap-4 justify-items-center">

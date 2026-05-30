@@ -38,10 +38,10 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
 
   return (
     <div className="fixed inset-x-0 bottom-2 md:bottom-4 z-[65] flex justify-center pointer-events-none">
-      <div className="pointer-events-auto group max-w-[95vw] rounded-3xl border border-white/30 bg-white/20 px-4 py-3 shadow-2xl backdrop-blur-2xl transition-all duration-500 hover:translate-y-0 data-[hidden=true]:translate-y-24" id="main-bottom-dock">
+      <div className="pointer-events-auto group max-w-[95vw] rounded-3xl border border-white/50 bg-white/20 px-4 py-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition-all duration-500 hover:translate-y-0 data-[hidden=true]:translate-y-24" id="main-bottom-dock">
         <div className="flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
           {items.map((item) => (
-            <button key={item.label} onClick={item.action} className="relative flex min-w-[92px] flex-col items-center rounded-2xl bg-white/30 px-3 py-2 text-slate-800 transition hover:-translate-y-1 hover:bg-white/70">
+            <button key={item.label} onClick={item.action} className="relative flex min-w-[92px] flex-col items-center rounded-2xl bg-white/30 px-3 py-2 text-slate-800 transition hover:-translate-y-1 hover:bg-white/80 hover:shadow-sm">
               <span className="text-xl">{item.icon}</span>
               <span className="mt-1 text-xs font-bold">{item.label}</span>
               {item.badge ? <span className="absolute -right-1 -top-1 rounded-full bg-indigo-600 px-1.5 py-0.5 text-[10px] font-bold text-white">{item.badge}</span> : null}

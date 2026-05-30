@@ -65,7 +65,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({ adminUsers, currentAd
             <h1 className="text-3xl font-bold text-gray-800 mb-6">Admin User Management</h1>
 
             {/* Add New Admin Form */}
-            <div className="bg-white/10 backdrop-blur-xl p-6 rounded-lg shadow-md border mb-8">
+            <div className="bg-white/70 backdrop-blur-xl p-6 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] border mb-8">
                 <h2 className="text-xl font-bold text-gray-800 mb-4">Add New Admin</h2>
                 <form onSubmit={handleAddAdmin} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div className="md:col-span-2">
@@ -78,14 +78,14 @@ const AdminManagement: React.FC<AdminManagementProps> = ({ adminUsers, currentAd
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Role</label>
-                        <select value={newAdminRole} onChange={e => setNewAdminRole(e.target.value as AdminUser['role'])} className="mt-1 w-full p-2 border rounded-md bg-white/10 backdrop-blur-xl">
+                        <select value={newAdminRole} onChange={e => setNewAdminRole(e.target.value as AdminUser['role'])} className="mt-1 w-full p-2 border rounded-md bg-white/70 backdrop-blur-xl">
                             <option value="Admin">Admin</option>
                             <option value="Developer">Developer</option>
                         </select>
                     </div>
                     <div className="md:col-span-4 flex justify-between items-center mt-2">
                          {error && <p className="text-red-500 text-sm">{error}</p>}
-                         <button type="submit" className="bg-blue-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors ml-auto">
+                         <button type="submit" className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold px-5 py-2 rounded-lg hover:bg-blue-700 transition-colors ml-auto">
                             + Add Admin
                         </button>
                     </div>
@@ -93,7 +93,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({ adminUsers, currentAd
             </div>
 
             {/* List of Existing Admins */}
-            <div className="bg-white/10 backdrop-blur-xl shadow-md rounded-lg overflow-hidden border border-gray-200">
+            <div className="bg-white/70 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-lg overflow-hidden border border-gray-200">
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-max text-left">
                         <thead className="bg-gray-100">
@@ -112,7 +112,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({ adminUsers, currentAd
                                         <button 
                                             onClick={() => handleRemoveAdmin(user.id)} 
                                             disabled={user.id === currentAdminUser.id}
-                                            className="text-red-600 hover:underline disabled:text-gray-400 disabled:cursor-not-allowed disabled:no-underline"
+                                            className="text-red-600 hover:underline disabled:text-slate-600 disabled:cursor-not-allowed disabled:no-underline"
                                             aria-label={user.id === currentAdminUser.id ? "Cannot remove your own account" : `Remove ${user.email}`}
                                         >
                                             Remove

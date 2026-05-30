@@ -7,7 +7,7 @@ interface ReportsProps {
 }
 
 const StatCard: React.FC<{ title: string; value: string | number }> = ({ title, value }) => (
-    <div className="bg-white/10 backdrop-blur-xl p-6 rounded-lg shadow-md">
+    <div className="bg-white/70 backdrop-blur-xl p-6 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
         <h3 className="font-bold text-lg text-razorpay-blue">{title}</h3>
         <p className="text-3xl font-bold mt-2">{value}</p>
     </div>
@@ -38,7 +38,7 @@ const StarRating: React.FC<{ rating: number }> = ({ rating }) => (
 );
 
 const ProductListCard: React.FC<{ title: string; products: ProductWithRating[] }> = ({ title, products }) => (
-     <div className="bg-white/10 backdrop-blur-xl p-6 rounded-lg shadow-md">
+     <div className="bg-white/70 backdrop-blur-xl p-6 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
         <h3 className="font-bold text-lg text-razorpay-blue mb-4">{title}</h3>
         {products.length > 0 ? (
             <ul className="space-y-3">
@@ -53,7 +53,7 @@ const ProductListCard: React.FC<{ title: string; products: ProductWithRating[] }
                 ))}
             </ul>
         ) : (
-            <p className="text-sm text-gray-500">Not enough data to display.</p>
+            <p className="text-sm text-slate-600">Not enough data to display.</p>
         )}
     </div>
 );

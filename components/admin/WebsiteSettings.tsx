@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { WebsiteSettings, HomepageSection, NewsArticle, Announcement, ProductWithRating } from '../../App';
+import { WebsiteSettings, HomepageSection, Announcement, ProductWithRating } from '../../App';
 import { ServiceItem } from '../Services';
 import { FaqItem } from '../Faq';
 import { UpcomingFeatureItem } from '../UpcomingFeatures';
@@ -22,7 +22,7 @@ const TabButton: React.FC<{ label: string, isActive: boolean, onClick: () => voi
     <button
         onClick={onClick}
         className={`py-2 px-4 font-semibold text-sm rounded-lg transition-colors whitespace-nowrap ${
-            isActive ? 'bg-primary text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+            isActive ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
         }`}
     >
         {label}
@@ -33,7 +33,7 @@ const FormRow: React.FC<{ label: string, children: React.ReactNode, description?
     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-start py-4 border-b">
         <div className="md:col-span-1">
             <label className="font-semibold text-gray-700">{label}</label>
-            {description && <p className="text-xs text-gray-500 mt-1">{description}</p>}
+            {description && <p className="text-xs text-slate-600 mt-1">{description}</p>}
         </div>
         <div className="md:col-span-2">{children}</div>
     </div>
@@ -61,7 +61,7 @@ const ServiceManagement: React.FC<{ services: ServiceItem[], onUpdate: (services
                     <div key={service.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border">
                         <div>
                             <p className="font-bold">{service.title}</p>
-                            <p className="text-sm text-gray-500">{service.description}</p>
+                            <p className="text-sm text-slate-600">{service.description}</p>
                         </div>
                         <div className="space-x-2">
                             <button onClick={() => setEditing(service)} className="text-blue-600 font-semibold text-sm">Edit</button>
@@ -76,14 +76,14 @@ const ServiceManagement: React.FC<{ services: ServiceItem[], onUpdate: (services
 const ServiceFormModal: React.FC<{ service: ServiceItem, onSave: (s: ServiceItem) => void, onCancel: () => void }> = ({ service, onSave, onCancel }) => {
     const [form, setForm] = useState(service);
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white/10 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-white/70 z-50 flex items-center justify-center p-4">
+            <div className="bg-white/70 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{service.id ? 'Edit' : 'Add'} Service</h3>
                 <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
                 <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Description" className="w-full p-2 border rounded mb-4" rows={3}></textarea>
                 <div className="flex justify-end space-x-2">
                     <button onClick={onCancel} className="bg-gray-200 px-4 py-2 rounded-lg">Cancel</button>
-                    <button onClick={() => onSave(form)} className="bg-primary text-white px-4 py-2 rounded-lg">Save</button>
+                    <button onClick={() => onSave(form)} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-lg">Save</button>
                 </div>
             </div>
         </div>
@@ -112,7 +112,7 @@ const FaqManagement: React.FC<{ faqs: FaqItem[], onUpdate: (faqs: FaqItem[]) => 
                     <div key={faq.id} className="flex justify-between items-start p-3 bg-gray-50 rounded-lg border">
                         <div className="flex-1">
                             <p className="font-bold">{faq.question}</p>
-                            <p className="text-sm text-gray-500 mt-1">{faq.answer}</p>
+                            <p className="text-sm text-slate-600 mt-1">{faq.answer}</p>
                         </div>
                         <div className="space-x-2 flex-shrink-0 ml-4">
                             <button onClick={() => setEditing(faq)} className="text-blue-600 font-semibold text-sm">Edit</button>
@@ -127,14 +127,14 @@ const FaqManagement: React.FC<{ faqs: FaqItem[], onUpdate: (faqs: FaqItem[]) => 
 const FaqFormModal: React.FC<{ faq: FaqItem, onSave: (f: FaqItem) => void, onCancel: () => void }> = ({ faq, onSave, onCancel }) => {
     const [form, setForm] = useState(faq);
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white/10 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-white/70 z-50 flex items-center justify-center p-4">
+            <div className="bg-white/70 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{faq.id ? 'Edit' : 'Add'} FAQ</h3>
                 <input value={form.question} onChange={e => setForm({...form, question: e.target.value})} placeholder="Question" className="w-full p-2 border rounded mb-2" />
                 <textarea value={form.answer} onChange={e => setForm({...form, answer: e.target.value})} placeholder="Answer" className="w-full p-2 border rounded mb-4" rows={4}></textarea>
                 <div className="flex justify-end space-x-2">
                     <button onClick={onCancel} className="bg-gray-200 px-4 py-2 rounded-lg">Cancel</button>
-                    <button onClick={() => onSave(form)} className="bg-primary text-white px-4 py-2 rounded-lg">Save</button>
+                    <button onClick={() => onSave(form)} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-lg">Save</button>
                 </div>
             </div>
         </div>
@@ -163,8 +163,8 @@ const UpcomingFeatureManagement: React.FC<{ features: UpcomingFeatureItem[], onU
                     <div key={feature.id} className="flex justify-between items-start p-3 bg-gray-50 rounded-lg border">
                         <div className="flex-1">
                             <p className="font-bold">{feature.title} <span className="text-xs font-semibold bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full ml-2">{feature.status}</span></p>
-                            <p className="text-sm text-gray-500 mt-1">{feature.description}</p>
-                            <p className="text-xs text-gray-400 mt-1">Icon: {feature.icon}</p>
+                            <p className="text-sm text-slate-600 mt-1">{feature.description}</p>
+                            <p className="text-xs text-slate-600 mt-1">Icon: {feature.icon}</p>
                         </div>
                         <div className="space-x-2 flex-shrink-0 ml-4">
                             <button onClick={() => setEditing(feature)} className="text-blue-600 font-semibold text-sm">Edit</button>
@@ -179,8 +179,8 @@ const UpcomingFeatureManagement: React.FC<{ features: UpcomingFeatureItem[], onU
 const UpcomingFeatureFormModal: React.FC<{ feature: UpcomingFeatureItem, onSave: (f: UpcomingFeatureItem) => void, onCancel: () => void }> = ({ feature, onSave, onCancel }) => {
     const [form, setForm] = useState(feature);
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white/10 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-white/70 z-50 flex items-center justify-center p-4">
+            <div className="bg-white/70 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{feature.id ? 'Edit' : 'Add'} Feature</h3>
                 <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
                 <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Description" className="w-full p-2 border rounded mb-2" rows={3}></textarea>
@@ -192,69 +192,13 @@ const UpcomingFeatureFormModal: React.FC<{ feature: UpcomingFeatureItem, onSave:
                  <input value={form.icon} onChange={e => setForm({...form, icon: e.target.value})} placeholder="Icon name (e.g., rocket)" className="w-full p-2 border rounded mb-4" />
                 <div className="flex justify-end space-x-2">
                     <button onClick={onCancel} className="bg-gray-200 px-4 py-2 rounded-lg">Cancel</button>
-                    <button onClick={() => onSave(form)} className="bg-primary text-white px-4 py-2 rounded-lg">Save</button>
+                    <button onClick={() => onSave(form)} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-lg">Save</button>
                 </div>
             </div>
         </div>
     );
 };
 
-// CRUD component for News Articles (Blog)
-const NewsArticleManagement: React.FC<{ articles: NewsArticle[], onUpdate: (articles: NewsArticle[]) => void }> = ({ articles, onUpdate }) => {
-    const [editing, setEditing] = useState<NewsArticle | null>(null);
-    const handleSave = (article: NewsArticle) => {
-        if (article.id) {
-            onUpdate(articles.map(a => a.id === article.id ? article : a));
-        } else {
-            onUpdate([...articles, { ...article, id: Date.now() }]);
-        }
-        setEditing(null);
-    };
-    const handleDelete = (id: number) => onUpdate(articles.filter(a => a.id !== id));
-
-    return (
-        <div>
-            {editing && <NewsArticleFormModal article={editing} onSave={handleSave} onCancel={() => setEditing(null)} />}
-            <button onClick={() => setEditing({ id: 0, title: '', category: '', date: new Date().toISOString().split('T')[0], imageSeed: '', excerpt: '', content: '' })} className="mb-4 bg-green-500 text-white font-semibold px-4 py-2 rounded-lg text-sm">+ Add New Blog Post</button>
-            <div className="space-y-2">
-                {articles.map(article => (
-                    <div key={article.id} className="flex justify-between items-start p-3 bg-gray-50 rounded-lg border">
-                        <div className="flex-1">
-                            <p className="font-bold">{article.title} <span className="text-xs font-normal text-gray-500 ml-2">{new Date(article.date).toLocaleDateString()}</span></p>
-                            <p className="text-sm text-gray-500 mt-1">{article.excerpt}</p>
-                        </div>
-                        <div className="space-x-2 flex-shrink-0 ml-4">
-                            <button onClick={() => setEditing(article)} className="text-blue-600 font-semibold text-sm">Edit</button>
-                            <button onClick={() => handleDelete(article.id)} className="text-red-600 font-semibold text-sm">Delete</button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
-const NewsArticleFormModal: React.FC<{ article: NewsArticle, onSave: (a: NewsArticle) => void, onCancel: () => void }> = ({ article, onSave, onCancel }) => {
-    const [form, setForm] = useState(article);
-    return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white/10 backdrop-blur-xl rounded-lg p-6 w-full max-w-lg">
-                <h3 className="font-bold text-lg mb-4">{article.id ? 'Edit' : 'Add'} Blog Post</h3>
-                <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                    <input value={form.category} onChange={e => setForm({...form, category: e.target.value})} placeholder="Category (e.g., SEO)" className="w-full p-2 border rounded" />
-                    <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full p-2 border rounded" />
-                </div>
-                <input value={form.imageSeed} onChange={e => setForm({...form, imageSeed: e.target.value})} placeholder="Image Seed (for picsum.photos)" className="w-full p-2 border rounded mb-2" />
-                <textarea value={form.excerpt} onChange={e => setForm({...form, excerpt: e.target.value})} placeholder="Excerpt/Summary" className="w-full p-2 border rounded mb-2" rows={2}></textarea>
-                <textarea value={form.content} onChange={e => setForm({...form, content: e.target.value})} placeholder="Full Content (Markdown supported)" className="w-full p-2 border rounded mb-4" rows={6}></textarea>
-                <div className="flex justify-end space-x-2">
-                    <button onClick={onCancel} className="bg-gray-200 px-4 py-2 rounded-lg">Cancel</button>
-                    <button onClick={() => onSave(form)} className="bg-primary text-white px-4 py-2 rounded-lg">Save</button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 // CRUD component for Announcements
 const AnnouncementManagement: React.FC<{ announcements: Announcement[], onUpdate: (announcements: Announcement[]) => void }> = ({ announcements, onUpdate }) => {
@@ -277,8 +221,8 @@ const AnnouncementManagement: React.FC<{ announcements: Announcement[], onUpdate
                 {announcements.map(announcement => (
                     <div key={announcement.id} className="flex justify-between items-start p-3 bg-gray-50 rounded-lg border">
                         <div className="flex-1">
-                            <p className="font-bold">{announcement.title} <span className="text-xs font-normal text-gray-500 ml-2">{new Date(announcement.date).toLocaleDateString()}</span></p>
-                            <p className="text-sm text-gray-500 mt-1">{announcement.content}</p>
+                            <p className="font-bold">{announcement.title} <span className="text-xs font-normal text-slate-600 ml-2">{new Date(announcement.date).toLocaleDateString()}</span></p>
+                            <p className="text-sm text-slate-600 mt-1">{announcement.content}</p>
                         </div>
                         <div className="space-x-2 flex-shrink-0 ml-4">
                             <button onClick={() => setEditing(announcement)} className="text-blue-600 font-semibold text-sm">Edit</button>
@@ -293,15 +237,15 @@ const AnnouncementManagement: React.FC<{ announcements: Announcement[], onUpdate
 const AnnouncementFormModal: React.FC<{ announcement: Announcement, onSave: (a: Announcement) => void, onCancel: () => void }> = ({ announcement, onSave, onCancel }) => {
     const [form, setForm] = useState(announcement);
     return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white/10 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-white/70 z-50 flex items-center justify-center p-4">
+            <div className="bg-white/70 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{announcement.id ? 'Edit' : 'Add'} Announcement</h3>
                 <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
                 <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full p-2 border rounded mb-2" />
                 <textarea value={form.content} onChange={e => setForm({...form, content: e.target.value})} placeholder="Content" className="w-full p-2 border rounded mb-4" rows={5}></textarea>
                 <div className="flex justify-end space-x-2">
                     <button onClick={onCancel} className="bg-gray-200 px-4 py-2 rounded-lg">Cancel</button>
-                    <button onClick={() => onSave(form)} className="bg-primary text-white px-4 py-2 rounded-lg">Save</button>
+                    <button onClick={() => onSave(form)} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white px-4 py-2 rounded-lg">Save</button>
                 </div>
             </div>
         </div>
@@ -319,7 +263,7 @@ type EditableSubscriptionPlan = { id: string; name: string; price: number; descr
 type EditableReward = { id: string; title: string; cost: number; };
 
 const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, products = [], onSettingsChange }) => {
-    const [activeTab, setActiveTab] = useState<'theme' | 'layout' | 'content' | 'blog' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
+    const [activeTab, setActiveTab] = useState<'theme' | 'layout' | 'content' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
     const [localSettings, setLocalSettings] = useState<WebsiteSettings>(settings);
     const [showSuccess, setShowSuccess] = useState(false);
 
@@ -476,7 +420,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                         <FormRow label="Hero Image" description="Upload a meaningful learning/course image from your local file.">
                             <div className="space-y-3">
                                 {localSettings.content.heroImageUrl && <img src={localSettings.content.heroImageUrl} alt="Hero preview" className="h-36 w-full rounded-xl object-cover shadow-inner" />}
-                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-slate-900 px-4 py-3 text-sm font-bold text-white hover:bg-primary">
+                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-white/70 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-primary">
                                     Upload hero image
                                     <input type="file" accept="image/*" onChange={handleHeroImageUpload} className="hidden" />
                                 </label>
@@ -540,7 +484,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                     <div className="bg-slate-50 rounded-lg p-4 mt-4 border border-slate-200">
                         <div className="mb-4">
                             <h3 className="font-bold text-gray-800">Gamification & Subscription</h3>
-                            <p className="text-sm text-gray-500 mt-1">No JSON needed — edit rewards, coins, plans, unlocked products, and dock labels directly.</p>
+                            <p className="text-sm text-slate-600 mt-1">No JSON needed — edit rewards, coins, plans, unlocked products, and dock labels directly.</p>
                         </div>
 
                         <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
@@ -577,7 +521,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
                                     <h4 className="font-bold text-gray-800">Subscription Plans</h4>
-                                    <p className="text-sm text-gray-500">Plan name, price, description, badge, and products to unlock.</p>
+                                    <p className="text-sm text-slate-600">Plan name, price, description, badge, and products to unlock.</p>
                                 </div>
                                 <button type="button" onClick={addPlan} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">+ Add Plan</button>
                             </div>
@@ -621,10 +565,10 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
 
                         <div className="mt-5 rounded-xl border bg-white p-4">
                             <h4 className="font-bold text-gray-800">Bottom Dock Items</h4>
-                            <p className="text-sm text-gray-500">Choose which labels should appear in the bottom dock.</p>
+                            <p className="text-sm text-slate-600">Choose which labels should appear in the bottom dock.</p>
                             <div className="mt-3 flex flex-wrap gap-2">
                                 {defaultDockItems.map(label => (
-                                    <button type="button" key={label} onClick={() => toggleDockItem(label)} className={`rounded-full border px-4 py-2 text-sm font-bold ${dockItems.includes(label) ? 'border-blue-600 bg-blue-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>{label}</button>
+                                    <button type="button" key={label} onClick={() => toggleDockItem(label)} className={`rounded-full border px-4 py-2 text-sm font-bold ${dockItems.includes(label) ? 'border-blue-600 bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>{label}</button>
                                 ))}
                             </div>
                         </div>
@@ -641,7 +585,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                     </div>
                 </div>
             );
-            case 'blog': return <NewsArticleManagement articles={localSettings.content.newsArticles} onUpdate={articles => handleNestedChange('content', 'newsArticles', articles)} />;
             case 'announcements': return <AnnouncementManagement announcements={localSettings.content.announcements} onUpdate={announcements => handleNestedChange('content', 'announcements', announcements)} />;
             case 'services': return <ServiceManagement services={localSettings.content.services} onUpdate={services => handleNestedChange('content', 'services', services)} />;
             case 'faq': return <FaqManagement faqs={localSettings.content.faqs} onUpdate={faqs => handleNestedChange('content', 'faqs', faqs)} />;
@@ -663,13 +606,13 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     };
 
     return (
-        <div className="bg-white/10 backdrop-blur-xl p-6 rounded-lg shadow-md border">
+        <div className="bg-white/70 backdrop-blur-xl p-6 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] border">
             <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 border-b pb-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800">Site Customizer</h1>
-                    <p className="text-gray-500 mt-1">Changes are live in this panel. Click "Save" to apply them to the website.</p>
+                    <p className="text-slate-600 mt-1">Changes are live in this panel. Click "Save" to apply them to the website.</p>
                 </div>
-                <button onClick={handleSave} className="mt-4 md:mt-0 bg-blue-600 text-white font-bold px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors relative">
+                <button onClick={handleSave} className="mt-4 md:mt-0 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors relative">
                     Save Changes
                     {showSuccess && <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs rounded-full p-1 animate-pop-in">✔</span>}
                 </button>
@@ -679,7 +622,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                 <TabButton label="Theme" isActive={activeTab === 'theme'} onClick={() => setActiveTab('theme')} />
                 <TabButton label="Layout" isActive={activeTab === 'layout'} onClick={() => setActiveTab('layout')} />
                 <TabButton label="Content" isActive={activeTab === 'content'} onClick={() => setActiveTab('content')} />
-                <TabButton label="Blog" isActive={activeTab === 'blog'} onClick={() => setActiveTab('blog')} />
                 <TabButton label="Announcements" isActive={activeTab === 'announcements'} onClick={() => setActiveTab('announcements')} />
                 <TabButton label="Services" isActive={activeTab === 'services'} onClick={() => setActiveTab('services')} />
                 <TabButton label="FAQ" isActive={activeTab === 'faq'} onClick={() => setActiveTab('faq')} />

@@ -12,6 +12,7 @@ import AdminReviewManagement from './AdminReviewManagement';
 import Reports from './Reports';
 import WebsiteSettingsComponent from './WebsiteSettings';
 import AdminManagement from './AdminManagement';
+import NewsBlogManagement from './NewsBlogManagement';
 
 interface AdminDashboardProps {
     products: ProductWithRating[];
@@ -35,10 +36,10 @@ interface AdminDashboardProps {
     onSwitchToHome: () => void;
 }
 
-export type AdminView = 'dashboard' | 'products' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'analytics' | 'websiteSettings';
+export type AdminView = 'dashboard' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'analytics' | 'websiteSettings';
 
 const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?: string; icon: React.ReactNode; gradient: string }> = ({ title, value, subtitle, icon, gradient }) => (
-    <div className={`relative overflow-hidden rounded-2xl p-6 shadow-lg text-white ${gradient} transform transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl`}>
+    <div className={`relative overflow-hidden rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-slate-900 ${gradient} transform transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]`}>
         <div className="relative z-10">
             <p className="text-sm font-medium opacity-90 uppercase tracking-wider">{title}</p>
             <h3 className="text-4xl font-extrabold mt-2">{value}</h3>
@@ -47,7 +48,7 @@ const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?
         <div className="absolute -bottom-4 -right-4 opacity-20 text-black transform rotate-12 scale-150">
             {icon}
         </div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 backdrop-blur-xl opacity-10 rounded-full blur-2xl -mr-16 -mt-16"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/70 backdrop-blur-xl opacity-10 rounded-full blur-2xl -mr-16 -mt-16"></div>
     </div>
 );
 
@@ -58,6 +59,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     const renderView = () => {
         switch (currentView) {
             case 'products': return <ProductManagement products={props.products} users={props.users} coupons={props.coupons} onAddProduct={props.onAddProduct} onUpdateProduct={props.onUpdateProduct} onDeleteProduct={props.onDeleteProduct} />;
+            case 'newsBlog': return <NewsBlogManagement settings={props.websiteSettings} onSettingsChange={props.onWebsiteSettingsChange} />;
             case 'reviews': return <AdminReviewManagement products={props.products} reviews={props.reviews} />;
             case 'reports': return <Reports products={props.products} reviews={props.reviews} />;
             case 'users': return <UserManagement users={props.users} onDeleteUser={props.onDeleteUser} />;
@@ -79,10 +81,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                                 <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-800 tracking-tight">
                                     Hello, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">{props.currentAdminUser.email.split('@')[0]}</span> 👋
                                 </h1>
-                                <p className="mt-2 text-lg text-slate-500">Here's what's happening in your store today.</p>
+                                <p className="mt-2 text-lg text-slate-600">Here's what's happening in your store today.</p>
                             </div>
                             <div className="mt-4 md:mt-0 hidden md:block">
-                                <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/10 backdrop-blur-xl border border-slate-200 text-slate-600 shadow-sm">
+                                <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/70 backdrop-blur-xl border border-slate-200 text-slate-600 shadow-sm">
                                     <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
                                     System Operational
                                 </span>
@@ -120,7 +122,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                             />
                         </div>
 
-                        <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-100 p-6 sm:p-8">
+                        <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 p-6 sm:p-8">
                             <h2 className="text-2xl font-bold text-slate-800 mb-4">Quick Actions</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <button onClick={() => setCurrentView('products')} className="p-4 bg-blue-50 text-blue-700 rounded-xl font-semibold hover:bg-blue-100 transition-colors flex items-center gap-3 justify-center sm:justify-start">
@@ -152,7 +154,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 {/* Mobile Header */}
-                <header className="md:hidden bg-white/10 backdrop-blur-xl border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+                <header className="md:hidden bg-white/70 backdrop-blur-xl border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
                     <div className="flex items-center gap-3">
                         <button 
                             onClick={() => setIsMobileSidebarOpen(true)}
@@ -162,7 +164,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                         </button>
                         <span className="font-bold text-lg text-slate-800">Admin Panel</span>
                     </div>
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-white text-xs font-bold">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-slate-900 text-xs font-bold">
                         {props.currentAdminUser.email.charAt(0).toUpperCase()}
                     </div>
                 </header>

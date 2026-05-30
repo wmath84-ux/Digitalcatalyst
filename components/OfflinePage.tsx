@@ -2,7 +2,7 @@
 import React from 'react';
 
 const BrokenFileIcon: React.FC = () => (
-    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-gray-300">
+    <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" className="text-slate-600">
         <path d="M10 2H30L40 12V46H10V2Z" fill="currentColor" opacity="0.6"/>
         <path d="M30 2V12H40L30 2Z" fill="currentColor" opacity="0.4"/>
         

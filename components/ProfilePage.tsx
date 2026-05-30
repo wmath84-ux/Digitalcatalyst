@@ -40,7 +40,7 @@ const defaultCoverImage =
   'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1800&q=80';
 
 const glassCard =
-  'border border-white/10 bg-white/5 backdrop-blur-xl shadow-2xl shadow-black/30 transition-all duration-300 hover:-translate-y-1 hover:border-white/20 hover:shadow-xl hover:shadow-indigo-500/10';
+  'border border-white/50 bg-white/70 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition-all duration-300 hover:-translate-y-1 hover:border-white/50 hover:shadow-sm hover:shadow-black/5';
 
 const getStorageKey = (userId?: number) => `studentAchievementHubCover-${userId ?? 'guest'}`;
 
@@ -179,7 +179,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   ];
 
   return (
-    <div className="min-h-screen overflow-hidden bg-slate-950 bg-gradient-to-br from-indigo-950 via-slate-900 to-black text-white">
+    <div className="min-h-screen overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
       <style>{`
         @keyframes hubFadeUp {
           from { opacity: 0; transform: translateY(28px); }
@@ -197,7 +197,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
       <main className="relative mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
         <button
           onClick={onBack}
-          className="hub-animate mb-5 rounded-2xl border border-white/10 bg-white/5 px-5 py-3 text-sm font-black uppercase tracking-[0.2em] text-slate-100 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/10 hover:shadow-xl hover:shadow-indigo-500/10"
+          className="hub-animate mb-5 rounded-2xl border border-white/50 bg-white/70 px-5 py-3 text-sm font-black uppercase tracking-[0.2em] text-slate-900 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/80 hover:shadow-sm hover:shadow-sm hover:shadow-black/5"
         >
           ← Back
         </button>
@@ -205,15 +205,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <section className={`hub-animate overflow-hidden rounded-[2rem] ${glassCard}`} style={{ animationDelay: '80ms' }}>
           <div className="relative aspect-video min-h-[300px] w-full sm:min-h-[420px]">
             <img src={coverImage} alt="Student achievement cover" className="h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-950/55 to-indigo-950/15" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-indigo-50/30/55 to-indigo-950/15" />
             <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4 sm:p-6">
-              <div className="rounded-full border border-white/10 bg-black/20 px-4 py-2 text-xs font-black uppercase tracking-[0.28em] text-cyan-100 backdrop-blur-xl">
+              <div className="rounded-full border border-white/50 bg-white/70 px-4 py-2 text-xs font-black uppercase tracking-[0.28em] text-cyan-700 backdrop-blur-xl">
                 Student Achievement Hub
               </div>
               <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
               <button
                 onClick={() => coverInputRef.current?.click()}
-                className="rounded-full border border-white/15 bg-white/10 px-4 py-2 text-sm font-bold text-white backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/20 hover:shadow-xl"
+                className="rounded-full border border-white/50 bg-white/70 px-4 py-2 text-sm font-bold text-slate-900 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/80 hover:shadow-sm hover:shadow-sm"
               >
                 📷 Upload Cover
               </button>
@@ -221,18 +221,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             <div className="absolute -bottom-1 left-0 right-0 p-5 sm:p-8 lg:p-10">
               <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
                 <div className="flex flex-col gap-5 sm:flex-row sm:items-end">
-                  <div className="flex h-28 w-28 items-center justify-center rounded-[2rem] border-4 border-slate-950 bg-gradient-to-br from-cyan-300 via-indigo-400 to-fuchsia-500 text-5xl font-black shadow-2xl shadow-cyan-500/25 sm:h-36 sm:w-36">
+                  <div className="flex h-28 w-28 items-center justify-center rounded-[2rem] border-4 border-white/50 bg-gradient-to-br from-cyan-300 via-indigo-400 to-fuchsia-500 text-5xl font-black shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 sm:h-36 sm:w-36">
                     {(currentUser?.name || 'S').slice(0, 1).toUpperCase()}
                   </div>
                   <div className="pb-2">
                     <p className="text-sm font-black uppercase tracking-[0.35em] text-cyan-200">Level {level} Scholar</p>
                     <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-6xl">{currentUser?.name || 'Student'}</h1>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-300 sm:text-base">
+                    <p className="mt-2 max-w-2xl text-sm text-slate-600 sm:text-base">
                       {currentUser?.email || 'student@learninghub.dev'} {currentUser?.mobile ? `• +91 ${currentUser.mobile}` : ''}
                     </p>
                   </div>
                 </div>
-                <div className="rounded-3xl border border-orange-300/20 bg-orange-400/10 px-5 py-4 text-right backdrop-blur-xl shadow-xl shadow-orange-500/10">
+                <div className="rounded-3xl border border-orange-300/20 bg-orange-400/10 px-5 py-4 text-right backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5">
                   <p className="text-sm font-bold text-orange-100">Activity Streak</p>
                   <p className="mt-1 text-3xl font-black">🔥 {streakDays} Days</p>
                   <p className="text-xs uppercase tracking-[0.2em] text-orange-200/80">Active streak</p>
@@ -248,20 +248,20 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
               <div>
                 <p className="text-sm font-black uppercase tracking-[0.3em] text-cyan-200">EduPoints Engine</p>
                 <h2 className="mt-2 text-4xl font-black sm:text-5xl">{eduPoints.toLocaleString()} EduPoints</h2>
-                <p className="mt-2 text-slate-300">Earned from purchases, module momentum, study time, and quiz performance.</p>
+                <p className="mt-2 text-slate-600">Earned from purchases, module momentum, study time, and quiz performance.</p>
               </div>
-              <div className="rounded-3xl border border-cyan-300/20 bg-cyan-400/10 p-5 text-center shadow-2xl shadow-cyan-500/10">
-                <p className="text-xs font-black uppercase tracking-[0.25em] text-cyan-100">Next Rank</p>
+              <div className="rounded-3xl border border-cyan-300/20 bg-cyan-400/10 p-5 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5">
+                <p className="text-xs font-black uppercase tracking-[0.25em] text-cyan-700">Next Rank</p>
                 <p className="mt-1 text-2xl font-black">Level {level + 1}</p>
               </div>
             </div>
             <div className="mt-6">
-              <div className="mb-2 flex justify-between text-sm font-bold text-slate-300">
+              <div className="mb-2 flex justify-between text-sm font-bold text-slate-600">
                 <span>Level {level} Scholar progress</span>
                 <span>{pointsRemaining} pts to next level</span>
               </div>
-              <div className="h-4 overflow-hidden rounded-full border border-white/10 bg-black/30">
-                <div className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-indigo-400 to-fuchsia-400 shadow-lg shadow-cyan-400/30" style={{ width: `${nextLevelProgress}%` }} />
+              <div className="h-4 overflow-hidden rounded-full border border-white/50 bg-white/70">
+                <div className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-indigo-400 to-fuchsia-400 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5" style={{ width: `${nextLevelProgress}%` }} />
               </div>
             </div>
           </div>
@@ -271,10 +271,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
               <div key={stat.label} className={`hub-animate rounded-[2rem] p-5 ${glassCard}`} style={{ animationDelay: `${220 + index * 80}ms` }}>
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-bold text-slate-300">{stat.label}</p>
+                    <p className="text-sm font-bold text-slate-600">{stat.label}</p>
                     <p className="mt-1 text-3xl font-black">{stat.value}</p>
                   </div>
-                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/10 bg-white/10 text-2xl">{stat.icon}</div>
+                  <div className="flex h-14 w-14 items-center justify-center rounded-2xl border border-white/50 bg-white/70 text-2xl">{stat.icon}</div>
                 </div>
               </div>
             ))}
@@ -289,7 +289,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 <h2 className="mt-2 text-3xl font-black">Course Completion</h2>
               </div>
               {!purchasedProducts.length && (
-                <button onClick={onExplore} className="rounded-full bg-white px-4 py-2 text-sm font-black text-slate-950 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl">
+                <button onClick={onExplore} className="rounded-full bg-white px-4 py-2 text-sm font-black text-slate-900 transition-all duration-300 hover:-translate-y-1 hover:shadow-sm">
                   Explore Courses
                 </button>
               )}
@@ -299,11 +299,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 const circumference = 2 * Math.PI * 38;
                 const dashOffset = circumference - (course.completion / 100) * circumference;
                 return (
-                  <div key={course.id} className="rounded-3xl border border-white/10 bg-white/[0.04] p-4 transition-all duration-300 hover:-translate-y-1 hover:bg-white/[0.07]">
+                  <div key={course.id} className="rounded-3xl border border-white/50 bg-white/70 p-4 transition-all duration-300 hover:-translate-y-1 hover:bg-white/80 hover:shadow-sm">
                     <div className="flex items-center gap-4">
                       <div className="relative h-24 w-24 shrink-0">
                         <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
-                          <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-white/10" />
+                          <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-slate-900/10" />
                           <circle
                             cx="50"
                             cy="50"
@@ -321,8 +321,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate text-xl font-black">{course.title}</p>
-                        <p className="mt-1 text-sm text-slate-400">{course.category}</p>
-                        <div className="mt-4 h-2 rounded-full bg-white/10">
+                        <p className="mt-1 text-sm text-slate-600">{course.category}</p>
+                        <div className="mt-4 h-2 rounded-full bg-white/70">
                           <div className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-indigo-400" style={{ width: `${course.completion}%` }} />
                         </div>
                       </div>
@@ -336,17 +336,17 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className={`hub-animate rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '440ms' }}>
             <p className="text-sm font-black uppercase tracking-[0.3em] text-fuchsia-200">Recent Quiz Scores</p>
             <h2 className="mt-2 text-3xl font-black">Performance Pulse</h2>
-            <div className="mt-6 flex h-36 items-end gap-3 rounded-3xl border border-white/10 bg-black/20 p-4">
+            <div className="mt-6 flex h-36 items-end gap-3 rounded-3xl border border-white/50 bg-white/70 p-4">
               {quizScores.map(score => (
                 <div key={score.title} className="flex flex-1 flex-col items-center gap-2">
-                  <div className={`w-full rounded-t-2xl bg-gradient-to-t ${score.accent} shadow-lg`} style={{ height: `${score.score}%` }} />
-                  <span className="text-xs font-black text-slate-300">{score.score}%</span>
+                  <div className={`w-full rounded-t-2xl bg-gradient-to-t ${score.accent} shadow-[0_8px_30px_rgb(0,0,0,0.04)]`} style={{ height: `${score.score}%` }} />
+                  <span className="text-xs font-black text-slate-600">{score.score}%</span>
                 </div>
               ))}
             </div>
             <div className="mt-5 space-y-3">
               {quizScores.map(score => (
-                <div key={score.title} className="rounded-2xl border border-white/10 bg-white/[0.04] p-3">
+                <div key={score.title} className="rounded-2xl border border-white/50 bg-white/70 p-3">
                   <div className="flex items-center justify-between gap-3 text-sm font-bold">
                     <span className="truncate">{score.title}</span>
                     <span className="text-cyan-200">{score.score}%</span>
@@ -363,23 +363,23 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
               <p className="text-sm font-black uppercase tracking-[0.3em] text-amber-200">Achievement Badges</p>
               <h2 className="mt-2 text-3xl font-black">Glowing Milestones</h2>
             </div>
-            <p className="text-sm text-slate-400">Unlocked badges glow. Locked goals stay dim until earned.</p>
+            <p className="text-sm text-slate-600">Unlocked badges glow. Locked goals stay dim until earned.</p>
           </div>
           <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
             {badges.map(badge => (
               <div
                 key={badge.id}
-                className={`rounded-[1.75rem] border p-5 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-xl ${
+                className={`rounded-[1.75rem] border p-5 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-sm ${
                   badge.unlocked
-                    ? 'border-cyan-300/30 bg-cyan-300/10 shadow-xl shadow-cyan-400/10'
-                    : 'border-white/10 bg-white/[0.03] opacity-55 grayscale'
+                    ? 'border-cyan-300/30 bg-cyan-300/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5'
+                    : 'border-white/50 bg-white/70 opacity-55 grayscale'
                 }`}
               >
-                <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border text-4xl ${badge.unlocked ? 'border-cyan-200/40 bg-white/10 shadow-lg shadow-cyan-300/20' : 'border-white/10 bg-black/20'}`}>
+                <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border text-4xl ${badge.unlocked ? 'border-cyan-200/40 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5' : 'border-white/50 bg-white/70'}`}>
                   {badge.icon}
                 </div>
                 <h3 className="mt-4 text-lg font-black">{badge.label}</h3>
-                <p className="mt-2 text-xs text-slate-400">{badge.description}</p>
+                <p className="mt-2 text-xs text-slate-600">{badge.description}</p>
               </div>
             ))}
           </div>
@@ -395,12 +395,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                   key={reward.id}
                   disabled={!!redeeming || (currentUser?.eduCoins || 0) < reward.cost}
                   onClick={() => redeem(reward)}
-                  className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/70 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:bg-white/80 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <span className="font-bold">{reward.title}</span>
                   <span className="font-black text-amber-200">🪙 {reward.cost}</span>
                 </button>
-              )) : <p className="rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-slate-300">Reward claims will appear here as new perks are released.</p>}
+              )) : <p className="rounded-2xl border border-white/50 bg-white/70 p-4 text-slate-600">Reward claims will appear here as new perks are released.</p>}
             </div>
           </div>
 
@@ -414,7 +414,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                   <button
                     key={theme.name}
                     onClick={() => onThemeChange(key)}
-                    className={`rounded-2xl border p-3 text-left transition-all duration-300 hover:-translate-y-1 ${activeTheme === key ? 'border-cyan-300/50 bg-cyan-300/10' : 'border-white/10 bg-white/[0.04]'}`}
+                    className={`rounded-2xl border p-3 text-left transition-all duration-300 hover:-translate-y-1 ${activeTheme === key ? 'border-cyan-300/50 bg-cyan-300/10' : 'border-white/50 bg-white/70'}`}
                   >
                     <div className="flex -space-x-1">
                       <span className="h-4 w-4 rounded-full border border-white" style={{ background: theme.palette.primaryColor }} />
@@ -428,8 +428,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             <div className="mt-5 grid gap-3">
               {activeCoupons.slice(0, 3).map(coupon => (
                 <div key={coupon.id} className="flex items-center justify-between rounded-2xl border border-dashed border-cyan-300/30 bg-cyan-300/10 p-4">
-                  <span className="font-black text-cyan-100">{coupon.code}</span>
-                  <span className="text-sm font-bold text-slate-200">{coupon.type === 'percentage' ? `${coupon.value}% off` : `₹${coupon.value} off`}</span>
+                  <span className="font-black text-cyan-700">{coupon.code}</span>
+                  <span className="text-sm font-bold text-slate-600">{coupon.type === 'percentage' ? `${coupon.value}% off` : `₹${coupon.value} off`}</span>
                 </div>
               ))}
             </div>

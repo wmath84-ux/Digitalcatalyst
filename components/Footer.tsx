@@ -13,7 +13,7 @@ interface FooterProps {
 }
 
 const LogoIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-white" viewBox="0 0 24 24" fill="currentColor">
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-slate-900" viewBox="0 0 24 24" fill="currentColor">
         <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.59L5.41 12 4 13.41l7 7 9-9L18.59 10 11 17.59z" />
     </svg>
 );
@@ -47,7 +47,7 @@ const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClic
   };
 
   return (
-    <footer id="contact" className="relative overflow-hidden bg-slate-950 text-white pt-16 pb-8">
+    <footer id="contact" className="relative overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900 pt-16 pb-8">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.22),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(147,51,234,0.20),transparent_32%)]" />
       <div className="container relative z-10 mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
@@ -58,13 +58,13 @@ const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClic
               <LogoIcon />
               <span className="text-xl font-bold">Digital Catalyst</span>
             </div>
-             <p className="text-gray-400 text-sm">
+             <p className="text-slate-600 text-sm">
                 Your one-stop shop for digital marketing and e-commerce solutions.
             </p>
             <div className="flex space-x-4 mt-6">
                 {Object.entries(socialLinks).map(([key, url]) => (
                     socialIcons[key] && url ? (
-                        <a key={key} href={url} target="_blank" rel="noopener noreferrer" className="text-gray-400 hover:text-white transition-colors">
+                        <a key={key} href={url} target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-slate-900 transition-colors">
                             {socialIcons[key]}
                         </a>
                     ) : null
@@ -75,46 +75,46 @@ const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClic
           {/* Column 2: Explore */}
           <div>
             <h3 className="text-lg font-semibold mb-4">Explore</h3>
-            <ul className="space-y-2 text-gray-400">
-              <li><button onClick={onNavigateToAllProducts} className="hover:text-white transition-colors">Products</button></li>
-              <li><button onClick={() => onNavigateToHomeAndScroll('services')} className="hover:text-white transition-colors">Services</button></li>
-              <li><button onClick={() => onNavigateToHomeAndScroll('faq')} className="hover:text-white transition-colors">FAQ</button></li>
+            <ul className="space-y-2 text-slate-600">
+              <li><button onClick={onNavigateToAllProducts} className="hover:text-slate-900 transition-colors">Products</button></li>
+              <li><button onClick={() => onNavigateToHomeAndScroll('services')} className="hover:text-slate-900 transition-colors">Services</button></li>
+              <li><button onClick={() => onNavigateToHomeAndScroll('faq')} className="hover:text-slate-900 transition-colors">FAQ</button></li>
             </ul>
           </div>
           
           {/* Column 3: Legal */}
           <div>
             <h3 className="text-lg font-semibold mb-4">Legal</h3>
-            <ul className="space-y-2 text-gray-400">
-              <li><button onClick={() => onNavigateToPolicies('terms-and-conditions')} className="hover:text-white transition-colors">Terms of Service</button></li>
-              <li><button onClick={() => onNavigateToPolicies('privacy-policy')} className="hover:text-white transition-colors">Privacy Policy</button></li>
-              <li><button onClick={() => onNavigateToPolicies('refund-policy')} className="hover:text-white transition-colors">Refund Policy</button></li>
-              <li><button onClick={onLoginClick} className="hover:text-white transition-colors">Login / Register</button></li>
-              <li><button onClick={onAdminLoginClick} className="hover:text-white transition-colors">Admin Login</button></li>
+            <ul className="space-y-2 text-slate-600">
+              <li><button onClick={() => onNavigateToPolicies('terms-and-conditions')} className="hover:text-slate-900 transition-colors">Terms of Service</button></li>
+              <li><button onClick={() => onNavigateToPolicies('privacy-policy')} className="hover:text-slate-900 transition-colors">Privacy Policy</button></li>
+              <li><button onClick={() => onNavigateToPolicies('refund-policy')} className="hover:text-slate-900 transition-colors">Refund Policy</button></li>
+              <li><button onClick={onLoginClick} className="hover:text-slate-900 transition-colors">Login / Register</button></li>
+              <li><button onClick={onAdminLoginClick} className="hover:text-slate-900 transition-colors">Admin Login</button></li>
             </ul>
           </div>
 
           {/* Column 4: Stay Updated */}
           <div>
             <h3 className="text-lg font-semibold mb-4">Stay Updated</h3>
-            <p className="text-gray-400 text-sm mb-4">Subscribe to our newsletter for the latest products and offers.</p>
-            <form onSubmit={handleSubscribeSubmit} className="flex items-center rounded-full border border-white/10 bg-white/5 p-1 shadow-[0_0_30px_rgba(139,92,246,0.16)] backdrop-blur-xl transition-all duration-300 focus-within:border-purple-300/50 focus-within:shadow-[0_0_36px_rgba(139,92,246,0.28)]">
+            <p className="text-slate-600 text-sm mb-4">Subscribe to our newsletter for the latest products and offers.</p>
+            <form onSubmit={handleSubscribeSubmit} className="flex items-center rounded-full border border-white/50 bg-white/70 p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 focus-within:border-purple-300/50 focus-within:shadow-sm">
                 <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="your@email.com"
                     required
-                    className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-white placeholder:text-slate-400 focus:outline-none"
+                    className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-slate-900 placeholder:text-slate-600 focus:outline-none"
                 />
-                <button type="submit" disabled={isSubscribed} className="rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 text-sm font-bold text-white shadow-[0_0_24px_rgba(79,70,229,0.45)] transition-all duration-300 hover:scale-105 hover:shadow-[0_0_34px_rgba(147,51,234,0.65)] disabled:scale-100 disabled:animate-pulse disabled:opacity-70 sm:px-6">
+                <button type="submit" disabled={isSubscribed} className="rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-sm disabled:scale-100 disabled:animate-pulse disabled:opacity-70 sm:px-6">
                     {isSubscribed ? 'Subscribed' : 'Subscribe'}
                 </button>
             </form>
           </div>
         </div>
         
-        <div className="border-t border-white/20 mt-12 pt-8 text-center text-sm text-gray-400">
+        <div className="border-t border-white/50 mt-12 pt-8 text-center text-sm text-slate-600">
           <p>{footerText}</p>
           <p className="mt-2">This is a demo site for a digital marketing and e-commerce business. All transactions are for demonstration purposes.</p>
         </div>

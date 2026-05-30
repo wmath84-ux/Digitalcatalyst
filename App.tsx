@@ -26,9 +26,8 @@ import UpcomingFeatures, { UpcomingFeatureItem } from './components/UpcomingFeat
 import SubscriptionSuccessModal from './components/SubscriptionSuccessModal';
 import LatestNews from './components/LatestNews';
 import ComingSoonModal from './components/ComingSoonModal';
-import BlogModal from './components/Prerequisites';
-import { FreeProductsModal, AnnouncementsModal } from './components/ContentModals';
-import AnnouncementDetail from './components/AnnouncementDetail';
+import { FreeProductsModal } from './components/ContentModals';
+import ReadingDrawer, { ReadingView } from './components/ReadingDrawer';
 import BottomGlassDock from './components/BottomGlassDock';
 import ProfilePage from './components/ProfilePage';
 import PlatformExperience from './components/PlatformExperience';
@@ -65,7 +64,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-red-50 p-6 text-center font-sans">
-          <div className="max-w-lg bg-white/10 backdrop-blur-xl p-8 rounded-xl shadow-2xl border border-red-100">
+          <div className="max-w-lg bg-white/70 backdrop-blur-xl p-8 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-red-100">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
             </div>
@@ -79,14 +78,14 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
             )}
 
             <div className="flex flex-col gap-3">
-                <button onClick={() => window.location.reload()} className="w-full bg-slate-800/70 text-white px-4 py-3 rounded-lg hover:bg-gray-900 font-semibold transition-colors">
+                <button onClick={() => window.location.reload()} className="w-full bg-white/70 text-slate-900 px-4 py-3 rounded-lg hover:bg-white/80 hover:shadow-sm font-semibold transition-colors">
                 Reload Page
                 </button>
-                <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full bg-white/10 backdrop-blur-xl border border-red-200 text-red-600 px-4 py-3 rounded-lg hover:bg-red-50 font-semibold transition-colors">
+                <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full bg-white/70 backdrop-blur-xl border border-red-200 text-red-600 px-4 py-3 rounded-lg hover:bg-red-50 font-semibold transition-colors">
                 Reset App Data (Fixes Storage Issues)
                 </button>
             </div>
-            <p className="text-xs text-gray-400 mt-4">Warning: Resetting app data will clear all products and settings saved in your browser.</p>
+            <p className="text-xs text-slate-600 mt-4">Warning: Resetting app data will clear all products and settings saved in your browser.</p>
           </div>
         </div>
       );
@@ -249,6 +248,9 @@ export interface NewsArticle {
   excerpt: string;
   date: string;
   content: string;
+  type?: 'news' | 'blog';
+  thumbnailImage?: string;
+  createdAt?: string;
 }
 
 // New Announcement structure
@@ -419,50 +421,6 @@ export interface WebsiteSettings {
     };
 }
 
-// New Component for Blog Post Detail View
-const BlogDetail: React.FC<{
-  settings: WebsiteSettings;
-  article: NewsArticle;
-  onBack: () => void;
-}> = ({ settings, article, onBack }) => {
-  return (
-    <div className="bg-background min-h-screen font-sans animate-fade-in">
-      <header className="bg-white/10 backdrop-blur-xl shadow-md sticky top-0 z-10">
-        <div className="container mx-auto px-6 py-4 flex justify-between items-center">
-          <h1 className="text-xl font-bold text-primary truncate">Catalyst Blog</h1>
-          <button
-            onClick={onBack}
-            className="bg-primary text-white font-semibold px-6 py-2 rounded-lg hover:opacity-90 transition-colors duration-300"
-          >
-            &larr; Back to Blog List
-          </button>
-        </div>
-      </header>
-      <main className="container mx-auto px-6 py-12">
-        <div className="max-w-4xl mx-auto bg-white/10 backdrop-blur-xl p-8 sm:p-12 rounded-lg shadow-lg animate-fade-in-up">
-          <div className="mb-8 border-b pb-6">
-            <p className="text-sm font-semibold text-primary tracking-widest uppercase">{article.category}</p>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-primary mt-2">{article.title}</h2>
-            <p className="text-sm text-text-muted mt-4">
-              Published on {new Date(article.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}
-            </p>
-          </div>
-          <div className="aspect-video bg-gray-200 rounded-lg overflow-hidden mb-8 shadow-inner">
-            <img src={`https://picsum.photos/seed/${article.imageSeed}/1200/675`} alt={article.title} className="w-full h-full object-cover" />
-          </div>
-          
-          <div className="text-lg text-text leading-relaxed space-y-6">
-            {article.content.split('\n').filter(p => p.trim() !== '').map((paragraph, index) => (
-                <p key={index}>{paragraph}</p>
-            ))}
-          </div>
-        </div>
-      </main>
-    </div>
-  );
-};
-
-
 const initialProducts: Product[] = [
   {
     id: 2,
@@ -553,6 +511,9 @@ const initialNewsArticles: NewsArticle[] = [
   {
     id: 1,
     imageSeed: "futuristic-seo-trends",
+    type: "blog",
+    thumbnailImage: "",
+    createdAt: "2024-07-28T09:00:00.000Z",
     category: "SEO",
     title: "Top 5 SEO Trends to Watch in 2025",
     excerpt: "Google's algorithm is constantly evolving. Stay ahead of the competition by understanding the key trends that will shape search engine optimization next year.",
@@ -562,6 +523,9 @@ const initialNewsArticles: NewsArticle[] = [
   {
     id: 2,
     imageSeed: "ecommerce-conversion-funnel",
+    type: "blog",
+    thumbnailImage: "",
+    createdAt: "2024-07-25T09:00:00.000Z",
     category: "E-commerce",
     title: "The Psychology of Online Shopping: How to Convert More Customers",
     excerpt: "Discover the psychological triggers that motivate users to buy. We break down the science behind high-converting product pages and checkout processes.",
@@ -571,6 +535,9 @@ const initialNewsArticles: NewsArticle[] = [
   {
     id: 3,
     imageSeed: "ai-writing-robot",
+    type: "news",
+    thumbnailImage: "",
+    createdAt: "2024-07-22T09:00:00.000Z",
     category: "Marketing",
     title: "AI in Content Marketing: A Practical Guide for Small Businesses",
     excerpt: "Artificial intelligence is no longer just for large corporations. Learn how you can leverage AI tools to create better content, faster and more efficiently.",
@@ -619,6 +586,7 @@ const defaultWebsiteSettings: WebsiteSettings = {
         { id: 'about', visible: true },
         { id: 'trust', visible: true },
         { id: 'upcoming', visible: true, title: "What's Next for Digital Catalyst?" },
+        { id: 'news', visible: true, title: 'Daily Reading Hub' },
         { id: 'faq', visible: true },
     ],
     features: {
@@ -781,9 +749,9 @@ const App: React.FC = () => {
   const [infoModal, setInfoModal] = useState<{ title: string; message: string; icon: string; } | null>(null);
   
   // New Large Content Modal States
-  const [isBlogModalOpen, setIsBlogModalOpen] = useState(false);
+  const [isReadingDrawerOpen, setIsReadingDrawerOpen] = useState(false);
+  const [readingDrawerView, setReadingDrawerView] = useState<ReadingView>('hub');
   const [isFreeModalOpen, setIsFreeModalOpen] = useState(false);
-  const [isAnnouncementsModalOpen, setIsAnnouncementsModalOpen] = useState(false);
   
   // User Theme State
   const [activeTheme, setActiveTheme] = useState<ThemeName>('default');
@@ -945,8 +913,8 @@ const App: React.FC = () => {
         'heavy': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
     };
     root.style.setProperty('--style-shadow-base', shadows[adminTheme.shadowIntensity] || shadows.medium);
-    root.style.setProperty('--style-shadow-lg', shadows[adminTheme.shadowIntensity === 'light' ? 'medium' : 'heavy']);
-    root.style.setProperty('--style-shadow-xl', shadows[adminTheme.shadowIntensity === 'heavy' ? 'heavy' : 'heavy']);
+    root.style.setProperty('--style-shadow-[0_8px_30px_rgb(0,0,0,0.04)]', shadows[adminTheme.shadowIntensity === 'light' ? 'medium' : 'heavy']);
+    root.style.setProperty('--style-shadow-[0_8px_30px_rgb(0,0,0,0.04)]', shadows[adminTheme.shadowIntensity === 'heavy' ? 'heavy' : 'heavy']);
 
   }, [websiteSettings.theme, activeTheme]);
 
@@ -1301,9 +1269,8 @@ const App: React.FC = () => {
   };
   
   const handleViewProductFromModal = (product: ProductWithRating) => {
-    setIsBlogModalOpen(false);
+    setIsReadingDrawerOpen(false);
     setIsFreeModalOpen(false);
-    setIsAnnouncementsModalOpen(false);
     handleViewProduct(product);
   };
   
@@ -1418,18 +1385,25 @@ const App: React.FC = () => {
     // In a real app, you would make an API call here to your backend.
   };
 
+  const openReadingHub = () => {
+    setSelectedArticle(null);
+    setSelectedAnnouncement(null);
+    setReadingDrawerView('hub');
+    setIsReadingDrawerOpen(true);
+  };
+
   const handleViewAnnouncement = (announcement: Announcement) => {
-    setIsAnnouncementsModalOpen(false);
     setSelectedAnnouncement(announcement);
-    setCurrentView('announcementDetail');
-    window.scrollTo(0, 0);
+    setSelectedArticle(null);
+    setReadingDrawerView('announcement');
+    setIsReadingDrawerOpen(true);
   };
 
   const handleViewBlogArticle = (article: NewsArticle) => {
-    setIsBlogModalOpen(false);
     setSelectedArticle(article);
-    setCurrentView('blogDetail');
-    window.scrollTo(0, 0);
+    setSelectedAnnouncement(null);
+    setReadingDrawerView('article');
+    setIsReadingDrawerOpen(true);
   };
 
   // FIX: Changed to check for existing admin session before showing login screen
@@ -1521,12 +1495,12 @@ const App: React.FC = () => {
           {websiteSettings.layout.map(section => {
               if (!section.visible) return null;
               switch(section.id) {
-                  case 'hero': return <React.Fragment key={section.id}><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => setIsBlogModalOpen(true)} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => setIsAnnouncementsModalOpen(true)} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></React.Fragment>;
+                  case 'hero': return <React.Fragment key={section.id}><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={openReadingHub} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={openReadingHub} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></React.Fragment>;
                   case 'purchased': return purchasedProducts.length > 0 && <PurchasedProducts settings={websiteSettings} key={section.id} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
                   case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} coupons={coupons} />;
                   case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} coupons={coupons} />;
                   case 'services': return <Services settings={websiteSettings} key={section.id} services={websiteSettings.content.services} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} />;
-                  case 'news': return null;
+                  case 'news': return <LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Daily Reading Hub'} articles={websiteSettings.content.newsArticles} onReadMoreClick={handleViewBlogArticle} onOpenHub={openReadingHub} />;
                   case 'about': return <AboutUs settings={websiteSettings} key={section.id} title={websiteSettings.content.aboutUsTitle} text={websiteSettings.content.aboutUsText} imageSeed={websiteSettings.content.aboutUsImageSeed} />;
                   case 'trust': return <TrustBadges settings={websiteSettings} key={section.id} />;
                   case 'upcoming': return <UpcomingFeatures settings={websiteSettings} key={section.id} title={section.title || "What's Next?"} features={websiteSettings.content.upcomingFeatures} />;
@@ -1557,43 +1531,20 @@ const App: React.FC = () => {
     if (currentView === 'admin' && currentAdminUser) return <AdminDashboard websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} onTicketsUpdate={setTickets} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={setCoupons} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} />;
     if (currentView === 'adminLogin') return <AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={handleBackToHome} />;
     if (currentView === 'coursePlayer') return renderContent();
-    if (currentView === 'announcementDetail' && selectedAnnouncement) {
-      return <AnnouncementDetail 
-          settings={websiteSettings} 
-          announcement={selectedAnnouncement} 
-          onBack={() => {
-              setCurrentView('home'); 
-              setSelectedAnnouncement(null); 
-              setIsAnnouncementsModalOpen(true);
-          }} 
-      />;
-    }
-    if (currentView === 'blogDetail' && selectedArticle) {
-      return <BlogDetail 
-          settings={websiteSettings} 
-          article={selectedArticle} 
-          onBack={() => {
-              setCurrentView('home'); 
-              setSelectedArticle(null); 
-              setIsBlogModalOpen(true);
-          }} 
-      />;
-    }
 
     return (
        <ErrorBoundary>
          <div className="font-sans">
             <WelcomeOverlay />
             <Header settings={websiteSettings} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} activeTheme={activeTheme} onThemeChange={setActiveTheme} />
-            {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onOpenBlogModal={() => setIsBlogModalOpen(true)} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => setIsAnnouncementsModalOpen(true)} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} onSubscriptionClick={handleNavigateToSubscription} />}
+            {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onOpenBlogModal={openReadingHub} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={openReadingHub} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} onSubscriptionClick={handleNavigateToSubscription} />}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
             {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null)} />}
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
-            <BlogModal isOpen={isBlogModalOpen} onClose={() => setIsBlogModalOpen(false)} articles={websiteSettings.content.newsArticles} onReadMoreClick={handleViewBlogArticle} settings={websiteSettings} />
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onViewProduct={handleViewProductFromModal} />
-            <AnnouncementsModal isOpen={isAnnouncementsModalOpen} onClose={() => setIsAnnouncementsModalOpen(false)} announcements={websiteSettings.content.announcements} settings={websiteSettings} onViewAnnouncement={handleViewAnnouncement} />
+            <ReadingDrawer isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} />
             <main>{renderContent()}</main>
             <Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} />
          </div>

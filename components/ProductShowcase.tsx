@@ -85,7 +85,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
     <section 
       id="products" 
       ref={sectionRef}
-      className={`py-24 bg-white/10 backdrop-blur-xl ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+      className={`py-24 bg-white/70 backdrop-blur-xl ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
     >
       <div className="container mx-auto px-6">
         <div className="text-center max-w-3xl mx-auto mb-12 animate-child animate-delay-1">
@@ -104,9 +104,9 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search..."
-                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition bg-white/10 backdrop-blur-xl"
+                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition bg-white/70 backdrop-blur-xl"
                 />
-                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </div>
 
               {/* Sort */}
@@ -114,7 +114,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
                 <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition bg-white/10 backdrop-blur-xl cursor-pointer"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition bg-white/70 backdrop-blur-xl cursor-pointer"
                 >
                     <option value="default">Default Sorting</option>
                     <option value="newest">Newest Arrivals</option>
@@ -133,7 +133,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
                     onClick={() => setActiveFilter(filter)} 
                     className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-all duration-200 ${
                         activeFilter === filter 
-                        ? 'bg-primary text-white shadow-md scale-105' 
+                        ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] scale-105'
                         : 'bg-gray-100 text-gray-600 hover:bg-gray-200 hover:text-gray-900'
                     }`}
                 >
@@ -164,8 +164,8 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
             ))
           ) : (
             <div className="col-span-full text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-gray-300 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              <p className="text-lg text-gray-500">No products found matching your criteria.</p>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-slate-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <p className="text-lg text-slate-600">No products found matching your criteria.</p>
               <button onClick={() => {setSearchQuery(''); setActiveFilter('All');}} className="mt-4 text-primary font-semibold hover:underline">Clear Filters</button>
             </div>
           )}

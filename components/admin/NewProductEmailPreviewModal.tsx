@@ -71,17 +71,17 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-950 bg-opacity-70 z-[60] flex justify-center items-center p-4 font-sans animate-fade-in" onClick={onClose}>
-            <div className="bg-gray-100 rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-scale-in-up" onClick={e => e.stopPropagation()}>
-                <header className="p-4 border-b bg-white/10 backdrop-blur-xl rounded-t-lg flex justify-between items-center">
+        <div className="fixed inset-0 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 bg-opacity-70 z-[60] flex justify-center items-center p-4 font-sans animate-fade-in" onClick={onClose}>
+            <div className="bg-gray-100 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full max-w-3xl max-h-[90vh] flex flex-col animate-scale-in-up" onClick={e => e.stopPropagation()}>
+                <header className="p-4 border-b bg-white/70 backdrop-blur-xl rounded-t-lg flex justify-between items-center">
                     <h2 className="text-lg font-bold text-gray-800">Email Preview: New Product Announcement</h2>
-                    <button onClick={onClose} className="text-gray-400 hover:text-gray-600 font-bold text-2xl" aria-label="Close modal">&times;</button>
+                    <button onClick={onClose} className="text-slate-600 hover:text-gray-600 font-bold text-2xl" aria-label="Close modal">&times;</button>
                 </header>
 
                 <main className="flex-1 p-6 overflow-y-auto">
-                    <div className="bg-white/10 backdrop-blur-xl rounded-md shadow-md overflow-hidden border">
+                    <div className="bg-white/70 backdrop-blur-xl rounded-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden border">
                         {/* Email Metadata */}
-                        <div className="p-4 bg-gray-50 border-b text-xs text-gray-500">
+                        <div className="p-4 bg-gray-50 border-b text-xs text-slate-600">
                             <p><strong>To:</strong> All Users ({users.length} recipients)</p>
                             <p><strong>Subject:</strong> 🚀 New Arrival: {product.title}!</p>
                         </div>
@@ -91,7 +91,7 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
                             {/* Header Image */}
                             <div className="h-64 bg-gray-200 flex items-center justify-center rounded-md mb-6 overflow-hidden">
                                 {isLoadingImage ? (
-                                    <div className="flex items-center space-x-2 text-gray-500">
+                                    <div className="flex items-center space-x-2 text-slate-600">
                                         <div className="w-3 h-3 bg-gray-400 rounded-full animate-pulse [animation-delay:-0.3s]"></div>
                                         <div className="w-3 h-3 bg-gray-400 rounded-full animate-pulse [animation-delay:-0.15s]"></div>
                                         <div className="w-3 h-3 bg-gray-400 rounded-full animate-pulse"></div>
@@ -100,7 +100,7 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
                                 ) : marketingImageUrl ? (
                                     <img src={marketingImageUrl} alt="AI Generated Marketing Banner" className="w-full h-full object-cover" />
                                 ) : (
-                                    <div className="text-sm text-gray-500">Image Unavailable</div>
+                                    <div className="text-sm text-slate-600">Image Unavailable</div>
                                 )}
                             </div>
                             
@@ -120,13 +120,13 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
                                         {product.salePrice ? (
                                             <div className="flex items-baseline gap-2">
                                                 <span className="text-2xl font-bold text-primary">{product.salePrice}</span>
-                                                <span className="text-lg font-medium text-gray-400 line-through">{product.price}</span>
+                                                <span className="text-lg font-medium text-slate-600 line-through">{product.price}</span>
                                             </div>
                                         ) : (
                                             <span className="text-2xl font-bold text-primary">{product.price}</span>
                                         )}
                                     </div>
-                                    <button className="w-full mt-4 bg-primary text-white font-bold py-3 rounded-lg hover:opacity-90">
+                                    <button className="w-full mt-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-3 rounded-lg hover:opacity-90">
                                         Shop Now
                                     </button>
                                 </div>
@@ -138,9 +138,9 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
                                     <h4 className="text-xl font-semibold text-gray-800 text-center mb-6">You Might Also Like</h4>
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         {relatedProducts.map(p => (
-                                            <div key={p.id} className="border rounded-lg overflow-hidden bg-white/10 backdrop-blur-xl hover:shadow-md transition-shadow">
+                                            <div key={p.id} className="border rounded-lg overflow-hidden bg-white/70 backdrop-blur-xl hover:shadow-sm transition-shadow">
                                                 <div className="aspect-video bg-gray-100"><img src={p.images[0]} alt={p.title} className="w-full h-full object-cover" /></div>
-                                                <div className="p-3"><h4 className="font-semibold text-sm truncate text-gray-800">{p.title}</h4><p className="text-xs text-gray-500">{p.salePrice || p.price}</p></div>
+                                                <div className="p-3"><h4 className="font-semibold text-sm truncate text-gray-800">{p.title}</h4><p className="text-xs text-slate-600">{p.salePrice || p.price}</p></div>
                                             </div>
                                         ))}
                                     </div>
@@ -151,8 +151,8 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
                 </main>
                 
                 <footer className="p-4 bg-gray-200 border-t flex justify-end space-x-3">
-                    <button onClick={onClose} disabled={isSending || isSent} className="px-5 py-2 bg-white/10 backdrop-blur-xl text-gray-800 rounded-lg hover:bg-gray-50 border font-semibold disabled:opacity-50">Cancel</button>
-                    <button onClick={handleSend} disabled={isSending || isSent} className="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:bg-gray-400 w-48 justify-center">
+                    <button onClick={onClose} disabled={isSending || isSent} className="px-5 py-2 bg-white/70 backdrop-blur-xl text-gray-800 rounded-lg hover:bg-gray-50 border font-semibold disabled:opacity-50">Cancel</button>
+                    <button onClick={handleSend} disabled={isSending || isSent} className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:bg-gray-400 w-48 justify-center">
                         {isSending ? (
                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
                         ) : isSent ? (
