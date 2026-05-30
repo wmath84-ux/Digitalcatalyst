@@ -12,6 +12,7 @@ import AdminReviewManagement from './AdminReviewManagement';
 import Reports from './Reports';
 import WebsiteSettingsComponent from './WebsiteSettings';
 import AdminManagement from './AdminManagement';
+import NewsBlogManagement from './NewsBlogManagement';
 
 interface AdminDashboardProps {
     products: ProductWithRating[];
@@ -35,7 +36,7 @@ interface AdminDashboardProps {
     onSwitchToHome: () => void;
 }
 
-export type AdminView = 'dashboard' | 'products' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'analytics' | 'websiteSettings';
+export type AdminView = 'dashboard' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'analytics' | 'websiteSettings';
 
 const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?: string; icon: React.ReactNode; gradient: string }> = ({ title, value, subtitle, icon, gradient }) => (
     <div className={`relative overflow-hidden rounded-2xl p-6 shadow-lg text-white ${gradient} transform transition-all duration-300 hover:-translate-y-1 hover:shadow-2xl`}>
@@ -58,6 +59,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     const renderView = () => {
         switch (currentView) {
             case 'products': return <ProductManagement products={props.products} users={props.users} coupons={props.coupons} onAddProduct={props.onAddProduct} onUpdateProduct={props.onUpdateProduct} onDeleteProduct={props.onDeleteProduct} />;
+            case 'newsBlog': return <NewsBlogManagement settings={props.websiteSettings} onSettingsChange={props.onWebsiteSettingsChange} />;
             case 'reviews': return <AdminReviewManagement products={props.products} reviews={props.reviews} />;
             case 'reports': return <Reports products={props.products} reviews={props.reviews} />;
             case 'users': return <UserManagement users={props.users} onDeleteUser={props.onDeleteUser} />;

@@ -266,7 +266,7 @@
       }
 
       /* Coming Soon / Feature Modals */
-      .coming-soon-overlay, .blog-modal-overlay, .share-modal-overlay, .image-zoom-overlay {
+      .coming-soon-overlay, .share-modal-overlay, .image-zoom-overlay {
          @extend .common-modal-overlay;
          position: fixed;
          inset: 0;
@@ -279,17 +279,9 @@
          animation: fade-in 0.3s ease-out forwards;
       }
       
-      .coming-soon-content, .blog-modal-content, .share-modal-content, .image-zoom-content {
+      .coming-soon-content, .share-modal-content, .image-zoom-content {
          @extend .common-modal-content;
          animation: pop-in 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275) forwards;
-      }
-
-      .blog-modal-content {
-        padding: 2.5rem;
-        width: 90%;
-        max-width: 900px;
-        max-height: 90vh;
-        overflow-y: auto;
       }
       
       .image-zoom-overlay {
@@ -356,6 +348,15 @@
       @keyframes typing { from { width: 0 } to { width: 100% } }
       @keyframes blink { 50% { border-color: transparent; } }
       @keyframes slideUp { from { opacity: 0; transform: translateY(16px);} to { opacity: 1; transform: translateY(0);} }
+
+
+      @keyframes slide-in-right {
+        from { transform: translateX(100%); }
+        to { transform: translateX(0); }
+      }
+      .animate-slide-in-right {
+        animation: slide-in-right 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
 
     </style>
   <script type="importmap">
