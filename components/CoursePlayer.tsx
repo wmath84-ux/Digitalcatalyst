@@ -1,6 +1,6 @@
 // components/CoursePlayer.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile } from '../App';
+import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, QuizAnswerState } from '../App';
 import AiMentor from './AiMentor';
 
 const FileIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (

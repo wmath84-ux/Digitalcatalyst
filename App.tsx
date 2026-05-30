@@ -375,6 +375,7 @@ export interface WebsiteSettings {
         showSaleBadges: boolean;
     };
     content: {
+        siteName?: string;
         heroTitle: string;
         heroSubtitle: string;
         heroImageUrl?: string;
