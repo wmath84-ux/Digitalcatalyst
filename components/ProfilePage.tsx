@@ -16,6 +16,7 @@ interface ProfilePageProps {
   users: User[];
   setUsers: (users: User[]) => void;
   setCurrentUser: (user: User | null) => void;
+  onClaimMilestoneReward: (reward: { id: string; title: string; requirement: number; unlockProductIds?: number[] }) => boolean;
 }
 
 interface LearningProgress {
@@ -39,6 +40,17 @@ interface Badge {
   description: string;
 }
 
+interface MilestoneReward {
+  id: string;
+  title: string;
+  requirement: number;
+  icon: string;
+  description: string;
+  actionLabel: string;
+  unlockProductIds?: number[];
+  downloadContent?: string;
+}
+
 const defaultCoverImage =
   'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1800&q=80';
 
@@ -48,6 +60,18 @@ const glassCard =
 const getStorageKey = (userId?: number) => `studentAchievementHubCover-${userId ?? 'guest'}`;
 
 const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
+
+const formatLedgerTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Just now';
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startYesterday = startToday - 24 * 60 * 60 * 1000;
+  const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  if (date.getTime() >= startToday) return `Today, ${time}`;
+  if (date.getTime() >= startYesterday) return `Yesterday, ${time}`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
 
 const ProfilePage: React.FC<ProfilePageProps> = ({
   settings,
@@ -62,6 +86,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   users,
   setUsers,
   setCurrentUser,
+  onClaimMilestoneReward,
 }) => {
   const coverInputRef = React.useRef<HTMLInputElement | null>(null);
   const [coverImage, setCoverImage] = React.useState(defaultCoverImage);
@@ -106,6 +131,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const studyMinutes = currentUser?.studyMinutes ?? 0;
   const watchTimeMinutes = currentUser?.totalWatchTimeMinutes ?? studyMinutes;
   const eduPoints = currentUser?.eduCoins ?? 0;
+  const totalLifetimeCoins = currentUser?.totalLifetimeCoins ?? eduPoints;
+  const milestoneRewards = React.useMemo<MilestoneReward[]>(() => {
+    const premiumProduct = products.find(product => !product.isFree && product.isVisible !== false);
+    return [
+      { id: 'premium-pdf-pack', title: 'Premium PDF Pack', requirement: 500, icon: '📦', description: 'Download a curated premium revision pack once you cross 500 lifetime coins.', actionLabel: 'Download Pack', downloadContent: 'Digital Catalyst Premium PDF Pack\n\n- Exam sprint checklist\n- Revision planner\n- AI study prompts\n- Career-readiness worksheet' },
+      { id: 'course-access-pass', title: 'Course Access Pass', requirement: 1000, icon: '🎓', description: premiumProduct ? `Unlock access to ${premiumProduct.title}.` : 'Unlock access to a featured premium course.', actionLabel: 'Unlock Course', unlockProductIds: premiumProduct ? [premiumProduct.id] : [] },
+      { id: 'elite-wallet-badge', title: 'Elite Wallet Badge', requirement: 2000, icon: '💎', description: 'Permanent profile recognition for serious learners.', actionLabel: 'Claim Badge' },
+    ];
+  }, [products]);
+
   const dynamicClaimCards = React.useMemo(() => {
     const productCards = products
       .filter(product => product.isVisible !== false && !product.isFree)
@@ -217,6 +252,21 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     };
     reader.readAsDataURL(file);
     event.target.value = '';
+  };
+
+
+  const handleMilestoneClaim = (reward: MilestoneReward) => {
+    const claimed = onClaimMilestoneReward(reward);
+    if (!claimed) return;
+    if (reward.downloadContent) {
+      const blob = new Blob([reward.downloadContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${reward.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.txt`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
   };
 
   const statCards = [
@@ -407,28 +457,31 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <section className={`hub-animate mt-6 rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '520ms' }}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.3em] text-amber-200">Achievement Badges</p>
+              <p className="text-sm font-black uppercase tracking-[0.3em] text-amber-200">Actionable Milestones</p>
               <h2 className="mt-2 text-3xl font-black">Glowing Milestones</h2>
             </div>
-            <p className="text-sm text-slate-600">Unlocked badges glow. Locked goals stay dim until earned.</p>
+            <p className="text-sm text-slate-600">Lifetime earned: 🪙 {totalLifetimeCoins}. Reached milestones unlock real downloads or access.</p>
           </div>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {badges.map(badge => (
-              <div
-                key={badge.id}
-                className={`rounded-[1.75rem] border p-5 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-sm ${
-                  badge.unlocked
-                    ? 'border-cyan-300/30 bg-cyan-300/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5'
-                    : 'border-white/50 bg-white/70 opacity-55 grayscale'
-                }`}
-              >
-                <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border text-4xl ${badge.unlocked ? 'border-cyan-200/40 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5' : 'border-white/50 bg-white/70'}`}>
-                  {badge.icon}
-                </div>
-                <h3 className="mt-4 text-lg font-black">{badge.label}</h3>
-                <p className="mt-2 text-xs text-slate-600">{badge.description}</p>
-              </div>
-            ))}
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            {milestoneRewards.map(reward => {
+              const reached = totalLifetimeCoins >= reward.requirement;
+              const claimed = (currentUser?.claimedRewardIds || []).includes(reward.id);
+              return (
+                <article key={reward.id} className={`rounded-[1.75rem] border p-5 transition-all duration-300 hover:-translate-y-1 ${claimed ? 'border-emerald-300/60 bg-emerald-50/80 shadow-[0_0_18px_rgba(16,185,129,0.35)]' : reached ? 'border-indigo-400 bg-white/80 shadow-[0_0_15px_rgba(79,70,229,0.5)] animate-pulse' : 'border-white/50 bg-white/70 opacity-75'}`}>
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/60 bg-white/80 text-3xl shadow-sm">{reward.icon}</div>
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900">{reward.title}</h3>
+                      <p className="mt-1 text-sm text-slate-600">{reward.description}</p>
+                      <p className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-amber-700">Requires 🪙 {reward.requirement}</p>
+                    </div>
+                  </div>
+                  <button type="button" disabled={!reached || claimed} onClick={() => handleMilestoneClaim(reward)} className="mt-5 w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60">
+                    {claimed ? 'Claimed / Unlocked' : reached ? reward.actionLabel : `Earn ${reward.requirement - totalLifetimeCoins} more coins`}
+                  </button>
+                </article>
+              );
+            })}
           </div>
         </section>
 
@@ -500,10 +553,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             {coinTransactions.length ? coinTransactions.slice(0, 8).map((entry) => (
               <div key={entry.id || `${entry.createdAt}-${entry.description}`} className="flex items-center justify-between gap-4 rounded-2xl border border-white/50 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
                 <div>
-                  <p className="font-black text-slate-900">{entry.type === 'credit' ? '✔️' : '↘️'} {entry.source}</p>
-                  <p className="mt-1 text-sm text-slate-600">{entry.description}</p>
+                  <p className="font-black text-slate-900">{entry.amount >= 0 ? '🟢' : '🔴'} {entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</p>
+                  <p className="mt-1 text-sm text-slate-600">{entry.amount >= 0 ? '📝' : '🛒'} <span className="font-bold">{entry.title || entry.source}</span> — {entry.description}</p>
                 </div>
-                <div className={`text-right text-lg font-black ${entry.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</div>
+                <div className="text-right"><div className={`text-lg font-black ${entry.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</div><div className="mt-1 text-xs font-bold text-slate-500">{formatLedgerTime(entry.timestamp || entry.createdAt)}</div></div>
               </div>
             )) : (
               <div className="rounded-2xl border border-white/50 bg-white/70 p-5 text-slate-600">No coin movements yet. Read an article or complete a purchase to start your live ledger.</div>

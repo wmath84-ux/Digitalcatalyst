@@ -201,10 +201,12 @@ export interface CoinTransaction {
     amount: number;
     type: 'credit' | 'debit';
     source: string;
+    title?: string;
     description: string;
     articleId?: number | string;
     productId?: number | string;
     createdAt: string;
+    timestamp?: string;
 }
 
 export interface User {
@@ -218,8 +220,11 @@ export interface User {
     eduCoins?: number;
     studyMinutes?: number;
     totalWatchTimeMinutes?: number;
+    totalLifetimeCoins?: number;
     rewardedArticleIds?: Array<number | string>;
     readArticles?: Array<number | string>;
+    rewardedQuizIds?: Array<number | string>;
+    claimedRewardIds?: Array<string>;
     coinTransactions?: CoinTransaction[];
 }
 
@@ -1173,7 +1178,7 @@ const App: React.FC = () => {
 
   // --- Auth Handlers ---
   const completeUserSession = (user: User) => {
-      const sessionUser = { ...user, eduCoins: user.eduCoins ?? 120, studyMinutes: user.studyMinutes ?? 0, totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0, rewardedArticleIds: user.rewardedArticleIds || [], readArticles: user.readArticles || user.rewardedArticleIds || [], coinTransactions: user.coinTransactions || [], lastLoginAt: new Date().toISOString() };
+      const sessionUser = { ...user, eduCoins: user.eduCoins ?? 120, studyMinutes: user.studyMinutes ?? 0, totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0, rewardedArticleIds: user.rewardedArticleIds || [], readArticles: user.readArticles || user.rewardedArticleIds || [], rewardedQuizIds: user.rewardedQuizIds || [], claimedRewardIds: user.claimedRewardIds || [], totalLifetimeCoins: user.totalLifetimeCoins ?? user.eduCoins ?? 120, coinTransactions: user.coinTransactions || [], lastLoginAt: new Date().toISOString() };
       setCurrentUser(sessionUser);
       safeSetItem('currentUser', sessionUser);
 
@@ -1200,7 +1205,7 @@ const App: React.FC = () => {
       if (users.some(u => u.email === email)) {
           return { success: false, message: 'An account with this email already exists.' };
       }
-      const newUser: User = { id: Date.now(), name, email, mobile, password, createdAt: new Date().toISOString(), eduCoins: 120, studyMinutes: 0, totalWatchTimeMinutes: 0, rewardedArticleIds: [], readArticles: [], coinTransactions: [] };
+      const newUser: User = { id: Date.now(), name, email, mobile, password, createdAt: new Date().toISOString(), eduCoins: 120, totalLifetimeCoins: 120, studyMinutes: 0, totalWatchTimeMinutes: 0, rewardedArticleIds: [], readArticles: [], rewardedQuizIds: [], claimedRewardIds: [], coinTransactions: [] };
       const updatedUsers = [...users, newUser];
       setUsers(updatedUsers);
       safeSetItem('siteUsers', updatedUsers);
@@ -1264,7 +1269,8 @@ const App: React.FC = () => {
   };
 
   const recordCoinTransaction = (user: User, transaction: Omit<CoinTransaction, 'id' | 'createdAt'>) => {
-    const entry: CoinTransaction = { ...transaction, id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, createdAt: new Date().toISOString() };
+    const timestamp = new Date().toISOString();
+    const entry: CoinTransaction = { ...transaction, title: transaction.title || transaction.source, id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, createdAt: timestamp, timestamp };
     const storageKey = `coinTransactions-${user.id}`;
     const localLedger = JSON.parse(localStorage.getItem(storageKey) || '[]') as CoinTransaction[];
     const nextLedger = [entry, ...localLedger].slice(0, 100);
@@ -1297,7 +1303,7 @@ const App: React.FC = () => {
   const creditEduCoins = (amount: number, message?: string, metadata?: Partial<Omit<CoinTransaction, 'amount' | 'type' | 'createdAt'>>) => {
     if (!currentUser || amount <= 0) return false;
     syncCurrentUser(
-      user => ({ ...user, eduCoins: (user.eduCoins || 0) + amount }),
+      user => ({ ...user, eduCoins: (user.eduCoins || 0) + amount, totalLifetimeCoins: (user.totalLifetimeCoins || 0) + amount }),
       { amount, type: 'credit', source: metadata?.source || 'EduCoin reward', description: metadata?.description || message || `+${amount} EduCoins earned`, articleId: metadata?.articleId, productId: metadata?.productId },
     );
     showCoinToast(message || `✦ +${amount} EduCoins Earned`);
@@ -1323,6 +1329,7 @@ const App: React.FC = () => {
       user => ({
         ...user,
         eduCoins: (user.eduCoins || 0) + rewardCoins,
+        totalLifetimeCoins: (user.totalLifetimeCoins || 0) + rewardCoins,
         rewardedArticleIds: [...new Set([...(user.rewardedArticleIds || []), articleId])],
         readArticles: [...new Set([...(user.readArticles || []), articleId])],
       }),
@@ -1332,13 +1339,50 @@ const App: React.FC = () => {
     return true;
   };
 
-  const handleWatchTimeMinutes = (minutes: number) => {
+  const handleWatchTimeMinutes = (minutes: number, lessonTitle = 'Course video') => {
     if (!currentUser || minutes <= 0) return;
-    syncCurrentUser(user => ({
-      ...user,
-      studyMinutes: (user.studyMinutes || 0) + minutes,
-      totalWatchTimeMinutes: (user.totalWatchTimeMinutes || 0) + minutes,
-    }));
+    syncCurrentUser(
+      user => ({
+        ...user,
+        studyMinutes: (user.studyMinutes || 0) + minutes,
+        totalWatchTimeMinutes: (user.totalWatchTimeMinutes || 0) + minutes,
+        eduCoins: (user.eduCoins || 0) + minutes,
+        totalLifetimeCoins: (user.totalLifetimeCoins || 0) + minutes,
+      }),
+      { amount: minutes, type: 'credit', source: `Video: ${lessonTitle}`, description: `Watched ${lessonTitle} (${minutes} min${minutes > 1 ? 's' : ''})` },
+    );
+  };
+
+  const handleQuizReward = (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => {
+    if (!currentUser || coins <= 0) return false;
+    if ((currentUser.rewardedQuizIds || []).includes(quizId)) return false;
+    syncCurrentUser(
+      user => ({
+        ...user,
+        eduCoins: (user.eduCoins || 0) + coins,
+        totalLifetimeCoins: (user.totalLifetimeCoins || 0) + coins,
+        rewardedQuizIds: [...new Set([...(user.rewardedQuizIds || []), quizId])],
+      }),
+      { amount: coins, type: 'credit', source: `Quiz: ${quizTitle}`, description: `${correctAnswers} correct answer${correctAnswers === 1 ? '' : 's'} in ${quizTitle}` },
+    );
+    showCoinToast(`✦ +${coins} EduCoins Quiz Reward`);
+    return true;
+  };
+
+  const handleClaimMilestoneReward = (reward: { id: string; title: string; requirement: number; unlockProductIds?: number[] }) => {
+    if (!currentUser) return false;
+    if ((currentUser.totalLifetimeCoins || 0) < reward.requirement || (currentUser.claimedRewardIds || []).includes(reward.id)) return false;
+    syncCurrentUser(
+      user => ({ ...user, claimedRewardIds: [...new Set([...(user.claimedRewardIds || []), reward.id])] }),
+      { amount: 0, type: 'credit', source: 'Milestone unlocked', description: `Unlocked: ${reward.title}` },
+    );
+    if (reward.unlockProductIds?.length) {
+      const nextPurchasedIds = [...new Set([...purchasedProductIds, ...reward.unlockProductIds])];
+      setPurchasedProductIds(nextPurchasedIds);
+      safeSetItem('purchasedProducts', nextPurchasedIds);
+    }
+    setInfoModal({ title: 'Milestone unlocked', message: `${reward.title} is now available.`, icon: '🏆' });
+    return true;
   };
 
   const handleToggleWishlist = (productId: number) => {
@@ -1713,11 +1757,11 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case 'product': return selectedProduct && <ProductDetailPage settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToAllProducts} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={currentUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
-      case 'coursePlayer': return selectedProduct && <CoursePlayer settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToPurchases} onWatchTimeMinutes={handleWatchTimeMinutes} />;
+      case 'coursePlayer': return selectedProduct && <CoursePlayer settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToPurchases} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={handleBackToHome} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} coupons={coupons} />;
       case 'myPurchases': return <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
-      case 'profile': return <ProfilePage settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} />;
+      case 'profile': return <ProfilePage settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} />;
       case 'subscription': return <SubscriptionPage settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={handleBackToHome} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
       case 'home': default: return renderHomePageContent();

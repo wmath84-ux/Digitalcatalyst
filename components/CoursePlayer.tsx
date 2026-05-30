@@ -232,10 +232,13 @@ const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
   </div>
 );
 
-const QuizPlayer: React.FC<{ file: ProductFile }> = ({ file }) => {
+const QuizPlayer: React.FC<{ file: ProductFile; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ file, onQuizReward }) => {
   const questions = file.quiz?.questions || [];
   const [answers, setAnswers] = useState<QuizAnswerState>({});
   const [currentQuestion, setCurrentQuestion] = useState(0);
+  const [submitted, setSubmitted] = useState(false);
+  const [rewardClaimed, setRewardClaimed] = useState(false);
+  const [rewardCoins, setRewardCoins] = useState(0);
   const score = questions.reduce((total, q, index) => total + (answers[index] === q.correctAnswer ? 1 : 0), 0);
   if (!questions.length) return <GlassDownloadCard file={file} headline="Quiz unavailable" />;
 
@@ -243,6 +246,14 @@ const QuizPlayer: React.FC<{ file: ProductFile }> = ({ file }) => {
   const selected = answers[currentQuestion];
   const answered = selected !== undefined;
   const isLastQuestion = currentQuestion === questions.length - 1;
+  const allAnswered = questions.every((_, index) => answers[index] !== undefined);
+
+  const submitQuiz = () => {
+    const coins = score * 2;
+    setSubmitted(true);
+    setRewardCoins(coins);
+    if (coins > 0 && onQuizReward) setRewardClaimed(onQuizReward(file.id, file.name, score, coins));
+  };
 
   return (
     <div className="h-full overflow-y-auto p-4 text-slate-900 md:p-8 custom-scrollbar">
@@ -299,23 +310,34 @@ const QuizPlayer: React.FC<{ file: ProductFile }> = ({ file }) => {
           {answered && <div className={`mt-6 rounded-2xl border p-4 font-black ${selected === question.correctAnswer ? 'border-emerald-300/50 bg-emerald-400/15 text-emerald-700' : 'border-rose-300/50 bg-rose-400/15 text-rose-100'}`}>{selected === question.correctAnswer ? 'Correct! Great work.' : `Incorrect. Correct answer: ${question.options[question.correctAnswer]}`}</div>}
         </div>
 
-        <div className="mt-6 flex items-center justify-between gap-4">
+        {submitted && (
+          <div className="mt-6 rounded-3xl border border-emerald-200/70 bg-emerald-50/80 p-5 shadow-sm backdrop-blur-xl">
+            <p className="text-xl font-black text-emerald-800">Quiz submitted: {score}/{questions.length}</p>
+            <p className="mt-2 text-sm font-bold text-emerald-700">{rewardClaimed ? `✦ +${rewardCoins} EduCoins credited to your wallet.` : rewardCoins > 0 ? 'Reward already claimed for this quiz.' : 'No coin reward this time — revise and try another quiz.'}</p>
+          </div>
+        )}
+
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
           <button type="button" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(index => Math.max(0, index - 1))} className="rounded-2xl border border-white/50 bg-white/70 px-5 py-3 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-          <button type="button" onClick={() => isLastQuestion ? setCurrentQuestion(0) : setCurrentQuestion(index => Math.min(questions.length - 1, index + 1))} className="rounded-2xl bg-cyan-200 px-6 py-3 font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50">{isLastQuestion ? 'Review Quiz' : 'Next Question'}</button>
+          <div className="flex gap-3">
+            <button type="button" onClick={() => isLastQuestion ? setCurrentQuestion(0) : setCurrentQuestion(index => Math.min(questions.length - 1, index + 1))} className="rounded-2xl bg-cyan-200 px-6 py-3 font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50">{isLastQuestion ? 'Review Quiz' : 'Next Question'}</button>
+            <button type="button" disabled={!allAnswered || submitted} onClick={submitQuiz} className="rounded-2xl bg-gradient-to-r from-indigo-500 to-amber-400 px-6 py-3 font-black text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50">Submit & Claim Coins</button>
+          </div>
         </div>
       </div>
     </div>
   );
 };
 
-const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; onWatchTimeMinutes?: (minutes: number) => void; }> = ({ settings, product, onBack, onWatchTimeMinutes }) => {
+const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; onWatchTimeMinutes?: (minutes: number, lessonTitle?: string) => void; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ settings, product, onBack, onWatchTimeMinutes, onQuizReward }) => {
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const watchSecondsRef = useRef(0);
-  const lastVideoTimeRef = useRef(0);
+  const activePlaybackSecondsRef = useRef(0);
+  const [watchedMinutes, setWatchedMinutes] = useState(0);
+  const [earnedVideoCoins, setEarnedVideoCoins] = useState(0);
 
   useEffect(() => {
     const findFirst = (modules?: CourseModule[]): ProductFile | null => {
@@ -330,38 +352,38 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
     setActiveFile(findFirst(product.courseContent || []));
   }, [product]);
 
-  useEffect(() => setMediaHasError(false), [activeFile]);
+  useEffect(() => {
+    setMediaHasError(false);
+    activePlaybackSecondsRef.current = 0;
+    setWatchedMinutes(0);
+    setEarnedVideoCoins(0);
+  }, [activeFile]);
 
   const backgroundImage = useMemo(() => getCourseBackground(product, activeFile), [product, activeFile]);
   const accentGlow = settings.theme?.accentColor || '#a5f3fc';
 
   const onSelectFile = (file: ProductFile) => {
-    flushWatchMinutes();
     setActiveFile(file);
     setIsSidebarOpen(false);
     setIsMentorOpen(false);
   };
 
-  const flushWatchMinutes = () => {
-    if (!onWatchTimeMinutes) return;
-    const minutes = Math.floor(watchSecondsRef.current / 60);
-    if (minutes > 0) {
-      watchSecondsRef.current -= minutes * 60;
-      onWatchTimeMinutes(minutes);
-    }
-  };
-
-  const handleVideoTimeUpdate = (event: React.SyntheticEvent<HTMLVideoElement>) => {
-    const currentTime = event.currentTarget.currentTime;
-    const delta = currentTime - lastVideoTimeRef.current;
-    if (delta > 0 && delta < 5) watchSecondsRef.current += delta;
-    lastVideoTimeRef.current = currentTime;
-    flushWatchMinutes();
-  };
-
-  const handleVideoSeeked = (event: React.SyntheticEvent<HTMLVideoElement>) => {
-    lastVideoTimeRef.current = event.currentTarget.currentTime;
-  };
+  useEffect(() => {
+    if (activeFile?.type !== 'video' || !onWatchTimeMinutes) return;
+    const timer = window.setInterval(() => {
+      const video = videoRef.current;
+      const isActivelyPlaying = !!video && !video.paused && !video.ended && video.readyState >= 2 && document.visibilityState === 'visible' && document.hasFocus();
+      if (!isActivelyPlaying) return;
+      activePlaybackSecondsRef.current += 1;
+      if (activePlaybackSecondsRef.current >= 60) {
+        activePlaybackSecondsRef.current -= 60;
+        setWatchedMinutes((minutes) => minutes + 1);
+        setEarnedVideoCoins((coins) => coins + 1);
+        onWatchTimeMinutes(1, activeFile.name);
+      }
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeFile, onWatchTimeMinutes]);
 
   const renderMedia = () => {
     if (!activeFile) return <div className="flex h-full items-center justify-center bg-white/70 text-slate-900/70 backdrop-blur-xl">Select content to begin.</div>;
@@ -371,14 +393,14 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
         const videoId = extractYouTubeID(activeFile.url);
         return videoId ? <iframe key={activeFile.id} className="h-full w-full bg-white/70" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaHasError(true)} /> : <VideoUnavailablePlaceholder />;
       }
-      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onTimeUpdate={handleVideoTimeUpdate} onSeeked={handleVideoSeeked} onPause={flushWatchMinutes} onEnded={flushWatchMinutes} onError={() => setMediaHasError(true)} />;
+      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onError={() => setMediaHasError(true)} />;
       case 'audio': return <div className="flex h-full w-full flex-col items-center justify-center bg-white/70 p-8 text-slate-900"><svg xmlns="http://www.w3.org/2000/svg" className="mb-4 h-24 w-24 text-slate-900/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z" /></svg><h3 className="mb-6 max-w-full truncate text-xl font-semibold">{activeFile.name}</h3><audio key={activeFile.id} src={activeFile.url} controls className="w-full max-w-md" onError={() => setMediaHasError(true)} /></div>;
       case 'pdf':
       case 'sheet': return <GlassDownloadCard file={activeFile} />;
       case 'doc':
       case 'ebook': return <SmartDocsWorkspace file={activeFile} productId={product.id} />;
       case 'link': return <ExternalResourceCard file={activeFile} />;
-      case 'quiz': return <QuizPlayer file={activeFile} />;
+      case 'quiz': return <QuizPlayer file={activeFile} onQuizReward={onQuizReward} />;
       default: return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
     }
   };
@@ -418,7 +440,12 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
             </div>
           </aside>
 
-          <div className="min-h-0 overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)]">
+          <div className="relative min-h-0 overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)]">
+            {activeFile?.type === 'video' && (
+              <div className="pointer-events-none absolute right-5 top-5 z-20 rounded-full border border-amber-200/70 bg-white/80 px-4 py-2 text-xs font-black text-amber-700 shadow-sm backdrop-blur-2xl">
+                ⏱️ {watchedMinutes} mins watched | ✦ +{earnedVideoCoins} Coins
+              </div>
+            )}
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>
