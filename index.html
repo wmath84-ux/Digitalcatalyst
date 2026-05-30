@@ -95,6 +95,48 @@
       html {
         scroll-behavior: smooth;
       }
+
+      :root {
+        --apple-fluid-curve: cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      @keyframes apple-app-open {
+        from {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      .animate-in.fade-in.zoom-in-95 {
+        animation: apple-app-open 500ms var(--apple-fluid-curve) both;
+        transform-origin: center;
+        will-change: opacity, transform;
+      }
+
+      :where(button, a, [role="button"], [role="tab"], [role="menuitem"], .cursor-pointer, .product-card-shine, .hover-lift) {
+        transition-timing-function: var(--apple-fluid-curve);
+      }
+
+      :where(button, a, [role="button"], [role="tab"], [role="menuitem"], .cursor-pointer, .product-card-shine, .hover-lift):active {
+        transform: scale(0.97);
+        transition-property: transform, opacity, background-color, border-color, color, box-shadow, filter, backdrop-filter;
+        transition-duration: 200ms;
+        transition-timing-function: ease-out;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .animate-in.fade-in.zoom-in-95 {
+          animation: none;
+        }
+
+        :where(button, a, [role="button"], [role="tab"], [role="menuitem"], .cursor-pointer, .product-card-shine, .hover-lift):active {
+          transform: none;
+        }
+      }
       
       /* --- Utility Animations --- */
       
