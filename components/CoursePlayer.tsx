@@ -308,12 +308,14 @@ const QuizPlayer: React.FC<{ file: ProductFile }> = ({ file }) => {
   );
 };
 
-const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; }> = ({ settings, product, onBack }) => {
+const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; onWatchTimeMinutes?: (minutes: number) => void; }> = ({ settings, product, onBack, onWatchTimeMinutes }) => {
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const watchSecondsRef = useRef(0);
+  const lastVideoTimeRef = useRef(0);
 
   useEffect(() => {
     const findFirst = (modules?: CourseModule[]): ProductFile | null => {
@@ -334,9 +336,31 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
   const accentGlow = settings.theme?.accentColor || '#a5f3fc';
 
   const onSelectFile = (file: ProductFile) => {
+    flushWatchMinutes();
     setActiveFile(file);
     setIsSidebarOpen(false);
     setIsMentorOpen(false);
+  };
+
+  const flushWatchMinutes = () => {
+    if (!onWatchTimeMinutes) return;
+    const minutes = Math.floor(watchSecondsRef.current / 60);
+    if (minutes > 0) {
+      watchSecondsRef.current -= minutes * 60;
+      onWatchTimeMinutes(minutes);
+    }
+  };
+
+  const handleVideoTimeUpdate = (event: React.SyntheticEvent<HTMLVideoElement>) => {
+    const currentTime = event.currentTarget.currentTime;
+    const delta = currentTime - lastVideoTimeRef.current;
+    if (delta > 0 && delta < 5) watchSecondsRef.current += delta;
+    lastVideoTimeRef.current = currentTime;
+    flushWatchMinutes();
+  };
+
+  const handleVideoSeeked = (event: React.SyntheticEvent<HTMLVideoElement>) => {
+    lastVideoTimeRef.current = event.currentTarget.currentTime;
   };
 
   const renderMedia = () => {
@@ -347,7 +371,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
         const videoId = extractYouTubeID(activeFile.url);
         return videoId ? <iframe key={activeFile.id} className="h-full w-full bg-white/70" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaHasError(true)} /> : <VideoUnavailablePlaceholder />;
       }
-      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onError={() => setMediaHasError(true)} />;
+      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onTimeUpdate={handleVideoTimeUpdate} onSeeked={handleVideoSeeked} onPause={flushWatchMinutes} onEnded={flushWatchMinutes} onError={() => setMediaHasError(true)} />;
       case 'audio': return <div className="flex h-full w-full flex-col items-center justify-center bg-white/70 p-8 text-slate-900"><svg xmlns="http://www.w3.org/2000/svg" className="mb-4 h-24 w-24 text-slate-900/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z" /></svg><h3 className="mb-6 max-w-full truncate text-xl font-semibold">{activeFile.name}</h3><audio key={activeFile.id} src={activeFile.url} controls className="w-full max-w-md" onError={() => setMediaHasError(true)} /></div>;
       case 'pdf':
       case 'sheet': return <GlassDownloadCard file={activeFile} />;

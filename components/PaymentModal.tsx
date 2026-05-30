@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { WebsiteSettings, ProductWithRating, CartItem } from '../App';
+import { WebsiteSettings, ProductWithRating, CartItem, User } from '../App';
 import MacWindowModal from './ui/MacWindowModal';
 
 interface PaymentModalProps {
@@ -13,13 +13,19 @@ interface PaymentModalProps {
   productTitle?: string;
   cartItems?: ({ product: ProductWithRating } & CartItem)[];
   paymentLink?: string;
+  currentUser?: User | null;
+  coinPrice?: number;
+  onConfirmWithCoins?: () => void;
 }
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice, salePrice, couponDiscount, finalPrice, onClose, onConfirm, cartItems, paymentLink }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice, salePrice, couponDiscount, finalPrice, onClose, onConfirm, cartItems, paymentLink, currentUser, coinPrice = 0, onConfirmWithCoins }) => {
   const [paymentOpened, setPaymentOpened] = useState(false);
   const [verificationSubmitted, setVerificationSubmitted] = useState(false);
   const razorpayUrl = paymentLink || 'https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view';
   const isCartMode = !!cartItems && cartItems.length > 0;
+  const eduCoinBalance = currentUser?.eduCoins || 0;
+  const canPayWithCoins = !!onConfirmWithCoins && coinPrice > 0 && eduCoinBalance >= coinPrice;
+  const missingCoins = Math.max(0, coinPrice - eduCoinBalance);
 
   const handlePayNow = () => {
     window.open(razorpayUrl, '_blank', 'noopener,noreferrer');
@@ -59,7 +65,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice
         </div>
 
         {!paymentOpened ? (
-          <button onClick={handlePayNow} className="w-full rounded-2xl bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 px-6 py-4 text-lg font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:bg-primary">Open payment page</button>
+          <div className="space-y-3">
+            <button onClick={handlePayNow} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 text-lg font-black text-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition hover:-translate-y-0.5 active:scale-95">Pay with Razorpay</button>
+            {onConfirmWithCoins && coinPrice > 0 && (
+              <button onClick={onConfirmWithCoins} disabled={!canPayWithCoins} className="w-full rounded-2xl border border-amber-200/60 bg-white/80 px-6 py-4 text-lg font-black text-amber-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
+                {canPayWithCoins ? `Pay with ${coinPrice} EduCoins` : `Need ${missingCoins} more coins`}
+              </button>
+            )}
+          </div>
         ) : verificationSubmitted ? (
           <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-center text-amber-900">
             <p className="text-lg font-black">Verification request submitted</p>

@@ -54,10 +54,10 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
         <>
             {/* FIX: Wrapped event handler in an arrow function to prevent passing implicit event arguments. */}
             <div className={`cart-overlay ${isOpen ? 'is-open' : ''}`} onClick={() => onClose()}></div>
-            <aside className={`cart-sidebar ${isOpen ? 'is-open' : ''}`}>
+            <aside className={`cart-sidebar bg-white/80 backdrop-blur-2xl border-l border-white/50 shadow-2xl ${isOpen ? 'is-open' : ''}`}>
                 <div className="flex flex-col h-full">
-                    <header className="p-6 border-b flex justify-between items-center">
-                        <h2 className="text-2xl font-bold text-primary">Your Cart</h2>
+                    <header className="p-6 border-b border-white/50 flex justify-between items-center bg-white/60 backdrop-blur-xl">
+                        <h2 className="text-2xl font-bold text-slate-900">Your Cart</h2>
                         {/* FIX: Wrapped event handler in an arrow function to prevent passing implicit event arguments. */}
                         <button onClick={() => onClose()} className="p-2 text-slate-600 hover:text-gray-600">
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12"></path></svg>
@@ -75,17 +75,17 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
                                 {cartItems.map(item => (
                                     <li key={item.productId} className="flex gap-4">
                                         <button onClick={() => handleViewProductClick(item.product)} className="flex-shrink-0">
-                                            <div className="w-24 h-24 bg-gray-100 rounded-md overflow-hidden">
+                                            <div className="w-24 h-24 bg-white/70 rounded-2xl overflow-hidden border border-white/50 shadow-sm">
                                                 <img src={(item.product.images || [])[0]} alt={item.product.title} className="w-full h-full object-cover"/>
                                             </div>
                                         </button>
                                         <div className="flex-1">
                                             <button onClick={() => handleViewProductClick(item.product)}>
-                                                <h3 className="font-semibold text-text text-left hover:underline">{item.product.title}</h3>
+                                                <h3 className="font-black text-slate-900 text-left hover:underline">{item.product.title}</h3>
                                             </button>
                                             <p className="text-sm text-primary font-bold mt-1">{item.product.salePrice || item.product.price}</p>
                                             <div className="mt-2 flex items-center justify-between">
-                                                <div className="flex items-center border rounded">
+                                                <div className="flex items-center rounded-full border border-white/50 bg-white/70 text-slate-900">
                                                     <button onClick={() => onUpdateQuantity(item.productId, item.quantity - 1)} className="px-2 py-1 text-sm">-</button>
                                                     <span className="px-3 text-sm">{item.quantity}</span>
                                                     <button onClick={() => onUpdateQuantity(item.productId, item.quantity + 1)} className="px-2 py-1 text-sm">+</button>
@@ -121,7 +121,7 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
                                 <span>₹{subtotal.toFixed(2)}</span>
                             </div>
                             {/* FIX: Wrapped event handler in an arrow function to prevent passing implicit event arguments. */}
-                            <button onClick={() => onCheckout()} className="w-full mt-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold py-3 rounded-lg hover:opacity-90 transition-all transform active:scale-95">
+                            <button onClick={() => onCheckout()} className="w-full mt-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black py-4 rounded-2xl hover:opacity-90 transition-all transform active:scale-95 shadow-sm">
                                 Proceed to Checkout
                             </button>
                              <p className="text-xs text-text-muted text-center mt-2">Shipping & taxes calculated at checkout.</p>

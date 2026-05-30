@@ -1,7 +1,7 @@
 
 // FIX: Imported useState, useEffect, and useRef hooks from React to resolve 'Cannot find name' errors.
 import React, { useState, useEffect, useRef } from 'react';
-import { ProductWithRating, Review, Coupon, WebsiteSettings, PriceHistoryEntry } from '../App';
+import { ProductWithRating, Review, Coupon, WebsiteSettings, PriceHistoryEntry, User } from '../App';
 import PaymentModal from './PaymentModal';
 import RatingsAndReviews from './RatingsAndReviews';
 import FeaturedProducts from './FeaturedProducts';
@@ -264,6 +264,8 @@ interface ProductDetailPageProps {
   onQuickView: (product: ProductWithRating) => void;
   onGoHome: () => void;
   isPurchased?: boolean;
+  currentUser?: User | null;
+  onCoinPurchase?: (product: ProductWithRating, quantity: number) => void;
 }
 
 const ShareIcon = () => (
@@ -277,7 +279,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     settings, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews, 
     onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, onModalOpened, coupons,
     scrollToSection, onSectionScrolled, allProducts, onViewProduct, wishlist, onQuickView, onGoHome,
-    isPurchased = false
+    isPurchased = false, currentUser = null, onCoinPurchase
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
@@ -417,6 +419,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const handleBuyClick = () => { if (isLoggedIn) setModalOpen(true); else onLoginRequired(); };
   const handleModalClose = () => setModalOpen(false);
+  const handleModalConfirmWithCoins = () => {
+    onCoinPurchase?.(product, quantity);
+    setModalOpen(false);
+  };
+
   const handleModalConfirm = () => { setModalOpen(false); onPurchase(appliedCoupon ? appliedCoupon.code : null, quantity); };
 
   const handleImageZoom = (e: React.MouseEvent<HTMLDivElement>) => {
@@ -750,6 +757,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         onClose={handleModalClose} 
         onConfirm={handleModalConfirm} 
         paymentLink={product.paymentLink}
+        currentUser={currentUser}
+        coinPrice={(product.coinPrice || 0) * quantity}
+        onConfirmWithCoins={onCoinPurchase ? handleModalConfirmWithCoins : undefined}
       />}
     </>
   );

@@ -20,6 +20,7 @@ interface ReadingDrawerProps {
   promoTitle?: string;
   promoDescription?: string;
   promoCtaLabel?: string;
+  onReadingReward?: (article: NewsArticle) => void;
 }
 
 
@@ -150,9 +151,10 @@ const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: s
   </button>
 );
 
-const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel }) => {
+const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
+  const rewardIssuedRef = useRef<number | string | null>(null);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -161,6 +163,20 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
     setProgress(0);
     return () => { document.body.style.overflow = ''; };
   }, [isOpen, view, selectedArticle?.id, selectedAnnouncement?.id]);
+
+  useEffect(() => {
+    if (!isOpen || view !== 'article' || !selectedArticle || !onReadingReward) return;
+    let secondsRead = 0;
+    rewardIssuedRef.current = rewardIssuedRef.current === selectedArticle.id ? rewardIssuedRef.current : null;
+    const timer = window.setInterval(() => {
+      secondsRead += 5;
+      if (secondsRead >= 120 && rewardIssuedRef.current !== selectedArticle.id) {
+        rewardIssuedRef.current = selectedArticle.id;
+        onReadingReward(selectedArticle);
+      }
+    }, 5000);
+    return () => window.clearInterval(timer);
+  }, [isOpen, onReadingReward, selectedArticle, view]);
 
   const activeMeta = useMemo(() => {
     if (view === 'article' && selectedArticle) {

@@ -259,7 +259,7 @@ interface WebsiteSettingsProps {
     onSettingsChange: (settings: WebsiteSettings) => void;
 }
 
-type EditableSubscriptionPlan = { id: string; name: string; price: number; description: string; unlockProductIds: number[]; badge?: string; };
+type EditableSubscriptionPlan = { id: string; name: string; price: number; coinPrice?: number; description: string; unlockProductIds: number[]; badge?: string; };
 type EditableReward = { id: string; title: string; cost: number; };
 
 const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, products = [], onSettingsChange }) => {
@@ -309,6 +309,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
 
     const subscriptionPlans = (((localSettings.content as any).subscriptionPlans || []) as EditableSubscriptionPlan[]).map(plan => ({
         ...plan,
+        coinPrice: Number(plan.coinPrice || 0),
         unlockProductIds: plan.unlockProductIds || [],
     }));
     const redeemRewards = (((localSettings.content as any).redeemRewards || []) as EditableReward[]);
@@ -324,7 +325,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const addPlan = () => {
         updateContentValue('subscriptionPlans', [
             ...subscriptionPlans,
-            { id: `plan-${Date.now()}`, name: 'New Plan', price: 299, description: 'Describe this plan', unlockProductIds: [] },
+            { id: `plan-${Date.now()}`, name: 'New Plan', price: 299, coinPrice: 0, description: 'Describe this plan', unlockProductIds: [] },
         ]);
     };
 
@@ -528,7 +529,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             <div className="mt-4 space-y-4">
                                 {subscriptionPlans.map((plan, planIndex) => (
                                     <div key={plan.id || planIndex} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
+                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
                                             <label className="text-sm font-semibold text-gray-700">Plan Name
                                                 <input value={plan.name} onChange={e => updatePlan(planIndex, { name: e.target.value })} className="mt-1 w-full rounded border p-2" />
                                             </label>
@@ -537,6 +538,9 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                             </label>
                                             <label className="text-sm font-semibold text-gray-700">Badge Text
                                                 <input value={plan.badge || ''} onChange={e => updatePlan(planIndex, { badge: e.target.value })} placeholder="Popular / Best Value" className="mt-1 w-full rounded border p-2" />
+                                            </label>
+                                            <label className="text-sm font-semibold text-gray-700">EduCoin Price (0 disables)
+                                                <input type="number" min="0" value={plan.coinPrice || 0} onChange={e => updatePlan(planIndex, { coinPrice: Number(e.target.value) || 0 })} className="mt-1 w-full rounded border p-2" />
                                             </label>
                                             <button type="button" onClick={() => removePlan(planIndex)} className="mt-6 rounded border border-red-200 px-3 py-2 text-sm font-bold text-red-600">Remove Plan</button>
                                         </div>
