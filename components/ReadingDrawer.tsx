@@ -1,10 +1,13 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Announcement, NewsArticle, User } from '../App';
+import { EconomySettings } from '../utils/economy';
+import { useBodyScrollLock } from '../utils/useBodyScrollLock';
 
 type ReadingListType = 'news' | 'blog';
 type ReadingView = ReadingListType | 'article' | 'announcement';
 
 interface ReadingDrawerProps {
+  economySettings: EconomySettings;
   isOpen: boolean;
   view: ReadingView;
   articles: NewsArticle[];
@@ -154,20 +157,19 @@ const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: s
   </button>
 );
 
-const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
+const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const rewardIssuedRef = useRef<number | string | null>(null);
   const lastReadingActivityRef = useRef(0);
-  const [rewardSecondsLeft, setRewardSecondsLeft] = useState(119);
+  const [rewardSecondsLeft, setRewardSecondsLeft] = useState(Math.max(0, economySettings.articleReadTimeRequiredSec));
   const [rewardStatus, setRewardStatus] = useState<'idle' | 'claimed' | 'already' | 'login'>('idle');
+  useBodyScrollLock(isOpen);
 
   useEffect(() => {
     if (!isOpen) return;
-    document.body.style.overflow = 'hidden';
     scrollRef.current?.scrollTo({ top: 0 });
     setProgress(0);
-    return () => { document.body.style.overflow = ''; };
   }, [isOpen, view, selectedArticle?.id, selectedAnnouncement?.id]);
 
   useEffect(() => {
@@ -176,10 +178,10 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
     if (!currentUser) setRewardStatus('login');
     else if (readIds.includes(selectedArticle.id)) setRewardStatus('already');
     else setRewardStatus('idle');
-    setRewardSecondsLeft(119);
+    setRewardSecondsLeft(Math.max(0, economySettings.articleReadTimeRequiredSec));
     lastReadingActivityRef.current = 0;
     rewardIssuedRef.current = null;
-  }, [currentUser, isOpen, selectedArticle, view]);
+  }, [currentUser, economySettings.articleReadTimeRequiredSec, isOpen, selectedArticle, view]);
 
   useEffect(() => {
     if (!isOpen || view !== 'article' || !selectedArticle || !onReadingReward || rewardStatus !== 'idle') return;
@@ -247,7 +249,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[1200] bg-white/70 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="reading-drawer-title" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[1200] bg-slate-900/20 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="reading-drawer-title" onMouseDown={onClose}>
       <div className="absolute inset-y-0 right-0 flex w-full justify-end">
         <section onMouseDown={(e) => e.stopPropagation()} className="relative h-full w-full overflow-hidden border-l border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw]">
           <div className="sticky top-0 z-30 h-1 bg-white/70">
@@ -314,7 +316,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
                   <p className="mt-6 text-xl leading-8 text-slate-600">{selectedArticle.excerpt}</p>
                   {isExternalArticle(selectedArticle) ? (
                     <div className="mt-10 overflow-hidden rounded-[2rem] border border-white/50 bg-white/70 p-2 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
-                      <iframe src={getArticleUrl(selectedArticle)} title={selectedArticle.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 [scrollbar-width:none]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
+                      <iframe src={getArticleUrl(selectedArticle)} title={selectedArticle.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 [scrollbar-width:none]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
                     </div>
                   ) : (
                     <>
@@ -351,12 +353,12 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
 
           {view === 'article' && selectedArticle && (
             <div className="absolute bottom-5 right-5 z-30 max-w-sm rounded-[1.5rem] border border-white/60 bg-white/80 px-5 py-4 text-sm font-black text-slate-900 shadow-[0_12px_40px_rgba(79,70,229,0.18)] backdrop-blur-2xl animate-fade-in-up">
-              {rewardStatus === 'claimed' && <span className="text-emerald-700">🎉 +10 Coins Claimed!</span>}
+              {rewardStatus === 'claimed' && <span className="text-emerald-700">🎉 +{economySettings.coinPerArticleRead} Coins Claimed!</span>}
               {rewardStatus === 'already' && <span className="text-indigo-700">✔️ Reward already claimed for this article</span>}
               {rewardStatus === 'login' && <span className="text-amber-700">🔐 Login to earn reading coins</span>}
               {rewardStatus === 'idle' && (
                 <div>
-                  <p className="text-indigo-700">⏳ {String(rewardMinutes).padStart(2, '0')}:{rewardSeconds} to earn +10 Coins</p>
+                  <p className="text-indigo-700">⏳ {String(rewardMinutes).padStart(2, '0')}:{rewardSeconds} to earn +{economySettings.coinPerArticleRead} Coins</p>
                   <p className="mt-1 text-xs font-bold text-slate-600">Timer runs only while this tab is focused and you keep reading/scrolling.</p>
                 </div>
               )}

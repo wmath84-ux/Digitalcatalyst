@@ -4,6 +4,7 @@ import { WebsiteSettings, HomepageSection, Announcement, ProductWithRating } fro
 import { ServiceItem } from '../Services';
 import { FaqItem } from '../Faq';
 import { UpcomingFeatureItem } from '../UpcomingFeatures';
+import { useBodyScrollLock } from '../../utils/useBodyScrollLock';
 
 const sectionNames: Record<HomepageSection['id'], string> = {
     hero: 'Hero Section',
@@ -74,9 +75,10 @@ const ServiceManagement: React.FC<{ services: ServiceItem[], onUpdate: (services
     );
 };
 const ServiceFormModal: React.FC<{ service: ServiceItem, onSave: (s: ServiceItem) => void, onCancel: () => void }> = ({ service, onSave, onCancel }) => {
+    useBodyScrollLock(true);
     const [form, setForm] = useState(service);
     return (
-        <div className="fixed inset-0 bg-white/70 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4">
             <div className="bg-white/70 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{service.id ? 'Edit' : 'Add'} Service</h3>
                 <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
@@ -125,9 +127,10 @@ const FaqManagement: React.FC<{ faqs: FaqItem[], onUpdate: (faqs: FaqItem[]) => 
     );
 };
 const FaqFormModal: React.FC<{ faq: FaqItem, onSave: (f: FaqItem) => void, onCancel: () => void }> = ({ faq, onSave, onCancel }) => {
+    useBodyScrollLock(true);
     const [form, setForm] = useState(faq);
     return (
-        <div className="fixed inset-0 bg-white/70 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4">
             <div className="bg-white/70 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{faq.id ? 'Edit' : 'Add'} FAQ</h3>
                 <input value={form.question} onChange={e => setForm({...form, question: e.target.value})} placeholder="Question" className="w-full p-2 border rounded mb-2" />
@@ -177,9 +180,10 @@ const UpcomingFeatureManagement: React.FC<{ features: UpcomingFeatureItem[], onU
     );
 };
 const UpcomingFeatureFormModal: React.FC<{ feature: UpcomingFeatureItem, onSave: (f: UpcomingFeatureItem) => void, onCancel: () => void }> = ({ feature, onSave, onCancel }) => {
+    useBodyScrollLock(true);
     const [form, setForm] = useState(feature);
     return (
-        <div className="fixed inset-0 bg-white/70 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4">
             <div className="bg-white/70 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{feature.id ? 'Edit' : 'Add'} Feature</h3>
                 <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
@@ -235,9 +239,10 @@ const AnnouncementManagement: React.FC<{ announcements: Announcement[], onUpdate
     );
 };
 const AnnouncementFormModal: React.FC<{ announcement: Announcement, onSave: (a: Announcement) => void, onCancel: () => void }> = ({ announcement, onSave, onCancel }) => {
+    useBodyScrollLock(true);
     const [form, setForm] = useState(announcement);
     return (
-        <div className="fixed inset-0 bg-white/70 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-slate-900/20 z-50 flex items-center justify-center p-4">
             <div className="bg-white/70 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{announcement.id ? 'Edit' : 'Add'} Announcement</h3>
                 <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />

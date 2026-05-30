@@ -1,10 +1,13 @@
 import React from 'react';
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { CoinTransaction, Coupon, ProductWithRating, ThemeName, themes, User, WebsiteSettings } from '../App';
+import { ActiveCoinDiscount, CoinTransaction, Coupon, ProductWithRating, ThemeName, themes, User, WebsiteSettings } from '../App';
+import { EconomySettings, resolveCoinPrice, resolveMaxDiscountPercentage } from '../utils/economy';
 import { db } from '../firebase';
 
 interface ProfilePageProps {
   settings: WebsiteSettings;
+  economySettings: EconomySettings;
+  onApplyCoinClaim: (claim: ActiveCoinDiscount) => void;
   currentUser: User | null;
   purchasedProducts: ProductWithRating[];
   products: ProductWithRating[];
@@ -75,6 +78,8 @@ const formatLedgerTime = (value: string) => {
 
 const ProfilePage: React.FC<ProfilePageProps> = ({
   settings,
+  economySettings,
+  onApplyCoinClaim,
   currentUser,
   purchasedProducts,
   products,
@@ -127,7 +132,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   }, [currentUser?.id, currentUser?.coinTransactions]);
 
   const activeCoupons = React.useMemo(() => coupons.filter(coupon => coupon.isActive), [coupons]);
-  const coinRedeemRate = Math.max(1, Number((settings.content as any).eduCoinRules?.redeemRate || 10));
+  const coinRedeemRate = Math.max(1, Number(economySettings.coinToFiatRatio));
   const studyMinutes = currentUser?.studyMinutes ?? 0;
   const watchTimeMinutes = currentUser?.totalWatchTimeMinutes ?? studyMinutes;
   const eduPoints = currentUser?.eduCoins ?? 0;
@@ -144,19 +149,53 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const dynamicClaimCards = React.useMemo(() => {
     const productCards = products
       .filter(product => product.isVisible !== false && !product.isFree)
-      .sort((a, b) => (b.rating * Math.max(1, b.reviewCount)) - (a.rating * Math.max(1, a.reviewCount)))
-      .slice(0, 2)
-      .map(product => ({ id: `product-${product.id}`, name: product.title, type: 'Product', price: Number((product.salePrice || product.price).replace('₹', '')) || 0 }));
-    const planCards = ((settings.content as any).subscriptionPlans || [])
-      .slice(0, 2)
-      .map((plan: any) => ({ id: `plan-${plan.id}`, name: `${plan.name} Plan`, type: 'Subscription', price: Number(plan.price || 0) }));
+      .map(product => {
+        const price = Number((product.salePrice || product.price).replace(/[^\d.]/g, '')) || 0;
+        const coinPrice = resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id);
+        const maxDiscount = Math.floor(price * (resolveMaxDiscountPercentage(economySettings, 'product', product.id) / 100));
+        const outright = coinPrice > 0 && eduPoints >= coinPrice;
+        const affordableDiscount = Math.min(price, maxDiscount, Math.floor(eduPoints / coinRedeemRate));
+        return {
+          id: `product-${product.id}`,
+          targetType: 'product' as const,
+          targetId: product.id,
+          name: product.title,
+          type: 'Product',
+          price,
+          coinPrice,
+          discount: outright ? price : affordableDiscount,
+          requiredCoins: outright ? coinPrice : affordableDiscount * coinRedeemRate,
+          mode: outright ? 'unlock' as const : 'discount' as const,
+          claimable: outright || affordableDiscount > 0,
+        };
+      });
 
-    return [...productCards, ...planCards].slice(0, 3).map(item => {
-      const maxDiscount = Math.min(item.price, Math.floor(eduPoints / coinRedeemRate));
-      const requiredCoins = Math.min(Math.max(coinRedeemRate, maxDiscount * coinRedeemRate), Math.max(coinRedeemRate, Math.floor(item.price * coinRedeemRate)));
-      return { ...item, discount: maxDiscount, requiredCoins, claimable: eduPoints >= requiredCoins && maxDiscount > 0 };
+    const planCards = ((settings.content as any).subscriptionPlans || []).map((plan: any) => {
+      const price = Number(plan.price || 0);
+      const coinPrice = resolveCoinPrice(plan.coinPrice, economySettings, 'subscription', plan.id);
+      const maxDiscount = Math.floor(price * (resolveMaxDiscountPercentage(economySettings, 'subscription', plan.id) / 100));
+      const outright = coinPrice > 0 && eduPoints >= coinPrice;
+      const affordableDiscount = Math.min(price, maxDiscount, Math.floor(eduPoints / coinRedeemRate));
+      return {
+        id: `plan-${plan.id}`,
+        targetType: 'subscription' as const,
+        targetId: String(plan.id),
+        name: `${plan.name} Plan`,
+        type: 'Subscription',
+        price,
+        coinPrice,
+        discount: outright ? price : affordableDiscount,
+        requiredCoins: outright ? coinPrice : affordableDiscount * coinRedeemRate,
+        mode: outright ? 'unlock' as const : 'discount' as const,
+        claimable: outright || affordableDiscount > 0,
+      };
     });
-  }, [coinRedeemRate, eduPoints, products, settings.content]);
+
+    return [...productCards, ...planCards]
+      .filter(item => item.price > 0)
+      .sort((a, b) => Number(b.claimable) - Number(a.claimable) || b.discount - a.discount)
+      .slice(0, 6);
+  }, [coinRedeemRate, economySettings, eduPoints, products, settings.content]);
   const level = Math.max(1, Math.floor(eduPoints / 500) + 1);
   const currentLevelStart = (level - 1) * 500;
   const pointsIntoLevel = eduPoints - currentLevelStart;
@@ -276,7 +315,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   ];
 
   return (
-    <div className="min-h-screen overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
+    <div className="min-h-screen overflow-hidden bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 text-slate-900">
       <style>{`
         @keyframes hubFadeUp {
           from { opacity: 0; transform: translateY(28px); }
@@ -302,7 +341,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <section className={`hub-animate overflow-hidden rounded-[2rem] ${glassCard}`} style={{ animationDelay: '80ms' }}>
           <div className="relative aspect-video min-h-[300px] w-full sm:min-h-[420px]">
             <img src={coverImage} alt="Student achievement cover" className="h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-indigo-50/30/55 to-indigo-950/15" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-100 via-slate-200/60 to-indigo-950/15" />
             <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4 sm:p-6">
               <div className="rounded-full border border-white/50 bg-white/70 px-4 py-2 text-xs font-black uppercase tracking-[0.28em] text-cyan-700 backdrop-blur-xl">
                 Student Achievement Hub
@@ -499,11 +538,19 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                   <div className="flex items-start justify-between gap-4">
                     <div>
                       <span className="rounded-full border border-amber-200/70 bg-amber-50/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-amber-700">{reward.type}</span>
-                      <h3 className="mt-3 text-lg font-black text-slate-900">Claim ₹{reward.discount} off on {reward.name}</h3>
-                      <p className="mt-1 text-xs font-bold text-slate-600">Uses up to 🪙 {reward.requiredCoins} at checkout. {reward.claimable ? 'Ready to claim now.' : `Earn ${Math.max(0, reward.requiredCoins - eduPoints)} more coins.`}</p>
+                      <h3 className="mt-3 text-lg font-black text-slate-900">{reward.mode === 'unlock' ? `Unlock ${reward.name} for ${reward.requiredCoins} Coins` : `Claim ₹${reward.discount} Discount on ${reward.name}`}</h3>
+                      <p className="mt-1 text-xs font-bold text-slate-600">{reward.mode === 'unlock' ? 'Full access via EduCoin wallet.' : `Uses 🪙 ${reward.requiredCoins} at checkout.`} {reward.claimable ? 'Ready to apply now.' : `Earn ${Math.max(0, reward.requiredCoins - eduPoints)} more coins.`}</p>
                     </div>
                     <span className="text-2xl">{reward.claimable ? '✨' : '🔒'}</span>
                   </div>
+                  <button
+                    type="button"
+                    disabled={!reward.claimable}
+                    onClick={() => onApplyCoinClaim({ type: 'coin', targetType: reward.targetType, amount: reward.discount, coins: reward.requiredCoins, productId: reward.targetType === 'product' ? Number(reward.targetId) : undefined, subscriptionId: reward.targetType === 'subscription' ? String(reward.targetId) : undefined })}
+                    className="mt-4 w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 text-sm font-black text-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    {reward.claimable ? 'Apply & Checkout' : 'Keep Earning'}
+                  </button>
                 </article>
               )) : <p className="rounded-2xl border border-white/50 bg-white/70 p-4 text-slate-600">Reward claims will appear here once products or subscriptions are available.</p>}
             </div>

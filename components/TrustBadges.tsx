@@ -38,7 +38,7 @@ const TrustBadges: React.FC<TrustBadgesProps> = ({ settings }) => {
   return (
     <section
       ref={sectionRef}
-      className={`relative overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 py-20 text-slate-900 sm:py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      className={`relative overflow-hidden bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 py-20 text-slate-900 sm:py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_16%_22%,rgba(34,211,238,0.18),transparent_26%),radial-gradient(circle_at_85%_12%,rgba(59,130,246,0.22),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.72),rgba(248,250,252,0.95))]" />
       <div className="absolute left-1/2 top-0 h-px w-[82%] -translate-x-1/2 bg-gradient-to-r from-transparent via-white/20 to-transparent" />

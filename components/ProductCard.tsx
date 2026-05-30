@@ -57,7 +57,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                 
                 {/* Overlay on Hover (Desktop) */}
                 {displayMode === 'showcase' && (
-                    <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-slate-50/80 via-indigo-50/30/40 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out flex items-end justify-center gap-2 pb-6">
+                    <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-slate-100/80 via-slate-200/50 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out flex items-end justify-center gap-2 pb-6">
                          <button onClick={() => onAddToCart(product.id, 1)} className="bg-white/70 backdrop-blur-xl text-gray-900 font-bold px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-sm shadow-[0_8px_30px_rgb(0,0,0,0.04)] active:scale-95">
                              Add to Cart
                          </button>

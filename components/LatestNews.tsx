@@ -78,7 +78,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
     <section 
       id="news" 
       ref={sectionRef}
-      className={`py-24 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      className={`py-24 bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
     >
       <div className="container mx-auto px-6">
         <div className="flex flex-col md:flex-row justify-between items-end mb-12">

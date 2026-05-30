@@ -37,7 +37,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice
 
   return (
     <MacWindowModal title="Secure Checkout" subtitle="Delivery unlocks only after payment verification" onClose={onClose} maxWidth="max-w-lg">
-      <div className="bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 p-6 text-slate-900">
+      <div className="bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 p-6 text-slate-900">
         <div className="rounded-[1.5rem] border border-white/50 bg-white/70 p-5 backdrop-blur-xl">
           <p className="text-xs font-black uppercase tracking-[0.25em] text-blue-200">Razorpay payment</p>
           <h3 className="mt-2 text-2xl font-black">Pay securely, then wait for admin verification</h3>

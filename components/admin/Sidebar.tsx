@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { AdminView } from './AdminDashboard';
+import { useBodyScrollLock } from '../../utils/useBodyScrollLock';
 
 interface SidebarProps {
     currentView: AdminView;
@@ -46,8 +47,10 @@ const NavLink: React.FC<{
 };
 
 const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, onSwitchToHome, isOpen, onClose }) => {
+    useBodyScrollLock(isOpen);
     const navItems: { label: string; view: AdminView; isFeatured?: boolean; icon: React.ReactNode }[] = [
         { label: 'Dashboard', view: 'dashboard', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> },
+        { label: 'EduCoin Economy', view: 'economy', isFeatured: true, icon: <span className="text-lg">🪙</span> },
         { label: 'Analytics', view: 'analytics', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg> },
         { label: 'Products', view: 'products', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg> },
         { label: 'News & Blog', view: 'newsBlog', isFeatured: true, icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10l6 6v8a2 2 0 01-2 2zM14 4v6h6M8 13h8M8 17h8M8 9h2" /></svg> },
@@ -63,15 +66,15 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
 
     // Mobile overlay classes vs Desktop static classes
     const containerClasses = isOpen 
-        ? "fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-slate-50 via-indigo-50/30 to-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-transform transform translate-x-0"
-        : "hidden md:flex md:w-72 bg-gradient-to-b from-slate-50 via-indigo-50/30 to-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex-col md:fixed md:left-0 md:top-0 md:bottom-0 md:z-40 md:translate-x-[-248px] md:hover:translate-x-0 md:transition-transform md:duration-300";
+        ? "fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-slate-100 via-slate-200/80 to-slate-300/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-transform transform translate-x-0"
+        : "hidden md:flex md:w-72 bg-gradient-to-b from-slate-100 via-slate-200/80 to-slate-300/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex-col md:fixed md:left-0 md:top-0 md:bottom-0 md:z-40 md:translate-x-[-248px] md:hover:translate-x-0 md:transition-transform md:duration-300";
 
     return (
         <>
             {/* Mobile Backdrop */}
             {isOpen && (
                 <div 
-                    className="fixed inset-0 bg-white/70 z-40 md:hidden backdrop-blur-sm"
+                    className="fixed inset-0 bg-slate-900/20 z-40 md:hidden backdrop-blur-sm"
                     onClick={onClose}
                 ></div>
             )}

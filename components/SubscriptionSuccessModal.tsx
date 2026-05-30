@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBodyScrollLock } from '../utils/useBodyScrollLock';
 import { ProductWithRating } from '../App';
 
 interface SubscriptionSuccessModalProps {
@@ -22,10 +23,11 @@ const MiniProductCard: React.FC<{ product: ProductWithRating }> = ({ product }) 
 );
 
 const SubscriptionSuccessModal: React.FC<SubscriptionSuccessModalProps> = ({ isOpen, onClose, email, products, onNavigateToAllProducts }) => {
+  useBodyScrollLock(isOpen);
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 bg-opacity-60 z-50 flex justify-center items-center p-4 animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 bg-opacity-60 z-50 flex justify-center items-center p-4 animate-fade-in" onClick={onClose}>
       <div className="bg-gray-100 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full max-w-2xl max-h-[90vh] flex flex-col animate-scale-in-up" onClick={e => e.stopPropagation()}>
         <header className="p-4 border-b bg-white/70 backdrop-blur-xl rounded-t-lg flex justify-between items-center">
             <h2 className="text-lg font-bold text-gray-800">Check your inbox!</h2>

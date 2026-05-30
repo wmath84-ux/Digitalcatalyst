@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { ProductWithRating, User } from '../../App';
 import { GoogleGenAI, Modality } from '@google/genai';
 import { getGeminiApiKey } from '../../utils/gemini';
+import { useBodyScrollLock } from '../../utils/useBodyScrollLock';
 
 interface NewProductEmailPreviewModalProps {
     product: ProductWithRating;
@@ -11,6 +12,7 @@ interface NewProductEmailPreviewModalProps {
 }
 
 const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = ({ product, relatedProducts, users, onClose }) => {
+    useBodyScrollLock(true);
     const [marketingImageUrl, setMarketingImageUrl] = useState<string | null>(null);
     const [isLoadingImage, setIsLoadingImage] = useState(true);
     const [isSending, setIsSending] = useState(false);
@@ -71,7 +73,7 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
     };
 
     return (
-        <div className="fixed inset-0 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 bg-opacity-70 z-[60] flex justify-center items-center p-4 font-sans animate-fade-in" onClick={onClose}>
+        <div className="fixed inset-0 bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 bg-opacity-70 z-[60] flex justify-center items-center p-4 font-sans animate-fade-in" onClick={onClose}>
             <div className="bg-gray-100 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full max-w-3xl max-h-[90vh] flex flex-col animate-scale-in-up" onClick={e => e.stopPropagation()}>
                 <header className="p-4 border-b bg-white/70 backdrop-blur-xl rounded-t-lg flex justify-between items-center">
                     <h2 className="text-lg font-bold text-gray-800">Email Preview: New Product Announcement</h2>

@@ -95,7 +95,7 @@ const Congratulations: React.FC<CongratulationsProps> = ({ settings, onBack, pro
   const animationClass = (delay: string) => settings.animations.enabled ? `animate-fade-in-up style={{ animationDelay: '${delay}' }}` : '';
 
   return (
-    <div className="bg-white/70 backdrop-blur-xl min-h-screen">
+    <div className="bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 min-h-screen">
       <header className="bg-background py-6 border-b">
         <div className="container mx-auto px-6 flex justify-between items-center">
             <h1 className="text-2xl font-bold text-primary">Digital Catalyst</h1>
@@ -144,7 +144,7 @@ const Congratulations: React.FC<CongratulationsProps> = ({ settings, onBack, pro
             <div className="bg-white/70 py-12">
                 <div className="container mx-auto px-6">
                     <h3 className="text-slate-900 text-2xl font-bold mb-6 text-center">Product Preview</h3>
-                    <div className="max-w-5xl mx-auto rounded-xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100">
+                    <div className="max-w-5xl mx-auto rounded-xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200 bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70">
                         {renderProductPreview()}
                     </div>
                 </div>

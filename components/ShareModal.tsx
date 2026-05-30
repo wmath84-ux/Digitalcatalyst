@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useBodyScrollLock } from '../utils/useBodyScrollLock';
 
 interface ShareModalProps {
     url: string;
@@ -19,6 +20,7 @@ const ShareIcon: React.FC<{ network: string, color: string, children: React.Reac
 
 const ShareModal: React.FC<ShareModalProps> = ({ url, title, onClose }) => {
     const [copySuccess, setCopySuccess] = useState('');
+    useBodyScrollLock(true);
 
     const networks = [
         { name: 'WhatsApp', color: '#25D366', url: `https://api.whatsapp.com/send?text=${encodeURIComponent(title + '\n' + url)}` },

@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Product, ProductWithRating, Review, User, Coupon, WebsiteSettings, Order, AdminUser, SupportTicket } from '../../App';
+import { EconomySettings } from '../../utils/economy';
 import Sidebar from './Sidebar';
 import ProductManagement from './ProductManagement';
 import UserManagement from './UserManagement';
@@ -13,6 +14,7 @@ import Reports from './Reports';
 import WebsiteSettingsComponent from './WebsiteSettings';
 import AdminManagement from './AdminManagement';
 import NewsBlogManagement from './NewsBlogManagement';
+import CoinEconomyManagement from './CoinEconomyManagement';
 
 interface AdminDashboardProps {
     products: ProductWithRating[];
@@ -24,6 +26,7 @@ interface AdminDashboardProps {
     orders: Order[];
     tickets: SupportTicket[];
     websiteSettings: WebsiteSettings;
+    economySettings: EconomySettings;
     onAddProduct: (product: Omit<Product, 'id'>) => void;
     onUpdateProduct: (product: Product) => void;
     onDeleteProduct: (id: number) => void;
@@ -36,7 +39,7 @@ interface AdminDashboardProps {
     onSwitchToHome: () => void;
 }
 
-export type AdminView = 'dashboard' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'analytics' | 'websiteSettings';
+export type AdminView = 'dashboard' | 'economy' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'analytics' | 'websiteSettings';
 
 const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?: string; icon: React.ReactNode; gradient: string }> = ({ title, value, subtitle, icon, gradient }) => (
     <div className={`relative overflow-hidden rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-slate-900 ${gradient} transform transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]`}>
@@ -58,6 +61,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
     const renderView = () => {
         switch (currentView) {
+            case 'economy': return <CoinEconomyManagement economySettings={props.economySettings} products={props.products} websiteSettings={props.websiteSettings} />;
             case 'products': return <ProductManagement products={props.products} users={props.users} coupons={props.coupons} onAddProduct={props.onAddProduct} onUpdateProduct={props.onUpdateProduct} onDeleteProduct={props.onDeleteProduct} />;
             case 'newsBlog': return <NewsBlogManagement settings={props.websiteSettings} onSettingsChange={props.onWebsiteSettingsChange} />;
             case 'reviews': return <AdminReviewManagement products={props.products} reviews={props.reviews} />;
@@ -142,7 +146,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     }
 
     return (
-        <div className="flex min-h-screen bg-slate-50 font-sans">
+        <div className="flex min-h-screen bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 font-sans">
             <Sidebar 
                 onNavigate={setCurrentView} 
                 onLogout={props.onLogout} 

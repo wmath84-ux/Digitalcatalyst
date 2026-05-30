@@ -21,7 +21,7 @@ const BrokenFileIcon: React.FC = () => (
 
 const OfflinePage: React.FC = () => {
     return (
-        <div className="bg-gray-100 w-full min-h-screen flex items-center justify-center">
+        <div className="bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 w-full min-h-screen flex items-center justify-center">
             <BrokenFileIcon />
         </div>
     );

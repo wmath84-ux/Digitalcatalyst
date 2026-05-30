@@ -51,11 +51,11 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
   return (
     <section
       ref={sectionRef}
-      className="relative isolate min-h-[92vh] overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900 stagger-animate-container flex items-center"
+      className="relative isolate min-h-[92vh] overflow-hidden bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 text-slate-900 stagger-animate-container flex items-center"
     >
-      <div className="absolute inset-0 -z-30 animate-gradient-flow bg-gradient-to-r from-slate-50 via-indigo-50/30 to-slate-100 bg-[length:400%_400%]" />
+      <div className="absolute inset-0 -z-30 animate-gradient-flow bg-gradient-to-r from-slate-100 via-slate-200/80 to-slate-300/70 bg-[length:400%_400%]" />
       <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.22),transparent_34%),radial-gradient(circle_at_70%_20%,rgba(168,85,247,0.30),transparent_32%),radial-gradient(circle_at_50%_85%,rgba(37,99,235,0.22),transparent_36%)]" />
-      <div className="absolute inset-0 -z-10 bg-white/70" />
+      <div className="absolute inset-0 -z-10 bg-white/45" />
       <div className="absolute inset-0 -z-10 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:72px_72px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_74%)]" />
       <div className="absolute -left-24 top-1/4 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl animate-pulse" />
       <div className="absolute -right-24 bottom-1/4 h-96 w-96 rounded-full bg-fuchsia-500/25 blur-3xl animate-icon-float" />

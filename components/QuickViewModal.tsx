@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ProductWithRating, WebsiteSettings } from '../App';
+import { useBodyScrollLock } from '../utils/useBodyScrollLock';
 
 interface QuickViewModalProps {
   settings: WebsiteSettings;
@@ -12,6 +13,7 @@ interface QuickViewModalProps {
 }
 
 const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onClose, onAddToCart, isWishlisted, onToggleWishlist, onViewFullDetails }) => {
+  useBodyScrollLock(true);
   const [quantity, setQuantity] = useState(1);
   const [mainImage, setMainImage] = useState((product.images || [])[0] || `https://picsum.photos/seed/${product.imageSeed}/800/600`);
 
@@ -21,7 +23,7 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onCl
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 bg-opacity-60 z-50 flex justify-center items-center p-4 animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 bg-opacity-60 z-50 flex justify-center items-center p-4 animate-fade-in" onClick={onClose}>
       <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full max-w-4xl max-h-[90vh] overflow-y-auto relative transform transition-all animate-scale-in-up flex flex-col md:flex-row" onClick={e => e.stopPropagation()}>
         <button onClick={onClose} className="absolute top-4 right-4 text-slate-600 hover:text-gray-600 z-10" aria-label="Close modal">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>

@@ -227,7 +227,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
 
   if (mode === 'form') {
     return (
-      <div className="min-h-full bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
+      <div className="min-h-full bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 text-slate-900">
         <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.35em] text-cyan-200/80">News & Blog Management</p>
@@ -308,7 +308,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
   }
 
   return (
-    <div className="min-h-full bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
+    <div className="min-h-full bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 text-slate-900">
       <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.35em] text-cyan-200/80">Daily Reading Hub CMS</p>

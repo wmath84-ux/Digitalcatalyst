@@ -1,16 +1,17 @@
 import React from 'react';
-import { ProductWithRating, WebsiteSettings, User } from '../App';
+import { ActiveCoinDiscount, ProductWithRating, WebsiteSettings, User } from '../App';
+import { EconomySettings, resolveCoinPrice } from '../utils/economy';
 
 interface Plan { id: string; name: string; price: number; coinPrice?: number; description: string; unlockProductIds: number[]; badge?: string; }
 
-const SubscriptionPage: React.FC<{settings: WebsiteSettings; products: ProductWithRating[]; purchasedProductIds: number[]; onBack: () => void; onActivatePlan: (plan: Plan) => void; currentUser?: User | null; onActivatePlanWithCoins?: (plan: Plan) => void;}> = ({ settings, products, purchasedProductIds, onBack, onActivatePlan, currentUser, onActivatePlanWithCoins }) => {
+const SubscriptionPage: React.FC<{economySettings: EconomySettings; activeCoinDiscount?: ActiveCoinDiscount | null; onConsumeCoinDiscount?: () => void; settings: WebsiteSettings; products: ProductWithRating[]; purchasedProductIds: number[]; onBack: () => void; onActivatePlan: (plan: Plan) => void; currentUser?: User | null; onActivatePlanWithCoins?: (plan: Plan) => void;}> = ({ economySettings, activeCoinDiscount = null, onConsumeCoinDiscount, settings, products, purchasedProductIds, onBack, onActivatePlan, currentUser, onActivatePlanWithCoins }) => {
   const plans: Plan[] = (settings.content as any).subscriptionPlans || [];
   const totalUnlockedProducts = plans.reduce((ids, plan) => new Set([...ids, ...(plan.unlockProductIds || [])]), new Set<number>()).size;
   const highlightedPlanIndex = plans.length > 1 ? 1 : 0;
   const lowestPlanPrice = plans.length ? Math.min(...plans.map(plan => plan.price || 0)) : 0;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 pb-36 text-slate-900">
+    <div className="relative min-h-screen overflow-hidden bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 pb-36 text-slate-900">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(37,99,235,0.38),transparent_28%),radial-gradient(circle_at_82%_5%,rgba(168,85,247,0.28),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.72),rgba(248,250,252,0.95))]" />
       <div className="absolute left-1/2 top-0 h-px w-[84%] -translate-x-1/2 bg-gradient-to-r from-transparent via-cyan-200/50 to-transparent" />
 
@@ -44,10 +45,20 @@ const SubscriptionPage: React.FC<{settings: WebsiteSettings; products: ProductWi
             const allUnlocked = (plan.unlockProductIds || []).every((id: number) => purchasedProductIds.includes(id));
             const isHighlighted = index === highlightedPlanIndex;
             const unlockedProducts = (plan.unlockProductIds || []).map((id:number) => products.find(product => product.id === id)?.title || `Product #${id}`);
-            const coinPrice = Number(plan.coinPrice || 0);
+            const coinPrice = resolveCoinPrice(plan.coinPrice, economySettings, 'subscription', plan.id);
             const coinBalance = currentUser?.eduCoins || 0;
             const canPayWithCoins = coinPrice > 0 && coinBalance >= coinPrice;
             const missingCoins = Math.max(0, coinPrice - coinBalance);
+            const activeDiscount = activeCoinDiscount?.subscriptionId === String(plan.id) ? activeCoinDiscount : null;
+            const finalPlanPrice = Math.max(0, Number(plan.price || 0) - (activeDiscount?.amount || 0));
+            const handlePlanCheckout = () => {
+              if (activeDiscount?.coins) {
+                onActivatePlanWithCoins?.({ ...plan, coinPrice: activeDiscount.coins });
+                onConsumeCoinDiscount?.();
+                return;
+              }
+              onActivatePlan(plan);
+            };
 
             return (
               <article key={plan.id} className={`group relative flex min-h-[25rem] flex-col overflow-hidden rounded-[2rem] border p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 ${isHighlighted ? 'border-cyan-200/40 bg-cyan-200/[0.10]' : 'border-white/50 bg-white/70'}`}>
@@ -62,9 +73,10 @@ const SubscriptionPage: React.FC<{settings: WebsiteSettings; products: ProductWi
                 </div>
 
                 <div className="mt-6 flex items-end gap-2">
-                  <p className="text-5xl font-black tracking-tight">₹{plan.price}</p>
+                  <p className="text-5xl font-black tracking-tight">₹{finalPlanPrice}</p>
                   <p className="pb-2 text-sm font-bold text-slate-600">/ access</p>
                 </div>
+                {activeDiscount && <div className="mt-4 rounded-2xl border border-emerald-200/70 bg-emerald-50/80 p-4 text-sm font-bold text-emerald-800"><div className="flex justify-between"><span>Subtotal</span><span>₹{plan.price}</span></div><div className="flex justify-between"><span>EduCoin Discount</span><span>-₹{activeDiscount.amount}</span></div><div className="mt-2 flex justify-between text-base font-black"><span>Final Price</span><span>₹{finalPlanPrice}</span></div></div>}
 
                 <div className="mt-6 flex-1 rounded-3xl border border-white/50 bg-white/70 p-4">
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-700">Included</p>
@@ -74,7 +86,7 @@ const SubscriptionPage: React.FC<{settings: WebsiteSettings; products: ProductWi
                 </div>
 
                 <div className="mt-6 space-y-3">
-                  <button disabled={allUnlocked} onClick={() => onActivatePlan(plan)} className={`w-full rounded-2xl px-5 py-4 font-black transition active:scale-95 ${allUnlocked ? 'cursor-not-allowed bg-white/70 text-slate-600' : 'bg-gradient-to-r from-cyan-200 to-blue-300 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 hover:-translate-y-0.5 hover:shadow-sm'}`}>{allUnlocked ? 'Already Active' : 'Pay with Rupees'}</button>
+                  <button disabled={allUnlocked} onClick={handlePlanCheckout} className={`w-full rounded-2xl px-5 py-4 font-black transition active:scale-95 ${allUnlocked ? 'cursor-not-allowed bg-white/70 text-slate-600' : 'bg-gradient-to-r from-cyan-200 to-blue-300 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 hover:-translate-y-0.5 hover:shadow-sm'}`}>{allUnlocked ? 'Already Active' : activeDiscount ? 'Apply & Activate' : 'Pay with Rupees'}</button>
                   {coinPrice > 0 && <button disabled={allUnlocked || !canPayWithCoins} onClick={() => onActivatePlanWithCoins?.(plan)} className="w-full rounded-2xl border border-amber-200/60 bg-white/80 px-5 py-4 font-black text-amber-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">{canPayWithCoins ? `Pay ${coinPrice} EduCoins` : `Need ${missingCoins} more coins`}</button>}
                 </div>
               </article>

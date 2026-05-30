@@ -1,4 +1,5 @@
 import React from 'react';
+import { useBodyScrollLock } from '../utils/useBodyScrollLock';
 
 const icons: { [key: string]: React.ReactNode } = {
     rocket: (
@@ -36,6 +37,7 @@ const ComingSoonModal: React.FC<ComingSoonModalProps> = ({
     message,
     icon = 'rocket'
 }) => {
+    useBodyScrollLock(isOpen);
     if (!isOpen) return null;
     
     const defaultMessage = "Our experts are adding the final touches. This feature is preparing for liftoff. Check back soon!";

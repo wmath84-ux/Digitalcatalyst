@@ -67,7 +67,7 @@ const Services: React.FC<ServicesProps> = ({ settings, services, onNavigateToHom
         <section 
             id="services" 
             ref={sectionRef}
-            className={`relative overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 py-24 text-slate-900 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+            className={`relative overflow-hidden bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 py-24 text-slate-900 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
         >
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(59,130,246,0.22),transparent_30%),radial-gradient(circle_at_85%_10%,rgba(168,85,247,0.18),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.25),rgba(248,250,252,0.9))]" />
             <div className="container relative z-10 mx-auto px-6">

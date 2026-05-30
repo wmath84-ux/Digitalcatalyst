@@ -1,6 +1,7 @@
 
 import React, { useEffect, useRef, useState } from 'react';
 import { CartItem, ProductWithRating, Coupon } from '../App';
+import { useBodyScrollLock } from '../utils/useBodyScrollLock';
 
 interface CartSidebarProps {
     isOpen: boolean;
@@ -30,6 +31,7 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
 }) => {
     const [flash, setFlash] = useState(false);
     const [couponInput, setCouponInput] = useState('');
+    useBodyScrollLock(isOpen);
     
     const subtotal = cartItems.reduce((acc, item) => {
         const priceStr = item.product.salePrice || item.product.price;

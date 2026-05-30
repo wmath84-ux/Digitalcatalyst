@@ -45,7 +45,7 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
     const subtotal = items.reduce((sum, item) => sum + parseCurrency(item.price) * (item.quantity || 0), 0);
 
     return (
-        <div className="min-h-screen bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
+        <div className="min-h-screen bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 text-slate-900">
             <header className="sticky top-0 z-30 border-b border-white/50 bg-white/70 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
                 <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex items-center gap-4">
@@ -241,7 +241,7 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 p-4 text-slate-900 animate-fade-in-up sm:p-6 lg:p-8">
+        <div className="min-h-screen bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 p-4 text-slate-900 animate-fade-in-up sm:p-6 lg:p-8">
             <div className="mx-auto max-w-7xl">
                 <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div>

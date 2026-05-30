@@ -1,6 +1,8 @@
 // components/CoursePlayer.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, QuizAnswerState } from '../App';
+import { EconomySettings } from '../utils/economy';
+import { useBodyScrollLock } from '../utils/useBodyScrollLock';
 import AiMentor from './AiMentor';
 
 const FileIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
@@ -33,6 +35,13 @@ const VideoUnavailablePlaceholder: React.FC = () => (
     <p className="mt-1 text-slate-900/60">This video is unavailable in this environment.</p>
   </div>
 );
+
+
+const formatActiveWatchTime = (totalSeconds: number) => {
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+};
 
 const GlassDownloadCard: React.FC<{ file: ProductFile; headline?: string }> = ({ file, headline = 'Your download is ready' }) => (
   <div className="flex h-full w-full items-center justify-center overflow-hidden bg-white/70 p-6 text-slate-900">
@@ -232,7 +241,7 @@ const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
   </div>
 );
 
-const QuizPlayer: React.FC<{ file: ProductFile; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ file, onQuizReward }) => {
+const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ file, economySettings, onQuizReward }) => {
   const questions = file.quiz?.questions || [];
   const [answers, setAnswers] = useState<QuizAnswerState>({});
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -249,7 +258,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; onQuizReward?: (quizId: string, 
   const allAnswered = questions.every((_, index) => answers[index] !== undefined);
 
   const submitQuiz = () => {
-    const coins = score * 2;
+    const coins = score * Math.max(0, Number(economySettings.coinPerQuizCorrect));
     setSubmitted(true);
     setRewardCoins(coins);
     if (coins > 0 && onQuizReward) setRewardClaimed(onQuizReward(file.id, file.name, score, coins));
@@ -329,15 +338,18 @@ const QuizPlayer: React.FC<{ file: ProductFile; onQuizReward?: (quizId: string, 
   );
 };
 
-const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; onWatchTimeMinutes?: (minutes: number, lessonTitle?: string) => void; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ settings, product, onBack, onWatchTimeMinutes, onQuizReward }) => {
+const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: EconomySettings; product: ProductWithRating; onBack: () => void; onWatchTimeMinutes?: (minutes: number, lessonTitle?: string) => void; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ settings, economySettings, product, onBack, onWatchTimeMinutes, onQuizReward }) => {
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
-  const activePlaybackSecondsRef = useRef(0);
-  const [watchedMinutes, setWatchedMinutes] = useState(0);
-  const [earnedVideoCoins, setEarnedVideoCoins] = useState(0);
+  const [activeWatchSeconds, setActiveWatchSeconds] = useState(0);
+  const [sessionEarnedCoins, setSessionEarnedCoins] = useState(0);
+  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
+  const [isPlaybackWindowFocused, setIsPlaybackWindowFocused] = useState(() => typeof document === 'undefined' ? true : document.visibilityState === 'visible' && document.hasFocus());
+  const [coinPulse, setCoinPulse] = useState(false);
+  useBodyScrollLock(isSidebarOpen);
 
   useEffect(() => {
     const findFirst = (modules?: CourseModule[]): ProductFile | null => {
@@ -354,10 +366,26 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
 
   useEffect(() => {
     setMediaHasError(false);
-    activePlaybackSecondsRef.current = 0;
-    setWatchedMinutes(0);
-    setEarnedVideoCoins(0);
+    setActiveWatchSeconds(0);
+    setSessionEarnedCoins(0);
+    setIsVideoPlaying(false);
+    setCoinPulse(false);
   }, [activeFile]);
+
+  useEffect(() => {
+    const updateFocusState = () => {
+      setIsPlaybackWindowFocused(document.visibilityState === 'visible' && document.hasFocus());
+    };
+    window.addEventListener('focus', updateFocusState);
+    window.addEventListener('blur', updateFocusState);
+    document.addEventListener('visibilitychange', updateFocusState);
+    updateFocusState();
+    return () => {
+      window.removeEventListener('focus', updateFocusState);
+      window.removeEventListener('blur', updateFocusState);
+      document.removeEventListener('visibilitychange', updateFocusState);
+    };
+  }, []);
 
   const backgroundImage = useMemo(() => getCourseBackground(product, activeFile), [product, activeFile]);
   const accentGlow = settings.theme?.accentColor || '#a5f3fc';
@@ -369,21 +397,26 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
   };
 
   useEffect(() => {
-    if (activeFile?.type !== 'video' || !onWatchTimeMinutes) return;
+    if (activeFile?.type !== 'video' || !isVideoPlaying || !isPlaybackWindowFocused) return;
     const timer = window.setInterval(() => {
       const video = videoRef.current;
       const isActivelyPlaying = !!video && !video.paused && !video.ended && video.readyState >= 2 && document.visibilityState === 'visible' && document.hasFocus();
       if (!isActivelyPlaying) return;
-      activePlaybackSecondsRef.current += 1;
-      if (activePlaybackSecondsRef.current >= 60) {
-        activePlaybackSecondsRef.current -= 60;
-        setWatchedMinutes((minutes) => minutes + 1);
-        setEarnedVideoCoins((coins) => coins + 1);
-        onWatchTimeMinutes(1, activeFile.name);
-      }
+
+      setActiveWatchSeconds((seconds) => {
+        const nextSeconds = seconds + 1;
+        if (nextSeconds % 60 === 0) {
+          const earnedThisMinute = Math.max(0, Number(economySettings.coinPerVideoMinute));
+          setSessionEarnedCoins((coins) => coins + earnedThisMinute);
+          setCoinPulse(true);
+          window.setTimeout(() => setCoinPulse(false), 1000);
+          onWatchTimeMinutes?.(1, activeFile.name);
+        }
+        return nextSeconds;
+      });
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [activeFile, onWatchTimeMinutes]);
+  }, [activeFile, economySettings.coinPerVideoMinute, isPlaybackWindowFocused, isVideoPlaying, onWatchTimeMinutes]);
 
   const renderMedia = () => {
     if (!activeFile) return <div className="flex h-full items-center justify-center bg-white/70 text-slate-900/70 backdrop-blur-xl">Select content to begin.</div>;
@@ -393,20 +426,20 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
         const videoId = extractYouTubeID(activeFile.url);
         return videoId ? <iframe key={activeFile.id} className="h-full w-full bg-white/70" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaHasError(true)} /> : <VideoUnavailablePlaceholder />;
       }
-      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onError={() => setMediaHasError(true)} />;
+      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onPlay={() => setIsVideoPlaying(true)} onPause={() => setIsVideoPlaying(false)} onEnded={() => setIsVideoPlaying(false)} onError={() => { setIsVideoPlaying(false); setMediaHasError(true); }} />;
       case 'audio': return <div className="flex h-full w-full flex-col items-center justify-center bg-white/70 p-8 text-slate-900"><svg xmlns="http://www.w3.org/2000/svg" className="mb-4 h-24 w-24 text-slate-900/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z" /></svg><h3 className="mb-6 max-w-full truncate text-xl font-semibold">{activeFile.name}</h3><audio key={activeFile.id} src={activeFile.url} controls className="w-full max-w-md" onError={() => setMediaHasError(true)} /></div>;
       case 'pdf':
       case 'sheet': return <GlassDownloadCard file={activeFile} />;
       case 'doc':
       case 'ebook': return <SmartDocsWorkspace file={activeFile} productId={product.id} />;
       case 'link': return <ExternalResourceCard file={activeFile} />;
-      case 'quiz': return <QuizPlayer file={activeFile} onQuizReward={onQuizReward} />;
+      case 'quiz': return <QuizPlayer file={activeFile} economySettings={economySettings} onQuizReward={onQuizReward} />;
       default: return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
     }
   };
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
+    <div className="relative h-screen w-screen overflow-hidden bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 text-slate-900">
       <div className="absolute inset-0 scale-110 bg-cover bg-center opacity-20 blur-2xl" style={{ backgroundImage: `url(${backgroundImage})` }} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(99,102,241,0.28),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.16),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.82),rgba(238,242,255,0.72),rgba(248,250,252,0.94))]" />
       <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: accentGlow }} />
@@ -418,7 +451,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
         <button onClick={() => setIsMentorOpen(value => !value)} className="ml-auto rounded-xl border border-cyan-200/30 bg-cyan-200/15 px-3 py-2 text-sm font-black shadow-sm">🧠 AI</button>
       </header>
 
-      <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
+      <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-slate-900/20 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
       <main className="relative z-10 flex h-full flex-col gap-3 p-3 lg:p-3">
         <div className="hidden shrink-0 grid-cols-[1fr_auto_1fr] items-center rounded-xl border border-white/50 bg-white/70 px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid">
@@ -442,8 +475,10 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
 
           <div className="relative min-h-0 overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)]">
             {activeFile?.type === 'video' && (
-              <div className="pointer-events-none absolute right-5 top-5 z-20 rounded-full border border-amber-200/70 bg-white/80 px-4 py-2 text-xs font-black text-amber-700 shadow-sm backdrop-blur-2xl">
-                ⏱️ {watchedMinutes} mins watched | ✦ +{earnedVideoCoins} Coins
+              <div className="pointer-events-none absolute right-5 top-5 z-20 rounded-full border border-white/40 bg-white/30 px-4 py-2 text-sm font-semibold text-slate-800 shadow-lg backdrop-blur-md flex items-center gap-3">
+                <span>⏱️ {formatActiveWatchTime(activeWatchSeconds)} Mins</span>
+                <span className="h-4 w-px bg-white/50" />
+                <span className={`rounded-full px-2 py-0.5 transition-all duration-300 ${coinPulse ? 'animate-bounce bg-amber-200/80 text-amber-800 shadow-[0_0_18px_rgba(251,191,36,0.9)]' : 'text-amber-700'}`}>✦ +{sessionEarnedCoins} Coins Earned</span>
               </div>
             )}
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}

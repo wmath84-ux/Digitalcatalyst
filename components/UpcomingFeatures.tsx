@@ -68,7 +68,7 @@ const UpcomingFeatures: React.FC<UpcomingFeaturesProps> = ({ settings, title, fe
     <section 
       id="upcoming"
       ref={sectionRef}
-      className={`relative overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 py-24 text-slate-900 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+      className={`relative overflow-hidden bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 py-24 text-slate-900 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(139,92,246,0.22),transparent_34%),radial-gradient(circle_at_10%_70%,rgba(37,99,235,0.16),transparent_30%)]" />
       <div className="container relative z-10 mx-auto px-6">

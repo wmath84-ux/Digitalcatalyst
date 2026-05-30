@@ -71,7 +71,7 @@ const Faq: React.FC<FaqProps> = ({ settings, faqs }) => {
     <section 
       id="faq" 
       ref={sectionRef}
-      className={`relative overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 py-20 text-slate-900 sm:py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      className={`relative overflow-hidden bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 py-20 text-slate-900 sm:py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_25%,rgba(56,189,248,0.16),transparent_30%),radial-gradient(circle_at_30%_80%,rgba(139,92,246,0.20),transparent_34%)]" />
       <div className="container relative z-10 mx-auto px-6">

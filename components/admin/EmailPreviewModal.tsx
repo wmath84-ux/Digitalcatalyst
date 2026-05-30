@@ -5,6 +5,7 @@ import { GoogleGenAI, Modality } from '@google/genai';
 // FIX: Corrected import path for SupportTicket to resolve circular dependency and import error.
 import { SupportTicket } from '../../App';
 import { getGeminiApiKey } from '../../utils/gemini';
+import { useBodyScrollLock } from '../../utils/useBodyScrollLock';
 
 interface EmailPreviewModalProps {
     ticket: SupportTicket;
@@ -15,6 +16,7 @@ interface EmailPreviewModalProps {
 }
 
 const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({ ticket, replyText, attachment, onClose, onConfirmSend }) => {
+    useBodyScrollLock(true);
     const [isLoadingImage, setIsLoadingImage] = useState(true);
     const [headerImageUrl, setHeaderImageUrl] = useState<string | null>(null);
 
@@ -61,7 +63,7 @@ const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({ ticket, replyText
     }, [ticket.subject]);
     
     return (
-        <div className="fixed inset-0 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 bg-opacity-70 z-[60] flex justify-center items-center p-4 font-sans animate-fade-in">
+        <div className="fixed inset-0 bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 bg-opacity-70 z-[60] flex justify-center items-center p-4 font-sans animate-fade-in">
             <div className="bg-gray-100 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full max-w-3xl max-h-[90vh] flex flex-col animate-scale-in-up">
                 <div className="p-4 border-b bg-white/70 backdrop-blur-xl rounded-t-lg flex justify-between items-center">
                     <h2 className="text-lg font-bold text-gray-800">Email Preview</h2>

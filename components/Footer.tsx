@@ -47,7 +47,7 @@ const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClic
   };
 
   return (
-    <footer id="contact" className="relative overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900 pt-16 pb-8">
+    <footer id="contact" className="relative overflow-hidden bg-slate-100 bg-gradient-to-br from-slate-100 via-slate-200/80 to-slate-300/70 text-slate-900 pt-16 pb-8">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.22),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(147,51,234,0.20),transparent_32%)]" />
       <div className="container relative z-10 mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">

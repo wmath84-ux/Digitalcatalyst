@@ -2,6 +2,7 @@
 import React, { useRef, useEffect } from 'react';
 import { ProductWithRating, WebsiteSettings } from '../App';
 import ProductCard from './ProductCard';
+import { useBodyScrollLock } from '../utils/useBodyScrollLock';
 
 // --- Free Products Modal ---
 interface FreeProductsModalProps {
@@ -15,6 +16,7 @@ interface FreeProductsModalProps {
 
 export const FreeProductsModal: React.FC<FreeProductsModalProps> = ({ isOpen, onClose, products, settings, onAddToCart, onViewProduct }) => {
     const modalContentRef = useRef<HTMLDivElement>(null);
+    useBodyScrollLock(isOpen);
 
     useEffect(() => {
         if (!isOpen || !settings.animations.enabled) return;
@@ -34,7 +36,7 @@ export const FreeProductsModal: React.FC<FreeProductsModalProps> = ({ isOpen, on
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-white/70 p-4 backdrop-blur-xl" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="free-modal-title">
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-900/20 p-4 backdrop-blur-xl" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="free-modal-title">
             <div ref={modalContentRef} className="relative max-h-[90vh] w-[90vw] max-w-5xl overflow-y-auto rounded-[2rem] border border-white/50 bg-white/70 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl" onClick={e => e.stopPropagation()}>
                 <button onClick={onClose} className="absolute top-3 right-4 text-slate-600 hover:text-slate-900 font-bold text-2xl z-10" aria-label="Close free products modal">&times;</button>
                 
