@@ -1,133 +1,228 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { getGeminiApiKey } from '../utils/gemini';
 
 interface AiMentorProps {
     productTitle: string;
     activeContentName: string | null;
+    onClose?: () => void;
 }
 
 interface ChatMessage {
     sender: 'user' | 'ai';
     text: string;
+    createdAt: string;
 }
 
-const renderStructuredText = (text: string) => {
-    const blocks = text.split(/\n\n+/).filter(Boolean);
-    return blocks.map((b, i) => {
-        const lines = b.split('\n');
-        if (lines.every(l => /^[-*•]/.test(l.trim()))) {
-            return <ul key={i} className="list-disc pl-5 space-y-1">{lines.map((l,j)=><li key={j}>{l.replace(/^[-*•]\s*/, '')}</li>)}</ul>;
-        }
-        if (/^#{1,3}\s/.test(lines[0])) {
-            return <h4 key={i} className="font-black text-indigo-100">{lines[0].replace(/^#{1,3}\s*/, '')}</h4>;
-        }
-        return <p key={i} className="leading-7">{b}</p>;
-    });
+interface ChatSession {
+    id: string;
+    title: string;
+    updatedAt: string;
+    messages: ChatMessage[];
+}
+
+const makeWelcomeMessage = (productTitle: string, activeContentName: string | null): ChatMessage => ({
+    sender: 'ai',
+    createdAt: new Date().toISOString(),
+    text: `# Welcome\n\nI'm your AI mentor for **${productTitle}**. You are currently viewing **${activeContentName || 'the product details'}**.\n\nAsk me for summaries, examples, code explanations, quiz prep, or a study plan.`,
+});
+
+const InlineMarkdown: React.FC<{ text: string }> = ({ text }) => {
+    const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).filter(Boolean);
+    return <>{parts.map((part, index) => {
+        if (part.startsWith('**') && part.endsWith('**')) return <strong key={index}>{part.slice(2, -2)}</strong>;
+        if (part.startsWith('`') && part.endsWith('`')) return <code key={index} className="rounded-md border border-white/10 bg-slate-950/60 px-1.5 py-0.5 text-cyan-100">{part.slice(1, -1)}</code>;
+        return <React.Fragment key={index}>{part}</React.Fragment>;
+    })}</>;
 };
 
-const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName }) => {
-    const [messages, setMessages] = useState<ChatMessage[]>([]);
+const MarkdownMessage: React.FC<{ text: string }> = ({ text }) => {
+    const blocks = text.split(/\n{2,}/).filter(Boolean);
+    return <div className="space-y-3 text-sm leading-7 text-slate-100/95">
+        {blocks.map((block, blockIndex) => {
+            const trimmed = block.trim();
+            if (trimmed.startsWith('```')) {
+                return <pre key={blockIndex} className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/80 p-4 text-xs text-cyan-100 shadow-inner"><code>{trimmed.replace(/^```\w*\n?/, '').replace(/```$/, '')}</code></pre>;
+            }
+            if (/^#{1,3}\s/.test(trimmed)) {
+                const level = trimmed.match(/^#+/)?.[0].length || 3;
+                const content = trimmed.replace(/^#{1,3}\s*/, '');
+                const className = level === 1 ? 'text-2xl' : level === 2 ? 'text-xl' : 'text-lg';
+                return <h3 key={blockIndex} className={`${className} font-black text-white`}><InlineMarkdown text={content} /></h3>;
+            }
+            const lines = trimmed.split('\n').filter(Boolean);
+            if (lines.every(line => /^[-*•]\s+/.test(line.trim()))) {
+                return <ul key={blockIndex} className="list-disc space-y-1 pl-5 marker:text-cyan-200">{lines.map((line, lineIndex) => <li key={lineIndex}><InlineMarkdown text={line.replace(/^[-*•]\s+/, '')} /></li>)}</ul>;
+            }
+            if (lines.every(line => /^\d+\.\s+/.test(line.trim()))) {
+                return <ol key={blockIndex} className="list-decimal space-y-1 pl-5 marker:text-cyan-200">{lines.map((line, lineIndex) => <li key={lineIndex}><InlineMarkdown text={line.replace(/^\d+\.\s+/, '')} /></li>)}</ol>;
+            }
+            return <p key={blockIndex}><InlineMarkdown text={trimmed} /></p>;
+        })}
+    </div>;
+};
+
+const TypingIndicator: React.FC = () => (
+    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 shadow-lg backdrop-blur-xl">
+        <span>AI is thinking</span>
+        <span className="flex gap-1.5" aria-hidden="true">
+            <span className="h-2 w-2 animate-bounce rounded-full bg-cyan-200 [animation-delay:-0.24s]" />
+            <span className="h-2 w-2 animate-bounce rounded-full bg-cyan-200 [animation-delay:-0.12s]" />
+            <span className="h-2 w-2 animate-bounce rounded-full bg-cyan-200" />
+        </span>
+    </div>
+);
+
+const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, onClose }) => {
+    const storageKey = useMemo(() => `ai-mentor-sessions-${productTitle.replace(/\W+/g, '-').toLowerCase()}`, [productTitle]);
+    const [sessions, setSessions] = useState<ChatSession[]>([]);
+    const [activeSessionId, setActiveSessionId] = useState('');
     const [chatInput, setChatInput] = useState('');
     const [isChatLoading, setIsChatLoading] = useState(false);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(true);
     const chatContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
-        setMessages([{ 
-            sender: 'ai', 
-            text: `Welcome! I'm your AI mentor for "${productTitle}". You are currently viewing "${activeContentName || 'the product details'}". How can I help you?` 
-        }]);
-    }, [productTitle, activeContentName]);
+        const saved = localStorage.getItem(storageKey);
+        if (saved) {
+            try {
+                const parsed = JSON.parse(saved) as ChatSession[];
+                if (Array.isArray(parsed) && parsed.length) {
+                    setSessions(parsed);
+                    setActiveSessionId(parsed[0].id);
+                    return;
+                }
+            } catch (error) {
+                console.warn('Unable to restore AI Mentor history.', error);
+            }
+        }
+        const firstSession: ChatSession = {
+            id: crypto.randomUUID(),
+            title: activeContentName || productTitle,
+            updatedAt: new Date().toISOString(),
+            messages: [makeWelcomeMessage(productTitle, activeContentName)],
+        };
+        setSessions([firstSession]);
+        setActiveSessionId(firstSession.id);
+    }, [activeContentName, productTitle, storageKey]);
 
     useEffect(() => {
-        if (chatContainerRef.current) {
-            chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
-        }
-    }, [messages]);
+        if (sessions.length) localStorage.setItem(storageKey, JSON.stringify(sessions));
+    }, [sessions, storageKey]);
+
+    const activeSession = sessions.find(session => session.id === activeSessionId) || sessions[0];
+    const messages = activeSession?.messages || [];
+
+    useEffect(() => {
+        if (chatContainerRef.current) chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }, [messages, isChatLoading]);
+
+    const updateActiveSession = (updater: (session: ChatSession) => ChatSession) => {
+        setSessions(previous => previous.map(session => session.id === activeSession?.id ? updater(session) : session));
+    };
+
+    const createNewChat = () => {
+        const nextSession: ChatSession = {
+            id: crypto.randomUUID(),
+            title: activeContentName || 'New mentor chat',
+            updatedAt: new Date().toISOString(),
+            messages: [makeWelcomeMessage(productTitle, activeContentName)],
+        };
+        setSessions(previous => [nextSession, ...previous]);
+        setActiveSessionId(nextSession.id);
+    };
 
     const handleSendMessage = async () => {
-        if (chatInput.trim() === '' || isChatLoading) return;
+        const prompt = chatInput.trim();
+        if (!prompt || isChatLoading || !activeSession) return;
 
-        const userMessage: ChatMessage = { sender: 'user', text: chatInput };
-        setMessages(prev => [...prev, userMessage]);
+        const userMessage: ChatMessage = { sender: 'user', text: prompt, createdAt: new Date().toISOString() };
+        updateActiveSession(session => ({
+            ...session,
+            title: session.messages.length <= 1 ? prompt.slice(0, 48) : session.title,
+            updatedAt: new Date().toISOString(),
+            messages: [...session.messages, userMessage],
+        }));
         setChatInput('');
         setIsChatLoading(true);
 
         try {
             const apiKey = getGeminiApiKey();
             if (!apiKey) {
-                const demoReply = `Demo AI Mentor: I can help you study "${productTitle}". For now, focus on the current lesson, write 3 key points in notes, and revise them after watching. Add GEMINI_API_KEY later to enable live AI answers.`;
-                setMessages(prev => [...prev, { sender: 'ai', text: demoReply }]);
+                const demoReply = `## Demo study plan\n\n- Review **${activeContentName || productTitle}** in 20-minute focus blocks.\n- Write three key takeaways after every lesson.\n- Ask me for a quiz, summary, or code explanation once GEMINI_API_KEY is configured.\n\n\`Tip:\` Turn tough sections into flashcards.`;
+                updateActiveSession(session => ({ ...session, updatedAt: new Date().toISOString(), messages: [...session.messages, { sender: 'ai', text: demoReply, createdAt: new Date().toISOString() }] }));
                 return;
             }
             const ai = new GoogleGenAI({ apiKey });
-            const systemInstruction = `You are a helpful AI Mentor for the product "${productTitle}". The user is currently viewing content titled "${activeContentName || 'the main product page'}". Your role is to answer questions about this topic, the product, and related subjects to help the user learn and succeed. Be encouraging and clear.`;
-            
+            const historyContext = messages.slice(-8).map(message => `${message.sender === 'user' ? 'User' : 'AI'}: ${message.text}`).join('\n');
+            const systemInstruction = `You are a premium AI Mentor for the product "${productTitle}". The user is currently viewing "${activeContentName || 'the main product page'}". Return structured Markdown with short sections, bullets, bold emphasis, and fenced code blocks when useful. Avoid walls of text.`;
             const response = await ai.models.generateContent({
                 model: 'gemini-2.5-flash',
-                contents: `${systemInstruction}\n\nUser: ${chatInput}`,
+                contents: `${systemInstruction}\n\nRecent conversation:\n${historyContext}\n\nUser: ${prompt}`,
             });
 
-            setMessages(prev => [...prev, { sender: 'ai', text: response.text }]);
+            updateActiveSession(session => ({ ...session, updatedAt: new Date().toISOString(), messages: [...session.messages, { sender: 'ai', text: response.text, createdAt: new Date().toISOString() }] }));
         } catch (err) {
-            console.error("Gemini API Error:", err);
+            console.error('Gemini API Error:', err);
             const fallbackMessage = err instanceof Error && err.message ? err.message : "Sorry, I couldn't connect. Please check your API key or try again later.";
-            setMessages(prev => [...prev, { sender: 'ai', text: fallbackMessage }]);
+            updateActiveSession(session => ({ ...session, updatedAt: new Date().toISOString(), messages: [...session.messages, { sender: 'ai', text: fallbackMessage, createdAt: new Date().toISOString() }] }));
         } finally {
             setIsChatLoading(false);
         }
     };
 
     return (
-        <div className="flex flex-col h-full bg-[#1e293b] text-white overflow-hidden rounded-lg shadow-inner">
-            <div className="p-4 border-b border-gray-700 flex-shrink-0">
-                <h3 className="font-bold text-lg flex items-center gap-2">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-yellow-300" viewBox="0 0 20 20" fill="currentColor">
-                        <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                    AI Mentor
-                </h3>
-            </div>
-            <div ref={chatContainerRef} className="flex-1 p-4 space-y-4 overflow-y-auto">
-                {messages.map((msg, i) => (
-                    <div key={i} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                        <div className={`max-w-xl p-3 rounded-lg animate-fade-in ${msg.sender === 'user' ? 'bg-primary' : 'bg-slate-600'}`}>
-                            <div className="text-sm space-y-2">{renderStructuredText(msg.text)}</div>
-                        </div>
+        <div className="flex h-full min-h-0 overflow-hidden rounded-[1.75rem] border border-white/15 bg-white/10 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_30px_90px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
+            <aside className={`${isHistoryOpen ? 'w-72' : 'w-0'} hidden shrink-0 overflow-hidden border-r border-white/10 bg-slate-950/25 transition-all duration-300 md:block`}>
+                <div className="flex h-full flex-col p-4">
+                    <button onClick={createNewChat} className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-left font-black text-white transition hover:bg-cyan-50/20">＋ New chat</button>
+                    <div className="mt-4 flex-1 space-y-2 overflow-y-auto pr-1">
+                        {sessions.map(session => (
+                            <button key={session.id} onClick={() => setActiveSessionId(session.id)} className={`w-full rounded-2xl border px-4 py-3 text-left transition ${session.id === activeSession?.id ? 'border-cyan-200/50 bg-cyan-200/15 text-white shadow-[0_0_30px_rgba(103,232,249,0.16)]' : 'border-white/10 bg-white/[0.06] text-slate-200 hover:bg-cyan-50/12'}`}>
+                                <span className="block truncate text-sm font-black">{session.title}</span>
+                                <span className="mt-1 block text-xs text-slate-300/70">{new Date(session.updatedAt).toLocaleDateString()}</span>
+                            </button>
+                        ))}
                     </div>
-                ))}
-                {isChatLoading && (
-                    <div className="flex justify-start">
-                        <div className="max-w-xl p-3 rounded-lg bg-slate-600">
-                            <div className="flex items-center space-x-2">
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse [animation-delay:-0.3s]"></div>
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse [animation-delay:-0.15s]"></div>
-                                <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+                </div>
+            </aside>
+
+            <section className="flex min-w-0 flex-1 flex-col">
+                <header className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-white/[0.06] px-4 py-3 backdrop-blur-xl">
+                    <button onClick={() => setIsHistoryOpen(value => !value)} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white transition hover:bg-cyan-50/20">☰</button>
+                    <div className="min-w-0 flex-1">
+                        <p className="text-xs font-black uppercase tracking-[0.32em] text-cyan-100/80">Dedicated AI Workspace</p>
+                        <h2 className="truncate text-xl font-black text-white">AI Mentor · {activeContentName || productTitle}</h2>
+                    </div>
+                    {onClose && <button onClick={onClose} className="rounded-2xl border border-white/15 bg-white/10 px-4 py-2 font-black text-white transition hover:bg-cyan-50/20">Close</button>}
+                </header>
+
+                <div ref={chatContainerRef} className="flex-1 space-y-5 overflow-y-auto px-4 py-5 md:px-8">
+                    {messages.map((msg, index) => (
+                        <div key={`${msg.createdAt}-${index}`} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                            <div className={`max-w-3xl rounded-[1.5rem] border p-4 shadow-xl backdrop-blur-xl ${msg.sender === 'user' ? 'border-cyan-200/30 bg-cyan-400/20 text-white' : 'border-white/10 bg-slate-900/45 text-slate-100'}`}>
+                                <MarkdownMessage text={msg.text} />
                             </div>
                         </div>
-                    </div>
-                )}
-            </div>
-            <div className="p-4 border-t border-gray-700 bg-slate-800 flex-shrink-0">
-                <div className="flex space-x-2">
-                    <input
-                        type="text"
-                        value={chatInput}
-                        onChange={(e) => setChatInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                        placeholder="Ask a question..."
-                        className="w-full p-2 border border-slate-600 rounded-lg bg-slate-700 text-white focus:ring-2 focus:ring-primary focus:border-transparent"
-                        disabled={isChatLoading}
-                    />
-                    <button
-                        onClick={handleSendMessage}
-                        disabled={isChatLoading || !chatInput.trim()}
-                        className="bg-primary text-white font-semibold px-5 py-2 rounded-lg hover:opacity-90 transition-all active:scale-95 disabled:bg-gray-500"
-                    >
-                        Send
-                    </button>
+                    ))}
+                    {isChatLoading && <TypingIndicator />}
                 </div>
-            </div>
+
+                <footer className="shrink-0 border-t border-white/10 bg-slate-950/25 p-4 backdrop-blur-xl">
+                    <div className="flex gap-3 rounded-3xl border border-white/15 bg-white/10 p-2 shadow-inner">
+                        <input
+                            type="text"
+                            value={chatInput}
+                            onChange={(e) => setChatInput(e.target.value)}
+                            onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
+                            placeholder="Ask for a summary, quiz, explanation, or study plan..."
+                            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-slate-100 outline-none placeholder:text-slate-300/60"
+                            disabled={isChatLoading}
+                        />
+                        <button onClick={handleSendMessage} disabled={isChatLoading || !chatInput.trim()} className="rounded-2xl bg-cyan-200 px-6 py-3 font-black text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50">Send</button>
+                    </div>
+                </footer>
+            </section>
         </div>
     );
 };
