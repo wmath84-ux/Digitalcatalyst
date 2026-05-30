@@ -13,12 +13,6 @@ const HeartIcon = () => (
     </svg>
 );
 
-const PurchasesIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-    </svg>
-);
-
 const UserIcon = () => (
     <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
@@ -84,7 +78,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
               <span className="text-xl font-bold text-primary">{(settings.content as any).siteName || "Digital Catalyst"}</span>
             </button>
             
-            <nav className="hidden md:flex items-center space-x-8">
+            <nav className="hidden md:flex items-center justify-center gap-x-7 lg:gap-x-9">
               {navItems.map((item) => (
                   <button key={item.name} onClick={item.action} className="text-text-muted hover:text-primary transition-colors duration-300">
                     {item.name}
@@ -92,11 +86,8 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
               ))}
             </nav>
 
-            <div className="flex items-center space-x-4">
-                <div className="hidden md:flex items-center space-x-4">
-                    <button onClick={onNavigateToPurchases} className="text-text-muted hover:text-primary transition-colors duration-300" aria-label="View your purchased items">
-                        <PurchasesIcon />
-                    </button>
+            <div className="flex items-center justify-end">
+                <div className="hidden md:flex items-center gap-x-4 lg:gap-x-5">
                     {settings.features.showFavourites && (
                         <button onClick={onNavigateToWishlist} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your wishlist with ${wishlistCount} items`}>
                             <HeartIcon />
@@ -133,7 +124,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                             )}
                         </div>
                     ) : (
-                         <button onClick={onLoginClick} className="bg-primary text-white font-semibold px-6 py-2 rounded-lg hover:opacity-90 transition-opacity duration-300">
+                         <button onClick={onLoginClick} className="rounded-full bg-primary px-6 py-2 font-semibold text-white shadow-lg shadow-primary/20 transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90">
                             Login
                         </button>
                     )}

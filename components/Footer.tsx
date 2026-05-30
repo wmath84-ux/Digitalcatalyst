@@ -47,8 +47,9 @@ const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClic
   };
 
   return (
-    <footer id="contact" className="bg-primary text-white pt-16 pb-8">
-      <div className="container mx-auto px-6">
+    <footer id="contact" className="relative overflow-hidden bg-slate-950 text-white pt-16 pb-8">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.22),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(147,51,234,0.20),transparent_32%)]" />
+      <div className="container relative z-10 mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
 
           {/* Column 1: Logo & Social */}
@@ -97,16 +98,16 @@ const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClic
           <div>
             <h3 className="text-lg font-semibold mb-4">Stay Updated</h3>
             <p className="text-gray-400 text-sm mb-4">Subscribe to our newsletter for the latest products and offers.</p>
-            <form onSubmit={handleSubscribeSubmit} className="flex">
+            <form onSubmit={handleSubscribeSubmit} className="flex items-center rounded-full border border-white/10 bg-white/5 p-1 shadow-[0_0_30px_rgba(139,92,246,0.16)] backdrop-blur-xl transition-all duration-300 focus-within:border-purple-300/50 focus-within:shadow-[0_0_36px_rgba(139,92,246,0.28)]">
                 <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="your@email.com"
                     required
-                    className="w-full px-3 py-2 text-gray-800 rounded-l-md focus:outline-none"
+                    className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-white placeholder:text-slate-400 focus:outline-none"
                 />
-                <button type="submit" disabled={isSubscribed} className="bg-accent text-white font-semibold px-4 py-2 rounded-r-md hover:opacity-90 transition-opacity disabled:opacity-50">
+                <button type="submit" disabled={isSubscribed} className="rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 text-sm font-bold text-white shadow-[0_0_24px_rgba(79,70,229,0.45)] transition-all duration-300 hover:scale-105 hover:shadow-[0_0_34px_rgba(147,51,234,0.65)] disabled:scale-100 disabled:animate-pulse disabled:opacity-70 sm:px-6">
                     {isSubscribed ? 'Subscribed' : 'Subscribe'}
                 </button>
             </form>

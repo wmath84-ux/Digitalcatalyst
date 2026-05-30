@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from 'react';
 import { WebsiteSettings } from '../App';
 
@@ -39,51 +38,58 @@ const AboutUs: React.FC<AboutUsProps> = ({ settings, title, text, imageSeed }) =
     <section 
       id="about" 
       ref={sectionRef}
-      className={`py-24 bg-white/10 backdrop-blur-xl overflow-hidden ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      className={`relative overflow-hidden bg-slate-950 py-24 text-white ${settings.animations.enabled ? 'scroll-animate' : ''}`}
     >
-      <div className="container mx-auto px-6">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">
-          
-          {/* Text Column */}
-          <div className="order-2 lg:order-1">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_65%,rgba(14,165,233,0.18),transparent_30%),radial-gradient(circle_at_82%_36%,rgba(139,92,246,0.20),transparent_30%)]" />
+      <div className="container relative z-10 mx-auto px-6">
+        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
+          <div className="order-2 rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl shadow-slate-950/20 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(139,92,246,0.2)] lg:order-1 lg:p-10">
             <div className="relative">
-                <h2 className="text-4xl font-extrabold text-primary tracking-tight">{title}</h2>
-                <div className="w-20 h-1.5 bg-accent mt-4 rounded-full"></div>
+                <p className="text-sm font-bold uppercase tracking-[0.35em] text-cyan-200">About us</p>
+                <h2 className="mt-3 text-4xl font-extrabold tracking-tight text-white">{title}</h2>
+                <div className="mt-5 h-1.5 w-24 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 shadow-[0_0_24px_rgba(139,92,246,0.5)]"></div>
             </div>
-            <div className="mt-8 text-lg text-gray-600 leading-relaxed space-y-6">
+            <div className="mt-8 space-y-6 text-lg leading-relaxed text-slate-300">
                 {text.split('\n').map((paragraph, index) => (
                     <p key={index}>{paragraph}</p>
                 ))}
             </div>
-            <div className="mt-8 flex gap-4">
-                <div className="text-center">
-                    <p className="text-3xl font-bold text-primary">5k+</p>
-                    <p className="text-sm text-gray-500">Happy Clients</p>
+            <div className="mt-8 grid grid-cols-2 gap-4">
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur-xl">
+                    <p className="text-3xl font-bold text-white">5k+</p>
+                    <p className="mt-1 text-sm text-slate-400">Happy Clients</p>
                 </div>
-                <div className="w-px bg-gray-300 h-12"></div>
-                <div className="text-center">
-                    <p className="text-3xl font-bold text-primary">150+</p>
-                    <p className="text-sm text-gray-500">Products</p>
+                <div className="rounded-2xl border border-white/10 bg-white/5 p-5 text-center backdrop-blur-xl">
+                    <p className="text-3xl font-bold text-white">150+</p>
+                    <p className="mt-1 text-sm text-slate-400">Products</p>
                 </div>
             </div>
           </div>
 
-          {/* Image Column */}
-          <div className="order-1 lg:order-2 relative">
-            {/* Decorative elements */}
-            <div className="absolute top-0 right-0 w-64 h-64 bg-primary/10 rounded-full blur-3xl -z-10"></div>
-            <div className="absolute bottom-0 left-0 w-64 h-64 bg-accent/10 rounded-full blur-3xl -z-10"></div>
-
-            <div className="relative rounded-2xl shadow-2xl overflow-hidden border-8 border-white transform md:rotate-3 transition-all duration-500 hover:rotate-0 hover:scale-[1.02] group">
-                 <video src="https://cdn.coverr.co/videos/coverr-students-preparing-for-exams-1577/1080p.mp4" autoPlay muted loop playsInline className="w-full h-auto object-cover transform group-hover:scale-110 transition-transform duration-700" />
-                 <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent opacity-60"></div>
-                 <div className="absolute bottom-6 left-6 text-white">
-                     <p className="font-bold text-xl">Our Mission</p>
-                     <p className="text-sm opacity-90">Empowering your digital journey.</p>
-                 </div>
+          <div className="order-1 lg:order-2">
+            <div className="relative rounded-3xl border border-white/10 bg-white/5 p-6 shadow-2xl shadow-slate-950/30 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_0_30px_rgba(139,92,246,0.2)]">
+              <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-cyan-400/20 blur-3xl" />
+              <div className="absolute -bottom-6 -left-6 h-32 w-32 rounded-full bg-purple-500/20 blur-3xl" />
+              <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-900/70 p-8">
+                <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:36px_36px]" />
+                <div className="relative min-h-[340px] rounded-2xl bg-gradient-to-br from-blue-500/20 via-purple-500/20 to-cyan-400/10 p-8">
+                  <div className="flex h-full min-h-[284px] flex-col justify-between">
+                    <div>
+                      <p className="text-sm font-semibold uppercase tracking-[0.3em] text-cyan-100">Mission control</p>
+                      <h3 className="mt-4 text-3xl font-extrabold text-white">Empowering your digital journey.</h3>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      {['Strategy', 'Automation', imageSeed || 'Growth', 'Scale'].map((item) => (
+                        <div key={item} className="rounded-2xl border border-white/10 bg-white/10 p-4 text-sm font-semibold text-slate-100 backdrop-blur-xl">
+                          {item}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
-
         </div>
       </div>
     </section>
