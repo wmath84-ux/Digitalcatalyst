@@ -42,15 +42,15 @@ const TrustBadges: React.FC<TrustBadgesProps> = ({ settings }) => {
           </p>
         </div>
         <div className="mt-12 grid grid-cols-1 md:grid-cols-3 gap-8 text-center">
-            <div className="relative overflow-hidden bg-white p-6 rounded-lg shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 product-card-shine">
+            <div className="relative overflow-hidden bg-white/10 backdrop-blur-xl p-6 rounded-lg shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 product-card-shine">
                 <h3 className="font-semibold text-lg text-primary">Secure Payments</h3>
                 <p className="text-sm text-text-muted mt-2">All transactions are encrypted and processed securely through Razorpay.</p>
             </div>
-            <div className="relative overflow-hidden bg-white p-6 rounded-lg shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 product-card-shine">
+            <div className="relative overflow-hidden bg-white/10 backdrop-blur-xl p-6 rounded-lg shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 product-card-shine">
                 <h3 className="font-semibold text-lg text-primary">High-Quality Products</h3>
                 <p className="text-sm text-text-muted mt-2">Our digital products and services are curated and created by industry experts.</p>
             </div>
-            <div className="relative overflow-hidden bg-white p-6 rounded-lg shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 product-card-shine">
+            <div className="relative overflow-hidden bg-white/10 backdrop-blur-xl p-6 rounded-lg shadow-lg transition-all duration-300 hover:shadow-xl hover:-translate-y-1 product-card-shine">
                 <h3 className="font-semibold text-lg text-primary">Dedicated Support</h3>
                 <p className="text-sm text-text-muted mt-2">Our support team is ready to help you with any questions or issues.</p>
             </div>

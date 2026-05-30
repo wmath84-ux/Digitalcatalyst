@@ -85,7 +85,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
     <section 
       id="products" 
       ref={sectionRef}
-      className={`py-24 bg-white ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+      className={`py-24 bg-white/10 backdrop-blur-xl ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
     >
       <div className="container mx-auto px-6">
         <div className="text-center max-w-3xl mx-auto mb-12 animate-child animate-delay-1">
@@ -104,7 +104,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search..."
-                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition bg-white"
+                  className="w-full pl-12 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition bg-white/10 backdrop-blur-xl"
                 />
                 <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </div>
@@ -114,7 +114,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
                 <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition bg-white cursor-pointer"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition bg-white/10 backdrop-blur-xl cursor-pointer"
                 >
                     <option value="default">Default Sorting</option>
                     <option value="newest">Newest Arrivals</option>

@@ -17,7 +17,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onDeleteUser }) 
                 </div>
             </div>
             
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+            <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-max text-left border-collapse">
                         <thead>

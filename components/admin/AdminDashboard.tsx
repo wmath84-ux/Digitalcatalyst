@@ -47,7 +47,7 @@ const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?
         <div className="absolute -bottom-4 -right-4 opacity-20 text-black transform rotate-12 scale-150">
             {icon}
         </div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white opacity-10 rounded-full blur-2xl -mr-16 -mt-16"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/10 backdrop-blur-xl opacity-10 rounded-full blur-2xl -mr-16 -mt-16"></div>
     </div>
 );
 
@@ -82,7 +82,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                                 <p className="mt-2 text-lg text-slate-500">Here's what's happening in your store today.</p>
                             </div>
                             <div className="mt-4 md:mt-0 hidden md:block">
-                                <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white border border-slate-200 text-slate-600 shadow-sm">
+                                <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/10 backdrop-blur-xl border border-slate-200 text-slate-600 shadow-sm">
                                     <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
                                     System Operational
                                 </span>
@@ -120,7 +120,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                             />
                         </div>
 
-                        <div className="bg-white rounded-2xl shadow-xl border border-slate-100 p-6 sm:p-8">
+                        <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-100 p-6 sm:p-8">
                             <h2 className="text-2xl font-bold text-slate-800 mb-4">Quick Actions</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <button onClick={() => setCurrentView('products')} className="p-4 bg-blue-50 text-blue-700 rounded-xl font-semibold hover:bg-blue-100 transition-colors flex items-center gap-3 justify-center sm:justify-start">
@@ -152,7 +152,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 {/* Mobile Header */}
-                <header className="md:hidden bg-white border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+                <header className="md:hidden bg-white/10 backdrop-blur-xl border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
                     <div className="flex items-center gap-3">
                         <button 
                             onClick={() => setIsMobileSidebarOpen(true)}

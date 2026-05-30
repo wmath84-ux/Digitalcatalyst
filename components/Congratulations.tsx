@@ -95,7 +95,7 @@ const Congratulations: React.FC<CongratulationsProps> = ({ settings, onBack, pro
   const animationClass = (delay: string) => settings.animations.enabled ? `animate-fade-in-up style={{ animationDelay: '${delay}' }}` : '';
 
   return (
-    <div className="bg-white min-h-screen">
+    <div className="bg-white/10 backdrop-blur-xl min-h-screen">
       <header className="bg-background py-6 border-b">
         <div className="container mx-auto px-6 flex justify-between items-center">
             <h1 className="text-2xl font-bold text-primary">Digital Catalyst</h1>
@@ -132,7 +132,7 @@ const Congratulations: React.FC<CongratulationsProps> = ({ settings, onBack, pro
                 <button onClick={() => setShowProduct(!showProduct)} className="bg-primary text-white font-bold text-lg px-10 py-4 rounded-xl hover:bg-opacity-90 transition-all duration-300 transform hover:scale-105 shadow-lg hover:shadow-xl">
                     {showProduct ? 'Hide Content' : 'Start Learning Now'}
                 </button>
-                <button onClick={onBack} className="bg-white text-gray-700 font-bold text-lg px-10 py-4 rounded-xl border-2 border-gray-200 hover:border-primary hover:text-primary transition-all duration-300">
+                <button onClick={onBack} className="bg-white/10 backdrop-blur-xl text-gray-700 font-bold text-lg px-10 py-4 rounded-xl border-2 border-gray-200 hover:border-primary hover:text-primary transition-all duration-300">
                     Continue Shopping
                 </button>
             </div>
@@ -144,7 +144,7 @@ const Congratulations: React.FC<CongratulationsProps> = ({ settings, onBack, pro
             <div className="bg-gray-900 py-12">
                 <div className="container mx-auto px-6">
                     <h3 className="text-white text-2xl font-bold mb-6 text-center">Product Preview</h3>
-                    <div className="max-w-5xl mx-auto rounded-xl overflow-hidden shadow-2xl border border-gray-700 bg-black">
+                    <div className="max-w-5xl mx-auto rounded-xl overflow-hidden shadow-2xl border border-gray-700 bg-slate-950">
                         {renderProductPreview()}
                     </div>
                 </div>
@@ -153,7 +153,7 @@ const Congratulations: React.FC<CongratulationsProps> = ({ settings, onBack, pro
       
       {/* Enhanced Reviews Section */}
       {settings.features.showReviews && product && (
-        <div className="py-20 bg-white border-t">
+        <div className="py-20 bg-white/10 backdrop-blur-xl border-t">
             <div className="container mx-auto px-6">
                 <div className="max-w-4xl mx-auto bg-blue-50 rounded-3xl p-10 shadow-inner border border-blue-100 text-center">
                     <h3 className="text-3xl font-bold text-primary mb-4">Share Your Experience</h3>

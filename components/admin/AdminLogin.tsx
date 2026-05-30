@@ -29,7 +29,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ settings, onLogin, onBack }) =>
                     &larr; Back to Home
                 </button>
             </div>
-            <div className="max-w-md w-full bg-white p-8 rounded-xl shadow-lg border">
+            <div className="max-w-md w-full bg-white/10 backdrop-blur-xl p-8 rounded-xl shadow-lg border">
                 <h1 className="text-3xl font-bold text-center text-primary">Admin Login</h1>
                 <p className="text-center text-text-muted mt-2">Enter your credentials to access the dashboard.</p>
                 <form onSubmit={handleSubmit} className="mt-8 space-y-6">

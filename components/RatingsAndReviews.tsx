@@ -127,7 +127,7 @@ const RatingsAndReviews: React.FC<RatingsAndReviewsProps> = ({ settings, product
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
             {/* Left Column: Stats & Breakdown */}
             <div className="lg:col-span-4 space-y-8">
-                <div className="bg-white p-8 rounded-2xl shadow-lg border border-gray-100 text-center lg:text-left">
+                <div className="bg-white/10 backdrop-blur-xl p-8 rounded-2xl shadow-lg border border-gray-100 text-center lg:text-left">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Rating Overview</h3>
                     <div className="flex items-end gap-4 justify-center lg:justify-start mb-6">
                         <span className="text-6xl font-extrabold text-gray-900 leading-none">{averageRating.toFixed(1)}</span>
@@ -148,7 +148,7 @@ const RatingsAndReviews: React.FC<RatingsAndReviewsProps> = ({ settings, product
                         <p className="text-sm text-gray-500 mb-4">If you’ve used this product, share your thoughts with other customers.</p>
                         <button 
                             onClick={() => setIsWritingReview(!isWritingReview)}
-                            className="w-full bg-white border-2 border-primary text-primary font-bold py-2.5 rounded-xl hover:bg-primary hover:text-white transition-all duration-300"
+                            className="w-full bg-white/10 backdrop-blur-xl border-2 border-primary text-primary font-bold py-2.5 rounded-xl hover:bg-primary hover:text-white transition-all duration-300"
                         >
                             {isWritingReview ? 'Cancel Review' : 'Write a Review'}
                         </button>
@@ -160,7 +160,7 @@ const RatingsAndReviews: React.FC<RatingsAndReviewsProps> = ({ settings, product
             <div className="lg:col-span-8">
                 {/* Review Form */}
                 <div className={`overflow-hidden transition-all duration-500 ease-in-out ${isWritingReview ? 'max-h-[600px] opacity-100 mb-10' : 'max-h-0 opacity-0'}`}>
-                    <div className="bg-white p-8 rounded-2xl shadow-xl border border-blue-100">
+                    <div className="bg-white/10 backdrop-blur-xl p-8 rounded-2xl shadow-xl border border-blue-100">
                         <h3 className="text-xl font-bold text-gray-800 mb-6">{prompt || 'Write a Review'}</h3>
                         {submitted ? (
                             <div className="flex flex-col items-center justify-center py-8 text-green-600">
@@ -207,7 +207,7 @@ const RatingsAndReviews: React.FC<RatingsAndReviewsProps> = ({ settings, product
                     )}
 
                     {reviews.map((review, index) => (
-                        <div key={index} className="bg-white p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-300 flex gap-4 animate-fade-in-up" style={{ animationDelay: `${index * 100}ms`}}>
+                        <div key={index} className="bg-white/10 backdrop-blur-xl p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-300 flex gap-4 animate-fade-in-up" style={{ animationDelay: `${index * 100}ms`}}>
                             {/* Avatar Placeholder */}
                             <div className="flex-shrink-0">
                                 <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-inner`} style={{ backgroundColor: `hsl(${(review.name.length * 50) % 360}, 70%, 50%)` }}>

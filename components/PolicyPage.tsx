@@ -47,7 +47,7 @@ const PolicyPage: React.FC<PolicyPageProps> = ({ settings, onBack, scrollToSecti
 
   return (
     <div className="bg-background min-h-screen font-sans">
-      <header className="bg-white shadow-md sticky top-0 z-10">
+      <header className="bg-white/10 backdrop-blur-xl shadow-md sticky top-0 z-10">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <h1 className="text-xl font-bold text-primary">Digital Catalyst Policies</h1>
           <button 
@@ -59,7 +59,7 @@ const PolicyPage: React.FC<PolicyPageProps> = ({ settings, onBack, scrollToSecti
         </div>
       </header>
       <main className="container mx-auto px-6 py-12">
-        <div className="max-w-4xl mx-auto bg-white p-8 sm:p-12 rounded-lg shadow-lg">
+        <div className="max-w-4xl mx-auto bg-white/10 backdrop-blur-xl p-8 sm:p-12 rounded-lg shadow-lg">
           
           <PolicySection id="privacy-policy">
             <h2 className="text-3xl font-extrabold text-primary border-b-2 border-accent pb-2 mb-6">Privacy Policy</h2>

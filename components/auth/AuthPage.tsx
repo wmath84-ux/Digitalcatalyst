@@ -75,7 +75,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, onOtpAuthenticate, onBack
                     </div>
                 </section>
 
-                <section className="bg-white text-slate-900 p-6 sm:p-10 lg:p-12">
+                <section className="bg-white/10 backdrop-blur-xl text-slate-900 p-6 sm:p-10 lg:p-12">
                     <div className="mb-8">
                         <p className="text-sm font-bold text-primary uppercase tracking-[0.25em]">{settings.content.siteName}</p>
                         <h2 className="text-3xl font-black mt-2">Login / Sign up</h2>

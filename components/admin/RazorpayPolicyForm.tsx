@@ -42,7 +42,7 @@ interface PolicySectionProps {
 
 const PolicySection: React.FC<PolicySectionProps> = ({ id, title, icon, hasNa, isFocused, state, onOptionChange, onUrlChange }) => {
     return (
-        <div className={`p-4 border rounded-lg transition-all duration-300 ${state.status === 'verified' ? 'bg-gray-50 border-gray-200' : 'bg-white'} ${isFocused ? 'border-razorpay-light-blue ring-2 ring-razorpay-light-blue/50' : 'border-gray-200'}`}>
+        <div className={`p-4 border rounded-lg transition-all duration-300 ${state.status === 'verified' ? 'bg-gray-50 border-gray-200' : 'bg-white/10 backdrop-blur-xl'} ${isFocused ? 'border-razorpay-light-blue ring-2 ring-razorpay-light-blue/50' : 'border-gray-200'}`}>
             <div className="flex items-start justify-between">
                 <div className="flex items-center gap-3">
                     {icon}
@@ -216,7 +216,7 @@ const RazorpayPolicyForm: React.FC = () => {
     return (
         <div className="flex flex-col items-center">
             {notification && <NotificationBanner notification={notification} onClose={() => setNotification(null)} />}
-            <div className="w-full max-w-3xl bg-white p-8 rounded-xl shadow-lg border">
+            <div className="w-full max-w-3xl bg-white/10 backdrop-blur-xl p-8 rounded-xl shadow-lg border">
                 <h1 className="text-2xl font-bold text-center text-razorpay-blue">Required policy pages on your website</h1>
                 <p className="text-center text-gray-500 mt-2 mb-8">If you don't have any of these required pages/details, we'll help you create them.</p>
 

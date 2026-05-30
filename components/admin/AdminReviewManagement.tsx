@@ -54,7 +54,7 @@ const AdminReviewManagement: React.FC<{
     return (
         <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-6">Customer Reviews</h1>
-            <div className="bg-white shadow-md rounded-lg overflow-hidden border border-gray-200">
+            <div className="bg-white/10 backdrop-blur-xl shadow-md rounded-lg overflow-hidden border border-gray-200">
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-max text-left">
                         <thead className="bg-gray-100">

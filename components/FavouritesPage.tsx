@@ -53,7 +53,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ settings, products, onViewP
 
   if (!settings.features.showFavourites) {
     return (
-        <div className="py-20 sm:py-24 bg-white min-h-[60vh] flex items-center justify-center">
+        <div className="py-20 sm:py-24 bg-white/10 backdrop-blur-xl min-h-[60vh] flex items-center justify-center">
             <div className="text-center">
                 <p className="text-xl text-text-muted">This feature is currently disabled.</p>
             </div>
@@ -62,7 +62,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ settings, products, onViewP
   }
     
   return (
-    <section ref={sectionRef} className={`py-20 sm:py-24 bg-white min-h-[60vh] ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
+    <section ref={sectionRef} className={`py-20 sm:py-24 bg-white/10 backdrop-blur-xl min-h-[60vh] ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
       <div className="container mx-auto px-6">
         <div className="text-center max-w-3xl mx-auto">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-primary">My Wishlist</h2>

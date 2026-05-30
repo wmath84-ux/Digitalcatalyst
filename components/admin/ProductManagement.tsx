@@ -55,7 +55,7 @@ const AdminDocsEditor: React.FC<{ value: string; onChange: (value: string) => vo
     };
     return (
         <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-            <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-white p-2">
+            <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-white/10 backdrop-blur-xl p-2">
                 <button type="button" onClick={() => runCommand('bold')} className="rounded-lg border px-3 py-1 font-black">B</button>
                 <button type="button" onClick={() => runCommand('italic')} className="rounded-lg border px-3 py-1 font-black italic">I</button>
                 <button type="button" onClick={() => runCommand('formatBlock', '<h1>')} className="rounded-lg border px-3 py-1 font-black">H1</button>
@@ -65,7 +65,7 @@ const AdminDocsEditor: React.FC<{ value: string; onChange: (value: string) => vo
                 <button type="button" onClick={() => runCommand('justifyCenter')} className="rounded-lg border px-3 py-1 font-black">Center</button>
                 <button type="button" onClick={() => runCommand('justifyRight')} className="rounded-lg border px-3 py-1 font-black">Right</button>
             </div>
-            <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={() => onChange(editorRef.current?.innerHTML || '')} className="min-h-56 bg-white p-5 text-slate-900 outline-none" />
+            <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={() => onChange(editorRef.current?.innerHTML || '')} className="min-h-56 bg-white/10 backdrop-blur-xl p-5 text-slate-900 outline-none" />
         </div>
     );
 };
@@ -128,12 +128,12 @@ const AddContentModal: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
             <div className="p-6">
                  {isUploading ? <p className="text-center py-10 font-bold text-slate-600">Uploading...</p> : !formState ? (
                     <div className="grid gap-3 md:grid-cols-2">
-                        <button type="button" onClick={() => triggerFileUpload('pdf', '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">📄 Upload PDF / document for download UI</button>
-                        <button type="button" onClick={() => triggerFileUpload('video', 'video/mp4,video/webm')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">🎬 Upload Video from local file</button>
-                        <button type="button" onClick={() => showForm('youtube')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">▶️ Add YouTube embed link</button>
-                        <button type="button" onClick={() => showForm('doc')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">📝 Add Smart Docs Workspace</button>
-                        <button type="button" onClick={() => showForm('link')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">🔗 Add External Resource / Link</button>
-                        <button type="button" onClick={() => showForm('quiz')} className="rounded-2xl border border-slate-200 bg-white p-4 text-left font-bold shadow-sm hover:bg-blue-50">❓ Create Interactive Quiz</button>
+                        <button type="button" onClick={() => triggerFileUpload('pdf', '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx')} className="rounded-2xl border border-slate-200 bg-white/10 backdrop-blur-xl p-4 text-left font-bold shadow-sm hover:bg-blue-50">📄 Upload PDF / document for download UI</button>
+                        <button type="button" onClick={() => triggerFileUpload('video', 'video/mp4,video/webm')} className="rounded-2xl border border-slate-200 bg-white/10 backdrop-blur-xl p-4 text-left font-bold shadow-sm hover:bg-blue-50">🎬 Upload Video from local file</button>
+                        <button type="button" onClick={() => showForm('youtube')} className="rounded-2xl border border-slate-200 bg-white/10 backdrop-blur-xl p-4 text-left font-bold shadow-sm hover:bg-blue-50">▶️ Add YouTube embed link</button>
+                        <button type="button" onClick={() => showForm('doc')} className="rounded-2xl border border-slate-200 bg-white/10 backdrop-blur-xl p-4 text-left font-bold shadow-sm hover:bg-blue-50">📝 Add Smart Docs Workspace</button>
+                        <button type="button" onClick={() => showForm('link')} className="rounded-2xl border border-slate-200 bg-white/10 backdrop-blur-xl p-4 text-left font-bold shadow-sm hover:bg-blue-50">🔗 Add External Resource / Link</button>
+                        <button type="button" onClick={() => showForm('quiz')} className="rounded-2xl border border-slate-200 bg-white/10 backdrop-blur-xl p-4 text-left font-bold shadow-sm hover:bg-blue-50">❓ Create Interactive Quiz</button>
                     </div>
                  ) : (
                     <div className="space-y-4">
@@ -151,7 +151,7 @@ const AddContentModal: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                                         <input placeholder="Question prompt" value={question.prompt} onChange={e => updateQuestion(qIndex, q => ({ ...q, prompt: e.target.value }))} className="mb-3 w-full rounded-xl border p-3" />
                                         <div className="grid gap-2 md:grid-cols-2">
                                             {question.options.map((option, oIndex) => (
-                                                <label key={oIndex} className="flex items-center gap-2 rounded-xl border bg-white p-2">
+                                                <label key={oIndex} className="flex items-center gap-2 rounded-xl border bg-white/10 backdrop-blur-xl p-2">
                                                     <input type="radio" checked={question.correctAnswer === oIndex} onChange={() => updateQuestion(qIndex, q => ({ ...q, correctAnswer: oIndex }))} />
                                                     <input placeholder={`Option ${oIndex + 1}`} value={option} onChange={e => updateQuestion(qIndex, q => ({ ...q, options: q.options.map((item, i) => i === oIndex ? e.target.value : item) }))} className="w-full bg-transparent outline-none" />
                                                 </label>
@@ -186,10 +186,10 @@ const ModuleEditor: React.FC<{ module: CourseModule; onUpdate: (updatedModules: 
         setIsAddingContent(false);
     };
     return (
-        <div className={`p-4 rounded-lg border mt-4 ${level === 0 ? 'bg-slate-50 border-slate-200' : 'bg-white border-gray-200'}`}>
+        <div className={`p-4 rounded-lg border mt-4 ${level === 0 ? 'bg-slate-50 border-slate-200' : 'bg-white/10 backdrop-blur-xl border-gray-200'}`}>
             <input value={module.title} onChange={(e) => handleUpdateTitle(e.target.value)} className="font-bold text-lg bg-transparent border-none w-full mb-2" placeholder="Module Title" />
             <div className="space-y-2 pl-4">
-                {module.files.map(f => <div key={f.id} className="text-sm p-2 bg-white border rounded flex justify-between">{f.name} <span className="text-xs text-gray-500">{f.type}</span></div>)}
+                {module.files.map(f => <div key={f.id} className="text-sm p-2 bg-white/10 backdrop-blur-xl border rounded flex justify-between">{f.name} <span className="text-xs text-gray-500">{f.type}</span></div>)}
                 <button type="button" onClick={() => setIsAddingContent(true)} className="text-sm text-blue-600 font-medium">+ Add Content</button>
             </div>
             {isAddingContent && <AddContentModal onAdd={handleAddContent} onClose={() => setIsAddingContent(false)} />}
@@ -288,7 +288,7 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
 
     return (
         <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-950/70 p-6">
-          <div className="mx-auto max-w-5xl rounded-3xl border border-white/20 bg-white">
+          <div className="mx-auto max-w-5xl rounded-3xl border border-white/20 bg-white/10 backdrop-blur-xl">
                 <div className="p-8">
 
                     <form onSubmit={handleSubmit} className="space-y-8">
@@ -321,7 +321,7 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
                         <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
                             <h3 className="font-bold text-lg text-blue-800 mb-4">Pricing & Status</h3>
                             
-                            <div className="flex items-center mb-6 p-3 bg-white rounded-lg border border-blue-100 shadow-sm">
+                            <div className="flex items-center mb-6 p-3 bg-white/10 backdrop-blur-xl rounded-lg border border-blue-100 shadow-sm">
                                 <label className="flex items-center space-x-3 cursor-pointer w-full">
                                     <input type="checkbox" checked={formData.isFree} onChange={e => setFormData({...formData, isFree: e.target.checked})} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
                                     <span className="font-bold text-slate-700">Mark as Free Product</span>
@@ -333,18 +333,18 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
                                 {formData.isFree ? (
                                     <div className="md:col-span-2">
                                         <label className="block text-sm font-bold text-slate-700 mb-1">Nominal Fee (₹)</label>
-                                        <input type="number" name="price" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full p-3 border rounded-lg bg-white" required placeholder="3" />
+                                        <input type="number" name="price" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full p-3 border rounded-lg bg-white/10 backdrop-blur-xl" required placeholder="3" />
                                         <p className="text-xs text-gray-500 mt-1">This fee handles gateway charges for 'free' products.</p>
                                     </div>
                                 ) : (
                                     <>
                                         <div>
                                             <label className="block text-sm font-bold text-slate-700 mb-1">Initial Price (MRP) (₹)</label>
-                                            <input type="number" name="price" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full p-3 border rounded-lg bg-white" required placeholder="499" />
+                                            <input type="number" name="price" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full p-3 border rounded-lg bg-white/10 backdrop-blur-xl" required placeholder="499" />
                                         </div>
                                         <div>
                                             <label className="block text-sm font-bold text-slate-700 mb-1">Final Price (Sale) (₹)</label>
-                                            <input type="number" name="salePrice" value={formData.salePrice} onChange={e => setFormData({...formData, salePrice: e.target.value})} className="w-full p-3 border rounded-lg bg-white" placeholder="299" />
+                                            <input type="number" name="salePrice" value={formData.salePrice} onChange={e => setFormData({...formData, salePrice: e.target.value})} className="w-full p-3 border rounded-lg bg-white/10 backdrop-blur-xl" placeholder="299" />
                                         </div>
                                     </>
                                 )}
@@ -363,12 +363,12 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 border-t border-blue-200 pt-6">
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-1">Custom Rating (0.0 - 5.0)</label>
-                                    <input type="number" step="0.1" min="0" max="5" name="manualRating" value={formData.manualRating} onChange={e => setFormData({...formData, manualRating: e.target.value})} className="w-full p-3 border rounded-lg bg-white" placeholder="4.8" />
+                                    <input type="number" step="0.1" min="0" max="5" name="manualRating" value={formData.manualRating} onChange={e => setFormData({...formData, manualRating: e.target.value})} className="w-full p-3 border rounded-lg bg-white/10 backdrop-blur-xl" placeholder="4.8" />
                                     <p className="text-xs text-gray-500 mt-1">Overrides calculated rating.</p>
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-slate-700 mb-1">Stock Status</label>
-                                    <select name="inStock" value={formData.inStock ? 'true' : 'false'} onChange={e => setFormData({...formData, inStock: e.target.value === 'true'})} className="w-full p-3 border rounded-lg bg-white cursor-pointer">
+                                    <select name="inStock" value={formData.inStock ? 'true' : 'false'} onChange={e => setFormData({...formData, inStock: e.target.value === 'true'})} className="w-full p-3 border rounded-lg bg-white/10 backdrop-blur-xl cursor-pointer">
                                         <option value="true">In Stock</option>
                                         <option value="false">Out of Stock</option>
                                     </select>
@@ -383,10 +383,10 @@ const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupo
                         <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
                             <h3 className="font-bold text-lg text-slate-700 mb-4">Course Content / Files</h3>
                             {modules.map(m => <ModuleEditor key={m.id} module={m} onUpdate={setModules} allModules={modules} level={0} />)}
-                            <button type="button" onClick={() => setModules([...modules, { id: `mod-${Date.now()}`, title: 'New Module', files: [], modules: [] }])} className="mt-4 w-full py-2 bg-white border border-dashed border-slate-300 rounded-lg text-slate-500 hover:bg-slate-100">+ Add Module</button>
+                            <button type="button" onClick={() => setModules([...modules, { id: `mod-${Date.now()}`, title: 'New Module', files: [], modules: [] }])} className="mt-4 w-full py-2 bg-white/10 backdrop-blur-xl border border-dashed border-slate-300 rounded-lg text-slate-500 hover:bg-slate-100">+ Add Module</button>
                         </div>
 
-                        <div className="flex justify-end gap-4 pt-6 border-t sticky bottom-0 bg-white p-4">
+                        <div className="flex justify-end gap-4 pt-6 border-t sticky bottom-0 bg-white/10 backdrop-blur-xl p-4">
                             <button type="button" onClick={onCancel} className="px-6 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-100 border">Cancel</button>
                             <button type="submit" className="px-8 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg transform hover:-translate-y-0.5 transition-all">Save Product</button>
                         </div>
@@ -434,7 +434,7 @@ const ProductManagement: React.FC<{
                 </button>
             </div>
 
-            <div className="bg-white rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
+            <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-max text-left border-collapse">
                         <thead>

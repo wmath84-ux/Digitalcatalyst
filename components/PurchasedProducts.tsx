@@ -12,7 +12,7 @@ const PurchasedProductCard: React.FC<{
     const buttonText = 'Access Files';
 
     return (
-        <div className={`relative bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 flex flex-col transform hover:-translate-y-2 transition-all duration-300 ease-in-out hover:shadow-xl product-card-shine ${animationClass}`}>
+        <div className={`relative bg-white/10 backdrop-blur-xl rounded-xl shadow-md overflow-hidden border border-gray-200 flex flex-col transform hover:-translate-y-2 transition-all duration-300 ease-in-out hover:shadow-xl product-card-shine ${animationClass}`}>
             <div className="h-48 overflow-hidden relative bg-gray-100">
                 <img src={product.images[0] || `https://picsum.photos/seed/${product.imageSeed}/600/400`} alt={product.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
                 <div className="absolute inset-0 bg-black/10"></div>
