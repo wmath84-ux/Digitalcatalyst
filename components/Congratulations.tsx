@@ -1,192 +1,127 @@
-
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import Faq from './Faq';
-import Services from './Services';
 import RatingsAndReviews from './RatingsAndReviews';
-import { ProductWithRating, Review, ProductFile, CourseModule, WebsiteSettings } from '../App';
+import { ProductWithRating, Review, WebsiteSettings } from '../App';
 
 interface CongratulationsProps {
   settings: WebsiteSettings;
   onBack: () => void;
+  onCheckProduct: () => void;
   product: ProductWithRating | null;
   reviews: Review[];
   onAddReview: (reviewData: Omit<Review, 'name' | 'date'>) => void;
 }
 
-const dataURLtoBlob = (dataurl: string) => {
-    const arr = dataurl.split(',');
-    const mimeMatch = arr[0].match(/:(.*?);/);
-    if (!mimeMatch) return null;
-    const mime = mimeMatch[1];
-    const bstr = atob(arr[1]);
-    let n = bstr.length;
-    const u8arr = new Uint8Array(n);
-    while (n--) u8arr[n] = bstr.charCodeAt(n);
-    return new Blob([u8arr], { type: mime });
-}
+const celebrationStats = [
+  { label: 'Access status', value: 'Unlocked', icon: '✅' },
+  { label: 'Delivery', value: 'My Purchases', icon: '📚' },
+  { label: 'Support', value: 'Available', icon: '💬' },
+];
 
-const Congratulations: React.FC<CongratulationsProps> = ({ settings, onBack, product, reviews, onAddReview }) => {
-  const [showProduct, setShowProduct] = useState(false);
-  const [pdfObjectUrl, setPdfObjectUrl] = useState<string | null>(null);
-  const [isPdfLoading, setIsPdfLoading] = useState(true);
-  
-  const getFirstPurchasedFile = (): ProductFile | null => {
-    if (!product || !product.courseContent) return null;
-    const findFirstFile = (modules: CourseModule[]): ProductFile | null => {
-        for (const module of modules) {
-            if (module.files.length > 0) return module.files[0];
-            const foundInSub = findFirstFile(module.modules);
-            if (foundInSub) return foundInSub;
-        }
-        return null;
-    }
-    return findFirstFile(product.courseContent);
-  }
-
-  const file = getFirstPurchasedFile();
-
-  useEffect(() => {
-    if (!file || file.type !== 'pdf') {
-        setPdfObjectUrl(null);
-        return;
-    }
-    setIsPdfLoading(true);
-    let objectUrl: string | undefined;
-    const blob = dataURLtoBlob(file.url);
-    if (blob) {
-        objectUrl = URL.createObjectURL(blob);
-        setPdfObjectUrl(objectUrl);
-    } else {
-        setPdfObjectUrl(null);
-    }
-    setIsPdfLoading(false);
-    return () => { if (objectUrl) URL.revokeObjectURL(objectUrl); };
-  }, [file]);
-
-
-  const renderProductPreview = () => {
-      if (!file) return <p className="text-text-muted">Your product is being processed and will be available in your account shortly.</p>;
-      if (file.type === 'video') return <video src={file.url} controls className="w-full h-auto rounded-lg" />;
-      if (file.type === 'audio') return <audio src={file.url} controls className="w-full" />;
-      if (file.type === 'pdf') {
-          if (isPdfLoading) return <div className="p-8 text-center text-text-muted">Loading PDF Preview...</div>;
-          if (pdfObjectUrl) {
-            return (
-              <iframe src={`${pdfObjectUrl}#toolbar=1`} title={file.name} className="w-full h-[80vh] border-0">
-                  <div className="p-8 text-center text-text-muted bg-gray-100 h-full flex flex-col justify-center items-center">
-                      <h3 className="text-xl font-bold mb-4">PDF Preview Unavailable</h3>
-                      <p>Your browser cannot display the PDF file directly.</p>
-                      <a href={file.url} download={file.name} className="mt-4 px-6 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90 font-semibold no-underline transform active:scale-95 transition-transform">Download PDF</a>
-                  </div>
-              </iframe>
-            );
-          }
-          return (
-             <div className="p-8 text-center text-text-muted bg-gray-100 h-full flex flex-col justify-center items-center">
-                <h3 className="text-xl font-bold mb-4 text-red-600">PDF Preview Error</h3>
-                <p>Could not load the PDF file.</p>
-                <a href={file.url} download={file.name} className="mt-4 px-6 py-2 rounded-lg bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:opacity-90 font-semibold no-underline transform active:scale-95 transition-transform">Download PDF</a>
-            </div>
-          );
-      }
-      return <p className="text-text-muted">Preview is not available. Access it from "My Purchases".</p>;
-  }
-
-  const animationClass = (delay: string) => settings.animations.enabled ? `animate-fade-in-up style={{ animationDelay: '${delay}' }}` : '';
-
+const Congratulations: React.FC<CongratulationsProps> = ({ settings, onBack, onCheckProduct, product, reviews, onAddReview }) => {
   return (
-    <div className="bg-white/70 backdrop-blur-xl min-h-screen">
-      <header className="bg-background py-6 border-b">
-        <div className="container mx-auto px-6 flex justify-between items-center">
-            <h1 className="text-2xl font-bold text-primary">Digital Catalyst</h1>
-            <button onClick={onBack} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold px-6 py-2 rounded-lg hover:opacity-90 transition-all duration-300 transform active:scale-95">
-              Back to Home
-            </button>
+    <div className="min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-indigo-50/50 to-cyan-50 text-slate-900">
+      <header className="border-b border-white/60 bg-white/75 py-4 shadow-sm backdrop-blur-2xl">
+        <div className="container mx-auto flex items-center justify-between gap-4 px-6">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.28em] text-indigo-500">Digital Catalyst</p>
+            <h1 className="text-2xl font-black text-primary">Purchase Complete</h1>
+          </div>
+          <button onClick={onBack} className="rounded-full border border-slate-200 bg-white/80 px-5 py-2.5 text-sm font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white">
+            Back to Home
+          </button>
         </div>
       </header>
 
-      {/* Hero Celebration Section */}
-      <main className="relative bg-gradient-to-b from-blue-50 to-white overflow-hidden py-20">
-        {/* Confetti decoration (simple CSS circles for effect) */}
-        <div className="absolute top-10 left-10 w-4 h-4 bg-red-400 rounded-full animate-bounce"></div>
-        <div className="absolute top-20 right-20 w-6 h-6 bg-yellow-400 rounded-full animate-bounce [animation-delay:0.2s]"></div>
-        <div className="absolute bottom-10 left-1/4 w-3 h-3 bg-green-400 rounded-full animate-bounce [animation-delay:0.5s]"></div>
-        
-        <div className="container mx-auto px-6 text-center relative z-10">
-            <div className="inline-block p-6 rounded-full bg-green-100 mb-8 animate-pop-in shadow-[0_8px_30px_rgb(0,0,0,0.04)] border-4 border-white">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-20 w-20 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                    <path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7" />
-                </svg>
-            </div>
-            
-            <h2 className={`text-5xl sm:text-6xl font-extrabold text-gray-900 tracking-tight mb-6 ${animationClass('0.2s')}`}>
-                Congratulations!
-            </h2>
-            
-            <p className={`text-xl sm:text-2xl text-gray-600 max-w-2xl mx-auto leading-relaxed ${animationClass('0.4s')}`}>
-                You've successfully unlocked <span className="text-primary font-bold">{product?.title || "your product"}</span>. 
-                Get ready to level up!
-            </p>
+      <main className="relative py-16 sm:py-20">
+        <div className="absolute left-10 top-10 h-5 w-5 rounded-full bg-rose-300 animate-bounce" />
+        <div className="absolute right-16 top-24 h-7 w-7 rounded-full bg-amber-300 animate-bounce [animation-delay:0.2s]" />
+        <div className="absolute bottom-20 left-1/4 h-4 w-4 rounded-full bg-emerald-300 animate-bounce [animation-delay:0.5s]" />
+        <div className="absolute inset-x-0 top-0 mx-auto h-80 max-w-3xl rounded-full bg-indigo-300/20 blur-3xl" />
 
-            <div className={`mt-12 flex flex-col sm:flex-row justify-center gap-4 ${animationClass('0.6s')}`}>
-                <button onClick={() => setShowProduct(!showProduct)} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-lg px-10 py-4 rounded-xl hover:bg-opacity-90 transition-all duration-300 transform hover:scale-105 shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-sm">
-                    {showProduct ? 'Hide Content' : 'Start Learning Now'}
-                </button>
-                <button onClick={onBack} className="bg-white/70 backdrop-blur-xl text-gray-700 font-bold text-lg px-10 py-4 rounded-xl border-2 border-gray-200 hover:border-primary hover:text-primary transition-all duration-300">
+        <div className="container relative z-10 mx-auto px-6">
+          <div className="mx-auto max-w-5xl overflow-hidden rounded-[2.5rem] border border-white/70 bg-white/75 shadow-[0_30px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl">
+            <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
+              <div className="relative min-h-[320px] bg-gradient-to-br from-emerald-500 via-cyan-500 to-indigo-600 p-8 text-white sm:p-10">
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.32),transparent_25%),radial-gradient(circle_at_75%_70%,rgba(255,255,255,0.18),transparent_24%)]" />
+                <div className="relative flex h-full flex-col justify-between">
+                  <div className="inline-flex h-24 w-24 items-center justify-center rounded-full border-4 border-white/60 bg-white/20 text-5xl shadow-2xl backdrop-blur-xl">
+                    ✅
+                  </div>
+                  <div>
+                    <p className="text-sm font-black uppercase tracking-[0.3em] text-white/75">Congratulations</p>
+                    <h2 className="mt-4 text-4xl font-black leading-tight sm:text-5xl">Your learning product is ready.</h2>
+                    <p className="mt-4 text-base font-semibold leading-7 text-white/80">Open your purchases page to access the unlocked content and start learning without refreshing the website.</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-7 sm:p-10">
+                <div className="rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5">
+                  <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">Unlocked product</p>
+                  <h3 className="mt-3 text-3xl font-black text-slate-950">{product?.title || 'Your product'}</h3>
+                  <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">Access has been added to your account. Use the button below to go directly to My Purchases.</p>
+                </div>
+
+                <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                  {celebrationStats.map(stat => (
+                    <div key={stat.label} className="rounded-2xl border border-slate-200/70 bg-white/80 p-4 text-center shadow-sm">
+                      <div className="text-2xl">{stat.icon}</div>
+                      <p className="mt-2 text-[11px] font-black uppercase tracking-widest text-slate-500">{stat.label}</p>
+                      <p className="mt-1 text-sm font-black text-slate-900">{stat.value}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="mt-7 flex flex-col gap-3 sm:flex-row">
+                  <button onClick={onCheckProduct} className="flex-1 rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-8 py-4 text-lg font-black text-white shadow-[0_16px_40px_rgba(79,70,229,0.25)] transition hover:-translate-y-0.5 active:scale-95">
+                    Check Product
+                  </button>
+                  <button onClick={onBack} className="flex-1 rounded-2xl border border-slate-200 bg-white/80 px-8 py-4 text-lg font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white active:scale-95">
                     Continue Shopping
-                </button>
+                  </button>
+                </div>
+              </div>
             </div>
+          </div>
         </div>
       </main>
 
-      {/* Content Viewer */}
-      <div className={`transition-all duration-700 ease-in-out overflow-hidden ${showProduct ? 'max-h-[150vh] opacity-100' : 'max-h-0 opacity-0'}`}>
-            <div className="bg-white/70 py-12">
-                <div className="container mx-auto px-6">
-                    <h3 className="text-slate-900 text-2xl font-bold mb-6 text-center">Product Preview</h3>
-                    <div className="max-w-5xl mx-auto rounded-xl overflow-hidden shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100">
-                        {renderProductPreview()}
-                    </div>
-                </div>
-            </div>
-      </div>
-      
-      {/* Enhanced Reviews Section */}
       {settings.features.showReviews && product && (
-        <div className="py-20 bg-white/70 backdrop-blur-xl border-t">
-            <div className="container mx-auto px-6">
-                <div className="max-w-4xl mx-auto bg-blue-50 rounded-3xl p-10 shadow-inner border border-blue-100 text-center">
-                    <h3 className="text-3xl font-bold text-primary mb-4">Share Your Experience</h3>
-                    <p className="text-gray-600 mb-8">Your feedback fuels our community. Let others know what you think!</p>
-                    <RatingsAndReviews 
-                        settings={settings}
-                        productTitle={product.title} 
-                        prompt=""
-                        reviews={reviews}
-                        onAddReview={onAddReview} 
-                    />
-                </div>
+        <section className="border-y border-white/70 bg-white/65 py-16 backdrop-blur-xl">
+          <div className="container mx-auto px-6">
+            <div className="mx-auto max-w-4xl rounded-[2rem] border border-indigo-100 bg-indigo-50/70 p-8 text-center shadow-inner sm:p-10">
+              <h3 className="text-3xl font-black text-primary">Share Your Experience</h3>
+              <p className="mx-auto mt-3 max-w-2xl text-slate-600">Your feedback helps other learners choose the right resource.</p>
+              <div className="mt-8">
+                <RatingsAndReviews
+                  settings={settings}
+                  productTitle={product.title}
+                  prompt=""
+                  reviews={reviews}
+                  onAddReview={onAddReview}
+                />
+              </div>
             </div>
-        </div>
+          </div>
+        </section>
       )}
 
-      <div className="bg-white/70 text-slate-900 py-16" id="contact">
-          <div className="container mx-auto px-6 text-center">
-              <h3 className="text-3xl font-bold mb-6">Need Support?</h3>
-              <p className="text-slate-600 mb-8 max-w-xl mx-auto">Our team is ready to assist you with any questions regarding your new purchase.</p>
-              <div className="flex flex-col sm:flex-row justify-center items-center gap-6">
-                  <a href="mailto:wmath84@gmail.com" className="flex items-center gap-2 font-semibold text-lg hover:text-blue-400 transition-colors">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" /></svg>
-                      wmath84@gmail.com
-                  </a>
-                  <a href="https://wa.me/916307730041" target="_blank" rel="noopener noreferrer" className="bg-green-500 text-white font-bold px-8 py-3 rounded-full hover:bg-green-600 transition-all duration-300 transform active:scale-95 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex items-center gap-2">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fillRule="evenodd" d="M18 10c0 3.866-3.582 7-8 7a8.841 8.841 0 01-4.083-.98L2 17l1.338-3.123C2.493 12.767 2 11.434 2 10c0-3.866 3.582-7 8-7s8 3.134 8 7zM7 9H5v2h2V9zm8 0h-2v2h2V9zM9 9h2v2H9V9z" clipRule="evenodd" /></svg>
-                      Chat on WhatsApp
-                  </a>
-              </div>
+      <section className="bg-white/70 py-16 text-slate-900" id="contact">
+        <div className="container mx-auto px-6 text-center">
+          <h3 className="text-3xl font-black">Need Support?</h3>
+          <p className="mx-auto mt-3 max-w-xl text-slate-600">Our team is ready to assist you with any questions regarding your new purchase.</p>
+          <div className="mt-8 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <a href="mailto:wmath84@gmail.com" className="rounded-full border border-slate-200 bg-white/80 px-6 py-3 font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:text-primary">
+              ✉️ wmath84@gmail.com
+            </a>
+            <a href="https://wa.me/916307730041" target="_blank" rel="noopener noreferrer" className="rounded-full bg-green-500 px-6 py-3 font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-green-600">
+              💬 Chat on WhatsApp
+            </a>
           </div>
-      </div>
-      
+        </div>
+      </section>
+
       <Faq settings={settings} faqs={settings.content.faqs} />
     </div>
   );

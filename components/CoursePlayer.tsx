@@ -416,6 +416,14 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     return () => window.clearInterval(timer);
   }, [activeFile, economySettings.coinPerVideoMinute, isPlaybackWindowFocused, isVideoPlaying, onWatchTimeMinutes]);
 
+  const liveEarningHud = activeFile?.type === 'video' ? (
+    <div className="bg-white/50 backdrop-blur-md border border-slate-200 shadow-sm rounded-full px-4 py-1.5 flex items-center gap-2 text-sm font-semibold text-slate-800 transition-all whitespace-nowrap max-sm:px-3 max-sm:text-xs" aria-live="polite">
+      <span>⏱️ {formatActiveWatchTime(activeWatchSeconds)} Mins</span>
+      <span className="h-4 w-px bg-slate-300" />
+      <span className={`text-amber-700 transition-all duration-300 ${coinPulse ? 'animate-bounce scale-110 text-amber-600 drop-shadow-[0_0_10px_rgba(251,191,36,0.65)]' : ''}`}>✦ +{sessionEarnedCoins} Coins</span>
+    </div>
+  ) : null;
+
   const renderMedia = () => {
     if (!activeFile) return <div className="flex h-full items-center justify-center bg-white/70 text-slate-900/70 backdrop-blur-xl">Select content to begin.</div>;
     if (mediaHasError) return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
@@ -444,17 +452,23 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       <div className="absolute -top-12 right-12 h-72 w-72 rounded-full bg-indigo-300/15 blur-3xl" />
 
       <header className="relative z-30 flex items-center gap-3 border-b border-white/50 bg-white/70 p-3 shadow-sm backdrop-blur-xl lg:hidden">
-        <button onClick={() => setIsSidebarOpen(true)} className="rounded-lg border border-white/60 bg-white/40 p-2"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
-        <h1 className="truncate text-lg font-black">{activeFile?.name || product.title}</h1>
-        <button onClick={() => setIsMentorOpen(value => !value)} className="ml-auto rounded-xl border border-cyan-200/30 bg-cyan-200/15 px-3 py-2 text-sm font-black shadow-sm">🧠 AI</button>
+        <button onClick={() => setIsSidebarOpen(true)} className="shrink-0 rounded-lg border border-white/60 bg-white/40 p-2"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
+        <h1 className="min-w-0 flex-1 truncate text-lg font-black">{activeFile?.name || product.title}</h1>
+        <div className="ml-auto flex shrink-0 items-center gap-2 overflow-x-auto">
+          {liveEarningHud}
+          <button onClick={() => setIsMentorOpen(value => !value)} className="rounded-xl border border-cyan-200/30 bg-cyan-200/15 px-3 py-2 text-sm font-black shadow-sm">🧠 AI</button>
+        </div>
       </header>
 
       <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
       <main className="relative z-10 flex h-full flex-col gap-3 p-3 lg:p-3">
-        <div className="hidden shrink-0 grid-cols-[1fr_auto_1fr] items-center rounded-xl border border-white/50 bg-white/70 px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid">
+        <div className="hidden shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border border-white/50 bg-white/70 px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid">
           <span className="truncate">{activeFile?.name || product.title}</span>
-          <button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-cyan-200/30 bg-cyan-200/15 px-6 py-3 text-base font-black text-cyan-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:bg-cyan-200/25">🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}</button>
+          <div className="flex items-center justify-center gap-3">
+            <button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-cyan-200/30 bg-cyan-200/15 px-6 py-3 text-base font-black text-cyan-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:bg-cyan-200/25">🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}</button>
+            {liveEarningHud}
+          </div>
           <span className="truncate text-right text-sm font-bold text-slate-900/60">Welcome to the Course</span>
         </div>
 
@@ -472,13 +486,6 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           </aside>
 
           <div className="relative min-h-0 overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)]">
-            {activeFile?.type === 'video' && (
-              <div className="pointer-events-none absolute right-5 top-5 z-20 rounded-full border border-white/40 bg-white/30 px-4 py-2 text-sm font-semibold text-slate-800 shadow-lg backdrop-blur-md flex items-center gap-3">
-                <span>⏱️ {formatActiveWatchTime(activeWatchSeconds)} Mins</span>
-                <span className="h-4 w-px bg-white/50" />
-                <span className={`rounded-full px-2 py-0.5 transition-all duration-300 ${coinPulse ? 'animate-bounce bg-amber-200/80 text-amber-800 shadow-[0_0_18px_rgba(251,191,36,0.9)]' : 'text-amber-700'}`}>✦ +{sessionEarnedCoins} Coins Earned</span>
-              </div>
-            )}
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>

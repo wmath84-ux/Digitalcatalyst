@@ -269,7 +269,7 @@ interface ProductDetailPageProps {
   onGoHome: () => void;
   isPurchased?: boolean;
   currentUser?: User | null;
-  onCoinPurchase?: (product: ProductWithRating, quantity: number) => void;
+  onCoinPurchase?: (product: ProductWithRating, quantity: number) => boolean;
 }
 
 const ShareIcon = () => (
@@ -401,10 +401,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   };
   
   useEffect(() => {
-    if (autoOpenPaymentModal) { setModalOpen(true); onModalOpened(); }
-  }, [autoOpenPaymentModal, onModalOpened]);
-
-  useEffect(() => {
     if (scrollToSection) {
         const timer = setTimeout(() => {
             const element = document.getElementById(scrollToSection);
@@ -422,14 +418,69 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     }
   }, [priceJustUpdated]);
 
-  const handleBuyClick = () => { if (isLoggedIn) setModalOpen(true); else onLoginRequired(); };
-  const handleModalClose = () => setModalOpen(false);
-  const handleModalConfirmWithCoins = () => {
-    onCoinPurchase?.(product, quantity);
-    setModalOpen(false);
+  useEffect(() => {
+    if (autoOpenPaymentModal) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      setModalOpen(true);
+      onModalOpened();
+    }
+  }, [autoOpenPaymentModal, onModalOpened]);
+
+  useEffect(() => {
+    if (modalOpen) {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }
+  }, [modalOpen]);
+
+  const handleBuyClick = () => {
+    if (!isLoggedIn) {
+      onLoginRequired();
+      return;
+    }
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    setModalOpen(true);
   };
 
-  const handleModalConfirm = () => { setModalOpen(false); onPurchase(appliedCoupon ? appliedCoupon.code : null, quantity); onConsumeCoinDiscount?.(); };
+  const handleModalClose = () => {
+    setModalOpen(false);
+    window.setTimeout(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }), 0);
+  };
+
+  const handleModalConfirmWithCoins = () => {
+    const wasPurchased = onCoinPurchase?.(product, quantity) || false;
+    if (wasPurchased) {
+      setModalOpen(false);
+    }
+  };
+
+  const handleModalConfirm = () => {
+    setModalOpen(false);
+    onPurchase(appliedCoupon ? appliedCoupon.code : null, quantity);
+    onConsumeCoinDiscount?.();
+  };
+
+  if (modalOpen) {
+    return (
+      <PaymentModal
+        settings={settings}
+        productTitle={product.title}
+        originalPrice={originalPriceNum * quantity}
+        salePrice={salePriceNum !== null ? salePriceNum * quantity : null}
+        couponDiscount={totalCouponDiscount}
+        finalPrice={finalTotalPrice}
+        eduCoinDiscount={eduCoinDiscount}
+        appliedEduCoins={activeCoinDiscount?.coins || 0}
+        coinRedeemRate={economySettings.coinToFiatRatio}
+        onClose={handleModalClose}
+        onConfirm={handleModalConfirm}
+        paymentLink={product.paymentLink}
+        currentUser={currentUser}
+        coinPrice={resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity}
+        onConfirmWithCoins={onCoinPurchase ? handleModalConfirmWithCoins : undefined}
+        presentation="page"
+      />
+    );
+  }
 
   const handleImageZoom = (e: React.MouseEvent<HTMLDivElement>) => {
     const zoomer = e.currentTarget.firstChild as HTMLElement;
@@ -669,22 +720,35 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             )}
             
             {/* --- ACTION BUTTONS SECTION --- */}
-            <div className="mt-8 max-w-3xl mx-auto">
-                <div className="bg-white/70 backdrop-blur-xl rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border p-6">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
-                        <div className="flex items-center border rounded-lg justify-center">
-                            <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="px-4 py-3 text-xl font-bold text-gray-600 hover:bg-gray-100 rounded-l-lg">-</button>
-                            <input type="number" value={quantity} onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} className="w-16 text-center border-l border-r font-semibold focus:outline-none bg-transparent" />
-                            <button onClick={() => setQuantity(q => q + 1)} className="px-4 py-3 text-xl font-bold text-gray-600 hover:bg-gray-100 rounded-r-lg">+</button>
+            <div className="mt-8 max-w-4xl mx-auto">
+                <div className="relative overflow-hidden rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl sm:p-8">
+                    <div className="absolute -right-16 -top-16 h-40 w-40 rounded-full bg-indigo-200/50 blur-3xl" />
+                    <div className="absolute -bottom-16 -left-16 h-40 w-40 rounded-full bg-emerald-200/50 blur-3xl" />
+                    <div className="relative grid gap-5 lg:grid-cols-[1fr_1.4fr]">
+                        <div className="rounded-3xl border border-slate-200/70 bg-slate-50/80 p-5">
+                            <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">Order quantity</p>
+                            <div className="mt-4 flex items-center justify-center rounded-2xl border border-slate-200 bg-white shadow-inner">
+                                <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="px-5 py-4 text-2xl font-black text-slate-600 transition hover:text-primary" aria-label="Decrease quantity">-</button>
+                                <input type="number" value={quantity} onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} className="w-20 border-x border-slate-200 bg-transparent py-4 text-center text-xl font-black focus:outline-none" aria-label="Quantity" />
+                                <button onClick={() => setQuantity(q => q + 1)} className="px-5 py-4 text-2xl font-black text-slate-600 transition hover:text-primary" aria-label="Increase quantity">+</button>
+                            </div>
+                            <p className="mt-3 text-center text-sm font-semibold text-slate-500">Instant digital access after verification.</p>
                         </div>
-                        <button onClick={() => onAddToCart(product.id, quantity)} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold px-8 py-4 rounded-lg hover:opacity-90 transition-all duration-300 transform active:scale-95 text-lg">
-                            Add to Cart
-                        </button>
-                    </div>
-                    <div className="mt-4">
-                        <button disabled={isPurchased} onClick={handleBuyClick} className="w-full bg-green-500 text-white font-bold px-10 py-4 rounded-lg hover:bg-green-600 transition-all duration-300 transform hover:scale-105 active:scale-100 text-lg disabled:opacity-50 disabled:cursor-not-allowed">
-                            {isPurchased ? 'Purchased' : 'Buy Now'}
-                        </button>
+                        <div className="space-y-4">
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                                <button onClick={() => onAddToCart(product.id, quantity)} className="w-full rounded-2xl border border-indigo-200/70 bg-white/80 px-8 py-4 text-lg font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95">
+                                    Add to Cart
+                                </button>
+                                <button disabled={isPurchased} onClick={handleBuyClick} className="w-full rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 px-8 py-4 text-lg font-black text-white shadow-[0_14px_35px_rgba(34,197,94,0.25)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(34,197,94,0.32)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
+                                    {isPurchased ? 'Purchased' : 'Buy Now'}
+                                </button>
+                            </div>
+                            <div className="grid gap-3 text-sm font-bold text-slate-600 sm:grid-cols-3">
+                                <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-3 text-center">🔒 Secure Razorpay</div>
+                                <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-3 text-center">⚡ Fast verification</div>
+                                <div className="rounded-2xl border border-slate-200/70 bg-white/70 p-3 text-center">📚 Lifetime access</div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -752,24 +816,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         <ImageZoomModal src={mainImage} alt={product.title} onClose={() => setIsImageZoomOpen(false)} />
       )}
 
-      {modalOpen && <PaymentModal 
-        settings={settings} 
-        productTitle={product.title} 
-        originalPrice={originalPriceNum * quantity} 
-        salePrice={salePriceNum !== null ? salePriceNum * quantity : null} 
-        couponDiscount={totalCouponDiscount} 
-        finalPrice={finalTotalPrice} 
-        eduCoinDiscount={eduCoinDiscount}
-        appliedEduCoins={activeCoinDiscount?.coins || 0}
-        coinRedeemRate={economySettings.coinToFiatRatio}
-        
-        onClose={handleModalClose} 
-        onConfirm={handleModalConfirm} 
-        paymentLink={product.paymentLink}
-        currentUser={currentUser}
-        coinPrice={resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity}
-        onConfirmWithCoins={onCoinPurchase ? handleModalConfirmWithCoins : undefined}
-      />}
     </>
   );
 };
