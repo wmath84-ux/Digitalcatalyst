@@ -276,7 +276,8 @@ const ShareIcon = () => (
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ 
     settings, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews, 
     onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, onModalOpened, coupons,
-    scrollToSection, onSectionScrolled, allProducts, onViewProduct, wishlist, onQuickView, onGoHome
+    scrollToSection, onSectionScrolled, allProducts, onViewProduct, wishlist, onQuickView, onGoHome,
+    isPurchased = false
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);

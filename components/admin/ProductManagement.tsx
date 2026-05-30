@@ -201,6 +201,8 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
     const [formState, setFormState] = useState<{ type: ProductFileType; url: string; name: string; content: string } | null>(null);
     const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
     const [isUploading, setIsUploading] = useState(false);
+    const quizListRef = useRef<HTMLDivElement>(null);
+    const previousQuizQuestionCountRef = useRef(quizQuestions.length);
 
     const contentTypes: Array<{ type: ProductFileType; title: string; description: string; icon: string; accept?: string }> = [
         { type: 'video', title: 'Video Upload', description: 'Upload MP4/WebM lesson files.', icon: '🎬', accept: 'video/*' },
@@ -250,6 +252,27 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
 
     const updateQuizQuestion = (questionIndex: number, updater: (question: QuizQuestion) => QuizQuestion) => {
         setQuizQuestions(prev => (prev || []).map((question, index) => index === questionIndex ? updater(question) : question));
+    };
+
+    useEffect(() => {
+        if (formState?.type !== 'quiz') {
+            previousQuizQuestionCountRef.current = quizQuestions.length;
+            return;
+        }
+
+        const questionWasAdded = quizQuestions.length > previousQuizQuestionCountRef.current;
+        previousQuizQuestionCountRef.current = quizQuestions.length;
+
+        if (questionWasAdded) {
+            window.requestAnimationFrame(() => {
+                const lastQuestion = quizListRef.current?.lastElementChild;
+                lastQuestion?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            });
+        }
+    }, [formState?.type, quizQuestions.length]);
+
+    const addQuizQuestion = () => {
+        setQuizQuestions(prev => [...(prev || []), { prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
     };
 
     const handleFormSubmit = () => {
@@ -302,45 +325,54 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                     ))}
                 </div>
             ) : (
-                <div className="space-y-5">
-                    <div>
-                        <label className={labelClass}>Resource Name</label>
-                        <input value={formState.name} onChange={event => setFormState(prev => prev ? { ...prev, name: event.target.value } : prev)} className={fieldClass} />
+                <div className="flex max-h-[78vh] flex-col overflow-hidden rounded-3xl border border-white/10 bg-slate-950/20">
+                    <div className="shrink-0 space-y-5 border-b border-white/10 bg-slate-950/50 p-4 backdrop-blur-xl sm:p-5">
+                        <div>
+                            <label className={labelClass}>Resource Name</label>
+                            <input value={formState.name} onChange={event => setFormState(prev => prev ? { ...prev, name: event.target.value } : prev)} className={fieldClass} />
+                        </div>
+                        {formState.type === 'quiz' && <p className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-bold text-cyan-100">{quizQuestions.length} question{quizQuestions.length === 1 ? '' : 's'} added. Scroll inside this quiz builder to review every question before saving.</p>}
                     </div>
 
-                    {formState.type === 'doc' ? (
-                        <AdminDocsEditor value={formState.content} onChange={content => setFormState(prev => prev ? { ...prev, content } : prev)} />
-                    ) : formState.type === 'quiz' ? (
-                        <div className="space-y-4">
-                            {(quizQuestions || []).map((question, questionIndex) => (
-                                <div key={questionIndex} className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
-                                    <label className={labelClass}>Question {questionIndex + 1}</label>
-                                    <input value={question.prompt} onChange={event => updateQuizQuestion(questionIndex, q => ({ ...q, prompt: event.target.value }))} className={fieldClass} placeholder="What should learners answer?" />
-                                    <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-                                        {(question.options || []).map((option, optionIndex) => (
-                                            <label key={optionIndex} className="block">
-                                                <span className="mb-2 block text-xs font-bold text-slate-400">Option {optionIndex + 1}</span>
-                                                <div className="flex gap-2">
-                                                    <input value={option} onChange={event => updateQuizQuestion(questionIndex, q => ({ ...q, options: (q.options || []).map((current, idx) => idx === optionIndex ? event.target.value : current) }))} className={fieldClass} />
-                                                    <button type="button" onClick={() => updateQuizQuestion(questionIndex, q => ({ ...q, correctAnswer: optionIndex }))} className={`rounded-2xl px-4 text-xs font-black ${question.correctAnswer === optionIndex ? 'bg-emerald-400 text-slate-950' : 'border border-white/10 text-slate-400'}`}>Correct</button>
-                                                </div>
-                                            </label>
-                                        ))}
-                                    </div>
+                    <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5 custom-scrollbar">
+                        {formState.type === 'doc' ? (
+                            <AdminDocsEditor value={formState.content} onChange={content => setFormState(prev => prev ? { ...prev, content } : prev)} />
+                        ) : formState.type === 'quiz' ? (
+                            <div className="space-y-4">
+                                <div ref={quizListRef} className="space-y-4">
+                                    {(quizQuestions || []).map((question, questionIndex) => (
+                                        <div key={questionIndex} className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                                            <label className={labelClass}>Question {questionIndex + 1}</label>
+                                            <input value={question.prompt} onChange={event => updateQuizQuestion(questionIndex, q => ({ ...q, prompt: event.target.value }))} className={fieldClass} placeholder="What should learners answer?" />
+                                            <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                                {(question.options || []).map((option, optionIndex) => (
+                                                    <label key={optionIndex} className="block">
+                                                        <span className="mb-2 block text-xs font-bold text-slate-400">Option {optionIndex + 1}</span>
+                                                        <div className="flex gap-2">
+                                                            <input value={option} onChange={event => updateQuizQuestion(questionIndex, q => ({ ...q, options: (q.options || []).map((current, idx) => idx === optionIndex ? event.target.value : current) }))} className={fieldClass} />
+                                                            <button type="button" onClick={() => updateQuizQuestion(questionIndex, q => ({ ...q, correctAnswer: optionIndex }))} className={`rounded-2xl px-4 text-xs font-black ${question.correctAnswer === optionIndex ? 'bg-emerald-400 text-slate-950' : 'border border-white/10 text-slate-400'}`}>Correct</button>
+                                                        </div>
+                                                    </label>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    ))}
                                 </div>
-                            ))}
-                            <button type="button" onClick={() => setQuizQuestions(prev => [...(prev || []), { prompt: '', options: ['', '', '', ''], correctAnswer: 0 }])} className="w-full rounded-2xl border border-dashed border-cyan-300/40 py-3 font-black text-cyan-200 hover:bg-cyan-400/10">+ Add Question</button>
-                        </div>
-                    ) : (
-                        <div>
-                            <label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : 'Resource URL'}</label>
-                            <input value={formState.url} onChange={event => setFormState(prev => prev ? { ...prev, url: event.target.value } : prev)} className={fieldClass} placeholder="https://example.com/resource" />
-                        </div>
-                    )}
+                                <button type="button" onClick={addQuizQuestion} className="w-full rounded-2xl border border-dashed border-cyan-300/40 py-3 font-black text-cyan-200 hover:bg-cyan-400/10">+ Add Question</button>
+                            </div>
+                        ) : (
+                            <div>
+                                <label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : 'Resource URL'}</label>
+                                <input value={formState.url} onChange={event => setFormState(prev => prev ? { ...prev, url: event.target.value } : prev)} className={fieldClass} placeholder="https://example.com/resource" />
+                            </div>
+                        )}
+                    </div>
 
-                    <div className="flex justify-end gap-3">
-                        <button type="button" onClick={() => setFormState(null)} className="rounded-2xl border border-white/10 px-5 py-3 font-bold text-slate-300 hover:bg-white/10">Back</button>
-                        <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-300 px-6 py-3 font-black text-slate-950 shadow-lg shadow-cyan-500/20 hover:bg-cyan-200">Add Content</button>
+                    <div className="shrink-0 border-t border-white/10 bg-slate-950/70 p-4 backdrop-blur-xl sm:p-5">
+                        <div className="flex justify-end gap-3">
+                            <button type="button" onClick={() => setFormState(null)} className="rounded-2xl border border-white/10 px-5 py-3 font-bold text-slate-300 hover:bg-white/10">Back</button>
+                            <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-300 px-6 py-3 font-black text-slate-950 shadow-lg shadow-cyan-500/20 hover:bg-cyan-200">Add Content</button>
+                        </div>
                     </div>
                 </div>
             )}

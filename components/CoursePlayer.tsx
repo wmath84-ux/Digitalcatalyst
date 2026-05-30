@@ -1,6 +1,6 @@
 // components/CoursePlayer.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile } from '../App';
+import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, QuizAnswerState } from '../App';
 import AiMentor from './AiMentor';
 
 const FileIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
@@ -244,8 +244,8 @@ const QuizPlayer: React.FC<{ file: ProductFile }> = ({ file }) => {
   const isLastQuestion = currentQuestion === questions.length - 1;
 
   return (
-    <div className="flex h-full items-center justify-center overflow-y-auto p-4 text-white md:p-8">
-      <div className="w-full max-w-4xl rounded-[2rem] border border-white/10 bg-white/[0.05] p-6 shadow-[0_35px_110px_rgba(2,6,23,0.55)] backdrop-blur-3xl md:p-8">
+    <div className="h-full overflow-y-auto p-4 text-white md:p-8 custom-scrollbar">
+      <div className="mx-auto w-full max-w-4xl rounded-[2rem] border border-white/10 bg-white/[0.05] p-6 shadow-[0_35px_110px_rgba(2,6,23,0.55)] backdrop-blur-3xl md:p-8">
         <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
           <div>
             <p className="font-black uppercase tracking-[0.3em] text-cyan-100">Interactive Quiz</p>
@@ -257,6 +257,26 @@ const QuizPlayer: React.FC<{ file: ProductFile }> = ({ file }) => {
         <div className="mb-6 h-2 overflow-hidden rounded-full bg-white/10">
           <div className="h-full rounded-full bg-cyan-200 transition-all" style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }} />
         </div>
+
+        {questions.length > 1 && (
+          <div className="mb-6 flex flex-wrap gap-2 rounded-3xl border border-white/10 bg-slate-950/30 p-3">
+            {questions.map((_, index) => {
+              const isActive = currentQuestion === index;
+              const isAnswered = answers[index] !== undefined;
+              return (
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => setCurrentQuestion(index)}
+                  className={`rounded-2xl px-4 py-2 text-sm font-black transition ${isActive ? 'bg-cyan-200 text-slate-950 shadow-lg shadow-cyan-500/20' : isAnswered ? 'border border-emerald-300/40 bg-emerald-400/10 text-emerald-100 hover:bg-emerald-400/20' : 'border border-white/10 bg-white/[0.06] text-slate-200 hover:bg-cyan-50/15'}`}
+                  aria-current={isActive ? 'step' : undefined}
+                >
+                  Q{index + 1}
+                </button>
+              );
+            })}
+          </div>
+        )}
 
         <div className="rounded-3xl border border-white/10 bg-white/[0.06] p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.16)] md:p-7">
           <p className="mb-3 text-sm font-black uppercase tracking-[0.24em] text-slate-300">Question {currentQuestion + 1} of {questions.length}</p>
