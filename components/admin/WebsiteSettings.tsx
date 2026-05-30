@@ -495,8 +495,9 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                     <label className="block text-sm font-semibold text-gray-700">Coins per purchase
                                         <input type="number" min="0" value={eduCoinRules.purchase} onChange={e => updateContentValue('eduCoinRules', { ...eduCoinRules, purchase: Number(e.target.value) || 0 })} className="mt-1 w-full rounded border p-2" />
                                     </label>
-                                    <label className="block text-sm font-semibold text-gray-700">Redeem rate
-                                        <input type="number" min="0" value={eduCoinRules.redeemRate} onChange={e => updateContentValue('eduCoinRules', { ...eduCoinRules, redeemRate: Number(e.target.value) || 0 })} className="mt-1 w-full rounded border p-2" />
+                                    <label className="block text-sm font-semibold text-gray-700">Coins per ₹1 discount
+                                        <input type="number" min="1" value={eduCoinRules.redeemRate || 10} onChange={e => updateContentValue('eduCoinRules', { ...eduCoinRules, redeemRate: Number(e.target.value) || 10 })} className="mt-1 w-full rounded border p-2" />
+                                        <span className="mt-1 block text-xs text-slate-500">Default economy ratio is 10 EduCoins = ₹1.</span>
                                     </label>
                                 </div>
                             </div>

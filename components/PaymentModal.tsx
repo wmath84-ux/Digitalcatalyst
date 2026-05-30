@@ -8,6 +8,9 @@ interface PaymentModalProps {
   salePrice?: number | null;
   couponDiscount: number;
   finalPrice: number;
+  eduCoinDiscount?: number;
+  appliedEduCoins?: number;
+  coinRedeemRate?: number;
   onClose: () => void;
   onConfirm: () => void;
   productTitle?: string;
@@ -18,7 +21,7 @@ interface PaymentModalProps {
   onConfirmWithCoins?: () => void;
 }
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice, salePrice, couponDiscount, finalPrice, onClose, onConfirm, cartItems, paymentLink, currentUser, coinPrice = 0, onConfirmWithCoins }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice, salePrice, couponDiscount, finalPrice, eduCoinDiscount = 0, appliedEduCoins = 0, coinRedeemRate = 10, onClose, onConfirm, cartItems, paymentLink, currentUser, coinPrice = 0, onConfirmWithCoins }) => {
   const [paymentOpened, setPaymentOpened] = useState(false);
   const [verificationSubmitted, setVerificationSubmitted] = useState(false);
   const razorpayUrl = paymentLink || 'https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view';
@@ -60,13 +63,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice
           <div className="border-t border-dashed pt-3 text-sm">
             {!isCartMode && salePrice !== null && salePrice !== undefined && <div className="flex justify-between"><span className="text-slate-600">Sale discount</span><span className="font-bold text-emerald-600">- ₹{(originalPrice - salePrice).toFixed(2)}</span></div>}
             {couponDiscount > 0 && <div className="flex justify-between"><span className="text-slate-600">Coupon savings</span><span className="font-bold text-emerald-600">- ₹{couponDiscount.toFixed(2)}</span></div>}
+            {eduCoinDiscount > 0 && <div className="flex justify-between"><span className="text-slate-600">EduCoins applied ({appliedEduCoins} @ {coinRedeemRate}:1)</span><span className="font-bold text-emerald-600">- ₹{eduCoinDiscount.toFixed(2)}</span></div>}
             <div className="mt-3 flex items-center justify-between"><span className="text-lg font-black text-slate-900">Total</span><span className="text-3xl font-black text-primary">₹{finalPrice.toFixed(2)}</span></div>
           </div>
         </div>
 
         {!paymentOpened ? (
           <div className="space-y-3">
-            <button onClick={handlePayNow} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 text-lg font-black text-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition hover:-translate-y-0.5 active:scale-95">Pay with Razorpay</button>
+            <button onClick={finalPrice <= 0 ? () => { setVerificationSubmitted(true); onConfirm(); } : handlePayNow} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 text-lg font-black text-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition hover:-translate-y-0.5 active:scale-95">{finalPrice <= 0 ? 'Complete ₹0 EduCoin Checkout' : 'Pay with Razorpay'}</button>
             {onConfirmWithCoins && coinPrice > 0 && (
               <button onClick={onConfirmWithCoins} disabled={!canPayWithCoins} className="w-full rounded-2xl border border-amber-200/60 bg-white/80 px-6 py-4 text-lg font-black text-amber-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
                 {canPayWithCoins ? `Pay with ${coinPrice} EduCoins` : `Need ${missingCoins} more coins`}
