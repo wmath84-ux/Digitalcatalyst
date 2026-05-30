@@ -283,7 +283,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const gridRef = useRef<HTMLDivElement>(null);
   const [openAccordion, setOpenAccordion] = useState<number | null>(0);
 
-  const [mainImage, setMainImage] = useState(product.images[0] || `https://picsum.photos/seed/${product.imageSeed}/800/600`);
+  const [mainImage, setMainImage] = useState((product.images || [])[0] || `https://picsum.photos/seed/${product.imageSeed}/800/600`);
   const [quantity, setQuantity] = useState(1);
   const [isImageZoomOpen, setIsImageZoomOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
@@ -296,7 +296,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const productUrl = `https://digitalcatalyst.example.com/product/${product.id}`;
 
   useEffect(() => {
-    setMainImage(product.images[0] || `https://picsum.photos/seed/${product.imageSeed}/800/600`);
+    setMainImage((product.images || [])[0] || `https://picsum.photos/seed/${product.imageSeed}/800/600`);
     setAppliedCoupon(null);
     setCouponInput('');
     setCouponError(null);
@@ -478,7 +478,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 )}
               </button>
               <div className="mt-4 flex space-x-2">
-                  {product.images.map((img, i) => (
+                  {(product.images || []).map((img, i) => (
                       <button key={i} onClick={() => setMainImage(img)} className={`w-20 h-20 rounded-md overflow-hidden border-2 transition-all ${mainImage === img ? 'border-primary' : 'border-transparent hover:border-gray-400'}`}>
                           <img src={img} alt={`thumbnail ${i+1}`} className="w-full h-full object-cover"/>
                       </button>
@@ -499,7 +499,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               <div className="mt-8 border rounded-lg">
                 <h3 className="text-xl font-bold text-primary p-4 border-b">Key Features:</h3>
                 <div className="divide-y">
-                    {product.features.map((feature, i) => (
+                    {(product.features || []).map((feature, i) => (
                         <div key={i} className="feature-accordion">
                             <button onClick={() => setOpenAccordion(openAccordion === i ? null : i)} className="feature-accordion-header w-full flex justify-between items-center p-4 text-left">
                                 <span className="font-semibold text-text">{feature}</span>
@@ -516,7 +516,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </div>
               
               <div className="mt-8">
-                  <PriceChart basePrice={currentPriceNum} priceHistory={product.priceHistory} />
+                  <PriceChart basePrice={currentPriceNum} priceHistory={product.priceHistory || []} />
               </div>
               
               <div id="price-section" className={`mt-10 bg-gray-50 p-6 rounded-lg border scroll-mt-24 ${priceJustUpdated ? 'price-flash' : ''}`}>

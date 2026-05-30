@@ -76,7 +76,7 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
                                     <li key={item.productId} className="flex gap-4">
                                         <button onClick={() => handleViewProductClick(item.product)} className="flex-shrink-0">
                                             <div className="w-24 h-24 bg-gray-100 rounded-md overflow-hidden">
-                                                <img src={item.product.images[0]} alt={item.product.title} className="w-full h-full object-cover"/>
+                                                <img src={(item.product.images || [])[0]} alt={item.product.title} className="w-full h-full object-cover"/>
                                             </div>
                                         </button>
                                         <div className="flex-1">

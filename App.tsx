@@ -716,6 +716,26 @@ const App: React.FC = () => {
   const [cartToastMessage, setCartToastMessage] = useState('');
   const [isCartPaymentModalOpen, setIsCartPaymentModalOpen] = useState(false);
 
+  const normalizeCourseModules = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
+    ...module,
+    files: (module.files || []).map(file => ({
+      ...file,
+      quiz: file.quiz
+        ? { questions: (file.quiz.questions || []).map(question => ({ ...question, options: question.options || [] })) }
+        : file.type === 'quiz' ? { questions: [] } : file.quiz,
+    })),
+    modules: normalizeCourseModules(module.modules || []),
+  }));
+
+  const normalizeProductArrays = (product: Product): Product => ({
+    ...product,
+    images: product.images || [],
+    features: product.features || [],
+    tags: product.tags || [],
+    courseContent: normalizeCourseModules(product.courseContent || []),
+    priceHistory: product.priceHistory || [],
+  });
+
   useEffect(() => {
     const onScroll = () => {
       const dock = document.getElementById('main-bottom-dock');
@@ -778,15 +798,17 @@ const App: React.FC = () => {
       const storedProducts = localStorage.getItem('siteProducts');
       const hasPurgedLegacyProducts = localStorage.getItem('legacyProductsPurged') === 'true';
       if (storedProducts && hasPurgedLegacyProducts) {
-          setProducts(JSON.parse(storedProducts));
+          
+          const parsedProducts = JSON.parse(storedProducts);
+          setProducts(Array.isArray(parsedProducts) ? parsedProducts.map(normalizeProductArrays) : initialProducts.map(normalizeProductArrays));
       } else {
-          setProducts(initialProducts);
-          safeSetItem('siteProducts', initialProducts);
+          setProducts(initialProducts.map(normalizeProductArrays));
+          safeSetItem('siteProducts', initialProducts.map(normalizeProductArrays));
           localStorage.setItem('legacyProductsPurged', 'true');
       }
     } catch (err) {
       console.error("Error loading products from localStorage:", err);
-      setProducts(initialProducts);
+      setProducts(initialProducts.map(normalizeProductArrays));
     }
   }, []);
 
@@ -960,7 +982,8 @@ const App: React.FC = () => {
     return { rating: total / pReviews.length, reviewCount: pReviews.length };
   };
 
-  const productsWithRatings: ProductWithRating[] = products.map(p => {
+  const productsWithRatings: ProductWithRating[] = (products || []).map(product => {
+    const p = normalizeProductArrays(product);
     const { rating: calculatedRating, reviewCount } = calculateAverageRating(p.id);
     const displayRating = (p.manualRating !== null && p.manualRating !== undefined) ? p.manualRating : calculatedRating;
     return { ...p, rating: displayRating, reviewCount, calculatedRating };
@@ -1443,7 +1466,7 @@ const App: React.FC = () => {
   const handleAddProduct = async (product: Omit<Product, 'id'>) => {
       try {
           const newId = Date.now();
-          const productWithId = { ...product, id: newId, manualRating: product.manualRating !== undefined ? product.manualRating : null };
+          const productWithId = normalizeProductArrays({ ...product, id: newId, manualRating: product.manualRating !== undefined ? product.manualRating : null });
           
           const updatedProducts = [...products, productWithId];
           setProducts(updatedProducts);
@@ -1456,7 +1479,8 @@ const App: React.FC = () => {
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
       try {
-            const updatedProducts = products.map(p => p.id === updatedProduct.id ? updatedProduct : p);
+            const normalizedProduct = normalizeProductArrays(updatedProduct);
+            const updatedProducts = products.map(p => p.id === normalizedProduct.id ? normalizedProduct : p);
             setProducts(updatedProducts);
             safeSetItem('siteProducts', updatedProducts); // Save to LocalStorage
       } catch (e) {

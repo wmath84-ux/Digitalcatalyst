@@ -21,6 +21,9 @@ const QuizIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) =
   </svg>
 );
 
+const smartDocToolbarCommands: Array<[string, string]> | undefined = [['bold', 'B'], ['italic', 'I'], ['underline', 'U']];
+const readingThemeOptions: Array<'dark' | 'sepia' | 'light'> | undefined = ['dark', 'sepia', 'light'];
+
 const VideoUnavailablePlaceholder: React.FC = () => (
   <div className="flex h-full w-full flex-col items-center justify-center bg-slate-950/80 p-4 text-center text-white backdrop-blur-xl">
     <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full border-2 border-white/30 bg-white/10">
@@ -58,13 +61,13 @@ const ModuleItem: React.FC<{ module: CourseModule; activeFile: ProductFile | nul
       </button>
       {isExpanded && (
         <div className="space-y-1 pb-2">
-          {module.files.map((file) => (
+          {(module.files || []).map((file) => (
             <button key={file.id} onClick={() => onSelectFile(file)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition ${activeFile?.id === file.id ? "border border-cyan-200/50 bg-cyan-200/15 font-black text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_8px_24px_rgba(34,211,238,0.14)]" : "font-medium text-slate-100/90 hover:bg-cyan-50/25"}`}>
               <span className="min-w-0 flex-1 truncate">{file.name}</span>
               {file.type === 'quiz' ? <QuizIcon className="h-5 w-5 shrink-0" /> : <FileIcon className="h-5 w-5 shrink-0" />}
             </button>
           ))}
-          {module.modules.map((subModule) => <ModuleItem key={subModule.id} module={subModule} activeFile={activeFile} onSelectFile={onSelectFile} level={level + 1} />)}
+          {(module.modules || []).map((subModule) => <ModuleItem key={subModule.id} module={subModule} activeFile={activeFile} onSelectFile={onSelectFile} level={level + 1} />)}
         </div>
       )}
     </div>
@@ -175,9 +178,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
     <div className="relative flex h-full flex-col overflow-hidden bg-white/[0.06] text-slate-100 backdrop-blur-xl">
       <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-slate-950/35 p-3 shadow-sm backdrop-blur-xl">
         <span className="mr-2 rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-black uppercase tracking-widest text-cyan-100">Smart Docs Workspace</span>
-        {[
-          ['bold', 'B'], ['italic', 'I'], ['underline', 'U'],
-        ].map(([cmd, label]) => <button key={cmd} type="button" onClick={() => runCommand(cmd)} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white shadow-sm hover:bg-cyan-50/20">{label}</button>)}
+        {(smartDocToolbarCommands || []).map(([cmd, label]) => <button key={cmd} type="button" onClick={() => runCommand(cmd)} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white shadow-sm hover:bg-cyan-50/20">{label}</button>)}
         <button type="button" onClick={() => runCommand('formatBlock', 'H1')} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white hover:bg-cyan-50/20">H1</button>
         <button type="button" onClick={() => runCommand('formatBlock', 'H2')} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white hover:bg-cyan-50/20">H2</button>
         <button type="button" onClick={() => runCommand('insertUnorderedList')} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white hover:bg-cyan-50/20">• List</button>
@@ -206,7 +207,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
             <button onClick={() => setLineSpacing(value => Math.max(1.25, Number((value - 0.15).toFixed(2))))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">Line -</button>
             <button onClick={() => setLineSpacing(value => Math.min(2.4, Number((value + 0.15).toFixed(2))))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">Line +</button>
             <button onClick={() => setFontStyle(value => value === 'sans' ? 'serif' : 'sans')} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">{fontStyle === 'sans' ? 'Serif' : 'Sans'}</button>
-            {(['dark', 'sepia', 'light'] as const).map(option => <button key={option} onClick={() => setTheme(option)} className={`rounded-xl px-3 py-2 font-black capitalize ${theme === option ? 'bg-cyan-200 text-slate-950' : 'bg-white/10 hover:bg-cyan-50/20'}`}>{option}</button>)}
+            {(readingThemeOptions || []).map(option => <button key={option} onClick={() => setTheme(option)} className={`rounded-xl px-3 py-2 font-black capitalize ${theme === option ? 'bg-cyan-200 text-slate-950' : 'bg-white/10 hover:bg-cyan-50/20'}`}>{option}</button>)}
             <button onClick={() => setIsReadingMode(false)} className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 font-black hover:bg-cyan-50/20">Close</button>
           </div>
           <div className={`flex-1 overflow-y-auto p-6 md:p-10 ${readingTheme}`}>
@@ -261,7 +262,7 @@ const QuizPlayer: React.FC<{ file: ProductFile }> = ({ file }) => {
           <p className="mb-3 text-sm font-black uppercase tracking-[0.24em] text-slate-300">Question {currentQuestion + 1} of {questions.length}</p>
           <h3 className="text-2xl font-black leading-tight text-white">{question.prompt}</h3>
           <div className="mt-6 grid gap-3 md:grid-cols-2">
-            {question.options.map((option, oIndex) => {
+            {(question.options || []).map((option, oIndex) => {
               const isCorrect = oIndex === question.correctAnswer;
               const isSelected = selected === oIndex;
               const stateClass = !answered
@@ -297,13 +298,13 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
     const findFirst = (modules?: CourseModule[]): ProductFile | null => {
       if (!modules) return null;
       for (const m of modules) {
-        if (m.files.length) return m.files[0];
-        const found = findFirst(m.modules);
+        if ((m.files || []).length) return (m.files || [])[0];
+        const found = findFirst(m.modules || []);
         if (found) return found;
       }
       return null;
     };
-    setActiveFile(findFirst(product.courseContent));
+    setActiveFile(findFirst(product.courseContent || []));
   }, [product]);
 
   useEffect(() => setMediaHasError(false), [activeFile]);
@@ -367,7 +368,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
                 <h2 className="text-[25px] font-black leading-tight text-slate-100">{product.title}</h2>
               </div>
               <nav className="flex-1 overflow-y-auto p-3">
-                {product.courseContent?.map(m => <ModuleItem key={m.id} module={m} activeFile={activeFile} onSelectFile={onSelectFile} />) || <p className="p-4 text-center font-semibold text-slate-100/60">No content added yet.</p>}
+                {(product.courseContent || []).length > 0 ? (product.courseContent || []).map(m => <ModuleItem key={m.id} module={m} activeFile={activeFile} onSelectFile={onSelectFile} />) : <p className="p-4 text-center font-semibold text-slate-100/60">No content added yet.</p>}
               </nav>
             </div>
           </aside>

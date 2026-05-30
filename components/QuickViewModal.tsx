@@ -13,7 +13,7 @@ interface QuickViewModalProps {
 
 const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onClose, onAddToCart, isWishlisted, onToggleWishlist, onViewFullDetails }) => {
   const [quantity, setQuantity] = useState(1);
-  const [mainImage, setMainImage] = useState(product.images[0]);
+  const [mainImage, setMainImage] = useState((product.images || [])[0] || `https://picsum.photos/seed/${product.imageSeed}/800/600`);
 
   const handleAddToCartClick = () => {
     onAddToCart(product.id, quantity);
@@ -32,7 +32,7 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onCl
                 <img src={mainImage} alt={product.title} className="w-full h-auto object-cover aspect-square"/>
             </div>
             <div className="mt-2 flex space-x-2">
-                {product.images.map((img, i) => (
+                {(product.images || []).map((img, i) => (
                     <button key={i} onClick={() => setMainImage(img)} className={`w-16 h-16 rounded-md overflow-hidden border-2 transition-all ${mainImage === img ? 'border-primary' : 'border-transparent hover:border-gray-400'}`}>
                         <img src={img} alt={`thumbnail ${i+1}`} className="w-full h-full object-cover"/>
                     </button>

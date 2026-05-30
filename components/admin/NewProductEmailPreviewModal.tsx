@@ -23,7 +23,7 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
                 const apiKey = getGeminiApiKey();
                 if (!apiKey) {
                     // Demo mode: no Vercel variables are required for preview/deployment.
-                    setMarketingImageUrl(product.images[0] || `https://picsum.photos/seed/${product.imageSeed}/1200/600`);
+                    setMarketingImageUrl((product.images || [])[0] || `https://picsum.photos/seed/${product.imageSeed}/1200/600`);
                     setIsLoadingImage(false);
                     return;
                 }
@@ -49,7 +49,7 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
             } catch (err) {
                 console.warn("Using product image because AI generation is unavailable:", err);
                 // Fallback to product image if AI fails
-                setMarketingImageUrl(product.images[0] || `https://picsum.photos/seed/${product.imageSeed}/1200/600`);
+                setMarketingImageUrl((product.images || [])[0] || `https://picsum.photos/seed/${product.imageSeed}/1200/600`);
             } finally {
                 setIsLoadingImage(false);
             }
@@ -112,7 +112,7 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
 
                             <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-8 items-center bg-gray-50 p-6 rounded-lg">
                                 <div className="aspect-video bg-gray-200 rounded-md overflow-hidden">
-                                    <img src={product.images[0]} alt={product.title} className="w-full h-full object-cover"/>
+                                    <img src={(product.images || [])[0]} alt={product.title} className="w-full h-full object-cover"/>
                                 </div>
                                 <div>
                                     <h4 className="text-xl font-bold text-gray-800">{product.title}</h4>

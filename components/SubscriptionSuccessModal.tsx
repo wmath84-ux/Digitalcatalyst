@@ -12,7 +12,7 @@ interface SubscriptionSuccessModalProps {
 const MiniProductCard: React.FC<{ product: ProductWithRating }> = ({ product }) => (
     <div className="border rounded-lg overflow-hidden bg-white/10 backdrop-blur-xl hover:shadow-md transition-shadow">
         <div className="aspect-video bg-gray-100">
-            <img src={product.images[0]} alt={product.title} className="w-full h-full object-cover" />
+            <img src={(product.images || [])[0]} alt={product.title} className="w-full h-full object-cover" />
         </div>
         <div className="p-3">
             <h4 className="font-semibold text-sm truncate text-gray-800">{product.title}</h4>
