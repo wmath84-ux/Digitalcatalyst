@@ -1,403 +1,617 @@
-
-import React, { useState, useRef, useEffect } from 'react';
-import { Product, ProductWithRating, ProductFile, CourseModule, ProductFileType, Coupon, User, QuizQuestion } from '../../App';
+import React, { useEffect, useRef, useState } from 'react';
+import { Coupon, CourseModule, Product, ProductFile, ProductFileType, ProductWithRating, QuizQuestion, User } from '../../App';
 import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
-import MacWindowModal from '../ui/MacWindowModal';
 
-// ... (Keep recursive functions recursiveUpdate, recursiveFileUpdate exactly as before)
-const recursiveUpdate = (
-    modules: CourseModule[], 
-    parentId: string | null, 
-    updateCallback: (modules: CourseModule[]) => CourseModule[]
-): CourseModule[] => {
-    if (!modules) return []; 
-    if (parentId === null) return updateCallback(modules);
-    return modules.map(module => {
-        if (module.id === parentId) {
-            const currentModules = Array.isArray(module.modules) ? module.modules : [];
-            return { ...module, modules: updateCallback(currentModules) };
-        }
-        if (module.modules && module.modules.length > 0) {
-            return { ...module, modules: recursiveUpdate(module.modules, parentId, updateCallback) };
-        }
-        return module;
-    });
+type ProductViewState = 'list' | 'add' | 'edit';
+
+type ProductFormData = {
+    title: string;
+    description: string;
+    longDescription: string;
+    price: string;
+    salePrice: string;
+    imageSeed: string;
+    category: string;
+    department: 'Men' | 'Women' | 'Unisex';
+    inStock: boolean;
+    isVisible: boolean;
+    manualRating: string;
+    sku: string;
+    dimensions: string;
+    fileFormat: string;
+    aspectRatio: string;
+    isFree: boolean;
+    couponCode: string;
+    paymentLink: string;
+    featuresText: string;
+    tagsText: string;
 };
+
+const emptyArrays = {
+    images: [] as string[],
+    features: [] as string[],
+    tags: [] as string[],
+    courseContent: [] as CourseModule[],
+    priceHistory: [],
+};
+
+const createEmptyProductForm = (product?: ProductWithRating | null): ProductFormData => ({
+    title: product?.title || '',
+    description: product?.description || '',
+    longDescription: product?.longDescription || '',
+    price: product?.price ? product.price.replace('₹', '') : '',
+    salePrice: product?.salePrice ? product.salePrice.replace('₹', '') : '',
+    imageSeed: product?.imageSeed || '',
+    category: product?.category || '',
+    department: product?.department || 'Unisex',
+    inStock: product?.inStock ?? true,
+    isVisible: product?.isVisible ?? true,
+    manualRating: product?.manualRating !== null && product?.manualRating !== undefined ? product.manualRating.toString() : '',
+    sku: product?.sku || '',
+    dimensions: product?.dimensions || '',
+    fileFormat: product?.fileFormat || '',
+    aspectRatio: product?.aspectRatio || 'aspect-[4/3]',
+    isFree: product?.isFree || false,
+    couponCode: product?.couponCode || '',
+    paymentLink: product?.paymentLink || '',
+    featuresText: (product?.features || []).join('\n'),
+    tagsText: (product?.tags || []).join(', '),
+});
+
+const normaliseQuizQuestions = (questions?: QuizQuestion[]): QuizQuestion[] => (questions || []).map(question => ({
+    prompt: question.prompt || '',
+    options: question.options || [],
+    correctAnswer: question.correctAnswer ?? 0,
+}));
+
+const normaliseFiles = (files?: ProductFile[]): ProductFile[] => (files || []).map(file => ({
+    ...file,
+    content: file.content || '',
+    quiz: file.quiz ? { questions: normaliseQuizQuestions(file.quiz.questions || []) } : file.type === 'quiz' ? { questions: [] } : undefined,
+}));
+
+const normaliseModules = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
+    ...module,
+    title: module.title || 'Untitled Module',
+    files: normaliseFiles(module.files || []),
+    modules: normaliseModules(module.modules || []),
+}));
+
+const countModuleContent = (modules?: CourseModule[]): number => (modules || []).reduce(
+    (count, module) => count + (module.files || []).length + countModuleContent(module.modules || []),
+    0
+);
 
 const recursiveFileUpdate = (
-    modules: CourseModule[], 
-    moduleId: string, 
+    modules: CourseModule[],
+    moduleId: string,
     updateCallback: (files: ProductFile[]) => ProductFile[]
-): CourseModule[] => {
-    if (!modules) return [];
-    return modules.map(module => {
-        if (module.id === moduleId) {
-            const currentFiles = Array.isArray(module.files) ? module.files : [];
-            return { ...module, files: updateCallback(currentFiles) };
-        }
-        if (module.modules && module.modules.length > 0) {
-            return { ...module, modules: recursiveFileUpdate(module.modules, moduleId, updateCallback) };
-        }
-        return module;
-    });
-};
+): CourseModule[] => (modules || []).map(module => {
+    if (module.id === moduleId) {
+        return { ...module, files: updateCallback(module.files || []) };
+    }
 
-// ... (Keep AddContentModal, ModuleEditor, ProductForm components exactly as before)
+    return { ...module, modules: recursiveFileUpdate(module.modules || [], moduleId, updateCallback) };
+});
+
+const recursiveModuleUpdate = (
+    modules: CourseModule[],
+    moduleId: string,
+    updateCallback: (module: CourseModule) => CourseModule
+): CourseModule[] => (modules || []).map(module => {
+    if (module.id === moduleId) return updateCallback(module);
+    return { ...module, modules: recursiveModuleUpdate(module.modules || [], moduleId, updateCallback) };
+});
+
+const glassCard = 'rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl';
+const fieldClass = 'w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
+const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-400';
+
 const AdminDocsEditor: React.FC<{ value: string; onChange: (value: string) => void; }> = ({ value, onChange }) => {
     const editorRef = useRef<HTMLDivElement>(null);
+
     useEffect(() => {
         if (editorRef.current && editorRef.current.innerHTML !== value) editorRef.current.innerHTML = value;
     }, [value]);
+
     const runCommand = (command: string, commandValue?: string) => {
         editorRef.current?.focus();
         document.execCommand(command, false, commandValue);
         onChange(editorRef.current?.innerHTML || '');
     };
+
     return (
-        <div className="overflow-hidden rounded-2xl border border-slate-200 bg-slate-50">
-            <div className="flex flex-wrap gap-2 border-b border-slate-200 bg-white/10 backdrop-blur-xl p-2">
-                <button type="button" onClick={() => runCommand('bold')} className="rounded-lg border px-3 py-1 font-black">B</button>
-                <button type="button" onClick={() => runCommand('italic')} className="rounded-lg border px-3 py-1 font-black italic">I</button>
-                <button type="button" onClick={() => runCommand('formatBlock', '<h1>')} className="rounded-lg border px-3 py-1 font-black">H1</button>
-                <button type="button" onClick={() => runCommand('formatBlock', '<h2>')} className="rounded-lg border px-3 py-1 font-black">H2</button>
-                <button type="button" onClick={() => runCommand('insertUnorderedList')} className="rounded-lg border px-3 py-1 font-black">• List</button>
-                <button type="button" onClick={() => runCommand('justifyLeft')} className="rounded-lg border px-3 py-1 font-black">Left</button>
-                <button type="button" onClick={() => runCommand('justifyCenter')} className="rounded-lg border px-3 py-1 font-black">Center</button>
-                <button type="button" onClick={() => runCommand('justifyRight')} className="rounded-lg border px-3 py-1 font-black">Right</button>
+        <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/70">
+            <div className="flex flex-wrap gap-2 border-b border-white/10 bg-white/5 p-3 backdrop-blur-xl">
+                {[
+                    ['bold', 'B'],
+                    ['italic', 'I'],
+                    ['formatBlock', 'H1', '<h1>'],
+                    ['formatBlock', 'H2', '<h2>'],
+                    ['insertUnorderedList', '• List'],
+                    ['justifyLeft', 'Left'],
+                    ['justifyCenter', 'Center'],
+                    ['justifyRight', 'Right'],
+                ].map(([command, label, value]) => (
+                    <button
+                        key={`${command}-${label}`}
+                        type="button"
+                        onClick={() => runCommand(command, value)}
+                        className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-slate-200 transition hover:bg-white/20"
+                    >
+                        {label}
+                    </button>
+                ))}
             </div>
-            <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={() => onChange(editorRef.current?.innerHTML || '')} className="min-h-56 bg-white/10 backdrop-blur-xl p-5 text-slate-900 outline-none" />
+            <div
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onInput={() => onChange(editorRef.current?.innerHTML || '')}
+                className="prose prose-invert min-h-72 max-w-none bg-slate-950/50 p-5 text-slate-100 outline-none"
+            />
         </div>
     );
 };
 
-const AddContentModal: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void; onClose: () => void; }> = ({ onAdd, onClose }) => {
+const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void; onClose: () => void; }> = ({ onAdd, onClose }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
-    const [uploadConfig, setUploadConfig] = useState<{type: ProductFileType, accept: string} | null>(null);
-    const [formState, setFormState] = useState<{type: ProductFileType, url: string, name: string, content: string} | null>(null);
+    const [uploadConfig, setUploadConfig] = useState<{ type: ProductFileType; accept: string } | null>(null);
+    const [formState, setFormState] = useState<{ type: ProductFileType; url: string; name: string; content: string } | null>(null);
     const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
     const [isUploading, setIsUploading] = useState(false);
 
-    const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        if (e.target.files && e.target.files[0] && uploadConfig) {
-            const file = e.target.files[0];
-            setIsUploading(true);
-            const reader = new FileReader();
-            reader.onload = (event) => {
-                if (event.target?.result) {
-                    onAdd({ name: file.name, type: uploadConfig.type, url: event.target.result as string });
-                    setIsUploading(false); onClose();
-                }
-            };
-            reader.readAsDataURL(file);
-        }
-        if (fileInputRef.current) fileInputRef.current.value = "";
-        setUploadConfig(null);
+    const contentTypes: Array<{ type: ProductFileType; title: string; description: string; icon: string; accept?: string }> = [
+        { type: 'video', title: 'Video Upload', description: 'Upload MP4/WebM lesson files.', icon: '🎬', accept: 'video/*' },
+        { type: 'youtube', title: 'YouTube Video', description: 'Embed a hosted YouTube lesson.', icon: '▶️' },
+        { type: 'pdf', title: 'PDF', description: 'Attach worksheets, notes, or guides.', icon: '📄', accept: 'application/pdf' },
+        { type: 'doc', title: 'Smart Docs', description: 'Build rich HTML lesson notes inline.', icon: '🧠' },
+        { type: 'quiz', title: 'Quiz', description: 'Create interactive assessment questions.', icon: '✅' },
+        { type: 'link', title: 'External Link', description: 'Reference any hosted resource.', icon: '🔗' },
+        { type: 'sheet', title: 'Spreadsheet', description: 'Upload CSV/XLS study material.', icon: '📊', accept: '.csv,.xls,.xlsx' },
+        { type: 'ebook', title: 'E-book', description: 'Upload EPUB or PDF book content.', icon: '📚', accept: '.epub,.pdf' },
+        { type: 'audio', title: 'Audio', description: 'Upload audio classes or podcasts.', icon: '🎧', accept: 'audio/*' },
+    ];
+
+    const triggerFileUpload = (type: ProductFileType, accept: string) => {
+        setUploadConfig({ type, accept });
+        fileInputRef.current?.click();
     };
-    const triggerFileUpload = (type: ProductFileType, accept: string) => { setUploadConfig({ type, accept }); fileInputRef.current?.click(); };
+
     const showForm = (type: ProductFileType) => {
+        const selected = contentTypes.find(item => item.type === type);
         setFormState({
             type,
             url: '',
-            name: type === 'youtube' ? 'YouTube Video' : type === 'doc' ? 'Smart Docs Workspace' : type === 'quiz' ? 'Interactive Quiz' : 'External Resource',
-            content: type === 'doc' ? '<h1>Smart Docs Workspace</h1><p>Start building the lesson document here.</p>' : ''
+            name: selected?.title || 'Learning Resource',
+            content: type === 'doc' ? '<h1>Smart Docs Workspace</h1><p>Start building your lesson here.</p>' : '',
         });
+        if (type === 'quiz') setQuizQuestions([{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
     };
-    const updateQuestion = (index: number, updater: (question: QuizQuestion) => QuizQuestion) => setQuizQuestions(prev => prev.map((question, i) => i === index ? updater(question) : question));
-    const handleFormSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formState?.name) return;
-        if (formState.type === 'doc') {
-            onAdd({ name: formState.name, type: 'doc', url: '#', content: formState.content || '<h1>Smart Docs Workspace</h1><p>Start writing here.</p>' });
-            onClose();
-            return;
-        }
-        if (formState.type === 'quiz') {
-            const cleanQuestions = quizQuestions
-                .map(q => ({ ...q, options: q.options.map(option => option.trim()) }))
-                .filter(q => q.prompt.trim() && q.options.filter(Boolean).length >= 2);
-            if (!cleanQuestions.length) return;
-            onAdd({ name: formState.name, type: 'quiz', url: '#', quiz: { questions: cleanQuestions } });
-            onClose();
-            return;
-        }
-        if (formState.url) { onAdd({ name: formState.name, type: formState.type, url: formState.url }); onClose(); }
-    };
-    
-    return (
-        <MacWindowModal title="Add Content" subtitle="Upload course files or build YouTube, Smart Docs, links, and quizzes" onClose={onClose} maxWidth="max-w-3xl" zIndex="z-[95]">
-            <div className="p-6">
-                 {isUploading ? <p className="text-center py-10 font-bold text-slate-600">Uploading...</p> : !formState ? (
-                    <div className="grid gap-3 md:grid-cols-2">
-                        <button type="button" onClick={() => triggerFileUpload('pdf', '.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx')} className="rounded-2xl border border-slate-200 bg-white/10 backdrop-blur-xl p-4 text-left font-bold shadow-sm hover:bg-blue-50">📄 Upload PDF / document for download UI</button>
-                        <button type="button" onClick={() => triggerFileUpload('video', 'video/mp4,video/webm')} className="rounded-2xl border border-slate-200 bg-white/10 backdrop-blur-xl p-4 text-left font-bold shadow-sm hover:bg-blue-50">🎬 Upload Video from local file</button>
-                        <button type="button" onClick={() => showForm('youtube')} className="rounded-2xl border border-slate-200 bg-white/10 backdrop-blur-xl p-4 text-left font-bold shadow-sm hover:bg-blue-50">▶️ Add YouTube embed link</button>
-                        <button type="button" onClick={() => showForm('doc')} className="rounded-2xl border border-slate-200 bg-white/10 backdrop-blur-xl p-4 text-left font-bold shadow-sm hover:bg-blue-50">📝 Add Smart Docs Workspace</button>
-                        <button type="button" onClick={() => showForm('link')} className="rounded-2xl border border-slate-200 bg-white/10 backdrop-blur-xl p-4 text-left font-bold shadow-sm hover:bg-blue-50">🔗 Add External Resource / Link</button>
-                        <button type="button" onClick={() => showForm('quiz')} className="rounded-2xl border border-slate-200 bg-white/10 backdrop-blur-xl p-4 text-left font-bold shadow-sm hover:bg-blue-50">❓ Create Interactive Quiz</button>
-                    </div>
-                 ) : (
-                    <div className="space-y-4">
-                        <input placeholder="Content name" value={formState.name} onChange={e => setFormState(prev => prev ? ({...prev, name: e.target.value}) : null)} className="w-full rounded-2xl border p-3" required />
-                        {formState.type === 'doc' ? (
-                            <AdminDocsEditor value={formState.content} onChange={content => setFormState(prev => prev ? ({...prev, content}) : null)} />
-                        ) : formState.type === 'quiz' ? (
-                            <div className="space-y-4">
-                                {quizQuestions.map((question, qIndex) => (
-                                    <div key={qIndex} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                                        <div className="mb-3 flex items-center justify-between gap-3">
-                                            <label className="font-black text-slate-700">Question {qIndex + 1}</label>
-                                            {quizQuestions.length > 1 && <button type="button" onClick={() => setQuizQuestions(prev => prev.filter((_, i) => i !== qIndex))} className="rounded-lg bg-red-50 px-3 py-1 text-sm font-bold text-red-600">Remove</button>}
-                                        </div>
-                                        <input placeholder="Question prompt" value={question.prompt} onChange={e => updateQuestion(qIndex, q => ({ ...q, prompt: e.target.value }))} className="mb-3 w-full rounded-xl border p-3" />
-                                        <div className="grid gap-2 md:grid-cols-2">
-                                            {question.options.map((option, oIndex) => (
-                                                <label key={oIndex} className="flex items-center gap-2 rounded-xl border bg-white/10 backdrop-blur-xl p-2">
-                                                    <input type="radio" checked={question.correctAnswer === oIndex} onChange={() => updateQuestion(qIndex, q => ({ ...q, correctAnswer: oIndex }))} />
-                                                    <input placeholder={`Option ${oIndex + 1}`} value={option} onChange={e => updateQuestion(qIndex, q => ({ ...q, options: q.options.map((item, i) => i === oIndex ? e.target.value : item) }))} className="w-full bg-transparent outline-none" />
-                                                </label>
-                                            ))}
-                                        </div>
-                                        <p className="mt-2 text-xs font-semibold text-slate-500">Select the radio button beside the correct answer.</p>
-                                    </div>
-                                ))}
-                                <button type="button" onClick={() => setQuizQuestions(prev => [...prev, { prompt: '', options: ['', '', '', ''], correctAnswer: 0 }])} className="w-full rounded-xl border border-dashed border-blue-300 bg-blue-50 py-2 font-bold text-blue-700">+ Add Question</button>
-                            </div>
-                        ) : (
-                            <input placeholder={formState.type === 'youtube' ? 'YouTube URL' : 'https://example.com/resource'} value={formState.url} onChange={e => setFormState(prev => prev ? ({...prev, url: e.target.value}) : null)} className="w-full rounded-2xl border p-3" required />
-                        )}
-                        <div className="flex justify-end gap-3"><button type="button" onClick={() => setFormState(null)} className="rounded-xl px-4 py-2 font-bold text-slate-600">Back</button><button type="button" onClick={handleFormSubmit} className="rounded-xl bg-primary px-5 py-2 font-bold text-white">Add Content</button></div>
-                    </div>
-                 )}
-                 <input type="file" ref={fileInputRef} className="hidden" accept={uploadConfig?.accept} onChange={handleFileSelected} />
-            </div>
-        </MacWindowModal>
-    );
-};
 
-const ModuleEditor: React.FC<{ module: CourseModule; onUpdate: (updatedModules: CourseModule[]) => void; allModules: CourseModule[]; level: number; }> = ({ module, onUpdate, allModules, level }) => {
-    const [isAddingContent, setIsAddingContent] = useState(false);
-    const handleUpdateTitle = (newTitle: string) => {
-        const updateRecursive = (modules: CourseModule[]): CourseModule[] => modules.map(m => m.id === module.id ? { ...m, title: newTitle } : { ...m, modules: m.modules ? updateRecursive(m.modules) : [] });
-        onUpdate(updateRecursive(allModules));
+    const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        if (!file || !uploadConfig) return;
+
+        setIsUploading(true);
+        const reader = new FileReader();
+        reader.onload = readerEvent => {
+            if (readerEvent.target?.result) {
+                onAdd({ name: file.name, type: uploadConfig.type, url: readerEvent.target.result as string, content: '', quiz: { questions: [] } });
+                setIsUploading(false);
+                onClose();
+            }
+        };
+        reader.readAsDataURL(file);
+        event.target.value = '';
+        setUploadConfig(null);
     };
-    const handleAddContent = (fileData: Omit<ProductFile, 'id'>) => {
-        const newFile: ProductFile = { ...fileData, id: `file-${Date.now()}` };
-        onUpdate(recursiveFileUpdate(allModules, module.id, (files) => [...files, newFile]));
-        setIsAddingContent(false);
+
+    const updateQuizQuestion = (questionIndex: number, updater: (question: QuizQuestion) => QuizQuestion) => {
+        setQuizQuestions(prev => (prev || []).map((question, index) => index === questionIndex ? updater(question) : question));
     };
+
+    const handleFormSubmit = () => {
+        if (!formState) return;
+        const trimmedName = formState.name.trim() || 'Untitled Resource';
+
+        if (formState.type === 'quiz') {
+            onAdd({
+                name: trimmedName,
+                type: 'quiz',
+                url: '',
+                content: '',
+                quiz: { questions: quizQuestions || [] },
+            });
+        } else {
+            onAdd({
+                name: trimmedName,
+                type: formState.type,
+                url: formState.type === 'doc' ? '' : formState.url,
+                content: formState.type === 'doc' ? formState.content : '',
+                quiz: { questions: [] },
+            });
+        }
+        onClose();
+    };
+
     return (
-        <div className={`p-4 rounded-lg border mt-4 ${level === 0 ? 'bg-slate-50 border-slate-200' : 'bg-white/10 backdrop-blur-xl border-gray-200'}`}>
-            <input value={module.title} onChange={(e) => handleUpdateTitle(e.target.value)} className="font-bold text-lg bg-transparent border-none w-full mb-2" placeholder="Module Title" />
-            <div className="space-y-2 pl-4">
-                {module.files.map(f => <div key={f.id} className="text-sm p-2 bg-white/10 backdrop-blur-xl border rounded flex justify-between">{f.name} <span className="text-xs text-gray-500">{f.type}</span></div>)}
-                <button type="button" onClick={() => setIsAddingContent(true)} className="text-sm text-blue-600 font-medium">+ Add Content</button>
+        <div className="mt-5 rounded-[1.75rem] border border-cyan-400/20 bg-cyan-400/5 p-5 backdrop-blur-xl">
+            <div className="mb-5 flex items-center justify-between gap-4">
+                <div>
+                    <p className="text-xs font-black uppercase tracking-[0.24em] text-cyan-300">Content Studio</p>
+                    <h4 className="text-xl font-black text-white">Add learning content</h4>
+                </div>
+                <button type="button" onClick={onClose} className="rounded-full border border-white/10 px-4 py-2 text-sm font-bold text-slate-300 hover:bg-white/10">Close</button>
             </div>
-            {isAddingContent && <AddContentModal onAdd={handleAddContent} onClose={() => setIsAddingContent(false)} />}
+
+            {!formState ? (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                    {contentTypes.map(item => (
+                        <button
+                            key={item.type}
+                            type="button"
+                            onClick={() => item.accept ? triggerFileUpload(item.type, item.accept) : showForm(item.type)}
+                            className="rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/50 hover:bg-white/10"
+                        >
+                            <span className="text-2xl">{item.icon}</span>
+                            <span className="mt-3 block font-black text-white">{item.title}</span>
+                            <span className="mt-1 block text-sm text-slate-400">{item.description}</span>
+                        </button>
+                    ))}
+                </div>
+            ) : (
+                <div className="space-y-5">
+                    <div>
+                        <label className={labelClass}>Resource Name</label>
+                        <input value={formState.name} onChange={event => setFormState(prev => prev ? { ...prev, name: event.target.value } : prev)} className={fieldClass} />
+                    </div>
+
+                    {formState.type === 'doc' ? (
+                        <AdminDocsEditor value={formState.content} onChange={content => setFormState(prev => prev ? { ...prev, content } : prev)} />
+                    ) : formState.type === 'quiz' ? (
+                        <div className="space-y-4">
+                            {(quizQuestions || []).map((question, questionIndex) => (
+                                <div key={questionIndex} className="rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                                    <label className={labelClass}>Question {questionIndex + 1}</label>
+                                    <input value={question.prompt} onChange={event => updateQuizQuestion(questionIndex, q => ({ ...q, prompt: event.target.value }))} className={fieldClass} placeholder="What should learners answer?" />
+                                    <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                        {(question.options || []).map((option, optionIndex) => (
+                                            <label key={optionIndex} className="block">
+                                                <span className="mb-2 block text-xs font-bold text-slate-400">Option {optionIndex + 1}</span>
+                                                <div className="flex gap-2">
+                                                    <input value={option} onChange={event => updateQuizQuestion(questionIndex, q => ({ ...q, options: (q.options || []).map((current, idx) => idx === optionIndex ? event.target.value : current) }))} className={fieldClass} />
+                                                    <button type="button" onClick={() => updateQuizQuestion(questionIndex, q => ({ ...q, correctAnswer: optionIndex }))} className={`rounded-2xl px-4 text-xs font-black ${question.correctAnswer === optionIndex ? 'bg-emerald-400 text-slate-950' : 'border border-white/10 text-slate-400'}`}>Correct</button>
+                                                </div>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </div>
+                            ))}
+                            <button type="button" onClick={() => setQuizQuestions(prev => [...(prev || []), { prompt: '', options: ['', '', '', ''], correctAnswer: 0 }])} className="w-full rounded-2xl border border-dashed border-cyan-300/40 py-3 font-black text-cyan-200 hover:bg-cyan-400/10">+ Add Question</button>
+                        </div>
+                    ) : (
+                        <div>
+                            <label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : 'Resource URL'}</label>
+                            <input value={formState.url} onChange={event => setFormState(prev => prev ? { ...prev, url: event.target.value } : prev)} className={fieldClass} placeholder="https://example.com/resource" />
+                        </div>
+                    )}
+
+                    <div className="flex justify-end gap-3">
+                        <button type="button" onClick={() => setFormState(null)} className="rounded-2xl border border-white/10 px-5 py-3 font-bold text-slate-300 hover:bg-white/10">Back</button>
+                        <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-300 px-6 py-3 font-black text-slate-950 shadow-lg shadow-cyan-500/20 hover:bg-cyan-200">Add Content</button>
+                    </div>
+                </div>
+            )}
+
+            <input ref={fileInputRef} type="file" accept={uploadConfig?.accept} onChange={handleFileSelected} className="hidden" />
+            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-200">Uploading content...</p>}
         </div>
     );
 };
 
-const ProductForm: React.FC<{ product?: ProductWithRating | null; coupons: Coupon[]; onSave: (product: Omit<Product, 'id'>) => void; onCancel: () => void; }> = ({ product, coupons, onSave, onCancel }) => {
-    const [formData, setFormData] = useState({
-        title: product?.title || '',
-        description: product?.description || '',
-        longDescription: product?.longDescription || '',
-        price: product?.price ? product.price.replace('₹', '') : '', 
-        salePrice: product?.salePrice ? product.salePrice.replace('₹', '') : '', 
-        imageSeed: product?.imageSeed || '',
-        category: product?.category || '',
-        department: product?.department || 'Unisex',
-        inStock: product?.inStock === undefined ? true : product.inStock,
-        manualRating: (product?.manualRating !== null && product?.manualRating !== undefined) ? product.manualRating.toString() : '',
-        sku: product?.sku || '',
-        dimensions: product?.dimensions || '',
-        fileFormat: product?.fileFormat || '',
-        aspectRatio: product?.aspectRatio || 'aspect-[4/3]',
-        isFree: product?.isFree || false,
-        couponCode: product?.couponCode || '',
-        paymentLink: product?.paymentLink || '',
-    });
-    const [modules, setModules] = useState<CourseModule[]>(product?.courseContent || []);
-    const [images, setImages] = useState<string[]>(product?.images || []);
-    const productImageInputRef = useRef<HTMLInputElement>(null);
+const ModuleEditor: React.FC<{
+    module: CourseModule;
+    allModules: CourseModule[];
+    level: number;
+    onUpdate: (modules: CourseModule[]) => void;
+    onAddChild: (parentId: string) => void;
+}> = ({ module, allModules, level, onUpdate, onAddChild }) => {
+    const [isAddingContent, setIsAddingContent] = useState(false);
+    const files = module.files || [];
+    const childModules = module.modules || [];
 
+    const updateModule = (updater: (module: CourseModule) => CourseModule) => {
+        onUpdate(recursiveModuleUpdate(allModules || [], module.id, updater));
+    };
+
+    const handleAddContent = (fileData: Omit<ProductFile, 'id'>) => {
+        const newFile: ProductFile = { ...fileData, id: `file-${Date.now()}`, quiz: fileData.quiz || { questions: [] } };
+        onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles => [...(currentFiles || []), newFile]));
+        setIsAddingContent(false);
+    };
+
+    return (
+        <div className={`rounded-[1.75rem] border p-5 ${level === 0 ? 'border-white/10 bg-white/5' : 'border-white/10 bg-slate-950/50'}`}>
+            <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+                <div className="flex-1">
+                    <label className={labelClass}>Module Title</label>
+                    <input value={module.title} onChange={event => updateModule(current => ({ ...current, title: event.target.value }))} className={fieldClass} placeholder="Module title" />
+                </div>
+                <div className="flex gap-2 pt-6">
+                    <button type="button" onClick={() => setIsAddingContent(true)} className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-950 hover:bg-cyan-100">+ Content</button>
+                    <button type="button" onClick={() => onAddChild(module.id)} className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-black text-slate-200 hover:bg-white/10">+ Submodule</button>
+                </div>
+            </div>
+
+            <div className="mt-5 space-y-3">
+                {files.length > 0 ? files.map(file => (
+                    <div key={file.id} className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-slate-950/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                            <p className="font-black text-white">{file.name}</p>
+                            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">{file.type}{file.quiz?.questions?.length ? ` • ${file.quiz.questions.length} questions` : ''}</p>
+                        </div>
+                        <button type="button" onClick={() => onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles => (currentFiles || []).filter(item => item.id !== file.id)))} className="self-start rounded-xl border border-red-400/30 px-3 py-2 text-xs font-black text-red-200 hover:bg-red-500/10 sm:self-auto">Remove</button>
+                    </div>
+                )) : <p className="rounded-2xl border border-dashed border-white/10 p-4 text-sm text-slate-500">No content yet. Add videos, PDFs, Smart Docs, quizzes, and resource links here.</p>}
+            </div>
+
+            {isAddingContent && <ContentComposer onAdd={handleAddContent} onClose={() => setIsAddingContent(false)} />}
+
+            {childModules.length > 0 && (
+                <div className="mt-5 space-y-4 border-l border-white/10 pl-4">
+                    {childModules.map(child => (
+                        <ModuleEditor key={child.id} module={child} allModules={allModules} level={level + 1} onUpdate={onUpdate} onAddChild={onAddChild} />
+                    ))}
+                </div>
+            )}
+        </div>
+    );
+};
+
+const ProductForm: React.FC<{
+    mode: 'add' | 'edit';
+    product?: ProductWithRating | null;
+    coupons: Coupon[];
+    onSave: (product: Omit<Product, 'id'>) => void;
+    onCancel: () => void;
+}> = ({ mode, product, coupons, onSave, onCancel }) => {
+    const [formData, setFormData] = useState<ProductFormData>(() => createEmptyProductForm(product));
+    const [modules, setModules] = useState<CourseModule[]>(() => normaliseModules(product?.courseContent || []));
+    const [images, setImages] = useState<string[]>(() => product?.images || []);
     const [imageMode, setImageMode] = useState<'upload' | 'ai'>('upload');
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
+    const [discountPercent, setDiscountPercent] = useState(0);
+    const productImageInputRef = useRef<HTMLInputElement>(null);
+
+    useEffect(() => {
+        const regular = parseFloat(formData.price) || 0;
+        const sale = parseFloat(formData.salePrice) || 0;
+        setDiscountPercent(regular > 0 && sale > 0 && sale < regular ? Math.round(((regular - sale) / regular) * 100) : 0);
+    }, [formData.price, formData.salePrice]);
+
+    useEffect(() => {
+        if (formData.isFree && (!formData.price || formData.price === '0')) {
+            setFormData(prev => ({ ...prev, price: '3', salePrice: '' }));
+        }
+    }, [formData.isFree]);
+
+    const handleProductImagesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+        const files: File[] = event.currentTarget.files ? Array.from(event.currentTarget.files) as File[] : [];
+        files.forEach(file => {
+            const reader = new FileReader();
+            reader.onload = () => setImages(prev => [...(prev || []), reader.result as string]);
+            reader.readAsDataURL(file);
+        });
+        event.target.value = '';
+    };
+
     const handleGenerateAiImage = async () => {
-        const prompt = encodeURIComponent(`${formData.title || 'Education course'} ${formData.description || 'learning notes'}`);
+        const prompt = encodeURIComponent(`${formData.title || 'Education course'} ${formData.description || 'premium learning product'}`);
         setIsGeneratingImage(true);
         try {
             const aiImageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=768&nologo=true`;
-            setImages(prev => [aiImageUrl, ...prev.filter(Boolean)]);
+            setImages(prev => [aiImageUrl, ...(prev || []).filter(Boolean)]);
             setImageMode('upload');
         } finally {
             setIsGeneratingImage(false);
         }
     };
 
-    const handleProductImagesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(event.target.files || []);
-        if (!files.length) return;
-        files.forEach(file => {
-            const reader = new FileReader();
-            reader.onload = () => setImages(prev => [...prev, reader.result as string]);
-            reader.readAsDataURL(file);
-        });
-        event.target.value = '';
+    const addRootModule = () => {
+        setModules(prev => [...(prev || []), { id: `mod-${Date.now()}`, title: 'New Module', files: [], modules: [] }]);
     };
 
-    const [discountPercent, setDiscountPercent] = useState(0);
+    const addChildModule = (parentId: string) => {
+        const child: CourseModule = { id: `mod-${Date.now()}`, title: 'New Submodule', files: [], modules: [] };
+        setModules(prev => recursiveModuleUpdate(prev || [], parentId, module => ({ ...module, modules: [...(module.modules || []), child] })));
+    };
 
-    useEffect(() => {
-        const regular = parseFloat(formData.price) || 0;
-        const sale = parseFloat(formData.salePrice) || 0;
-        if (regular > 0 && sale > 0 && sale < regular) {
-            setDiscountPercent(Math.round(((regular - sale) / regular) * 100));
-        } else {
-            setDiscountPercent(0);
+    const handleSubmit = (event: React.FormEvent) => {
+        event.preventDefault();
+        if (!formData.paymentLink.trim()) {
+            alert('Payment Link Required');
+            return;
         }
-    }, [formData.price, formData.salePrice]);
 
-    useEffect(() => {
-        if (formData.isFree) {
-            if (!formData.price || formData.price === '0') {
-                setFormData(prev => ({ ...prev, price: '3', salePrice: '' }));
-            }
-        }
-    }, [formData.isFree]);
-
-    const handleSubmit = (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!formData.paymentLink) { alert("Payment Link Required"); return; }
-        
+        const features = formData.featuresText.split('\n').map(item => item.trim()).filter(Boolean);
+        const tags = formData.tagsText.split(',').map(item => item.trim()).filter(Boolean);
         const formattedPrice = formData.price ? `₹${formData.price}` : '₹0';
         const formattedSalePrice = formData.salePrice ? `₹${formData.salePrice}` : undefined;
 
-        onSave({ 
-            ...formData, 
+        onSave({
+            imageSeed: formData.imageSeed || formData.title || `product-${Date.now()}`,
+            images: images || [],
+            title: formData.title,
+            description: formData.description,
+            longDescription: formData.longDescription,
+            features,
+            tags,
             price: formattedPrice,
             salePrice: formattedSalePrice,
-            features: [], 
-            tags: [], 
-            images, 
-            imageSeed: formData.imageSeed || formData.title, 
-            manualRating: formData.manualRating ? parseFloat(formData.manualRating) : null, 
-            courseContent: modules 
+            category: formData.category,
+            department: formData.department,
+            inStock: formData.inStock,
+            isVisible: formData.isVisible,
+            manualRating: formData.manualRating ? parseFloat(formData.manualRating) : null,
+            sku: formData.sku,
+            dimensions: formData.dimensions,
+            fileFormat: formData.fileFormat,
+            aspectRatio: formData.aspectRatio,
+            isFree: formData.isFree,
+            couponCode: formData.couponCode,
+            paymentLink: formData.paymentLink,
+            courseContent: normaliseModules(modules || []),
+            priceHistory: product?.priceHistory || [],
+            wishlistCount: product?.wishlistCount,
+            viewCount: product?.viewCount,
         });
     };
 
     return (
-        <div className="fixed inset-0 z-[95] overflow-y-auto bg-slate-950/70 p-6">
-          <div className="mx-auto max-w-5xl rounded-3xl border border-white/20 bg-white/10 backdrop-blur-xl">
-                <div className="p-8">
-
-                    <form onSubmit={handleSubmit} className="space-y-8">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                            <div className="space-y-4">
-                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Product Title</label><input name="title" value={formData.title} onChange={e => setFormData({...formData, title: e.target.value})} className="w-full p-3 border rounded-lg bg-slate-50 focus:bg-white transition" required /></div>
-                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Short Description</label><textarea name="description" value={formData.description} onChange={e => setFormData({...formData, description: e.target.value})} className="w-full p-3 border rounded-lg bg-slate-50" rows={3} required /></div>
-                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Long Description</label><textarea name="longDescription" value={formData.longDescription} onChange={e => setFormData({...formData, longDescription: e.target.value})} className="w-full p-3 border rounded-lg bg-slate-50" rows={4} /></div>
+        <div className="min-h-screen bg-slate-950 text-slate-100">
+            <form onSubmit={handleSubmit}>
+                <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/85 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
+                    <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                        <div className="flex items-center gap-4">
+                            <button type="button" onClick={onCancel} className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-black text-slate-200 transition hover:bg-white/10">← Back to List</button>
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-300">{mode === 'add' ? 'Create Product' : 'Edit Product'}</p>
+                                <h1 className="text-2xl font-black text-white sm:text-3xl">{mode === 'add' ? 'New digital product' : formData.title || 'Product editor'}</h1>
                             </div>
-                            <div className="space-y-4">
-                                <div><label className="block text-sm font-bold text-slate-700 mb-1">SKU</label><input name="sku" value={formData.sku} onChange={e => setFormData({...formData, sku: e.target.value})} className="w-full p-3 border rounded-lg bg-slate-50" /></div>
-                                <div><label className="block text-sm font-bold text-slate-700 mb-1">Category</label><input name="category" value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full p-3 border rounded-lg bg-slate-50" /></div>
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1">Product Images</label>
-                                    <div className="mb-3 grid grid-cols-2 gap-2"><button type="button" onClick={() => setImageMode('upload')} className={`rounded-xl px-3 py-2 text-sm font-bold ${imageMode === 'upload' ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Upload Manually</button><button type="button" onClick={() => setImageMode('ai')} className={`rounded-xl px-3 py-2 text-sm font-bold ${imageMode === 'ai' ? 'bg-purple-600 text-white' : 'bg-slate-100 text-slate-600'}`}>Generate with AI</button></div>
-                                    {imageMode === 'upload' ? <button type="button" onClick={() => productImageInputRef.current?.click()} className="w-full rounded-2xl border-2 border-dashed border-blue-200 bg-blue-50 p-5 text-center font-bold text-blue-700 hover:bg-blue-100">Tap to upload product images</button> : <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-2xl border border-purple-300 bg-purple-50 p-5 text-center font-bold text-purple-700 hover:bg-purple-100 disabled:opacity-60">{isGeneratingImage ? 'Generating image...' : 'Generate image from title + description'}</button>}
-                                    <input ref={productImageInputRef} type="file" accept="image/*" multiple onChange={handleProductImagesUpload} className="hidden" />
-                                    <div className="mt-3 grid grid-cols-3 gap-2">
-                                        {images.filter(Boolean).map((img, index) => (
-                                            <div key={`${img}-${index}`} className="relative aspect-square overflow-hidden rounded-xl border bg-slate-100">
-                                                <img src={img} alt={`Product ${index + 1}`} className="h-full w-full object-cover" />
-                                                <button type="button" onClick={() => setImages(prev => prev.filter((_, i) => i !== index))} className="absolute right-1 top-1 rounded-full bg-red-500 px-2 py-0.5 text-xs font-bold text-white">×</button>
-                                            </div>
-                                        ))}
+                        </div>
+                        <button type="submit" className="rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-400 px-7 py-3 font-black text-slate-950 shadow-2xl shadow-cyan-500/20 transition hover:-translate-y-0.5 hover:shadow-cyan-500/30">{mode === 'add' ? 'Save Product' : 'Update Product'}</button>
+                    </div>
+                </header>
+
+                <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
+                        <section className="space-y-8 lg:col-span-2">
+                            <div className={glassCard}>
+                                <div className="mb-6">
+                                    <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-300">Main Settings</p>
+                                    <h2 className="mt-2 text-2xl font-black text-white">Product identity</h2>
+                                </div>
+                                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
+                                    <div className="md:col-span-2">
+                                        <label className={labelClass}>Product Title</label>
+                                        <input required value={formData.title} onChange={event => setFormData(prev => ({ ...prev, title: event.target.value }))} className={fieldClass} placeholder="Masterclass, template pack, guide..." />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className={labelClass}>Short Description</label>
+                                        <textarea required rows={3} value={formData.description} onChange={event => setFormData(prev => ({ ...prev, description: event.target.value }))} className={fieldClass} placeholder="A concise storefront summary." />
+                                    </div>
+                                    <div className="md:col-span-2">
+                                        <label className={labelClass}>Long Description</label>
+                                        <textarea rows={7} value={formData.longDescription} onChange={event => setFormData(prev => ({ ...prev, longDescription: event.target.value }))} className={fieldClass} placeholder="Deep product narrative, outcomes, curriculum promise..." />
+                                    </div>
+                                    <div>
+                                        <label className={labelClass}>SKU</label>
+                                        <input value={formData.sku} onChange={event => setFormData(prev => ({ ...prev, sku: event.target.value }))} className={fieldClass} placeholder="DC-COURSE-001" />
+                                    </div>
+                                    <div>
+                                        <label className={labelClass}>Manual Rating</label>
+                                        <input type="number" min="0" max="5" step="0.1" value={formData.manualRating} onChange={event => setFormData(prev => ({ ...prev, manualRating: event.target.value }))} className={fieldClass} placeholder="4.8" />
                                     </div>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="bg-blue-50 p-6 rounded-xl border border-blue-200">
-                            <h3 className="font-bold text-lg text-blue-800 mb-4">Pricing & Status</h3>
-                            
-                            <div className="flex items-center mb-6 p-3 bg-white/10 backdrop-blur-xl rounded-lg border border-blue-100 shadow-sm">
-                                <label className="flex items-center space-x-3 cursor-pointer w-full">
-                                    <input type="checkbox" checked={formData.isFree} onChange={e => setFormData({...formData, isFree: e.target.checked})} className="w-5 h-5 text-blue-600 rounded focus:ring-blue-500" />
-                                    <span className="font-bold text-slate-700">Mark as Free Product</span>
-                                    {formData.isFree && <span className="text-sm text-blue-600 ml-auto font-medium">Nominal Fee Enabled</span>}
-                                </label>
-                            </div>
-
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                                {formData.isFree ? (
-                                    <div className="md:col-span-2">
-                                        <label className="block text-sm font-bold text-slate-700 mb-1">Nominal Fee (₹)</label>
-                                        <input type="number" name="price" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full p-3 border rounded-lg bg-white/10 backdrop-blur-xl" required placeholder="3" />
-                                        <p className="text-xs text-gray-500 mt-1">This fee handles gateway charges for 'free' products.</p>
+                            <div className={glassCard}>
+                                <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                                    <div>
+                                        <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-300">Curriculum Builder</p>
+                                        <h2 className="mt-2 text-2xl font-black text-white">Course content / files</h2>
+                                        <p className="mt-2 text-sm text-slate-400">Organize Video, PDF, Smart Docs, Quiz, audio, sheets, e-books, and links in spacious modules.</p>
                                     </div>
-                                ) : (
-                                    <>
-                                        <div>
-                                            <label className="block text-sm font-bold text-slate-700 mb-1">Initial Price (MRP) (₹)</label>
-                                            <input type="number" name="price" value={formData.price} onChange={e => setFormData({...formData, price: e.target.value})} className="w-full p-3 border rounded-lg bg-white/10 backdrop-blur-xl" required placeholder="499" />
-                                        </div>
-                                        <div>
-                                            <label className="block text-sm font-bold text-slate-700 mb-1">Final Price (Sale) (₹)</label>
-                                            <input type="number" name="salePrice" value={formData.salePrice} onChange={e => setFormData({...formData, salePrice: e.target.value})} className="w-full p-3 border rounded-lg bg-white/10 backdrop-blur-xl" placeholder="299" />
-                                        </div>
-                                    </>
-                                )}
-                                
-                                <div className="flex items-center justify-center pt-6">
-                                    {!formData.isFree && discountPercent > 0 ? (
-                                        <span className="text-lg font-bold text-green-600 bg-green-100 px-4 py-2 rounded-full border border-green-200 animate-pulse">
-                                            {discountPercent}% Drop Price
-                                        </span>
-                                    ) : (
-                                        <span className="text-sm text-gray-400">{formData.isFree ? 'Free Product' : 'No discount calculated'}</span>
+                                    <button type="button" onClick={addRootModule} className="rounded-2xl bg-white px-5 py-3 font-black text-slate-950 hover:bg-cyan-100">+ Add Module</button>
+                                </div>
+                                <div className="space-y-5">
+                                    {(modules || []).length > 0 ? (modules || []).map(module => (
+                                        <ModuleEditor key={module.id} module={module} allModules={modules || []} level={0} onUpdate={setModules} onAddChild={addChildModule} />
+                                    )) : (
+                                        <button type="button" onClick={addRootModule} className="w-full rounded-[1.75rem] border border-dashed border-cyan-300/30 bg-cyan-400/5 p-10 text-center transition hover:bg-cyan-400/10">
+                                            <span className="block text-4xl">🧱</span>
+                                            <span className="mt-3 block text-lg font-black text-white">Start with your first module</span>
+                                            <span className="mt-1 block text-sm text-slate-400">Every new module is initialized with empty files and submodules to prevent undefined map crashes.</span>
+                                        </button>
                                     )}
                                 </div>
                             </div>
+                        </section>
 
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6 border-t border-blue-200 pt-6">
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1">Custom Rating (0.0 - 5.0)</label>
-                                    <input type="number" step="0.1" min="0" max="5" name="manualRating" value={formData.manualRating} onChange={e => setFormData({...formData, manualRating: e.target.value})} className="w-full p-3 border rounded-lg bg-white/10 backdrop-blur-xl" placeholder="4.8" />
-                                    <p className="text-xs text-gray-500 mt-1">Overrides calculated rating.</p>
-                                </div>
-                                <div>
-                                    <label className="block text-sm font-bold text-slate-700 mb-1">Stock Status</label>
-                                    <select name="inStock" value={formData.inStock ? 'true' : 'false'} onChange={e => setFormData({...formData, inStock: e.target.value === 'true'})} className="w-full p-3 border rounded-lg bg-white/10 backdrop-blur-xl cursor-pointer">
-                                        <option value="true">In Stock</option>
-                                        <option value="false">Out of Stock</option>
-                                    </select>
+                        <aside className="space-y-8 lg:col-span-1">
+                            <div className={glassCard}>
+                                <h2 className="text-xl font-black text-white">Publish Status</h2>
+                                <div className="mt-5 space-y-4">
+                                    <label className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                                        <span><span className="block font-black text-white">Visible</span><span className="text-sm text-slate-400">Show on storefront</span></span>
+                                        <input type="checkbox" checked={formData.isVisible} onChange={event => setFormData(prev => ({ ...prev, isVisible: event.target.checked }))} className="h-5 w-5 accent-cyan-300" />
+                                    </label>
+                                    <label className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                                        <span><span className="block font-black text-white">In Stock</span><span className="text-sm text-slate-400">Purchasable now</span></span>
+                                        <input type="checkbox" checked={formData.inStock} onChange={event => setFormData(prev => ({ ...prev, inStock: event.target.checked }))} className="h-5 w-5 accent-emerald-300" />
+                                    </label>
+                                    <label className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/60 p-4">
+                                        <span><span className="block font-black text-white">Free via coupon</span><span className="text-sm text-slate-400">Enable free access flow</span></span>
+                                        <input type="checkbox" checked={formData.isFree} onChange={event => setFormData(prev => ({ ...prev, isFree: event.target.checked }))} className="h-5 w-5 accent-blue-300" />
+                                    </label>
                                 </div>
                             </div>
-                        </div>
 
-                        <div className="space-y-4">
-                            <div><label className="block text-sm font-bold text-slate-700 mb-1">Razorpay Payment Page Link (Required)</label><input name="paymentLink" value={formData.paymentLink} onChange={e => setFormData({...formData, paymentLink: e.target.value})} className="w-full p-3 border rounded-lg bg-slate-50 border-green-200 focus:ring-green-500" required placeholder="https://pages.razorpay.com/..." /></div>
-                        </div>
-                        
-                        <div className="bg-slate-50 p-6 rounded-xl border border-slate-200">
-                            <h3 className="font-bold text-lg text-slate-700 mb-4">Course Content / Files</h3>
-                            {modules.map(m => <ModuleEditor key={m.id} module={m} onUpdate={setModules} allModules={modules} level={0} />)}
-                            <button type="button" onClick={() => setModules([...modules, { id: `mod-${Date.now()}`, title: 'New Module', files: [], modules: [] }])} className="mt-4 w-full py-2 bg-white/10 backdrop-blur-xl border border-dashed border-slate-300 rounded-lg text-slate-500 hover:bg-slate-100">+ Add Module</button>
-                        </div>
+                            <div className={glassCard}>
+                                <h2 className="text-xl font-black text-white">Pricing</h2>
+                                {discountPercent > 0 && <p className="mt-3 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-black text-emerald-200">{discountPercent}% discount active</p>}
+                                <div className="mt-5 space-y-4">
+                                    <div><label className={labelClass}>Regular Price</label><input required type="number" value={formData.price} onChange={event => setFormData(prev => ({ ...prev, price: event.target.value }))} className={fieldClass} placeholder="999" /></div>
+                                    <div><label className={labelClass}>Sale Price</label><input type="number" value={formData.salePrice} onChange={event => setFormData(prev => ({ ...prev, salePrice: event.target.value }))} className={fieldClass} placeholder="499" /></div>
+                                    <div><label className={labelClass}>Coupon Code</label><select value={formData.couponCode} onChange={event => setFormData(prev => ({ ...prev, couponCode: event.target.value }))} className={fieldClass}><option value="">No coupon</option>{(coupons || []).map(coupon => <option key={coupon.id} value={coupon.code}>{coupon.code}</option>)}</select></div>
+                                    <div><label className={labelClass}>Razorpay Payment Page Link</label><input required value={formData.paymentLink} onChange={event => setFormData(prev => ({ ...prev, paymentLink: event.target.value }))} className={fieldClass} placeholder="https://pages.razorpay.com/..." /></div>
+                                </div>
+                            </div>
 
-                        <div className="flex justify-end gap-4 pt-6 border-t sticky bottom-0 bg-white/10 backdrop-blur-xl p-4">
-                            <button type="button" onClick={onCancel} className="px-6 py-3 rounded-xl font-bold text-slate-600 hover:bg-slate-100 border">Cancel</button>
-                            <button type="submit" className="px-8 py-3 rounded-xl font-bold text-white bg-blue-600 hover:bg-blue-700 shadow-lg transform hover:-translate-y-0.5 transition-all">Save Product</button>
-                        </div>
-                    </form>
-                </div>
-          </div>
+                            <div className={glassCard}>
+                                <h2 className="text-xl font-black text-white">Categories & Metadata</h2>
+                                <div className="mt-5 space-y-4">
+                                    <div><label className={labelClass}>Category</label><input value={formData.category} onChange={event => setFormData(prev => ({ ...prev, category: event.target.value }))} className={fieldClass} placeholder="Design, Finance, Coding..." /></div>
+                                    <div><label className={labelClass}>Department</label><select value={formData.department} onChange={event => setFormData(prev => ({ ...prev, department: event.target.value as ProductFormData['department'] }))} className={fieldClass}><option>Unisex</option><option>Men</option><option>Women</option></select></div>
+                                    <div><label className={labelClass}>Dimensions</label><input value={formData.dimensions} onChange={event => setFormData(prev => ({ ...prev, dimensions: event.target.value }))} className={fieldClass} placeholder="1024x768, A4, 16:9" /></div>
+                                    <div><label className={labelClass}>File Format</label><input value={formData.fileFormat} onChange={event => setFormData(prev => ({ ...prev, fileFormat: event.target.value }))} className={fieldClass} placeholder="PDF + MP4 + Docs" /></div>
+                                    <div><label className={labelClass}>Features (one per line)</label><textarea rows={4} value={formData.featuresText} onChange={event => setFormData(prev => ({ ...prev, featuresText: event.target.value }))} className={fieldClass} /></div>
+                                    <div><label className={labelClass}>Tags (comma separated)</label><input value={formData.tagsText} onChange={event => setFormData(prev => ({ ...prev, tagsText: event.target.value }))} className={fieldClass} placeholder="premium, beginner, template" /></div>
+                                </div>
+                            </div>
+
+                            <div className={glassCard}>
+                                <h2 className="text-xl font-black text-white">Image Upload</h2>
+                                <div className="mt-5 grid grid-cols-2 gap-2">
+                                    <button type="button" onClick={() => setImageMode('upload')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'upload' ? 'bg-cyan-300 text-slate-950' : 'border border-white/10 text-slate-300'}`}>Upload</button>
+                                    <button type="button" onClick={() => setImageMode('ai')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'ai' ? 'bg-purple-300 text-slate-950' : 'border border-white/10 text-slate-300'}`}>AI Image</button>
+                                </div>
+                                <div className="mt-4">
+                                    {imageMode === 'upload' ? (
+                                        <button type="button" onClick={() => productImageInputRef.current?.click()} className="w-full rounded-3xl border border-dashed border-cyan-300/40 bg-cyan-400/5 p-8 text-center font-black text-cyan-100 hover:bg-cyan-400/10">Upload product images</button>
+                                    ) : (
+                                        <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-3xl border border-dashed border-purple-300/40 bg-purple-400/5 p-8 text-center font-black text-purple-100 hover:bg-purple-400/10 disabled:opacity-60">{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</button>
+                                    )}
+                                    <input ref={productImageInputRef} type="file" accept="image/*" multiple onChange={handleProductImagesUpload} className="hidden" />
+                                </div>
+                                <div className="mt-4 grid grid-cols-2 gap-3">
+                                    {(images || []).filter(Boolean).map((image, index) => (
+                                        <div key={`${image}-${index}`} className="group relative aspect-square overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
+                                            <img src={image} alt={`Product ${index + 1}`} className="h-full w-full object-cover" />
+                                            <button type="button" onClick={() => setImages(prev => (prev || []).filter((_, currentIndex) => currentIndex !== index))} className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-sm font-black text-white opacity-90">×</button>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div className="mt-4"><label className={labelClass}>Image Seed</label><input value={formData.imageSeed} onChange={event => setFormData(prev => ({ ...prev, imageSeed: event.target.value }))} className={fieldClass} placeholder="Fallback image seed" /></div>
+                            </div>
+                        </aside>
+                    </div>
+                </main>
+            </form>
         </div>
     );
 };
-
-// --- MAIN COMPONENT ---
 
 const ProductManagement: React.FC<{
     products: ProductWithRating[];
@@ -407,97 +621,141 @@ const ProductManagement: React.FC<{
     onUpdateProduct: (product: Product) => void;
     onDeleteProduct: (id: number) => void;
 }> = ({ products, users, coupons, onAddProduct, onUpdateProduct, onDeleteProduct }) => {
-    const [isFormOpen, setIsFormOpen] = useState(false);
+    const [viewState, setViewState] = useState<ProductViewState>('list');
     const [editingProduct, setEditingProduct] = useState<ProductWithRating | null>(null);
     const [newProductForEmail, setNewProductForEmail] = useState<ProductWithRating | null>(null);
+    const safeProducts = products || [];
 
-    const handleSave = (productData: Omit<Product, 'id'>) => {
-        if (editingProduct) {
-            onUpdateProduct({ ...productData, id: editingProduct.id });
-        } else {
-            onAddProduct(productData);
-            setNewProductForEmail({ ...productData, id: Date.now(), rating: 0, reviewCount: 0, calculatedRating: 0 });
-        }
-        setIsFormOpen(false); setEditingProduct(null);
+    const openAddView = () => {
+        setEditingProduct(null);
+        setViewState('add');
     };
 
+    const openEditView = (product: ProductWithRating) => {
+        setEditingProduct({
+            ...product,
+            images: product.images || [],
+            features: product.features || [],
+            tags: product.tags || [],
+            courseContent: normaliseModules(product.courseContent || []),
+            priceHistory: product.priceHistory || [],
+        });
+        setViewState('edit');
+    };
+
+    const handleSave = (productData: Omit<Product, 'id'>) => {
+        const safeProductData: Omit<Product, 'id'> = {
+            ...productData,
+            ...emptyArrays,
+            ...productData,
+            images: productData.images || [],
+            features: productData.features || [],
+            tags: productData.tags || [],
+            courseContent: normaliseModules(productData.courseContent || []),
+            priceHistory: productData.priceHistory || [],
+        };
+
+        if (editingProduct && viewState === 'edit') {
+            onUpdateProduct({ ...safeProductData, id: editingProduct.id });
+        } else {
+            onAddProduct(safeProductData);
+            setNewProductForEmail({ ...safeProductData, id: Date.now(), rating: 0, reviewCount: 0, calculatedRating: 0 });
+        }
+
+        setEditingProduct(null);
+        setViewState('list');
+    };
+
+    if (viewState !== 'list') {
+        return (
+            <>
+                <ProductForm mode={viewState} product={editingProduct} coupons={coupons || []} onSave={handleSave} onCancel={() => { setEditingProduct(null); setViewState('list'); }} />
+                {newProductForEmail && <NewProductEmailPreviewModal product={newProductForEmail} relatedProducts={[]} users={users || []} onClose={() => setNewProductForEmail(null)} />}
+            </>
+        );
+    }
+
     return (
-        <div className="animate-fade-in-up">
-            <div className="flex justify-between items-center mb-8">
-                <div>
-                    <h1 className="text-3xl font-extrabold text-slate-800">Product Management</h1>
-                    <p className="text-slate-500 mt-1">Manage your digital inventory, prices, and availability.</p>
+        <div className="min-h-screen bg-slate-950 p-4 text-slate-100 animate-fade-in-up sm:p-6 lg:p-8">
+            <div className="mx-auto max-w-7xl">
+                <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
+                    <div>
+                        <p className="text-xs font-black uppercase tracking-[0.3em] text-cyan-300">Admin Inventory</p>
+                        <h1 className="mt-2 text-4xl font-black tracking-tight text-white">Product Management</h1>
+                        <p className="mt-2 max-w-2xl text-slate-400">Manage your digital catalogue from a premium full-page workflow. Add and edit products in dedicated nested screens, not cramped modals.</p>
+                    </div>
+                    <button onClick={openAddView} className="rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-400 px-7 py-4 font-black text-slate-950 shadow-2xl shadow-cyan-500/20 transition hover:-translate-y-0.5">+ Add Product</button>
                 </div>
-                <button onClick={() => { setEditingProduct(null); setIsFormOpen(true); }} className="bg-blue-600 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:bg-blue-700 hover:shadow-xl hover:-translate-y-0.5 transition-all flex items-center gap-2">
-                    <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                    Add Product
-                </button>
-            </div>
 
-            <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-xl border border-slate-100 overflow-hidden">
-                <div className="overflow-x-auto">
-                    <table className="w-full min-w-max text-left border-collapse">
-                        <thead>
-                            <tr className="bg-slate-50 border-b border-slate-200">
-                                <th className="p-3 sm:p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">Product Name</th>
-                                <th className="p-3 sm:p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">Status</th>
-                                <th className="p-3 sm:p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">Price</th>
-                                <th className="p-3 sm:p-5 font-bold text-xs text-slate-500 uppercase tracking-wider">Rating</th>
-                                <th className="p-3 sm:p-5 font-bold text-xs text-slate-500 uppercase tracking-wider text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {products.map((product) => (
-                                <tr key={product.id} className="hover:bg-slate-50/80 transition-all duration-200 hover:shadow-inner group">
-                                    <td className="p-3 sm:p-5">
-                                        <div className="flex items-center gap-4">
-                                            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-lg bg-slate-100 border border-slate-200 overflow-hidden flex-shrink-0">
-                                                <img src={product.images[0] || `https://picsum.photos/seed/${product.imageSeed}/100/100`} alt="" className="w-full h-full object-cover" />
-                                            </div>
-                                            <div className="min-w-0">
-                                                <p className="font-bold text-slate-800 group-hover:text-blue-600 transition-colors truncate max-w-[150px] sm:max-w-xs">{product.title}</p>
-                                                <p className="text-xs text-slate-400 font-mono mt-0.5">{product.sku || 'NO-SKU'}</p>
-                                                {product.isFree && <span className="text-[10px] bg-blue-100 text-blue-800 px-1.5 rounded border border-blue-200">FREE</span>}
-                                            </div>
-                                        </div>
-                                    </td>
-                                    <td className="p-3 sm:p-5">
-                                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium border ${product.inStock ? 'bg-green-50 text-green-700 border-green-100' : 'bg-red-50 text-red-700 border-red-100'}`}>
-                                            <span className={`w-1.5 h-1.5 rounded-full mr-1.5 ${product.inStock ? 'bg-green-500' : 'bg-red-500'}`}></span>
-                                            {product.inStock ? 'In Stock' : 'Out of Stock'}
-                                        </span>
-                                    </td>
-                                    <td className="p-3 sm:p-5 font-semibold text-slate-700">
-                                        {product.salePrice ? (
-                                            <div className="flex flex-col">
-                                                <span className="text-red-600">{product.salePrice}</span>
-                                                <span className="text-xs text-slate-400 line-through font-normal">{product.price}</span>
-                                            </div>
-                                        ) : product.price}
-                                    </td>
-                                    <td className="p-3 sm:p-5">
-                                        <div className="flex items-center gap-1 text-slate-600 text-sm">
-                                            <svg className="w-4 h-4 text-yellow-400 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-                                            <span className="font-bold">{product.rating.toFixed(1)}</span>
-                                        </div>
-                                    </td>
-                                    <td className="p-3 sm:p-5 text-right space-x-2">
-                                        <button onClick={() => { setEditingProduct(product); setIsFormOpen(true); }} className="p-2 text-slate-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors" title="Edit">
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
-                                        </button>
-                                        <button onClick={() => onDeleteProduct(product.id)} className="p-2 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
-                                            <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
-                                        </button>
-                                    </td>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+                    <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5 backdrop-blur-xl"><p className="text-sm font-bold text-slate-400">Total Products</p><p className="mt-2 text-3xl font-black text-white">{safeProducts.length}</p></div>
+                    <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5 backdrop-blur-xl"><p className="text-sm font-bold text-slate-400">Visible</p><p className="mt-2 text-3xl font-black text-emerald-300">{safeProducts.filter(product => product.isVisible !== false).length}</p></div>
+                    <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5 backdrop-blur-xl"><p className="text-sm font-bold text-slate-400">Out of Stock</p><p className="mt-2 text-3xl font-black text-rose-300">{safeProducts.filter(product => product.inStock === false).length}</p></div>
+                </div>
+
+                <div className="mt-8 overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-black/20 backdrop-blur-xl">
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-left">
+                            <thead className="border-b border-white/10 bg-white/5 text-xs uppercase tracking-[0.24em] text-slate-400">
+                                <tr>
+                                    <th className="p-5 font-black">Product</th>
+                                    <th className="p-5 font-black">Status</th>
+                                    <th className="p-5 font-black">Price</th>
+                                    <th className="p-5 font-black">Content</th>
+                                    <th className="p-5 text-right font-black">Actions</th>
                                 </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                            </thead>
+                            <tbody className="divide-y divide-white/10">
+                                {safeProducts.length > 0 ? safeProducts.map(product => {
+                                    const thumbnail = product.images?.[0] || `https://picsum.photos/seed/${product.imageSeed || product.id}/100/100`;
+                                    const contentCount = countModuleContent(product.courseContent || []);
+                                    return (
+                                        <tr key={product.id} className="group transition hover:bg-white/5">
+                                            <td className="p-5">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
+                                                        <img src={thumbnail} alt="" className="h-full w-full object-cover" />
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <p className="truncate font-black text-white group-hover:text-cyan-200">{product.title}</p>
+                                                        <p className="mt-1 text-xs font-mono text-slate-500">{product.sku || 'NO-SKU'} • {product.category || 'Uncategorized'}</p>
+                                                    </div>
+                                                </div>
+                                            </td>
+                                            <td className="p-5">
+                                                <div className="flex flex-col gap-2">
+                                                    <span className={`w-fit rounded-full border px-3 py-1 text-xs font-black ${product.inStock !== false ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-200' : 'border-red-300/30 bg-red-400/10 text-red-200'}`}>{product.inStock !== false ? 'In Stock' : 'Out of Stock'}</span>
+                                                    {product.isFree && <span className="w-fit rounded-full border border-blue-300/30 bg-blue-400/10 px-3 py-1 text-xs font-black text-blue-200">Free Flow</span>}
+                                                </div>
+                                            </td>
+                                            <td className="p-5 font-bold text-slate-200">
+                                                {product.salePrice ? <div><p className="text-rose-200">{product.salePrice}</p><p className="text-xs text-slate-500 line-through">{product.price}</p></div> : product.price}
+                                            </td>
+                                            <td className="p-5"><span className="rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-xs font-black text-slate-300">{contentCount} items</span></td>
+                                            <td className="p-5 text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <button onClick={() => openEditView(product)} className="rounded-2xl border border-cyan-300/30 px-4 py-2 text-sm font-black text-cyan-200 transition hover:bg-cyan-400/10">Edit</button>
+                                                    <button onClick={() => onDeleteProduct(product.id)} className="rounded-2xl border border-red-300/30 px-4 py-2 text-sm font-black text-red-200 transition hover:bg-red-400/10">Delete</button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                }) : (
+                                    <tr>
+                                        <td colSpan={5} className="p-12 text-center text-slate-400">
+                                            <p className="text-4xl">📦</p>
+                                            <p className="mt-3 text-lg font-black text-white">No products yet</p>
+                                            <p className="mt-1">Create your first product using the full-page editor.</p>
+                                        </td>
+                                    </tr>
+                                )}
+                            </tbody>
+                        </table>
+                    </div>
                 </div>
             </div>
 
-            {isFormOpen && <ProductForm product={editingProduct} coupons={coupons} onSave={handleSave} onCancel={() => setIsFormOpen(false)} />}
-            {newProductForEmail && <NewProductEmailPreviewModal product={newProductForEmail} relatedProducts={[]} users={users} onClose={() => setNewProductForEmail(null)} />}
+            {newProductForEmail && <NewProductEmailPreviewModal product={newProductForEmail} relatedProducts={[]} users={users || []} onClose={() => setNewProductForEmail(null)} />}
         </div>
     );
 };
