@@ -1,10 +1,13 @@
 import React from 'react';
-import { Coupon, ProductWithRating, ThemeName, themes, User, WebsiteSettings } from '../App';
+import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { CoinTransaction, Coupon, ProductWithRating, ThemeName, themes, User, WebsiteSettings } from '../App';
+import { db } from '../firebase';
 
 interface ProfilePageProps {
   settings: WebsiteSettings;
   currentUser: User | null;
   purchasedProducts: ProductWithRating[];
+  products: ProductWithRating[];
   coupons: Coupon[];
   onBack: () => void;
   onExplore: () => void;
@@ -50,6 +53,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   settings,
   currentUser,
   purchasedProducts,
+  products,
   coupons,
   onBack,
   onExplore,
@@ -62,17 +66,62 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const coverInputRef = React.useRef<HTMLInputElement | null>(null);
   const [coverImage, setCoverImage] = React.useState(defaultCoverImage);
   const [redeeming, setRedeeming] = React.useState<string | null>(null);
+  const [coinTransactions, setCoinTransactions] = React.useState<CoinTransaction[]>([]);
 
   React.useEffect(() => {
     const storedCover = localStorage.getItem(getStorageKey(currentUser?.id));
     setCoverImage(storedCover || defaultCoverImage);
   }, [currentUser?.id]);
 
+  React.useEffect(() => {
+    if (!currentUser?.id) {
+      setCoinTransactions([]);
+      return;
+    }
+
+    const storageKey = `coinTransactions-${currentUser.id}`;
+    const localLedger = JSON.parse(localStorage.getItem(storageKey) || '[]') as CoinTransaction[];
+    setCoinTransactions([...(currentUser.coinTransactions || []), ...localLedger].slice(0, 12));
+
+    const ledgerQuery = query(collection(db, 'users', String(currentUser.id), 'coinTransactions'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(ledgerQuery, (snapshot) => {
+      const remoteLedger = snapshot.docs.map((entry) => {
+        const data = entry.data() as Omit<CoinTransaction, 'id' | 'createdAt'> & { createdAt?: any };
+        return {
+          ...data,
+          id: entry.id,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || new Date().toISOString()),
+        } as CoinTransaction;
+      });
+      setCoinTransactions(remoteLedger.slice(0, 12));
+    }, () => {
+      setCoinTransactions([...(currentUser.coinTransactions || []), ...localLedger].slice(0, 12));
+    });
+
+    return unsubscribe;
+  }, [currentUser?.id, currentUser?.coinTransactions]);
+
   const activeCoupons = React.useMemo(() => coupons.filter(coupon => coupon.isActive), [coupons]);
-  const rewards = React.useMemo(() => (settings.content as any).redeemRewards || [], [settings.content]);
+  const coinRedeemRate = Math.max(1, Number((settings.content as any).eduCoinRules?.redeemRate || 10));
   const studyMinutes = currentUser?.studyMinutes ?? 0;
   const watchTimeMinutes = currentUser?.totalWatchTimeMinutes ?? studyMinutes;
   const eduPoints = currentUser?.eduCoins ?? 0;
+  const dynamicClaimCards = React.useMemo(() => {
+    const productCards = products
+      .filter(product => product.isVisible !== false && !product.isFree)
+      .sort((a, b) => (b.rating * Math.max(1, b.reviewCount)) - (a.rating * Math.max(1, a.reviewCount)))
+      .slice(0, 2)
+      .map(product => ({ id: `product-${product.id}`, name: product.title, type: 'Product', price: Number((product.salePrice || product.price).replace('₹', '')) || 0 }));
+    const planCards = ((settings.content as any).subscriptionPlans || [])
+      .slice(0, 2)
+      .map((plan: any) => ({ id: `plan-${plan.id}`, name: `${plan.name} Plan`, type: 'Subscription', price: Number(plan.price || 0) }));
+
+    return [...productCards, ...planCards].slice(0, 3).map(item => {
+      const maxDiscount = Math.min(item.price, Math.floor(eduPoints / coinRedeemRate));
+      const requiredCoins = Math.min(Math.max(coinRedeemRate, maxDiscount * coinRedeemRate), Math.max(coinRedeemRate, Math.floor(item.price * coinRedeemRate)));
+      return { ...item, discount: maxDiscount, requiredCoins, claimable: eduPoints >= requiredCoins && maxDiscount > 0 };
+    });
+  }, [coinRedeemRate, eduPoints, products, settings.content]);
   const level = Math.max(1, Math.floor(eduPoints / 500) + 1);
   const currentLevelStart = (level - 1) * 500;
   const pointsIntoLevel = eduPoints - currentLevelStart;
@@ -244,8 +293,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className={`hub-animate rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '160ms' }}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.3em] text-cyan-200">EduPoints Engine</p>
-                <h2 className="mt-2 text-4xl font-black sm:text-5xl">{eduPoints.toLocaleString()} EduPoints</h2>
+                <p className="text-sm font-black uppercase tracking-[0.3em] text-cyan-200">EduCoin Engine</p>
+                <h2 className="mt-2 text-4xl font-black sm:text-5xl">{eduPoints.toLocaleString()} EduCoins</h2>
                 <p className="mt-2 text-slate-600">Earned from purchases, module momentum, study time, and quiz performance.</p>
               </div>
               <div className="rounded-3xl border border-cyan-300/20 bg-cyan-400/10 p-5 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5">
@@ -387,18 +436,23 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className={`hub-animate rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '600ms' }}>
             <p className="text-sm font-black uppercase tracking-[0.3em] text-emerald-200">Rewards Vault</p>
             <h2 className="mt-2 text-3xl font-black">What You Can Claim</h2>
+            <p className="mt-2 text-sm text-slate-600">Live wallet: 🪙 {eduPoints} • {coinRedeemRate} EduCoins = ₹1 discount.</p>
             <div className="mt-5 grid gap-3">
-              {rewards.length ? rewards.map((reward: any) => (
-                <button
+              {dynamicClaimCards.length ? dynamicClaimCards.map((reward) => (
+                <article
                   key={reward.id}
-                  disabled={!!redeeming || (currentUser?.eduCoins || 0) < reward.cost}
-                  onClick={() => redeem(reward)}
-                  className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/70 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:bg-white/80 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  className={`rounded-2xl border bg-white/70 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:bg-white/80 ${reward.claimable ? 'border-indigo-400 shadow-[0_0_15px_rgba(79,70,229,0.5)] animate-pulse' : 'border-white/50 shadow-sm'}`}
                 >
-                  <span className="font-bold">{reward.title}</span>
-                  <span className="font-black text-amber-200">🪙 {reward.cost}</span>
-                </button>
-              )) : <p className="rounded-2xl border border-white/50 bg-white/70 p-4 text-slate-600">Reward claims will appear here as new perks are released.</p>}
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <span className="rounded-full border border-amber-200/70 bg-amber-50/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-amber-700">{reward.type}</span>
+                      <h3 className="mt-3 text-lg font-black text-slate-900">Claim ₹{reward.discount} off on {reward.name}</h3>
+                      <p className="mt-1 text-xs font-bold text-slate-600">Uses up to 🪙 {reward.requiredCoins} at checkout. {reward.claimable ? 'Ready to claim now.' : `Earn ${Math.max(0, reward.requiredCoins - eduPoints)} more coins.`}</p>
+                    </div>
+                    <span className="text-2xl">{reward.claimable ? '✨' : '🔒'}</span>
+                  </div>
+                </article>
+              )) : <p className="rounded-2xl border border-white/50 bg-white/70 p-4 text-slate-600">Reward claims will appear here once products or subscriptions are available.</p>}
             </div>
           </div>
 
@@ -406,7 +460,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             <p className="text-sm font-black uppercase tracking-[0.3em] text-blue-200">Personalization</p>
             <h2 className="mt-2 text-3xl font-black">Theme & Coupons</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {Object.values(themes).map(theme => {
+              {Object.values(themes).filter(theme => theme.name !== 'Midnight').map(theme => {
                 const key = theme.name.toLowerCase() as ThemeName;
                 return (
                   <button
@@ -431,6 +485,29 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className={`hub-animate mt-6 rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '760ms' }}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.3em] text-indigo-300">Coin History</p>
+              <h2 className="mt-2 text-3xl font-black">Live Earning Ledger</h2>
+            </div>
+            <p className="text-sm text-slate-600">Synced from your coinTransactions wallet ledger.</p>
+          </div>
+          <div className="mt-5 grid gap-3">
+            {coinTransactions.length ? coinTransactions.slice(0, 8).map((entry) => (
+              <div key={entry.id || `${entry.createdAt}-${entry.description}`} className="flex items-center justify-between gap-4 rounded-2xl border border-white/50 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+                <div>
+                  <p className="font-black text-slate-900">{entry.type === 'credit' ? '✔️' : '↘️'} {entry.source}</p>
+                  <p className="mt-1 text-sm text-slate-600">{entry.description}</p>
+                </div>
+                <div className={`text-right text-lg font-black ${entry.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</div>
+              </div>
+            )) : (
+              <div className="rounded-2xl border border-white/50 bg-white/70 p-5 text-slate-600">No coin movements yet. Read an article or complete a purchase to start your live ledger.</div>
+            )}
           </div>
         </section>
       </main>

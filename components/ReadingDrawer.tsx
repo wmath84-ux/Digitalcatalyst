@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Announcement, NewsArticle } from '../App';
+import { Announcement, NewsArticle, User } from '../App';
 
 type ReadingListType = 'news' | 'blog';
 type ReadingView = ReadingListType | 'article' | 'announcement';
@@ -12,6 +12,7 @@ interface ReadingDrawerProps {
   listType: ReadingListType;
   selectedArticle: NewsArticle | null;
   selectedAnnouncement: Announcement | null;
+  currentUser?: User | null;
   onClose: () => void;
   onSelectArticle: (article: NewsArticle) => void;
   onSelectAnnouncement: (announcement: Announcement) => void;
@@ -20,7 +21,7 @@ interface ReadingDrawerProps {
   promoTitle?: string;
   promoDescription?: string;
   promoCtaLabel?: string;
-  onReadingReward?: (article: NewsArticle) => void;
+  onReadingReward?: (article: NewsArticle) => boolean;
 }
 
 
@@ -153,10 +154,13 @@ const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: s
   </button>
 );
 
-const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
+const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const rewardIssuedRef = useRef<number | string | null>(null);
+  const lastReadingActivityRef = useRef(0);
+  const [rewardSecondsLeft, setRewardSecondsLeft] = useState(119);
+  const [rewardStatus, setRewardStatus] = useState<'idle' | 'claimed' | 'already' | 'login'>('idle');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -167,18 +171,35 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
   }, [isOpen, view, selectedArticle?.id, selectedAnnouncement?.id]);
 
   useEffect(() => {
-    if (!isOpen || view !== 'article' || !selectedArticle || !onReadingReward) return;
-    let secondsRead = 0;
-    rewardIssuedRef.current = rewardIssuedRef.current === selectedArticle.id ? rewardIssuedRef.current : null;
+    if (!isOpen || view !== 'article' || !selectedArticle) return;
+    const readIds = [...(currentUser?.rewardedArticleIds || []), ...(currentUser?.readArticles || [])];
+    if (!currentUser) setRewardStatus('login');
+    else if (readIds.includes(selectedArticle.id)) setRewardStatus('already');
+    else setRewardStatus('idle');
+    setRewardSecondsLeft(119);
+    lastReadingActivityRef.current = 0;
+    rewardIssuedRef.current = null;
+  }, [currentUser, isOpen, selectedArticle, view]);
+
+  useEffect(() => {
+    if (!isOpen || view !== 'article' || !selectedArticle || !onReadingReward || rewardStatus !== 'idle') return;
     const timer = window.setInterval(() => {
-      secondsRead += 5;
-      if (secondsRead >= 120 && rewardIssuedRef.current !== selectedArticle.id) {
-        rewardIssuedRef.current = selectedArticle.id;
-        onReadingReward(selectedArticle);
-      }
-    }, 5000);
+      const active = document.visibilityState === 'visible' && document.hasFocus() && Date.now() - lastReadingActivityRef.current < 3500;
+      if (!active) return;
+      setRewardSecondsLeft((seconds) => {
+        if (seconds <= 1) {
+          if (rewardIssuedRef.current !== selectedArticle.id) {
+            rewardIssuedRef.current = selectedArticle.id;
+            const claimed = onReadingReward(selectedArticle);
+            setRewardStatus(claimed ? 'claimed' : 'already');
+          }
+          return 0;
+        }
+        return seconds - 1;
+      });
+    }, 1000);
     return () => window.clearInterval(timer);
-  }, [isOpen, onReadingReward, selectedArticle, view]);
+  }, [isOpen, onReadingReward, rewardStatus, selectedArticle, view]);
 
   const activeMeta = useMemo(() => {
     if (view === 'article' && selectedArticle) {
@@ -207,6 +228,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
     : 'In-depth how-to guides, study systems, career readiness playbooks, and practical learning strategies.';
 
   const handleScroll = () => {
+    lastReadingActivityRef.current = Date.now();
     const el = scrollRef.current;
     if (!el) return;
     const max = el.scrollHeight - el.clientHeight;
@@ -218,6 +240,9 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
     if (navigator.share) await navigator.share(shareData);
     else await navigator.clipboard?.writeText(`${shareData.text} ${shareData.url}`);
   };
+
+  const rewardMinutes = Math.floor(rewardSecondsLeft / 60);
+  const rewardSeconds = String(rewardSecondsLeft % 60).padStart(2, '0');
 
   if (!isOpen) return null;
 
@@ -324,9 +349,19 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
             </div>
           </div>
 
-          <div className="pointer-events-none absolute bottom-5 left-1/2 z-30 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-full border border-emerald-300/20 bg-white/70 px-5 py-3 text-center text-sm font-bold text-emerald-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
-            📚 Read 1 more article today to earn +10 EduPoints!
-          </div>
+          {view === 'article' && selectedArticle && (
+            <div className="absolute bottom-5 right-5 z-30 max-w-sm rounded-[1.5rem] border border-white/60 bg-white/80 px-5 py-4 text-sm font-black text-slate-900 shadow-[0_12px_40px_rgba(79,70,229,0.18)] backdrop-blur-2xl animate-fade-in-up">
+              {rewardStatus === 'claimed' && <span className="text-emerald-700">🎉 +10 Coins Claimed!</span>}
+              {rewardStatus === 'already' && <span className="text-indigo-700">✔️ Reward already claimed for this article</span>}
+              {rewardStatus === 'login' && <span className="text-amber-700">🔐 Login to earn reading coins</span>}
+              {rewardStatus === 'idle' && (
+                <div>
+                  <p className="text-indigo-700">⏳ {String(rewardMinutes).padStart(2, '0')}:{rewardSeconds} to earn +10 Coins</p>
+                  <p className="mt-1 text-xs font-bold text-slate-600">Timer runs only while this tab is focused and you keep reading/scrolling.</p>
+                </div>
+              )}
+            </div>
+          )}
         </section>
       </div>
     </div>
