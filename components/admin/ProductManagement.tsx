@@ -4,6 +4,11 @@ import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
 
 type ProductViewState = 'list' | 'add' | 'edit';
 
+type ProductAdminInitialState = Omit<Product, 'id'> & {
+    faqs: unknown[];
+    modules: CourseModule[];
+};
+
 type ProductFormData = {
     title: string;
     description: string;
@@ -27,6 +32,36 @@ type ProductFormData = {
     tagsText: string;
 };
 
+const initialProductState: ProductAdminInitialState = {
+    imageSeed: '',
+    images: [],
+    title: '',
+    description: '',
+    longDescription: '',
+    features: [],
+    price: '₹0',
+    salePrice: undefined,
+    category: '',
+    department: 'Unisex',
+    inStock: true,
+    isVisible: true,
+    manualRating: null,
+    sku: '',
+    tags: [],
+    dimensions: '',
+    fileFormat: '',
+    courseContent: [],
+    aspectRatio: 'aspect-[4/3]',
+    priceHistory: [],
+    isFree: false,
+    couponCode: '',
+    paymentLink: '',
+    wishlistCount: 0,
+    viewCount: 0,
+    faqs: [],
+    modules: [],
+};
+
 const emptyArrays = {
     images: [] as string[],
     features: [] as string[],
@@ -35,28 +70,32 @@ const emptyArrays = {
     priceHistory: [],
 };
 
-const createEmptyProductForm = (product?: ProductWithRating | null): ProductFormData => ({
-    title: product?.title || '',
-    description: product?.description || '',
-    longDescription: product?.longDescription || '',
-    price: product?.price ? product.price.replace('₹', '') : '',
-    salePrice: product?.salePrice ? product.salePrice.replace('₹', '') : '',
-    imageSeed: product?.imageSeed || '',
-    category: product?.category || '',
-    department: product?.department || 'Unisex',
-    inStock: product?.inStock ?? true,
-    isVisible: product?.isVisible ?? true,
-    manualRating: product?.manualRating !== null && product?.manualRating !== undefined ? product.manualRating.toString() : '',
-    sku: product?.sku || '',
-    dimensions: product?.dimensions || '',
-    fileFormat: product?.fileFormat || '',
-    aspectRatio: product?.aspectRatio || 'aspect-[4/3]',
-    isFree: product?.isFree || false,
-    couponCode: product?.couponCode || '',
-    paymentLink: product?.paymentLink || '',
-    featuresText: (product?.features || []).join('\n'),
-    tagsText: (product?.tags || []).join(', '),
-});
+const createEmptyProductForm = (product?: ProductWithRating | null): ProductFormData => {
+    const source = product || initialProductState;
+
+    return {
+        title: source.title || '',
+        description: source.description || '',
+        longDescription: source.longDescription || '',
+        price: source.price ? source.price.replace('₹', '') : '',
+        salePrice: source.salePrice ? source.salePrice.replace('₹', '') : '',
+        imageSeed: source.imageSeed || '',
+        category: source.category || '',
+        department: source.department || 'Unisex',
+        inStock: source.inStock ?? true,
+        isVisible: source.isVisible ?? true,
+        manualRating: source.manualRating !== null && source.manualRating !== undefined ? source.manualRating.toString() : '',
+        sku: source.sku || '',
+        dimensions: source.dimensions || '',
+        fileFormat: source.fileFormat || '',
+        aspectRatio: source.aspectRatio || 'aspect-[4/3]',
+        isFree: source.isFree || false,
+        couponCode: source.couponCode || '',
+        paymentLink: source.paymentLink || '',
+        featuresText: (source.features || []).join('\n'),
+        tagsText: (source.tags || []).join(', '),
+    };
+};
 
 const normaliseQuizQuestions = (questions?: QuizQuestion[]): QuizQuestion[] => (questions || []).map(question => ({
     prompt: question.prompt || '',
@@ -107,6 +146,17 @@ const glassCard = 'rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2
 const fieldClass = 'w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-400';
 
+const editorCommands: Array<[string, string, string?]> = [
+    ['bold', 'B'],
+    ['italic', 'I'],
+    ['formatBlock', 'H1', '<h1>'],
+    ['formatBlock', 'H2', '<h2>'],
+    ['insertUnorderedList', '• List'],
+    ['justifyLeft', 'Left'],
+    ['justifyCenter', 'Center'],
+    ['justifyRight', 'Right'],
+];
+
 const AdminDocsEditor: React.FC<{ value: string; onChange: (value: string) => void; }> = ({ value, onChange }) => {
     const editorRef = useRef<HTMLDivElement>(null);
 
@@ -123,16 +173,7 @@ const AdminDocsEditor: React.FC<{ value: string; onChange: (value: string) => vo
     return (
         <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/70">
             <div className="flex flex-wrap gap-2 border-b border-white/10 bg-white/5 p-3 backdrop-blur-xl">
-                {[
-                    ['bold', 'B'],
-                    ['italic', 'I'],
-                    ['formatBlock', 'H1', '<h1>'],
-                    ['formatBlock', 'H2', '<h2>'],
-                    ['insertUnorderedList', '• List'],
-                    ['justifyLeft', 'Left'],
-                    ['justifyCenter', 'Center'],
-                    ['justifyRight', 'Right'],
-                ].map(([command, label, value]) => (
+                {(editorCommands || []).map(([command, label, value]) => (
                     <button
                         key={`${command}-${label}`}
                         type="button"
@@ -247,7 +288,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
 
             {!formState ? (
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-                    {contentTypes.map(item => (
+                    {(contentTypes || []).map(item => (
                         <button
                             key={item.type}
                             type="button"
@@ -345,7 +386,7 @@ const ModuleEditor: React.FC<{
             </div>
 
             <div className="mt-5 space-y-3">
-                {files.length > 0 ? files.map(file => (
+                {files.length > 0 ? (files || []).map(file => (
                     <div key={file.id} className="flex flex-col gap-2 rounded-2xl border border-white/10 bg-slate-950/70 p-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <p className="font-black text-white">{file.name}</p>
@@ -360,7 +401,7 @@ const ModuleEditor: React.FC<{
 
             {childModules.length > 0 && (
                 <div className="mt-5 space-y-4 border-l border-white/10 pl-4">
-                    {childModules.map(child => (
+                    {(childModules || []).map(child => (
                         <ModuleEditor key={child.id} module={child} allModules={allModules} level={level + 1} onUpdate={onUpdate} onAddChild={onAddChild} />
                     ))}
                 </div>
@@ -377,8 +418,8 @@ const ProductForm: React.FC<{
     onCancel: () => void;
 }> = ({ mode, product, coupons, onSave, onCancel }) => {
     const [formData, setFormData] = useState<ProductFormData>(() => createEmptyProductForm(product));
-    const [modules, setModules] = useState<CourseModule[]>(() => normaliseModules(product?.courseContent || []));
-    const [images, setImages] = useState<string[]>(() => product?.images || []);
+    const [modules, setModules] = useState<CourseModule[]>(() => normaliseModules(product?.courseContent || initialProductState.courseContent || []));
+    const [images, setImages] = useState<string[]>(() => product?.images || initialProductState.images || []);
     const [imageMode, setImageMode] = useState<'upload' | 'ai'>('upload');
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [discountPercent, setDiscountPercent] = useState(0);
@@ -434,8 +475,8 @@ const ProductForm: React.FC<{
             return;
         }
 
-        const features = formData.featuresText.split('\n').map(item => item.trim()).filter(Boolean);
-        const tags = formData.tagsText.split(',').map(item => item.trim()).filter(Boolean);
+        const features = ((formData.featuresText || '').split('\n') || []).map(item => item.trim()).filter(Boolean);
+        const tags = ((formData.tagsText || '').split(',') || []).map(item => item.trim()).filter(Boolean);
         const formattedPrice = formData.price ? `₹${formData.price}` : '₹0';
         const formattedSalePrice = formData.salePrice ? `₹${formData.salePrice}` : undefined;
 
@@ -596,7 +637,7 @@ const ProductForm: React.FC<{
                                     <input ref={productImageInputRef} type="file" accept="image/*" multiple onChange={handleProductImagesUpload} className="hidden" />
                                 </div>
                                 <div className="mt-4 grid grid-cols-2 gap-3">
-                                    {(images || []).filter(Boolean).map((image, index) => (
+                                    {((images || []).filter(Boolean) || []).map((image, index) => (
                                         <div key={`${image}-${index}`} className="group relative aspect-square overflow-hidden rounded-2xl border border-white/10 bg-slate-900">
                                             <img src={image} alt={`Product ${index + 1}`} className="h-full w-full object-cover" />
                                             <button type="button" onClick={() => setImages(prev => (prev || []).filter((_, currentIndex) => currentIndex !== index))} className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-sm font-black text-white opacity-90">×</button>
@@ -706,7 +747,7 @@ const ProductManagement: React.FC<{
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/10">
-                                {safeProducts.length > 0 ? safeProducts.map(product => {
+                                {safeProducts.length > 0 ? (safeProducts || []).map(product => {
                                     const thumbnail = product.images?.[0] || `https://picsum.photos/seed/${product.imageSeed || product.id}/100/100`;
                                     const contentCount = countModuleContent(product.courseContent || []);
                                     return (
