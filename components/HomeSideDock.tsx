@@ -16,7 +16,7 @@ interface HomeSideDockProps {
 }
 
 const dockItems = [
-  ['Products', '🛍️'], ['Purchases', '📚'], ['Wishlist', '💜'], ['Cart', '🛒'], ['Announcements', '📢'], ['Free', '🎁'], ['Blog', '📝'], ['Profile', '🪙']
+  ['Products', '🛍️'], ['Purchases', '📚'], ['Wishlist', '💜'], ['Cart', '🛒'], ['News', '📢'], ['Free', '🎁'], ['Blog', '📝'], ['Profile', '🪙']
 ] as const;
 
 const HomeSideDock: React.FC<HomeSideDockProps> = ({ currentUser, cartCount, wishlistCount, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick }) => {
@@ -28,7 +28,7 @@ const HomeSideDock: React.FC<HomeSideDockProps> = ({ currentUser, cartCount, wis
     Purchases: onNavigateToPurchases,
     Wishlist: onNavigateToWishlist,
     Cart: onCartClick,
-    Announcements: onOpenAnnouncementsModal,
+    News: onOpenAnnouncementsModal,
     Free: onOpenFreeModal,
     Blog: onOpenBlogModal,
     Profile: onProfileClick,

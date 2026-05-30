@@ -73,14 +73,29 @@ const SmartDocsEditor: React.FC<{ value: string; onChange: (value: string) => vo
 };
 
 const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSettingsChange }) => {
-  const posts = useMemo(() => ((settings.content.newsArticles || []) as NewsArticle[]).map(normalizePost), [settings.content.newsArticles]);
+  const settingsPosts = useMemo(() => ((settings.content.newsArticles || []) as NewsArticle[]).map(normalizePost), [settings.content.newsArticles]);
+  const [articles, setArticles] = useState<EditablePost[]>(settingsPosts);
+  const posts = articles;
+
   const [mode, setMode] = useState<AdminMode>('list');
   const [editingPost, setEditingPost] = useState<EditablePost>(emptyPost());
   const [autopilotEnabled, setAutopilotEnabled] = useState(() => localStorage.getItem('dailyAiContentAutopilot') === 'enabled');
   const [automationStatus, setAutomationStatus] = useState('Idle — ready for the next editorial run.');
   const [isRunning, setIsRunning] = useState(false);
+  const [successToast, setSuccessToast] = useState('');
+
+  useEffect(() => {
+    setArticles(settingsPosts);
+  }, [settingsPosts]);
+
+  useEffect(() => {
+    if (!successToast) return;
+    const timer = window.setTimeout(() => setSuccessToast(''), 3500);
+    return () => window.clearTimeout(timer);
+  }, [successToast]);
 
   const updatePosts = (nextPosts: EditablePost[]) => {
+    setArticles(nextPosts);
     onSettingsChange({
       ...settings,
       content: {
@@ -126,7 +141,8 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
 
   const runAiFetchNow = async () => {
     setIsRunning(true);
-    setAutomationStatus('Running AI fetch, generating 20 posts, and purging expired content…');
+    setSuccessToast('');
+    setAutomationStatus('Running AI fetch, generating 10 news posts + 10 blog posts, and purging expired content…');
 
     let workingPosts = [...posts];
     const localAdapter: ContentDatabaseAdapter<ContentPostRecord> = {
@@ -134,27 +150,28 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
       deletePosts: async (ids) => {
         workingPosts = workingPosts.filter((post) => !ids.includes(post.id));
       },
-      createPosts: async (generated) => {
-        const generatedArticles = generated.map((post) => ({
-          id: Number(post.id) || Date.now() + Math.floor(Math.random() * 10000),
-          title: post.title,
-          type: post.type,
-          category: post.category,
-          date: post.date,
-          createdAt: post.createdAt,
-          imageSeed: post.imageSeed || `ai-${post.type}-${post.id}`,
-          thumbnailImage: post.thumbnailImage || '',
-          excerpt: post.excerpt,
-          content: post.content,
-        })) as EditablePost[];
-        workingPosts = [...generatedArticles, ...workingPosts.filter((post) => !generated.some((generatedPost) => generatedPost.id === post.id))];
-        updatePosts(workingPosts);
-      },
+      createPosts: async () => undefined,
     };
 
     try {
       const result = await runContentAutomation(localAdapter, { idFactory: () => Date.now() + Math.floor(Math.random() * 100000) });
-      setAutomationStatus(`Completed: generated ${result.generated.length} posts and purged ${result.purgedIds.length} expired posts.`);
+      const newArticles = result.generated.map((post) => ({
+        id: Number(post.id) || Date.now() + Math.floor(Math.random() * 10000),
+        title: post.title,
+        type: post.type,
+        category: post.category,
+        date: post.date,
+        createdAt: post.createdAt,
+        imageSeed: post.imageSeed || `ai-${post.type}-${post.id}`,
+        thumbnailImage: post.thumbnailImage || '',
+        excerpt: post.excerpt,
+        content: post.content,
+      })) as EditablePost[];
+      const purgedPostIds = new Set(result.purgedIds);
+      const nextPosts = [...newArticles, ...workingPosts.filter((post) => !purgedPostIds.has(post.id))];
+      updatePosts(nextPosts);
+      setSuccessToast(`AI fetch complete — added ${newArticles.filter(post => post.type === 'news').length} news + ${newArticles.filter(post => post.type === 'blog').length} blogs.`);
+      setAutomationStatus(`Completed: generated ${result.generated.length} posts and purged ${result.purgedIds.length} expired posts. The list below has been updated instantly.`);
     } catch (error) {
       console.error('AI content automation failed:', error);
       setAutomationStatus(error instanceof Error ? error.message : 'AI automation failed. Check the console for details.');
@@ -246,11 +263,17 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
               {autopilotEnabled ? 'Daily AI Fetch Enabled' : 'Enable Daily AI Fetch'}
             </button>
             <button onClick={runAiFetchNow} disabled={isRunning} className="rounded-2xl border border-purple-300/30 bg-purple-400/15 px-5 py-3 font-black text-purple-700 transition hover:bg-purple-400/25 disabled:cursor-not-allowed disabled:opacity-60">
-              {isRunning ? 'Running…' : 'Run AI Fetch Now'}
+              {isRunning ? <span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-purple-700/30 border-t-purple-700" /> Fetching…</span> : 'Run AI Fetch Now'}
             </button>
           </div>
         </div>
       </section>
+
+      {successToast && (
+        <div className="mb-8 rounded-3xl border border-emerald-300/30 bg-emerald-400/10 px-5 py-4 font-bold text-emerald-700 shadow-sm backdrop-blur-xl" role="status">
+          ✅ {successToast}
+        </div>
+      )}
 
       <section className={glassCard}>
         <div className="mb-5 flex items-center justify-between">
