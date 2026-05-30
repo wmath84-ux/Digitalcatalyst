@@ -202,16 +202,17 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
         <div className="absolute inset-4 z-20 flex flex-col overflow-hidden rounded-[2rem] border border-white/15 bg-slate-950/70 shadow-[0_30px_100px_rgba(0,0,0,0.45)] backdrop-blur-2xl">
           <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-white/10 p-3">
             <span className="mr-auto font-black text-white">Reading Mode</span>
-            <button onClick={() => setFontSize(value => Math.max(14, value - 2))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">A-</button>
-            <button onClick={() => setFontSize(value => Math.min(28, value + 2))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">A+</button>
-            <button onClick={() => setLineSpacing(value => Math.max(1.25, Number((value - 0.15).toFixed(2))))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">Line -</button>
-            <button onClick={() => setLineSpacing(value => Math.min(2.4, Number((value + 0.15).toFixed(2))))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">Line +</button>
-            <button onClick={() => setFontStyle(value => value === 'sans' ? 'serif' : 'sans')} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">{fontStyle === 'sans' ? 'Serif' : 'Sans'}</button>
-            {(readingThemeOptions || []).map(option => <button key={option} onClick={() => setTheme(option)} className={`rounded-xl px-3 py-2 font-black capitalize ${theme === option ? 'bg-cyan-200 text-slate-950' : 'bg-white/10 hover:bg-cyan-50/20'}`}>{option}</button>)}
-            <button onClick={() => setIsReadingMode(false)} className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 font-black hover:bg-cyan-50/20">Close</button>
+            <button type="button" onClick={() => setFontSize(value => Math.max(14, value - 2))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">A-</button>
+            <button type="button" onClick={() => setFontSize(value => Math.min(28, value + 2))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">A+</button>
+            <button type="button" onClick={() => setLineSpacing(value => Math.max(1.25, Number((value - 0.15).toFixed(2))))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">Line -</button>
+            <button type="button" onClick={() => setLineSpacing(value => Math.min(2.4, Number((value + 0.15).toFixed(2))))} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">Line +</button>
+            <button type="button" onClick={() => setFontStyle(value => value === 'sans' ? 'serif' : 'sans')} className="rounded-xl bg-white/10 px-3 py-2 font-black hover:bg-cyan-50/20">{fontStyle === 'sans' ? 'Serif' : 'Sans'}</button>
+            {(readingThemeOptions || []).map(option => <button key={option} type="button" onClick={() => setTheme(option)} className={`rounded-xl px-3 py-2 font-black capitalize ${theme === option ? 'bg-cyan-200 text-slate-950' : 'bg-white/10 hover:bg-cyan-50/20'}`}>{option}</button>)}
+            <button type="button" onClick={() => setIsReadingMode(false)} className="rounded-xl border border-white/15 bg-white/10 px-4 py-2 font-black hover:bg-cyan-50/20">Close</button>
           </div>
           <div className={`flex-1 overflow-y-auto p-6 md:p-10 ${readingTheme}`}>
-            <article className={`mx-auto max-w-3xl ${fontStyle === 'serif' ? 'font-serif' : 'font-sans'} [&_h1]:mb-5 [&_h1]:text-4xl [&_h1]:font-black [&_h2]:mb-4 [&_h2]:text-3xl [&_h2]:font-black [&_p]:mb-4 [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6`} style={{ fontSize, lineHeight: lineSpacing }} dangerouslySetInnerHTML={{ __html: editorRef.current?.innerHTML || defaultContent }} />
+            <style>{`.reader-content, .reader-content * { line-height: ${lineSpacing} !important; } .reader-content p, .reader-content li, .reader-content div, .reader-content span, .reader-content blockquote { font-size: ${fontSize}px !important; } .reader-content h1 { font-size: ${Math.round(fontSize * 2)}px !important; } .reader-content h2 { font-size: ${Math.round(fontSize * 1.65)}px !important; } .reader-content h3 { font-size: ${Math.round(fontSize * 1.35)}px !important; }`}</style>
+            <article className={`reader-content mx-auto max-w-3xl ${fontStyle === 'serif' ? 'font-serif' : 'font-sans'} [&_h1]:mb-5 [&_h1]:font-black [&_h2]:mb-4 [&_h2]:font-black [&_p]:mb-4 [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6`} dangerouslySetInnerHTML={{ __html: editorRef.current?.innerHTML || defaultContent }} />
           </div>
         </div>
       )}
@@ -299,8 +300,8 @@ const QuizPlayer: React.FC<{ file: ProductFile }> = ({ file }) => {
         </div>
 
         <div className="mt-6 flex items-center justify-between gap-4">
-          <button disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(index => Math.max(0, index - 1))} className="rounded-2xl border border-white/15 bg-white/10 px-5 py-3 font-black text-white transition hover:bg-cyan-50/20 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-          <button disabled={!answered} onClick={() => isLastQuestion ? setCurrentQuestion(0) : setCurrentQuestion(index => index + 1)} className="rounded-2xl bg-cyan-200 px-6 py-3 font-black text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50">{isLastQuestion ? 'Review Quiz' : 'Next Question'}</button>
+          <button type="button" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(index => Math.max(0, index - 1))} className="rounded-2xl border border-white/15 bg-white/10 px-5 py-3 font-black text-white transition hover:bg-cyan-50/20 disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
+          <button type="button" onClick={() => isLastQuestion ? setCurrentQuestion(0) : setCurrentQuestion(index => Math.min(questions.length - 1, index + 1))} className="rounded-2xl bg-cyan-200 px-6 py-3 font-black text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-50">{isLastQuestion ? 'Review Quiz' : 'Next Question'}</button>
         </div>
       </div>
     </div>
