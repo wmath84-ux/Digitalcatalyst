@@ -1,6 +1,7 @@
 // components/CoursePlayer.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, QuizAnswerState } from '../App';
+import { EconomySettings } from '../utils/economy';
 import AiMentor from './AiMentor';
 
 const FileIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
@@ -232,7 +233,7 @@ const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
   </div>
 );
 
-const QuizPlayer: React.FC<{ file: ProductFile; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ file, onQuizReward }) => {
+const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ file, economySettings, onQuizReward }) => {
   const questions = file.quiz?.questions || [];
   const [answers, setAnswers] = useState<QuizAnswerState>({});
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -249,7 +250,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; onQuizReward?: (quizId: string, 
   const allAnswered = questions.every((_, index) => answers[index] !== undefined);
 
   const submitQuiz = () => {
-    const coins = score * 2;
+    const coins = score * Math.max(0, Number(economySettings.coinPerQuizCorrect));
     setSubmitted(true);
     setRewardCoins(coins);
     if (coins > 0 && onQuizReward) setRewardClaimed(onQuizReward(file.id, file.name, score, coins));
@@ -329,7 +330,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; onQuizReward?: (quizId: string, 
   );
 };
 
-const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; onWatchTimeMinutes?: (minutes: number, lessonTitle?: string) => void; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ settings, product, onBack, onWatchTimeMinutes, onQuizReward }) => {
+const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: EconomySettings; product: ProductWithRating; onBack: () => void; onWatchTimeMinutes?: (minutes: number, lessonTitle?: string) => void; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ settings, economySettings, product, onBack, onWatchTimeMinutes, onQuizReward }) => {
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -378,12 +379,12 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
       if (activePlaybackSecondsRef.current >= 60) {
         activePlaybackSecondsRef.current -= 60;
         setWatchedMinutes((minutes) => minutes + 1);
-        setEarnedVideoCoins((coins) => coins + 1);
+        setEarnedVideoCoins((coins) => coins + Math.max(0, Number(economySettings.coinPerVideoMinute)));
         onWatchTimeMinutes(1, activeFile.name);
       }
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [activeFile, onWatchTimeMinutes]);
+  }, [activeFile, economySettings.coinPerVideoMinute, onWatchTimeMinutes]);
 
   const renderMedia = () => {
     if (!activeFile) return <div className="flex h-full items-center justify-center bg-white/70 text-slate-900/70 backdrop-blur-xl">Select content to begin.</div>;
@@ -400,7 +401,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
       case 'doc':
       case 'ebook': return <SmartDocsWorkspace file={activeFile} productId={product.id} />;
       case 'link': return <ExternalResourceCard file={activeFile} />;
-      case 'quiz': return <QuizPlayer file={activeFile} onQuizReward={onQuizReward} />;
+      case 'quiz': return <QuizPlayer file={activeFile} economySettings={economySettings} onQuizReward={onQuizReward} />;
       default: return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
     }
   };

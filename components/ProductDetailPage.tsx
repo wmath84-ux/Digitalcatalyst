@@ -1,7 +1,8 @@
 
 // FIX: Imported useState, useEffect, and useRef hooks from React to resolve 'Cannot find name' errors.
 import React, { useState, useEffect, useRef } from 'react';
-import { ProductWithRating, Review, Coupon, WebsiteSettings, PriceHistoryEntry, User } from '../App';
+import { ActiveCoinDiscount, ProductWithRating, Review, Coupon, WebsiteSettings, PriceHistoryEntry, User } from '../App';
+import { EconomySettings, resolveCoinPrice } from '../utils/economy';
 import PaymentModal from './PaymentModal';
 import RatingsAndReviews from './RatingsAndReviews';
 import FeaturedProducts from './FeaturedProducts';
@@ -243,6 +244,9 @@ const PriceChart: React.FC<{ basePrice: number, priceHistory?: PriceHistoryEntry
 
 interface ProductDetailPageProps {
   settings: WebsiteSettings;
+  economySettings: EconomySettings;
+  activeCoinDiscount?: ActiveCoinDiscount | null;
+  onConsumeCoinDiscount?: () => void;
   product: ProductWithRating;
   onBack: () => void;
   onPurchase: (appliedCouponCode: string | null, quantity: number) => void;
@@ -276,7 +280,7 @@ const ShareIcon = () => (
 
 
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ 
-    settings, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews, 
+    settings, economySettings, activeCoinDiscount = null, onConsumeCoinDiscount, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews, 
     onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, onModalOpened, coupons,
     scrollToSection, onSectionScrolled, allProducts, onViewProduct, wishlist, onQuickView, onGoHome,
     isPurchased = false, currentUser = null, onCoinPurchase
@@ -340,7 +344,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   };
   
   const totalCouponDiscount = calculateTotalDiscount(appliedCoupon);
-  const finalTotalPrice = preDiscountTotal - totalCouponDiscount;
+  const eduCoinDiscount = activeCoinDiscount ? Math.min(preDiscountTotal - totalCouponDiscount, activeCoinDiscount.amount) : 0;
+  const finalTotalPrice = Math.max(0, preDiscountTotal - totalCouponDiscount - eduCoinDiscount);
   
   const handleApplyCoupon = (code: string) => {
     const codeUpper = code.toUpperCase();
@@ -424,7 +429,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     setModalOpen(false);
   };
 
-  const handleModalConfirm = () => { setModalOpen(false); onPurchase(appliedCoupon ? appliedCoupon.code : null, quantity); };
+  const handleModalConfirm = () => { setModalOpen(false); onPurchase(appliedCoupon ? appliedCoupon.code : null, quantity); onConsumeCoinDiscount?.(); };
 
   const handleImageZoom = (e: React.MouseEvent<HTMLDivElement>) => {
     const zoomer = e.currentTarget.firstChild as HTMLElement;
@@ -754,11 +759,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         salePrice={salePriceNum !== null ? salePriceNum * quantity : null} 
         couponDiscount={totalCouponDiscount} 
         finalPrice={finalTotalPrice} 
+        eduCoinDiscount={eduCoinDiscount}
+        appliedEduCoins={activeCoinDiscount?.coins || 0}
+        coinRedeemRate={economySettings.coinToFiatRatio}
+        
         onClose={handleModalClose} 
         onConfirm={handleModalConfirm} 
         paymentLink={product.paymentLink}
         currentUser={currentUser}
-        coinPrice={(product.coinPrice || 0) * quantity}
+        coinPrice={resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity}
         onConfirmWithCoins={onCoinPurchase ? handleModalConfirmWithCoins : undefined}
       />}
     </>
