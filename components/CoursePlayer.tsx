@@ -1,6 +1,6 @@
 // components/CoursePlayer.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, QuizAnswerState } from '../App';
+import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile } from '../App';
 import AiMentor from './AiMentor';
 
 const FileIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
@@ -88,19 +88,79 @@ const getCourseBackground = (product: ProductWithRating, activeFile: ProductFile
   return product.images?.[0] || `https://picsum.photos/seed/${product.imageSeed || product.id}/1600/900`;
 };
 
-const htmlFromPlainText = (value: string) => value.trim().startsWith('<') ? value : `<p>${value.replace(/\n/g, '<br />')}</p>`;
+const htmlFromPlainText = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed.startsWith('<') ? trimmed : `<p>${trimmed.replace(/\n/g, '<br />')}</p>`;
+};
+
+type ReadingTheme = 'dark' | 'light' | 'sepia';
+type ReadingFontSize = 'comfortable' | 'large' | 'immersive';
+type ReadingLineSpacing = 'relaxed' | 'loose' | 'wide';
+type ReadingFontStyle = 'sans' | 'serif' | 'mono';
+
+const fontSizeClasses: Record<ReadingFontSize, string> = {
+  comfortable: 'text-lg',
+  large: 'text-xl',
+  immersive: 'text-2xl',
+};
+
+const lineSpacingClasses: Record<ReadingLineSpacing, string> = {
+  relaxed: 'leading-8',
+  loose: 'leading-9',
+  wide: 'leading-10',
+};
+
+const fontStyleClasses: Record<ReadingFontStyle, string> = {
+  sans: 'font-sans',
+  serif: 'font-serif',
+  mono: 'font-mono',
+};
+
+const readingThemeClasses: Record<ReadingTheme, string> = {
+  dark: 'border-white/10 bg-slate-950/95 text-slate-100',
+  light: 'border-slate-200/80 bg-slate-50/95 text-slate-950',
+  sepia: 'border-amber-200/60 bg-[#f4ecd8]/95 text-[#352516]',
+};
+
+const RichTextButton: React.FC<{ active?: boolean; children: React.ReactNode; onClick: () => void; title?: string; }> = ({ active = false, children, onClick, title }) => (
+  <button
+    type="button"
+    title={title}
+    onMouseDown={(event) => event.preventDefault()}
+    onClick={onClick}
+    className={`rounded-xl border px-3 py-2 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-white/20 ${active ? 'border-cyan-200 bg-cyan-300/25 shadow-[0_0_24px_rgba(125,211,252,0.25)]' : 'border-white/15 bg-white/10'}`}
+  >
+    {children}
+  </button>
+);
 
 const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = ({ file, productId }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const storageKey = `smart-docs-workspace-${productId}-${file.id}`;
-  const defaultContent = htmlFromPlainText(file.content || '<h1>Smart Docs Workspace</h1><p>Start writing here.</p>');
+  const defaultContent = useMemo(() => htmlFromPlainText(file.content || '<h1>Smart Docs Workspace</h1><p>Start writing here.</p>'), [file.content]);
+  const [html, setHtml] = useState(defaultContent);
   const [savedAt, setSavedAt] = useState('Saved locally');
+  const [isReadingMode, setIsReadingMode] = useState(false);
+  const [fontSize, setFontSize] = useState<ReadingFontSize>('large');
+  const [readingTheme, setReadingTheme] = useState<ReadingTheme>('dark');
+  const [lineSpacing, setLineSpacing] = useState<ReadingLineSpacing>('loose');
+  const [fontStyle, setFontStyle] = useState<ReadingFontStyle>('serif');
+  const [focusMode, setFocusMode] = useState(false);
 
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
-    if (editorRef.current) editorRef.current.innerHTML = saved || defaultContent;
+    const nextHtml = saved || defaultContent;
+    setHtml(nextHtml);
+    if (editorRef.current) editorRef.current.innerHTML = nextHtml;
     setSavedAt(saved ? 'Restored from local autosave' : 'Loaded admin version');
   }, [storageKey, defaultContent]);
+
+  const persist = (updateReadingPreview = false) => {
+    const nextHtml = editorRef.current?.innerHTML || '';
+    localStorage.setItem(storageKey, nextHtml);
+    if (updateReadingPreview || isReadingMode) setHtml(nextHtml);
+    setSavedAt(`Saved ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+  };
 
   const runCommand = (command: string, value?: string) => {
     editorRef.current?.focus();
@@ -108,30 +168,113 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
     persist();
   };
 
-  const persist = () => {
-    localStorage.setItem(storageKey, editorRef.current?.innerHTML || '');
-    setSavedAt(`Saved ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+  const openReadingMode = () => {
+    setHtml(editorRef.current?.innerHTML || html);
+    setIsReadingMode(true);
   };
 
+  const handlePaste = (event: React.ClipboardEvent<HTMLDivElement>) => {
+    const richHtml = event.clipboardData.getData('text/html');
+    if (!richHtml) return;
+    event.preventDefault();
+    editorRef.current?.focus();
+    document.execCommand('insertHTML', false, richHtml);
+    persist();
+  };
+
+  const applyBlock = (tagName: string) => runCommand('formatBlock', tagName);
+  const readingArticleClass = `${fontSizeClasses[fontSize]} ${lineSpacingClasses[lineSpacing]} ${fontStyleClasses[fontStyle]} ${readingThemeClasses[readingTheme]} ${focusMode ? 'mx-auto max-w-2xl' : 'mx-auto max-w-4xl'}`;
+
   return (
-    <div className="flex h-full flex-col overflow-hidden bg-slate-100/60 text-slate-950">
-      <div className="flex flex-wrap items-center gap-2 border-b border-white/55 bg-white/45 p-3 shadow-sm backdrop-blur-xl">
-        <span className="mr-2 rounded-full border border-white/70 bg-white/60 px-3 py-2 text-xs font-black uppercase tracking-widest text-slate-600">Smart Docs Workspace</span>
-        {[
-          ['bold', 'B'], ['italic', 'I'], ['underline', 'U'],
-        ].map(([cmd, label]) => <button key={cmd} type="button" onClick={() => runCommand(cmd)} className="rounded-xl border border-white/70 bg-white/55 px-3 py-2 font-black shadow-sm hover:bg-white">{label}</button>)}
-        <button type="button" onClick={() => runCommand('formatBlock', '<h1>')} className="rounded-xl border border-white/70 bg-white/55 px-3 py-2 font-black hover:bg-white">H1</button>
-        <button type="button" onClick={() => runCommand('formatBlock', '<h2>')} className="rounded-xl border border-white/70 bg-white/55 px-3 py-2 font-black hover:bg-white">H2</button>
-        <button type="button" onClick={() => runCommand('insertUnorderedList')} className="rounded-xl border border-white/70 bg-white/55 px-3 py-2 font-black hover:bg-white">• List</button>
-        <button type="button" onClick={() => runCommand('justifyLeft')} className="rounded-xl border border-white/70 bg-white/55 px-3 py-2 font-black hover:bg-white">Left</button>
-        <button type="button" onClick={() => runCommand('justifyCenter')} className="rounded-xl border border-white/70 bg-white/55 px-3 py-2 font-black hover:bg-white">Center</button>
-        <button type="button" onClick={() => runCommand('justifyRight')} className="rounded-xl border border-white/70 bg-white/55 px-3 py-2 font-black hover:bg-white">Right</button>
-        <span className="ml-auto text-xs font-bold text-slate-500">{savedAt}</span>
-        <button type="button" onClick={() => window.print()} className="rounded-2xl bg-slate-950 px-4 py-2 font-black text-white shadow-lg transition hover:-translate-y-0.5 hover:bg-slate-800">Print / Save as PDF</button>
+    <div className="relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/10 bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_30px_90px_rgba(2,6,23,0.38)] backdrop-blur-xl">
+      <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-slate-950/35 p-3 shadow-[0_10px_40px_rgba(2,6,23,0.22)] backdrop-blur-2xl">
+        <button type="button" onClick={openReadingMode} className="mr-2 rounded-2xl border border-cyan-200/40 bg-cyan-300/20 px-4 py-2 text-sm font-black uppercase tracking-[0.18em] text-cyan-50 shadow-[0_0_32px_rgba(125,211,252,0.22)] transition hover:-translate-y-0.5 hover:bg-cyan-300/30">Reading Mode</button>
+        <span className="rounded-full border border-white/15 bg-white/10 px-3 py-2 text-xs font-black uppercase tracking-widest text-white/80">Smart Docs Workspace</span>
+        <select aria-label="Heading style" onChange={(event) => applyBlock(event.target.value)} defaultValue="P" className="rounded-xl border border-white/15 bg-slate-950/70 px-3 py-2 text-sm font-black text-white outline-none transition hover:bg-slate-900">
+          <option value="P">Paragraph</option>
+          <option value="H1">Heading 1</option>
+          <option value="H2">Heading 2</option>
+          <option value="H3">Heading 3</option>
+        </select>
+        <RichTextButton onClick={() => runCommand('bold')} title="Bold">B</RichTextButton>
+        <RichTextButton onClick={() => runCommand('italic')} title="Italic"><span className="italic">I</span></RichTextButton>
+        <RichTextButton onClick={() => runCommand('underline')} title="Underline"><span className="underline">U</span></RichTextButton>
+        <RichTextButton onClick={() => runCommand('insertUnorderedList')} title="Bulleted list">• List</RichTextButton>
+        <RichTextButton onClick={() => runCommand('insertOrderedList')} title="Numbered list">1. List</RichTextButton>
+        <select aria-label="Text color" onChange={(event) => runCommand('foreColor', event.target.value)} defaultValue="" className="rounded-xl border border-white/15 bg-slate-950/70 px-3 py-2 text-sm font-black text-white outline-none transition hover:bg-slate-900">
+          <option value="" disabled>Color</option>
+          <option value="#ffffff">White</option>
+          <option value="#67e8f9">Cyan</option>
+          <option value="#a7f3d0">Emerald</option>
+          <option value="#fde68a">Amber</option>
+          <option value="#fda4af">Rose</option>
+        </select>
+        <RichTextButton onClick={() => runCommand('justifyLeft')} title="Align left">Left</RichTextButton>
+        <RichTextButton onClick={() => runCommand('justifyCenter')} title="Align center">Center</RichTextButton>
+        <RichTextButton onClick={() => runCommand('justifyRight')} title="Align right">Right</RichTextButton>
+        <span className="ml-auto rounded-full border border-white/10 bg-white/10 px-3 py-2 text-xs font-bold text-white/65">{savedAt}</span>
       </div>
-      <div className="flex-1 overflow-y-auto p-5 md:p-10">
-        <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={persist} className="smart-docs-page mx-auto min-h-full max-w-4xl rounded-sm bg-white px-8 py-10 text-lg leading-8 shadow-[0_25px_80px_rgba(15,23,42,0.18)] outline-none md:px-14" />
+
+      <div className="flex-1 overflow-y-auto bg-[radial-gradient(circle_at_20%_20%,rgba(125,211,252,0.18),transparent_28%),radial-gradient(circle_at_80%_5%,rgba(255,255,255,0.12),transparent_26%)] p-4 md:p-8">
+        <div
+          ref={editorRef}
+          contentEditable
+          suppressContentEditableWarning
+          onInput={persist}
+          onPaste={handlePaste}
+          className="mx-auto min-h-full max-w-4xl rounded-[1.75rem] border border-white/10 bg-slate-950/70 px-6 py-8 text-lg leading-8 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_30px_80px_rgba(2,6,23,0.35)] outline-none backdrop-blur-2xl md:px-12 [&_*]:max-w-full [&_a]:text-cyan-200 [&_blockquote]:border-l-4 [&_blockquote]:border-cyan-200/60 [&_blockquote]:pl-5 [&_h1]:mb-5 [&_h1]:text-4xl [&_h1]:font-black [&_h2]:mb-4 [&_h2]:text-3xl [&_h2]:font-black [&_h3]:mb-3 [&_h3]:text-2xl [&_h3]:font-black [&_li]:my-1 [&_ol]:list-decimal [&_ol]:pl-8 [&_p]:mb-4 [&_ul]:list-disc [&_ul]:pl-8"
+          dangerouslySetInnerHTML={{ __html: html }}
+        />
       </div>
+
+      {isReadingMode && (
+        <div className="absolute inset-0 z-20 overflow-y-auto bg-slate-950/78 p-4 backdrop-blur-2xl md:p-8">
+          <div className="mx-auto flex min-h-full max-w-6xl flex-col rounded-[2rem] border border-white/15 bg-white/10 shadow-[inset_0_1px_0_rgba(255,255,255,0.18),0_30px_90px_rgba(2,6,23,0.55)] backdrop-blur-3xl">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-white/10 p-4">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.3em] text-cyan-100">Reading Mode</p>
+                <h2 className="text-2xl font-black text-white">{file.name}</h2>
+              </div>
+              <button type="button" onClick={() => setIsReadingMode(false)} className="rounded-full border border-white/20 bg-white/10 px-4 py-2 text-2xl font-black leading-none text-white transition hover:bg-white/20">×</button>
+            </div>
+
+            <div className="grid min-h-0 flex-1 gap-4 p-4 lg:grid-cols-[18rem_minmax(0,1fr)]">
+              <aside className="space-y-5 rounded-[1.5rem] border border-white/10 bg-slate-950/35 p-4 text-white">
+                <div>
+                  <label className="text-xs font-black uppercase tracking-[0.22em] text-white/55">Font Size</label>
+                  <div className="mt-2 grid gap-2">
+                    {(['comfortable', 'large', 'immersive'] as ReadingFontSize[]).map((option) => <button key={option} type="button" onClick={() => setFontSize(option)} className={`rounded-xl border px-3 py-2 text-left font-bold capitalize transition ${fontSize === option ? 'border-cyan-200 bg-cyan-300/20 text-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}`}>{option}</button>)}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-black uppercase tracking-[0.22em] text-white/55">Dark/Light/Sepia Theme</label>
+                  <div className="mt-2 grid grid-cols-3 gap-2">
+                    {(['dark', 'light', 'sepia'] as ReadingTheme[]).map((option) => <button key={option} type="button" onClick={() => setReadingTheme(option)} className={`rounded-xl border px-3 py-2 text-sm font-bold capitalize transition ${readingTheme === option ? 'border-cyan-200 bg-cyan-300/20 text-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}`}>{option}</button>)}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-black uppercase tracking-[0.22em] text-white/55">Line Spacing</label>
+                  <div className="mt-2 grid gap-2">
+                    {(['relaxed', 'loose', 'wide'] as ReadingLineSpacing[]).map((option) => <button key={option} type="button" onClick={() => setLineSpacing(option)} className={`rounded-xl border px-3 py-2 text-left font-bold capitalize transition ${lineSpacing === option ? 'border-cyan-200 bg-cyan-300/20 text-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}`}>{option}</button>)}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-black uppercase tracking-[0.22em] text-white/55">Font Style</label>
+                  <div className="mt-2 grid gap-2">
+                    {(['sans', 'serif', 'mono'] as ReadingFontStyle[]).map((option) => <button key={option} type="button" onClick={() => setFontStyle(option)} className={`rounded-xl border px-3 py-2 text-left font-bold capitalize transition ${fontStyle === option ? 'border-cyan-200 bg-cyan-300/20 text-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}`}>{option}</button>)}
+                  </div>
+                </div>
+                <div>
+                  <label className="text-xs font-black uppercase tracking-[0.22em] text-white/55">Focus Mode</label>
+                  <button type="button" onClick={() => setFocusMode(prev => !prev)} className={`mt-2 w-full rounded-xl border px-3 py-2 text-left font-bold transition ${focusMode ? 'border-cyan-200 bg-cyan-300/20 text-white' : 'border-white/10 bg-white/5 text-white/70 hover:bg-white/10'}`}>{focusMode ? 'Enabled' : 'Disabled'}</button>
+                </div>
+              </aside>
+
+              <article className={`overflow-y-auto rounded-[1.5rem] border p-6 shadow-[0_24px_70px_rgba(2,6,23,0.35)] md:p-10 [&_a]:text-cyan-400 [&_blockquote]:border-l-4 [&_blockquote]:border-current [&_blockquote]:pl-5 [&_h1]:mb-5 [&_h1]:text-5xl [&_h1]:font-black [&_h2]:mb-4 [&_h2]:text-4xl [&_h2]:font-black [&_h3]:mb-3 [&_h3]:text-3xl [&_h3]:font-black [&_li]:my-2 [&_ol]:list-decimal [&_ol]:pl-8 [&_p]:mb-5 [&_ul]:list-disc [&_ul]:pl-8 ${readingArticleClass}`} dangerouslySetInnerHTML={{ __html: html }} />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -150,35 +293,96 @@ const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
 
 const QuizPlayer: React.FC<{ file: ProductFile }> = ({ file }) => {
   const questions = file.quiz?.questions || [];
-  const [answers, setAnswers] = useState<QuizAnswerState>({});
-  const score = questions.reduce((total, q, index) => total + (answers[index] === q.correctAnswer ? 1 : 0), 0);
+  const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
+  const [answers, setAnswers] = useState<Record<number, number>>({});
+
+  useEffect(() => {
+    setCurrentQuestionIndex(0);
+    setAnswers({});
+  }, [file.id]);
+
   if (!questions.length) return <GlassDownloadCard file={file} headline="Quiz unavailable" />;
+
+  const currentQuestion = questions[currentQuestionIndex];
+  const selectedAnswer = answers[currentQuestionIndex];
+  const hasAnswered = selectedAnswer !== undefined;
+  const isCorrect = selectedAnswer === currentQuestion.correctAnswer;
+  const score = questions.reduce((total, question, index) => total + (answers[index] === question.correctAnswer ? 1 : 0), 0);
+  const progressPercent = ((currentQuestionIndex + 1) / questions.length) * 100;
+  const isLastQuestion = currentQuestionIndex === questions.length - 1;
+
+  const moveNext = () => {
+    if (!hasAnswered) return;
+    if (!isLastQuestion) setCurrentQuestionIndex(prev => prev + 1);
+  };
+
   return (
-    <div className="h-full overflow-y-auto p-4 text-white md:p-8">
-      <div className="mx-auto max-w-5xl rounded-[2rem] border border-white/25 bg-white/10 p-6 shadow-2xl backdrop-blur-xl md:p-8">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div><p className="font-black uppercase tracking-[0.3em] text-cyan-100">Interactive Quiz</p><h2 className="mt-2 text-3xl font-black">{file.name}</h2></div>
-          <div className="rounded-2xl border border-white/25 bg-white/15 px-5 py-3 text-lg font-black">Score: {score}/{questions.length}</div>
+    <div className="flex h-full items-center justify-center overflow-y-auto bg-[radial-gradient(circle_at_20%_15%,rgba(34,211,238,0.18),transparent_30%),radial-gradient(circle_at_80%_85%,rgba(16,185,129,0.14),transparent_28%)] p-4 text-white md:p-8">
+      <div className="relative mx-auto w-full max-w-4xl overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.05] p-6 shadow-[inset_0_1px_0_rgba(255,255,255,0.14),0_30px_110px_rgba(2,6,23,0.55),0_0_80px_rgba(125,211,252,0.12)] backdrop-blur-3xl md:p-8">
+        <div className="pointer-events-none absolute -right-20 -top-20 h-56 w-56 rounded-full bg-cyan-300/15 blur-3xl" />
+        <div className="pointer-events-none absolute -bottom-24 left-10 h-64 w-64 rounded-full bg-emerald-300/10 blur-3xl" />
+
+        <div className="relative mb-8 flex flex-wrap items-start justify-between gap-4">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.34em] text-cyan-100/90">Interactive Quiz</p>
+            <h2 className="mt-2 text-3xl font-black leading-tight text-white md:text-4xl">{file.name}</h2>
+          </div>
+          <div className="rounded-2xl border border-white/10 bg-white/10 px-5 py-3 text-right shadow-[inset_0_1px_0_rgba(255,255,255,0.12)]">
+            <p className="text-xs font-black uppercase tracking-[0.2em] text-white/45">Score</p>
+            <p className="text-2xl font-black text-white">{score}/{questions.length}</p>
+          </div>
         </div>
-        <div className="space-y-5">
-          {questions.map((question, qIndex) => {
-            const selected = answers[qIndex];
-            const answered = selected !== undefined;
-            return (
-              <div key={`${question.prompt}-${qIndex}`} className="rounded-3xl border border-white/20 bg-white/10 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-                <h3 className="text-xl font-black">{qIndex + 1}. {question.prompt}</h3>
-                <div className="mt-4 grid gap-3 md:grid-cols-2">
-                  {question.options.map((option, oIndex) => {
-                    const isCorrect = oIndex === question.correctAnswer;
-                    const isSelected = selected === oIndex;
-                    const stateClass = !answered ? 'border-white/25 bg-white/10 hover:bg-white/20' : isCorrect ? 'border-emerald-300 bg-emerald-400/25' : isSelected ? 'border-rose-300 bg-rose-400/25' : 'border-white/15 bg-white/5 opacity-70';
-                    return <button key={`${option}-${oIndex}`} type="button" onClick={() => setAnswers(prev => ({ ...prev, [qIndex]: oIndex }))} className={`rounded-2xl border px-4 py-3 text-left font-bold transition ${stateClass}`}>{option}</button>;
-                  })}
-                </div>
-                {answered && <p className={`mt-4 font-black ${selected === question.correctAnswer ? 'text-emerald-200' : 'text-rose-200'}`}>{selected === question.correctAnswer ? 'Correct! Great work.' : `Incorrect. Correct answer: ${question.options[question.correctAnswer]}`}</p>}
-              </div>
-            );
-          })}
+
+        <div className="relative mb-8">
+          <div className="mb-3 flex items-center justify-between gap-3 text-sm font-black text-slate-200">
+            <span>Question {currentQuestionIndex + 1} of {questions.length}</span>
+            <span>{Math.round(progressPercent)}% complete</span>
+          </div>
+          <div className="h-3 overflow-hidden rounded-full border border-white/10 bg-white/10">
+            <div className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-sky-300 to-emerald-300 shadow-[0_0_24px_rgba(125,211,252,0.55)] transition-all duration-500" style={{ width: `${progressPercent}%` }} />
+          </div>
+        </div>
+
+        <div className="relative rounded-[1.75rem] border border-white/10 bg-slate-950/30 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] md:p-7">
+          <h3 className="text-2xl font-black leading-snug text-white md:text-3xl">{currentQuestion.prompt}</h3>
+          <div className="mt-6 grid gap-3 md:grid-cols-2">
+            {currentQuestion.options.map((option, optionIndex) => {
+              const optionIsCorrect = optionIndex === currentQuestion.correctAnswer;
+              const optionIsSelected = selectedAnswer === optionIndex;
+              const feedbackClass = !hasAnswered
+                ? 'border-white/10 bg-white/[0.07] text-slate-100 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/20 hover:text-white'
+                : optionIsCorrect
+                  ? 'border-emerald-300 bg-emerald-400/20 text-emerald-50 shadow-[0_0_32px_rgba(52,211,153,0.25)]'
+                  : optionIsSelected
+                    ? 'border-rose-300 bg-rose-500/20 text-rose-50 shadow-[0_0_32px_rgba(251,113,133,0.22)]'
+                    : 'border-white/10 bg-white/[0.04] text-slate-400 opacity-70';
+
+              return (
+                <button
+                  key={`${option}-${optionIndex}`}
+                  type="button"
+                  onClick={() => setAnswers(prev => hasAnswered ? prev : ({ ...prev, [currentQuestionIndex]: optionIndex }))}
+                  className={`group flex min-h-20 items-center gap-4 rounded-2xl border px-4 py-4 text-left transition-all duration-300 ${feedbackClass}`}
+                >
+                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-white/15 bg-white/10 text-sm font-black text-white/80 transition group-hover:bg-white/15">{String.fromCharCode(65 + optionIndex)}</span>
+                  <span className="text-base font-bold leading-relaxed md:text-lg">{option}</span>
+                </button>
+              );
+            })}
+          </div>
+
+          {hasAnswered && (
+            <div className={`mt-6 rounded-2xl border px-5 py-4 font-black ${isCorrect ? 'border-emerald-300/70 bg-emerald-400/15 text-emerald-100 shadow-[0_0_28px_rgba(52,211,153,0.18)]' : 'border-rose-300/70 bg-rose-500/15 text-rose-100 shadow-[0_0_28px_rgba(251,113,133,0.16)]'}`}>
+              {isCorrect ? 'Correct! Beautiful work.' : `Incorrect. Correct answer: ${currentQuestion.options[currentQuestion.correctAnswer]}`}
+            </div>
+          )}
+        </div>
+
+        <div className="relative mt-8 flex flex-wrap items-center justify-between gap-3">
+          <button type="button" onClick={() => setCurrentQuestionIndex(prev => Math.max(0, prev - 1))} disabled={currentQuestionIndex === 0} className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-black text-white/75 transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-35">Previous</button>
+          <button type="button" onClick={moveNext} disabled={!hasAnswered || isLastQuestion} className="rounded-2xl bg-gradient-to-r from-cyan-200 to-emerald-200 px-6 py-3 font-black text-slate-950 shadow-[0_18px_45px_rgba(125,211,252,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_24px_70px_rgba(125,211,252,0.34)] disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0">
+            {isLastQuestion ? 'Quiz Complete' : 'Next Question'}
+          </button>
         </div>
       </div>
     </div>
