@@ -264,6 +264,7 @@ interface ProductDetailPageProps {
   onSectionScrolled: () => void;
   allProducts: ProductWithRating[];
   onViewProduct: (product: ProductWithRating, sectionId?: string) => void;
+  onBuyNow: (product: ProductWithRating) => void;
   wishlist: number[];
   onQuickView: (product: ProductWithRating) => void;
   onGoHome: () => void;
@@ -283,7 +284,7 @@ const ShareIcon = () => (
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ 
     settings, economySettings, activeCoinDiscount = null, onConsumeCoinDiscount, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews, 
     onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, onModalOpened, coupons,
-    scrollToSection, onSectionScrolled, allProducts, onViewProduct, wishlist, onQuickView, onGoHome, onStartEarning,
+    scrollToSection, onSectionScrolled, allProducts, onViewProduct, onBuyNow, wishlist, onQuickView, onGoHome, onStartEarning,
     isPurchased = false, currentUser = null, onCoinPurchase
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
@@ -446,7 +447,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const productCoinPrice = resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id);
   const userCoinBalance = (currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0;
 
-  const handleEduCoinButtonClick = () => {
+  const handleEduCoinButtonClick = async () => {
     if (!isLoggedIn) {
       onLoginRequired();
       return;
@@ -454,8 +455,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
     window.scrollTo(0, 0);
     if (userCoinBalance >= productCoinPrice && productCoinPrice > 0) {
-      setOpenCoinGuideOnMount(false);
-      setModalOpen(true);
+      const wasPurchased = await handleModalConfirmWithCoins();
+      if (!wasPurchased) {
+        setOpenCoinGuideOnMount(true);
+        setModalOpen(true);
+      }
       return;
     }
 
@@ -661,7 +665,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     {isPurchased ? 'Purchased' : 'Pay with Razorpay'}
                   </button>
                   {onCoinPurchase && productCoinPrice > 0 && (
-                    <button disabled={isPurchased} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-8 py-4 text-lg font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
+                    <button disabled={isPurchased || isCoinButtonChecking} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-8 py-4 text-lg font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
                       {isCoinButtonChecking ? 'Checking EduCoins...' : `Pay with ${productCoinPrice} EduCoins`}
                     </button>
                   )}
@@ -703,6 +707,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 wishlist={wishlist}
                 onToggleWishlist={onToggleWishlist}
                 onAddToCart={onAddToCart}
+                onBuyNow={onBuyNow}
                 onQuickView={onQuickView}
                 bgColor="bg-transparent"
                 coupons={coupons}

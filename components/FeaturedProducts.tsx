@@ -11,12 +11,13 @@ interface FeaturedProductsProps {
   wishlist: number[];
   onToggleWishlist: (id: number) => void;
   onAddToCart: (productId: number, quantity?: number) => void;
+  onBuyNow: (product: ProductWithRating) => void;
   onQuickView: (product: ProductWithRating) => void;
   bgColor?: string;
   coupons: Coupon[];
 }
 
-const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onQuickView, bgColor = 'bg-background', coupons }) => {
+const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, onQuickView, bgColor = 'bg-background', coupons }) => {
   const sectionRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -80,6 +81,7 @@ const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, pr
               isWishlisted={wishlist.includes(product.id)}
               onToggleWishlist={onToggleWishlist}
               onAddToCart={onAddToCart}
+              onBuyNow={onBuyNow}
               onQuickView={onQuickView}
               animationDelay={index}
               coupons={coupons}

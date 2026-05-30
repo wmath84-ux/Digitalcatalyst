@@ -6,18 +6,24 @@ interface QuickViewModalProps {
   product: ProductWithRating;
   onClose: () => void;
   onAddToCart: (productId: number, quantity: number) => void;
+  onBuyNow: (product: ProductWithRating) => void;
   isWishlisted: boolean;
   onToggleWishlist: (id: number) => void;
   onViewFullDetails: () => void;
 }
 
-const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onClose, onAddToCart, isWishlisted, onToggleWishlist, onViewFullDetails }) => {
+const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onClose, onAddToCart, onBuyNow, isWishlisted, onToggleWishlist, onViewFullDetails }) => {
   const [quantity, setQuantity] = useState(1);
   const [mainImage, setMainImage] = useState((product.images || [])[0] || `https://picsum.photos/seed/${product.imageSeed}/800/600`);
 
   const handleAddToCartClick = () => {
     onAddToCart(product.id, quantity);
     onClose();
+  };
+
+  const handleBuyNowClick = () => {
+    onClose();
+    onBuyNow(product);
   };
 
   return (
@@ -68,8 +74,8 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onCl
                     <input type="number" value={quantity} onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} className="w-16 text-center border-l border-r font-semibold focus:outline-none" />
                     <button onClick={() => setQuantity(q => q + 1)} className="px-3 py-2 text-lg font-bold text-gray-600 hover:bg-gray-100 rounded-r-lg">+</button>
                 </div>
-                <button onClick={handleAddToCartClick} className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold px-8 py-3 rounded-lg hover:opacity-90 transition-all duration-300 transform active:scale-95">
-                    Add to Cart
+                <button onClick={handleBuyNowClick} className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold px-8 py-3 rounded-lg hover:opacity-90 transition-all duration-300 transform active:scale-95">
+                    Buy Now
                 </button>
                 {settings.features.showFavourites && (
                     <button onClick={() => onToggleWishlist(product.id)} className="p-3 border rounded-lg text-slate-600 hover:text-red-500 hover:bg-red-50 transition-colors">
@@ -77,9 +83,14 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onCl
                     </button>
                 )}
             </div>
-            <button onClick={onViewFullDetails} className="w-full mt-4 text-sm text-primary font-semibold hover:underline">
-                View Full Product Details &rarr;
-            </button>
+            <div className="mt-4 grid grid-cols-2 gap-3">
+              <button onClick={handleAddToCartClick} className="rounded-lg border border-indigo-200 bg-white/80 px-4 py-3 text-sm font-black text-indigo-700 hover:bg-indigo-50">
+                Add to Cart
+              </button>
+              <button onClick={onViewFullDetails} className="rounded-lg border border-slate-200 bg-white/80 px-4 py-3 text-sm font-black text-primary hover:bg-slate-50">
+                Details →
+              </button>
+            </div>
           </div>
         </div>
 

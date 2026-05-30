@@ -10,12 +10,13 @@ interface WishlistPageProps {
   onToggleWishlist: (id: number) => void;
   onNavigateToAllProducts: () => void;
   onAddToCart: (productId: number, quantity?: number) => void;
+  onBuyNow: (product: ProductWithRating) => void;
   onQuickView: (product: ProductWithRating) => void;
   onClearWishlist: () => void;
   coupons: Coupon[];
 }
 
-const WishlistPage: React.FC<WishlistPageProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onNavigateToAllProducts, onAddToCart, onQuickView, onClearWishlist, coupons }) => {
+const WishlistPage: React.FC<WishlistPageProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onNavigateToAllProducts, onAddToCart, onBuyNow, onQuickView, onClearWishlist, coupons }) => {
   const sectionRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -87,6 +88,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ settings, products, onViewP
                 isWishlisted={wishlist.includes(product.id)}
                 onToggleWishlist={onToggleWishlist}
                 onAddToCart={handleMoveToCart}
+                onBuyNow={onBuyNow}
                 onQuickView={onQuickView}
                 animationDelay={index}
                 displayMode="wishlist"
