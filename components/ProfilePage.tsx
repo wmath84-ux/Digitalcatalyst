@@ -1,10 +1,13 @@
 import React from 'react';
-import { Coupon, ProductWithRating, ThemeName, themes, User, WebsiteSettings } from '../App';
+import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
+import { CoinTransaction, Coupon, ProductWithRating, ThemeName, themes, User, WebsiteSettings } from '../App';
+import { db } from '../firebase';
 
 interface ProfilePageProps {
   settings: WebsiteSettings;
   currentUser: User | null;
   purchasedProducts: ProductWithRating[];
+  products: ProductWithRating[];
   coupons: Coupon[];
   onBack: () => void;
   onExplore: () => void;
@@ -13,6 +16,7 @@ interface ProfilePageProps {
   users: User[];
   setUsers: (users: User[]) => void;
   setCurrentUser: (user: User | null) => void;
+  onClaimMilestoneReward: (reward: { id: string; title: string; requirement: number; unlockProductIds?: number[] }) => boolean;
 }
 
 interface LearningProgress {
@@ -36,6 +40,17 @@ interface Badge {
   description: string;
 }
 
+interface MilestoneReward {
+  id: string;
+  title: string;
+  requirement: number;
+  icon: string;
+  description: string;
+  actionLabel: string;
+  unlockProductIds?: number[];
+  downloadContent?: string;
+}
+
 const defaultCoverImage =
   'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1800&q=80';
 
@@ -46,10 +61,23 @@ const getStorageKey = (userId?: number) => `studentAchievementHubCover-${userId 
 
 const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
 
+const formatLedgerTime = (value: string) => {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'Just now';
+  const now = new Date();
+  const startToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const startYesterday = startToday - 24 * 60 * 60 * 1000;
+  const time = date.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+  if (date.getTime() >= startToday) return `Today, ${time}`;
+  if (date.getTime() >= startYesterday) return `Yesterday, ${time}`;
+  return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
 const ProfilePage: React.FC<ProfilePageProps> = ({
   settings,
   currentUser,
   purchasedProducts,
+  products,
   coupons,
   onBack,
   onExplore,
@@ -58,21 +86,77 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   users,
   setUsers,
   setCurrentUser,
+  onClaimMilestoneReward,
 }) => {
   const coverInputRef = React.useRef<HTMLInputElement | null>(null);
   const [coverImage, setCoverImage] = React.useState(defaultCoverImage);
   const [redeeming, setRedeeming] = React.useState<string | null>(null);
+  const [coinTransactions, setCoinTransactions] = React.useState<CoinTransaction[]>([]);
 
   React.useEffect(() => {
     const storedCover = localStorage.getItem(getStorageKey(currentUser?.id));
     setCoverImage(storedCover || defaultCoverImage);
   }, [currentUser?.id]);
 
+  React.useEffect(() => {
+    if (!currentUser?.id) {
+      setCoinTransactions([]);
+      return;
+    }
+
+    const storageKey = `coinTransactions-${currentUser.id}`;
+    const localLedger = JSON.parse(localStorage.getItem(storageKey) || '[]') as CoinTransaction[];
+    setCoinTransactions([...(currentUser.coinTransactions || []), ...localLedger].slice(0, 12));
+
+    const ledgerQuery = query(collection(db, 'users', String(currentUser.id), 'coinTransactions'), orderBy('createdAt', 'desc'));
+    const unsubscribe = onSnapshot(ledgerQuery, (snapshot) => {
+      const remoteLedger = snapshot.docs.map((entry) => {
+        const data = entry.data() as Omit<CoinTransaction, 'id' | 'createdAt'> & { createdAt?: any };
+        return {
+          ...data,
+          id: entry.id,
+          createdAt: data.createdAt?.toDate ? data.createdAt.toDate().toISOString() : (data.createdAt || new Date().toISOString()),
+        } as CoinTransaction;
+      });
+      setCoinTransactions(remoteLedger.slice(0, 12));
+    }, () => {
+      setCoinTransactions([...(currentUser.coinTransactions || []), ...localLedger].slice(0, 12));
+    });
+
+    return unsubscribe;
+  }, [currentUser?.id, currentUser?.coinTransactions]);
+
   const activeCoupons = React.useMemo(() => coupons.filter(coupon => coupon.isActive), [coupons]);
-  const rewards = React.useMemo(() => (settings.content as any).redeemRewards || [], [settings.content]);
+  const coinRedeemRate = Math.max(1, Number((settings.content as any).eduCoinRules?.redeemRate || 10));
   const studyMinutes = currentUser?.studyMinutes ?? 0;
   const watchTimeMinutes = currentUser?.totalWatchTimeMinutes ?? studyMinutes;
   const eduPoints = currentUser?.eduCoins ?? 0;
+  const totalLifetimeCoins = currentUser?.totalLifetimeCoins ?? eduPoints;
+  const milestoneRewards = React.useMemo<MilestoneReward[]>(() => {
+    const premiumProduct = products.find(product => !product.isFree && product.isVisible !== false);
+    return [
+      { id: 'premium-pdf-pack', title: 'Premium PDF Pack', requirement: 500, icon: '📦', description: 'Download a curated premium revision pack once you cross 500 lifetime coins.', actionLabel: 'Download Pack', downloadContent: 'Digital Catalyst Premium PDF Pack\n\n- Exam sprint checklist\n- Revision planner\n- AI study prompts\n- Career-readiness worksheet' },
+      { id: 'course-access-pass', title: 'Course Access Pass', requirement: 1000, icon: '🎓', description: premiumProduct ? `Unlock access to ${premiumProduct.title}.` : 'Unlock access to a featured premium course.', actionLabel: 'Unlock Course', unlockProductIds: premiumProduct ? [premiumProduct.id] : [] },
+      { id: 'elite-wallet-badge', title: 'Elite Wallet Badge', requirement: 2000, icon: '💎', description: 'Permanent profile recognition for serious learners.', actionLabel: 'Claim Badge' },
+    ];
+  }, [products]);
+
+  const dynamicClaimCards = React.useMemo(() => {
+    const productCards = products
+      .filter(product => product.isVisible !== false && !product.isFree)
+      .sort((a, b) => (b.rating * Math.max(1, b.reviewCount)) - (a.rating * Math.max(1, a.reviewCount)))
+      .slice(0, 2)
+      .map(product => ({ id: `product-${product.id}`, name: product.title, type: 'Product', price: Number((product.salePrice || product.price).replace('₹', '')) || 0 }));
+    const planCards = ((settings.content as any).subscriptionPlans || [])
+      .slice(0, 2)
+      .map((plan: any) => ({ id: `plan-${plan.id}`, name: `${plan.name} Plan`, type: 'Subscription', price: Number(plan.price || 0) }));
+
+    return [...productCards, ...planCards].slice(0, 3).map(item => {
+      const maxDiscount = Math.min(item.price, Math.floor(eduPoints / coinRedeemRate));
+      const requiredCoins = Math.min(Math.max(coinRedeemRate, maxDiscount * coinRedeemRate), Math.max(coinRedeemRate, Math.floor(item.price * coinRedeemRate)));
+      return { ...item, discount: maxDiscount, requiredCoins, claimable: eduPoints >= requiredCoins && maxDiscount > 0 };
+    });
+  }, [coinRedeemRate, eduPoints, products, settings.content]);
   const level = Math.max(1, Math.floor(eduPoints / 500) + 1);
   const currentLevelStart = (level - 1) * 500;
   const pointsIntoLevel = eduPoints - currentLevelStart;
@@ -170,6 +254,21 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     event.target.value = '';
   };
 
+
+  const handleMilestoneClaim = (reward: MilestoneReward) => {
+    const claimed = onClaimMilestoneReward(reward);
+    if (!claimed) return;
+    if (reward.downloadContent) {
+      const blob = new Blob([reward.downloadContent], { type: 'text/plain;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `${reward.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.txt`;
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+  };
+
   const statCards = [
     { label: 'Courses Owned', value: purchasedProducts.length, icon: '📚' },
     { label: 'Video Watch Time', value: `${Math.floor(watchTimeMinutes / 60)}h ${watchTimeMinutes % 60}m`, icon: '⏱️' },
@@ -244,8 +343,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className={`hub-animate rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '160ms' }}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.3em] text-cyan-200">EduPoints Engine</p>
-                <h2 className="mt-2 text-4xl font-black sm:text-5xl">{eduPoints.toLocaleString()} EduPoints</h2>
+                <p className="text-sm font-black uppercase tracking-[0.3em] text-cyan-200">EduCoin Engine</p>
+                <h2 className="mt-2 text-4xl font-black sm:text-5xl">{eduPoints.toLocaleString()} EduCoins</h2>
                 <p className="mt-2 text-slate-600">Earned from purchases, module momentum, study time, and quiz performance.</p>
               </div>
               <div className="rounded-3xl border border-cyan-300/20 bg-cyan-400/10 p-5 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5">
@@ -358,28 +457,31 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <section className={`hub-animate mt-6 rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '520ms' }}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.3em] text-amber-200">Achievement Badges</p>
+              <p className="text-sm font-black uppercase tracking-[0.3em] text-amber-200">Actionable Milestones</p>
               <h2 className="mt-2 text-3xl font-black">Glowing Milestones</h2>
             </div>
-            <p className="text-sm text-slate-600">Unlocked badges glow. Locked goals stay dim until earned.</p>
+            <p className="text-sm text-slate-600">Lifetime earned: 🪙 {totalLifetimeCoins}. Reached milestones unlock real downloads or access.</p>
           </div>
-          <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-            {badges.map(badge => (
-              <div
-                key={badge.id}
-                className={`rounded-[1.75rem] border p-5 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-sm ${
-                  badge.unlocked
-                    ? 'border-cyan-300/30 bg-cyan-300/10 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5'
-                    : 'border-white/50 bg-white/70 opacity-55 grayscale'
-                }`}
-              >
-                <div className={`mx-auto flex h-20 w-20 items-center justify-center rounded-full border text-4xl ${badge.unlocked ? 'border-cyan-200/40 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5' : 'border-white/50 bg-white/70'}`}>
-                  {badge.icon}
-                </div>
-                <h3 className="mt-4 text-lg font-black">{badge.label}</h3>
-                <p className="mt-2 text-xs text-slate-600">{badge.description}</p>
-              </div>
-            ))}
+          <div className="mt-6 grid gap-4 lg:grid-cols-3">
+            {milestoneRewards.map(reward => {
+              const reached = totalLifetimeCoins >= reward.requirement;
+              const claimed = (currentUser?.claimedRewardIds || []).includes(reward.id);
+              return (
+                <article key={reward.id} className={`rounded-[1.75rem] border p-5 transition-all duration-300 hover:-translate-y-1 ${claimed ? 'border-emerald-300/60 bg-emerald-50/80 shadow-[0_0_18px_rgba(16,185,129,0.35)]' : reached ? 'border-indigo-400 bg-white/80 shadow-[0_0_15px_rgba(79,70,229,0.5)] animate-pulse' : 'border-white/50 bg-white/70 opacity-75'}`}>
+                  <div className="flex items-start gap-4">
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/60 bg-white/80 text-3xl shadow-sm">{reward.icon}</div>
+                    <div>
+                      <h3 className="text-lg font-black text-slate-900">{reward.title}</h3>
+                      <p className="mt-1 text-sm text-slate-600">{reward.description}</p>
+                      <p className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-amber-700">Requires 🪙 {reward.requirement}</p>
+                    </div>
+                  </div>
+                  <button type="button" disabled={!reached || claimed} onClick={() => handleMilestoneClaim(reward)} className="mt-5 w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60">
+                    {claimed ? 'Claimed / Unlocked' : reached ? reward.actionLabel : `Earn ${reward.requirement - totalLifetimeCoins} more coins`}
+                  </button>
+                </article>
+              );
+            })}
           </div>
         </section>
 
@@ -387,18 +489,23 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className={`hub-animate rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '600ms' }}>
             <p className="text-sm font-black uppercase tracking-[0.3em] text-emerald-200">Rewards Vault</p>
             <h2 className="mt-2 text-3xl font-black">What You Can Claim</h2>
+            <p className="mt-2 text-sm text-slate-600">Live wallet: 🪙 {eduPoints} • {coinRedeemRate} EduCoins = ₹1 discount.</p>
             <div className="mt-5 grid gap-3">
-              {rewards.length ? rewards.map((reward: any) => (
-                <button
+              {dynamicClaimCards.length ? dynamicClaimCards.map((reward) => (
+                <article
                   key={reward.id}
-                  disabled={!!redeeming || (currentUser?.eduCoins || 0) < reward.cost}
-                  onClick={() => redeem(reward)}
-                  className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/70 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:bg-white/80 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-50"
+                  className={`rounded-2xl border bg-white/70 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:bg-white/80 ${reward.claimable ? 'border-indigo-400 shadow-[0_0_15px_rgba(79,70,229,0.5)] animate-pulse' : 'border-white/50 shadow-sm'}`}
                 >
-                  <span className="font-bold">{reward.title}</span>
-                  <span className="font-black text-amber-200">🪙 {reward.cost}</span>
-                </button>
-              )) : <p className="rounded-2xl border border-white/50 bg-white/70 p-4 text-slate-600">Reward claims will appear here as new perks are released.</p>}
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <span className="rounded-full border border-amber-200/70 bg-amber-50/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-amber-700">{reward.type}</span>
+                      <h3 className="mt-3 text-lg font-black text-slate-900">Claim ₹{reward.discount} off on {reward.name}</h3>
+                      <p className="mt-1 text-xs font-bold text-slate-600">Uses up to 🪙 {reward.requiredCoins} at checkout. {reward.claimable ? 'Ready to claim now.' : `Earn ${Math.max(0, reward.requiredCoins - eduPoints)} more coins.`}</p>
+                    </div>
+                    <span className="text-2xl">{reward.claimable ? '✨' : '🔒'}</span>
+                  </div>
+                </article>
+              )) : <p className="rounded-2xl border border-white/50 bg-white/70 p-4 text-slate-600">Reward claims will appear here once products or subscriptions are available.</p>}
             </div>
           </div>
 
@@ -406,7 +513,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             <p className="text-sm font-black uppercase tracking-[0.3em] text-blue-200">Personalization</p>
             <h2 className="mt-2 text-3xl font-black">Theme & Coupons</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
-              {Object.values(themes).map(theme => {
+              {Object.values(themes).filter(theme => theme.name !== 'Midnight').map(theme => {
                 const key = theme.name.toLowerCase() as ThemeName;
                 return (
                   <button
@@ -431,6 +538,29 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section className={`hub-animate mt-6 rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '760ms' }}>
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.3em] text-indigo-300">Coin History</p>
+              <h2 className="mt-2 text-3xl font-black">Live Earning Ledger</h2>
+            </div>
+            <p className="text-sm text-slate-600">Synced from your coinTransactions wallet ledger.</p>
+          </div>
+          <div className="mt-5 grid gap-3">
+            {coinTransactions.length ? coinTransactions.slice(0, 8).map((entry) => (
+              <div key={entry.id || `${entry.createdAt}-${entry.description}`} className="flex items-center justify-between gap-4 rounded-2xl border border-white/50 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
+                <div>
+                  <p className="font-black text-slate-900">{entry.amount >= 0 ? '🟢' : '🔴'} {entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</p>
+                  <p className="mt-1 text-sm text-slate-600">{entry.amount >= 0 ? '📝' : '🛒'} <span className="font-bold">{entry.title || entry.source}</span> — {entry.description}</p>
+                </div>
+                <div className="text-right"><div className={`text-lg font-black ${entry.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</div><div className="mt-1 text-xs font-bold text-slate-500">{formatLedgerTime(entry.timestamp || entry.createdAt)}</div></div>
+              </div>
+            )) : (
+              <div className="rounded-2xl border border-white/50 bg-white/70 p-5 text-slate-600">No coin movements yet. Read an article or complete a purchase to start your live ledger.</div>
+            )}
           </div>
         </section>
       </main>

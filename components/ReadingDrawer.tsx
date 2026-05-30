@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Announcement, NewsArticle } from '../App';
+import { Announcement, NewsArticle, User } from '../App';
 
 type ReadingListType = 'news' | 'blog';
 type ReadingView = ReadingListType | 'article' | 'announcement';
@@ -12,6 +12,7 @@ interface ReadingDrawerProps {
   listType: ReadingListType;
   selectedArticle: NewsArticle | null;
   selectedAnnouncement: Announcement | null;
+  currentUser?: User | null;
   onClose: () => void;
   onSelectArticle: (article: NewsArticle) => void;
   onSelectAnnouncement: (announcement: Announcement) => void;
@@ -20,7 +21,7 @@ interface ReadingDrawerProps {
   promoTitle?: string;
   promoDescription?: string;
   promoCtaLabel?: string;
-  onReadingReward?: (article: NewsArticle) => void;
+  onReadingReward?: (article: NewsArticle) => boolean;
 }
 
 
@@ -32,7 +33,7 @@ const isExternalArticle = (article: NewsArticle | null) => {
   return /^https?:\/\//i.test(possibleUrl.trim());
 };
 const getArticleUrl = (article: NewsArticle) => ((article as NewsArticle & { externalUrl?: string }).externalUrl || article.content).trim();
-const getArticleImage = (article: NewsArticle, size = '900/540') => article.thumbnailImage || `https://picsum.photos/seed/${article.imageSeed}/${size}`;
+const getArticleImage = (article: NewsArticle, size = '900/540') => article.coverImage || article.thumbnailImage || `https://picsum.photos/seed/${article.imageSeed}/${size}`;
 const getArticleType = (article: NewsArticle): ReadingListType => article.type === 'news' ? 'news' : 'blog';
 const stripMarkdown = (value = '') => value.replace(/[#*_`>-]/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -135,26 +136,31 @@ const SponsoredPartnerCard: React.FC<{
 );
 
 const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: string; imageSeed?: string; onClick: () => void; }> = ({ title, meta, excerpt, badge, imageSeed, onClick }) => (
-  <button onClick={onClick} className="group relative overflow-hidden rounded-[2rem] border border-white/50 bg-white/70 p-4 text-left shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:border-indigo-300/40 hover:bg-white/80 hover:shadow-sm">
+  <button onClick={onClick} className="group relative overflow-hidden rounded-xl border border-white/50 bg-white/70 text-left shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:border-indigo-300/40 hover:bg-white/80 hover:shadow-sm">
     {imageSeed && (
-      <div className="mb-5 h-44 overflow-hidden rounded-[1.5rem] bg-white/70">
-        <img src={imageSeed || ''} alt="" className="h-full w-full object-cover opacity-85 transition duration-700 group-hover:scale-110 group-hover:opacity-100" />
+      <div className="aspect-video overflow-hidden rounded-t-xl bg-white/70">
+        <img src={imageSeed || ''} alt="" className="h-full w-full rounded-t-xl object-cover opacity-85 transition duration-700 group-hover:scale-110 group-hover:opacity-100" />
       </div>
     )}
-    <div className="flex items-center justify-between gap-4">
-      <span className="rounded-full border border-indigo-300/20 bg-indigo-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-indigo-200">{badge}</span>
-      <span className="text-xs text-slate-600">{meta}</span>
+    <div className="p-5">
+      <div className="flex items-center justify-between gap-4">
+        <span className="rounded-full border border-indigo-300/20 bg-indigo-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-indigo-200">{badge}</span>
+        <span className="text-xs text-slate-600">{meta}</span>
+      </div>
+      <h3 className="mt-4 text-xl font-black leading-tight text-slate-900 transition group-hover:text-indigo-700">{title}</h3>
+      <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{excerpt}</p>
+      <div className="mt-5 text-sm font-black text-indigo-200">Open in reading hub →</div>
     </div>
-    <h3 className="mt-4 text-xl font-black leading-tight text-slate-900 transition group-hover:text-indigo-700">{title}</h3>
-    <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{excerpt}</p>
-    <div className="mt-5 text-sm font-black text-indigo-200">Open in reading hub →</div>
   </button>
 );
 
-const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
+const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const rewardIssuedRef = useRef<number | string | null>(null);
+  const lastReadingActivityRef = useRef(0);
+  const [rewardSecondsLeft, setRewardSecondsLeft] = useState(119);
+  const [rewardStatus, setRewardStatus] = useState<'idle' | 'claimed' | 'already' | 'login'>('idle');
 
   useEffect(() => {
     if (!isOpen) return;
@@ -165,18 +171,35 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
   }, [isOpen, view, selectedArticle?.id, selectedAnnouncement?.id]);
 
   useEffect(() => {
-    if (!isOpen || view !== 'article' || !selectedArticle || !onReadingReward) return;
-    let secondsRead = 0;
-    rewardIssuedRef.current = rewardIssuedRef.current === selectedArticle.id ? rewardIssuedRef.current : null;
+    if (!isOpen || view !== 'article' || !selectedArticle) return;
+    const readIds = [...(currentUser?.rewardedArticleIds || []), ...(currentUser?.readArticles || [])];
+    if (!currentUser) setRewardStatus('login');
+    else if (readIds.includes(selectedArticle.id)) setRewardStatus('already');
+    else setRewardStatus('idle');
+    setRewardSecondsLeft(119);
+    lastReadingActivityRef.current = 0;
+    rewardIssuedRef.current = null;
+  }, [currentUser, isOpen, selectedArticle, view]);
+
+  useEffect(() => {
+    if (!isOpen || view !== 'article' || !selectedArticle || !onReadingReward || rewardStatus !== 'idle') return;
     const timer = window.setInterval(() => {
-      secondsRead += 5;
-      if (secondsRead >= 120 && rewardIssuedRef.current !== selectedArticle.id) {
-        rewardIssuedRef.current = selectedArticle.id;
-        onReadingReward(selectedArticle);
-      }
-    }, 5000);
+      const active = document.visibilityState === 'visible' && document.hasFocus() && Date.now() - lastReadingActivityRef.current < 3500;
+      if (!active) return;
+      setRewardSecondsLeft((seconds) => {
+        if (seconds <= 1) {
+          if (rewardIssuedRef.current !== selectedArticle.id) {
+            rewardIssuedRef.current = selectedArticle.id;
+            const claimed = onReadingReward(selectedArticle);
+            setRewardStatus(claimed ? 'claimed' : 'already');
+          }
+          return 0;
+        }
+        return seconds - 1;
+      });
+    }, 1000);
     return () => window.clearInterval(timer);
-  }, [isOpen, onReadingReward, selectedArticle, view]);
+  }, [isOpen, onReadingReward, rewardStatus, selectedArticle, view]);
 
   const activeMeta = useMemo(() => {
     if (view === 'article' && selectedArticle) {
@@ -205,6 +228,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
     : 'In-depth how-to guides, study systems, career readiness playbooks, and practical learning strategies.';
 
   const handleScroll = () => {
+    lastReadingActivityRef.current = Date.now();
     const el = scrollRef.current;
     if (!el) return;
     const max = el.scrollHeight - el.clientHeight;
@@ -216,6 +240,9 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
     if (navigator.share) await navigator.share(shareData);
     else await navigator.clipboard?.writeText(`${shareData.text} ${shareData.url}`);
   };
+
+  const rewardMinutes = Math.floor(rewardSecondsLeft / 60);
+  const rewardSeconds = String(rewardSecondsLeft % 60).padStart(2, '0');
 
   if (!isOpen) return null;
 
@@ -291,8 +318,8 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
                     </div>
                   ) : (
                     <>
-                      <div className="mt-10 overflow-hidden rounded-[2rem] border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                        <img src={getArticleImage(selectedArticle, '1400/800')} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90" />
+                      <div className="mb-6 mt-10 aspect-video overflow-hidden rounded-2xl border border-slate-200 bg-white/70 shadow-sm backdrop-blur-2xl">
+                        <img src={getArticleImage(selectedArticle, '1400/800')} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" />
                       </div>
                       <div className="mt-12 text-lg leading-9 text-slate-600">
                         <MarkdownContent content={selectedArticle.content} />
@@ -322,9 +349,19 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
             </div>
           </div>
 
-          <div className="pointer-events-none absolute bottom-5 left-1/2 z-30 w-[calc(100%-2rem)] max-w-xl -translate-x-1/2 rounded-full border border-emerald-300/20 bg-white/70 px-5 py-3 text-center text-sm font-bold text-emerald-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
-            📚 Read 1 more article today to earn +10 EduPoints!
-          </div>
+          {view === 'article' && selectedArticle && (
+            <div className="absolute bottom-5 right-5 z-30 max-w-sm rounded-[1.5rem] border border-white/60 bg-white/80 px-5 py-4 text-sm font-black text-slate-900 shadow-[0_12px_40px_rgba(79,70,229,0.18)] backdrop-blur-2xl animate-fade-in-up">
+              {rewardStatus === 'claimed' && <span className="text-emerald-700">🎉 +10 Coins Claimed!</span>}
+              {rewardStatus === 'already' && <span className="text-indigo-700">✔️ Reward already claimed for this article</span>}
+              {rewardStatus === 'login' && <span className="text-amber-700">🔐 Login to earn reading coins</span>}
+              {rewardStatus === 'idle' && (
+                <div>
+                  <p className="text-indigo-700">⏳ {String(rewardMinutes).padStart(2, '0')}:{rewardSeconds} to earn +10 Coins</p>
+                  <p className="mt-1 text-xs font-bold text-slate-600">Timer runs only while this tab is focused and you keep reading/scrolling.</p>
+                </div>
+              )}
+            </div>
+          )}
         </section>
       </div>
     </div>

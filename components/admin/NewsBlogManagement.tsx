@@ -1,5 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { NewsArticle, WebsiteSettings } from '../../App';
+import { storage } from '../../firebase';
 import { ContentDatabaseAdapter, ContentPostRecord, ContentPostType, runContentAutomation } from '../../utils/contentAutomator';
 
 const glassCard = 'rounded-[2rem] border border-white/50 bg-white/70 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
@@ -23,13 +25,14 @@ interface NewsBlogManagementProps {
 }
 
 type AdminMode = 'list' | 'form';
-type EditablePost = NewsArticle & { type: ContentPostType; thumbnailImage?: string; createdAt: string; };
+type EditablePost = NewsArticle & { type: ContentPostType; thumbnailImage?: string; coverImage: string; createdAt: string; };
 
 const normalizePost = (post: NewsArticle): EditablePost => ({
   ...post,
   type: ((post as NewsArticle & { type?: ContentPostType }).type || 'blog') as ContentPostType,
   createdAt: (post as NewsArticle & { createdAt?: string }).createdAt || `${post.date || new Date().toISOString().split('T')[0]}T00:00:00.000Z`,
   thumbnailImage: (post as NewsArticle & { thumbnailImage?: string }).thumbnailImage || '',
+  coverImage: (post as NewsArticle & { coverImage?: string }).coverImage || (post as NewsArticle & { thumbnailImage?: string }).thumbnailImage || '',
 });
 
 const emptyPost = (): EditablePost => ({
@@ -41,6 +44,7 @@ const emptyPost = (): EditablePost => ({
   createdAt: new Date().toISOString(),
   imageSeed: `post-${Date.now()}`,
   thumbnailImage: '',
+  coverImage: '',
   excerpt: '',
   content: '<h2>Start with the big idea</h2><p>Write a clear, student-focused introduction here.</p><ul><li>Add practical takeaways.</li><li>Keep paragraphs readable.</li></ul>',
 });
@@ -83,6 +87,8 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
   const [automationStatus, setAutomationStatus] = useState('Idle — ready for the next editorial run.');
   const [isRunning, setIsRunning] = useState(false);
   const [successToast, setSuccessToast] = useState('');
+  const [isUploadingCover, setIsUploadingCover] = useState(false);
+  const [coverUploadError, setCoverUploadError] = useState('');
 
   useEffect(() => {
     setArticles(settingsPosts);
@@ -115,6 +121,35 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
     setMode('form');
   };
 
+  const uploadCoverImage = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setCoverUploadError('Please choose a valid image file.');
+      return;
+    }
+
+    setIsUploadingCover(true);
+    setCoverUploadError('');
+
+    try {
+      const safeName = file.name.replace(/[^a-z0-9._-]/gi, '-').toLowerCase();
+      const storagePath = `news-blog-covers/${editingPost.id || 'draft'}-${Date.now()}-${safeName}`;
+      const imageRef = ref(storage, storagePath);
+      const snapshot = await uploadBytes(imageRef, file, { contentType: file.type });
+      const downloadUrl = await getDownloadURL(snapshot.ref);
+      setEditingPost((current) => ({
+        ...current,
+        coverImage: downloadUrl,
+        thumbnailImage: downloadUrl,
+      }));
+      setSuccessToast('Cover image uploaded and attached to this post.');
+    } catch (error) {
+      console.error('Cover image upload failed:', error);
+      setCoverUploadError(error instanceof Error ? error.message : 'Upload failed. Check Firebase Storage settings and try again.');
+    } finally {
+      setIsUploadingCover(false);
+    }
+  };
+
   const savePost = () => {
     const now = new Date().toISOString();
     const preparedPost: EditablePost = {
@@ -123,6 +158,8 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
       date: editingPost.date || now.split('T')[0],
       createdAt: editingPost.createdAt || now,
       imageSeed: editingPost.imageSeed || `post-${Date.now()}`,
+      coverImage: editingPost.coverImage || editingPost.thumbnailImage || '',
+      thumbnailImage: editingPost.thumbnailImage || editingPost.coverImage || '',
       excerpt: editingPost.excerpt || editingPost.content.replace(/<[^>]+>/g, ' ').trim().slice(0, 180),
     };
 
@@ -163,7 +200,8 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
         date: post.date,
         createdAt: post.createdAt,
         imageSeed: post.imageSeed || `ai-${post.type}-${post.id}`,
-        thumbnailImage: post.thumbnailImage || '',
+        thumbnailImage: post.thumbnailImage || post.coverImage || '',
+        coverImage: post.coverImage || post.thumbnailImage || '',
         excerpt: post.excerpt,
         content: post.content,
       })) as EditablePost[];
@@ -223,9 +261,39 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
             <input value={editingPost.category} onChange={(event) => setEditingPost({ ...editingPost, category: event.target.value })} className={fieldClass} placeholder="Education News" />
           </div>
           <div className="lg:col-span-8">
-            <label className={labelClass}>Thumbnail Image</label>
-            <input value={editingPost.thumbnailImage || ''} onChange={(event) => setEditingPost({ ...editingPost, thumbnailImage: event.target.value })} className={fieldClass} placeholder="Paste image URL, or leave blank to use generated image seed" />
+            <label className={labelClass}>Cover Image URL</label>
+            <input value={editingPost.coverImage || ''} onChange={(event) => setEditingPost({ ...editingPost, coverImage: event.target.value, thumbnailImage: event.target.value })} className={fieldClass} placeholder="AI placeholder or uploaded Firebase Storage URL" />
           </div>
+
+          <section className="lg:col-span-12 overflow-hidden rounded-[2rem] border border-white/50 bg-white/60 p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
+            <div className="grid gap-6 rounded-[1.75rem] bg-white/60 p-5 backdrop-blur-2xl lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.3em] text-indigo-300/90">Cover Image</p>
+                <h2 className="mt-2 text-2xl font-black text-slate-900">Smart hybrid article thumbnail</h2>
+                <p className="mt-3 text-sm leading-6 text-slate-600">Keep the AI-generated placeholder, paste a stock image URL, or upload a custom admin-approved cover. Uploaded images are stored in Firebase Storage and override the AI cover instantly.</p>
+                <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
+                  <label className="inline-flex cursor-pointer items-center justify-center rounded-2xl border border-indigo-200/70 bg-white/80 px-5 py-3 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md">
+                    <input type="file" accept="image/*" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadCoverImage(file); event.currentTarget.value = ''; }} />
+                    {isUploadingCover ? 'Uploading cover…' : 'Upload Custom Cover'}
+                  </label>
+                  <button type="button" onClick={() => setEditingPost({ ...editingPost, coverImage: '', thumbnailImage: '' })} className="rounded-2xl border border-white/50 bg-white/70 px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-white/90 hover:shadow-sm">Clear Image</button>
+                </div>
+                {coverUploadError && <p className="mt-4 rounded-2xl border border-rose-200/70 bg-rose-50/80 px-4 py-3 text-sm font-bold text-rose-700">{coverUploadError}</p>}
+              </div>
+              <div className="overflow-hidden rounded-[1.5rem] border border-white/60 bg-gradient-to-br from-indigo-50 via-white to-fuchsia-50 p-2 shadow-sm">
+                <div className="aspect-video overflow-hidden rounded-[1.15rem] bg-white/70">
+                  {editingPost.coverImage ? (
+                    <img src={editingPost.coverImage} alt={`${editingPost.title || 'Article'} cover preview`} className="h-full w-full object-cover transition duration-700 hover:scale-105" />
+                  ) : (
+                    <div className="flex h-full w-full flex-col items-center justify-center px-6 text-center text-slate-500">
+                      <span className="text-4xl">🖼️</span>
+                      <span className="mt-3 text-sm font-bold">No cover selected yet</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </section>
           <div className="lg:col-span-12">
             <label className={labelClass}>Excerpt</label>
             <textarea value={editingPost.excerpt} onChange={(event) => setEditingPost({ ...editingPost, excerpt: event.target.value })} className={fieldClass} rows={3} placeholder="Short card summary for the reading hub." />

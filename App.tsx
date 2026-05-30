@@ -33,9 +33,10 @@ import ProfilePage from './components/ProfilePage';
 import PlatformExperience from './components/PlatformExperience';
 import WelcomeOverlay from './components/WelcomeOverlay';
 import SubscriptionPage from './components/SubscriptionPage';
+import { addDoc, collection, doc, serverTimestamp, setDoc } from 'firebase/firestore';
+import { db } from './firebase';
 
-// NOTE: Firebase imports removed to prevent "Service not available" crashes.
-// The app now runs in "Local Mode" using browser storage.
+// Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
 
 // --- SAFETY & UTILS ---
 
@@ -195,6 +196,19 @@ export interface ProductWithRating extends Product {
 }
 
 // User structure for authentication
+export interface CoinTransaction {
+    id?: string;
+    amount: number;
+    type: 'credit' | 'debit';
+    source: string;
+    title?: string;
+    description: string;
+    articleId?: number | string;
+    productId?: number | string;
+    createdAt: string;
+    timestamp?: string;
+}
+
 export interface User {
     id: number;
     name: string;
@@ -206,7 +220,12 @@ export interface User {
     eduCoins?: number;
     studyMinutes?: number;
     totalWatchTimeMinutes?: number;
+    totalLifetimeCoins?: number;
     rewardedArticleIds?: Array<number | string>;
+    readArticles?: Array<number | string>;
+    rewardedQuizIds?: Array<number | string>;
+    claimedRewardIds?: Array<string>;
+    coinTransactions?: CoinTransaction[];
 }
 
 // New Admin User structure for multi-user admin management
@@ -253,6 +272,7 @@ export interface NewsArticle {
   content: string;
   type?: 'news' | 'blog';
   thumbnailImage?: string;
+  coverImage: string;
   createdAt?: string;
 }
 
@@ -516,6 +536,7 @@ const initialNewsArticles: NewsArticle[] = [
     imageSeed: "futuristic-seo-trends",
     type: "blog",
     thumbnailImage: "",
+    coverImage: "https://placehold.co/800x400/e0e7ff/312e81?text=SEO+Trends",
     createdAt: "2024-07-28T09:00:00.000Z",
     category: "SEO",
     title: "Top 5 SEO Trends to Watch in 2025",
@@ -528,6 +549,7 @@ const initialNewsArticles: NewsArticle[] = [
     imageSeed: "ecommerce-conversion-funnel",
     type: "blog",
     thumbnailImage: "",
+    coverImage: "https://placehold.co/800x400/e0e7ff/312e81?text=Ecommerce+Psychology",
     createdAt: "2024-07-25T09:00:00.000Z",
     category: "E-commerce",
     title: "The Psychology of Online Shopping: How to Convert More Customers",
@@ -540,6 +562,7 @@ const initialNewsArticles: NewsArticle[] = [
     imageSeed: "ai-writing-robot",
     type: "news",
     thumbnailImage: "",
+    coverImage: "https://placehold.co/800x400/e0e7ff/312e81?text=AI+Content+Marketing",
     createdAt: "2024-07-22T09:00:00.000Z",
     category: "Marketing",
     title: "AI in Content Marketing: A Practical Guide for Small Businesses",
@@ -743,6 +766,7 @@ const App: React.FC = () => {
   }, []);
   const [appliedCartCoupon, setAppliedCartCoupon] = useState<Coupon | null>(null);
   const [cartCouponError, setCartCouponError] = useState<string | null>(null);
+  const [applyCartEduCoins, setApplyCartEduCoins] = useState(false);
 
   // Subscription Modal State
   const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
@@ -1033,7 +1057,7 @@ const App: React.FC = () => {
     setIsCartOpen(false);
   };
 
-  const handleConfirmCartPurchase = (appliedCouponCode: string | null) => {
+  const handleConfirmCartPurchase = (appliedCouponCode: string | null, appliedCoins = 0) => {
       if (cart.length === 0) return;
 
       // --- Recalculate price at the moment of confirmation for robustness ---
@@ -1048,7 +1072,14 @@ const App: React.FC = () => {
       if (couponToApply) {
           finalDiscount = calculateDiscount(couponToApply, currentCartSubtotal);
       }
-      const finalPrice = currentCartSubtotal - finalDiscount;
+      const afterCoupon = Math.max(0, currentCartSubtotal - finalDiscount);
+      const safeAppliedCoins = Math.min(currentUser?.eduCoins || 0, Math.max(0, appliedCoins), Math.floor(afterCoupon * eduCoinRedeemRate));
+      const coinDiscount = Math.min(afterCoupon, safeAppliedCoins / eduCoinRedeemRate);
+      const finalPrice = Math.max(0, afterCoupon - coinDiscount);
+      if (safeAppliedCoins > 0 && !deductEduCoins(safeAppliedCoins, {
+        source: 'Checkout discount',
+        description: `Applied ${safeAppliedCoins} EduCoins for ₹${coinDiscount.toFixed(2)} cart discount`,
+      })) return;
       // --- End of recalculation ---
 
       const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
@@ -1071,7 +1102,7 @@ const App: React.FC = () => {
         customerName: currentUser?.name || currentUser?.email.split('@')[0] || 'Valued Customer',
         customerEmail: currentUser?.email || 'customer@example.com',
         date: new Date().toISOString().split('T')[0],
-        total: `₹${finalPrice.toFixed(2)}`,
+        total: `₹${finalPrice.toFixed(2)}${safeAppliedCoins > 0 ? ` (🪙 ${safeAppliedCoins} applied)` : ''}`,
         status: 'Completed',
         items: newOrderItems,
         shippingAddress: 'N/A (Digital Product)',
@@ -1085,6 +1116,7 @@ const App: React.FC = () => {
       setCart([]);
       setAppliedCartCoupon(null);
       setCartCouponError(null);
+      setApplyCartEduCoins(false);
       setIsCartPaymentModalOpen(false);
       setCurrentView('congratulations');
       window.scrollTo(0, 0);
@@ -1108,7 +1140,11 @@ const App: React.FC = () => {
   };
   
   const cartCouponDiscount = appliedCartCoupon ? calculateDiscount(appliedCartCoupon, cartSubtotal) : 0;
-  const cartFinalPrice = cartSubtotal - cartCouponDiscount;
+  const cartAfterCoupon = Math.max(0, cartSubtotal - cartCouponDiscount);
+  const eduCoinRedeemRate = Math.max(1, Number((websiteSettings.content as any).eduCoinRules?.redeemRate || 10));
+  const cartAppliedEduCoins = applyCartEduCoins ? Math.min(currentUser?.eduCoins || 0, Math.floor(cartAfterCoupon * eduCoinRedeemRate)) : 0;
+  const cartEduCoinDiscount = Math.min(cartAfterCoupon, cartAppliedEduCoins / eduCoinRedeemRate);
+  const cartFinalPrice = Math.max(0, cartAfterCoupon - cartEduCoinDiscount);
 
   const handleApplyCartCoupon = (code: string) => {
     setCartCouponError(null);
@@ -1142,7 +1178,7 @@ const App: React.FC = () => {
 
   // --- Auth Handlers ---
   const completeUserSession = (user: User) => {
-      const sessionUser = { ...user, eduCoins: user.eduCoins ?? 120, studyMinutes: user.studyMinutes ?? 0, totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0, rewardedArticleIds: user.rewardedArticleIds || [], lastLoginAt: new Date().toISOString() };
+      const sessionUser = { ...user, eduCoins: user.eduCoins ?? 120, studyMinutes: user.studyMinutes ?? 0, totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0, rewardedArticleIds: user.rewardedArticleIds || [], readArticles: user.readArticles || user.rewardedArticleIds || [], rewardedQuizIds: user.rewardedQuizIds || [], claimedRewardIds: user.claimedRewardIds || [], totalLifetimeCoins: user.totalLifetimeCoins ?? user.eduCoins ?? 120, coinTransactions: user.coinTransactions || [], lastLoginAt: new Date().toISOString() };
       setCurrentUser(sessionUser);
       safeSetItem('currentUser', sessionUser);
 
@@ -1169,7 +1205,7 @@ const App: React.FC = () => {
       if (users.some(u => u.email === email)) {
           return { success: false, message: 'An account with this email already exists.' };
       }
-      const newUser: User = { id: Date.now(), name, email, mobile, password, createdAt: new Date().toISOString(), eduCoins: 120, studyMinutes: 0, totalWatchTimeMinutes: 0, rewardedArticleIds: [] };
+      const newUser: User = { id: Date.now(), name, email, mobile, password, createdAt: new Date().toISOString(), eduCoins: 120, totalLifetimeCoins: 120, studyMinutes: 0, totalWatchTimeMinutes: 0, rewardedArticleIds: [], readArticles: [], rewardedQuizIds: [], claimedRewardIds: [], coinTransactions: [] };
       const updatedUsers = [...users, newUser];
       setUsers(updatedUsers);
       safeSetItem('siteUsers', updatedUsers);
@@ -1226,15 +1262,37 @@ const App: React.FC = () => {
   };
 
 
-  const syncCurrentUser = (updater: (user: User) => User) => {
+  const persistUserToFirestore = (user: User) => {
+    void setDoc(doc(db, 'users', String(user.id)), user, { merge: true }).catch(error => {
+      console.warn('User database sync failed; local wallet remains updated.', error);
+    });
+  };
+
+  const recordCoinTransaction = (user: User, transaction: Omit<CoinTransaction, 'id' | 'createdAt'>) => {
+    const timestamp = new Date().toISOString();
+    const entry: CoinTransaction = { ...transaction, title: transaction.title || transaction.source, id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, createdAt: timestamp, timestamp };
+    const storageKey = `coinTransactions-${user.id}`;
+    const localLedger = JSON.parse(localStorage.getItem(storageKey) || '[]') as CoinTransaction[];
+    const nextLedger = [entry, ...localLedger].slice(0, 100);
+    localStorage.setItem(storageKey, JSON.stringify(nextLedger));
+    void addDoc(collection(db, 'users', String(user.id), 'coinTransactions'), { ...entry, createdAt: serverTimestamp() }).catch(error => {
+      console.warn('Coin transaction database write failed; local ledger remains updated.', error);
+    });
+    return entry;
+  };
+
+  const syncCurrentUser = (updater: (user: User) => User, transaction?: Omit<CoinTransaction, 'id' | 'createdAt'>) => {
     if (!currentUser) return null;
     const updatedUser = updater(currentUser);
-    setCurrentUser(updatedUser);
-    localStorage.setItem('currentUser', JSON.stringify(updatedUser));
-    const nextUsers = users.map(user => user.id === updatedUser.id ? updatedUser : user);
+    const entry = transaction ? recordCoinTransaction(updatedUser, transaction) : null;
+    const userWithLedger = entry ? { ...updatedUser, coinTransactions: [entry, ...(updatedUser.coinTransactions || [])].slice(0, 25) } : updatedUser;
+    setCurrentUser(userWithLedger);
+    localStorage.setItem('currentUser', JSON.stringify(userWithLedger));
+    const nextUsers = users.map(user => user.id === userWithLedger.id ? userWithLedger : user);
     setUsers(nextUsers);
     safeSetItem('siteUsers', nextUsers);
-    return updatedUser;
+    persistUserToFirestore(userWithLedger);
+    return userWithLedger;
   };
 
   const showCoinToast = (message: string) => {
@@ -1242,39 +1300,89 @@ const App: React.FC = () => {
     window.setTimeout(() => setCoinToast(null), 3000);
   };
 
-  const creditEduCoins = (amount: number, message?: string) => {
+  const creditEduCoins = (amount: number, message?: string, metadata?: Partial<Omit<CoinTransaction, 'amount' | 'type' | 'createdAt'>>) => {
     if (!currentUser || amount <= 0) return false;
-    syncCurrentUser(user => ({ ...user, eduCoins: (user.eduCoins || 0) + amount }));
+    syncCurrentUser(
+      user => ({ ...user, eduCoins: (user.eduCoins || 0) + amount, totalLifetimeCoins: (user.totalLifetimeCoins || 0) + amount }),
+      { amount, type: 'credit', source: metadata?.source || 'EduCoin reward', description: metadata?.description || message || `+${amount} EduCoins earned`, articleId: metadata?.articleId, productId: metadata?.productId },
+    );
     showCoinToast(message || `✦ +${amount} EduCoins Earned`);
     return true;
   };
 
-  const deductEduCoins = (amount: number) => {
+  const deductEduCoins = (amount: number, metadata?: Partial<Omit<CoinTransaction, 'amount' | 'type' | 'createdAt'>>) => {
     if (!currentUser || amount <= 0 || (currentUser.eduCoins || 0) < amount) return false;
-    syncCurrentUser(user => ({ ...user, eduCoins: (user.eduCoins || 0) - amount }));
+    syncCurrentUser(
+      user => ({ ...user, eduCoins: (user.eduCoins || 0) - amount }),
+      { amount: -amount, type: 'debit', source: metadata?.source || 'EduCoin redemption', description: metadata?.description || `${amount} EduCoins redeemed`, productId: metadata?.productId, articleId: metadata?.articleId },
+    );
     return true;
   };
 
   const handleReadingReward = (article: NewsArticle) => {
     const rewardCoins = 10;
-    if (!currentUser) return;
+    if (!currentUser) return false;
     const articleId = article.id;
-    if ((currentUser.rewardedArticleIds || []).includes(articleId)) return;
-    syncCurrentUser(user => ({
-      ...user,
-      eduCoins: (user.eduCoins || 0) + rewardCoins,
-      rewardedArticleIds: [...(user.rewardedArticleIds || []), articleId],
-    }));
+    const alreadyRead = [...(currentUser.rewardedArticleIds || []), ...(currentUser.readArticles || [])].includes(articleId);
+    if (alreadyRead) return false;
+    syncCurrentUser(
+      user => ({
+        ...user,
+        eduCoins: (user.eduCoins || 0) + rewardCoins,
+        totalLifetimeCoins: (user.totalLifetimeCoins || 0) + rewardCoins,
+        rewardedArticleIds: [...new Set([...(user.rewardedArticleIds || []), articleId])],
+        readArticles: [...new Set([...(user.readArticles || []), articleId])],
+      }),
+      { amount: rewardCoins, type: 'credit', source: 'Article reading reward', description: `Read: ${article.title}`, articleId },
+    );
     showCoinToast(`✦ +${rewardCoins} EduCoins Earned`);
+    return true;
   };
 
-  const handleWatchTimeMinutes = (minutes: number) => {
+  const handleWatchTimeMinutes = (minutes: number, lessonTitle = 'Course video') => {
     if (!currentUser || minutes <= 0) return;
-    syncCurrentUser(user => ({
-      ...user,
-      studyMinutes: (user.studyMinutes || 0) + minutes,
-      totalWatchTimeMinutes: (user.totalWatchTimeMinutes || 0) + minutes,
-    }));
+    syncCurrentUser(
+      user => ({
+        ...user,
+        studyMinutes: (user.studyMinutes || 0) + minutes,
+        totalWatchTimeMinutes: (user.totalWatchTimeMinutes || 0) + minutes,
+        eduCoins: (user.eduCoins || 0) + minutes,
+        totalLifetimeCoins: (user.totalLifetimeCoins || 0) + minutes,
+      }),
+      { amount: minutes, type: 'credit', source: `Video: ${lessonTitle}`, description: `Watched ${lessonTitle} (${minutes} min${minutes > 1 ? 's' : ''})` },
+    );
+  };
+
+  const handleQuizReward = (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => {
+    if (!currentUser || coins <= 0) return false;
+    if ((currentUser.rewardedQuizIds || []).includes(quizId)) return false;
+    syncCurrentUser(
+      user => ({
+        ...user,
+        eduCoins: (user.eduCoins || 0) + coins,
+        totalLifetimeCoins: (user.totalLifetimeCoins || 0) + coins,
+        rewardedQuizIds: [...new Set([...(user.rewardedQuizIds || []), quizId])],
+      }),
+      { amount: coins, type: 'credit', source: `Quiz: ${quizTitle}`, description: `${correctAnswers} correct answer${correctAnswers === 1 ? '' : 's'} in ${quizTitle}` },
+    );
+    showCoinToast(`✦ +${coins} EduCoins Quiz Reward`);
+    return true;
+  };
+
+  const handleClaimMilestoneReward = (reward: { id: string; title: string; requirement: number; unlockProductIds?: number[] }) => {
+    if (!currentUser) return false;
+    if ((currentUser.totalLifetimeCoins || 0) < reward.requirement || (currentUser.claimedRewardIds || []).includes(reward.id)) return false;
+    syncCurrentUser(
+      user => ({ ...user, claimedRewardIds: [...new Set([...(user.claimedRewardIds || []), reward.id])] }),
+      { amount: 0, type: 'credit', source: 'Milestone unlocked', description: `Unlocked: ${reward.title}` },
+    );
+    if (reward.unlockProductIds?.length) {
+      const nextPurchasedIds = [...new Set([...purchasedProductIds, ...reward.unlockProductIds])];
+      setPurchasedProductIds(nextPurchasedIds);
+      safeSetItem('purchasedProducts', nextPurchasedIds);
+    }
+    setInfoModal({ title: 'Milestone unlocked', message: `${reward.title} is now available.`, icon: '🏆' });
+    return true;
   };
 
   const handleToggleWishlist = (productId: number) => {
@@ -1355,7 +1463,7 @@ const App: React.FC = () => {
 
         const newPurchasedIds = [...new Set([...purchasedProductIds, selectedProduct.id])];
         const purchaseCoins = Number((websiteSettings.content as any).eduCoinRules?.purchase || 25);
-        creditEduCoins(purchaseCoins, `✦ +${purchaseCoins} EduCoins Purchase Reward`);
+        creditEduCoins(purchaseCoins, `✦ +${purchaseCoins} EduCoins Purchase Reward`, { source: 'Purchase reward', description: `Purchased ${selectedProduct.title}`, productId: selectedProduct.id });
         setPurchasedProductIds(newPurchasedIds);
         safeSetItem('purchasedProducts', newPurchasedIds);
 
@@ -1408,7 +1516,7 @@ const App: React.FC = () => {
   const handleProductCoinPurchase = (product: ProductWithRating, quantity: number) => {
     if (!currentUser) { setCurrentView('auth'); return; }
     const totalCoinPrice = (product.coinPrice || 0) * quantity;
-    if (!totalCoinPrice || !deductEduCoins(totalCoinPrice)) return;
+    if (!totalCoinPrice || !deductEduCoins(totalCoinPrice, { source: 'Product EduCoin purchase', description: `Unlocked ${product.title} with EduCoins`, productId: product.id })) return;
     completeProductUnlock(product, quantity, `🪙 ${totalCoinPrice}`);
     setInfoModal({ title: 'EduCoin purchase complete', message: `${product.title} unlocked with EduCoins.`, icon: '🪙' });
   };
@@ -1417,7 +1525,7 @@ const App: React.FC = () => {
     if (!currentUser || cartDetails.length === 0) return;
     const totalCoinPrice = cartDetails.reduce((total, item) => total + ((item.product.coinPrice || 0) * item.quantity), 0);
     const allCoinEnabled = cartDetails.every(item => (item.product.coinPrice || 0) > 0);
-    if (!allCoinEnabled || !totalCoinPrice || !deductEduCoins(totalCoinPrice)) return;
+    if (!allCoinEnabled || !totalCoinPrice || !deductEduCoins(totalCoinPrice, { source: 'Cart EduCoin purchase', description: 'Unlocked cart with EduCoins' })) return;
     const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
     setPurchasedProductIds(newPurchasedIds);
     safeSetItem('purchasedProducts', newPurchasedIds);
@@ -1435,6 +1543,7 @@ const App: React.FC = () => {
     setCart([]);
     setAppliedCartCoupon(null);
     setCartCouponError(null);
+    setApplyCartEduCoins(false);
     setIsCartPaymentModalOpen(false);
     setCurrentView('congratulations');
     setInfoModal({ title: 'EduCoin checkout complete', message: 'Your cart was unlocked with EduCoins.', icon: '🪙' });
@@ -1475,7 +1584,7 @@ const App: React.FC = () => {
   const handleActivateSubscriptionWithCoins = (plan: any) => {
     if (!currentUser) { setCurrentView('auth'); return; }
     const coinPrice = Number(plan.coinPrice || 0);
-    if (!coinPrice || !deductEduCoins(coinPrice)) return;
+    if (!coinPrice || !deductEduCoins(coinPrice, { source: 'Subscription EduCoin purchase', description: `Activated ${plan.name} with EduCoins` })) return;
     unlockSubscriptionPlan(plan, `${coinPrice} EduCoins`);
   };
   const handleNavigateToSubscription = () => { setCurrentView('subscription'); window.scrollTo(0,0); };
@@ -1648,11 +1757,11 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case 'product': return selectedProduct && <ProductDetailPage settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToAllProducts} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={currentUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
-      case 'coursePlayer': return selectedProduct && <CoursePlayer settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToPurchases} onWatchTimeMinutes={handleWatchTimeMinutes} />;
+      case 'coursePlayer': return selectedProduct && <CoursePlayer settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToPurchases} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={handleBackToHome} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} coupons={coupons} />;
       case 'myPurchases': return <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
-      case 'profile': return <ProfilePage settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} />;
+      case 'profile': return <ProfilePage settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} />;
       case 'subscription': return <SubscriptionPage settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={handleBackToHome} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
       case 'home': default: return renderHomePageContent();
@@ -1674,13 +1783,13 @@ const App: React.FC = () => {
             <WelcomeOverlay />
             <Header settings={websiteSettings} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} activeTheme={activeTheme} onThemeChange={setActiveTheme} />
             {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} onSubscriptionClick={handleNavigateToSubscription} />}
-            <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} />
+            <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={currentUser?.eduCoins || 0} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
-            {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null)} currentUser={currentUser} coinPrice={cartDetails.every(item => (item.product.coinPrice || 0) > 0) ? cartDetails.reduce((total, item) => total + ((item.product.coinPrice || 0) * item.quantity), 0) : 0} onConfirmWithCoins={handleConfirmCartCoinPurchase} />}
+            {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins)} currentUser={currentUser} coinPrice={cartDetails.every(item => (item.product.coinPrice || 0) > 0) ? cartDetails.reduce((total, item) => total + ((item.product.coinPrice || 0) * item.quantity), 0) : 0} onConfirmWithCoins={handleConfirmCartCoinPurchase} />}
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onViewProduct={handleViewProductFromModal} />
-            <ReadingDrawer isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
+            <ReadingDrawer isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={currentUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
             <main key={currentView} className={appleOpenClass}>{renderContent()}</main>
             <Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} />

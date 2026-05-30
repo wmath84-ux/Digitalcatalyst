@@ -14,11 +14,19 @@ interface CartSidebarProps {
     appliedCoupon: Coupon | null;
     couponError: string | null;
     onRemoveCoupon: () => void;
+    coinBalance: number;
+    coinRedeemRate: number;
+    applyEduCoins: boolean;
+    onToggleEduCoins: (enabled: boolean) => void;
+    appliedEduCoins: number;
+    eduCoinDiscount: number;
+    finalPrice: number;
 }
 
 const CartSidebar: React.FC<CartSidebarProps> = ({ 
     isOpen, onClose, cartItems, onUpdateQuantity, onRemoveItem, onViewProduct, onCheckout,
-    onApplyCoupon, appliedCoupon, couponError, onRemoveCoupon 
+    onApplyCoupon, appliedCoupon, couponError, onRemoveCoupon, coinBalance, coinRedeemRate,
+    applyEduCoins, onToggleEduCoins, appliedEduCoins, eduCoinDiscount, finalPrice
 }) => {
     const [flash, setFlash] = useState(false);
     const [couponInput, setCouponInput] = useState('');
@@ -116,15 +124,26 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
                                 )}
                                 {couponError && <p className="text-xs text-red-500 mt-1">{couponError}</p>}
                             </div>
-                            <div className={`flex justify-between items-center font-semibold text-lg p-2 rounded-md ${flash ? 'subtotal-flash' : ''}`}>
-                                <span>Subtotal</span>
-                                <span>₹{subtotal.toFixed(2)}</span>
+                            <div className="mb-4 rounded-2xl border border-amber-200/60 bg-white/80 p-4 shadow-sm backdrop-blur-xl">
+                                <label className="flex cursor-pointer items-start gap-3">
+                                    <input type="checkbox" checked={applyEduCoins} onChange={event => onToggleEduCoins(event.target.checked)} className="mt-1 h-4 w-4 rounded border-amber-300 text-indigo-600" />
+                                    <span className="flex-1">
+                                        <span className="block text-sm font-black text-slate-900">Apply EduCoins Balance</span>
+                                        <span className="mt-1 block text-xs leading-5 text-slate-600">🪙 {coinBalance} available • {coinRedeemRate} coins = ₹1 discount</span>
+                                    </span>
+                                </label>
+                                {applyEduCoins && <div className="mt-3 rounded-xl border border-indigo-200/70 bg-indigo-50/80 px-3 py-2 text-xs font-bold text-indigo-700">Applying {appliedEduCoins} coins for ₹{eduCoinDiscount.toFixed(2)} off</div>}
+                            </div>
+                            <div className={`space-y-2 rounded-2xl bg-white/70 p-3 ${flash ? 'subtotal-flash' : ''}`}>
+                                <div className="flex justify-between text-sm font-semibold"><span>Subtotal</span><span>₹{subtotal.toFixed(2)}</span></div>
+                                {eduCoinDiscount > 0 && <div className="flex justify-between text-sm font-bold text-emerald-700"><span>EduCoin discount</span><span>- ₹{eduCoinDiscount.toFixed(2)}</span></div>}
+                                <div className="flex justify-between border-t border-white/70 pt-2 text-lg font-black"><span>Total</span><span>₹{finalPrice.toFixed(2)}</span></div>
                             </div>
                             {/* FIX: Wrapped event handler in an arrow function to prevent passing implicit event arguments. */}
                             <button onClick={() => onCheckout()} className="w-full mt-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black py-4 rounded-2xl hover:opacity-90 transition-all transform active:scale-95 shadow-sm">
                                 Proceed to Checkout
                             </button>
-                             <p className="text-xs text-text-muted text-center mt-2">Shipping & taxes calculated at checkout.</p>
+                             <p className="text-xs text-text-muted text-center mt-2">Discounts are validated again at checkout.</p>
                         </footer>
                     )}
                 </div>
