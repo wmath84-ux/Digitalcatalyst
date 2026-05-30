@@ -70,18 +70,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
   const activeCoupons = React.useMemo(() => coupons.filter(coupon => coupon.isActive), [coupons]);
   const rewards = React.useMemo(() => (settings.content as any).redeemRewards || [], [settings.content]);
-  const studyMinutes = currentUser?.studyMinutes ?? purchasedProducts.length * 48 + 35;
-  const purchasePoints = purchasedProducts.length * 180;
-  const modulePoints = Math.floor(studyMinutes / 15) * 12;
-  const quizBonus = purchasedProducts.reduce((total, product, index) => total + Math.round((product.rating || 4) * 18) + index * 10, 0);
-  const eduPoints = (currentUser?.eduCoins ?? 120) + purchasePoints + modulePoints + quizBonus;
+  const studyMinutes = currentUser?.studyMinutes ?? 0;
+  const watchTimeMinutes = currentUser?.totalWatchTimeMinutes ?? studyMinutes;
+  const eduPoints = currentUser?.eduCoins ?? 0;
   const level = Math.max(1, Math.floor(eduPoints / 500) + 1);
   const currentLevelStart = (level - 1) * 500;
   const pointsIntoLevel = eduPoints - currentLevelStart;
   const pointsForNextLevel = 500;
   const nextLevelProgress = clamp((pointsIntoLevel / pointsForNextLevel) * 100);
   const pointsRemaining = Math.max(0, pointsForNextLevel - pointsIntoLevel);
-  const streakDays = Math.max(1, Math.min(21, Math.floor(studyMinutes / 55) + purchasedProducts.length + 2));
+  const streakDays = Math.max(0, Math.min(21, Math.floor(studyMinutes / 55) + purchasedProducts.length));
 
   const learningProgress: LearningProgress[] = purchasedProducts.length
     ? purchasedProducts.slice(0, 5).map((product, index) => ({
@@ -174,7 +172,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
   const statCards = [
     { label: 'Courses Owned', value: purchasedProducts.length, icon: '📚' },
-    { label: 'Study Time', value: `${Math.floor(studyMinutes / 60)}h ${studyMinutes % 60}m`, icon: '⏱️' },
+    { label: 'Video Watch Time', value: `${Math.floor(watchTimeMinutes / 60)}h ${watchTimeMinutes % 60}m`, icon: '⏱️' },
     { label: 'Badges Unlocked', value: `${badges.filter(badge => badge.unlocked).length}/${badges.length}`, icon: '🏅' },
   ];
 

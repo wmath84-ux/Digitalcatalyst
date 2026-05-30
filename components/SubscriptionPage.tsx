@@ -1,9 +1,9 @@
 import React from 'react';
-import { ProductWithRating, WebsiteSettings } from '../App';
+import { ProductWithRating, WebsiteSettings, User } from '../App';
 
-interface Plan { id: string; name: string; price: number; description: string; unlockProductIds: number[]; badge?: string; }
+interface Plan { id: string; name: string; price: number; coinPrice?: number; description: string; unlockProductIds: number[]; badge?: string; }
 
-const SubscriptionPage: React.FC<{settings: WebsiteSettings; products: ProductWithRating[]; purchasedProductIds: number[]; onBack: () => void; onActivatePlan: (plan: Plan) => void;}> = ({ settings, products, purchasedProductIds, onBack, onActivatePlan }) => {
+const SubscriptionPage: React.FC<{settings: WebsiteSettings; products: ProductWithRating[]; purchasedProductIds: number[]; onBack: () => void; onActivatePlan: (plan: Plan) => void; currentUser?: User | null; onActivatePlanWithCoins?: (plan: Plan) => void;}> = ({ settings, products, purchasedProductIds, onBack, onActivatePlan, currentUser, onActivatePlanWithCoins }) => {
   const plans: Plan[] = (settings.content as any).subscriptionPlans || [];
   const totalUnlockedProducts = plans.reduce((ids, plan) => new Set([...ids, ...(plan.unlockProductIds || [])]), new Set<number>()).size;
   const highlightedPlanIndex = plans.length > 1 ? 1 : 0;
@@ -44,6 +44,10 @@ const SubscriptionPage: React.FC<{settings: WebsiteSettings; products: ProductWi
             const allUnlocked = (plan.unlockProductIds || []).every((id: number) => purchasedProductIds.includes(id));
             const isHighlighted = index === highlightedPlanIndex;
             const unlockedProducts = (plan.unlockProductIds || []).map((id:number) => products.find(product => product.id === id)?.title || `Product #${id}`);
+            const coinPrice = Number(plan.coinPrice || 0);
+            const coinBalance = currentUser?.eduCoins || 0;
+            const canPayWithCoins = coinPrice > 0 && coinBalance >= coinPrice;
+            const missingCoins = Math.max(0, coinPrice - coinBalance);
 
             return (
               <article key={plan.id} className={`group relative flex min-h-[25rem] flex-col overflow-hidden rounded-[2rem] border p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 ${isHighlighted ? 'border-cyan-200/40 bg-cyan-200/[0.10]' : 'border-white/50 bg-white/70'}`}>
@@ -69,7 +73,10 @@ const SubscriptionPage: React.FC<{settings: WebsiteSettings; products: ProductWi
                   </ul>
                 </div>
 
-                <button disabled={allUnlocked} onClick={() => onActivatePlan(plan)} className={`mt-6 w-full rounded-2xl px-5 py-4 font-black transition ${allUnlocked ? 'cursor-not-allowed bg-white/70 text-slate-600' : 'bg-gradient-to-r from-cyan-200 to-blue-300 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 hover:-translate-y-0.5 hover:shadow-sm'}`}>{allUnlocked ? 'Already Active' : 'Activate Plan'}</button>
+                <div className="mt-6 space-y-3">
+                  <button disabled={allUnlocked} onClick={() => onActivatePlan(plan)} className={`w-full rounded-2xl px-5 py-4 font-black transition active:scale-95 ${allUnlocked ? 'cursor-not-allowed bg-white/70 text-slate-600' : 'bg-gradient-to-r from-cyan-200 to-blue-300 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 hover:-translate-y-0.5 hover:shadow-sm'}`}>{allUnlocked ? 'Already Active' : 'Pay with Rupees'}</button>
+                  {coinPrice > 0 && <button disabled={allUnlocked || !canPayWithCoins} onClick={() => onActivatePlanWithCoins?.(plan)} className="w-full rounded-2xl border border-amber-200/60 bg-white/80 px-5 py-4 font-black text-amber-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">{canPayWithCoins ? `Pay ${coinPrice} EduCoins` : `Need ${missingCoins} more coins`}</button>}
+                </div>
               </article>
             );
           })}

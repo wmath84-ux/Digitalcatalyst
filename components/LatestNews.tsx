@@ -68,7 +68,9 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
     };
   }, []);
 
-  if (articles.length === 0) return null;
+  const newsArticles = articles.filter(article => article.type === 'news');
+
+  if (newsArticles.length === 0) return null;
 
   return (
     <section 
@@ -81,11 +83,11 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
             <div className="max-w-2xl">
                 <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight">{title}</h2>
                 <p className="mt-4 text-lg text-slate-600">
-                    Insights, strategies, and updates from the Digital Catalyst team.
+                    Current student alerts, education updates, and opportunity signals from Digital Catalyst.
                 </p>
             </div>
             <button onClick={onOpenHub} className="hidden md:block rounded-full border border-white/50 bg-white/70 px-5 py-2 text-sm font-bold text-indigo-700 backdrop-blur-xl transition hover:border-indigo-300/40 hover:bg-indigo-400/10">
-                Open Reading Hub
+                Open News
             </button>
         </div>
 
@@ -93,7 +95,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
             ref={gridRef} 
             className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
         >
-          {articles.map((article, index) => (
+          {newsArticles.map((article, index) => (
             <NewsCard 
               key={article.id}
               settings={settings}
@@ -105,7 +107,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
         </div>
         
         <button onClick={onOpenHub} className="md:hidden w-full mt-8 border border-white/50 bg-white/70 py-3 rounded-lg font-semibold text-indigo-700">
-            Open Reading Hub
+            Open News
         </button>
       </div>
     </section>

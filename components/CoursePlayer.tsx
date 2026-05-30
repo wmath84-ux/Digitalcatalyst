@@ -62,7 +62,7 @@ const ModuleItem: React.FC<{ module: CourseModule; activeFile: ProductFile | nul
       {isExpanded && (
         <div className="space-y-1 pb-2">
           {(module.files || []).map((file) => (
-            <button key={file.id} onClick={() => onSelectFile(file)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition ${activeFile?.id === file.id ? "border border-cyan-200/50 bg-cyan-200/15 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)]" : "font-medium text-slate-900/90 hover:bg-cyan-50/25"}`}>
+            <button key={file.id} onClick={() => onSelectFile(file)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition ${activeFile?.id === file.id ? "bg-white border border-slate-200 font-black text-slate-900 shadow-sm shadow-slate-200/50" : "font-medium text-slate-900/90 hover:bg-cyan-50/25"}`}>
               <span className="min-w-0 flex-1 truncate">{file.name}</span>
               {file.type === 'quiz' ? <QuizIcon className="h-5 w-5 shrink-0" /> : <FileIcon className="h-5 w-5 shrink-0" />}
             </button>
@@ -308,12 +308,14 @@ const QuizPlayer: React.FC<{ file: ProductFile }> = ({ file }) => {
   );
 };
 
-const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; }> = ({ settings, product, onBack }) => {
+const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRating; onBack: () => void; onWatchTimeMinutes?: (minutes: number) => void; }> = ({ settings, product, onBack, onWatchTimeMinutes }) => {
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const watchSecondsRef = useRef(0);
+  const lastVideoTimeRef = useRef(0);
 
   useEffect(() => {
     const findFirst = (modules?: CourseModule[]): ProductFile | null => {
@@ -334,9 +336,31 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
   const accentGlow = settings.theme?.accentColor || '#a5f3fc';
 
   const onSelectFile = (file: ProductFile) => {
+    flushWatchMinutes();
     setActiveFile(file);
     setIsSidebarOpen(false);
     setIsMentorOpen(false);
+  };
+
+  const flushWatchMinutes = () => {
+    if (!onWatchTimeMinutes) return;
+    const minutes = Math.floor(watchSecondsRef.current / 60);
+    if (minutes > 0) {
+      watchSecondsRef.current -= minutes * 60;
+      onWatchTimeMinutes(minutes);
+    }
+  };
+
+  const handleVideoTimeUpdate = (event: React.SyntheticEvent<HTMLVideoElement>) => {
+    const currentTime = event.currentTarget.currentTime;
+    const delta = currentTime - lastVideoTimeRef.current;
+    if (delta > 0 && delta < 5) watchSecondsRef.current += delta;
+    lastVideoTimeRef.current = currentTime;
+    flushWatchMinutes();
+  };
+
+  const handleVideoSeeked = (event: React.SyntheticEvent<HTMLVideoElement>) => {
+    lastVideoTimeRef.current = event.currentTarget.currentTime;
   };
 
   const renderMedia = () => {
@@ -347,7 +371,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
         const videoId = extractYouTubeID(activeFile.url);
         return videoId ? <iframe key={activeFile.id} className="h-full w-full bg-white/70" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaHasError(true)} /> : <VideoUnavailablePlaceholder />;
       }
-      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onError={() => setMediaHasError(true)} />;
+      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onTimeUpdate={handleVideoTimeUpdate} onSeeked={handleVideoSeeked} onPause={flushWatchMinutes} onEnded={flushWatchMinutes} onError={() => setMediaHasError(true)} />;
       case 'audio': return <div className="flex h-full w-full flex-col items-center justify-center bg-white/70 p-8 text-slate-900"><svg xmlns="http://www.w3.org/2000/svg" className="mb-4 h-24 w-24 text-slate-900/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z" /></svg><h3 className="mb-6 max-w-full truncate text-xl font-semibold">{activeFile.name}</h3><audio key={activeFile.id} src={activeFile.url} controls className="w-full max-w-md" onError={() => setMediaHasError(true)} /></div>;
       case 'pdf':
       case 'sheet': return <GlassDownloadCard file={activeFile} />;
@@ -382,7 +406,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
         </div>
 
         <section className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
-          <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform border-r border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl lg:border shadow-[0_8px_30px_rgb(0,0,0,0.04)] ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+          <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-slate-900/[0.04] backdrop-blur-3xl border-r border-slate-200/50 shadow-[4px_0_30px_rgba(0,0,0,0.02)] transition lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl lg:border ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col">
               <div className="shrink-0 border-b border-white/50 px-4 py-5">
                 <button onClick={onBack} className="mb-4 flex items-center gap-2 text-[22px] font-medium text-slate-900 hover:opacity-70">← <span>Back</span></button>
@@ -394,7 +418,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; product: ProductWithRa
             </div>
           </aside>
 
-          <div className="min-h-0 overflow-hidden rounded-2xl border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
+          <div className="min-h-0 overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)]">
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>

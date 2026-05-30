@@ -95,6 +95,48 @@
       html {
         scroll-behavior: smooth;
       }
+
+      :root {
+        --apple-fluid-curve: cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      @keyframes apple-app-open {
+        from {
+          opacity: 0;
+          transform: scale(0.95);
+        }
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      .animate-in.fade-in.zoom-in-95 {
+        animation: apple-app-open 500ms var(--apple-fluid-curve) both;
+        transform-origin: center;
+        will-change: opacity, transform;
+      }
+
+      :where(button, a, [role="button"], [role="tab"], [role="menuitem"], .cursor-pointer, .product-card-shine, .hover-lift) {
+        transition-timing-function: var(--apple-fluid-curve);
+      }
+
+      :where(button, a, [role="button"], [role="tab"], [role="menuitem"], .cursor-pointer, .product-card-shine, .hover-lift):active {
+        transform: scale(0.97);
+        transition-property: transform, opacity, background-color, border-color, color, box-shadow, filter, backdrop-filter;
+        transition-duration: 200ms;
+        transition-timing-function: ease-out;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .animate-in.fade-in.zoom-in-95 {
+          animation: none;
+        }
+
+        :where(button, a, [role="button"], [role="tab"], [role="menuitem"], .cursor-pointer, .product-card-shine, .hover-lift):active {
+          transform: none;
+        }
+      }
       
       /* --- Utility Animations --- */
       
@@ -211,11 +253,13 @@
         bottom: 0;
         width: 100%;
         max-width: 400px;
-        background-color: white;
+        background: rgba(255, 255, 255, 0.8);
+        border-left: 1px solid rgba(255, 255, 255, 0.5);
+        backdrop-filter: blur(40px);
         z-index: 999;
         transform: translateX(100%);
-        transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-        box-shadow: -10px 0 25px rgba(0,0,0,0.1);
+        transition: transform 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+        box-shadow: -25px 0 50px rgba(15, 23, 42, 0.16);
       }
       .cart-sidebar.is-open {
         transform: translateX(0);
