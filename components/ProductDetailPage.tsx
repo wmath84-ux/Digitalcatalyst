@@ -18,7 +18,7 @@ const ImageZoomModal: React.FC<{ src: string; alt: string; onClose: () => void; 
     const overlayRef = React.useRef<HTMLDivElement>(null);
 
     // Using refs for values that change frequently in event listeners to avoid re-renders
-    const isDraggingRef = React.useRef(false);
+    const isZoomPanningRef = React.useRef(false);
     const dragStartRef = React.useRef({ x: 0, y: 0 });
     const pointersRef = React.useRef<PointerEvent[]>([]);
     const initialPinchDistRef = React.useRef(0);
@@ -28,7 +28,7 @@ const ImageZoomModal: React.FC<{ src: string; alt: string; onClose: () => void; 
         pointersRef.current.push(e.nativeEvent);
         
         if (pointersRef.current.length === 1) { // Pan / Swipe start
-            isDraggingRef.current = true;
+            isZoomPanningRef.current = true;
             dragStartRef.current = {
                 x: e.clientX - offset.x,
                 y: e.clientY - offset.y,
@@ -40,7 +40,7 @@ const ImageZoomModal: React.FC<{ src: string; alt: string; onClose: () => void; 
     };
     
     const handlePointerMove = (e: React.PointerEvent) => {
-        if (!isDraggingRef.current) return;
+        if (!isZoomPanningRef.current) return;
 
         if (pointersRef.current.length === 1) { // Panning or Swiping
             const currentX = e.clientX - dragStartRef.current.x;
@@ -79,7 +79,7 @@ const ImageZoomModal: React.FC<{ src: string; alt: string; onClose: () => void; 
             initialPinchDistRef.current = 0;
         }
         if (pointersRef.current.length < 1) {
-            isDraggingRef.current = false;
+            isZoomPanningRef.current = false;
             // Check for swipe-to-dismiss completion
             if (scale === 1 && Math.abs(offset.y) > 100) {
                 onClose();
@@ -129,8 +129,8 @@ const ImageZoomModal: React.FC<{ src: string; alt: string; onClose: () => void; 
 
     const imageStyle: React.CSSProperties = {
         transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`,
-        transition: isDraggingRef.current ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0.38, 0.9)',
-        cursor: isDraggingRef.current ? 'grabbing' : (scale > 1 ? 'grab' : 'zoom-out'),
+        transition: isZoomPanningRef.current ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0.38, 0.9)',
+        cursor: isZoomPanningRef.current ? 'grabbing' : (scale > 1 ? 'grab' : 'zoom-out'),
     };
     
     // Animate out on close
@@ -451,7 +451,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   return (
     <>
-      <section className="py-16 sm:py-20 bg-white">
+      <section className="py-16 sm:py-20 bg-white/10 backdrop-blur-xl">
         <div className="container mx-auto px-6">
           <nav className="flex text-sm text-gray-500 mb-6 items-center space-x-2" aria-label="Breadcrumb">
             <button onClick={onGoHome} className="hover:text-primary hover:underline transition-colors font-medium">Home</button>
@@ -569,7 +569,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
            {/* --- COUPON & PRICE BREAKDOWN SECTION --- */}
             {!product.isFree && coupons.length > 0 && (
               <div className="mt-8 max-w-3xl mx-auto">
-                <div className="bg-white rounded-xl shadow-lg border p-6 transition-all duration-300">
+                <div className="bg-white/10 backdrop-blur-xl rounded-xl shadow-lg border p-6 transition-all duration-300">
                   {/* New Coupon UI */}
                   <div>
                     <h3 className="text-lg font-semibold text-gray-800">Have a coupon?</h3>
@@ -657,7 +657,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             
             {/* --- ACTION BUTTONS SECTION --- */}
             <div className="mt-8 max-w-3xl mx-auto">
-                <div className="bg-white rounded-xl shadow-lg border p-6">
+                <div className="bg-white/10 backdrop-blur-xl rounded-xl shadow-lg border p-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
                         <div className="flex items-center border rounded-lg justify-center">
                             <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="px-4 py-3 text-xl font-bold text-gray-600 hover:bg-gray-100 rounded-l-lg">-</button>
@@ -691,7 +691,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       )}
 
       {relatedProducts.length > 0 && (
-        <div className="bg-white">
+        <div className="bg-white/10 backdrop-blur-xl">
            <FeaturedProducts
                 settings={settings}
                 title="Related Products"
@@ -710,7 +710,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       {/* AI Mentor Floating UI */}
       <div className="fixed bottom-6 right-6 z-40">
         {isMentorOpen && (
-          <div className="w-full max-w-sm h-[70vh] max-h-[600px] bg-white rounded-xl shadow-2xl flex flex-col mb-4 animate-fade-in-up">
+          <div className="w-full max-w-sm h-[70vh] max-h-[600px] bg-white/10 backdrop-blur-xl rounded-xl shadow-2xl flex flex-col mb-4 animate-fade-in-up">
               <AiMentor productTitle={product.title} activeContentName={"Product Overview"} />
           </div>
         )}

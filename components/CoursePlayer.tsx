@@ -171,9 +171,6 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
     light: 'bg-slate-100/95 text-slate-950',
   }[theme];
 
-  const applyBlock = (tagName: string) => runCommand('formatBlock', tagName);
-  const readingArticleClass = `${fontSizeClasses[fontSize]} ${lineSpacingClasses[lineSpacing]} ${fontStyleClasses[fontStyle]} ${readingThemeClasses[readingTheme]} ${focusMode ? 'mx-auto max-w-2xl' : 'mx-auto max-w-4xl'}`;
-
   return (
     <div className="relative flex h-full flex-col overflow-hidden bg-white/[0.06] text-slate-100 backdrop-blur-xl">
       <div className="flex flex-wrap items-center gap-2 border-b border-white/10 bg-slate-950/35 p-3 shadow-sm backdrop-blur-xl">

@@ -16,7 +16,6 @@ import AdminDashboard from './components/admin/AdminDashboard';
 import FeaturedProducts from './components/FeaturedProducts';
 import PurchasedProducts from './components/PurchasedProducts';
 import CoursePlayer from './components/CoursePlayer';
-import EbookReader from './components/EbookReader';
 import PolicyPage from './components/PolicyPage';
 import AuthPage from './components/auth/AuthPage';
 import WishlistPage from './components/FavouritesPage';
@@ -66,7 +65,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
     if (this.state.hasError) {
       return (
         <div className="min-h-screen flex items-center justify-center bg-red-50 p-6 text-center font-sans">
-          <div className="max-w-lg bg-white p-8 rounded-xl shadow-2xl border border-red-100">
+          <div className="max-w-lg bg-white/10 backdrop-blur-xl p-8 rounded-xl shadow-2xl border border-red-100">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
             </div>
@@ -80,10 +79,10 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
             )}
 
             <div className="flex flex-col gap-3">
-                <button onClick={() => window.location.reload()} className="w-full bg-gray-800 text-white px-4 py-3 rounded-lg hover:bg-gray-900 font-semibold transition-colors">
+                <button onClick={() => window.location.reload()} className="w-full bg-slate-800/70 text-white px-4 py-3 rounded-lg hover:bg-gray-900 font-semibold transition-colors">
                 Reload Page
                 </button>
-                <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full bg-white border border-red-200 text-red-600 px-4 py-3 rounded-lg hover:bg-red-50 font-semibold transition-colors">
+                <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full bg-white/10 backdrop-blur-xl border border-red-200 text-red-600 px-4 py-3 rounded-lg hover:bg-red-50 font-semibold transition-colors">
                 Reset App Data (Fixes Storage Issues)
                 </button>
             </div>
@@ -292,14 +291,6 @@ export interface SupportTicket {
 }
 
 
-// New E-book Reader settings, configurable from admin panel
-export interface EbookReaderSettings {
-    defaultTheme: 'light' | 'sepia' | 'dark' | 'slate' | 'green';
-    defaultFontSize: number;
-    defaultFontFamily: string;
-    availableFonts: string[];
-}
-
 // --- Theme Customization ---
 export interface ThemePalette {
     primaryColor: string;
@@ -403,9 +394,9 @@ export interface WebsiteSettings {
         newsArticles: NewsArticle[];
         announcements: Announcement[];
         subscriptionPlans: [
-            { id: 'starter', name: 'Starter', price: 199, description: 'Best for beginners', unlockProductIds: [1] },
-            { id: 'pro', name: 'Pro', price: 499, description: 'Unlock premium notes + course', unlockProductIds: [1,2] },
-            { id: 'elite', name: 'Elite', price: 999, description: 'Full bundle access', unlockProductIds: [1,2,3,4] },
+            { id: 'starter', name: 'Starter', price: 199, description: 'Best for beginners', unlockProductIds: [2] },
+            { id: 'pro', name: 'Pro', price: 499, description: 'Unlock premium notes + course', unlockProductIds: [2] },
+            { id: 'elite', name: 'Elite', price: 999, description: 'Full bundle access', unlockProductIds: [2] },
         ],
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
@@ -425,7 +416,6 @@ export interface WebsiteSettings {
         enabled: boolean;
         style: 'fade-up' | 'zoom-in';
     };
-    ebookReaderSettings: EbookReaderSettings;
 }
 
 // New Component for Blog Post Detail View
@@ -436,7 +426,7 @@ const BlogDetail: React.FC<{
 }> = ({ settings, article, onBack }) => {
   return (
     <div className="bg-background min-h-screen font-sans animate-fade-in">
-      <header className="bg-white shadow-md sticky top-0 z-10">
+      <header className="bg-white/10 backdrop-blur-xl shadow-md sticky top-0 z-10">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <h1 className="text-xl font-bold text-primary truncate">Catalyst Blog</h1>
           <button
@@ -448,7 +438,7 @@ const BlogDetail: React.FC<{
         </div>
       </header>
       <main className="container mx-auto px-6 py-12">
-        <div className="max-w-4xl mx-auto bg-white p-8 sm:p-12 rounded-lg shadow-lg animate-fade-in-up">
+        <div className="max-w-4xl mx-auto bg-white/10 backdrop-blur-xl p-8 sm:p-12 rounded-lg shadow-lg animate-fade-in-up">
           <div className="mb-8 border-b pb-6">
             <p className="text-sm font-semibold text-primary tracking-widest uppercase">{article.category}</p>
             <h2 className="text-3xl sm:text-4xl font-extrabold text-primary mt-2">{article.title}</h2>
@@ -473,61 +463,6 @@ const BlogDetail: React.FC<{
 
 
 const initialProducts: Product[] = [
-  {
-    id: 1,
-    imageSeed: "ebook-marketing",
-    images: [
-        "https://picsum.photos/seed/digital-marketing-ebook-cover/800/600", 
-        "https://picsum.photos/seed/marketing-analytics-dashboard/800/600",
-        "https://picsum.photos/seed/social-media-strategy-mindmap/800/600",
-        "https://picsum.photos/seed/seo-keyword-planner/800/600"
-    ],
-    title: "The Ultimate Marketing Guide",
-    description: "A comprehensive e-book covering everything from SEO to social media marketing.",
-    longDescription: "Unlock the secrets of digital marketing with this all-in-one guide. Perfect for beginners and seasoned marketers alike, this e-book provides actionable strategies for social media engagement, search engine optimization (SEO), content creation, email marketing, and analytics. Grow your audience and boost your sales with proven techniques.",
-    features: ["In-depth SEO strategies", "Social Media content calendar", "Email marketing templates", "Analytics and tracking guide", "150+ pages of expert advice"],
-    price: "₹499",
-    salePrice: "₹299",
-    category: "E-books",
-    department: 'Unisex',
-    inStock: true,
-    isVisible: true,
-    manualRating: 5,
-    sku: "EBOOK-MARK-001",
-    tags: ["seo", "marketing", "social media"],
-    dimensions: "152 pages",
-    fileFormat: "PDF",
-    aspectRatio: "aspect-[3/4]",
-    paymentLink: "https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view",
-    wishlistCount: 243,
-    viewCount: 1054,
-    priceHistory: [
-      { date: '2024-07-20', price: 499 },
-      { date: '2024-07-21', price: 499 },
-      { date: '2024-07-22', price: 450 },
-      { date: '2024-07-23', price: 450 },
-      { date: '2024-07-24', price: 399 },
-      { date: '2024-07-25', price: 399 },
-      { date: '2024-07-26', price: 299 },
-    ],
-    courseContent: [
-      {
-        id: 'mod-marketing-1',
-        title: 'Module 1: Introduction to Digital Marketing',
-        files: [
-          {
-            id: 'file-pdf-1',
-            name: 'The Ultimate Marketing Guide.pdf',
-            type: 'pdf',
-            // In a real app, this would be a secure URL, not base64.
-            // This is a placeholder for demonstration.
-            url: 'https://www.w3.org/WAI/ER/tests/xhtml/testfiles/resources/pdf/dummy.pdf' 
-          }
-        ],
-        modules: []
-      }
-    ],
-  },
   {
     id: 2,
     imageSeed: "dropshipping-course",
@@ -572,104 +507,12 @@ const initialProducts: Product[] = [
     ],
     couponCode: 'WELCOME500',
   },
-  {
-    id: 3,
-    imageSeed: "seo-notes",
-    images: [
-        "https://picsum.photos/seed/seo-optimization-checklist/800/600",
-        "https://picsum.photos/seed/website-audit-report/800/600",
-        "https://picsum.photos/seed/google-search-console-graph/800/600",
-        "https://picsum.photos/seed/technical-seo-flowchart/800/600"
-    ],
-    title: "SEO Checklist PDF",
-    description: "A printable PDF checklist to optimize your website for search engines.",
-    longDescription: "Never miss a crucial SEO step again. This printable checklist is your ultimate companion for website optimization. It covers everything from on-page SEO (meta tags, keywords) and technical SEO (site speed, mobile-friendliness) to off-page strategies (backlink building). It's the simplest way to ensure your website is primed to rank on Google.",
-    features: ["On-Page SEO checklist", "Technical SEO audit points", "Off-Page SEO action plan", "Keyword research workflow", "Printable A4 format"],
-    price: "₹3",
-    isFree: true,
-    category: "Digital Goods",
-    department: 'Women',
-    inStock: true,
-    isVisible: true,
-    manualRating: null,
-    sku: "DIGI-SEO-CHK-001",
-    tags: ["seo", "checklist", "website optimization"],
-    dimensions: "8 pages",
-    fileFormat: "PDF",
-    aspectRatio: "aspect-square",
-    paymentLink: "https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view",
-    wishlistCount: 56,
-    viewCount: 420,
-    courseContent: [],
-  },
-  {
-    id: 4,
-    imageSeed: "advanced-seo-ebook",
-    images: [
-        "https://picsum.photos/seed/advanced-seo-book-cover/800/600", 
-        "https://picsum.photos/seed/technical-seo-code/800/600",
-        "https://picsum.photos/seed/structured-data-json/800/600",
-        "https://picsum.photos/seed/international-seo-strategy/800/600"
-    ],
-    title: "Advanced SEO Techniques",
-    description: "An e-book for experienced marketers looking to level up their SEO game.",
-    longDescription: "Dive deep into the world of advanced search engine optimization. This e-book covers technical SEO, schema markup, international SEO, advanced link building, and algorithm analysis. It's designed for marketers who already have a solid foundation and want to achieve top rankings for competitive keywords.",
-    features: ["Technical SEO deep dive", "Schema and structured data", "International & multilingual SEO", "Advanced backlink analysis", "Algorithm update preparation"],
-    price: "₹799",
-    salePrice: "₹599",
-    category: "E-books",
-    department: 'Unisex',
-    inStock: true,
-    isVisible: true,
-    manualRating: 4.8,
-    sku: "EBOOK-SEO-ADV-002",
-    tags: ["seo", "marketing", "technical seo"],
-    dimensions: "210 pages",
-    fileFormat: "E-book",
-    aspectRatio: "aspect-[3/4]",
-    paymentLink: "https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view",
-    wishlistCount: 120,
-    viewCount: 650,
-    priceHistory: [
-      { date: '2024-07-20', price: 799 },
-      { date: '2024-07-21', price: 799 },
-      { date: '2024-07-22', price: 799 },
-      { date: '2024-07-23', price: 699 },
-      { date: '2024-07-24', price: 699 },
-      { date: '2024-07-25', price: 599 },
-      { date: '2024-07-26', price: 599 },
-    ],
-    courseContent: [
-      {
-        id: 'mod-adv-seo-1',
-        title: 'Chapter 1: The Evolution of SEO',
-        files: [
-          {
-            id: 'file-ebook-1',
-            name: 'The Ever-Changing Landscape',
-            type: 'ebook',
-            url: '', // Not needed for 'ebook' type with content
-            content: `<h2>The Ever-Changing Landscape</h2><p>Search Engine Optimization (SEO) is not a static field. What worked five years ago might be obsolete today. Google's algorithms are constantly evolving, becoming more sophisticated in their quest to understand user intent and deliver the most relevant, high-quality results. <strong>This chapter explores that evolution.</strong></p><h3>From Keywords to Concepts</h3><p>Early SEO was heavily focused on keyword density. The more times you repeated a keyword, the more relevant your page was considered. This led to practices like <em>keyword stuffing</em>, which created a poor user experience.</p><ul><li>Initial algorithms were simple text-based crawlers.</li><li>The introduction of PageRank revolutionized search by considering backlinks.</li><li>Modern SEO is about topical authority, user experience, and semantic search.</li></ul><p>Understanding this history is crucial for developing a forward-thinking SEO strategy that can adapt to future changes.</p>`
-          }
-        ],
-        modules: []
-      }
-    ],
-  },
 ];
 
 const initialReviews: { [productId: number]: Review[] } = {
-    1: [
-        { name: 'Rohan Sharma', rating: 5, comment: 'This guide was a game-changer for my business. Easy to follow and packed with value!', date: '2 weeks ago' },
-        { name: 'Priya Patel', rating: 4, comment: 'Very informative and well-structured. I learned a lot.', date: '1 month ago' },
-    ],
     2: [
         { name: 'Amit Singh', rating: 5, comment: 'Absolutely the best dropshipping course out there. Worth every penny!', date: '3 days ago' },
     ],
-    4: [
-      { name: 'Sneha Verma', rating: 5, comment: 'Finally, an SEO book that goes beyond the basics. Highly recommended!', date: '1 week ago'},
-      { name: 'Rajesh Kumar', rating: 4, comment: 'Good content, but some parts are very technical. A great resource nonetheless.', date: '2 weeks ago'}
-    ]
 };
 
 const initialCoupons: Coupon[] = [
@@ -691,68 +534,9 @@ const initialOrders: Order[] = [
         shippingAddress: 'N/A (Digital Product)',
         billingAddress: '123 Tech Park, Bangalore, KA 560001',
     },
-    { 
-        id: 'DC-1023', 
-        customerName: 'Priya Patel', 
-        customerEmail: 'priya.p@example.com', 
-        date: '2024-07-20', 
-        total: '₹299', 
-        status: 'Pending', 
-        items: [{ id: 1, name: 'The Ultimate Marketing Guide', quantity: 1, price: '₹299' }],
-        shippingAddress: 'N/A (Digital Product)',
-        billingAddress: '456 Commerce Rd, Mumbai, MH 400050',
-    },
-    { 
-        id: 'DC-1022', 
-        customerName: 'Amit Singh', 
-        customerEmail: 'amit.singh@example.com', 
-        date: '2024-07-20', 
-        total: '₹898', 
-        status: 'Pending', 
-        items: [
-            { id: 1, name: 'The Ultimate Marketing Guide', quantity: 1, price: '₹299' },
-            { id: 4, name: 'Advanced SEO Techniques', quantity: 1, price: '₹599' },
-        ],
-        shippingAddress: 'N/A (Digital Product)',
-        billingAddress: '789 Business Ave, New Delhi, DL 110001',
-    },
-    { 
-        id: 'DC-1021', 
-        customerName: 'Sneha Verma', 
-        customerEmail: 'sneha.v@example.com', 
-        date: '2024-07-19', 
-        total: '₹3', 
-        status: 'Pending', 
-        items: [{ id: 3, name: 'SEO Checklist PDF', quantity: 1, price: '₹3' }],
-        shippingAddress: 'N/A (Digital Product)',
-        billingAddress: '101 Innovation Hub, Pune, MH 411007',
-    },
-    { 
-        id: 'DC-1020', 
-        customerName: 'Vikram Rathore', 
-        customerEmail: 'vikram.r@example.com', 
-        date: '2024-07-18', 
-        total: '₹2298', 
-        status: 'Cancelled', 
-        items: [
-            { id: 2, name: 'Dropshipping Masterclass', quantity: 1, price: '₹1999' },
-            { id: 1, name: 'The Ultimate Marketing Guide', quantity: 1, price: '₹299' },
-        ],
-        shippingAddress: 'N/A (Digital Product)',
-        billingAddress: '212 Startup Lane, Hyderabad, TS 500081',
-    },
 ];
 
 const initialSupportTickets: SupportTicket[] = [
-    { 
-        id: 'TKT-781A', 
-        customerName: 'Priya Patel', 
-        customerEmail: 'priya.p@example.com', 
-        subject: 'Issue with E-book Download', 
-        message: "Hello, I purchased 'The Ultimate Marketing Guide' but I'm having trouble downloading the file. The link seems to be broken. Can you please help?",
-        date: '2024-07-21T10:30:00Z', 
-        status: 'Open' 
-    },
     { 
         id: 'TKT-780B', 
         customerName: 'Amit Singh', 
@@ -761,15 +545,6 @@ const initialSupportTickets: SupportTicket[] = [
         message: "Hi, I'm interested in the Dropshipping Masterclass. Does it cover international suppliers, specifically from Europe? Thanks!",
         date: '2024-07-20T14:00:00Z', 
         status: 'Open' 
-    },
-    { 
-        id: 'TKT-779C', 
-        customerName: 'Rohan Sharma', 
-        customerEmail: 'rohan.s@example.com', 
-        subject: 'Refund Request', 
-        message: "I accidentally purchased the SEO checklist twice. Could I please get a refund for the duplicate order? My order ID is DC-1022.",
-        date: '2024-07-19T09:15:00Z', 
-        status: 'Resolved' 
     },
 ];
 
@@ -884,9 +659,9 @@ const defaultWebsiteSettings: WebsiteSettings = {
         newsArticles: initialNewsArticles,
         announcements: initialAnnouncements,
         subscriptionPlans: [
-            { id: 'starter', name: 'Starter', price: 199, description: 'Best for beginners', unlockProductIds: [1] },
-            { id: 'pro', name: 'Pro', price: 499, description: 'Unlock premium notes + course', unlockProductIds: [1,2] },
-            { id: 'elite', name: 'Elite', price: 999, description: 'Full bundle access', unlockProductIds: [1,2,3,4] },
+            { id: 'starter', name: 'Starter', price: 199, description: 'Best for beginners', unlockProductIds: [2] },
+            { id: 'pro', name: 'Pro', price: 499, description: 'Unlock premium notes + course', unlockProductIds: [2] },
+            { id: 'elite', name: 'Elite', price: 999, description: 'Full bundle access', unlockProductIds: [2] },
         ],
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
@@ -905,12 +680,6 @@ const defaultWebsiteSettings: WebsiteSettings = {
     animations: {
         enabled: true,
         style: 'fade-up',
-    },
-    ebookReaderSettings: {
-        defaultTheme: 'light',
-        defaultFontSize: 18,
-        defaultFontFamily: 'serif',
-        availableFonts: ['serif', 'sans-serif', 'lato', 'lora', 'roboto', 'merriweather'],
     },
 };
 
@@ -1007,10 +776,13 @@ const App: React.FC = () => {
   useEffect(() => {
     try {
       const storedProducts = localStorage.getItem('siteProducts');
-      if (storedProducts) {
+      const hasPurgedLegacyProducts = localStorage.getItem('legacyProductsPurged') === 'true';
+      if (storedProducts && hasPurgedLegacyProducts) {
           setProducts(JSON.parse(storedProducts));
       } else {
           setProducts(initialProducts);
+          safeSetItem('siteProducts', initialProducts);
+          localStorage.setItem('legacyProductsPurged', 'true');
       }
     } catch (err) {
       console.error("Error loading products from localStorage:", err);
@@ -1513,11 +1285,7 @@ const App: React.FC = () => {
   
   const handleViewPurchasedProduct = (product: ProductWithRating) => {
     setSelectedProduct(product);
-    if (product.category === 'E-books') {
-        setCurrentView('ebookReader');
-    } else {
-        setCurrentView('coursePlayer');
-    }
+    setCurrentView('coursePlayer');
     window.scrollTo(0, 0);
   };
 
@@ -1748,7 +1516,6 @@ const App: React.FC = () => {
     switch (currentView) {
       case 'product': return selectedProduct && <ProductDetailPage settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToAllProducts} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} isPurchased={purchasedProductIds.includes(selectedProduct.id)} />;
       case 'coursePlayer': return selectedProduct && <CoursePlayer settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToPurchases} />;
-      case 'ebookReader': return selectedProduct && <EbookReader settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToPurchases} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={handleBackToHome} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} coupons={coupons} />;
       case 'myPurchases': return <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
@@ -1764,7 +1531,7 @@ const App: React.FC = () => {
     if (currentView === 'auth') return <AuthPage settings={websiteSettings} onOtpAuthenticate={handleOtpAuthenticate} onBack={handleBackFromAuth} />;
     if (currentView === 'admin' && currentAdminUser) return <AdminDashboard websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} onTicketsUpdate={setTickets} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={setCoupons} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} />;
     if (currentView === 'adminLogin') return <AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={handleBackToHome} />;
-    if (currentView === 'coursePlayer' || currentView === 'ebookReader') return renderContent();
+    if (currentView === 'coursePlayer') return renderContent();
     if (currentView === 'announcementDetail' && selectedAnnouncement) {
       return <AnnouncementDetail 
           settings={websiteSettings} 

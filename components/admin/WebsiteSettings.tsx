@@ -77,7 +77,7 @@ const ServiceFormModal: React.FC<{ service: ServiceItem, onSave: (s: ServiceItem
     const [form, setForm] = useState(service);
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="bg-white/10 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{service.id ? 'Edit' : 'Add'} Service</h3>
                 <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
                 <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Description" className="w-full p-2 border rounded mb-4" rows={3}></textarea>
@@ -128,7 +128,7 @@ const FaqFormModal: React.FC<{ faq: FaqItem, onSave: (f: FaqItem) => void, onCan
     const [form, setForm] = useState(faq);
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="bg-white/10 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{faq.id ? 'Edit' : 'Add'} FAQ</h3>
                 <input value={form.question} onChange={e => setForm({...form, question: e.target.value})} placeholder="Question" className="w-full p-2 border rounded mb-2" />
                 <textarea value={form.answer} onChange={e => setForm({...form, answer: e.target.value})} placeholder="Answer" className="w-full p-2 border rounded mb-4" rows={4}></textarea>
@@ -180,7 +180,7 @@ const UpcomingFeatureFormModal: React.FC<{ feature: UpcomingFeatureItem, onSave:
     const [form, setForm] = useState(feature);
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="bg-white/10 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{feature.id ? 'Edit' : 'Add'} Feature</h3>
                 <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
                 <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Description" className="w-full p-2 border rounded mb-2" rows={3}></textarea>
@@ -237,7 +237,7 @@ const NewsArticleFormModal: React.FC<{ article: NewsArticle, onSave: (a: NewsArt
     const [form, setForm] = useState(article);
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-lg">
+            <div className="bg-white/10 backdrop-blur-xl rounded-lg p-6 w-full max-w-lg">
                 <h3 className="font-bold text-lg mb-4">{article.id ? 'Edit' : 'Add'} Blog Post</h3>
                 <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
                 <div className="grid grid-cols-2 gap-2 mb-2">
@@ -294,7 +294,7 @@ const AnnouncementFormModal: React.FC<{ announcement: Announcement, onSave: (a: 
     const [form, setForm] = useState(announcement);
     return (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <div className="bg-white/10 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{announcement.id ? 'Edit' : 'Add'} Announcement</h3>
                 <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
                 <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full p-2 border rounded mb-2" />
@@ -521,7 +521,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, on
     };
 
     return (
-        <div className="bg-white p-6 rounded-lg shadow-md border">
+        <div className="bg-white/10 backdrop-blur-xl p-6 rounded-lg shadow-md border">
             <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 border-b pb-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800">Site Customizer</h1>

@@ -93,7 +93,7 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
                 <div className="mt-10 flex flex-col sm:flex-row justify-center lg:justify-start items-center gap-4 animate-child animate-delay-4">
                     <button 
                         onClick={onNavigateToAllProducts} 
-                        className="w-full sm:w-auto bg-white text-primary font-bold px-8 py-4 rounded-xl hover:bg-gray-100 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 text-lg shadow-lg ring-4 ring-white/30"
+                        className="w-full sm:w-auto bg-white/10 backdrop-blur-xl text-primary font-bold px-8 py-4 rounded-xl hover:bg-gray-100 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 text-lg shadow-lg ring-4 ring-white/30"
                     >
                         Explore Products
                     </button>
@@ -133,7 +133,7 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
                     </div>
                     
                     {/* Floating Cards */}
-                    <div className="absolute -bottom-6 -left-6 bg-white text-gray-800 p-4 rounded-lg shadow-xl animate-icon-float" style={{ animationDelay: '0s' }}>
+                    <div className="absolute -bottom-6 -left-6 bg-white/10 backdrop-blur-xl text-gray-800 p-4 rounded-lg shadow-xl animate-icon-float" style={{ animationDelay: '0s' }}>
                         <div className="flex items-center gap-3">
                             <div className="bg-green-100 p-2 rounded-full text-green-600">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
@@ -146,7 +146,7 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
                         </div>
                     </div>
 
-                    <div className="absolute -top-6 -right-6 bg-white text-gray-800 p-4 rounded-lg shadow-xl animate-icon-float" style={{ animationDelay: '1.5s' }}>
+                    <div className="absolute -top-6 -right-6 bg-white/10 backdrop-blur-xl text-gray-800 p-4 rounded-lg shadow-xl animate-icon-float" style={{ animationDelay: '1.5s' }}>
                         <div className="flex items-center gap-3">
                             <div className="bg-blue-100 p-2 rounded-full text-blue-600">
                                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>

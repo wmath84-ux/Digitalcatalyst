@@ -45,7 +45,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
     }
 
     return (
-        <div className={`group relative bg-white rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 ease-out border border-gray-100 flex flex-col overflow-hidden hover:-translate-y-2 product-card-shine ${animationClass}`}>
+        <div className={`group relative bg-white/10 backdrop-blur-xl rounded-2xl shadow-sm hover:shadow-xl transition-all duration-300 ease-out border border-gray-100 flex flex-col overflow-hidden hover:-translate-y-2 product-card-shine ${animationClass}`}>
             {/* Image Container */}
             <div className="relative w-full overflow-hidden aspect-[4/3] bg-gray-100">
                 <img 
@@ -58,7 +58,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                 {/* Overlay on Hover (Desktop) */}
                 {displayMode === 'showcase' && (
                     <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-black/80 via-black/40 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out flex items-end justify-center gap-2 pb-6">
-                         <button onClick={() => onAddToCart(product.id, 1)} className="bg-white text-gray-900 font-bold px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-sm shadow-lg active:scale-95">
+                         <button onClick={() => onAddToCart(product.id, 1)} className="bg-white/10 backdrop-blur-xl text-gray-900 font-bold px-4 py-2 rounded-lg hover:bg-gray-100 transition-colors text-sm shadow-lg active:scale-95">
                              Add to Cart
                          </button>
                          <button onClick={() => onQuickView(product)} className="bg-white/20 backdrop-blur-md border border-white/50 text-white font-bold px-4 py-2 rounded-lg hover:bg-white/30 transition-colors text-sm shadow-lg active:scale-95">

@@ -83,7 +83,7 @@ interface AnnouncementsModalProps {
 
 const AnnouncementCard: React.FC<{ announcement: Announcement; onView: () => void; }> = ({ announcement, onView }) => {
     return (
-        <button onClick={onView} className="bg-white rounded-xl shadow-md overflow-hidden border p-6 text-left w-full hover:shadow-lg hover:border-primary transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
+        <button onClick={onView} className="bg-white/10 backdrop-blur-xl rounded-xl shadow-md overflow-hidden border p-6 text-left w-full hover:shadow-lg hover:border-primary transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2">
             <div className="flex justify-between items-start">
                 <h3 className="text-xl font-bold text-primary">{announcement.title}</h3>
                 <span className="text-sm text-text-muted flex-shrink-0 ml-4">{new Date(announcement.date).toLocaleDateString()}</span>

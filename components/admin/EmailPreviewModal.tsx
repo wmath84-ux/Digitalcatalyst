@@ -61,15 +61,15 @@ const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({ ticket, replyText
     }, [ticket.subject]);
     
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex justify-center items-center p-4 font-sans animate-fade-in">
+        <div className="fixed inset-0 bg-slate-950 bg-opacity-70 z-[60] flex justify-center items-center p-4 font-sans animate-fade-in">
             <div className="bg-gray-100 rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-scale-in-up">
-                <div className="p-4 border-b bg-white rounded-t-lg flex justify-between items-center">
+                <div className="p-4 border-b bg-white/10 backdrop-blur-xl rounded-t-lg flex justify-between items-center">
                     <h2 className="text-lg font-bold text-gray-800">Email Preview</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 font-bold text-2xl">&times;</button>
                 </div>
 
                 <div className="flex-1 p-6 overflow-y-auto">
-                    <div className="bg-white rounded-md shadow-md overflow-hidden border">
+                    <div className="bg-white/10 backdrop-blur-xl rounded-md shadow-md overflow-hidden border">
                          {/* Header Image */}
                         <div className="h-48 bg-gray-200 flex items-center justify-center">
                              {isLoadingImage ? (

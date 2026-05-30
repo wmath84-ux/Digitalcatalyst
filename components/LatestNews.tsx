@@ -12,7 +12,7 @@ interface LatestNewsProps {
 const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, settings: WebsiteSettings, onReadMoreClick: () => void }> = ({ article, animationDelay, settings, onReadMoreClick }) => {
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${(animationDelay % 8) + 1}` : '';
     return (
-        <div className={`bg-white rounded-2xl shadow-sm hover:shadow-xl border border-gray-100 overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
+        <div className={`bg-white/10 backdrop-blur-xl rounded-2xl shadow-sm hover:shadow-xl border border-gray-100 overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
             <div className="relative h-48 overflow-hidden bg-gray-200">
                 <img 
                     src={`https://picsum.photos/seed/${article.imageSeed}/800/600`} 

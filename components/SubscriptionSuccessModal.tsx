@@ -10,7 +10,7 @@ interface SubscriptionSuccessModalProps {
 }
 
 const MiniProductCard: React.FC<{ product: ProductWithRating }> = ({ product }) => (
-    <div className="border rounded-lg overflow-hidden bg-white hover:shadow-md transition-shadow">
+    <div className="border rounded-lg overflow-hidden bg-white/10 backdrop-blur-xl hover:shadow-md transition-shadow">
         <div className="aspect-video bg-gray-100">
             <img src={product.images[0]} alt={product.title} className="w-full h-full object-cover" />
         </div>
@@ -25,16 +25,16 @@ const SubscriptionSuccessModal: React.FC<SubscriptionSuccessModalProps> = ({ isO
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4 animate-fade-in" onClick={onClose}>
+    <div className="fixed inset-0 bg-slate-950 bg-opacity-60 z-50 flex justify-center items-center p-4 animate-fade-in" onClick={onClose}>
       <div className="bg-gray-100 rounded-lg shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col animate-scale-in-up" onClick={e => e.stopPropagation()}>
-        <header className="p-4 border-b bg-white rounded-t-lg flex justify-between items-center">
+        <header className="p-4 border-b bg-white/10 backdrop-blur-xl rounded-t-lg flex justify-between items-center">
             <h2 className="text-lg font-bold text-gray-800">Check your inbox!</h2>
             <button onClick={onClose} className="text-gray-400 hover:text-gray-600 font-bold text-2xl" aria-label="Close modal">&times;</button>
         </header>
 
         <main className="flex-1 p-6 overflow-y-auto">
             {/* This div simulates an email client's view */}
-            <div className="bg-white rounded-md shadow-md overflow-hidden border">
+            <div className="bg-white/10 backdrop-blur-xl rounded-md shadow-md overflow-hidden border">
                 <div className="p-4 bg-gray-50 border-b text-xs text-gray-500">
                     <p><strong>From:</strong> Digital Catalyst &lt;hello@digitalcatalyst.com&gt;</p>
                     <p><strong>To:</strong> {email}</p>

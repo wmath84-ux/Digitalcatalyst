@@ -39,7 +39,7 @@ const AboutUs: React.FC<AboutUsProps> = ({ settings, title, text, imageSeed }) =
     <section 
       id="about" 
       ref={sectionRef}
-      className={`py-24 bg-white overflow-hidden ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      className={`py-24 bg-white/10 backdrop-blur-xl overflow-hidden ${settings.animations.enabled ? 'scroll-animate' : ''}`}
     >
       <div className="container mx-auto px-6">
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-center">

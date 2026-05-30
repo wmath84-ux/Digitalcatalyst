@@ -22,7 +22,7 @@ interface ServiceCardProps {
 }
 
 const ServiceCard: React.FC<ServiceCardProps> = ({ title, description, onRequestQuote, animationDelay }) => (
-    <div className={`animate-child animate-delay-${animationDelay} relative overflow-hidden bg-white p-8 rounded-2xl shadow-lg border border-gray-100 text-center h-full flex flex-col transition-all duration-300 ease-out hover:shadow-2xl hover:-translate-y-2 product-card-shine group`}>
+    <div className={`animate-child animate-delay-${animationDelay} relative overflow-hidden bg-white/10 backdrop-blur-xl p-8 rounded-2xl shadow-lg border border-gray-100 text-center h-full flex flex-col transition-all duration-300 ease-out hover:shadow-2xl hover:-translate-y-2 product-card-shine group`}>
         <div className="flex justify-center mb-6 transform group-hover:scale-110 transition-transform duration-300">
            <ServiceIcon />
         </div>

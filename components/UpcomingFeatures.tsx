@@ -80,7 +80,7 @@ const UpcomingFeatures: React.FC<UpcomingFeaturesProps> = ({ settings, title, fe
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
           {features.map((feature, index) => (
-            <div key={feature.id} className={`animate-child animate-delay-${index + 2} bg-white p-8 rounded-2xl shadow-md border border-gray-100 text-center h-full flex flex-col transform hover:-translate-y-2 transition-all duration-300 hover:shadow-xl`}>
+            <div key={feature.id} className={`animate-child animate-delay-${index + 2} bg-white/10 backdrop-blur-xl p-8 rounded-2xl shadow-md border border-gray-100 text-center h-full flex flex-col transform hover:-translate-y-2 transition-all duration-300 hover:shadow-xl`}>
                 <div className="flex justify-center mb-6">
                     <div className="w-20 h-20 rounded-full bg-gray-50 flex items-center justify-center border border-gray-100 shadow-inner">
                         <Icon name={feature.icon} />

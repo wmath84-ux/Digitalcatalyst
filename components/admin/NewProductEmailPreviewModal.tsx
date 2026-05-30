@@ -71,15 +71,15 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
     };
 
     return (
-        <div className="fixed inset-0 bg-black bg-opacity-70 z-[60] flex justify-center items-center p-4 font-sans animate-fade-in" onClick={onClose}>
+        <div className="fixed inset-0 bg-slate-950 bg-opacity-70 z-[60] flex justify-center items-center p-4 font-sans animate-fade-in" onClick={onClose}>
             <div className="bg-gray-100 rounded-lg shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col animate-scale-in-up" onClick={e => e.stopPropagation()}>
-                <header className="p-4 border-b bg-white rounded-t-lg flex justify-between items-center">
+                <header className="p-4 border-b bg-white/10 backdrop-blur-xl rounded-t-lg flex justify-between items-center">
                     <h2 className="text-lg font-bold text-gray-800">Email Preview: New Product Announcement</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 font-bold text-2xl" aria-label="Close modal">&times;</button>
                 </header>
 
                 <main className="flex-1 p-6 overflow-y-auto">
-                    <div className="bg-white rounded-md shadow-md overflow-hidden border">
+                    <div className="bg-white/10 backdrop-blur-xl rounded-md shadow-md overflow-hidden border">
                         {/* Email Metadata */}
                         <div className="p-4 bg-gray-50 border-b text-xs text-gray-500">
                             <p><strong>To:</strong> All Users ({users.length} recipients)</p>
@@ -138,7 +138,7 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
                                     <h4 className="text-xl font-semibold text-gray-800 text-center mb-6">You Might Also Like</h4>
                                     <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                         {relatedProducts.map(p => (
-                                            <div key={p.id} className="border rounded-lg overflow-hidden bg-white hover:shadow-md transition-shadow">
+                                            <div key={p.id} className="border rounded-lg overflow-hidden bg-white/10 backdrop-blur-xl hover:shadow-md transition-shadow">
                                                 <div className="aspect-video bg-gray-100"><img src={p.images[0]} alt={p.title} className="w-full h-full object-cover" /></div>
                                                 <div className="p-3"><h4 className="font-semibold text-sm truncate text-gray-800">{p.title}</h4><p className="text-xs text-gray-500">{p.salePrice || p.price}</p></div>
                                             </div>
@@ -151,7 +151,7 @@ const NewProductEmailPreviewModal: React.FC<NewProductEmailPreviewModalProps> = 
                 </main>
                 
                 <footer className="p-4 bg-gray-200 border-t flex justify-end space-x-3">
-                    <button onClick={onClose} disabled={isSending || isSent} className="px-5 py-2 bg-white text-gray-800 rounded-lg hover:bg-gray-50 border font-semibold disabled:opacity-50">Cancel</button>
+                    <button onClick={onClose} disabled={isSending || isSent} className="px-5 py-2 bg-white/10 backdrop-blur-xl text-gray-800 rounded-lg hover:bg-gray-50 border font-semibold disabled:opacity-50">Cancel</button>
                     <button onClick={handleSend} disabled={isSending || isSent} className="px-5 py-2 bg-blue-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-2 disabled:bg-gray-400 w-48 justify-center">
                         {isSending ? (
                              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>

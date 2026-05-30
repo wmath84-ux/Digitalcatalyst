@@ -60,7 +60,7 @@ const ProfilePage: React.FC<{ settings: WebsiteSettings; currentUser: User | nul
           <div className="mt-4 grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
             {Object.values(themes).map((theme) => {
               const key = theme.name.toLowerCase() as ThemeName;
-              return <button key={theme.name} onClick={() => onThemeChange(key)} className={`rounded-2xl border p-3 text-left ${activeTheme === key ? 'border-primary bg-primary/10' : 'border-slate-200 bg-white'}`}>
+              return <button key={theme.name} onClick={() => onThemeChange(key)} className={`rounded-2xl border p-3 text-left ${activeTheme === key ? 'border-primary bg-primary/10' : 'border-slate-200 bg-white/10 backdrop-blur-xl'}`}>
                 <div className="flex -space-x-1"><span className="h-4 w-4 rounded-full border border-white" style={{ background: theme.palette.primaryColor }}></span><span className="h-4 w-4 rounded-full border border-white" style={{ background: theme.palette.backgroundColor }}></span></div>
                 <div className="mt-2 text-sm font-bold">{theme.name}</div>
               </button>;

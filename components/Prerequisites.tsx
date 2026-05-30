@@ -11,7 +11,7 @@ interface BlogModalProps {
 
 const NewsCard: React.FC<{ article: NewsArticle, onReadMoreClick: () => void, settings: WebsiteSettings }> = ({ article, onReadMoreClick, settings }) => {
     return (
-        <div className="bg-white rounded-xl shadow-md overflow-hidden transform hover:-translate-y-2 transition-transform duration-300 group border">
+        <div className="bg-white/10 backdrop-blur-xl rounded-xl shadow-md overflow-hidden transform hover:-translate-y-2 transition-transform duration-300 group border">
             <div className="relative">
                 <div className="aspect-video bg-gray-200">
                     <img src={`https://picsum.photos/seed/${article.imageSeed}/800/600`} alt={article.title} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />

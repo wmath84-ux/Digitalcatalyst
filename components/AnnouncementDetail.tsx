@@ -10,7 +10,7 @@ interface AnnouncementDetailProps {
 const AnnouncementDetail: React.FC<AnnouncementDetailProps> = ({ settings, announcement, onBack }) => {
   return (
     <div className="bg-background min-h-screen font-sans animate-fade-in">
-      <header className="bg-white shadow-md sticky top-0 z-10">
+      <header className="bg-white/10 backdrop-blur-xl shadow-md sticky top-0 z-10">
         <div className="container mx-auto px-6 py-4 flex justify-between items-center">
           <h1 className="text-xl font-bold text-primary truncate">Announcement</h1>
           <button
@@ -22,7 +22,7 @@ const AnnouncementDetail: React.FC<AnnouncementDetailProps> = ({ settings, annou
         </div>
       </header>
       <main className="container mx-auto px-6 py-12">
-        <div className="max-w-4xl mx-auto bg-white p-8 sm:p-12 rounded-lg shadow-lg animate-fade-in-up">
+        <div className="max-w-4xl mx-auto bg-white/10 backdrop-blur-xl p-8 sm:p-12 rounded-lg shadow-lg animate-fade-in-up">
           <div className="flex flex-col sm:flex-row justify-between items-start mb-6 border-b pb-4 gap-4">
             <h2 className="text-3xl sm:text-4xl font-extrabold text-primary">{announcement.title}</h2>
             <span className="text-sm text-text-muted flex-shrink-0 sm:pt-2">{new Date(announcement.date).toLocaleDateString()}</span>
