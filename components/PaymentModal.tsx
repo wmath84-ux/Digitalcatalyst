@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { WebsiteSettings, ProductWithRating, CartItem, User } from '../App';
 import MacWindowModal from './ui/MacWindowModal';
 
@@ -31,9 +31,28 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice
   const canPayWithCoins = !!onConfirmWithCoins && coinPrice > 0 && eduCoinBalance >= coinPrice;
   const missingCoins = Math.max(0, coinPrice - eduCoinBalance);
 
+  useEffect(() => {
+    if (presentation === 'page') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    }
+  }, [presentation]);
+
   const handlePayNow = () => {
     window.open(razorpayUrl, '_blank', 'noopener,noreferrer');
     setPaymentOpened(true);
+    if (presentation === 'page') {
+      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    }
+  };
+
+  const handleFreeCheckout = () => {
+    if (presentation === 'modal') setVerificationSubmitted(true);
+    onConfirm();
+  };
+
+  const handlePaidVerification = () => {
+    if (presentation === 'modal') setVerificationSubmitted(true);
+    onConfirm();
   };
 
   const checkoutContent = (
@@ -71,7 +90,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice
 
         {!paymentOpened ? (
           <div className="space-y-3">
-            <button onClick={finalPrice <= 0 ? () => { setVerificationSubmitted(true); onConfirm(); } : handlePayNow} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 text-lg font-black text-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition hover:-translate-y-0.5 active:scale-95">{finalPrice <= 0 ? 'Complete ₹0 EduCoin Checkout' : 'Pay with Razorpay'}</button>
+            <button onClick={finalPrice <= 0 ? handleFreeCheckout : handlePayNow} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 text-lg font-black text-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition hover:-translate-y-0.5 active:scale-95">{finalPrice <= 0 ? 'Complete ₹0 EduCoin Checkout' : 'Pay with Razorpay'}</button>
             {onConfirmWithCoins && coinPrice > 0 && (
               <button onClick={onConfirmWithCoins} disabled={!canPayWithCoins} className="w-full rounded-2xl border border-amber-200/60 bg-white/80 px-6 py-4 text-lg font-black text-amber-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
                 {canPayWithCoins ? `Pay with ${coinPrice} EduCoins` : `Need ${missingCoins} more coins`}
@@ -87,7 +106,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ productTitle, originalPrice
         ) : (
           <div className="space-y-3 text-center">
             <p className="text-sm text-slate-600">If you completed the payment, submit it for admin verification. This will not unlock content instantly in demo mode.</p>
-            <button onClick={() => { setVerificationSubmitted(true); onConfirm(); }} className="w-full rounded-2xl bg-amber-500 px-6 py-4 text-lg font-black text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:bg-amber-600">I have paid — unlock in demo</button>
+            <button onClick={handlePaidVerification} className="w-full rounded-2xl bg-amber-500 px-6 py-4 text-lg font-black text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:bg-amber-600">I have paid — unlock in demo</button>
             <button onClick={handlePayNow} className="text-sm font-bold text-primary underline">Open payment page again</button>
           </div>
         )}
