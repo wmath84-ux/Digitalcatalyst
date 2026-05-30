@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from 'react';
 import { WebsiteSettings } from '../App';
 
@@ -12,8 +11,6 @@ interface HeroProps {
   realMetrics?: { revenue: number; users: number };
 }
 
-const fallbackHeroVideo = 'https://cdn.coverr.co/videos/coverr-young-students-studying-together-1579/1080p.mp4';
-
 const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateToAllProducts, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, realMetrics }) => {
   const sectionRef = useRef<HTMLElement>(null);
 
@@ -21,7 +18,6 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
     const observer = new IntersectionObserver(
         (entries) => {
             const [entry] = entries;
-            // Only toggle if intersecting to avoid re-triggering on scroll up unless desired
             if (entry.isIntersecting) {
                 entry.target.classList.add('is-visible');
             }
@@ -41,125 +37,92 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
     };
   }, []);
 
-  // Metrics Logic
   const useRealData = settings.content.heroMetrics?.enableRealData;
-  
-  // Revenue
-  const revenueDisplay = useRealData && realMetrics 
-    ? `₹${realMetrics.revenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}` 
-    : settings.content.heroMetrics?.customRevenue || "₹0";
-    
-  const revenueChange = useRealData 
-    ? "+100%" // Default growth indicator for real data mode
-    : settings.content.heroMetrics?.customRevenueChange || "+0%";
-
-  // Active Users
+  const revenueDisplay = useRealData && realMetrics
+    ? `₹${realMetrics.revenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
+    : settings.content.heroMetrics?.customRevenue || '₹0';
+  const revenueChange = useRealData
+    ? '+100%'
+    : settings.content.heroMetrics?.customRevenueChange || '+0%';
   const usersDisplay = useRealData && realMetrics
     ? `${realMetrics.users}`
-    : settings.content.heroMetrics?.customActiveUsers || "0+";
+    : settings.content.heroMetrics?.customActiveUsers || '0+';
 
   return (
-    <section ref={sectionRef} className="relative bg-primary text-white overflow-hidden stagger-animate-container min-h-[85vh] flex items-center">
-      {/* Animated Background */}
-      <div className="absolute inset-0 -z-10 animate-gradient-flow bg-[length:400%_400%]" style={{
-          background: `linear-gradient(-45deg, ${settings.theme.primaryColor}, ${settings.theme.accentColor}, #2563eb, #7c3aed)`
-      }}></div>
-      
-      {/* Overlay Pattern */}
-      <div className="absolute -top-24 right-10 h-72 w-72 rounded-full bg-cyan-300/30 blur-3xl animate-pulse" />
-      <div className="absolute bottom-10 left-1/2 h-96 w-96 rounded-full bg-fuchsia-400/20 blur-3xl animate-icon-float" />
-      <div className="absolute inset-0 -z-10 opacity-10" style={{
-          backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23ffffff' fill-opacity='1'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
-      }}></div>
+    <section
+      ref={sectionRef}
+      className="relative isolate min-h-[92vh] overflow-hidden bg-slate-950 text-white stagger-animate-container flex items-center"
+    >
+      <div className="absolute inset-0 -z-30 animate-gradient-flow bg-gradient-to-r from-slate-950 via-purple-950 to-slate-950 bg-[length:400%_400%]" />
+      <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_top_left,rgba(56,189,248,0.22),transparent_34%),radial-gradient(circle_at_70%_20%,rgba(168,85,247,0.30),transparent_32%),radial-gradient(circle_at_50%_85%,rgba(37,99,235,0.22),transparent_36%)]" />
+      <div className="absolute inset-0 -z-10 bg-slate-950/35" />
+      <div className="absolute inset-0 -z-10 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:72px_72px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_74%)]" />
+      <div className="absolute -left-24 top-1/4 h-72 w-72 rounded-full bg-cyan-400/20 blur-3xl animate-pulse" />
+      <div className="absolute -right-24 bottom-1/4 h-96 w-96 rounded-full bg-fuchsia-500/25 blur-3xl animate-icon-float" />
 
-      <div className="container mx-auto px-6 relative z-10 py-20">
-        <div className="flex flex-col lg:flex-row items-center gap-12 lg:gap-20">
-            
-            {/* Text Content */}
-            <div className="lg:w-1/2 text-center lg:text-left">
-                <div className="animate-child animate-delay-1 inline-block mb-4 px-4 py-1.5 rounded-full bg-white/10 border border-white/20 backdrop-blur-sm text-sm font-medium tracking-wide text-indigo-100">
-                    🚀 Boost Your Digital Growth
-                </div>
-                <h1 
-                    className="text-5xl sm:text-6xl lg:text-7xl font-extrabold tracking-tight leading-tight animate-child animate-delay-2"
-                    style={{ textShadow: '0 4px 20px rgba(0,0,0,0.2)' }}
-                >
-                    {settings.content.heroTitle}
-                </h1>
-                <p className="mt-6 text-xl text-indigo-100 leading-relaxed max-w-2xl mx-auto lg:mx-0 animate-child animate-delay-3">
-                    {settings.content.heroSubtitle}
-                </p>
-                
-                <div className="mt-10 flex flex-col sm:flex-row justify-center lg:justify-start items-center gap-4 animate-child animate-delay-4">
-                    <button 
-                        onClick={onNavigateToAllProducts} 
-                        className="w-full sm:w-auto bg-white/10 backdrop-blur-xl text-primary font-bold px-8 py-4 rounded-xl hover:bg-gray-100 hover:shadow-2xl hover:-translate-y-1 transition-all duration-300 text-lg shadow-lg ring-4 ring-white/30"
-                    >
-                        Explore Products
-                    </button>
-                    <button 
-                        onClick={onNavigateToPolicies} 
-                        className="w-full sm:w-auto bg-transparent border-2 border-white/30 text-white font-semibold px-8 py-4 rounded-xl hover:bg-white/10 transition-all duration-300 hover:border-white"
-                    >
-                        Our Policies
-                    </button>
-                </div>
+      <div className="container relative z-10 mx-auto px-6 py-28 text-center">
+        <div className="mx-auto max-w-5xl">
+          <div className="animate-child animate-delay-1 inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-5 py-2 text-sm font-semibold tracking-wide text-indigo-100 shadow-[0_0_35px_rgba(139,92,246,0.20)] backdrop-blur-xl">
+            <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-[0_0_16px_rgba(103,232,249,0.85)]" />
+            🚀 Boost Your Digital Growth
+          </div>
 
-                {/* Quick Links */}
-                <div className="mt-12 pt-8 border-t border-white/10 flex flex-wrap justify-center lg:justify-start gap-6 animate-child animate-delay-5">
-                     <button onClick={onOpenBlogModal} className="group flex items-center gap-2 text-sm font-medium text-indigo-200 hover:text-white transition-colors">
-                        <span className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">📝</span>
-                        <span>Read Blog</span>
-                     </button>
-                     <button onClick={onOpenFreeModal} className="group flex items-center gap-2 text-sm font-medium text-indigo-200 hover:text-white transition-colors">
-                        <span className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">🎁</span>
-                        <span>Free Resources</span>
-                     </button>
-                     <button onClick={onOpenAnnouncementsModal} className="group flex items-center gap-2 text-sm font-medium text-indigo-200 hover:text-white transition-colors">
-                        <span className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center group-hover:bg-white/20 transition-colors">📢</span>
-                        <span>Announcements</span>
-                     </button>
-                </div>
+          <h1
+            className="animate-child animate-delay-2 mt-8 text-5xl font-black leading-tight tracking-[-0.04em] [text-shadow:_0_20px_60px_rgba(0,0,0,0.45)] sm:text-6xl lg:text-8xl"
+          >
+            {settings.content.heroTitle}
+          </h1>
+
+          <p className="animate-child animate-delay-3 mx-auto mt-7 max-w-3xl text-lg leading-8 text-slate-200 sm:text-xl">
+            {settings.content.heroSubtitle}
+          </p>
+
+          <div className="animate-child animate-delay-4 mt-10 flex flex-col items-center justify-center gap-4 sm:flex-row">
+            <button
+              onClick={onNavigateToAllProducts}
+              className="group relative w-full overflow-hidden rounded-full border border-white/20 bg-white/10 px-9 py-4 text-lg font-bold text-white shadow-[0_0_35px_rgba(37,99,235,0.30)] backdrop-blur-xl transition-all duration-300 hover:scale-105 hover:border-cyan-300/70 hover:shadow-[0_0_45px_rgba(56,189,248,0.45)] sm:w-auto"
+            >
+              <span className="absolute inset-0 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-cyan-400/30 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+              <span className="relative">Explore Products</span>
+            </button>
+            <button
+              onClick={onNavigateToPolicies}
+              className="w-full rounded-full border border-white/20 bg-slate-950/25 px-9 py-4 text-lg font-semibold text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.20),0_0_28px_rgba(139,92,246,0.22)] backdrop-blur-xl transition-all duration-300 hover:scale-105 hover:border-purple-300/70 hover:bg-white/10 hover:shadow-[0_0_42px_rgba(168,85,247,0.40)] sm:w-auto"
+            >
+              Our Policies
+            </button>
+          </div>
+
+          <div className="animate-child animate-delay-5 mx-auto mt-12 grid max-w-3xl grid-cols-1 gap-4 sm:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-cyan-300/40 hover:shadow-[0_0_30px_rgba(56,189,248,0.18)]">
+              <p className="text-2xl font-extrabold text-white">{revenueChange}</p>
+              <p className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-300">Revenue Lift</p>
+              {useRealData && <p className="mt-2 text-sm text-cyan-100">{revenueDisplay}</p>}
             </div>
-
-            {/* Hero Image */}
-            <div className="lg:w-1/2 animate-child animate-delay-3">
-                <div className="relative">
-                    {/* Decorative Blob */}
-                    <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[120%] h-[120%] bg-indigo-500/30 rounded-full blur-3xl -z-10 animate-pulse"></div>
-                    
-                    <div className="bg-white/10 backdrop-blur-2xl rounded-[2rem] p-4 border border-white/25 shadow-2xl transform rotate-1 hover:rotate-0 transition-transform duration-500 animate-icon-float">
-                        <video src={fallbackHeroVideo} poster={settings.content.heroImageUrl} autoPlay muted loop playsInline className="rounded-[1.4rem] w-full h-auto shadow-inner object-cover aspect-[4/3]" />
-                    </div>
-                    
-                    {/* Floating Cards */}
-                    <div className="absolute -bottom-6 -left-6 bg-white/10 backdrop-blur-xl text-gray-800 p-4 rounded-lg shadow-xl animate-icon-float" style={{ animationDelay: '0s' }}>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-green-100 p-2 rounded-full text-green-600">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path></svg>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500 font-bold uppercase">Revenue</p>
-                                <p className="text-lg font-bold">{revenueChange}</p>
-                                {useRealData && <p className="text-xs text-gray-400">({revenueDisplay})</p>}
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="absolute -top-6 -right-6 bg-white/10 backdrop-blur-xl text-gray-800 p-4 rounded-lg shadow-xl animate-icon-float" style={{ animationDelay: '1.5s' }}>
-                        <div className="flex items-center gap-3">
-                            <div className="bg-blue-100 p-2 rounded-full text-blue-600">
-                                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z"></path></svg>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500 font-bold uppercase">Active Users</p>
-                                <p className="text-lg font-bold">{usersDisplay}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-purple-300/40 hover:shadow-[0_0_30px_rgba(168,85,247,0.18)]">
+              <p className="text-2xl font-extrabold text-white">{usersDisplay}</p>
+              <p className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-300">Active Users</p>
             </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-blue-300/40 hover:shadow-[0_0_30px_rgba(59,130,246,0.18)]">
+              <p className="text-2xl font-extrabold text-white">24/7</p>
+              <p className="mt-1 text-xs uppercase tracking-[0.25em] text-slate-300">Digital Support</p>
+            </div>
+          </div>
+
+          <div className="animate-child animate-delay-6 mt-12 flex flex-wrap justify-center gap-4 border-t border-white/10 pt-8">
+            <button onClick={onOpenBlogModal} className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-indigo-100 backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/10 hover:text-white">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 transition-colors group-hover:bg-white/20">📝</span>
+              <span>Read Blog</span>
+            </button>
+            <button onClick={onOpenFreeModal} className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-indigo-100 backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/10 hover:text-white">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 transition-colors group-hover:bg-white/20">🎁</span>
+              <span>Free Resources</span>
+            </button>
+            <button onClick={onOpenAnnouncementsModal} className="group flex items-center gap-2 rounded-full border border-white/10 bg-white/5 px-4 py-2 text-sm font-medium text-indigo-100 backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-white/25 hover:bg-white/10 hover:text-white">
+              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/10 transition-colors group-hover:bg-white/20">📢</span>
+              <span>Announcements</span>
+            </button>
+          </div>
         </div>
       </div>
     </section>
