@@ -16,7 +16,12 @@ interface ReadingDrawerProps {
   onSelectArticle: (article: NewsArticle) => void;
   onSelectAnnouncement: (announcement: Announcement) => void;
   onBackToList: () => void;
+  onExploreFeature: () => void;
+  promoTitle?: string;
+  promoDescription?: string;
+  promoCtaLabel?: string;
 }
+
 
 const estimateReadMinutes = (text?: string) => Math.max(1, Math.ceil((text || '').split(/\s+/).filter(Boolean).length / 180));
 const formatDate = (date: string) => new Date(date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
@@ -101,19 +106,27 @@ const MarkdownContent: React.FC<{ content: string }> = ({ content }) => {
   return <>{nodes}</>;
 };
 
-const SponsoredPartnerCard = () => (
+const SponsoredPartnerCard: React.FC<{
+  promoTitle?: string;
+  promoDescription?: string;
+  promoCtaLabel?: string;
+  onExploreFeature: () => void;
+}> = ({
+  promoTitle = "Level up tonight's study sprint",
+  promoDescription = 'Discover a handpicked premium resource built for sharper notes, faster revision, and calmer exam weeks.',
+  promoCtaLabel = 'Explore Feature',
+  onExploreFeature,
+}) => (
   <aside className="my-12 overflow-hidden rounded-[2rem] border border-purple-500/30 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
     <div className="rounded-[1.75rem] bg-white/70 p-6 backdrop-blur-2xl sm:p-8">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.35em] text-purple-200/80">Sponsored Partner</p>
-          <h3 className="mt-3 text-2xl font-black text-slate-900">Level up tonight's study sprint</h3>
-          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">
-            Discover a handpicked premium resource built for sharper notes, faster revision, and calmer exam weeks.
-          </p>
+          <h3 className="mt-3 text-2xl font-black text-slate-900">{promoTitle}</h3>
+          <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{promoDescription}</p>
         </div>
-        <button className="rounded-full bg-gradient-to-r from-indigo-400 via-fuchsia-400 to-purple-400 px-6 py-3 text-sm font-black text-slate-900 shadow-sm transition hover:scale-105">
-          Explore Feature
+        <button type="button" onClick={onExploreFeature} className="rounded-full bg-gradient-to-r from-indigo-400 via-fuchsia-400 to-purple-400 px-6 py-3 text-sm font-black text-slate-900 shadow-sm transition hover:scale-105">
+          {promoCtaLabel}
         </button>
       </div>
     </div>
@@ -137,7 +150,7 @@ const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: s
   </button>
 );
 
-const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, onClose, onSelectArticle, onSelectAnnouncement, onBackToList }) => {
+const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
 
@@ -267,7 +280,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
                       </div>
                       <div className="mt-12 text-lg leading-9 text-slate-600">
                         <MarkdownContent content={selectedArticle.content} />
-                        <SponsoredPartnerCard />
+                        <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} />
                       </div>
                     </>
                   )}
@@ -281,7 +294,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
                   <div className="mt-12 space-y-7 text-lg leading-9 text-slate-600">
                     {selectedAnnouncement.content.split('\n').filter(Boolean).map((paragraph, index) => (
                       <React.Fragment key={index}>
-                        {index === 1 && <SponsoredPartnerCard />}
+                        {index === 1 && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} />}
                         <p>{paragraph}</p>
                       </React.Fragment>
                     ))}
