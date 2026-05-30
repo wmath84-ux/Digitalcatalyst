@@ -2,21 +2,21 @@
 import React, { useState, useMemo } from 'react';
 import { Order, ProductWithRating, User, Review } from '../../App';
 
-const StatCard: React.FC<{ title: string; value: string | number; change?: string; changeType?: 'increase' | 'decrease'; icon?: React.ReactNode; colorClass?: string }> = ({ title, value, change, changeType, icon, colorClass = "bg-white/10 backdrop-blur-xl" }) => {
+const StatCard: React.FC<{ title: string; value: string | number; change?: string; changeType?: 'increase' | 'decrease'; icon?: React.ReactNode; colorClass?: string }> = ({ title, value, change, changeType, icon, colorClass = "bg-white/70 backdrop-blur-xl" }) => {
     const changeColor = changeType === 'increase' ? 'text-green-600' : 'text-red-500';
     const arrow = changeType === 'increase' ? '↑' : '↓';
 
     return (
-        <div className={`${colorClass} p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between h-full transition-all hover:shadow-md`}>
+        <div className={`${colorClass} p-6 rounded-xl shadow-sm border border-gray-100 flex flex-col justify-between h-full transition-all hover:shadow-sm`}>
             <div className="flex justify-between items-start">
-                <h3 className="text-sm font-medium text-gray-500">{title}</h3>
-                {icon && <div className="text-gray-400 p-2 bg-gray-50 rounded-lg">{icon}</div>}
+                <h3 className="text-sm font-medium text-slate-600">{title}</h3>
+                {icon && <div className="text-slate-600 p-2 bg-gray-50 rounded-lg">{icon}</div>}
             </div>
             <div className="mt-4">
                 <p className="text-3xl font-extrabold text-gray-800">{value}</p>
                 {change && (
                     <p className={`text-xs font-bold mt-2 uppercase tracking-wide ${changeColor}`}>
-                        {arrow} {change} <span className="text-gray-400 font-medium normal-case">vs last month</span>
+                        {arrow} {change} <span className="text-slate-600 font-medium normal-case">vs last month</span>
                     </p>
                 )}
             </div>
@@ -177,15 +177,15 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
             { label: 'All Time', value: 'all'},
         ];
         return (
-             <div className="flex bg-white/10 backdrop-blur-xl rounded-lg p-1 border shadow-sm">
+             <div className="flex bg-white/70 backdrop-blur-xl rounded-lg p-1 border shadow-sm">
                 {ranges.map(range => (
                     <button
                         key={range.value}
                         onClick={() => setDateRange(range.value)}
                         className={`px-4 py-1.5 text-xs font-bold rounded-md transition-all ${
                             dateRange === range.value
-                                ? 'bg-primary text-white shadow-sm'
-                                : 'text-gray-500 hover:text-gray-800'
+                                ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white shadow-sm'
+                                : 'text-slate-600 hover:text-gray-800'
                         }`}
                     >
                         {range.label}
@@ -200,7 +200,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
             <div className="flex flex-col md:flex-row justify-between items-end mb-8">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800">Dashboard Analytics</h1>
-                    <p className="text-gray-500 mt-1">Overview of your store's performance and engagement.</p>
+                    <p className="text-slate-600 mt-1">Overview of your store's performance and engagement.</p>
                 </div>
                 <DateFilterButtons />
             </div>
@@ -213,7 +213,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                     change="12%" 
                     changeType="increase"
                     icon={<svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
-                    colorClass="bg-white/10 backdrop-blur-xl border-l-4 border-l-green-500"
+                    colorClass="bg-white/70 backdrop-blur-xl border-l-4 border-l-green-500"
                 />
                 <StatCard 
                     title="Total Orders" 
@@ -221,7 +221,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                     change="5%"
                     changeType="increase"
                     icon={<svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>}
-                    colorClass="bg-white/10 backdrop-blur-xl border-l-4 border-l-blue-500"
+                    colorClass="bg-white/70 backdrop-blur-xl border-l-4 border-l-blue-500"
                 />
                 <StatCard 
                     title="Avg. Order Value" 
@@ -229,7 +229,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                     change="2%"
                     changeType="decrease"
                     icon={<svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>}
-                    colorClass="bg-white/10 backdrop-blur-xl border-l-4 border-l-purple-500"
+                    colorClass="bg-white/70 backdrop-blur-xl border-l-4 border-l-purple-500"
                 />
                 <StatCard 
                     title="Customers" 
@@ -237,7 +237,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                     change="8%"
                     changeType="increase"
                     icon={<svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
-                    colorClass="bg-white/10 backdrop-blur-xl border-l-4 border-l-orange-500"
+                    colorClass="bg-white/70 backdrop-blur-xl border-l-4 border-l-orange-500"
                 />
             </div>
 
@@ -245,7 +245,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
             <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
                 
                 {/* Most Wishlisted */}
-                <div className="bg-white/10 backdrop-blur-xl p-6 rounded-xl shadow-md border border-gray-100 lg:col-span-1 hover:border-pink-200 transition-colors">
+                <div className="bg-white/70 backdrop-blur-xl p-6 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 lg:col-span-1 hover:border-pink-200 transition-colors">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-bold text-lg text-gray-800">❤️ Most Wishlisted</h3>
                         <span className="text-xs bg-pink-100 text-pink-800 px-2 py-1 rounded-full font-bold">Hot</span>
@@ -264,14 +264,14 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-8 text-gray-400">
+                        <div className="text-center py-8 text-slate-600">
                             <p>No items wishlisted yet.</p>
                         </div>
                     )}
                 </div>
 
                 {/* Highest Rated */}
-                <div className="bg-white/10 backdrop-blur-xl p-6 rounded-xl shadow-md border border-gray-100 lg:col-span-1 hover:border-yellow-200 transition-colors">
+                <div className="bg-white/70 backdrop-blur-xl p-6 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 lg:col-span-1 hover:border-yellow-200 transition-colors">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-bold text-lg text-gray-800">⭐ Top Rated</h3>
                         <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-bold">Quality</span>
@@ -285,7 +285,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                                     </div>
                                     <div className="flex-1 min-w-0">
                                         <p className="font-semibold text-gray-800 truncate text-sm">{product.title}</p>
-                                        <div className="flex items-center text-xs text-gray-500 mt-0.5">
+                                        <div className="flex items-center text-xs text-slate-600 mt-0.5">
                                             <span className="text-yellow-500 mr-1">★</span>
                                             {(product.rating || 0).toFixed(1)}
                                             <span className="mx-1">•</span>
@@ -295,7 +295,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                                 </div>
                             ))
                         ) : (
-                            <div className="text-center py-8 text-gray-400">
+                            <div className="text-center py-8 text-slate-600">
                                 <p>No rated products yet.</p>
                             </div>
                         )}
@@ -303,7 +303,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                 </div>
 
                 {/* Most Viewed */}
-                <div className="bg-white/10 backdrop-blur-xl p-6 rounded-xl shadow-md border border-gray-100 lg:col-span-1 hover:border-blue-200 transition-colors">
+                <div className="bg-white/70 backdrop-blur-xl p-6 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 lg:col-span-1 hover:border-blue-200 transition-colors">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-bold text-lg text-gray-800">👀 Most Viewed</h3>
                         <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-bold">Traffic</span>
@@ -322,14 +322,14 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-8 text-gray-400">
+                        <div className="text-center py-8 text-slate-600">
                             <p>No view data recorded yet.</p>
                         </div>
                     )}
                 </div>
 
                 {/* Most Reviewed */}
-                <div className="bg-white/10 backdrop-blur-xl p-6 rounded-xl shadow-md border border-gray-100 lg:col-span-1 hover:border-purple-200 transition-colors">
+                <div className="bg-white/70 backdrop-blur-xl p-6 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 lg:col-span-1 hover:border-purple-200 transition-colors">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-bold text-lg text-gray-800">💬 Most Reviewed</h3>
                         <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full font-bold">Viral</span>
@@ -348,7 +348,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                             ))}
                         </div>
                     ) : (
-                        <div className="text-center py-8 text-gray-400">
+                        <div className="text-center py-8 text-slate-600">
                             <p>No reviews yet.</p>
                         </div>
                     )}
@@ -357,11 +357,11 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
 
             {/* Inventory & Sales */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <div className="bg-white/10 backdrop-blur-xl p-6 rounded-xl shadow-md border border-gray-100">
+                <div className="bg-white/70 backdrop-blur-xl p-6 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100">
                     <h3 className="font-bold text-lg text-gray-800 mb-4">Top Selling Products</h3>
                     {topSellingProducts.length > 0 ? (
                         <table className="w-full text-sm text-left">
-                            <thead className="bg-gray-50 text-gray-500 font-semibold">
+                            <thead className="bg-gray-50 text-slate-600 font-semibold">
                                 <tr>
                                     <th className="p-3 rounded-l-md">Product Name</th>
                                     <th className="p-3 rounded-r-md text-right">Units Sold</th>
@@ -377,13 +377,13 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                             </tbody>
                         </table>
                     ) : (
-                        <div className="flex flex-col items-center justify-center h-40 text-gray-400 bg-gray-50 rounded-lg border border-dashed">
+                        <div className="flex flex-col items-center justify-center h-40 text-slate-600 bg-gray-50 rounded-lg border border-dashed">
                             <p>No completed sales to analyze.</p>
                         </div>
                     )}
                 </div>
 
-                <div className="bg-white/10 backdrop-blur-xl p-6 rounded-xl shadow-md border border-gray-100 flex flex-col">
+                <div className="bg-white/70 backdrop-blur-xl p-6 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 flex flex-col">
                     <h3 className="font-bold text-lg text-gray-800 mb-4 flex items-center gap-2">
                         Inventory Health
                         {(outOfStockProducts.length > 0 || lowStockProducts.length > 0) && <span className="flex h-3 w-3 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>}

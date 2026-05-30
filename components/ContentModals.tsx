@@ -34,13 +34,13 @@ export const FreeProductsModal: React.FC<FreeProductsModalProps> = ({ isOpen, on
     if (!isOpen) return null;
 
     return (
-        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-slate-950/75 p-4 backdrop-blur-xl" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="free-modal-title">
-            <div ref={modalContentRef} className="relative max-h-[90vh] w-[90vw] max-w-5xl overflow-y-auto rounded-[2rem] border border-white/10 bg-slate-950/90 p-8 shadow-[0_0_50px_rgba(0,0,0,0.65)] backdrop-blur-3xl" onClick={e => e.stopPropagation()}>
-                <button onClick={onClose} className="absolute top-3 right-4 text-slate-400 hover:text-white font-bold text-2xl z-10" aria-label="Close free products modal">&times;</button>
+        <div className="fixed inset-0 z-[1000] flex items-center justify-center bg-white/70 p-4 backdrop-blur-xl" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="free-modal-title">
+            <div ref={modalContentRef} className="relative max-h-[90vh] w-[90vw] max-w-5xl overflow-y-auto rounded-[2rem] border border-white/50 bg-white/70 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl" onClick={e => e.stopPropagation()}>
+                <button onClick={onClose} className="absolute top-3 right-4 text-slate-600 hover:text-slate-900 font-bold text-2xl z-10" aria-label="Close free products modal">&times;</button>
                 
                 <div className="text-center mb-8">
-                    <h2 id="free-modal-title" className="text-3xl font-extrabold text-white">Free Digital Goodies</h2>
-                    <p className="mt-2 text-lg text-slate-300">
+                    <h2 id="free-modal-title" className="text-3xl font-extrabold text-slate-900">Free Digital Goodies</h2>
+                    <p className="mt-2 text-lg text-slate-600">
                         Enjoy these complimentary resources, on us! A nominal fee of ₹3 applies.
                     </p>
                 </div>
@@ -61,7 +61,7 @@ export const FreeProductsModal: React.FC<FreeProductsModalProps> = ({ isOpen, on
                             />
                         </div>
                     )) : (
-                        <div className="col-span-full text-center py-12 text-slate-400">
+                        <div className="col-span-full text-center py-12 text-slate-600">
                             <p>No free products available at the moment. Check back soon!</p>
                         </div>
                     )}

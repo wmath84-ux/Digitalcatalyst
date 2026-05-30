@@ -21,9 +21,9 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onCl
   };
 
   return (
-    <div className="fixed inset-0 bg-slate-950 bg-opacity-60 z-50 flex justify-center items-center p-4 animate-fade-in" onClick={onClose}>
-      <div className="bg-white/10 backdrop-blur-xl rounded-2xl shadow-2xl w-full max-w-4xl max-h-[90vh] overflow-y-auto relative transform transition-all animate-scale-in-up flex flex-col md:flex-row" onClick={e => e.stopPropagation()}>
-        <button onClick={onClose} className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 z-10" aria-label="Close modal">
+    <div className="fixed inset-0 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 bg-opacity-60 z-50 flex justify-center items-center p-4 animate-fade-in" onClick={onClose}>
+      <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full max-w-4xl max-h-[90vh] overflow-y-auto relative transform transition-all animate-scale-in-up flex flex-col md:flex-row" onClick={e => e.stopPropagation()}>
+        <button onClick={onClose} className="absolute top-4 right-4 text-slate-600 hover:text-gray-600 z-10" aria-label="Close modal">
           <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
         </button>
 
@@ -53,7 +53,7 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onCl
                 {product.salePrice ? (
                     <div className="flex items-baseline gap-3">
                         <span className="text-3xl font-bold text-primary">{product.salePrice}</span>
-                        <span className="text-xl font-medium text-gray-400 line-through">{product.price}</span>
+                        <span className="text-xl font-medium text-slate-600 line-through">{product.price}</span>
                     </div>
                 ) : ( <span className="text-3xl font-bold text-primary">{product.price}</span> )}
             </div>
@@ -68,11 +68,11 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onCl
                     <input type="number" value={quantity} onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} className="w-16 text-center border-l border-r font-semibold focus:outline-none" />
                     <button onClick={() => setQuantity(q => q + 1)} className="px-3 py-2 text-lg font-bold text-gray-600 hover:bg-gray-100 rounded-r-lg">+</button>
                 </div>
-                <button onClick={handleAddToCartClick} className="flex-1 bg-primary text-white font-bold px-8 py-3 rounded-lg hover:opacity-90 transition-all duration-300 transform active:scale-95">
+                <button onClick={handleAddToCartClick} className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold px-8 py-3 rounded-lg hover:opacity-90 transition-all duration-300 transform active:scale-95">
                     Add to Cart
                 </button>
                 {settings.features.showFavourites && (
-                    <button onClick={() => onToggleWishlist(product.id)} className="p-3 border rounded-lg text-gray-500 hover:text-red-500 hover:bg-red-50 transition-colors">
+                    <button onClick={() => onToggleWishlist(product.id)} className="p-3 border rounded-lg text-slate-600 hover:text-red-500 hover:bg-red-50 transition-colors">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isWishlisted ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" /></svg>
                     </button>
                 )}

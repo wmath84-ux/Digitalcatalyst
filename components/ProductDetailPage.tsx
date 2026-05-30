@@ -222,14 +222,14 @@ const PriceChart: React.FC<{ basePrice: number, priceHistory?: PriceHistoryEntry
             <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto">
                 <g transform={`translate(${margin.left}, ${margin.top})`}>
                     {/* Y-axis */}
-                    <text x={-10} y={0} dy="0.32em" textAnchor="end" className="text-xs fill-current text-gray-500">₹{yMax.toFixed(0)}</text>
-                    <text x={-10} y={height} dy="0.32em" textAnchor="end" className="text-xs fill-current text-gray-500">₹{yMin.toFixed(0)}</text>
-                    <line x1={0} y1={0} x2={0} y2={height} className="stroke-current text-gray-300" />
+                    <text x={-10} y={0} dy="0.32em" textAnchor="end" className="text-xs fill-current text-slate-600">₹{yMax.toFixed(0)}</text>
+                    <text x={-10} y={height} dy="0.32em" textAnchor="end" className="text-xs fill-current text-slate-600">₹{yMin.toFixed(0)}</text>
+                    <line x1={0} y1={0} x2={0} y2={height} className="stroke-current text-slate-600" />
                     {/* X-axis */}
                     {xLabels.map((d, i) => (
-                         <text key={i} x={getX(i)} y={height + 20} textAnchor="middle" className="text-xs fill-current text-gray-500">{d}</text>
+                         <text key={i} x={getX(i)} y={height + 20} textAnchor="middle" className="text-xs fill-current text-slate-600">{d}</text>
                     ))}
-                    <line x1={0} y1={height} x2={width} y2={height} className="stroke-current text-gray-300" />
+                    <line x1={0} y1={height} x2={width} y2={height} className="stroke-current text-slate-600" />
                     {/* Chart */}
                     <path d={linePath} fill="none" className="stroke-current text-primary" strokeWidth="2" />
                     {data.map((d, i) => (
@@ -452,25 +452,25 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   return (
     <>
-      <section className="py-16 sm:py-20 bg-white/10 backdrop-blur-xl">
+      <section className="py-16 sm:py-20 bg-white/70 backdrop-blur-xl">
         <div className="container mx-auto px-6">
-          <nav className="flex text-sm text-gray-500 mb-6 items-center space-x-2" aria-label="Breadcrumb">
+          <nav className="flex text-sm text-slate-600 mb-6 items-center space-x-2" aria-label="Breadcrumb">
             <button onClick={onGoHome} className="hover:text-primary hover:underline transition-colors font-medium">Home</button>
-            <span className="text-gray-300">/</span>
+            <span className="text-slate-600">/</span>
             <button onClick={onBack} className="hover:text-primary hover:underline transition-colors font-medium">Products</button>
-            <span className="text-gray-300">/</span>
+            <span className="text-slate-600">/</span>
             <span className="text-primary font-semibold truncate max-w-xs" title={product.title}>{product.title}</span>
           </nav>
 
           <div ref={gridRef} className={`grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-start ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
             {/* --- LEFT COLUMN: IMAGES --- */}
             <div>
-              <button onClick={() => setIsImageZoomOpen(true)} className="w-full bg-gray-100 rounded-xl shadow-md overflow-hidden border relative animate-fade-in group" aria-label="View larger image">
+              <button onClick={() => setIsImageZoomOpen(true)} className="w-full bg-gray-100 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden border relative animate-fade-in group" aria-label="View larger image">
                  <div className="zoom-container" onMouseMove={handleImageZoom}>
                     <img src={mainImage} alt={product.title} className="w-full h-auto object-cover aspect-video" />
                  </div>
-                 <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
+                 <div className="absolute inset-0 bg-white/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-slate-900" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
                  </div>
                 {settings.features.showFavourites && (
                     <button onClick={(e) => { e.stopPropagation(); onToggleWishlist(product.id); }} className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm rounded-full p-2 text-text-muted hover:text-red-500 hover:scale-110 transition-all duration-200 z-10" aria-label={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}>
@@ -505,7 +505,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                             <button onClick={() => setOpenAccordion(openAccordion === i ? null : i)} className="feature-accordion-header w-full flex justify-between items-center p-4 text-left">
                                 <span className="font-semibold text-text">{feature}</span>
                                 <span className={`transform transition-transform duration-300 ${openAccordion === i ? 'rotate-45' : ''}`}>
-                                  <svg className="w-5 h-5 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+                                  <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
                                 </span>
                             </button>
                             <div className={`feature-accordion-content px-4 ${openAccordion === i ? 'is-open' : ''}`}>
@@ -536,7 +536,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                             return (
                                 <div className="flex items-baseline gap-3">
                                     <span className="text-4xl font-bold text-primary">₹{finalTotalPrice.toFixed(2)}</span>
-                                    <span className="text-2xl font-medium text-gray-400 line-through">₹{preDiscountTotal.toFixed(2)}</span>
+                                    <span className="text-2xl font-medium text-slate-600 line-through">₹{preDiscountTotal.toFixed(2)}</span>
                                     <span className="text-sm font-bold text-green-600 bg-green-100 px-3 py-1 rounded-full">SAVE ₹{totalCouponDiscount.toFixed(2)}</span>
                                 </div>
                             );
@@ -549,7 +549,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                             return (
                                 <div className="flex items-baseline gap-3">
                                     <span className="text-4xl font-bold text-primary">₹{saleTotal.toFixed(2)}</span>
-                                    <span className="text-2xl font-medium text-gray-400 line-through">₹{originalTotal.toFixed(2)}</span>
+                                    <span className="text-2xl font-medium text-slate-600 line-through">₹{originalTotal.toFixed(2)}</span>
                                     {saleDiscount > 0 && <span className="text-sm font-bold text-green-600 bg-green-100 px-3 py-1 rounded-full">SAVE ₹{saleDiscount.toFixed(2)}</span>}
                                 </div>
                             );
@@ -570,7 +570,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
            {/* --- COUPON & PRICE BREAKDOWN SECTION --- */}
             {!product.isFree && coupons.length > 0 && (
               <div className="mt-8 max-w-3xl mx-auto">
-                <div className="bg-white/10 backdrop-blur-xl rounded-xl shadow-lg border p-6 transition-all duration-300">
+                <div className="bg-white/70 backdrop-blur-xl rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border p-6 transition-all duration-300">
                   {/* New Coupon UI */}
                   <div>
                     <h3 className="text-lg font-semibold text-gray-800">Have a coupon?</h3>
@@ -585,7 +585,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                         />
                         <button
                             onClick={() => handleApplyCoupon(couponInput)}
-                            className="bg-gray-700 text-white font-semibold px-6 py-2 rounded-md hover:bg-gray-800 transition-colors"
+                            className="bg-white/70 text-slate-900 font-semibold px-6 py-2 rounded-md hover:bg-white/80 hover:shadow-sm transition-colors"
                         >
                             Apply
                         </button>
@@ -616,7 +616,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                                         </div>
                                         <button
                                             onClick={() => handleApplyCoupon(coupon.code)}
-                                            className="font-semibold text-green-600 hover:underline disabled:text-gray-400 disabled:no-underline"
+                                            className="font-semibold text-green-600 hover:underline disabled:text-slate-600 disabled:no-underline"
                                             disabled={isApplied}
                                         >
                                             {isApplied ? 'Applied' : 'Apply'}
@@ -658,14 +658,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             
             {/* --- ACTION BUTTONS SECTION --- */}
             <div className="mt-8 max-w-3xl mx-auto">
-                <div className="bg-white/10 backdrop-blur-xl rounded-xl shadow-lg border p-6">
+                <div className="bg-white/70 backdrop-blur-xl rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border p-6">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-center">
                         <div className="flex items-center border rounded-lg justify-center">
                             <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="px-4 py-3 text-xl font-bold text-gray-600 hover:bg-gray-100 rounded-l-lg">-</button>
                             <input type="number" value={quantity} onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} className="w-16 text-center border-l border-r font-semibold focus:outline-none bg-transparent" />
                             <button onClick={() => setQuantity(q => q + 1)} className="px-4 py-3 text-xl font-bold text-gray-600 hover:bg-gray-100 rounded-r-lg">+</button>
                         </div>
-                        <button onClick={() => onAddToCart(product.id, quantity)} className="w-full bg-primary text-white font-bold px-8 py-4 rounded-lg hover:opacity-90 transition-all duration-300 transform active:scale-95 text-lg">
+                        <button onClick={() => onAddToCart(product.id, quantity)} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold px-8 py-4 rounded-lg hover:opacity-90 transition-all duration-300 transform active:scale-95 text-lg">
                             Add to Cart
                         </button>
                     </div>
@@ -692,7 +692,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       )}
 
       {relatedProducts.length > 0 && (
-        <div className="bg-white/10 backdrop-blur-xl">
+        <div className="bg-white/70 backdrop-blur-xl">
            <FeaturedProducts
                 settings={settings}
                 title="Related Products"
@@ -711,13 +711,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       {/* AI Mentor Floating UI */}
       <div className="fixed bottom-6 right-6 z-40">
         {isMentorOpen && (
-          <div className="w-full max-w-sm h-[70vh] max-h-[600px] bg-white/10 backdrop-blur-xl rounded-xl shadow-2xl flex flex-col mb-4 animate-fade-in-up">
+          <div className="w-full max-w-sm h-[70vh] max-h-[600px] bg-white/70 backdrop-blur-xl rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col mb-4 animate-fade-in-up">
               <AiMentor productTitle={product.title} activeContentName={"Product Overview"} />
           </div>
         )}
         <button
             onClick={() => setIsMentorOpen(!isMentorOpen)}
-            className="bg-primary text-white rounded-full shadow-lg p-4 hover:scale-110 transition-transform flex items-center justify-center"
+            className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-full shadow-[0_8px_30px_rgb(0,0,0,0.04)] p-4 hover:scale-110 transition-transform flex items-center justify-center"
             aria-label={isMentorOpen ? "Close AI Mentor" : "Open AI Mentor"}
         >
             {isMentorOpen ? (

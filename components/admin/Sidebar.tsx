@@ -25,19 +25,19 @@ const NavLink: React.FC<{
             onClick={() => onClick(view)}
             className={`group w-full text-left px-4 py-3 rounded-xl transition-all duration-300 flex items-center justify-between relative overflow-hidden ${
                 isActive
-                    ? 'bg-white/10 text-white shadow-lg border border-white/10 backdrop-blur-sm'
-                    : 'text-slate-400 hover:bg-white/5 hover:text-white'
+                    ? 'bg-white/70 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-white/50 backdrop-blur-sm'
+                    : 'text-slate-600 hover:bg-white/80 hover:shadow-sm hover:text-slate-900'
             }`}
         >
             <div className="flex items-center gap-3 relative z-10">
-                <span className={`transition-colors ${isActive ? 'text-accent' : 'text-slate-500 group-hover:text-slate-300'}`}>
+                <span className={`transition-colors ${isActive ? 'text-accent' : 'text-slate-600 group-hover:text-slate-600'}`}>
                     {icon}
                 </span>
                 <span className="font-medium tracking-wide">{label}</span>
             </div>
             {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent rounded-r-full"></div>}
             {isFeatured && (
-                <span className="relative z-10 text-[10px] font-bold bg-gradient-to-r from-yellow-400 to-orange-500 text-slate-900 px-2 py-0.5 rounded-full shadow-sm">
+                <span className="relative z-10 text-[10px] font-bold bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-0.5 rounded-full shadow-sm">
                     NEW
                 </span>
             )}
@@ -63,32 +63,32 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
 
     // Mobile overlay classes vs Desktop static classes
     const containerClasses = isOpen 
-        ? "fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-slate-900 to-slate-800 shadow-2xl transition-transform transform translate-x-0"
-        : "hidden md:flex md:w-72 bg-gradient-to-b from-slate-900 to-slate-800 shadow-2xl flex-col md:fixed md:left-0 md:top-0 md:bottom-0 md:z-40 md:translate-x-[-248px] md:hover:translate-x-0 md:transition-transform md:duration-300";
+        ? "fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-slate-50 via-indigo-50/30 to-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-transform transform translate-x-0"
+        : "hidden md:flex md:w-72 bg-gradient-to-b from-slate-50 via-indigo-50/30 to-slate-100 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex-col md:fixed md:left-0 md:top-0 md:bottom-0 md:z-40 md:translate-x-[-248px] md:hover:translate-x-0 md:transition-transform md:duration-300";
 
     return (
         <>
             {/* Mobile Backdrop */}
             {isOpen && (
                 <div 
-                    className="fixed inset-0 bg-black/50 z-40 md:hidden backdrop-blur-sm"
+                    className="fixed inset-0 bg-white/70 z-40 md:hidden backdrop-blur-sm"
                     onClick={onClose}
                 ></div>
             )}
 
-            <aside className={`${containerClasses} flex flex-col h-full text-white`}>
-                <div className="px-4 py-6 mb-2 flex items-center justify-between border-b border-white/10">
+            <aside className={`${containerClasses} flex flex-col h-full text-slate-900`}>
+                <div className="px-4 py-6 mb-2 flex items-center justify-between border-b border-white/50">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-lg">
+                        <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-lg flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
                             <span className="text-xl font-bold">DC</span>
                         </div>
                         <div>
                             <div className="text-lg font-bold tracking-tight">Digital Catalyst</div>
-                            <div className="text-xs text-slate-400 font-medium uppercase tracking-widest">Admin Panel</div>
+                            <div className="text-xs text-slate-600 font-medium uppercase tracking-widest">Admin Panel</div>
                         </div>
                     </div>
                     {/* Mobile Close Button */}
-                    <button onClick={onClose} className="md:hidden text-slate-400 hover:text-white p-2">
+                    <button onClick={onClose} className="md:hidden text-slate-600 hover:text-slate-900 p-2">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                         </svg>
@@ -109,7 +109,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
                     ))}
                 </div>
                 
-                <div className="pt-4 border-t border-white/10 mt-2 space-y-2 p-4">
+                <div className="pt-4 border-t border-white/50 mt-2 space-y-2 p-4">
                     <button
                         onClick={onSwitchToHome}
                         className="group w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center gap-3 text-blue-300 hover:bg-blue-500/10 hover:text-blue-200"

@@ -3,8 +3,8 @@ import { Order } from '../../App';
 
 type OrderViewState = 'list' | 'details';
 
-const glassCard = 'rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl';
-const subtleCard = 'rounded-[1.5rem] border border-white/10 bg-slate-950/60 p-5 backdrop-blur-xl';
+const glassCard = 'rounded-[2rem] border border-white/50 bg-white/70 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
+const subtleCard = 'rounded-[1.5rem] border border-white/50 bg-white/70 p-5 backdrop-blur-xl';
 
 const parseCurrency = (value: string) => parseFloat((value || '0').replace('₹', '').replace(/,/g, '')) || 0;
 
@@ -32,10 +32,10 @@ const StatusBadge: React.FC<{ status: Order['status'] }> = ({ status }) => {
 };
 
 const MetricCard: React.FC<{ label: string; value: string | number; accent: string; helper?: string }> = ({ label, value, accent, helper }) => (
-    <div className="rounded-[1.5rem] border border-white/10 bg-white/5 p-5 backdrop-blur-xl">
-        <p className="text-sm font-bold text-slate-400">{label}</p>
+    <div className="rounded-[1.5rem] border border-white/50 bg-white/70 p-5 backdrop-blur-xl">
+        <p className="text-sm font-bold text-slate-600">{label}</p>
         <p className={`mt-2 text-3xl font-black ${accent}`}>{value}</p>
-        {helper && <p className="mt-1 text-xs font-semibold text-slate-500">{helper}</p>}
+        {helper && <p className="mt-1 text-xs font-semibold text-slate-600">{helper}</p>}
     </div>
 );
 
@@ -45,19 +45,19 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
     const subtotal = items.reduce((sum, item) => sum + parseCurrency(item.price) * (item.quantity || 0), 0);
 
     return (
-        <div className="min-h-screen bg-slate-950 text-slate-100">
-            <header className="sticky top-0 z-30 border-b border-white/10 bg-slate-950/85 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
+            <header className="sticky top-0 z-30 border-b border-white/50 bg-white/70 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
                 <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex items-center gap-4">
-                        <button type="button" onClick={onBack} className="rounded-2xl border border-white/10 px-4 py-3 text-sm font-black text-slate-200 transition hover:bg-white/10">← Back to Orders</button>
+                        <button type="button" onClick={onBack} className="rounded-2xl border border-white/50 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm">← Back to Orders</button>
                         <div>
                             <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-300">Order Details</p>
-                            <h1 className="text-2xl font-black text-white sm:text-3xl">Order #{order.id}</h1>
+                            <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">Order #{order.id}</h1>
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                         <StatusBadge status={order.status} />
-                        <span className="rounded-2xl border border-white/10 bg-white/5 px-4 py-3 text-sm font-bold text-slate-300">{formatDate(order.date, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span className="rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-sm font-bold text-slate-600">{formatDate(order.date, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                     </div>
                 </div>
             </header>
@@ -69,14 +69,14 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                             <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
                                 <div>
                                     <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-300">Purchased Items</p>
-                                    <h2 className="mt-2 text-2xl font-black text-white">Order contents</h2>
+                                    <h2 className="mt-2 text-2xl font-black text-slate-900">Order contents</h2>
                                 </div>
-                                <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-100">{itemCount} total units</div>
+                                <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-700">{itemCount} total units</div>
                             </div>
 
-                            <div className="overflow-hidden rounded-[1.5rem] border border-white/10 bg-slate-950/60">
+                            <div className="overflow-hidden rounded-[1.5rem] border border-white/50 bg-white/70">
                                 <table className="w-full text-left">
-                                    <thead className="border-b border-white/10 bg-white/5 text-xs uppercase tracking-[0.24em] text-slate-400">
+                                    <thead className="border-b border-white/50 bg-white/70 text-xs uppercase tracking-[0.24em] text-slate-600">
                                         <tr>
                                             <th className="p-4 font-black">Product</th>
                                             <th className="p-4 text-center font-black">Qty</th>
@@ -88,19 +88,19 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                                         {items.length > 0 ? items.map(item => {
                                             const lineTotal = parseCurrency(item.price) * (item.quantity || 0);
                                             return (
-                                                <tr key={item.id} className="transition hover:bg-white/5">
+                                                <tr key={item.id} className="transition hover:bg-white/80 hover:shadow-sm">
                                                     <td className="p-4">
-                                                        <p className="font-black text-white">{item.name}</p>
-                                                        <p className="mt-1 text-xs font-mono text-slate-500">ITEM-{item.id}</p>
+                                                        <p className="font-black text-slate-900">{item.name}</p>
+                                                        <p className="mt-1 text-xs font-mono text-slate-600">ITEM-{item.id}</p>
                                                     </td>
-                                                    <td className="p-4 text-center font-bold text-slate-300">{item.quantity}</td>
-                                                    <td className="p-4 text-right font-mono text-slate-300">{item.price}</td>
+                                                    <td className="p-4 text-center font-bold text-slate-600">{item.quantity}</td>
+                                                    <td className="p-4 text-right font-mono text-slate-600">{item.price}</td>
                                                     <td className="p-4 text-right font-black text-cyan-200">₹{lineTotal.toLocaleString('en-IN')}</td>
                                                 </tr>
                                             );
                                         }) : (
                                             <tr>
-                                                <td colSpan={4} className="p-10 text-center text-slate-400">No items were attached to this order.</td>
+                                                <td colSpan={4} className="p-10 text-center text-slate-600">No items were attached to this order.</td>
                                             </tr>
                                         )}
                                     </tbody>
@@ -110,16 +110,16 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
 
                         <div className={glassCard}>
                             <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-300">Timeline</p>
-                            <h2 className="mt-2 text-2xl font-black text-white">Fulfilment overview</h2>
+                            <h2 className="mt-2 text-2xl font-black text-slate-900">Fulfilment overview</h2>
                             <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-3">
                                 {[
                                     { title: 'Order placed', subtitle: formatDate(order.date), active: true },
                                     { title: 'Verification', subtitle: order.status === 'Awaiting Verification' ? 'In progress' : 'Reviewed', active: order.status !== 'Pending' },
                                     { title: 'Delivery', subtitle: order.status === 'Completed' ? 'Completed' : order.status === 'Shipped' ? 'Shipped' : 'Pending', active: order.status === 'Completed' || order.status === 'Shipped' },
                                 ].map(step => (
-                                    <div key={step.title} className={`rounded-2xl border p-4 ${step.active ? 'border-cyan-300/30 bg-cyan-400/10' : 'border-white/10 bg-slate-950/60'}`}>
-                                        <p className="font-black text-white">{step.title}</p>
-                                        <p className="mt-1 text-sm text-slate-400">{step.subtitle}</p>
+                                    <div key={step.title} className={`rounded-2xl border p-4 ${step.active ? 'border-cyan-300/30 bg-cyan-400/10' : 'border-white/50 bg-white/70'}`}>
+                                        <p className="font-black text-slate-900">{step.title}</p>
+                                        <p className="mt-1 text-sm text-slate-600">{step.subtitle}</p>
                                     </div>
                                 ))}
                             </div>
@@ -128,43 +128,43 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
 
                     <aside className="space-y-8 lg:col-span-1">
                         <div className={glassCard}>
-                            <h2 className="text-xl font-black text-white">Payment Summary</h2>
+                            <h2 className="text-xl font-black text-slate-900">Payment Summary</h2>
                             <div className="mt-5 space-y-3">
-                                <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-sm">
-                                    <span className="text-slate-400">Calculated subtotal</span>
-                                    <span className="font-black text-slate-100">₹{subtotal.toLocaleString('en-IN')}</span>
+                                <div className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/70 p-4 text-sm">
+                                    <span className="text-slate-600">Calculated subtotal</span>
+                                    <span className="font-black text-slate-900">₹{subtotal.toLocaleString('en-IN')}</span>
                                 </div>
-                                <div className="flex items-center justify-between rounded-2xl border border-white/10 bg-slate-950/60 p-4 text-sm">
-                                    <span className="text-slate-400">Recorded total</span>
+                                <div className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/70 p-4 text-sm">
+                                    <span className="text-slate-600">Recorded total</span>
                                     <span className="text-2xl font-black text-cyan-200">{order.total}</span>
                                 </div>
                             </div>
                         </div>
 
                         <div className={glassCard}>
-                            <h2 className="text-xl font-black text-white">Customer</h2>
+                            <h2 className="text-xl font-black text-slate-900">Customer</h2>
                             <div className="mt-5 space-y-4">
                                 <div className={subtleCard}>
-                                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Name</p>
-                                    <p className="mt-2 font-black text-white">{order.customerName}</p>
+                                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-600">Name</p>
+                                    <p className="mt-2 font-black text-slate-900">{order.customerName}</p>
                                 </div>
                                 <div className={subtleCard}>
-                                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Email</p>
+                                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-600">Email</p>
                                     <p className="mt-2 break-words text-sm font-bold text-cyan-200">{order.customerEmail}</p>
                                 </div>
                             </div>
                         </div>
 
                         <div className={glassCard}>
-                            <h2 className="text-xl font-black text-white">Addresses</h2>
+                            <h2 className="text-xl font-black text-slate-900">Addresses</h2>
                             <div className="mt-5 space-y-4">
                                 <div className={subtleCard}>
-                                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Billing</p>
-                                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-300">{order.billingAddress || 'No billing address provided.'}</p>
+                                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-600">Billing</p>
+                                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{order.billingAddress || 'No billing address provided.'}</p>
                                 </div>
                                 <div className={subtleCard}>
-                                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-500">Shipping</p>
-                                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-300">{order.shippingAddress || 'No shipping address provided.'}</p>
+                                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-600">Shipping</p>
+                                    <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-600">{order.shippingAddress || 'No shipping address provided.'}</p>
                                 </div>
                             </div>
                         </div>
@@ -241,17 +241,17 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-950 p-4 text-slate-100 animate-fade-in-up sm:p-6 lg:p-8">
+        <div className="min-h-screen bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 p-4 text-slate-900 animate-fade-in-up sm:p-6 lg:p-8">
             <div className="mx-auto max-w-7xl">
                 <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p className="text-xs font-black uppercase tracking-[0.3em] text-cyan-300">Admin Orders</p>
-                        <h1 className="mt-2 text-4xl font-black tracking-tight text-white">Order Management</h1>
-                        <p className="mt-2 max-w-2xl text-slate-400">Track customer purchases from a nested full-page workflow. Order details now open as a dedicated page instead of a cramped modal window.</p>
+                        <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-900">Order Management</h1>
+                        <p className="mt-2 max-w-2xl text-slate-600">Track customer purchases from a nested full-page workflow. Order details now open as a dedicated page instead of a cramped modal window.</p>
                     </div>
                     <button
                         onClick={handleExportCSV}
-                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-300/30 bg-cyan-400/10 px-6 py-4 text-sm font-black text-cyan-100 shadow-2xl shadow-cyan-500/10 transition hover:-translate-y-0.5 hover:bg-cyan-400/20"
+                        className="inline-flex items-center justify-center gap-2 rounded-2xl border border-cyan-300/30 bg-cyan-400/10 px-6 py-4 text-sm font-black text-cyan-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition hover:-translate-y-0.5 hover:bg-cyan-400/20"
                     >
                         <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
                         Export CSV
@@ -259,15 +259,15 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <MetricCard label="Total Orders" value={safeOrders.length} accent="text-white" />
+                    <MetricCard label="Total Orders" value={safeOrders.length} accent="text-slate-900" />
                     <MetricCard label="Completed Revenue" value={`₹${totalRevenue.toLocaleString('en-IN')}`} accent="text-emerald-300" helper={`${completedOrders.length} completed orders`} />
                     <MetricCard label="Needs Attention" value={pendingOrders.length} accent="text-amber-300" helper="Pending or awaiting verification" />
                 </div>
 
-                <div className="mt-8 overflow-hidden rounded-[2rem] border border-white/10 bg-white/5 shadow-2xl shadow-black/20 backdrop-blur-xl">
+                <div className="mt-8 overflow-hidden rounded-[2rem] border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl">
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-max text-left">
-                            <thead className="border-b border-white/10 bg-white/5 text-xs uppercase tracking-[0.24em] text-slate-400">
+                            <thead className="border-b border-white/50 bg-white/70 text-xs uppercase tracking-[0.24em] text-slate-600">
                                 <tr>
                                     <th className="p-5 font-black">Order ID</th>
                                     <th className="p-5 font-black">Customer</th>
@@ -284,15 +284,15 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
                                     const quantity = orderItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
 
                                     return (
-                                        <tr key={order.id} className="group transition hover:bg-white/5">
+                                        <tr key={order.id} className="group transition hover:bg-white/80 hover:shadow-sm">
                                             <td className="p-5 font-mono text-sm font-black text-cyan-200">#{order.id}</td>
                                             <td className="p-5">
-                                                <p className="font-black text-white group-hover:text-cyan-200">{order.customerName}</p>
-                                                <p className="mt-1 text-xs text-slate-500">{order.customerEmail}</p>
+                                                <p className="font-black text-slate-900 group-hover:text-cyan-200">{order.customerName}</p>
+                                                <p className="mt-1 text-xs text-slate-600">{order.customerEmail}</p>
                                             </td>
-                                            <td className="p-5 text-sm font-bold text-slate-300">{formatDate(order.date)}</td>
-                                            <td className="p-5"><span className="rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-xs font-black text-slate-300">{quantity} units</span></td>
-                                            <td className="p-5 text-sm font-black text-slate-100">{order.total}</td>
+                                            <td className="p-5 text-sm font-bold text-slate-600">{formatDate(order.date)}</td>
+                                            <td className="p-5"><span className="rounded-full border border-white/50 bg-white/70 px-3 py-1 text-xs font-black text-slate-600">{quantity} units</span></td>
+                                            <td className="p-5 text-sm font-black text-slate-900">{order.total}</td>
                                             <td className="p-5"><StatusBadge status={order.status} /></td>
                                             <td className="p-5 text-right">
                                                 <button
@@ -306,9 +306,9 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
                                     );
                                 }) : (
                                     <tr>
-                                        <td colSpan={7} className="p-12 text-center text-slate-400">
+                                        <td colSpan={7} className="p-12 text-center text-slate-600">
                                             <p className="text-4xl">🧾</p>
-                                            <p className="mt-3 text-lg font-black text-white">No orders yet</p>
+                                            <p className="mt-3 text-lg font-black text-slate-900">No orders yet</p>
                                             <p className="mt-1">Customer purchases will appear here when orders are created.</p>
                                         </td>
                                     </tr>

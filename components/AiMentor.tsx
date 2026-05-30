@@ -31,24 +31,24 @@ const InlineMarkdown: React.FC<{ text: string }> = ({ text }) => {
     const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*)/g).filter(Boolean);
     return <>{parts.map((part, index) => {
         if (part.startsWith('**') && part.endsWith('**')) return <strong key={index}>{part.slice(2, -2)}</strong>;
-        if (part.startsWith('`') && part.endsWith('`')) return <code key={index} className="rounded-md border border-white/10 bg-slate-950/60 px-1.5 py-0.5 text-cyan-100">{part.slice(1, -1)}</code>;
+        if (part.startsWith('`') && part.endsWith('`')) return <code key={index} className="rounded-md border border-white/50 bg-white/70 px-1.5 py-0.5 text-cyan-700">{part.slice(1, -1)}</code>;
         return <React.Fragment key={index}>{part}</React.Fragment>;
     })}</>;
 };
 
 const MarkdownMessage: React.FC<{ text: string }> = ({ text }) => {
     const blocks = text.split(/\n{2,}/).filter(Boolean);
-    return <div className="space-y-3 text-sm leading-7 text-slate-100/95">
+    return <div className="space-y-3 text-sm leading-7 text-slate-900/95">
         {blocks.map((block, blockIndex) => {
             const trimmed = block.trim();
             if (trimmed.startsWith('```')) {
-                return <pre key={blockIndex} className="overflow-x-auto rounded-2xl border border-white/10 bg-slate-950/80 p-4 text-xs text-cyan-100 shadow-inner"><code>{trimmed.replace(/^```\w*\n?/, '').replace(/```$/, '')}</code></pre>;
+                return <pre key={blockIndex} className="overflow-x-auto rounded-2xl border border-white/50 bg-white/70 p-4 text-xs text-cyan-700 shadow-inner"><code>{trimmed.replace(/^```\w*\n?/, '').replace(/```$/, '')}</code></pre>;
             }
             if (/^#{1,3}\s/.test(trimmed)) {
                 const level = trimmed.match(/^#+/)?.[0].length || 3;
                 const content = trimmed.replace(/^#{1,3}\s*/, '');
                 const className = level === 1 ? 'text-2xl' : level === 2 ? 'text-xl' : 'text-lg';
-                return <h3 key={blockIndex} className={`${className} font-black text-white`}><InlineMarkdown text={content} /></h3>;
+                return <h3 key={blockIndex} className={`${className} font-black text-slate-900`}><InlineMarkdown text={content} /></h3>;
             }
             const lines = trimmed.split('\n').filter(Boolean);
             if (lines.every(line => /^[-*•]\s+/.test(line.trim()))) {
@@ -63,7 +63,7 @@ const MarkdownMessage: React.FC<{ text: string }> = ({ text }) => {
 };
 
 const TypingIndicator: React.FC = () => (
-    <div className="flex items-center gap-3 rounded-2xl border border-white/10 bg-white/10 px-4 py-3 text-sm font-semibold text-slate-100 shadow-lg backdrop-blur-xl">
+    <div className="flex items-center gap-3 rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-sm font-semibold text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl">
         <span>AI is thinking</span>
         <span className="flex gap-1.5" aria-hidden="true">
             <span className="h-2 w-2 animate-bounce rounded-full bg-cyan-200 [animation-delay:-0.24s]" />
@@ -172,15 +172,15 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, on
     };
 
     return (
-        <div className="flex h-full min-h-0 overflow-hidden rounded-[1.75rem] border border-white/15 bg-white/10 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.22),0_30px_90px_rgba(0,0,0,0.35)] backdrop-blur-2xl">
-            <aside className={`${isHistoryOpen ? 'w-72' : 'w-0'} hidden shrink-0 overflow-hidden border-r border-white/10 bg-slate-950/25 transition-all duration-300 md:block`}>
+        <div className="flex h-full min-h-0 overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/70 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
+            <aside className={`${isHistoryOpen ? 'w-72' : 'w-0'} hidden shrink-0 overflow-hidden border-r border-white/50 bg-white/70 transition-all duration-300 md:block`}>
                 <div className="flex h-full flex-col p-4">
-                    <button onClick={createNewChat} className="rounded-2xl border border-white/15 bg-white/10 px-4 py-3 text-left font-black text-white transition hover:bg-cyan-50/20">＋ New chat</button>
+                    <button onClick={createNewChat} className="rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-left font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm">＋ New chat</button>
                     <div className="mt-4 flex-1 space-y-2 overflow-y-auto pr-1">
                         {sessions.map(session => (
-                            <button key={session.id} onClick={() => setActiveSessionId(session.id)} className={`w-full rounded-2xl border px-4 py-3 text-left transition ${session.id === activeSession?.id ? 'border-cyan-200/50 bg-cyan-200/15 text-white shadow-[0_0_30px_rgba(103,232,249,0.16)]' : 'border-white/10 bg-white/[0.06] text-slate-200 hover:bg-cyan-50/12'}`}>
+                            <button key={session.id} onClick={() => setActiveSessionId(session.id)} className={`w-full rounded-2xl border px-4 py-3 text-left transition ${session.id === activeSession?.id ? 'border-cyan-200/50 bg-cyan-200/15 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)]' : 'border-white/50 bg-white/70 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}>
                                 <span className="block truncate text-sm font-black">{session.title}</span>
-                                <span className="mt-1 block text-xs text-slate-300/70">{new Date(session.updatedAt).toLocaleDateString()}</span>
+                                <span className="mt-1 block text-xs text-slate-600/70">{new Date(session.updatedAt).toLocaleDateString()}</span>
                             </button>
                         ))}
                     </div>
@@ -188,19 +188,19 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, on
             </aside>
 
             <section className="flex min-w-0 flex-1 flex-col">
-                <header className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-white/[0.06] px-4 py-3 backdrop-blur-xl">
-                    <button onClick={() => setIsHistoryOpen(value => !value)} className="rounded-xl border border-white/15 bg-white/10 px-3 py-2 font-black text-white transition hover:bg-cyan-50/20">☰</button>
+                <header className="flex shrink-0 items-center gap-3 border-b border-white/50 bg-white/70 px-4 py-3 backdrop-blur-xl">
+                    <button onClick={() => setIsHistoryOpen(value => !value)} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm">☰</button>
                     <div className="min-w-0 flex-1">
-                        <p className="text-xs font-black uppercase tracking-[0.32em] text-cyan-100/80">Dedicated AI Workspace</p>
-                        <h2 className="truncate text-xl font-black text-white">AI Mentor · {activeContentName || productTitle}</h2>
+                        <p className="text-xs font-black uppercase tracking-[0.32em] text-cyan-700/80">Dedicated AI Workspace</p>
+                        <h2 className="truncate text-xl font-black text-slate-900">AI Mentor · {activeContentName || productTitle}</h2>
                     </div>
-                    {onClose && <button onClick={onClose} className="rounded-2xl border border-white/15 bg-white/10 px-4 py-2 font-black text-white transition hover:bg-cyan-50/20">Close</button>}
+                    {onClose && <button onClick={onClose} className="rounded-2xl border border-white/50 bg-white/70 px-4 py-2 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm">Close</button>}
                 </header>
 
                 <div ref={chatContainerRef} className="flex-1 space-y-5 overflow-y-auto px-4 py-5 md:px-8">
                     {messages.map((msg, index) => (
                         <div key={`${msg.createdAt}-${index}`} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-3xl rounded-[1.5rem] border p-4 shadow-xl backdrop-blur-xl ${msg.sender === 'user' ? 'border-cyan-200/30 bg-cyan-400/20 text-white' : 'border-white/10 bg-slate-900/45 text-slate-100'}`}>
+                            <div className={`max-w-3xl rounded-[1.5rem] border p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl ${msg.sender === 'user' ? 'border-cyan-200/50 bg-cyan-100/80 text-slate-900' : 'border-white/50 bg-white/70 text-slate-900'}`}>
                                 <MarkdownMessage text={msg.text} />
                             </div>
                         </div>
@@ -208,18 +208,18 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, on
                     {isChatLoading && <TypingIndicator />}
                 </div>
 
-                <footer className="shrink-0 border-t border-white/10 bg-slate-950/25 p-4 backdrop-blur-xl">
-                    <div className="flex gap-3 rounded-3xl border border-white/15 bg-white/10 p-2 shadow-inner">
+                <footer className="shrink-0 border-t border-white/50 bg-white/70 p-4 backdrop-blur-xl">
+                    <div className="flex gap-3 rounded-3xl border border-white/50 bg-white/70 p-2 shadow-inner">
                         <input
                             type="text"
                             value={chatInput}
                             onChange={(e) => setChatInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                             placeholder="Ask for a summary, quiz, explanation, or study plan..."
-                            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-slate-100 outline-none placeholder:text-slate-300/60"
+                            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-slate-900 outline-none placeholder:text-slate-600/60"
                             disabled={isChatLoading}
                         />
-                        <button onClick={handleSendMessage} disabled={isChatLoading || !chatInput.trim()} className="rounded-2xl bg-cyan-200 px-6 py-3 font-black text-slate-950 transition hover:-translate-y-0.5 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50">Send</button>
+                        <button onClick={handleSendMessage} disabled={isChatLoading || !chatInput.trim()} className="rounded-2xl bg-cyan-200 px-6 py-3 font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50">Send</button>
                     </div>
                 </footer>
             </section>

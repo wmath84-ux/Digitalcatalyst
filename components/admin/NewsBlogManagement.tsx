@@ -2,9 +2,9 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NewsArticle, WebsiteSettings } from '../../App';
 import { ContentDatabaseAdapter, ContentPostRecord, ContentPostType, runContentAutomation } from '../../utils/contentAutomator';
 
-const glassCard = 'rounded-[2rem] border border-white/10 bg-white/5 p-6 shadow-2xl shadow-black/20 backdrop-blur-xl';
-const fieldClass = 'w-full rounded-2xl border border-white/10 bg-slate-900/80 px-4 py-3 text-slate-100 outline-none transition placeholder:text-slate-500 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
-const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-400';
+const glassCard = 'rounded-[2rem] border border-white/50 bg-white/70 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
+const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
+const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
 
 const editorCommands: Array<[string, string, string?]> = [
   ['bold', 'B'],
@@ -59,15 +59,15 @@ const SmartDocsEditor: React.FC<{ value: string; onChange: (value: string) => vo
   };
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-white/10 bg-slate-950/70">
-      <div className="flex flex-wrap gap-2 border-b border-white/10 bg-white/5 p-3 backdrop-blur-xl">
+    <div className="overflow-hidden rounded-3xl border border-white/50 bg-white/70">
+      <div className="flex flex-wrap gap-2 border-b border-white/50 bg-white/70 p-3 backdrop-blur-xl">
         {(editorCommands || []).map(([command, label, value]) => (
-          <button key={`${command}-${label}`} type="button" onClick={() => runCommand(command, value)} className="rounded-xl border border-white/10 bg-white/10 px-3 py-2 text-xs font-black text-slate-200 transition hover:bg-white/20">
+          <button key={`${command}-${label}`} type="button" onClick={() => runCommand(command, value)} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 text-xs font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm">
             {label}
           </button>
         ))}
       </div>
-      <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={() => onChange(editorRef.current?.innerHTML || '')} className="prose prose-invert min-h-96 max-w-none bg-slate-950/50 p-6 text-slate-100 outline-none" />
+      <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={() => onChange(editorRef.current?.innerHTML || '')} className="prose prose-invert min-h-96 max-w-none bg-white/70 p-6 text-slate-900 outline-none" />
     </div>
   );
 };
@@ -172,16 +172,16 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
 
   if (mode === 'form') {
     return (
-      <div className="min-h-full bg-slate-950 text-slate-100">
+      <div className="min-h-full bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
         <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.35em] text-cyan-200/80">News & Blog Management</p>
-            <h1 className="mt-3 text-4xl font-black tracking-tight text-white">{editingPost.id ? 'Edit reading post' : 'Create reading post'}</h1>
-            <p className="mt-3 max-w-3xl text-slate-400">Full-page editor with Smart Docs formatting, no cramped modals.</p>
+            <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-900">{editingPost.id ? 'Edit reading post' : 'Create reading post'}</h1>
+            <p className="mt-3 max-w-3xl text-slate-600">Full-page editor with Smart Docs formatting, no cramped modals.</p>
           </div>
           <div className="flex gap-3">
-            <button onClick={() => setMode('list')} className="rounded-2xl border border-white/10 bg-white/5 px-5 py-3 font-black text-slate-200 transition hover:bg-white/10">Cancel</button>
-            <button onClick={savePost} className="rounded-2xl bg-gradient-to-r from-cyan-300 to-indigo-400 px-5 py-3 font-black text-slate-950 shadow-[0_0_30px_rgba(34,211,238,0.25)] transition hover:scale-105">Save Post</button>
+            <button onClick={() => setMode('list')} className="rounded-2xl border border-white/50 bg-white/70 px-5 py-3 font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm">Cancel</button>
+            <button onClick={savePost} className="rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3 font-black text-white shadow-sm transition hover:scale-105">Save Post</button>
           </div>
         </div>
 
@@ -223,29 +223,29 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
   }
 
   return (
-    <div className="min-h-full bg-slate-950 text-slate-100">
+    <div className="min-h-full bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
       <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.35em] text-cyan-200/80">Daily Reading Hub CMS</p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight text-white">News & Blog Management</h1>
-          <p className="mt-3 max-w-3xl text-slate-400">Manage manual posts or let AI Autopilot generate fresh student reading content every day.</p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-900">News & Blog Management</h1>
+          <p className="mt-3 max-w-3xl text-slate-600">Manage manual posts or let AI Autopilot generate fresh student reading content every day.</p>
         </div>
-        <button onClick={openAddView} className="rounded-2xl bg-gradient-to-r from-cyan-300 to-indigo-400 px-5 py-3 font-black text-slate-950 shadow-[0_0_30px_rgba(34,211,238,0.25)] transition hover:scale-105">+ Add News/Blog</button>
+        <button onClick={openAddView} className="rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3 font-black text-white shadow-sm transition hover:scale-105">+ Add News/Blog</button>
       </div>
 
       <section className={`${glassCard} mb-8 overflow-hidden`}>
         <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.35em] text-fuchsia-200/80">AI Autopilot Status</p>
-            <h2 className="mt-3 text-2xl font-black text-white">Daily AI Fetch</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-400">Generates 10 educational news updates and 10 student-focused blogs, then permanently purges posts older than 72 hours.</p>
-            <p className="mt-4 rounded-2xl border border-white/10 bg-slate-950/70 px-4 py-3 text-sm text-slate-300">{automationStatus}</p>
+            <h2 className="mt-3 text-2xl font-black text-slate-900">Daily AI Fetch</h2>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Generates 10 educational news updates and 10 student-focused blogs, then permanently purges posts older than 72 hours.</p>
+            <p className="mt-4 rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-sm text-slate-600">{automationStatus}</p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <button onClick={toggleAutopilot} className={`rounded-2xl border px-5 py-3 font-black transition ${autopilotEnabled ? 'border-emerald-300/40 bg-emerald-400/15 text-emerald-100' : 'border-white/10 bg-white/5 text-slate-200 hover:bg-white/10'}`}>
+            <button onClick={toggleAutopilot} className={`rounded-2xl border px-5 py-3 font-black transition ${autopilotEnabled ? 'border-emerald-300/40 bg-emerald-400/15 text-emerald-700' : 'border-white/50 bg-white/70 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}>
               {autopilotEnabled ? 'Daily AI Fetch Enabled' : 'Enable Daily AI Fetch'}
             </button>
-            <button onClick={runAiFetchNow} disabled={isRunning} className="rounded-2xl border border-purple-300/30 bg-purple-400/15 px-5 py-3 font-black text-purple-100 transition hover:bg-purple-400/25 disabled:cursor-not-allowed disabled:opacity-60">
+            <button onClick={runAiFetchNow} disabled={isRunning} className="rounded-2xl border border-purple-300/30 bg-purple-400/15 px-5 py-3 font-black text-purple-700 transition hover:bg-purple-400/25 disabled:cursor-not-allowed disabled:opacity-60">
               {isRunning ? 'Running…' : 'Run AI Fetch Now'}
             </button>
           </div>
@@ -254,13 +254,13 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
 
       <section className={glassCard}>
         <div className="mb-5 flex items-center justify-between">
-          <h2 className="text-xl font-black text-white">Current News & Blogs</h2>
-          <span className="rounded-full border border-white/10 bg-slate-950/70 px-3 py-1 text-xs font-black text-slate-300">{posts.length} posts</span>
+          <h2 className="text-xl font-black text-slate-900">Current News & Blogs</h2>
+          <span className="rounded-full border border-white/50 bg-white/70 px-3 py-1 text-xs font-black text-slate-600">{posts.length} posts</span>
         </div>
-        <div className="overflow-hidden rounded-3xl border border-white/10">
+        <div className="overflow-hidden rounded-3xl border border-white/50">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-white/5 text-xs uppercase tracking-[0.22em] text-slate-400">
+              <thead className="bg-white/70 text-xs uppercase tracking-[0.22em] text-slate-600">
                 <tr>
                   <th className="p-5">Title</th>
                   <th className="p-5">Type</th>
@@ -270,15 +270,15 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
               </thead>
               <tbody className="divide-y divide-white/10">
                 {posts.length > 0 ? (posts || []).map((post) => (
-                  <tr key={post.id} className="transition hover:bg-white/5">
+                  <tr key={post.id} className="transition hover:bg-white/80 hover:shadow-sm">
                     <td className="p-5">
-                      <p className="font-black text-white">{post.title}</p>
-                      <p className="mt-1 line-clamp-1 text-xs text-slate-500">{post.category} • {post.excerpt}</p>
+                      <p className="font-black text-slate-900">{post.title}</p>
+                      <p className="mt-1 line-clamp-1 text-xs text-slate-600">{post.category} • {post.excerpt}</p>
                     </td>
                     <td className="p-5">
-                      <span className={`rounded-full border px-3 py-1 text-xs font-black ${post.type === 'news' ? 'border-cyan-300/30 bg-cyan-400/10 text-cyan-100' : 'border-fuchsia-300/30 bg-fuchsia-400/10 text-fuchsia-100'}`}>{post.type === 'news' ? 'News' : 'Blog'}</span>
+                      <span className={`rounded-full border px-3 py-1 text-xs font-black ${post.type === 'news' ? 'border-cyan-300/30 bg-cyan-400/10 text-cyan-700' : 'border-fuchsia-300/30 bg-fuchsia-400/10 text-fuchsia-700'}`}>{post.type === 'news' ? 'News' : 'Blog'}</span>
                     </td>
-                    <td className="p-5 text-slate-300">{new Date(post.date).toLocaleDateString()}</td>
+                    <td className="p-5 text-slate-600">{new Date(post.date).toLocaleDateString()}</td>
                     <td className="p-5 text-right">
                       <div className="flex justify-end gap-2">
                         <button onClick={() => openEditView(post)} className="rounded-2xl border border-cyan-300/30 px-4 py-2 font-black text-cyan-200 transition hover:bg-cyan-400/10">Edit</button>
@@ -288,9 +288,9 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
                   </tr>
                 )) : (
                   <tr>
-                    <td colSpan={4} className="p-12 text-center text-slate-400">
+                    <td colSpan={4} className="p-12 text-center text-slate-600">
                       <p className="text-4xl">📰</p>
-                      <p className="mt-3 text-lg font-black text-white">No reading posts yet</p>
+                      <p className="mt-3 text-lg font-black text-slate-900">No reading posts yet</p>
                       <p className="mt-1">Create one manually or run the AI fetch now.</p>
                     </td>
                   </tr>

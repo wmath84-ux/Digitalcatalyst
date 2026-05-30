@@ -54,7 +54,7 @@ const AdminReviewManagement: React.FC<{
     return (
         <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-6">Customer Reviews</h1>
-            <div className="bg-white/10 backdrop-blur-xl shadow-md rounded-lg overflow-hidden border border-gray-200">
+            <div className="bg-white/70 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-lg overflow-hidden border border-gray-200">
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-max text-left">
                         <thead className="bg-gray-100">
@@ -74,12 +74,12 @@ const AdminReviewManagement: React.FC<{
                                         <td className="p-4 text-gray-600">{review.name}</td>
                                         <td className="p-4"><StarRating rating={review.rating} /></td>
                                         <td className="p-4 text-gray-600 max-w-sm whitespace-normal">{review.comment}</td>
-                                        <td className="p-4 text-gray-500">{review.date}</td>
+                                        <td className="p-4 text-slate-600">{review.date}</td>
                                     </tr>
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={5} className="text-center p-8 text-gray-500">
+                                    <td colSpan={5} className="text-center p-8 text-slate-600">
                                         No customer reviews have been submitted yet.
                                     </td>
                                 </tr>

@@ -76,7 +76,7 @@ const RatingBar: React.FC<{ star: number, count: number, total: number }> = ({ s
                     style={{ width: `${percentage}%` }}
                 ></div>
             </div>
-            <span className="w-8 text-right text-gray-500 text-xs">{percentage.toFixed(0)}%</span>
+            <span className="w-8 text-right text-slate-600 text-xs">{percentage.toFixed(0)}%</span>
         </div>
     );
 };
@@ -127,13 +127,13 @@ const RatingsAndReviews: React.FC<RatingsAndReviewsProps> = ({ settings, product
         <div className="grid grid-cols-1 lg:grid-cols-12 gap-12">
             {/* Left Column: Stats & Breakdown */}
             <div className="lg:col-span-4 space-y-8">
-                <div className="bg-white/10 backdrop-blur-xl p-8 rounded-2xl shadow-lg border border-gray-100 text-center lg:text-left">
+                <div className="bg-white/70 backdrop-blur-xl p-8 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-gray-100 text-center lg:text-left">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">Rating Overview</h3>
                     <div className="flex items-end gap-4 justify-center lg:justify-start mb-6">
                         <span className="text-6xl font-extrabold text-gray-900 leading-none">{averageRating.toFixed(1)}</span>
                         <div className="flex flex-col mb-1">
                             <StarRating rating={averageRating} size="md" />
-                            <span className="text-sm text-gray-500 mt-1">{reviews.length} Review{reviews.length !== 1 ? 's' : ''}</span>
+                            <span className="text-sm text-slate-600 mt-1">{reviews.length} Review{reviews.length !== 1 ? 's' : ''}</span>
                         </div>
                     </div>
                     
@@ -145,10 +145,10 @@ const RatingsAndReviews: React.FC<RatingsAndReviewsProps> = ({ settings, product
 
                     <div className="mt-8 pt-6 border-t border-gray-100">
                         <h4 className="font-semibold text-gray-800 mb-2">Share your thoughts</h4>
-                        <p className="text-sm text-gray-500 mb-4">If you’ve used this product, share your thoughts with other customers.</p>
+                        <p className="text-sm text-slate-600 mb-4">If you’ve used this product, share your thoughts with other customers.</p>
                         <button 
                             onClick={() => setIsWritingReview(!isWritingReview)}
-                            className="w-full bg-white/10 backdrop-blur-xl border-2 border-primary text-primary font-bold py-2.5 rounded-xl hover:bg-primary hover:text-white transition-all duration-300"
+                            className="w-full bg-white/70 backdrop-blur-xl border-2 border-primary text-primary font-bold py-2.5 rounded-xl hover:bg-primary hover:text-slate-900 transition-all duration-300"
                         >
                             {isWritingReview ? 'Cancel Review' : 'Write a Review'}
                         </button>
@@ -160,7 +160,7 @@ const RatingsAndReviews: React.FC<RatingsAndReviewsProps> = ({ settings, product
             <div className="lg:col-span-8">
                 {/* Review Form */}
                 <div className={`overflow-hidden transition-all duration-500 ease-in-out ${isWritingReview ? 'max-h-[600px] opacity-100 mb-10' : 'max-h-0 opacity-0'}`}>
-                    <div className="bg-white/10 backdrop-blur-xl p-8 rounded-2xl shadow-xl border border-blue-100">
+                    <div className="bg-white/70 backdrop-blur-xl p-8 rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-blue-100">
                         <h3 className="text-xl font-bold text-gray-800 mb-6">{prompt || 'Write a Review'}</h3>
                         {submitted ? (
                             <div className="flex flex-col items-center justify-center py-8 text-green-600">
@@ -187,7 +187,7 @@ const RatingsAndReviews: React.FC<RatingsAndReviewsProps> = ({ settings, product
                                     ></textarea>
                                 </div>
                                 <div className="flex justify-end">
-                                    <button type="submit" className="bg-primary text-white font-bold px-8 py-3 rounded-xl hover:shadow-lg hover:-translate-y-0.5 transition-all duration-300">
+                                    <button type="submit" className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold px-8 py-3 rounded-xl hover:shadow-sm hover:-translate-y-0.5 transition-all duration-300">
                                         Submit Review
                                     </button>
                                 </div>
@@ -200,17 +200,17 @@ const RatingsAndReviews: React.FC<RatingsAndReviewsProps> = ({ settings, product
                 <div className="space-y-6">
                     {reviews.length === 0 && !isWritingReview && (
                         <div className="text-center py-12 bg-gray-50 rounded-2xl border border-dashed border-gray-300">
-                            <svg className="w-16 h-16 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
-                            <p className="text-lg text-gray-500 font-medium">No reviews yet.</p>
-                            <p className="text-sm text-gray-400">Be the first to share your experience!</p>
+                            <svg className="w-16 h-16 text-slate-600 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" /></svg>
+                            <p className="text-lg text-slate-600 font-medium">No reviews yet.</p>
+                            <p className="text-sm text-slate-600">Be the first to share your experience!</p>
                         </div>
                     )}
 
                     {reviews.map((review, index) => (
-                        <div key={index} className="bg-white/10 backdrop-blur-xl p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow duration-300 flex gap-4 animate-fade-in-up" style={{ animationDelay: `${index * 100}ms`}}>
+                        <div key={index} className="bg-white/70 backdrop-blur-xl p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-sm transition-shadow duration-300 flex gap-4 animate-fade-in-up" style={{ animationDelay: `${index * 100}ms`}}>
                             {/* Avatar Placeholder */}
                             <div className="flex-shrink-0">
-                                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg shadow-inner`} style={{ backgroundColor: `hsl(${(review.name.length * 50) % 360}, 70%, 50%)` }}>
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-slate-900 font-bold text-lg shadow-inner`} style={{ backgroundColor: `hsl(${(review.name.length * 50) % 360}, 70%, 50%)` }}>
                                     {review.name.charAt(0).toUpperCase()}
                                 </div>
                             </div>
@@ -218,7 +218,7 @@ const RatingsAndReviews: React.FC<RatingsAndReviewsProps> = ({ settings, product
                             <div className="flex-1">
                                 <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-2">
                                     <h4 className="font-bold text-gray-900 text-lg">{review.name}</h4>
-                                    <span className="text-xs text-gray-400 font-medium">{review.date}</span>
+                                    <span className="text-xs text-slate-600 font-medium">{review.date}</span>
                                 </div>
                                 <div className="flex items-center gap-2 mb-3">
                                     <StarRating rating={review.rating} size="sm" />

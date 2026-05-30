@@ -70,7 +70,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
 
   return (
     <>
-      <header className="bg-background/80 backdrop-blur-md shadow-md sticky top-0 z-50">
+      <header className="bg-background/80 backdrop-blur-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
             <button onClick={onHomeClick} className="flex items-center space-x-2 cursor-pointer" aria-label="Back to Homepage">
@@ -101,7 +101,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                     <button onClick={onCartClick} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your cart with ${cartItemCount} items`}>
                         <CartIcon />
                         {cartItemCount > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                            <span className="absolute -top-2 -right-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                                 {cartItemCount}
                             </span>
                         )}
@@ -113,7 +113,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                                 <span className="text-sm font-medium">{currentUser.name || currentUser.email.split('@')[0]}</span>
                             </button>
                             {isUserMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white/10 backdrop-blur-xl rounded-md shadow-lg py-1 z-20">
+                                <div className="absolute right-0 mt-2 w-48 bg-white/70 backdrop-blur-xl rounded-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] py-1 z-20">
                                     <button onClick={onNavigateToProfile} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                             Profile & EduCoins
                                         </button>
@@ -124,7 +124,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                             )}
                         </div>
                     ) : (
-                         <button onClick={onLoginClick} className="rounded-full bg-primary px-6 py-2 font-semibold text-white shadow-lg shadow-primary/20 transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90">
+                         <button onClick={onLoginClick} className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-2 font-semibold text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90">
                             Login
                         </button>
                     )}
@@ -133,7 +133,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                     <button onClick={onCartClick} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your cart with ${cartItemCount} items`}>
                         <CartIcon />
                         {cartItemCount > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-primary text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                            <span className="absolute -top-2 -right-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
                                 {cartItemCount}
                             </span>
                         )}
