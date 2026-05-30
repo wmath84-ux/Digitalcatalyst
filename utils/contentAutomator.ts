@@ -41,9 +41,26 @@ const THREE_DAYS_IN_MS = 72 * 60 * 60 * 1000;
 
 const buildContentPrompt = () => `
 You are the editorial AI for Digital Catalyst, a premium student learning platform.
-Generate exactly 20 fresh, factual-sounding, non-clickbait content items for a Daily Reading Hub:
-- 10 items with type "news" focused on education, exams, productivity, AI tools for learning, scholarships, student technology, study policy updates, and employability.
-- 10 items with type "blog" focused on practical student habits, revision systems, career readiness, digital skills, side projects, deep work, and learning strategy.
+Generate exactly 20 fresh, factual-sounding, non-clickbait content items for separate News and Blog experiences.
+
+STRICT CATEGORIZATION:
+- Generate exactly 10 items with type "news".
+  - News means current education events, quick exam updates, student alerts, scholarships, policy/watch-list updates, student technology announcements, and employability signals.
+  - News must be concise, timely, and update-oriented.
+- Generate exactly 10 items with type "blog".
+  - Blog means in-depth educational articles, how-to guides, study tips, revision systems, career readiness advice, digital skills explainers, side-project guides, and deep learning strategy.
+  - Blog must be evergreen, practical, and tutorial-style.
+- Do not mix categories. A news item must never read like a long study guide, and a blog item must never read like a breaking update.
+
+STRICT MARKDOWN FORMATTING:
+- The "content" field MUST be rich Markdown, not HTML.
+- Every post MUST include:
+  - At least two "##" headings
+  - At least two "###" subheadings
+  - At least one bullet list using "- " bullets
+  - Short readable paragraphs of 2-4 sentences each
+  - A final "## Key Takeaways" section with bullets
+- No massive walls of plain text. Break ideas into scannable sections.
 
 Return ONLY valid JSON. No markdown fence. No commentary.
 The JSON shape must be:
@@ -55,17 +72,18 @@ The JSON shape must be:
       "category": "Short category label",
       "excerpt": "A punchy two-sentence summary for cards.",
       "thumbnailImage": "A stable Unsplash Source URL or empty string",
-      "content": "Formatting-ready rich HTML with <h2>, <p>, <ul>, <li>, <strong>, and <blockquote>. Write 650-900 words per post, with useful detail, student-focused examples, concrete takeaways, and no fake citations."
+      "content": "Rich Markdown with ## Headings, ### Subheadings, - bullet lists, short paragraphs, and a ## Key Takeaways section. Write 550-850 words per post with useful student-focused examples, concrete actions, and no fake citations."
     }
   ]
 }
 
 Quality rules:
 - Content must be original, educational, detailed, and safe for students.
-- Avoid promising real-time breaking news unless phrased as trend analysis.
-- Use rich HTML that can be inserted directly into a contentEditable Smart Docs editor.
+- Avoid promising real-time breaking news unless phrased as trend analysis or an alert-style explainer.
+- Markdown must be clean enough to render directly in a reading view.
 - Include actionable takeaways in every post.
 `;
+
 
 const safeJsonParse = (raw: string): { posts?: GeneratedContentPost[] } => {
   const trimmed = raw.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
@@ -83,7 +101,7 @@ const fallbackGeneratedPosts = (): GeneratedContentPost[] => {
     category: type === 'news' ? 'Education News' : 'Student Success',
     excerpt: `A premium ${type} briefing for ${nowLabel} with practical takeaways for focused learners.`,
     thumbnailImage: '',
-    content: `<h2>Why this matters</h2><p>This demo-mode ${type} item is generated locally because no Gemini API key is configured. It shows the same formatting-ready structure the AI autopilot will produce in production.</p><h2>Student takeaways</h2><ul><li><strong>Focus:</strong> Turn the idea into one concrete study action today.</li><li><strong>Review:</strong> Summarize the lesson in three bullet points.</li><li><strong>Apply:</strong> Use a 25-minute sprint to practice the skill.</li></ul><blockquote>Small daily reading habits compound into better exam confidence.</blockquote>`,
+    content: `## Why this ${type === 'news' ? 'update' : 'guide'} matters\n\nThis demo-mode ${type} item is generated locally because no Gemini API key is configured. It mirrors the Markdown structure the AI autopilot will produce in production with short paragraphs and scannable sections.\n\n### Quick context\n\nStudents can use this item as a focused reading prompt before a study sprint. The goal is to turn reading into action instead of passive scrolling.\n\n## What to do next\n\n### Student action plan\n\n- **Focus:** Turn the idea into one concrete study action today.\n- **Review:** Summarize the lesson in three bullet points.\n- **Apply:** Use a 25-minute sprint to practice the skill.\n\n## Key Takeaways\n\n- Small daily reading habits compound into better exam confidence.\n- Separate news alerts from deeper blog guides to keep your learning workflow clear.`,
   });
 
   return [
@@ -105,9 +123,11 @@ export const generateEducationalContent = async (): Promise<GeneratedContentPost
 
   const parsed = safeJsonParse(response.text || '{}');
   const posts = Array.isArray(parsed.posts) ? parsed.posts : [];
-  return posts
-    .filter((post) => post && (post.type === 'news' || post.type === 'blog') && post.title && post.content)
-    .slice(0, 20);
+  const validPosts = posts.filter((post) => post && (post.type === 'news' || post.type === 'blog') && post.title && post.content);
+  return [
+    ...validPosts.filter((post) => post.type === 'news').slice(0, 10),
+    ...validPosts.filter((post) => post.type === 'blog').slice(0, 10),
+  ];
 };
 
 export const purgeExpiredContent = async <TPost extends ContentPostRecord>(
@@ -138,7 +158,7 @@ export const runContentAutomation = async <TPost extends ContentPostRecord = Con
     content: post.content,
     type: post.type,
     category: post.category || (post.type === 'news' ? 'Education News' : 'Student Success'),
-    excerpt: post.excerpt || post.content.replace(/<[^>]+>/g, ' ').slice(0, 180),
+    excerpt: post.excerpt || post.content.replace(/<[^>]+>/g, ' ').replace(/[#*_`>-]/g, ' ').slice(0, 180),
     thumbnailImage: post.thumbnailImage || '',
     imageSeed: `${post.type}-${now.getTime()}-${index}`,
     date: now.toISOString().split('T')[0],
