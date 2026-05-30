@@ -1,6 +1,6 @@
 // components/CoursePlayer.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, QuizAnswerState } from '../App';
+import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile } from '../App';
 import AiMentor from './AiMentor';
 
 const FileIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
@@ -88,12 +88,57 @@ const getCourseBackground = (product: ProductWithRating, activeFile: ProductFile
   return product.images?.[0] || `https://picsum.photos/seed/${product.imageSeed || product.id}/1600/900`;
 };
 
-const htmlFromPlainText = (value: string) => value.trim().startsWith('<') ? value : `<p>${value.replace(/\n/g, '<br />')}</p>`;
+const htmlFromPlainText = (value: string) => {
+  const trimmed = value.trim();
+  return trimmed.startsWith('<') ? trimmed : `<p>${trimmed.replace(/\n/g, '<br />')}</p>`;
+};
+
+type ReadingTheme = 'dark' | 'light' | 'sepia';
+type ReadingFontSize = 'comfortable' | 'large' | 'immersive';
+type ReadingLineSpacing = 'relaxed' | 'loose' | 'wide';
+type ReadingFontStyle = 'sans' | 'serif' | 'mono';
+
+const fontSizeClasses: Record<ReadingFontSize, string> = {
+  comfortable: 'text-lg',
+  large: 'text-xl',
+  immersive: 'text-2xl',
+};
+
+const lineSpacingClasses: Record<ReadingLineSpacing, string> = {
+  relaxed: 'leading-8',
+  loose: 'leading-9',
+  wide: 'leading-10',
+};
+
+const fontStyleClasses: Record<ReadingFontStyle, string> = {
+  sans: 'font-sans',
+  serif: 'font-serif',
+  mono: 'font-mono',
+};
+
+const readingThemeClasses: Record<ReadingTheme, string> = {
+  dark: 'border-white/10 bg-slate-950/95 text-slate-100',
+  light: 'border-slate-200/80 bg-slate-50/95 text-slate-950',
+  sepia: 'border-amber-200/60 bg-[#f4ecd8]/95 text-[#352516]',
+};
+
+const RichTextButton: React.FC<{ active?: boolean; children: React.ReactNode; onClick: () => void; title?: string; }> = ({ active = false, children, onClick, title }) => (
+  <button
+    type="button"
+    title={title}
+    onMouseDown={(event) => event.preventDefault()}
+    onClick={onClick}
+    className={`rounded-xl border px-3 py-2 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-white/20 ${active ? 'border-cyan-200 bg-cyan-300/25 shadow-[0_0_24px_rgba(125,211,252,0.25)]' : 'border-white/15 bg-white/10'}`}
+  >
+    {children}
+  </button>
+);
 
 const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = ({ file, productId }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const storageKey = `smart-docs-workspace-${productId}-${file.id}`;
-  const defaultContent = htmlFromPlainText(file.content || '<h1>Smart Docs Workspace</h1><p>Start writing here.</p>');
+  const defaultContent = useMemo(() => htmlFromPlainText(file.content || '<h1>Smart Docs Workspace</h1><p>Start writing here.</p>'), [file.content]);
+  const [html, setHtml] = useState(defaultContent);
   const [savedAt, setSavedAt] = useState('Saved locally');
   const [isReadingMode, setIsReadingMode] = useState(false);
   const [fontSize, setFontSize] = useState(18);
@@ -103,7 +148,9 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
 
   useEffect(() => {
     const saved = localStorage.getItem(storageKey);
-    if (editorRef.current) editorRef.current.innerHTML = saved || defaultContent;
+    const nextHtml = saved || defaultContent;
+    setHtml(nextHtml);
+    if (editorRef.current) editorRef.current.innerHTML = nextHtml;
     setSavedAt(saved ? 'Restored from local autosave' : 'Loaded admin version');
   }, [storageKey, defaultContent]);
 
