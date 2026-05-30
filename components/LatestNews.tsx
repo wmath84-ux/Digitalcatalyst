@@ -10,15 +10,17 @@ interface LatestNewsProps {
   onOpenHub: () => void;
 }
 
+const getArticleCoverImage = (article: NewsArticle, size = '800/600') => article.coverImage || article.thumbnailImage || `https://picsum.photos/seed/${article.imageSeed}/${size}`;
+
 const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, settings: WebsiteSettings, onReadMoreClick: (article: NewsArticle) => void }> = ({ article, animationDelay, settings, onReadMoreClick }) => {
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${(animationDelay % 8) + 1}` : '';
     return (
-        <div className={`bg-white/70 backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/50 overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
-            <div className="relative h-48 overflow-hidden bg-white/70">
+        <div className={`bg-white/70 backdrop-blur-2xl rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/50 overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
+            <div className="relative h-48 overflow-hidden rounded-t-xl bg-white/70">
                 <img 
-                    src={article.thumbnailImage || `https://picsum.photos/seed/${article.imageSeed}/800/600`} 
+                    src={getArticleCoverImage(article)} 
                     alt={article.title} 
-                    className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+                    className="h-full w-full rounded-t-xl object-cover transition-transform duration-700 group-hover:scale-110" 
                 />
                 <div className="absolute top-4 left-4 bg-white/70 backdrop-blur-xl px-3 py-1 text-xs font-bold uppercase tracking-wider text-indigo-700 border border-white/50 rounded-md shadow-sm">
                     {article.type === 'news' ? 'News' : article.category}

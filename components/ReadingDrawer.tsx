@@ -32,7 +32,7 @@ const isExternalArticle = (article: NewsArticle | null) => {
   return /^https?:\/\//i.test(possibleUrl.trim());
 };
 const getArticleUrl = (article: NewsArticle) => ((article as NewsArticle & { externalUrl?: string }).externalUrl || article.content).trim();
-const getArticleImage = (article: NewsArticle, size = '900/540') => article.thumbnailImage || `https://picsum.photos/seed/${article.imageSeed}/${size}`;
+const getArticleImage = (article: NewsArticle, size = '900/540') => article.coverImage || article.thumbnailImage || `https://picsum.photos/seed/${article.imageSeed}/${size}`;
 const getArticleType = (article: NewsArticle): ReadingListType => article.type === 'news' ? 'news' : 'blog';
 const stripMarkdown = (value = '') => value.replace(/[#*_`>-]/g, ' ').replace(/\s+/g, ' ').trim();
 
@@ -135,19 +135,21 @@ const SponsoredPartnerCard: React.FC<{
 );
 
 const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: string; imageSeed?: string; onClick: () => void; }> = ({ title, meta, excerpt, badge, imageSeed, onClick }) => (
-  <button onClick={onClick} className="group relative overflow-hidden rounded-[2rem] border border-white/50 bg-white/70 p-4 text-left shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:border-indigo-300/40 hover:bg-white/80 hover:shadow-sm">
+  <button onClick={onClick} className="group relative overflow-hidden rounded-xl border border-white/50 bg-white/70 text-left shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:border-indigo-300/40 hover:bg-white/80 hover:shadow-sm">
     {imageSeed && (
-      <div className="mb-5 h-44 overflow-hidden rounded-[1.5rem] bg-white/70">
-        <img src={imageSeed || ''} alt="" className="h-full w-full object-cover opacity-85 transition duration-700 group-hover:scale-110 group-hover:opacity-100" />
+      <div className="aspect-video overflow-hidden rounded-t-xl bg-white/70">
+        <img src={imageSeed || ''} alt="" className="h-full w-full rounded-t-xl object-cover opacity-85 transition duration-700 group-hover:scale-110 group-hover:opacity-100" />
       </div>
     )}
-    <div className="flex items-center justify-between gap-4">
-      <span className="rounded-full border border-indigo-300/20 bg-indigo-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-indigo-200">{badge}</span>
-      <span className="text-xs text-slate-600">{meta}</span>
+    <div className="p-5">
+      <div className="flex items-center justify-between gap-4">
+        <span className="rounded-full border border-indigo-300/20 bg-indigo-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-indigo-200">{badge}</span>
+        <span className="text-xs text-slate-600">{meta}</span>
+      </div>
+      <h3 className="mt-4 text-xl font-black leading-tight text-slate-900 transition group-hover:text-indigo-700">{title}</h3>
+      <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{excerpt}</p>
+      <div className="mt-5 text-sm font-black text-indigo-200">Open in reading hub →</div>
     </div>
-    <h3 className="mt-4 text-xl font-black leading-tight text-slate-900 transition group-hover:text-indigo-700">{title}</h3>
-    <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{excerpt}</p>
-    <div className="mt-5 text-sm font-black text-indigo-200">Open in reading hub →</div>
   </button>
 );
 
@@ -291,8 +293,8 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
                     </div>
                   ) : (
                     <>
-                      <div className="mt-10 overflow-hidden rounded-[2rem] border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-                        <img src={getArticleImage(selectedArticle, '1400/800')} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90" />
+                      <div className="mb-6 mt-10 aspect-video overflow-hidden rounded-2xl border border-slate-200 bg-white/70 shadow-sm backdrop-blur-2xl">
+                        <img src={getArticleImage(selectedArticle, '1400/800')} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" />
                       </div>
                       <div className="mt-12 text-lg leading-9 text-slate-600">
                         <MarkdownContent content={selectedArticle.content} />
