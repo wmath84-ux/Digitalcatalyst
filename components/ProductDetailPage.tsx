@@ -431,6 +431,29 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const handleModalConfirm = () => { setModalOpen(false); onPurchase(appliedCoupon ? appliedCoupon.code : null, quantity); onConsumeCoinDiscount?.(); };
 
+  if (modalOpen) {
+    return (
+      <PaymentModal
+        settings={settings}
+        productTitle={product.title}
+        originalPrice={originalPriceNum * quantity}
+        salePrice={salePriceNum !== null ? salePriceNum * quantity : null}
+        couponDiscount={totalCouponDiscount}
+        finalPrice={finalTotalPrice}
+        eduCoinDiscount={eduCoinDiscount}
+        appliedEduCoins={activeCoinDiscount?.coins || 0}
+        coinRedeemRate={economySettings.coinToFiatRatio}
+        onClose={handleModalClose}
+        onConfirm={handleModalConfirm}
+        paymentLink={product.paymentLink}
+        currentUser={currentUser}
+        coinPrice={resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity}
+        onConfirmWithCoins={onCoinPurchase ? handleModalConfirmWithCoins : undefined}
+        presentation="page"
+      />
+    );
+  }
+
   const handleImageZoom = (e: React.MouseEvent<HTMLDivElement>) => {
     const zoomer = e.currentTarget.firstChild as HTMLElement;
     const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
@@ -752,24 +775,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         <ImageZoomModal src={mainImage} alt={product.title} onClose={() => setIsImageZoomOpen(false)} />
       )}
 
-      {modalOpen && <PaymentModal 
-        settings={settings} 
-        productTitle={product.title} 
-        originalPrice={originalPriceNum * quantity} 
-        salePrice={salePriceNum !== null ? salePriceNum * quantity : null} 
-        couponDiscount={totalCouponDiscount} 
-        finalPrice={finalTotalPrice} 
-        eduCoinDiscount={eduCoinDiscount}
-        appliedEduCoins={activeCoinDiscount?.coins || 0}
-        coinRedeemRate={economySettings.coinToFiatRatio}
-        
-        onClose={handleModalClose} 
-        onConfirm={handleModalConfirm} 
-        paymentLink={product.paymentLink}
-        currentUser={currentUser}
-        coinPrice={resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity}
-        onConfirmWithCoins={onCoinPurchase ? handleModalConfirmWithCoins : undefined}
-      />}
     </>
   );
 };
