@@ -16,12 +16,12 @@ const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, setting
         <div className={`bg-slate-950/80 backdrop-blur-2xl rounded-2xl shadow-[0_20px_60px_rgba(15,23,42,0.18)] hover:shadow-[0_25px_80px_rgba(79,70,229,0.25)] border border-white/10 overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
             <div className="relative h-48 overflow-hidden bg-slate-900">
                 <img 
-                    src={`https://picsum.photos/seed/${article.imageSeed}/800/600`} 
+                    src={article.thumbnailImage || `https://picsum.photos/seed/${article.imageSeed}/800/600`} 
                     alt={article.title} 
                     className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
                 />
                 <div className="absolute top-4 left-4 bg-slate-950/75 backdrop-blur-xl px-3 py-1 text-xs font-bold uppercase tracking-wider text-indigo-100 border border-white/10 rounded-md shadow-sm">
-                    {article.category}
+                    {article.type === 'news' ? 'News' : article.category}
                 </div>
             </div>
             <div className="p-6 flex flex-col flex-grow">

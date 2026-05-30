@@ -23,6 +23,7 @@ const isExternalArticle = (article: NewsArticle | null) => {
   return /^https?:\/\//i.test(possibleUrl.trim());
 };
 const getArticleUrl = (article: NewsArticle) => ((article as NewsArticle & { externalUrl?: string }).externalUrl || article.content).trim();
+const getArticleImage = (article: NewsArticle, size = '900/540') => article.thumbnailImage || `https://picsum.photos/seed/${article.imageSeed}/${size}`;
 
 const SponsoredPartnerCard = () => (
   <aside className="my-12 overflow-hidden rounded-[2rem] border border-purple-500/30 bg-gradient-to-r from-indigo-500/10 to-purple-500/10 p-1 shadow-[0_0_40px_rgba(129,140,248,0.16)]">
@@ -47,7 +48,7 @@ const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: s
   <button onClick={onClick} className="group relative overflow-hidden rounded-[2rem] border border-white/10 bg-white/[0.04] p-4 text-left shadow-2xl backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:border-indigo-300/40 hover:bg-white/[0.07]">
     {imageSeed && (
       <div className="mb-5 h-44 overflow-hidden rounded-[1.5rem] bg-slate-900">
-        <img src={`https://picsum.photos/seed/${imageSeed}/900/540`} alt="" className="h-full w-full object-cover opacity-85 transition duration-700 group-hover:scale-110 group-hover:opacity-100" />
+        <img src={imageSeed || ''} alt="" className="h-full w-full object-cover opacity-85 transition duration-700 group-hover:scale-110 group-hover:opacity-100" />
       </div>
     )}
     <div className="flex items-center justify-between gap-4">
@@ -147,7 +148,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
                     <p className="mt-5 text-lg leading-8 text-slate-300">A focused, dark-glass stream of news, blog insights, and official updates designed to keep students reading inside the app every day.</p>
                   </div>
                   <div className="grid gap-6 lg:grid-cols-3">
-                    {articles.map((article) => <HubCard key={`article-${article.id}`} title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(article.content)} min`} excerpt={article.excerpt} badge={article.category || 'Blog'} imageSeed={article.imageSeed} onClick={() => onSelectArticle(article)} />)}
+                    {articles.map((article) => <HubCard key={`article-${article.id}`} title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(article.content)} min`} excerpt={article.excerpt} badge={article.category || 'Blog'} imageSeed={getArticleImage(article)} onClick={() => onSelectArticle(article)} />)}
                     {announcements.map((announcement) => <HubCard key={`announcement-${announcement.id}`} title={announcement.title} meta={formatDate(announcement.date)} excerpt={announcement.content} badge="Announcement" onClick={() => onSelectAnnouncement(announcement)} />)}
                   </div>
                 </div>
@@ -165,7 +166,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ isOpen, view, articles, a
                   ) : (
                     <>
                       <div className="mt-10 overflow-hidden rounded-[2rem] border border-white/10 bg-slate-900/80 shadow-2xl">
-                        <img src={`https://picsum.photos/seed/${selectedArticle.imageSeed}/1400/800`} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90" />
+                        <img src={getArticleImage(selectedArticle, '1400/800')} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90" />
                       </div>
                       <div className="mt-12 space-y-7 text-lg leading-9 text-slate-300">
                         {selectedArticle.content.split('\n').filter(Boolean).map((paragraph, index) => (

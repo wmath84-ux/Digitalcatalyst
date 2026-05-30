@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { WebsiteSettings, HomepageSection, NewsArticle, Announcement, ProductWithRating } from '../../App';
+import { WebsiteSettings, HomepageSection, Announcement, ProductWithRating } from '../../App';
 import { ServiceItem } from '../Services';
 import { FaqItem } from '../Faq';
 import { UpcomingFeatureItem } from '../UpcomingFeatures';
@@ -199,62 +199,6 @@ const UpcomingFeatureFormModal: React.FC<{ feature: UpcomingFeatureItem, onSave:
     );
 };
 
-// CRUD component for News Articles (Blog)
-const NewsArticleManagement: React.FC<{ articles: NewsArticle[], onUpdate: (articles: NewsArticle[]) => void }> = ({ articles, onUpdate }) => {
-    const [editing, setEditing] = useState<NewsArticle | null>(null);
-    const handleSave = (article: NewsArticle) => {
-        if (article.id) {
-            onUpdate(articles.map(a => a.id === article.id ? article : a));
-        } else {
-            onUpdate([...articles, { ...article, id: Date.now() }]);
-        }
-        setEditing(null);
-    };
-    const handleDelete = (id: number) => onUpdate(articles.filter(a => a.id !== id));
-
-    return (
-        <div>
-            {editing && <NewsArticleFormModal article={editing} onSave={handleSave} onCancel={() => setEditing(null)} />}
-            <button onClick={() => setEditing({ id: 0, title: '', category: '', date: new Date().toISOString().split('T')[0], imageSeed: '', excerpt: '', content: '' })} className="mb-4 bg-green-500 text-white font-semibold px-4 py-2 rounded-lg text-sm">+ Add New Blog Post</button>
-            <div className="space-y-2">
-                {articles.map(article => (
-                    <div key={article.id} className="flex justify-between items-start p-3 bg-gray-50 rounded-lg border">
-                        <div className="flex-1">
-                            <p className="font-bold">{article.title} <span className="text-xs font-normal text-gray-500 ml-2">{new Date(article.date).toLocaleDateString()}</span></p>
-                            <p className="text-sm text-gray-500 mt-1">{article.excerpt}</p>
-                        </div>
-                        <div className="space-x-2 flex-shrink-0 ml-4">
-                            <button onClick={() => setEditing(article)} className="text-blue-600 font-semibold text-sm">Edit</button>
-                            <button onClick={() => handleDelete(article.id)} className="text-red-600 font-semibold text-sm">Delete</button>
-                        </div>
-                    </div>
-                ))}
-            </div>
-        </div>
-    );
-};
-const NewsArticleFormModal: React.FC<{ article: NewsArticle, onSave: (a: NewsArticle) => void, onCancel: () => void }> = ({ article, onSave, onCancel }) => {
-    const [form, setForm] = useState(article);
-    return (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
-            <div className="bg-white/10 backdrop-blur-xl rounded-lg p-6 w-full max-w-lg">
-                <h3 className="font-bold text-lg mb-4">{article.id ? 'Edit' : 'Add'} Blog Post</h3>
-                <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
-                <div className="grid grid-cols-2 gap-2 mb-2">
-                    <input value={form.category} onChange={e => setForm({...form, category: e.target.value})} placeholder="Category (e.g., SEO)" className="w-full p-2 border rounded" />
-                    <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full p-2 border rounded" />
-                </div>
-                <input value={form.imageSeed} onChange={e => setForm({...form, imageSeed: e.target.value})} placeholder="Image Seed (for picsum.photos)" className="w-full p-2 border rounded mb-2" />
-                <textarea value={form.excerpt} onChange={e => setForm({...form, excerpt: e.target.value})} placeholder="Excerpt/Summary" className="w-full p-2 border rounded mb-2" rows={2}></textarea>
-                <textarea value={form.content} onChange={e => setForm({...form, content: e.target.value})} placeholder="Full Content (Markdown supported)" className="w-full p-2 border rounded mb-4" rows={6}></textarea>
-                <div className="flex justify-end space-x-2">
-                    <button onClick={onCancel} className="bg-gray-200 px-4 py-2 rounded-lg">Cancel</button>
-                    <button onClick={() => onSave(form)} className="bg-primary text-white px-4 py-2 rounded-lg">Save</button>
-                </div>
-            </div>
-        </div>
-    );
-};
 
 // CRUD component for Announcements
 const AnnouncementManagement: React.FC<{ announcements: Announcement[], onUpdate: (announcements: Announcement[]) => void }> = ({ announcements, onUpdate }) => {
@@ -319,7 +263,7 @@ type EditableSubscriptionPlan = { id: string; name: string; price: number; descr
 type EditableReward = { id: string; title: string; cost: number; };
 
 const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, products = [], onSettingsChange }) => {
-    const [activeTab, setActiveTab] = useState<'theme' | 'layout' | 'content' | 'blog' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
+    const [activeTab, setActiveTab] = useState<'theme' | 'layout' | 'content' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
     const [localSettings, setLocalSettings] = useState<WebsiteSettings>(settings);
     const [showSuccess, setShowSuccess] = useState(false);
 
@@ -641,7 +585,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                     </div>
                 </div>
             );
-            case 'blog': return <NewsArticleManagement articles={localSettings.content.newsArticles} onUpdate={articles => handleNestedChange('content', 'newsArticles', articles)} />;
             case 'announcements': return <AnnouncementManagement announcements={localSettings.content.announcements} onUpdate={announcements => handleNestedChange('content', 'announcements', announcements)} />;
             case 'services': return <ServiceManagement services={localSettings.content.services} onUpdate={services => handleNestedChange('content', 'services', services)} />;
             case 'faq': return <FaqManagement faqs={localSettings.content.faqs} onUpdate={faqs => handleNestedChange('content', 'faqs', faqs)} />;
@@ -679,7 +622,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                 <TabButton label="Theme" isActive={activeTab === 'theme'} onClick={() => setActiveTab('theme')} />
                 <TabButton label="Layout" isActive={activeTab === 'layout'} onClick={() => setActiveTab('layout')} />
                 <TabButton label="Content" isActive={activeTab === 'content'} onClick={() => setActiveTab('content')} />
-                <TabButton label="Blog" isActive={activeTab === 'blog'} onClick={() => setActiveTab('blog')} />
                 <TabButton label="Announcements" isActive={activeTab === 'announcements'} onClick={() => setActiveTab('announcements')} />
                 <TabButton label="Services" isActive={activeTab === 'services'} onClick={() => setActiveTab('services')} />
                 <TabButton label="FAQ" isActive={activeTab === 'faq'} onClick={() => setActiveTab('faq')} />

@@ -248,6 +248,9 @@ export interface NewsArticle {
   excerpt: string;
   date: string;
   content: string;
+  type?: 'news' | 'blog';
+  thumbnailImage?: string;
+  createdAt?: string;
 }
 
 // New Announcement structure
@@ -508,6 +511,9 @@ const initialNewsArticles: NewsArticle[] = [
   {
     id: 1,
     imageSeed: "futuristic-seo-trends",
+    type: "blog",
+    thumbnailImage: "",
+    createdAt: "2024-07-28T09:00:00.000Z",
     category: "SEO",
     title: "Top 5 SEO Trends to Watch in 2025",
     excerpt: "Google's algorithm is constantly evolving. Stay ahead of the competition by understanding the key trends that will shape search engine optimization next year.",
@@ -517,6 +523,9 @@ const initialNewsArticles: NewsArticle[] = [
   {
     id: 2,
     imageSeed: "ecommerce-conversion-funnel",
+    type: "blog",
+    thumbnailImage: "",
+    createdAt: "2024-07-25T09:00:00.000Z",
     category: "E-commerce",
     title: "The Psychology of Online Shopping: How to Convert More Customers",
     excerpt: "Discover the psychological triggers that motivate users to buy. We break down the science behind high-converting product pages and checkout processes.",
@@ -526,6 +535,9 @@ const initialNewsArticles: NewsArticle[] = [
   {
     id: 3,
     imageSeed: "ai-writing-robot",
+    type: "news",
+    thumbnailImage: "",
+    createdAt: "2024-07-22T09:00:00.000Z",
     category: "Marketing",
     title: "AI in Content Marketing: A Practical Guide for Small Businesses",
     excerpt: "Artificial intelligence is no longer just for large corporations. Learn how you can leverage AI tools to create better content, faster and more efficiently.",
