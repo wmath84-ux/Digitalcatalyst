@@ -15,7 +15,11 @@ const MacWindowModal: React.FC<MacWindowModalProps> = ({ title, subtitle, childr
   useEffect(() => {
     const previousOverflow = document.body.style.overflow;
     document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = previousOverflow; };
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.body.style.pointerEvents = '';
+      document.body.classList.remove('overflow-hidden', 'pointer-events-none');
+    };
   }, []);
 
   return (

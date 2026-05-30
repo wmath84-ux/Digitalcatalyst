@@ -267,6 +267,7 @@ interface ProductDetailPageProps {
   wishlist: number[];
   onQuickView: (product: ProductWithRating) => void;
   onGoHome: () => void;
+  onStartEarning?: () => void;
   isPurchased?: boolean;
   currentUser?: User | null;
   onCoinPurchase?: (product: ProductWithRating, quantity: number) => boolean;
@@ -282,16 +283,17 @@ const ShareIcon = () => (
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ 
     settings, economySettings, activeCoinDiscount = null, onConsumeCoinDiscount, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews, 
     onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, onModalOpened, coupons,
-    scrollToSection, onSectionScrolled, allProducts, onViewProduct, wishlist, onQuickView, onGoHome,
+    scrollToSection, onSectionScrolled, allProducts, onViewProduct, wishlist, onQuickView, onGoHome, onStartEarning,
     isPurchased = false, currentUser = null, onCoinPurchase
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
+  const [openCoinGuideOnMount, setOpenCoinGuideOnMount] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const [openAccordion, setOpenAccordion] = useState<number | null>(0);
 
   const [mainImage, setMainImage] = useState((product.images || [])[0] || `https://picsum.photos/seed/${product.imageSeed}/800/600`);
-  const [quantity, setQuantity] = useState(1);
+  const quantity = 1;
   const [isImageZoomOpen, setIsImageZoomOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
@@ -307,7 +309,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     setAppliedCoupon(null);
     setCouponInput('');
     setCouponError(null);
-    setQuantity(1);
   }, [product]);
 
   useEffect(() => {
@@ -327,8 +328,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const salePriceNum = product.salePrice && product.salePrice !== '₹' ? parseFloat(product.salePrice.replace('₹', '')) : null;
   const currentPriceNum = salePriceNum ?? originalPriceNum;
 
-  // Total price for quantity, before discount
-  const preDiscountTotal = currentPriceNum * quantity;
+  const preDiscountTotal = currentPriceNum;
 
   const calculateTotalDiscount = (coupon: Coupon | null): number => {
     if (!coupon) return 0;
@@ -437,13 +437,34 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       onLoginRequired();
       return;
     }
-    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+    setOpenCoinGuideOnMount(false);
+    window.scrollTo(0, 0);
+    setModalOpen(true);
+  };
+
+  const productCoinPrice = resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id);
+  const userCoinBalance = (currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0;
+
+  const handleEduCoinButtonClick = () => {
+    if (!isLoggedIn) {
+      onLoginRequired();
+      return;
+    }
+
+    if (userCoinBalance >= productCoinPrice && productCoinPrice > 0) {
+      handleModalConfirmWithCoins();
+      return;
+    }
+
+    setOpenCoinGuideOnMount(true);
+    window.scrollTo(0, 0);
     setModalOpen(true);
   };
 
   const handleModalClose = () => {
     setModalOpen(false);
-    window.setTimeout(() => window.scrollTo({ top: 0, left: 0, behavior: 'auto' }), 0);
+    setOpenCoinGuideOnMount(false);
+    window.setTimeout(() => window.scrollTo(0, 0), 0);
   };
 
   const handleModalConfirmWithCoins = () => {
@@ -477,6 +498,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         currentUser={currentUser}
         coinPrice={resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity}
         onConfirmWithCoins={onCoinPurchase ? handleModalConfirmWithCoins : undefined}
+        onStartEarning={onStartEarning}
+        initialShowCoinGuide={openCoinGuideOnMount}
         presentation="page"
       />
     );
@@ -515,246 +538,126 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   return (
     <>
-      <section className="py-16 sm:py-20 bg-white/70 backdrop-blur-xl">
-        <div className="container mx-auto px-6">
-          <nav className="flex text-sm text-slate-600 mb-6 items-center space-x-2" aria-label="Breadcrumb">
-            <button onClick={onGoHome} className="hover:text-primary hover:underline transition-colors font-medium">Home</button>
-            <span className="text-slate-600">/</span>
-            <button onClick={onBack} className="hover:text-primary hover:underline transition-colors font-medium">Products</button>
-            <span className="text-slate-600">/</span>
-            <span className="text-primary font-semibold truncate max-w-xs" title={product.title}>{product.title}</span>
+      <section className="relative overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-cyan-50/40 py-16 text-slate-900 sm:py-20">
+        <div className="pointer-events-none absolute -left-24 top-20 h-72 w-72 rounded-full bg-indigo-200/40 blur-3xl" />
+        <div className="pointer-events-none absolute -right-24 bottom-28 h-80 w-80 rounded-full bg-cyan-200/40 blur-3xl" />
+        <div className="container relative z-10 mx-auto px-6">
+          <nav className="mb-8 flex items-center space-x-2 text-sm text-slate-600" aria-label="Breadcrumb">
+            <button onClick={onGoHome} className="font-bold transition-colors hover:text-primary hover:underline">Home</button>
+            <span className="text-slate-400">/</span>
+            <button onClick={onBack} className="font-bold transition-colors hover:text-primary hover:underline">Products</button>
+            <span className="text-slate-400">/</span>
+            <span className="max-w-xs truncate font-black text-primary" title={product.title}>{product.title}</span>
           </nav>
 
-          <div ref={gridRef} className={`grid grid-cols-1 lg:grid-cols-2 gap-12 lg:gap-16 items-start ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
-            {/* --- LEFT COLUMN: IMAGES --- */}
-            <div>
-              <button onClick={() => setIsImageZoomOpen(true)} className="w-full bg-gray-100 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden border relative animate-fade-in group" aria-label="View larger image">
-                 <div className="zoom-container" onMouseMove={handleImageZoom}>
-                    <img src={mainImage} alt={product.title} className="w-full h-auto object-cover aspect-video" />
-                 </div>
-                 <div className="absolute inset-0 bg-white/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-slate-900" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v3m0 0v3m0-3h3m-3 0H7" /></svg>
-                 </div>
-                {settings.features.showFavourites && (
-                    <button onClick={(e) => { e.stopPropagation(); onToggleWishlist(product.id); }} className="absolute top-4 right-4 bg-white/80 backdrop-blur-sm rounded-full p-2 text-text-muted hover:text-red-500 hover:scale-110 transition-all duration-200 z-10" aria-label={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill={isWishlisted ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isWishlisted ? 0 : 2}><path strokeLinecap="round" strokeLinejoin="round" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" /></svg>
-                    </button>
-                )}
+          <div ref={gridRef} className={`grid grid-cols-1 gap-8 md:grid-cols-12 ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
+            <div className="md:col-span-7">
+              <button onClick={() => setIsImageZoomOpen(true)} className="group relative w-full overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 shadow-[0_24px_70px_rgba(15,23,42,0.10)]" aria-label="View larger image">
+                <div className="zoom-container" onMouseMove={handleImageZoom}>
+                  <img src={mainImage} alt={product.title} className="aspect-video h-auto w-full object-cover" />
+                </div>
+                <div className="absolute inset-0 flex items-center justify-center bg-white/35 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
+                  <div className="rounded-full bg-white/85 p-4 text-slate-900 shadow-xl"><svg xmlns="http://www.w3.org/2000/svg" className="h-9 w-9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" /></svg></div>
+                </div>
+                {isWishlisted && <span className="absolute right-5 top-5 rounded-full bg-red-500 px-4 py-2 text-sm font-black text-white shadow-lg">♥ Wishlisted</span>}
               </button>
-              <div className="mt-4 flex space-x-2">
+
+              {(product.images || []).length > 1 && (
+                <div className="mt-4 flex flex-wrap gap-3">
                   {(product.images || []).map((img, i) => (
-                      <button key={i} onClick={() => setMainImage(img)} className={`w-20 h-20 rounded-md overflow-hidden border-2 transition-all ${mainImage === img ? 'border-primary' : 'border-transparent hover:border-gray-400'}`}>
-                          <img src={img} alt={`thumbnail ${i+1}`} className="w-full h-full object-cover"/>
-                      </button>
+                    <button key={i} onClick={() => setMainImage(img)} className={`h-20 w-20 overflow-hidden rounded-2xl border-2 bg-white/75 transition-all ${mainImage === img ? 'border-primary shadow-lg' : 'border-white/70 hover:border-indigo-300'}`} aria-label={`View thumbnail ${i + 1}`}>
+                      <img src={img} alt={`thumbnail ${i + 1}`} className="h-full w-full object-cover" />
+                    </button>
                   ))}
-              </div>
-            </div>
-
-            {/* --- RIGHT COLUMN: DETAILS --- */}
-            <div className="lg:col-span-1">
-              <div className="flex items-start justify-between gap-4">
-                <h1 className="text-4xl sm:text-5xl font-extrabold text-primary tracking-tight">{product.title}</h1>
-                <button onClick={handleShare} className="p-3 bg-gray-100 rounded-full text-gray-600 hover:bg-gray-200 hover:text-primary transition-colors flex-shrink-0" aria-label="Share this product">
-                    <ShareIcon />
-                </button>
-              </div>
-              <p className="mt-6 text-lg text-text-muted">{product.longDescription}</p>
-
-              <div className="mt-8 border rounded-lg">
-                <h3 className="text-xl font-bold text-primary p-4 border-b">Key Features:</h3>
-                <div className="divide-y">
-                    {(product.features || []).map((feature, i) => (
-                        <div key={i} className="feature-accordion">
-                            <button onClick={() => setOpenAccordion(openAccordion === i ? null : i)} className="feature-accordion-header w-full flex justify-between items-center p-4 text-left">
-                                <span className="font-semibold text-text">{feature}</span>
-                                <span className={`transform transition-transform duration-300 ${openAccordion === i ? 'rotate-45' : ''}`}>
-                                  <svg className="w-5 h-5 text-slate-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
-                                </span>
-                            </button>
-                            <div className={`feature-accordion-content px-4 ${openAccordion === i ? 'is-open' : ''}`}>
-                                <p className="text-text-muted text-sm">Detailed information about '{feature}' would go here, explaining the benefits and how it helps the customer achieve their goals.</p>
-                            </div>
-                        </div>
-                    ))}
                 </div>
-              </div>
-              
-              <div className="mt-8">
-                  <PriceChart basePrice={currentPriceNum} priceHistory={product.priceHistory || []} />
-              </div>
-              
-              <div id="price-section" className={`mt-10 bg-gray-50 p-6 rounded-lg border scroll-mt-24 ${priceJustUpdated ? 'price-flash' : ''}`}>
-                <div className="mb-6">
-                    {(() => {
-                        if (product.isFree) {
-                            return (
-                                <div className="text-center">
-                                    <span className="text-4xl font-bold text-blue-600 bg-blue-100 px-4 py-2 rounded-lg">FREE</span>
-                                    <p className="text-sm text-text-muted mt-2">Nominal Fee of ₹3 applies.</p>
-                                </div>
-                            );
-                        }
+              )}
 
-                        if (appliedCoupon) {
-                            return (
-                                <div className="flex items-baseline gap-3">
-                                    <span className="text-4xl font-bold text-primary">₹{finalTotalPrice.toFixed(2)}</span>
-                                    <span className="text-2xl font-medium text-slate-600 line-through">₹{preDiscountTotal.toFixed(2)}</span>
-                                    <span className="text-sm font-bold text-green-600 bg-green-100 px-3 py-1 rounded-full">SAVE ₹{totalCouponDiscount.toFixed(2)}</span>
-                                </div>
-                            );
-                        }
-
-                        if (salePriceNum !== null) {
-                            const originalTotal = originalPriceNum * quantity;
-                            const saleTotal = salePriceNum * quantity;
-                            const saleDiscount = originalTotal - saleTotal;
-                            return (
-                                <div className="flex items-baseline gap-3">
-                                    <span className="text-4xl font-bold text-primary">₹{saleTotal.toFixed(2)}</span>
-                                    <span className="text-2xl font-medium text-slate-600 line-through">₹{originalTotal.toFixed(2)}</span>
-                                    {saleDiscount > 0 && <span className="text-sm font-bold text-green-600 bg-green-100 px-3 py-1 rounded-full">SAVE ₹{saleDiscount.toFixed(2)}</span>}
-                                </div>
-                            );
-                        }
-
-                        return (
-                            <div>
-                                <span className="text-sm text-text-muted">Price</span>
-                                <p className="text-4xl font-bold text-primary">₹{(originalPriceNum * quantity).toFixed(2)}</p>
-                            </div>
-                        );
-                    })()}
-                </div>
-              </div>
-            </div>
-          </div>
-          
-           {/* --- COUPON & PRICE BREAKDOWN SECTION --- */}
-            {!product.isFree && coupons.length > 0 && (
-              <div className="mt-8 max-w-3xl mx-auto">
-                <div className="bg-white/70 backdrop-blur-xl rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border p-6 transition-all duration-300">
-                  {/* New Coupon UI */}
+              <div className="mt-8 rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.07)] backdrop-blur-2xl sm:p-8">
+                <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
-                    <h3 className="text-lg font-semibold text-gray-800">Have a coupon?</h3>
-                    <div className="mt-2 flex gap-2">
-                        <input
-                            type="text"
-                            value={couponInput}
-                            onChange={e => setCouponInput(e.target.value.toUpperCase())}
-                            placeholder="Enter coupon code"
-                            className="w-full px-4 py-2 border rounded-md focus:ring-2 focus:ring-primary focus:border-transparent transition"
-                            aria-label="Coupon code"
-                        />
-                        <button
-                            onClick={() => handleApplyCoupon(couponInput)}
-                            className="bg-white/70 text-slate-900 font-semibold px-6 py-2 rounded-md hover:bg-white/80 hover:shadow-sm transition-colors"
-                        >
-                            Apply
-                        </button>
-                    </div>
-                    {couponError && <p className="text-red-500 text-sm mt-2">{couponError}</p>}
-                    {appliedCoupon && !couponError && <p className="text-green-600 text-sm mt-2">Coupon '{appliedCoupon.code}' applied successfully!</p>}
+                    <p className="text-xs font-black uppercase tracking-[0.28em] text-indigo-500">Digital product</p>
+                    <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-5xl">{product.title}</h1>
+                  </div>
+                  <button onClick={handleShare} className="rounded-full border border-slate-200 bg-white/80 p-3 text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:text-primary" aria-label="Share this product"><ShareIcon /></button>
+                </div>
+                <p className="mt-6 text-lg leading-8 text-slate-600">{product.longDescription}</p>
 
-                    <h3 className="text-lg font-semibold text-gray-800 mt-6">Available Coupons:</h3>
-                    <div className="mt-2 space-y-3">
-                        {coupons.filter(c => c.isActive).map(coupon => {
-                            const isSelected = coupon.code === couponInput;
-                            const isApplied = appliedCoupon?.id === coupon.id;
-                            return (
-                                <div
-                                    key={coupon.id}
-                                    className={`p-4 border-2 rounded-lg transition-all border-dashed ${
-                                        isSelected && !isApplied && couponError ? 'border-red-400 bg-red-50' : 
-                                        isApplied || (isSelected && !couponError) ? 'border-green-500 bg-green-50' : 
-                                        'border-gray-300'
-                                    }`}
-                                >
-                                    <div className="flex justify-between items-center">
-                                        <div>
-                                            <p className="font-bold font-mono text-gray-800">{coupon.code}</p>
-                                            <p className="text-sm text-gray-600">
-                                                {coupon.type === 'percentage' ? `${coupon.value}% off` : `Flat ₹${coupon.value} off`}
-                                            </p>
-                                        </div>
-                                        <button
-                                            onClick={() => handleApplyCoupon(coupon.code)}
-                                            className="font-semibold text-green-600 hover:underline disabled:text-slate-600 disabled:no-underline"
-                                            disabled={isApplied}
-                                        >
-                                            {isApplied ? 'Applied' : 'Apply'}
-                                        </button>
-                                    </div>
-                                </div>
-                            )
-                        })}
+                {(product.features || []).length > 0 && (
+                  <div className="mt-8 rounded-3xl border border-slate-200/70 bg-slate-50/80">
+                    <h3 className="border-b border-slate-200/70 p-4 text-xl font-black text-primary">Key Features</h3>
+                    <div className="divide-y divide-slate-200/70">
+                      {(product.features || []).map((feature, i) => (
+                        <div key={i} className="feature-accordion">
+                          <button onClick={() => setOpenAccordion(openAccordion === i ? null : i)} className="feature-accordion-header flex w-full items-center justify-between p-4 text-left">
+                            <span className="font-bold text-slate-900">{feature}</span>
+                            <span className={`transform transition-transform duration-300 ${openAccordion === i ? 'rotate-45' : ''}`}><svg className="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg></span>
+                          </button>
+                          <div className={`feature-accordion-content px-4 ${openAccordion === i ? 'is-open' : ''}`}>
+                            <p className="text-sm leading-6 text-slate-600">Detailed information about '{feature}' would go here, explaining the benefits and how it helps the customer achieve their goals.</p>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
+                )}
 
-                  {/* Price Breakdown on Success */}
-                  {appliedCoupon && (
-                      <div className="mt-6 animate-fade-in">
-                          <div className="flex justify-between items-center">
-                              <h3 className="text-xl font-bold text-gray-800">Price Breakdown</h3>
-                              <button onClick={handleRemoveCoupon} className="text-sm text-red-600 hover:underline font-semibold">Remove Coupon</button>
-                          </div>
-                          <div className="mt-4 space-y-2 border-t pt-4">
-                              <div className="flex justify-between text-text-muted">
-                                  <span>Subtotal ({quantity} item{quantity > 1 ? 's' : ''})</span>
-                                  <span>₹{preDiscountTotal.toFixed(2)}</span>
-                              </div>
-                              <div className="flex justify-between font-semibold text-green-700">
-                                  <span>Coupon ({appliedCoupon.code})</span>
-                                  <span>- ₹{totalCouponDiscount.toFixed(2)}</span>
-                              </div>
-                              <div className="border-t my-2"></div>
-                              <div className="flex justify-between font-bold text-2xl text-primary">
-                                  <span>Final Price</span>
-                                  <span>₹{finalTotalPrice.toFixed(2)}</span>
-                              </div>
-                          </div>
-                      </div>
-                  )}
+                <div className="mt-8">
+                  <PriceChart basePrice={currentPriceNum} priceHistory={product.priceHistory || []} />
                 </div>
               </div>
-            )}
-            
-            {/* --- ACTION BUTTONS SECTION --- */}
-            <div className="mt-8 max-w-4xl mx-auto">
-                <div className="relative overflow-hidden rounded-[2.25rem] border border-white/70 bg-white/80 p-6 shadow-[0_24px_70px_rgba(15,23,42,0.08)] backdrop-blur-2xl sm:p-8">
-                    <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-indigo-200/50 blur-3xl" />
-                    <div className="absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-emerald-200/50 blur-3xl" />
-                    <div className="relative grid gap-6 lg:grid-cols-[1fr_1.25fr]">
-                        <div className="rounded-3xl border border-slate-200/70 bg-slate-50/85 p-5">
-                            <p className="text-xs font-black uppercase tracking-[0.25em] text-slate-500">Ready to unlock</p>
-                            <h3 className="mt-3 text-2xl font-black text-slate-950">{product.title}</h3>
-                            <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">Buy once and access this digital product from My Purchases after verification.</p>
-                            <div className="mt-4 flex items-end justify-between rounded-2xl bg-white/80 p-4 shadow-inner">
-                                <span className="text-sm font-black uppercase tracking-widest text-slate-500">Checkout total</span>
-                                <span className="text-3xl font-black text-primary">₹{finalTotalPrice.toFixed(2)}</span>
-                            </div>
-                        </div>
-                        <div className="space-y-4">
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                <button onClick={() => onAddToCart(product.id, 1)} className="w-full rounded-2xl border border-indigo-200/70 bg-white/85 px-8 py-4 text-lg font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95">
-                                    Add to Cart
-                                </button>
-                                <button disabled={isPurchased} onClick={handleBuyClick} className="w-full rounded-2xl bg-gradient-to-r from-emerald-500 to-green-600 px-8 py-4 text-lg font-black text-white shadow-[0_14px_35px_rgba(34,197,94,0.25)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(34,197,94,0.32)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
-                                    {isPurchased ? 'Purchased' : 'Buy Now'}
-                                </button>
-                            </div>
-                            <div className="grid gap-3 text-sm font-bold text-slate-600 sm:grid-cols-3">
-                                <div className="rounded-2xl border border-slate-200/70 bg-white/75 p-3 text-center">🔒 Secure Razorpay</div>
-                                <div className="rounded-2xl border border-slate-200/70 bg-white/75 p-3 text-center">🪙 EduCoin option</div>
-                                <div className="rounded-2xl border border-slate-200/70 bg-white/75 p-3 text-center">📚 Lifetime access</div>
-                            </div>
-                            <p className="text-center text-xs font-bold uppercase tracking-[0.2em] text-slate-400">No quantity selection needed for this digital unlock</p>
-                        </div>
-                    </div>
-                </div>
             </div>
 
+            <aside className="md:col-span-5">
+              <div id="price-section" className={`sticky top-24 rounded-3xl border border-white/60 bg-white/80 p-6 shadow-xl backdrop-blur-2xl ${priceJustUpdated ? 'price-flash' : ''}`}>
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-indigo-500">Secure checkout</p>
+                <h2 className="mt-3 text-2xl font-black text-slate-950">Unlock instant access</h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Digital products are single-quantity purchases with lifetime access from My Purchases.</p>
 
+                <div className="mt-6 rounded-3xl border border-slate-200/70 bg-slate-50/85 p-5">
+                  <div className="flex items-end justify-between gap-4">
+                    <span className="text-sm font-black uppercase tracking-widest text-slate-500">Total</span>
+                    <div className="text-right">
+                      {salePriceNum !== null && !appliedCoupon && <p className="text-sm font-bold text-slate-400 line-through">₹{originalPriceNum.toFixed(2)}</p>}
+                      {appliedCoupon && <p className="text-sm font-bold text-emerald-600">Saved ₹{totalCouponDiscount.toFixed(2)}</p>}
+                      <p className="text-4xl font-black text-primary">{product.isFree ? 'FREE' : `₹${finalTotalPrice.toFixed(2)}`}</p>
+                    </div>
+                  </div>
+                  {eduCoinDiscount > 0 && <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">🪙 {activeCoinDiscount?.coins || 0} EduCoins applied for ₹{eduCoinDiscount.toFixed(2)} off</p>}
+                </div>
+
+                {!product.isFree && coupons.length > 0 && (
+                  <div className="mt-5 rounded-3xl border border-white/70 bg-white/70 p-4 shadow-sm">
+                    <div className="flex gap-2">
+                      <input type="text" value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} placeholder="Coupon code" className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white/85 px-4 py-3 font-bold outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20" aria-label="Coupon code" />
+                      <button onClick={() => handleApplyCoupon(couponInput)} className="rounded-2xl bg-slate-950 px-5 py-3 font-black text-white transition hover:-translate-y-0.5">Apply</button>
+                    </div>
+                    {couponError && <p className="mt-2 text-sm font-bold text-red-500">{couponError}</p>}
+                    {appliedCoupon && !couponError && <div className="mt-3 flex items-center justify-between rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700"><span>{appliedCoupon.code} applied</span><button onClick={handleRemoveCoupon} className="text-red-500 hover:underline">Remove</button></div>}
+                  </div>
+                )}
+
+                <div className="mt-6 space-y-3">
+                  <button disabled={isPurchased} onClick={handleBuyClick} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-8 py-4 text-lg font-black text-white shadow-[0_16px_40px_rgba(79,70,229,0.25)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
+                    {isPurchased ? 'Purchased' : 'Pay with Razorpay'}
+                  </button>
+                  {onCoinPurchase && productCoinPrice > 0 && (
+                    <button disabled={isPurchased} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200 bg-amber-50 px-8 py-4 text-lg font-black text-amber-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-amber-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
+                      Pay with EduCoins
+                    </button>
+                  )}
+                  <button onClick={() => onAddToCart(product.id, 1)} className="w-full rounded-2xl border border-indigo-200/70 bg-white/85 px-8 py-4 text-base font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95">
+                    Add to Cart
+                  </button>
+                </div>
+
+                <div className="mt-5 grid gap-3 text-sm font-bold text-slate-600 sm:grid-cols-3 md:grid-cols-1 lg:grid-cols-3">
+                  <div className="rounded-2xl border border-slate-200/70 bg-white/75 p-3 text-center">🔒 Razorpay</div>
+                  <div className="rounded-2xl border border-slate-200/70 bg-white/75 p-3 text-center">🪙 EduCoins</div>
+                  <div className="rounded-2xl border border-slate-200/70 bg-white/75 p-3 text-center">📚 Lifetime</div>
+                </div>
+              </div>
+            </aside>
+          </div>
         </div>
       </section>
       

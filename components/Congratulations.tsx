@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import Faq from './Faq';
 import RatingsAndReviews from './RatingsAndReviews';
 import { ProductWithRating, Review, WebsiteSettings } from '../App';
@@ -19,6 +19,15 @@ const celebrationStats = [
 ];
 
 const Congratulations: React.FC<CongratulationsProps> = ({ settings, onBack, onCheckProduct, product, reviews, onAddReview }) => {
+  useEffect(() => {
+    window.scrollTo(0, 0);
+    return () => {
+      document.body.classList.remove('overflow-hidden', 'pointer-events-none');
+      document.body.style.overflow = '';
+      document.body.style.pointerEvents = '';
+    };
+  }, []);
+
   return (
     <div className="min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-indigo-50/50 to-cyan-50 text-slate-900">
       <header className="border-b border-white/60 bg-white/75 py-4 shadow-sm backdrop-blur-2xl">
