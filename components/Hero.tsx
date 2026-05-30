@@ -120,7 +120,7 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
             </button>
             <button onClick={onOpenAnnouncementsModal} className="group flex items-center gap-2 rounded-full border border-white/50 bg-white/70 px-4 py-2 text-sm font-medium text-indigo-700 backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-white/50 hover:bg-white/80 hover:shadow-sm hover:text-slate-900">
               <span className="flex h-8 w-8 items-center justify-center rounded-full bg-white/70 transition-colors group-hover:bg-white/80 hover:shadow-sm">📢</span>
-              <span>Announcements</span>
+              <span>News</span>
             </button>
           </div>
         </div>

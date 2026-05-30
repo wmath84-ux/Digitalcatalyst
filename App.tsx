@@ -27,7 +27,7 @@ import SubscriptionSuccessModal from './components/SubscriptionSuccessModal';
 import LatestNews from './components/LatestNews';
 import ComingSoonModal from './components/ComingSoonModal';
 import { FreeProductsModal } from './components/ContentModals';
-import ReadingDrawer, { ReadingView } from './components/ReadingDrawer';
+import ReadingDrawer, { ReadingListType, ReadingView } from './components/ReadingDrawer';
 import BottomGlassDock from './components/BottomGlassDock';
 import ProfilePage from './components/ProfilePage';
 import PlatformExperience from './components/PlatformExperience';
@@ -750,7 +750,8 @@ const App: React.FC = () => {
   
   // New Large Content Modal States
   const [isReadingDrawerOpen, setIsReadingDrawerOpen] = useState(false);
-  const [readingDrawerView, setReadingDrawerView] = useState<ReadingView>('hub');
+  const [readingDrawerView, setReadingDrawerView] = useState<ReadingView>('blog');
+  const [readingListType, setReadingListType] = useState<ReadingListType>('blog');
   const [isFreeModalOpen, setIsFreeModalOpen] = useState(false);
   
   // User Theme State
@@ -1385,16 +1386,18 @@ const App: React.FC = () => {
     // In a real app, you would make an API call here to your backend.
   };
 
-  const openReadingHub = () => {
+  const openReadingHub = (type: ReadingListType = 'blog') => {
     setSelectedArticle(null);
     setSelectedAnnouncement(null);
-    setReadingDrawerView('hub');
+    setReadingListType(type);
+    setReadingDrawerView(type);
     setIsReadingDrawerOpen(true);
   };
 
   const handleViewAnnouncement = (announcement: Announcement) => {
     setSelectedAnnouncement(announcement);
     setSelectedArticle(null);
+    setReadingListType('news');
     setReadingDrawerView('announcement');
     setIsReadingDrawerOpen(true);
   };
@@ -1402,8 +1405,20 @@ const App: React.FC = () => {
   const handleViewBlogArticle = (article: NewsArticle) => {
     setSelectedArticle(article);
     setSelectedAnnouncement(null);
+    setReadingListType(article.type === 'news' ? 'news' : 'blog');
     setReadingDrawerView('article');
     setIsReadingDrawerOpen(true);
+  };
+
+  const handleBackToReadingList = () => {
+    setSelectedArticle(null);
+    setSelectedAnnouncement(null);
+    setReadingDrawerView(readingListType);
+  };
+
+  const handleExploreReadingFeature = () => {
+    setIsReadingDrawerOpen(false);
+    handleNavigateToAllProducts();
   };
 
   // FIX: Changed to check for existing admin session before showing login screen
@@ -1495,12 +1510,12 @@ const App: React.FC = () => {
           {websiteSettings.layout.map(section => {
               if (!section.visible) return null;
               switch(section.id) {
-                  case 'hero': return <React.Fragment key={section.id}><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={openReadingHub} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={openReadingHub} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></React.Fragment>;
+                  case 'hero': return <React.Fragment key={section.id}><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => openReadingHub('news')} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></React.Fragment>;
                   case 'purchased': return purchasedProducts.length > 0 && <PurchasedProducts settings={websiteSettings} key={section.id} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
                   case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} coupons={coupons} />;
                   case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onQuickView={setQuickViewProduct} coupons={coupons} />;
                   case 'services': return <Services settings={websiteSettings} key={section.id} services={websiteSettings.content.services} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} />;
-                  case 'news': return <LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Daily Reading Hub'} articles={websiteSettings.content.newsArticles} onReadMoreClick={handleViewBlogArticle} onOpenHub={openReadingHub} />;
+                  case 'news': return <LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Daily Reading Hub'} articles={websiteSettings.content.newsArticles.filter(article => article.type === 'news')} onReadMoreClick={handleViewBlogArticle} onOpenHub={() => openReadingHub('news')} />;
                   case 'about': return <AboutUs settings={websiteSettings} key={section.id} title={websiteSettings.content.aboutUsTitle} text={websiteSettings.content.aboutUsText} imageSeed={websiteSettings.content.aboutUsImageSeed} />;
                   case 'trust': return <TrustBadges settings={websiteSettings} key={section.id} />;
                   case 'upcoming': return <UpcomingFeatures settings={websiteSettings} key={section.id} title={section.title || "What's Next?"} features={websiteSettings.content.upcomingFeatures} />;
@@ -1525,27 +1540,29 @@ const App: React.FC = () => {
     }
   };
 
+  const appleOpenClass = "animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]";
+
   const renderPage = () => {
-    if (currentView === 'policies') return <PolicyPage settings={websiteSettings} onBack={handleBackToHome} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} />;
-    if (currentView === 'auth') return <AuthPage settings={websiteSettings} onOtpAuthenticate={handleOtpAuthenticate} onBack={handleBackFromAuth} />;
-    if (currentView === 'admin' && currentAdminUser) return <AdminDashboard websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} onTicketsUpdate={setTickets} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={setCoupons} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} />;
-    if (currentView === 'adminLogin') return <AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={handleBackToHome} />;
-    if (currentView === 'coursePlayer') return renderContent();
+    if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={handleBackToHome} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
+    if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} onOtpAuthenticate={handleOtpAuthenticate} onBack={handleBackFromAuth} /></div>;
+    if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} onTicketsUpdate={setTickets} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={setCoupons} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
+    if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={handleBackToHome} /></div>;
+    if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent()}</div>;
 
     return (
        <ErrorBoundary>
          <div className="font-sans">
             <WelcomeOverlay />
             <Header settings={websiteSettings} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} activeTheme={activeTheme} onThemeChange={setActiveTheme} />
-            {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onOpenBlogModal={openReadingHub} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={openReadingHub} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} onSubscriptionClick={handleNavigateToSubscription} />}
+            {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} onSubscriptionClick={handleNavigateToSubscription} />}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
             {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null)} />}
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onViewProduct={handleViewProductFromModal} />
-            <ReadingDrawer isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} />
-            <main>{renderContent()}</main>
+            <ReadingDrawer isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" />
+            <main key={currentView} className={appleOpenClass}>{renderContent()}</main>
             <Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} />
          </div>
        </ErrorBoundary>
