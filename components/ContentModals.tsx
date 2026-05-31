@@ -10,10 +10,11 @@ interface FreeProductsModalProps {
   products: ProductWithRating[];
   settings: WebsiteSettings;
   onAddToCart: (productId: number, quantity?: number) => void;
+  onBuyNow: (product: ProductWithRating) => void;
   onViewProduct: (product: ProductWithRating) => void;
 }
 
-export const FreeProductsModal: React.FC<FreeProductsModalProps> = ({ isOpen, onClose, products, settings, onAddToCart, onViewProduct }) => {
+export const FreeProductsModal: React.FC<FreeProductsModalProps> = ({ isOpen, onClose, products, settings, onAddToCart, onBuyNow, onViewProduct }) => {
     const modalContentRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -55,6 +56,7 @@ export const FreeProductsModal: React.FC<FreeProductsModalProps> = ({ isOpen, on
                                 isWishlisted={false} // Wishlist isn't relevant here
                                 onToggleWishlist={() => {}} // No-op
                                 onAddToCart={onAddToCart}
+                                onBuyNow={onBuyNow}
                                 onQuickView={() => {}} // No quick view from this modal
                                 animationDelay={0} // Stagger animation is disabled here
                                 coupons={[]} // Empty coupons for free products

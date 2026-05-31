@@ -264,13 +264,14 @@ interface ProductDetailPageProps {
   onSectionScrolled: () => void;
   allProducts: ProductWithRating[];
   onViewProduct: (product: ProductWithRating, sectionId?: string) => void;
+  onBuyNow: (product: ProductWithRating) => void;
   wishlist: number[];
   onQuickView: (product: ProductWithRating) => void;
   onGoHome: () => void;
   onStartEarning?: () => void;
   isPurchased?: boolean;
   currentUser?: User | null;
-  onCoinPurchase?: (product: ProductWithRating, quantity: number) => boolean;
+  onCoinPurchase?: (product: ProductWithRating, quantity: number) => boolean | Promise<boolean>;
 }
 
 const ShareIcon = () => (
@@ -283,10 +284,11 @@ const ShareIcon = () => (
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ 
     settings, economySettings, activeCoinDiscount = null, onConsumeCoinDiscount, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews, 
     onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, onModalOpened, coupons,
-    scrollToSection, onSectionScrolled, allProducts, onViewProduct, wishlist, onQuickView, onGoHome, onStartEarning,
+    scrollToSection, onSectionScrolled, allProducts, onViewProduct, onBuyNow, wishlist, onQuickView, onGoHome, onStartEarning,
     isPurchased = false, currentUser = null, onCoinPurchase
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
+  const [isCoinButtonChecking, setIsCoinButtonChecking] = useState(false);
   const [openCoinGuideOnMount, setOpenCoinGuideOnMount] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
@@ -445,19 +447,23 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const productCoinPrice = resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id);
   const userCoinBalance = (currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0;
 
-  const handleEduCoinButtonClick = () => {
+  const handleEduCoinButtonClick = async () => {
     if (!isLoggedIn) {
       onLoginRequired();
       return;
     }
 
+    window.scrollTo(0, 0);
     if (userCoinBalance >= productCoinPrice && productCoinPrice > 0) {
-      handleModalConfirmWithCoins();
+      const wasPurchased = await handleModalConfirmWithCoins();
+      if (!wasPurchased) {
+        setOpenCoinGuideOnMount(true);
+        setModalOpen(true);
+      }
       return;
     }
 
     setOpenCoinGuideOnMount(true);
-    window.scrollTo(0, 0);
     setModalOpen(true);
   };
 
@@ -467,11 +473,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     window.setTimeout(() => window.scrollTo(0, 0), 0);
   };
 
-  const handleModalConfirmWithCoins = () => {
-    const wasPurchased = onCoinPurchase?.(product, quantity) || false;
+  const handleModalConfirmWithCoins = async () => {
+    setIsCoinButtonChecking(true);
+    const wasPurchased = await (onCoinPurchase?.(product, quantity) || false);
+    setIsCoinButtonChecking(false);
     if (wasPurchased) {
       setModalOpen(false);
     }
+    return wasPurchased;
   };
 
   const handleModalConfirm = () => {
@@ -484,6 +493,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     return (
       <PaymentModal
         settings={settings}
+        economySettings={economySettings}
         productTitle={product.title}
         originalPrice={originalPriceNum * quantity}
         salePrice={salePriceNum !== null ? salePriceNum * quantity : null}
@@ -562,6 +572,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 {isWishlisted && <span className="absolute right-5 top-5 rounded-full bg-red-500 px-4 py-2 text-sm font-black text-white shadow-lg">♥ Wishlisted</span>}
               </button>
 
+              <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-3xl border border-white/70 bg-white/70 p-4 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl"><p className="text-2xl">⚡</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Instant</p><p className="text-sm font-black text-slate-900">Unlock</p></div>
+                <div className="rounded-3xl border border-white/70 bg-white/70 p-4 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl"><p className="text-2xl">🪙</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Wallet</p><p className="text-sm font-black text-slate-900">{productCoinPrice > 0 ? `${productCoinPrice} Coins` : 'Razorpay'}</p></div>
+                <div className="rounded-3xl border border-white/70 bg-white/70 p-4 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl"><p className="text-2xl">⭐</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Rating</p><p className="text-sm font-black text-slate-900">{product.rating.toFixed(1)} / 5</p></div>
+              </div>
+
               {(product.images || []).length > 1 && (
                 <div className="mt-4 flex flex-wrap gap-3">
                   {(product.images || []).map((img, i) => (
@@ -573,6 +589,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               )}
 
               <div className="mt-8 rounded-[2rem] border border-white/70 bg-white/75 p-6 shadow-[0_18px_55px_rgba(15,23,42,0.07)] backdrop-blur-2xl sm:p-8">
+                <div className="mb-6 flex flex-wrap gap-2">
+                  {(product.tags || [product.category || 'Premium resource', 'Digital access', 'Lifetime']).slice(0, 4).map(tag => (
+                    <span key={tag} className="rounded-full border border-indigo-100 bg-indigo-50/80 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-indigo-600">{tag}</span>
+                  ))}
+                </div>
                 <div className="flex flex-wrap items-start justify-between gap-4">
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.28em] text-indigo-500">Digital product</p>
@@ -608,7 +629,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </div>
 
             <aside className="md:col-span-5">
-              <div id="price-section" className={`sticky top-24 rounded-3xl border border-white/60 bg-white/80 p-6 shadow-xl backdrop-blur-2xl ${priceJustUpdated ? 'price-flash' : ''}`}>
+              <div id="price-section" className={`sticky top-24 overflow-hidden rounded-[2rem] border border-white/60 bg-white/75 p-6 shadow-[0_28px_85px_rgba(79,70,229,0.14)] backdrop-blur-2xl ${priceJustUpdated ? 'price-flash' : ''}`}>
+                <div className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-indigo-300/20 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-cyan-300/20 blur-3xl" />
+                <div className="relative">
                 <p className="text-xs font-black uppercase tracking-[0.28em] text-indigo-500">Secure checkout</p>
                 <h2 className="mt-3 text-2xl font-black text-slate-950">Unlock instant access</h2>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Digital products are single-quantity purchases with lifetime access from My Purchases.</p>
@@ -641,8 +665,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     {isPurchased ? 'Purchased' : 'Pay with Razorpay'}
                   </button>
                   {onCoinPurchase && productCoinPrice > 0 && (
-                    <button disabled={isPurchased} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200 bg-amber-50 px-8 py-4 text-lg font-black text-amber-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-amber-100 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
-                      Pay with EduCoins
+                    <button disabled={isPurchased || isCoinButtonChecking} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-8 py-4 text-lg font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
+                      {isCoinButtonChecking ? 'Checking EduCoins...' : `Pay with ${productCoinPrice} EduCoins`}
                     </button>
                   )}
                   <button onClick={() => onAddToCart(product.id, 1)} className="w-full rounded-2xl border border-indigo-200/70 bg-white/85 px-8 py-4 text-base font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95">
@@ -651,9 +675,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 </div>
 
                 <div className="mt-5 grid gap-3 text-sm font-bold text-slate-600 sm:grid-cols-3 md:grid-cols-1 lg:grid-cols-3">
-                  <div className="rounded-2xl border border-slate-200/70 bg-white/75 p-3 text-center">🔒 Razorpay</div>
-                  <div className="rounded-2xl border border-slate-200/70 bg-white/75 p-3 text-center">🪙 EduCoins</div>
-                  <div className="rounded-2xl border border-slate-200/70 bg-white/75 p-3 text-center">📚 Lifetime</div>
+                  <div className="rounded-2xl border border-white/70 bg-white/75 p-3 text-center shadow-sm backdrop-blur-xl">🔒 Razorpay</div>
+                  <div className="rounded-2xl border border-white/70 bg-white/75 p-3 text-center shadow-sm backdrop-blur-xl">🪙 EduCoins</div>
+                  <div className="rounded-2xl border border-white/70 bg-white/75 p-3 text-center shadow-sm backdrop-blur-xl">📚 Lifetime</div>
+                </div>
                 </div>
               </div>
             </aside>
@@ -682,6 +707,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 wishlist={wishlist}
                 onToggleWishlist={onToggleWishlist}
                 onAddToCart={onAddToCart}
+                onBuyNow={onBuyNow}
                 onQuickView={onQuickView}
                 bgColor="bg-transparent"
                 coupons={coupons}

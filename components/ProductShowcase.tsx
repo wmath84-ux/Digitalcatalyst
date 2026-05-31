@@ -10,11 +10,12 @@ interface ProductShowcaseProps {
   wishlist: number[];
   onToggleWishlist: (id: number) => void;
   onAddToCart: (productId: number, quantity?: number) => void;
+  onBuyNow: (product: ProductWithRating) => void;
   onQuickView: (product: ProductWithRating) => void;
   coupons: Coupon[];
 }
 
-const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onQuickView, coupons }) => {
+const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, onQuickView, coupons }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('default');
   const [activeFilter, setActiveFilter] = useState<string>('All');
@@ -157,6 +158,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
                 isWishlisted={wishlist.includes(product.id)}
                 onToggleWishlist={onToggleWishlist}
                 onAddToCart={onAddToCart}
+                onBuyNow={onBuyNow}
                 onQuickView={onQuickView}
                 animationDelay={index}
                 coupons={coupons}
