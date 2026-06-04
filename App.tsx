@@ -1304,9 +1304,13 @@ const App: React.FC = () => {
 
 
   const persistUserToFirestore = (user: User) => {
-    void setDoc(doc(db, 'users', String(user.id)), user, { merge: true }).catch(error => {
-      console.warn('User database sync failed; local wallet remains updated.', error);
-    });
+    try {
+      void setDoc(doc(db, 'users', String(user.id)), user, { merge: true }).catch(error => {
+        console.warn('User database sync failed; local wallet remains updated.', error);
+      });
+    } catch (error) {
+      console.warn('User database sync failed before request; local wallet remains updated.', error);
+    }
   };
 
   const recordCoinTransaction = (user: User, transaction: Omit<CoinTransaction, 'id' | 'createdAt'>) => {
@@ -1320,9 +1324,13 @@ const App: React.FC = () => {
     } catch (error) {
       console.warn('Coin transaction local ledger write failed; wallet update will continue.', error);
     }
-    void addDoc(collection(db, 'users', String(user.id), 'coinTransactions'), { ...entry, createdAt: serverTimestamp() }).catch(error => {
-      console.warn('Coin transaction database write failed; local ledger remains updated.', error);
-    });
+    try {
+      void addDoc(collection(db, 'users', String(user.id), 'coinTransactions'), { ...entry, createdAt: serverTimestamp() }).catch(error => {
+        console.warn('Coin transaction database write failed; local ledger remains updated.', error);
+      });
+    } catch (error) {
+      console.warn('Coin transaction database write failed before request; local ledger remains updated.', error);
+    }
     return entry;
   };
 
@@ -1551,10 +1559,14 @@ const App: React.FC = () => {
         }
 
         const newPurchasedIds = [...new Set([...purchasedProductIds, selectedProduct.id])];
-        const purchaseCoins = Math.max(0, Number(economySettings.coinPerPurchase));
-        creditEduCoins(purchaseCoins, `✦ +${purchaseCoins} EduCoins Purchase Reward`, { source: 'Purchase reward', description: `Purchased ${selectedProduct.title}`, productId: selectedProduct.id });
         setPurchasedProductIds(newPurchasedIds);
         safeSetItem('purchasedProducts', newPurchasedIds);
+        const purchaseCoins = Math.max(0, Number(economySettings.coinPerPurchase));
+        try {
+          creditEduCoins(purchaseCoins, `✦ +${purchaseCoins} EduCoins Purchase Reward`, { source: 'Purchase reward', description: `Purchased ${selectedProduct.title}`, productId: selectedProduct.id });
+        } catch (error) {
+          console.warn('Purchase reward credit failed; product unlock remains completed.', error);
+        }
 
         const newOrder: Order = {
             id: `DC-${Date.now()}`,
@@ -1587,19 +1599,23 @@ const App: React.FC = () => {
     setPurchasedProductIds(newPurchasedIds);
     safeSetItem('purchasedProducts', newPurchasedIds);
     if (currentUser) {
-      void setDoc(doc(db, 'users', String(currentUser.id)), { purchasedProductIds: newPurchasedIds }, { merge: true }).catch(error => {
-        console.warn('Purchased product database sync failed; local unlock remains available.', error);
-      });
-      void setDoc(doc(db, 'users', String(currentUser.id), 'purchases', String(product.id)), {
-        productId: product.id,
-        title: product.title,
-        quantity,
-        total: totalLabel,
-        status,
-        unlockedAt: serverTimestamp(),
-      }, { merge: true }).catch(error => {
-        console.warn('Purchase database record failed; local unlock remains available.', error);
-      });
+      try {
+        void setDoc(doc(db, 'users', String(currentUser.id)), { purchasedProductIds: newPurchasedIds }, { merge: true }).catch(error => {
+          console.warn('Purchased product database sync failed; local unlock remains available.', error);
+        });
+        void setDoc(doc(db, 'users', String(currentUser.id), 'purchases', String(product.id)), {
+          productId: product.id,
+          title: product.title,
+          quantity,
+          total: totalLabel,
+          status,
+          unlockedAt: serverTimestamp(),
+        }, { merge: true }).catch(error => {
+          console.warn('Purchase database record failed; local unlock remains available.', error);
+        });
+      } catch (error) {
+        console.warn('Purchase database sync failed before request; local unlock remains available.', error);
+      }
     }
     setOrders(prevOrders => [{
       id: `DC-${Date.now()}`,
@@ -1624,9 +1640,16 @@ const App: React.FC = () => {
       setInfoModal({ title: 'EduCoin checkout unavailable', message: 'This product does not have an EduCoin price configured yet.', icon: '🪙' });
       return false;
     }
-    const success = deductEduCoins(totalCoinPrice, { source: 'Product EduCoin purchase', description: `Unlocked ${product.title} with EduCoins`, productId: product.id });
-    if (!success) {
+    const liveCoinBalance = currentUser.eduCoins || 0;
+    if (liveCoinBalance < totalCoinPrice) {
       return false;
+    }
+    try {
+      const success = deductEduCoins(totalCoinPrice, { source: 'Product EduCoin purchase', description: `Unlocked ${product.title} with EduCoins`, productId: product.id });
+      if (!success) return false;
+    } catch (error) {
+      console.warn('EduCoin deduction ledger failed; using local wallet fallback for product unlock.', error);
+      syncCurrentUser(user => ({ ...user, eduCoins: Math.max(0, (user.eduCoins || 0) - totalCoinPrice) }));
     }
     completeProductUnlock(product, quantity, `🪙 ${totalCoinPrice}`);
     return true;
@@ -1636,16 +1659,24 @@ const App: React.FC = () => {
     if (!currentUser || cartDetails.length === 0) return false;
     const totalCoinPrice = cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0);
     const allCoinEnabled = cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0);
-    if (!allCoinEnabled || !totalCoinPrice || !deductEduCoins(totalCoinPrice, { source: 'Cart EduCoin purchase', description: 'Unlocked cart with EduCoins' })) {
+    const liveCoinBalance = currentUser.eduCoins || 0;
+    if (!allCoinEnabled || !totalCoinPrice || liveCoinBalance < totalCoinPrice) {
       return false;
+    }
+    try {
+      const deducted = deductEduCoins(totalCoinPrice, { source: 'Cart EduCoin purchase', description: 'Unlocked cart with EduCoins' });
+      if (!deducted) return false;
+    } catch (error) {
+      console.warn('EduCoin deduction ledger failed; using local wallet fallback for cart unlock.', error);
+      syncCurrentUser(user => ({ ...user, eduCoins: Math.max(0, (user.eduCoins || 0) - totalCoinPrice) }));
     }
     const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
     setPurchasedProductIds(newPurchasedIds);
     safeSetItem('purchasedProducts', newPurchasedIds);
     setOrders(prevOrders => [{
       id: `DC-${Date.now()}`,
-      customerName: currentUser.name || currentUser.email.split('@')[0] || 'Valued Customer',
-      customerEmail: currentUser.email,
+      customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
+      customerEmail: currentUser.email || 'customer@example.com',
       date: new Date().toISOString().split('T')[0],
       total: `🪙 ${totalCoinPrice}`,
       status: 'Completed',
