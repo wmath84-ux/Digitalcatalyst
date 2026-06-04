@@ -8,6 +8,7 @@ import RatingsAndReviews from './RatingsAndReviews';
 import FeaturedProducts from './FeaturedProducts';
 import ShareModal from './ShareModal';
 import AiMentor from './AiMentor';
+import ProductMusicPlayer from './ProductMusicPlayer';
 
 // ... (ImageZoomModal and PriceChart components remain unchanged, keeping them here for brevity) ...
 // A new, self-contained component for the image zoom modal with pan, zoom, and swipe-to-dismiss
@@ -577,6 +578,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <div className="rounded-3xl border border-white/70 bg-white/70 p-4 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl"><p className="text-2xl">🪙</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Wallet</p><p className="text-sm font-black text-slate-900">{productCoinPrice > 0 ? `${productCoinPrice} Coins` : 'Razorpay'}</p></div>
                 <div className="rounded-3xl border border-white/70 bg-white/70 p-4 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl"><p className="text-2xl">⭐</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Rating</p><p className="text-sm font-black text-slate-900">{product.rating.toFixed(1)} / 5</p></div>
               </div>
+
+              <ProductMusicPlayer product={product} variant="full" className="mt-6" />
 
               {(product.images || []).length > 1 && (
                 <div className="mt-4 flex flex-wrap gap-3">
