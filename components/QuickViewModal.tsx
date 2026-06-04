@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { ProductWithRating, WebsiteSettings } from '../App';
+import ProductMusicPlayer from './ProductMusicPlayer';
 
 interface QuickViewModalProps {
   settings: WebsiteSettings;
@@ -66,6 +67,7 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onCl
           )}
           
           <p className="mt-4 text-text-muted text-sm">{product.description}</p>
+          <ProductMusicPlayer product={product} variant="compact" className="mt-5" />
           
           <div className="mt-auto pt-6">
             <div className="flex gap-4 items-center">
