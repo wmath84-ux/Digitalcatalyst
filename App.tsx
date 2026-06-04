@@ -1338,57 +1338,6 @@ const App: React.FC = () => {
     return true;
   };
 
-  const deductEduCoinsFromLiveDb = async (amount: number, metadata?: Partial<Omit<CoinTransaction, 'amount' | 'type' | 'createdAt'>>) => {
-    if (!currentUser || amount <= 0) return { success: false, balance: currentUser?.eduCoins || 0 };
-    const userRef = doc(db, 'users', String(currentUser.id));
-    let updatedUser: User | null = null;
-
-    try {
-      const result = await runTransaction(db, async transaction => {
-        const snapshot = await transaction.get(userRef);
-        const dbUser = snapshot.exists() ? snapshot.data() as Partial<User> : {};
-        const liveBalance = Number(dbUser.eduCoins ?? currentUser.eduCoins ?? 0);
-        if (liveBalance < amount) {
-          return { success: false, balance: liveBalance };
-        }
-
-        const nextBalance = liveBalance - amount;
-        const mergedUser: User = {
-          ...currentUser,
-          ...dbUser,
-          id: currentUser.id,
-          eduCoins: nextBalance,
-        };
-        transaction.set(userRef, { ...mergedUser, eduCoins: nextBalance }, { merge: true });
-        updatedUser = mergedUser;
-        return { success: true, balance: nextBalance };
-      });
-
-      if (!result.success || !updatedUser) return result;
-
-      const entry = recordCoinTransaction(updatedUser, {
-        amount: -amount,
-        type: 'debit',
-        source: metadata?.source || 'EduCoin redemption',
-        description: metadata?.description || `${amount} EduCoins redeemed`,
-        productId: metadata?.productId,
-        articleId: metadata?.articleId,
-      });
-      const userWithLedger = { ...updatedUser, coinTransactions: [entry, ...(updatedUser.coinTransactions || [])].slice(0, 25) };
-      setCurrentUser(userWithLedger);
-      localStorage.setItem('currentUser', JSON.stringify(userWithLedger));
-      const nextUsers = users.some(user => user.id === userWithLedger.id)
-        ? users.map(user => user.id === userWithLedger.id ? userWithLedger : user)
-        : [...users, userWithLedger];
-      setUsers(nextUsers);
-      safeSetItem('siteUsers', nextUsers);
-      return result;
-    } catch (error) {
-      console.warn('Live EduCoin database check failed; EduCoin checkout was not unlocked.', error);
-      return { success: false, balance: currentUser.eduCoins || 0 };
-    }
-  };
-
   const handleReadingReward = (article: NewsArticle) => {
     const rewardCoins = Math.max(0, Number(economySettings.coinPerArticleRead));
     if (!currentUser) return false;
