@@ -1313,9 +1313,13 @@ const App: React.FC = () => {
     const timestamp = new Date().toISOString();
     const entry: CoinTransaction = { ...transaction, title: transaction.title || transaction.source, id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, createdAt: timestamp, timestamp };
     const storageKey = `coinTransactions-${user.id}`;
-    const localLedger = JSON.parse(localStorage.getItem(storageKey) || '[]') as CoinTransaction[];
-    const nextLedger = [entry, ...localLedger].slice(0, 100);
-    localStorage.setItem(storageKey, JSON.stringify(nextLedger));
+    try {
+      const localLedger = JSON.parse(localStorage.getItem(storageKey) || '[]') as CoinTransaction[];
+      const nextLedger = [entry, ...(Array.isArray(localLedger) ? localLedger : [])].slice(0, 100);
+      safeSetItem(storageKey, nextLedger);
+    } catch (error) {
+      console.warn('Coin transaction local ledger write failed; wallet update will continue.', error);
+    }
     void addDoc(collection(db, 'users', String(user.id), 'coinTransactions'), { ...entry, createdAt: serverTimestamp() }).catch(error => {
       console.warn('Coin transaction database write failed; local ledger remains updated.', error);
     });
@@ -1328,8 +1332,10 @@ const App: React.FC = () => {
     const entry = transaction ? recordCoinTransaction(updatedUser, transaction) : null;
     const userWithLedger = entry ? { ...updatedUser, coinTransactions: [entry, ...(updatedUser.coinTransactions || [])].slice(0, 25) } : updatedUser;
     setCurrentUser(userWithLedger);
-    localStorage.setItem('currentUser', JSON.stringify(userWithLedger));
-    const nextUsers = users.map(user => user.id === userWithLedger.id ? userWithLedger : user);
+    safeSetItem('currentUser', userWithLedger);
+    const nextUsers = users.some(user => user.id === userWithLedger.id)
+      ? users.map(user => user.id === userWithLedger.id ? userWithLedger : user)
+      : [...users, userWithLedger];
     setUsers(nextUsers);
     safeSetItem('siteUsers', nextUsers);
     persistUserToFirestore(userWithLedger);

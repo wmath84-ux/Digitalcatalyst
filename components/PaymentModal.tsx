@@ -26,6 +26,7 @@ interface PaymentModalProps {
   onInsufficientCoins?: (details: { requiredCoins: number; balance: number; missingCoins: number }) => void;
   initialShowCoinGuide?: boolean;
   presentation?: 'modal' | 'page';
+  razorpayAlreadyOpened?: boolean;
 }
 
 type CheckoutStep = 'checkout' | 'razorpay' | 'loading';
@@ -52,12 +53,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   initialShowCoinGuide = false,
   initialCheckoutStep = 'checkout',
   presentation = 'modal',
+  razorpayAlreadyOpened = false,
 }) => {
   const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>(initialCheckoutStep);
   const [isCompleting, setIsCompleting] = useState(false);
   const [coinStatus, setCoinStatus] = useState<string | null>(null);
   const [showCoinGuide, setShowCoinGuide] = useState(initialShowCoinGuide);
   const pageRef = useRef<HTMLDivElement>(null);
+  const autoStartedRazorpayRef = useRef(false);
   const razorpayUrl = paymentLink || 'https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view';
   const isCartMode = !!cartItems && cartItems.length > 0;
   const eduCoinBalance = (currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0;
@@ -107,14 +110,21 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     void completeVerifiedCheckout();
   };
 
-  const handlePayNow = () => {
+  const handlePayNow = (openRazorpayWindow = true) => {
+    if (isCompleting || checkoutStep === 'loading') return;
     setShowCoinGuide(false);
-    if (razorpayUrl) {
+    if (openRazorpayWindow && razorpayUrl) {
       window.open(razorpayUrl, '_blank');
     }
     // Trigger the demo completion to prevent infinite loading
     completeDemoRazorpayUnlock();
   };
+
+  useEffect(() => {
+    if (initialCheckoutStep !== 'razorpay' || autoStartedRazorpayRef.current) return;
+    autoStartedRazorpayRef.current = true;
+    window.setTimeout(() => handlePayNow(!razorpayAlreadyOpened), 0);
+  }, [initialCheckoutStep, razorpayAlreadyOpened]);
 
   const handleFreeCheckout = async () => {
     await completeVerifiedCheckout(900);
@@ -137,11 +147,17 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
     setIsCompleting(true);
     setCoinStatus('Checking your EduCoin wallet balance...');
-    const unlocked = await onConfirmWithCoins();
+    let unlocked = false;
+    try {
+      unlocked = await onConfirmWithCoins();
+    } catch (error) {
+      console.error('EduCoin checkout failed before unlock:', error);
+      unlocked = false;
+    }
     if (!unlocked) {
       const latestBalance = (currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0;
       const shortfall = Math.max(0, coinPrice - latestBalance);
-      setCoinStatus('Your wallet balance is not enough for this EduCoin checkout. Follow the earning guide below.');
+      setCoinStatus('Your wallet balance could not complete this EduCoin checkout. Follow the earning guide below.');
       setIsCompleting(false);
       if (onInsufficientCoins) {
         onClose();
@@ -151,6 +167,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       }
       return;
     }
+    setCoinStatus('EduCoins deducted. Unlocking your product...');
     closeAfterStateSettles();
   };
 
@@ -262,7 +279,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         {coinStatus && <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm font-black text-amber-800">{coinStatus}</div>}
 
         <div className="space-y-3">
-          <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : handlePayNow} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-500 px-6 py-4 text-lg font-black text-white shadow-[0_16px_45px_rgba(79,70,229,0.24)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70">{finalPrice <= 0 ? 'Complete ₹0 Checkout' : 'Pay with Razorpay'}</button>
+          <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-500 px-6 py-4 text-lg font-black text-white shadow-[0_16px_45px_rgba(79,70,229,0.24)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70">{finalPrice <= 0 ? 'Complete ₹0 Checkout' : 'Pay with Razorpay'}</button>
           {onConfirmWithCoins && coinPrice > 0 && (
             <button disabled={isCompleting} onClick={handleCoinCheckout} className={`w-full rounded-2xl border px-6 py-4 text-lg font-black shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 ${canPayWithCoins ? 'border-amber-200/60 bg-white/80 text-amber-700' : 'border-amber-200 bg-amber-50/90 text-amber-800'}`}>
               {isCompleting ? 'Checking live DB balance...' : canPayWithCoins ? `Pay with ${coinPrice} EduCoins` : `Need ${missingCoins} more EduCoins`}
