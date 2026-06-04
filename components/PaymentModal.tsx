@@ -109,15 +109,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const handlePayNow = () => {
     setShowCoinGuide(false);
-    setCheckoutStep('razorpay');
-    if (razorpayUrl) window.open(razorpayUrl, '_blank', 'noopener,noreferrer');
-    window.setTimeout(() => {
-      void completeVerifiedCheckout();
-    }, 100);
-    if (presentation === 'page') {
-      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-      pageRef.current?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    if (razorpayUrl) {
+      window.open(razorpayUrl, '_blank');
     }
+    // Trigger the demo completion to prevent infinite loading
+    completeDemoRazorpayUnlock();
   };
 
   const handleFreeCheckout = async () => {

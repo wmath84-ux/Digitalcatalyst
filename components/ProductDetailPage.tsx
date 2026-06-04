@@ -493,8 +493,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   };
 
   const handleModalConfirm = () => {
+    // Call the main purchase function first
     onPurchase(appliedCoupon ? appliedCoupon.code : null, quantity);
-    onConsumeCoinDiscount?.();
+
+    if (onConsumeCoinDiscount) {
+      onConsumeCoinDiscount();
+    }
+
+    // Delay closing the modal so App.tsx can safely transition to 'congratulations'
+    setTimeout(() => {
+      setModalOpen(false);
+    }, 150);
   };
 
   if (modalOpen) {
