@@ -711,6 +711,7 @@ const App: React.FC = () => {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(initialAdminUsers);
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
   const [productToBuyAfterLogin, setProductToBuyAfterLogin] = useState<ProductWithRating | null>(null);
+  const [resumeCartCheckoutAfterLogin, setResumeCartCheckoutAfterLogin] = useState(false);
   const [autoOpenPaymentModalFor, setAutoOpenPaymentModalFor] = useState<number | null>(null);
   const [activeCoinDiscount, setActiveCoinDiscount] = useState<ActiveCoinDiscount | null>(null);
   const [eduCoinGuideRequest, setEduCoinGuideRequest] = useState<{ requiredCoins: number; balance: number; missingCoins: number; productTitle?: string } | null>(null);
@@ -1071,10 +1072,17 @@ const App: React.FC = () => {
   };
 
   const handleInitiateCheckout = () => {
-    if (!currentUser) { setCurrentView('auth'); return; }
     if (cart.length === 0) return;
-    setIsCartPaymentModalOpen(true);
+    if (!currentUser) {
+      setResumeCartCheckoutAfterLogin(true);
+      setIsCartOpen(false);
+      setIsCartPaymentModalOpen(false);
+      setCurrentView('auth');
+      window.scrollTo(0, 0);
+      return;
+    }
     setIsCartOpen(false);
+    setIsCartPaymentModalOpen(true);
   };
 
   const handleConfirmCartPurchase = (appliedCouponCode: string | null, appliedCoins = 0) => {
@@ -1206,7 +1214,13 @@ const App: React.FC = () => {
           setCurrentView('product');
           setAutoOpenPaymentModalFor(productToBuyAfterLogin.id);
           setProductToBuyAfterLogin(null);
+      } else if (resumeCartCheckoutAfterLogin && cart.length > 0) {
+          setCurrentView('home');
+          setIsCartOpen(false);
+          setIsCartPaymentModalOpen(true);
+          setResumeCartCheckoutAfterLogin(false);
       } else {
+          setResumeCartCheckoutAfterLogin(false);
           setCurrentView('home');
       }
   };
@@ -1265,6 +1279,11 @@ const App: React.FC = () => {
       setSelectedProduct(productToBuyAfterLogin);
       setCurrentView('product');
       setProductToBuyAfterLogin(null);
+    } else if (resumeCartCheckoutAfterLogin) {
+      setResumeCartCheckoutAfterLogin(false);
+      setIsCartOpen(cart.length > 0);
+      setCurrentView('home');
+      window.scrollTo(0, 0);
     } else {
       handleBackToHome();
     }
@@ -1276,6 +1295,9 @@ const App: React.FC = () => {
 
   const handleLoginRequired = (product: ProductWithRating) => {
     setProductToBuyAfterLogin(product);
+    setResumeCartCheckoutAfterLogin(false);
+    setIsCartOpen(false);
+    setIsCartPaymentModalOpen(false);
     setCurrentView('auth');
     window.scrollTo(0,0);
   };
@@ -1598,7 +1620,6 @@ const App: React.FC = () => {
     }
     const success = deductEduCoins(totalCoinPrice, { source: 'Product EduCoin purchase', description: `Unlocked ${product.title} with EduCoins`, productId: product.id });
     if (!success) {
-      setInfoModal({ title: 'Not enough EduCoins', message: `Your latest wallet balance is ${currentUser.eduCoins || 0} EduCoins. You need ${totalCoinPrice} EduCoins to unlock this product.`, icon: '🪙' });
       return false;
     }
     completeProductUnlock(product, quantity, `🪙 ${totalCoinPrice}`);
@@ -1610,7 +1631,6 @@ const App: React.FC = () => {
     const totalCoinPrice = cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0);
     const allCoinEnabled = cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0);
     if (!allCoinEnabled || !totalCoinPrice || !deductEduCoins(totalCoinPrice, { source: 'Cart EduCoin purchase', description: 'Unlocked cart with EduCoins' })) {
-      setInfoModal({ title: 'EduCoin checkout unavailable', message: `Your wallet balance is ${currentUser.eduCoins || 0} EduCoins. This cart needs ${totalCoinPrice || 'configured'} EduCoins to unlock.`, icon: '🪙' });
       return false;
     }
     const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
@@ -1646,6 +1666,7 @@ const App: React.FC = () => {
 
   const handleInsufficientEduCoins = (details: { requiredCoins: number; balance: number; missingCoins: number; productTitle?: string }) => {
     setEduCoinGuideRequest(details);
+    setIsCartOpen(false);
     setIsCartPaymentModalOpen(false);
     setCurrentView('eduCoinGuide');
     window.scrollTo(0, 0);

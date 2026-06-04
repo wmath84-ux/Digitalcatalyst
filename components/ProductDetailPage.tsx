@@ -461,8 +461,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     if (userCoinBalance >= productCoinPrice * quantity && productCoinPrice > 0) {
       const wasPurchased = await handleModalConfirmWithCoins();
       if (!wasPurchased) {
-        setOpenCoinGuideOnMount(true);
-        setModalOpen(true);
+        setIsCoinButtonChecking(false);
+        if (onInsufficientCoins) {
+          onInsufficientCoins({ requiredCoins: productCoinPrice * quantity, balance: userCoinBalance, missingCoins: Math.max(0, (productCoinPrice * quantity) - userCoinBalance), productTitle: product.title });
+        } else {
+          setOpenCoinGuideOnMount(true);
+          setModalOpen(true);
+        }
       }
       return;
     }
