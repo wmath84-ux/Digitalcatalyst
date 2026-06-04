@@ -23,6 +23,7 @@ interface PaymentModalProps {
   onConfirmWithCoins?: () => boolean | Promise<boolean>;
   initialCheckoutStep?: 'checkout' | 'razorpay';
   onStartEarning?: () => void;
+  onInsufficientCoins?: (details: { requiredCoins: number; balance: number; missingCoins: number }) => void;
   initialShowCoinGuide?: boolean;
   presentation?: 'modal' | 'page';
 }
@@ -47,6 +48,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   coinPrice = 0,
   onConfirmWithCoins,
   onStartEarning,
+  onInsufficientCoins,
   initialShowCoinGuide = false,
   initialCheckoutStep = 'checkout',
   presentation = 'modal',
@@ -90,34 +92,46 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     }
   }, [checkoutStep, presentation, showCoinGuide]);
 
-  const completeDemoRazorpayUnlock = async () => {
+  const closeAfterStateSettles = () => {
+    window.setTimeout(() => onClose(), 100);
+  };
+
+  const completeVerifiedCheckout = async (verificationDelay = 1600) => {
     setCheckoutStep('loading');
-    await new Promise(resolve => window.setTimeout(resolve, 1600));
+    await new Promise(resolve => window.setTimeout(resolve, verificationDelay));
     await onConfirm();
+    closeAfterStateSettles();
+  };
+
+  const completeDemoRazorpayUnlock = () => {
+    void completeVerifiedCheckout();
   };
 
   const handlePayNow = () => {
     setShowCoinGuide(false);
-    if (razorpayUrl) window.open(razorpayUrl, '_blank');
-    setCheckoutStep('razorpay');
-    if (presentation === 'page') {
-      window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
-      pageRef.current?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
+    if (razorpayUrl) {
+      window.open(razorpayUrl, '_blank');
     }
+    // Trigger the demo completion to prevent infinite loading
+    completeDemoRazorpayUnlock();
   };
 
   const handleFreeCheckout = async () => {
-    setCheckoutStep('loading');
-    await new Promise(resolve => window.setTimeout(resolve, 900));
-    await onConfirm();
+    await completeVerifiedCheckout(900);
   };
 
   const handleCoinCheckout = async () => {
     const user = currentUser as (User & { coinBalance?: number }) | null | undefined;
     const userCoinBalance = user?.coinBalance ?? user?.eduCoins ?? 0;
     if (userCoinBalance < coinPrice || !onConfirmWithCoins) {
-      setCoinStatus(`You have ${userCoinBalance} EduCoins and need ${coinPrice}. Earn ${Math.max(0, coinPrice - userCoinBalance)} more.`);
-      setShowCoinGuide(true);
+      const shortfall = Math.max(0, coinPrice - userCoinBalance);
+      setCoinStatus(`You have ${userCoinBalance} EduCoins and need ${coinPrice}. Earn ${shortfall} more.`);
+      if (onInsufficientCoins) {
+        onClose();
+        window.setTimeout(() => onInsufficientCoins({ requiredCoins: coinPrice, balance: userCoinBalance, missingCoins: shortfall }), 0);
+      } else {
+        setShowCoinGuide(true);
+      }
       return;
     }
 
@@ -125,11 +139,19 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     setCoinStatus('Checking your EduCoin wallet balance...');
     const unlocked = await onConfirmWithCoins();
     if (!unlocked) {
+      const latestBalance = (currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0;
+      const shortfall = Math.max(0, coinPrice - latestBalance);
       setCoinStatus('Your wallet balance is not enough for this EduCoin checkout. Follow the earning guide below.');
-      setShowCoinGuide(true);
       setIsCompleting(false);
+      if (onInsufficientCoins) {
+        onClose();
+        window.setTimeout(() => onInsufficientCoins({ requiredCoins: coinPrice, balance: latestBalance, missingCoins: shortfall }), 0);
+      } else {
+        setShowCoinGuide(true);
+      }
       return;
     }
+    closeAfterStateSettles();
   };
 
   const coinGuideContent = (

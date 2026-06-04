@@ -270,6 +270,7 @@ interface ProductDetailPageProps {
   onQuickView: (product: ProductWithRating) => void;
   onGoHome: () => void;
   onStartEarning?: () => void;
+  onInsufficientCoins?: (details: { requiredCoins: number; balance: number; missingCoins: number; productTitle?: string }) => void;
   isPurchased?: boolean;
   currentUser?: User | null;
   onCoinPurchase?: (product: ProductWithRating, quantity: number) => boolean | Promise<boolean>;
@@ -285,7 +286,7 @@ const ShareIcon = () => (
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ 
     settings, economySettings, activeCoinDiscount = null, onConsumeCoinDiscount, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews, 
     onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, onModalOpened, coupons,
-    scrollToSection, onSectionScrolled, allProducts, onViewProduct, onBuyNow, wishlist, onQuickView, onGoHome, onStartEarning,
+    scrollToSection, onSectionScrolled, allProducts, onViewProduct, onBuyNow, wishlist, onQuickView, onGoHome, onStartEarning, onInsufficientCoins,
     isPurchased = false, currentUser = null, onCoinPurchase
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
@@ -442,11 +443,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       return;
     }
     setOpenCoinGuideOnMount(false);
-    const shouldOpenRazorpay = finalTotalPrice > 0;
-    setOpenRazorpayOnMount(shouldOpenRazorpay);
-    if (shouldOpenRazorpay && product.paymentLink) {
-      window.open(product.paymentLink, '_blank', 'noopener,noreferrer');
-    }
+    setOpenRazorpayOnMount(false);
     window.scrollTo(0, 0);
     setModalOpen(true);
   };
@@ -461,12 +458,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     }
 
     window.scrollTo(0, 0);
-    if (userCoinBalance >= productCoinPrice && productCoinPrice > 0) {
+    if (userCoinBalance >= productCoinPrice * quantity && productCoinPrice > 0) {
       const wasPurchased = await handleModalConfirmWithCoins();
       if (!wasPurchased) {
         setOpenCoinGuideOnMount(true);
         setModalOpen(true);
       }
+      return;
+    }
+
+    if (onInsufficientCoins) {
+      onInsufficientCoins({ requiredCoins: productCoinPrice * quantity, balance: userCoinBalance, missingCoins: Math.max(0, (productCoinPrice * quantity) - userCoinBalance), productTitle: product.title });
       return;
     }
 
@@ -491,8 +493,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   };
 
   const handleModalConfirm = () => {
+    // Call the main purchase function first
     onPurchase(appliedCoupon ? appliedCoupon.code : null, quantity);
-    onConsumeCoinDiscount?.();
+
+    if (onConsumeCoinDiscount) {
+      onConsumeCoinDiscount();
+    }
+
+    // Delay closing the modal so App.tsx can safely transition to 'congratulations'
+    setTimeout(() => {
+      setModalOpen(false);
+    }, 150);
   };
 
   if (modalOpen) {
@@ -515,6 +526,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         coinPrice={resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity}
         onConfirmWithCoins={onCoinPurchase ? handleModalConfirmWithCoins : undefined}
         onStartEarning={onStartEarning}
+        onInsufficientCoins={(details) => onInsufficientCoins?.({ ...details, productTitle: product.title })}
         initialShowCoinGuide={openCoinGuideOnMount}
         initialCheckoutStep={openRazorpayOnMount ? 'razorpay' : 'checkout'}
         presentation="page"
