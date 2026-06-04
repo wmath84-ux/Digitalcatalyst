@@ -1646,9 +1646,9 @@ const App: React.FC = () => {
       setInfoModal({ title: 'EduCoin checkout unavailable', message: 'This product does not have an EduCoin price configured yet.', icon: '🪙' });
       return false;
     }
-    const debit = await deductEduCoinsFromLiveDb(totalCoinPrice, { source: 'Product EduCoin purchase', description: `Unlocked ${product.title} with EduCoins`, productId: product.id });
-    if (!debit.success) {
-      setInfoModal({ title: 'Not enough EduCoins', message: `Your latest wallet balance is ${debit.balance} EduCoins. You need ${totalCoinPrice} EduCoins to unlock this product.`, icon: '🪙' });
+    const success = deductEduCoins(totalCoinPrice, { source: 'Product EduCoin purchase', description: `Unlocked ${product.title} with EduCoins`, productId: product.id });
+    if (!success) {
+      setInfoModal({ title: 'Not enough EduCoins', message: `Your latest wallet balance is ${currentUser.eduCoins || 0} EduCoins. You need ${totalCoinPrice} EduCoins to unlock this product.`, icon: '🪙' });
       return false;
     }
     completeProductUnlock(product, quantity, `🪙 ${totalCoinPrice}`);
@@ -1656,10 +1656,13 @@ const App: React.FC = () => {
   };
 
   const handleConfirmCartCoinPurchase = () => {
-    if (!currentUser || cartDetails.length === 0) return;
+    if (!currentUser || cartDetails.length === 0) return false;
     const totalCoinPrice = cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0);
     const allCoinEnabled = cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0);
-    if (!allCoinEnabled || !totalCoinPrice || !deductEduCoins(totalCoinPrice, { source: 'Cart EduCoin purchase', description: 'Unlocked cart with EduCoins' })) return;
+    if (!allCoinEnabled || !totalCoinPrice || !deductEduCoins(totalCoinPrice, { source: 'Cart EduCoin purchase', description: 'Unlocked cart with EduCoins' })) {
+      setInfoModal({ title: 'EduCoin checkout unavailable', message: `Your wallet balance is ${currentUser.eduCoins || 0} EduCoins. This cart needs ${totalCoinPrice || 'configured'} EduCoins to unlock.`, icon: '🪙' });
+      return false;
+    }
     const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
     setPurchasedProductIds(newPurchasedIds);
     safeSetItem('purchasedProducts', newPurchasedIds);
@@ -1682,6 +1685,7 @@ const App: React.FC = () => {
     setIsCartPaymentModalOpen(false);
     setCurrentView('congratulations');
     window.scrollTo(0, 0);
+    return true;
   };
 
   const handleNavigateToPolicies = (sectionId?: string) => {

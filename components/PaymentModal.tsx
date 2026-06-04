@@ -21,6 +21,7 @@ interface PaymentModalProps {
   currentUser?: User | null;
   coinPrice?: number;
   onConfirmWithCoins?: () => boolean | Promise<boolean>;
+  initialCheckoutStep?: 'checkout' | 'razorpay';
   onStartEarning?: () => void;
   initialShowCoinGuide?: boolean;
   presentation?: 'modal' | 'page';
@@ -47,9 +48,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   onConfirmWithCoins,
   onStartEarning,
   initialShowCoinGuide = false,
+  initialCheckoutStep = 'checkout',
   presentation = 'modal',
 }) => {
-  const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>('checkout');
+  const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>(initialCheckoutStep);
   const [isCompleting, setIsCompleting] = useState(false);
   const [coinStatus, setCoinStatus] = useState<string | null>(null);
   const [showCoinGuide, setShowCoinGuide] = useState(initialShowCoinGuide);
@@ -96,6 +98,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const handlePayNow = () => {
     setShowCoinGuide(false);
+    if (razorpayUrl) window.open(razorpayUrl, '_blank');
     setCheckoutStep('razorpay');
     if (presentation === 'page') {
       window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
@@ -119,16 +122,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     }
 
     setIsCompleting(true);
-    setCoinStatus('Checking your live EduCoin balance securely...');
+    setCoinStatus('Checking your EduCoin wallet balance...');
     const unlocked = await onConfirmWithCoins();
     if (!unlocked) {
-      setCoinStatus('Your latest database balance is not enough for this EduCoin checkout. Follow the earning guide below.');
+      setCoinStatus('Your wallet balance is not enough for this EduCoin checkout. Follow the earning guide below.');
       setShowCoinGuide(true);
       setIsCompleting(false);
       return;
     }
-    setCoinStatus(null);
-    setIsCompleting(false);
   };
 
   const coinGuideContent = (
@@ -197,15 +198,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       <div className="relative overflow-hidden rounded-[2rem] border border-sky-200/60 bg-gradient-to-br from-[#0b72e7] via-[#146ef5] to-[#7c3aed] p-6 text-white shadow-[0_24px_80px_rgba(37,99,235,0.26)]">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.28),transparent_24%),radial-gradient(circle_at_90%_80%,rgba(255,255,255,0.16),transparent_24%)]" />
         <div className="relative">
-          <p className="text-xs font-black uppercase tracking-[0.32em] text-white/70">Razorpay demo page</p>
-          <h3 className="mt-3 text-3xl font-black">Payment page opened inside checkout</h3>
-          <p className="mt-3 text-sm font-semibold leading-6 text-white/80">Demo mode does not fetch API keys or verify a live payment. When you return from this nested page, Digital Catalyst shows verification loading and unlocks the product for testing.</p>
+          <p className="text-xs font-black uppercase tracking-[0.32em] text-white/70">Razorpay payment page</p>
+          <h3 className="mt-3 text-3xl font-black">Complete payment in the Razorpay tab</h3>
+          <p className="mt-3 text-sm font-semibold leading-6 text-white/80">The real Razorpay payment page has been opened in a new tab. After completing payment there, return here and confirm so Digital Catalyst can show verification loading and unlock the product.</p>
         </div>
       </div>
       {summaryCard}
       <div className="grid gap-3 sm:grid-cols-2">
         <a href={razorpayUrl} target="_blank" rel="noreferrer" className="rounded-2xl border border-sky-200 bg-white/85 px-6 py-4 text-center text-base font-black text-sky-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5">Open real Razorpay tab</a>
-        <button onClick={completeDemoRazorpayUnlock} className="rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-6 py-4 text-base font-black text-white shadow-[0_14px_40px_rgba(245,158,11,0.28)] transition hover:-translate-y-0.5">← Back from payment</button>
+        <button onClick={completeDemoRazorpayUnlock} className="rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-6 py-4 text-base font-black text-white shadow-[0_14px_40px_rgba(245,158,11,0.28)] transition hover:-translate-y-0.5">I've completed payment — unlock product</button>
       </div>
       <button onClick={() => setCheckoutStep('checkout')} className="w-full rounded-2xl border border-white/70 bg-white/75 px-6 py-3 text-sm font-black text-slate-600 backdrop-blur-xl">Return to checkout options</button>
     </div>

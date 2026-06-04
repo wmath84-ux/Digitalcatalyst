@@ -290,6 +290,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [modalOpen, setModalOpen] = useState(false);
   const [isCoinButtonChecking, setIsCoinButtonChecking] = useState(false);
   const [openCoinGuideOnMount, setOpenCoinGuideOnMount] = useState(false);
+  const [openRazorpayOnMount, setOpenRazorpayOnMount] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const [openAccordion, setOpenAccordion] = useState<number | null>(0);
@@ -440,6 +441,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       return;
     }
     setOpenCoinGuideOnMount(false);
+    const shouldOpenRazorpay = finalTotalPrice > 0;
+    setOpenRazorpayOnMount(shouldOpenRazorpay);
+    if (shouldOpenRazorpay && product.paymentLink) {
+      window.open(product.paymentLink, '_blank', 'noopener,noreferrer');
+    }
     window.scrollTo(0, 0);
     setModalOpen(true);
   };
@@ -470,21 +476,20 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const handleModalClose = () => {
     setModalOpen(false);
     setOpenCoinGuideOnMount(false);
+    setOpenRazorpayOnMount(false);
     window.setTimeout(() => window.scrollTo(0, 0), 0);
   };
 
   const handleModalConfirmWithCoins = async () => {
     setIsCoinButtonChecking(true);
     const wasPurchased = await (onCoinPurchase?.(product, quantity) || false);
-    setIsCoinButtonChecking(false);
-    if (wasPurchased) {
-      setModalOpen(false);
+    if (!wasPurchased) {
+      setIsCoinButtonChecking(false);
     }
     return wasPurchased;
   };
 
   const handleModalConfirm = () => {
-    setModalOpen(false);
     onPurchase(appliedCoupon ? appliedCoupon.code : null, quantity);
     onConsumeCoinDiscount?.();
   };
@@ -510,6 +515,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         onConfirmWithCoins={onCoinPurchase ? handleModalConfirmWithCoins : undefined}
         onStartEarning={onStartEarning}
         initialShowCoinGuide={openCoinGuideOnMount}
+        initialCheckoutStep={openRazorpayOnMount ? 'razorpay' : 'checkout'}
         presentation="page"
       />
     );
