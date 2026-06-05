@@ -15,6 +15,8 @@ interface ProductMusicPlayerProps {
   product: ProductWithRating;
   variant?: PlayerVariant;
   className?: string;
+  focusTrackId?: string;
+  onAudioError?: () => void;
 }
 
 const isPlayableAudioFile = (file: ProductFile): boolean => file.type === 'audio' && Boolean(file.url);
@@ -53,7 +55,7 @@ const formatTime = (seconds: number): string => {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, variant = 'compact', className = '' }) => {
+const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, variant = 'compact', className = '', focusTrackId, onAudioError }) => {
   const tracks = useMemo(() => getProductAudioTracks(product), [product]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -71,11 +73,12 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, varian
   const isFull = variant === 'full';
 
   useEffect(() => {
-    setActiveIndex(0);
+    const focusedIndex = focusTrackId ? tracks.findIndex(track => track.id === focusTrackId) : -1;
+    setActiveIndex(focusedIndex >= 0 ? focusedIndex : 0);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
-  }, [product.id, tracks.length]);
+  }, [product.id, tracks.length, focusTrackId]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -148,6 +151,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, varian
         onLoadedMetadata={event => setDuration(event.currentTarget.duration || 0)}
         onTimeUpdate={event => setCurrentTime(event.currentTarget.currentTime)}
         onEnded={() => (isLooping ? undefined : goToNext())}
+        onError={onAudioError}
       />
 
       <div className="relative z-10">

@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { ProductWithRating, WebsiteSettings, Coupon } from '../App';
-import ProductMusicPlayer, { getProductAudioTracks } from './ProductMusicPlayer';
 
 interface ProductCardProps {
   settings: WebsiteSettings;
@@ -17,7 +16,7 @@ interface ProductCardProps {
   coupons: Coupon[];
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDetails, isWishlisted, onToggleWishlist, onAddToCart, onBuyNow, onQuickView, animationDelay, displayMode = 'showcase', coupons }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDetails, isWishlisted, onToggleWishlist, onAddToCart, onQuickView, animationDelay, displayMode = 'showcase', coupons }) => {
     // Use 'animate-child' class to hook into the parent's stagger logic.
     // The 'animate-delay-X' class comes from index.html CSS
     const animationClass = settings.animations.enabled 
@@ -25,7 +24,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
         : '';
     
     const displayImage = product.images && product.images.length > 0 ? product.images[0] : `https://picsum.photos/seed/${product.imageSeed}/600/400`;
-    const hasAudioTracks = getProductAudioTracks(product).length > 0;
     
     // Coupon availability logic
     const associatedCoupon = product.couponCode ? coupons.find(c => c.code === product.couponCode) : null;
@@ -60,11 +58,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                 
                 {/* Overlay on Hover (Desktop) */}
                 {displayMode === 'showcase' && (
-                    <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-slate-50/80 via-indigo-50/30/40 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out flex items-end justify-center gap-2 pb-6">
-                         <button onClick={() => onBuyNow(product)} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-colors text-sm shadow-[0_8px_30px_rgb(0,0,0,0.08)] active:scale-95">
-                             Buy Now
-                         </button>
-                         <button onClick={() => onQuickView(product)} className="bg-white/20 backdrop-blur-md border border-white/500 text-slate-900 font-bold px-4 py-2 rounded-lg hover:bg-white/30 transition-colors text-sm shadow-[0_8px_30px_rgb(0,0,0,0.04)] active:scale-95">
+                    <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-slate-50/80 via-indigo-50/30/40 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out flex items-end justify-center pb-6">
+                         <button onClick={() => onQuickView(product)} className="w-full rounded-xl border border-white/60 bg-white/80 px-5 py-3 text-sm font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.08)] backdrop-blur-md transition-all hover:-translate-y-0.5 hover:bg-white active:scale-95">
                              Quick View
                          </button>
                     </div>
@@ -124,9 +119,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                 </h3>
                 <p className="text-sm text-slate-600 line-clamp-2 mb-4 flex-grow">{product.description}</p>
 
-                {hasAudioTracks && (
-                    <ProductMusicPlayer product={product} variant="compact" className="mb-4" />
-                )}
 
                 {displayMode === 'showcase' ? (
                      <div className="flex items-end justify-between mt-auto pt-4 border-t border-gray-50">
@@ -151,14 +143,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                                 </>
                             )}
                         </div>
-                        <div className="flex flex-col items-end gap-2">
-                            <button onClick={() => onBuyNow(product)} className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 active:scale-95">
-                                Buy Now
-                            </button>
-                            <button onClick={() => onViewDetails()} className="text-primary font-semibold text-sm hover:underline group-hover:translate-x-1 transition-transform flex items-center">
-                                Details <span className="ml-1">&rarr;</span>
-                            </button>
-                        </div>
+                        <button onClick={() => onViewDetails()} className="rounded-full border border-indigo-200 bg-white/85 px-4 py-2 text-xs font-black text-primary shadow-sm transition-all hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-50 active:scale-95">
+                            Details <span className="ml-1">&rarr;</span>
+                        </button>
                     </div>
                 ) : (
                     <div className="mt-4 flex gap-2">
