@@ -711,6 +711,7 @@ const App: React.FC = () => {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(initialAdminUsers);
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
   const [productToBuyAfterLogin, setProductToBuyAfterLogin] = useState<ProductWithRating | null>(null);
+  const [resumeCartCheckoutAfterLogin, setResumeCartCheckoutAfterLogin] = useState(false);
   const [autoOpenPaymentModalFor, setAutoOpenPaymentModalFor] = useState<number | null>(null);
   const [activeCoinDiscount, setActiveCoinDiscount] = useState<ActiveCoinDiscount | null>(null);
   const [eduCoinGuideRequest, setEduCoinGuideRequest] = useState<{ requiredCoins: number; balance: number; missingCoins: number; productTitle?: string } | null>(null);
@@ -1071,10 +1072,17 @@ const App: React.FC = () => {
   };
 
   const handleInitiateCheckout = () => {
-    if (!currentUser) { setCurrentView('auth'); return; }
     if (cart.length === 0) return;
-    setIsCartPaymentModalOpen(true);
+    if (!currentUser) {
+      setResumeCartCheckoutAfterLogin(true);
+      setIsCartOpen(false);
+      setIsCartPaymentModalOpen(false);
+      setCurrentView('auth');
+      window.scrollTo(0, 0);
+      return;
+    }
     setIsCartOpen(false);
+    setIsCartPaymentModalOpen(true);
   };
 
   const handleConfirmCartPurchase = (appliedCouponCode: string | null, appliedCoins = 0) => {
@@ -1206,7 +1214,13 @@ const App: React.FC = () => {
           setCurrentView('product');
           setAutoOpenPaymentModalFor(productToBuyAfterLogin.id);
           setProductToBuyAfterLogin(null);
+      } else if (resumeCartCheckoutAfterLogin && cart.length > 0) {
+          setCurrentView('home');
+          setIsCartOpen(false);
+          setIsCartPaymentModalOpen(true);
+          setResumeCartCheckoutAfterLogin(false);
       } else {
+          setResumeCartCheckoutAfterLogin(false);
           setCurrentView('home');
       }
   };
@@ -1265,6 +1279,11 @@ const App: React.FC = () => {
       setSelectedProduct(productToBuyAfterLogin);
       setCurrentView('product');
       setProductToBuyAfterLogin(null);
+    } else if (resumeCartCheckoutAfterLogin) {
+      setResumeCartCheckoutAfterLogin(false);
+      setIsCartOpen(cart.length > 0);
+      setCurrentView('home');
+      window.scrollTo(0, 0);
     } else {
       handleBackToHome();
     }
@@ -1276,27 +1295,42 @@ const App: React.FC = () => {
 
   const handleLoginRequired = (product: ProductWithRating) => {
     setProductToBuyAfterLogin(product);
+    setResumeCartCheckoutAfterLogin(false);
+    setIsCartOpen(false);
+    setIsCartPaymentModalOpen(false);
     setCurrentView('auth');
     window.scrollTo(0,0);
   };
 
 
   const persistUserToFirestore = (user: User) => {
-    void setDoc(doc(db, 'users', String(user.id)), user, { merge: true }).catch(error => {
-      console.warn('User database sync failed; local wallet remains updated.', error);
-    });
+    try {
+      void setDoc(doc(db, 'users', String(user.id)), user, { merge: true }).catch(error => {
+        console.warn('User database sync failed; local wallet remains updated.', error);
+      });
+    } catch (error) {
+      console.warn('User database sync failed before request; local wallet remains updated.', error);
+    }
   };
 
   const recordCoinTransaction = (user: User, transaction: Omit<CoinTransaction, 'id' | 'createdAt'>) => {
     const timestamp = new Date().toISOString();
     const entry: CoinTransaction = { ...transaction, title: transaction.title || transaction.source, id: `${Date.now()}-${Math.random().toString(36).slice(2)}`, createdAt: timestamp, timestamp };
     const storageKey = `coinTransactions-${user.id}`;
-    const localLedger = JSON.parse(localStorage.getItem(storageKey) || '[]') as CoinTransaction[];
-    const nextLedger = [entry, ...localLedger].slice(0, 100);
-    localStorage.setItem(storageKey, JSON.stringify(nextLedger));
-    void addDoc(collection(db, 'users', String(user.id), 'coinTransactions'), { ...entry, createdAt: serverTimestamp() }).catch(error => {
-      console.warn('Coin transaction database write failed; local ledger remains updated.', error);
-    });
+    try {
+      const localLedger = JSON.parse(localStorage.getItem(storageKey) || '[]') as CoinTransaction[];
+      const nextLedger = [entry, ...(Array.isArray(localLedger) ? localLedger : [])].slice(0, 100);
+      safeSetItem(storageKey, nextLedger);
+    } catch (error) {
+      console.warn('Coin transaction local ledger write failed; wallet update will continue.', error);
+    }
+    try {
+      void addDoc(collection(db, 'users', String(user.id), 'coinTransactions'), { ...entry, createdAt: serverTimestamp() }).catch(error => {
+        console.warn('Coin transaction database write failed; local ledger remains updated.', error);
+      });
+    } catch (error) {
+      console.warn('Coin transaction database write failed before request; local ledger remains updated.', error);
+    }
     return entry;
   };
 
@@ -1306,8 +1340,10 @@ const App: React.FC = () => {
     const entry = transaction ? recordCoinTransaction(updatedUser, transaction) : null;
     const userWithLedger = entry ? { ...updatedUser, coinTransactions: [entry, ...(updatedUser.coinTransactions || [])].slice(0, 25) } : updatedUser;
     setCurrentUser(userWithLedger);
-    localStorage.setItem('currentUser', JSON.stringify(userWithLedger));
-    const nextUsers = users.map(user => user.id === userWithLedger.id ? userWithLedger : user);
+    safeSetItem('currentUser', userWithLedger);
+    const nextUsers = users.some(user => user.id === userWithLedger.id)
+      ? users.map(user => user.id === userWithLedger.id ? userWithLedger : user)
+      : [...users, userWithLedger];
     setUsers(nextUsers);
     safeSetItem('siteUsers', nextUsers);
     persistUserToFirestore(userWithLedger);
@@ -1523,10 +1559,14 @@ const App: React.FC = () => {
         }
 
         const newPurchasedIds = [...new Set([...purchasedProductIds, selectedProduct.id])];
-        const purchaseCoins = Math.max(0, Number(economySettings.coinPerPurchase));
-        creditEduCoins(purchaseCoins, `✦ +${purchaseCoins} EduCoins Purchase Reward`, { source: 'Purchase reward', description: `Purchased ${selectedProduct.title}`, productId: selectedProduct.id });
         setPurchasedProductIds(newPurchasedIds);
         safeSetItem('purchasedProducts', newPurchasedIds);
+        const purchaseCoins = Math.max(0, Number(economySettings.coinPerPurchase));
+        try {
+          creditEduCoins(purchaseCoins, `✦ +${purchaseCoins} EduCoins Purchase Reward`, { source: 'Purchase reward', description: `Purchased ${selectedProduct.title}`, productId: selectedProduct.id });
+        } catch (error) {
+          console.warn('Purchase reward credit failed; product unlock remains completed.', error);
+        }
 
         const newOrder: Order = {
             id: `DC-${Date.now()}`,
@@ -1559,19 +1599,23 @@ const App: React.FC = () => {
     setPurchasedProductIds(newPurchasedIds);
     safeSetItem('purchasedProducts', newPurchasedIds);
     if (currentUser) {
-      void setDoc(doc(db, 'users', String(currentUser.id)), { purchasedProductIds: newPurchasedIds }, { merge: true }).catch(error => {
-        console.warn('Purchased product database sync failed; local unlock remains available.', error);
-      });
-      void setDoc(doc(db, 'users', String(currentUser.id), 'purchases', String(product.id)), {
-        productId: product.id,
-        title: product.title,
-        quantity,
-        total: totalLabel,
-        status,
-        unlockedAt: serverTimestamp(),
-      }, { merge: true }).catch(error => {
-        console.warn('Purchase database record failed; local unlock remains available.', error);
-      });
+      try {
+        void setDoc(doc(db, 'users', String(currentUser.id)), { purchasedProductIds: newPurchasedIds }, { merge: true }).catch(error => {
+          console.warn('Purchased product database sync failed; local unlock remains available.', error);
+        });
+        void setDoc(doc(db, 'users', String(currentUser.id), 'purchases', String(product.id)), {
+          productId: product.id,
+          title: product.title,
+          quantity,
+          total: totalLabel,
+          status,
+          unlockedAt: serverTimestamp(),
+        }, { merge: true }).catch(error => {
+          console.warn('Purchase database record failed; local unlock remains available.', error);
+        });
+      } catch (error) {
+        console.warn('Purchase database sync failed before request; local unlock remains available.', error);
+      }
     }
     setOrders(prevOrders => [{
       id: `DC-${Date.now()}`,
@@ -1596,10 +1640,16 @@ const App: React.FC = () => {
       setInfoModal({ title: 'EduCoin checkout unavailable', message: 'This product does not have an EduCoin price configured yet.', icon: '🪙' });
       return false;
     }
-    const success = deductEduCoins(totalCoinPrice, { source: 'Product EduCoin purchase', description: `Unlocked ${product.title} with EduCoins`, productId: product.id });
-    if (!success) {
-      setInfoModal({ title: 'Not enough EduCoins', message: `Your latest wallet balance is ${currentUser.eduCoins || 0} EduCoins. You need ${totalCoinPrice} EduCoins to unlock this product.`, icon: '🪙' });
+    const liveCoinBalance = currentUser.eduCoins || 0;
+    if (liveCoinBalance < totalCoinPrice) {
       return false;
+    }
+    try {
+      const success = deductEduCoins(totalCoinPrice, { source: 'Product EduCoin purchase', description: `Unlocked ${product.title} with EduCoins`, productId: product.id });
+      if (!success) return false;
+    } catch (error) {
+      console.warn('EduCoin deduction ledger failed; using local wallet fallback for product unlock.', error);
+      syncCurrentUser(user => ({ ...user, eduCoins: Math.max(0, (user.eduCoins || 0) - totalCoinPrice) }));
     }
     completeProductUnlock(product, quantity, `🪙 ${totalCoinPrice}`);
     return true;
@@ -1609,17 +1659,24 @@ const App: React.FC = () => {
     if (!currentUser || cartDetails.length === 0) return false;
     const totalCoinPrice = cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0);
     const allCoinEnabled = cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0);
-    if (!allCoinEnabled || !totalCoinPrice || !deductEduCoins(totalCoinPrice, { source: 'Cart EduCoin purchase', description: 'Unlocked cart with EduCoins' })) {
-      setInfoModal({ title: 'EduCoin checkout unavailable', message: `Your wallet balance is ${currentUser.eduCoins || 0} EduCoins. This cart needs ${totalCoinPrice || 'configured'} EduCoins to unlock.`, icon: '🪙' });
+    const liveCoinBalance = currentUser.eduCoins || 0;
+    if (!allCoinEnabled || !totalCoinPrice || liveCoinBalance < totalCoinPrice) {
       return false;
+    }
+    try {
+      const deducted = deductEduCoins(totalCoinPrice, { source: 'Cart EduCoin purchase', description: 'Unlocked cart with EduCoins' });
+      if (!deducted) return false;
+    } catch (error) {
+      console.warn('EduCoin deduction ledger failed; using local wallet fallback for cart unlock.', error);
+      syncCurrentUser(user => ({ ...user, eduCoins: Math.max(0, (user.eduCoins || 0) - totalCoinPrice) }));
     }
     const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
     setPurchasedProductIds(newPurchasedIds);
     safeSetItem('purchasedProducts', newPurchasedIds);
     setOrders(prevOrders => [{
       id: `DC-${Date.now()}`,
-      customerName: currentUser.name || currentUser.email.split('@')[0] || 'Valued Customer',
-      customerEmail: currentUser.email,
+      customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
+      customerEmail: currentUser.email || 'customer@example.com',
       date: new Date().toISOString().split('T')[0],
       total: `🪙 ${totalCoinPrice}`,
       status: 'Completed',
@@ -1646,6 +1703,7 @@ const App: React.FC = () => {
 
   const handleInsufficientEduCoins = (details: { requiredCoins: number; balance: number; missingCoins: number; productTitle?: string }) => {
     setEduCoinGuideRequest(details);
+    setIsCartOpen(false);
     setIsCartPaymentModalOpen(false);
     setCurrentView('eduCoinGuide');
     window.scrollTo(0, 0);

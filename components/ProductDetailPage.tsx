@@ -443,7 +443,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       return;
     }
     setOpenCoinGuideOnMount(false);
-    setOpenRazorpayOnMount(false);
+    setOpenRazorpayOnMount(true);
+    window.open(product.paymentLink || 'https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view', '_blank');
     window.scrollTo(0, 0);
     setModalOpen(true);
   };
@@ -461,8 +462,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     if (userCoinBalance >= productCoinPrice * quantity && productCoinPrice > 0) {
       const wasPurchased = await handleModalConfirmWithCoins();
       if (!wasPurchased) {
-        setOpenCoinGuideOnMount(true);
-        setModalOpen(true);
+        setIsCoinButtonChecking(false);
+        if (onInsufficientCoins) {
+          onInsufficientCoins({ requiredCoins: productCoinPrice * quantity, balance: userCoinBalance, missingCoins: Math.max(0, (productCoinPrice * quantity) - userCoinBalance), productTitle: product.title });
+        } else {
+          setOpenCoinGuideOnMount(true);
+          setModalOpen(true);
+        }
       }
       return;
     }
@@ -485,11 +491,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const handleModalConfirmWithCoins = async () => {
     setIsCoinButtonChecking(true);
-    const wasPurchased = await (onCoinPurchase?.(product, quantity) || false);
-    if (!wasPurchased) {
+    try {
+      const wasPurchased = await (onCoinPurchase?.(product, quantity) || false);
+      if (!wasPurchased) {
+        setIsCoinButtonChecking(false);
+      }
+      return wasPurchased;
+    } catch (error) {
+      console.error('EduCoin product checkout failed:', error);
       setIsCoinButtonChecking(false);
+      return false;
     }
-    return wasPurchased;
   };
 
   const handleModalConfirm = () => {
@@ -530,6 +542,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         initialShowCoinGuide={openCoinGuideOnMount}
         initialCheckoutStep={openRazorpayOnMount ? 'razorpay' : 'checkout'}
         presentation="page"
+        razorpayAlreadyOpened={openRazorpayOnMount}
       />
     );
   }
