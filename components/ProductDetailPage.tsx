@@ -259,6 +259,7 @@ interface ProductDetailPageProps {
   isLoggedIn: boolean;
   onLoginRequired: () => void;
   autoOpenPaymentModal: boolean;
+  autoStartRazorpay?: boolean;
   onModalOpened: () => void;
   coupons: Coupon[];
   scrollToSection: string | null;
@@ -285,7 +286,7 @@ const ShareIcon = () => (
 
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ 
     settings, economySettings, activeCoinDiscount = null, onConsumeCoinDiscount, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews, 
-    onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, onModalOpened, coupons,
+    onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, autoStartRazorpay = false, onModalOpened, coupons,
     scrollToSection, onSectionScrolled, allProducts, onViewProduct, onBuyNow, wishlist, onQuickView, onGoHome, onStartEarning, onInsufficientCoins,
     isPurchased = false, currentUser = null, onCoinPurchase
 }) => {
@@ -426,10 +427,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   useEffect(() => {
     if (autoOpenPaymentModal) {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+      setOpenCoinGuideOnMount(false);
+      setOpenRazorpayOnMount(autoStartRazorpay);
       setModalOpen(true);
       onModalOpened();
     }
-  }, [autoOpenPaymentModal, onModalOpened]);
+  }, [autoOpenPaymentModal, autoStartRazorpay, onModalOpened]);
 
   useEffect(() => {
     if (modalOpen) {

@@ -26,6 +26,18 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
     
     const displayImage = product.images && product.images.length > 0 ? product.images[0] : `https://picsum.photos/seed/${product.imageSeed}/600/400`;
     const hasAudioTracks = getProductAudioTracks(product).length > 0;
+
+    const handleBuyNowClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onBuyNow(product);
+    };
+
+    const handleQuickViewClick = (event: React.MouseEvent<HTMLButtonElement>) => {
+        event.preventDefault();
+        event.stopPropagation();
+        onQuickView(product);
+    };
     
     // Coupon availability logic
     const associatedCoupon = product.couponCode ? coupons.find(c => c.code === product.couponCode) : null;
@@ -61,10 +73,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                 {/* Overlay on Hover (Desktop) */}
                 {displayMode === 'showcase' && (
                     <div className="absolute inset-x-0 bottom-0 p-4 bg-gradient-to-t from-slate-50/80 via-indigo-50/30/40 to-transparent translate-y-full group-hover:translate-y-0 transition-transform duration-300 ease-in-out flex items-end justify-center gap-2 pb-6">
-                         <button onClick={() => onBuyNow(product)} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-colors text-sm shadow-[0_8px_30px_rgb(0,0,0,0.08)] active:scale-95">
+                         <button onClick={handleBuyNowClick} className="bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold px-4 py-2 rounded-lg hover:opacity-90 transition-colors text-sm shadow-[0_8px_30px_rgb(0,0,0,0.08)] active:scale-95">
                              Buy Now
                          </button>
-                         <button onClick={() => onQuickView(product)} className="bg-white/20 backdrop-blur-md border border-white/500 text-slate-900 font-bold px-4 py-2 rounded-lg hover:bg-white/30 transition-colors text-sm shadow-[0_8px_30px_rgb(0,0,0,0.04)] active:scale-95">
+                         <button onClick={handleQuickViewClick} className="bg-white/20 backdrop-blur-md border border-white/500 text-slate-900 font-bold px-4 py-2 rounded-lg hover:bg-white/30 transition-colors text-sm shadow-[0_8px_30px_rgb(0,0,0,0.04)] active:scale-95">
                              Quick View
                          </button>
                     </div>
@@ -152,7 +164,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                             )}
                         </div>
                         <div className="flex flex-col items-end gap-2">
-                            <button onClick={() => onBuyNow(product)} className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 active:scale-95">
+                            <button onClick={handleBuyNowClick} className="rounded-full bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:-translate-y-0.5 active:scale-95">
                                 Buy Now
                             </button>
                             <button onClick={() => onViewDetails()} className="text-primary font-semibold text-sm hover:underline group-hover:translate-x-1 transition-transform flex items-center">
