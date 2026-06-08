@@ -346,8 +346,11 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const [isMentorOpen, setIsMentorOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const youtubeIframeRef = useRef<HTMLIFrameElement>(null);
   const mediaProgressRef = useRef<Record<string, number>>({});
   const mediaWasPlayingRef = useRef<Record<string, boolean>>({});
+  const scrollPositionsRef = useRef<Record<string, number>>({});
+  const youtubePlayerStateRef = useRef<number | null>(null);
   const [activeWatchSeconds, setActiveWatchSeconds] = useState(0);
   const [sessionEarnedCoins, setSessionEarnedCoins] = useState(0);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
@@ -390,13 +393,62 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     };
   }, []);
 
+
+  useEffect(() => {
+    if (activeFile?.type !== 'youtube') return;
+    const fileKey = String(activeFile.id);
+
+    const handleYouTubeMessage = (event: MessageEvent) => {
+      if (typeof event.data !== 'string') return;
+      let payload: { event?: string; info?: { currentTime?: number; playerState?: number } };
+      try {
+        payload = JSON.parse(event.data);
+      } catch {
+        return;
+      }
+      if (payload.event !== 'infoDelivery' || !payload.info) return;
+      if (Number.isFinite(payload.info.currentTime)) {
+        mediaProgressRef.current[fileKey] = Math.max(0, Number(payload.info.currentTime));
+      }
+      if (Number.isFinite(payload.info.playerState)) {
+        youtubePlayerStateRef.current = Number(payload.info.playerState);
+        mediaWasPlayingRef.current[fileKey] = payload.info.playerState === 1;
+      }
+    };
+
+    window.addEventListener('message', handleYouTubeMessage);
+    const timer = window.setInterval(() => {
+      postYouTubeCommand('getCurrentTime');
+      postYouTubeCommand('getPlayerState');
+    }, 1000);
+
+    return () => {
+      window.removeEventListener('message', handleYouTubeMessage);
+      window.clearInterval(timer);
+    };
+  }, [activeFile]);
+
   const backgroundImage = useMemo(() => getCourseBackground(product, activeFile), [product, activeFile]);
   const accentGlow = settings.theme?.accentColor || '#a5f3fc';
 
   const getActiveMediaElement = () => videoRef.current || audioRef.current;
 
+  const postYouTubeCommand = (func: string, args: unknown[] = []) => {
+    youtubeIframeRef.current?.contentWindow?.postMessage(JSON.stringify({ event: 'command', func, args }), '*');
+  };
+
   const saveCurrentMediaState = () => {
-    if (!activeFile || (activeFile.type !== 'video' && activeFile.type !== 'audio')) return;
+    if (!activeFile) return;
+    if (activeFile.type === 'youtube') {
+      const fileKey = String(activeFile.id);
+      postYouTubeCommand('getCurrentTime');
+      if (youtubePlayerStateRef.current !== null) {
+        mediaWasPlayingRef.current[fileKey] = youtubePlayerStateRef.current === 1;
+      }
+      setIsVideoPlaying(false);
+      return;
+    }
+    if (activeFile.type !== 'video' && activeFile.type !== 'audio') return;
     const media = getActiveMediaElement();
     if (!media) return;
     if (Number.isFinite(media.currentTime)) mediaProgressRef.current[String(activeFile.id)] = media.currentTime;
@@ -463,13 +515,26 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     switch (activeFile.type) {
       case 'youtube': {
         const videoId = extractYouTubeID(activeFile.url);
-        return videoId ? <iframe key={activeFile.id} className="h-full w-full bg-white/70" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaHasError(true)} /> : <VideoUnavailablePlaceholder />;
+        if (!videoId) return <VideoUnavailablePlaceholder />;
+        const fileKey = String(activeFile.id);
+        const savedTime = Math.max(0, Math.floor(mediaProgressRef.current[fileKey] || 0));
+        const shouldAutoplay = mediaWasPlayingRef.current[fileKey] !== false;
+        const params = new URLSearchParams({
+          autoplay: shouldAutoplay ? '1' : '0',
+          rel: '0',
+          modestbranding: '1',
+          enablejsapi: '1',
+          playsinline: '1',
+        });
+        if (savedTime > 1) params.set('start', String(savedTime));
+        if (typeof window !== 'undefined') params.set('origin', window.location.origin);
+        return <iframe ref={youtubeIframeRef} key={activeFile.id} className="block h-full w-full bg-white/70" src={`https://www.youtube.com/embed/${videoId}?${params.toString()}`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaHasError(true)} />;
       }
       case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onLoadedMetadata={(event) => restoreMediaState(activeFile, event.currentTarget)} onTimeUpdate={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; }} onPlay={() => setIsVideoPlaying(true)} onPause={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; setIsVideoPlaying(false); }} onEnded={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; mediaWasPlayingRef.current[String(activeFile.id)] = false; setIsVideoPlaying(false); }} onError={() => { setIsVideoPlaying(false); setMediaHasError(true); }} />;
       case 'audio': return <div className="flex h-full w-full flex-col items-center justify-center bg-white/70 p-8 text-slate-900"><svg xmlns="http://www.w3.org/2000/svg" className="mb-4 h-24 w-24 text-slate-900/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z" /></svg><h3 className="mb-6 max-w-full truncate text-xl font-semibold">{activeFile.name}</h3><audio ref={audioRef} key={activeFile.id} src={activeFile.url} controls className="w-full max-w-md" onLoadedMetadata={(event) => restoreMediaState(activeFile, event.currentTarget)} onTimeUpdate={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; }} onPause={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; }} onEnded={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; mediaWasPlayingRef.current[String(activeFile.id)] = false; }} onError={() => setMediaHasError(true)} /></div>;
       case 'pdf':
       case 'sheet': return (
-        <div className="flex h-full w-full flex-col overflow-y-auto bg-white/55 p-3 backdrop-blur-xl sm:p-5">
+        <div ref={(node) => { if (node) window.requestAnimationFrame(() => { node.scrollTop = scrollPositionsRef.current[String(activeFile.id)] || 0; }); }} onScroll={(event) => { scrollPositionsRef.current[String(activeFile.id)] = event.currentTarget.scrollTop; }} className="flex h-full min-h-0 w-full flex-col overflow-y-auto overscroll-contain bg-white/55 p-3 backdrop-blur-xl sm:p-5">
           <div className="my-4 shrink-0 rounded-3xl border border-white/60 bg-white/80 p-3 shadow-sm">
             <GoogleAd variant="display" label="Sponsored" />
           </div>
@@ -507,7 +572,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
 
       <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-slate-950/25 transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
-      <main className="relative z-10 flex h-full flex-col gap-3 p-3 lg:p-3">
+      <main className="relative z-10 flex h-full min-h-0 flex-col gap-3 overflow-hidden p-3 lg:p-3">
         <div className="hidden shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border border-white/50 bg-white/70 px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid">
           <span className="truncate">{activeFile?.name || product.title}</span>
           <div className="flex items-center justify-center gap-3">
@@ -517,7 +582,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           <span className="truncate text-right text-sm font-bold text-slate-900/60">Welcome to the Course</span>
         </div>
 
-        <section className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
+        <section className="grid min-h-0 flex-1 grid-cols-1 gap-3 overflow-hidden lg:grid-cols-[28rem_minmax(0,1fr)]">
           <aside className={`fixed inset-y-0 left-0 z-40 w-[86vw] max-w-80 transform border-r border-slate-200/70 bg-slate-50/95 shadow-[12px_0_40px_rgba(15,23,42,0.14)] transition lg:relative lg:inset-auto lg:w-auto lg:max-w-none lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-slate-200/50 lg:bg-slate-900/[0.04] lg:shadow-[4px_0_30px_rgba(0,0,0,0.02)] lg:backdrop-blur-3xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col">
               <div className="shrink-0 border-b border-white/50 px-4 py-5">
@@ -530,7 +595,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
             </div>
           </aside>
 
-          <div className="relative min-h-0 overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)]">
+          <div className="relative h-full min-h-0 overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)]">
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>
