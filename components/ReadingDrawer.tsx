@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Announcement, NewsArticle, User } from '../App';
 import { EconomySettings } from '../utils/economy';
+import GoogleAd from './GoogleAd';
 
 type ReadingListType = 'news' | 'blog';
 type ReadingView = ReadingListType | 'article' | 'announcement';
@@ -50,7 +51,7 @@ const InlineMarkdown: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-const MarkdownContent: React.FC<{ content: string }> = ({ content }) => {
+const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean }> = ({ content, includeInArticleAd = false }) => {
   if (/<\/?[a-z][\s\S]*>/i.test(content)) {
     return <div className="reading-rich-html" dangerouslySetInnerHTML={{ __html: content }} />;
   }
@@ -75,7 +76,13 @@ const MarkdownContent: React.FC<{ content: string }> = ({ content }) => {
     if (!paragraph.length) return;
     const text = paragraph.join(' ').trim();
     paragraph = [];
-    if (text) nodes.push(<p key={`p-${nodes.length}`} className="my-5 text-lg leading-9 text-slate-600"><InlineMarkdown text={text} /></p>);
+    if (text) {
+      nodes.push(<p key={`p-${nodes.length}`} className="my-5 text-lg leading-9 text-slate-600"><InlineMarkdown text={text} /></p>);
+      const paragraphCount = nodes.filter(node => React.isValidElement(node) && node.type === 'p').length;
+      if (includeInArticleAd && paragraphCount === 2) {
+        nodes.push(<GoogleAd key={`in-article-ad-${nodes.length}`} variant="inArticle" label="Advertisement" className="my-10 rounded-[2rem] border border-white/60 bg-white/80 p-5 shadow-sm backdrop-blur-xl" />);
+      }
+    }
   };
 
   lines.forEach((rawLine) => {
@@ -159,6 +166,7 @@ const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: s
 const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
+  const progressRef = useRef(0);
   const rewardIssuedRef = useRef<number | string | null>(null);
   const lastReadingActivityRef = useRef(0);
   const [rewardSecondsLeft, setRewardSecondsLeft] = useState(Math.max(0, economySettings.articleReadTimeRequiredSec));
@@ -169,6 +177,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
     document.body.style.overflow = 'hidden';
     scrollRef.current?.scrollTo({ top: 0 });
     setProgress(0);
+    progressRef.current = 0;
     return () => { document.body.style.overflow = ''; };
   }, [isOpen, view, selectedArticle?.id, selectedAnnouncement?.id]);
 
@@ -179,29 +188,40 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
     else if (readIds.includes(selectedArticle.id)) setRewardStatus('already');
     else setRewardStatus('idle');
     setRewardSecondsLeft(Math.max(0, economySettings.articleReadTimeRequiredSec));
-    lastReadingActivityRef.current = 0;
+    lastReadingActivityRef.current = Date.now();
     rewardIssuedRef.current = null;
   }, [currentUser, economySettings.articleReadTimeRequiredSec, isOpen, selectedArticle, view]);
 
   useEffect(() => {
     if (!isOpen || view !== 'article' || !selectedArticle || !onReadingReward || rewardStatus !== 'idle') return;
+    const markReadingActivity = () => { lastReadingActivityRef.current = Date.now(); };
     const timer = window.setInterval(() => {
-      const active = document.visibilityState === 'visible' && document.hasFocus() && Date.now() - lastReadingActivityRef.current < 3500;
-      if (!active) return;
+      const isActiveTab = document.visibilityState === 'visible' && document.hasFocus();
+      const hasRecentActivity = Date.now() - lastReadingActivityRef.current < 5000;
+      if (!isActiveTab || !hasRecentActivity) return;
+
       setRewardSecondsLeft((seconds) => {
-        if (seconds <= 1) {
-          if (rewardIssuedRef.current !== selectedArticle.id) {
-            rewardIssuedRef.current = selectedArticle.id;
-            const claimed = onReadingReward(selectedArticle);
-            setRewardStatus(claimed ? 'claimed' : 'already');
-          }
-          return 0;
+        const nextSeconds = Math.max(0, seconds - 1);
+        const targetScrollReached = progressRef.current >= economySettings.articleReadScrollRequiredPercent;
+        if (nextSeconds === 0 && targetScrollReached && rewardIssuedRef.current !== selectedArticle.id) {
+          rewardIssuedRef.current = selectedArticle.id;
+          const claimed = onReadingReward(selectedArticle);
+          setRewardStatus(claimed ? 'claimed' : 'already');
         }
-        return seconds - 1;
+        return nextSeconds;
       });
     }, 1000);
-    return () => window.clearInterval(timer);
-  }, [isOpen, onReadingReward, rewardStatus, selectedArticle, view]);
+
+    window.addEventListener('focus', markReadingActivity);
+    window.addEventListener('mousemove', markReadingActivity);
+    window.addEventListener('keydown', markReadingActivity);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener('focus', markReadingActivity);
+      window.removeEventListener('mousemove', markReadingActivity);
+      window.removeEventListener('keydown', markReadingActivity);
+    };
+  }, [economySettings.articleReadScrollRequiredPercent, isOpen, onReadingReward, rewardStatus, selectedArticle, view]);
 
   const activeMeta = useMemo(() => {
     if (view === 'article' && selectedArticle) {
@@ -234,7 +254,24 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
     const el = scrollRef.current;
     if (!el) return;
     const max = el.scrollHeight - el.clientHeight;
-    setProgress(max > 0 ? Math.min(100, (el.scrollTop / max) * 100) : 0);
+    const nextProgress = max > 0 ? Math.min(100, (el.scrollTop / max) * 100) : 100;
+    progressRef.current = nextProgress;
+    setProgress(nextProgress);
+
+    if (
+      isOpen &&
+      view === 'article' &&
+      selectedArticle &&
+      onReadingReward &&
+      rewardStatus === 'idle' &&
+      rewardSecondsLeft === 0 &&
+      nextProgress >= economySettings.articleReadScrollRequiredPercent &&
+      rewardIssuedRef.current !== selectedArticle.id
+    ) {
+      rewardIssuedRef.current = selectedArticle.id;
+      const claimed = onReadingReward(selectedArticle);
+      setRewardStatus(claimed ? 'claimed' : 'already');
+    }
   };
 
   const handleShare = async () => {
@@ -315,17 +352,21 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
                   <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-900 sm:text-6xl">{selectedArticle.title}</h1>
                   <p className="mt-6 text-xl leading-8 text-slate-600">{selectedArticle.excerpt}</p>
                   {isExternalArticle(selectedArticle) ? (
-                    <div className="mt-10 overflow-hidden rounded-[2rem] border border-white/50 bg-white/70 p-2 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
-                      <iframe src={getArticleUrl(selectedArticle)} title={selectedArticle.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 [scrollbar-width:none]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
-                    </div>
+                    <>
+                      <div className="mt-10 overflow-hidden rounded-[2rem] border border-white/50 bg-white/70 p-2 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
+                        <iframe src={getArticleUrl(selectedArticle)} title={selectedArticle.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 [scrollbar-width:none]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
+                      </div>
+                      <GoogleAd variant="multiplex" label="Related Content" className="mt-12 rounded-[2rem] border border-white/60 bg-white/80 p-5 shadow-sm backdrop-blur-xl" />
+                    </>
                   ) : (
                     <>
                       <div className="mb-6 mt-10 aspect-video overflow-hidden rounded-2xl border border-slate-200 bg-white/70 shadow-sm backdrop-blur-2xl">
                         <img src={getArticleImage(selectedArticle, '1400/800')} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" />
                       </div>
                       <div className="mt-12 text-lg leading-9 text-slate-600">
-                        <MarkdownContent content={selectedArticle.content} />
+                        <MarkdownContent content={selectedArticle.content} includeInArticleAd />
                         <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} />
+                        <GoogleAd variant="multiplex" label="Related Content" className="mt-12 rounded-[2rem] border border-white/60 bg-white/80 p-5 shadow-sm backdrop-blur-xl" />
                       </div>
                     </>
                   )}
@@ -358,8 +399,8 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
               {rewardStatus === 'login' && <span className="text-amber-700">🔐 Login to earn reading coins</span>}
               {rewardStatus === 'idle' && (
                 <div>
-                  <p className="text-indigo-700">⏳ {String(rewardMinutes).padStart(2, '0')}:{rewardSeconds} to earn +{economySettings.coinPerArticleRead} Coins</p>
-                  <p className="mt-1 text-xs font-bold text-slate-600">Timer runs only while this tab is focused and you keep reading/scrolling.</p>
+                  <p className="text-indigo-700">⏳ {String(rewardMinutes).padStart(2, '0')}:{rewardSeconds} + {Math.floor(progress)}%/{economySettings.articleReadScrollRequiredPercent}% scroll to earn +{economySettings.coinPerArticleRead} Coins</p>
+                  <p className="mt-1 text-xs font-bold text-slate-600">Timer pauses when this tab is hidden/minimized and reward unlocks only after the scroll target is reached.</p>
                 </div>
               )}
             </div>

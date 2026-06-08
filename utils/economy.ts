@@ -11,6 +11,7 @@ export interface EconomySettings {
   coinPerVideoMinute: number;
   coinPerArticleRead: number;
   articleReadTimeRequiredSec: number;
+  articleReadScrollRequiredPercent: number;
   coinPerQuizCorrect: number;
   coinPerPurchase: number;
   coinToFiatRatio: number;
@@ -24,6 +25,7 @@ export const DEFAULT_ECONOMY_SETTINGS: EconomySettings = {
   coinPerVideoMinute: 1,
   coinPerArticleRead: 10,
   articleReadTimeRequiredSec: 120,
+  articleReadScrollRequiredPercent: 75,
   coinPerQuizCorrect: 2,
   coinPerPurchase: 25,
   coinToFiatRatio: 10,
@@ -41,6 +43,7 @@ export const normalizeEconomySettings = (value?: Partial<EconomySettings> | null
   coinPerVideoMinute: sanitizeNumber(value?.coinPerVideoMinute, DEFAULT_ECONOMY_SETTINGS.coinPerVideoMinute),
   coinPerArticleRead: sanitizeNumber(value?.coinPerArticleRead, DEFAULT_ECONOMY_SETTINGS.coinPerArticleRead),
   articleReadTimeRequiredSec: sanitizeNumber(value?.articleReadTimeRequiredSec, DEFAULT_ECONOMY_SETTINGS.articleReadTimeRequiredSec),
+  articleReadScrollRequiredPercent: Math.min(100, sanitizeNumber(value?.articleReadScrollRequiredPercent, DEFAULT_ECONOMY_SETTINGS.articleReadScrollRequiredPercent)),
   coinPerQuizCorrect: sanitizeNumber(value?.coinPerQuizCorrect, DEFAULT_ECONOMY_SETTINGS.coinPerQuizCorrect),
   coinPerPurchase: sanitizeNumber((value as EconomySettings | undefined)?.coinPerPurchase, DEFAULT_ECONOMY_SETTINGS.coinPerPurchase),
   coinToFiatRatio: Math.max(1, sanitizeNumber(value?.coinToFiatRatio, DEFAULT_ECONOMY_SETTINGS.coinToFiatRatio)),
