@@ -1,6 +1,6 @@
 import React from 'react';
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { ActiveCoinDiscount, CoinTransaction, Coupon, ProductWithRating, ThemeName, themes, User, WebsiteSettings } from '../App';
+import { ActiveCoinDiscount, CoinTransaction, Coupon, ProductWithRating, ProfileMilestoneConfig, ProfileStreakConfig, ProfileStreakMetric, ProfileMilestoneMetric, ThemeName, themes, User, WebsiteSettings } from '../App';
 import { EconomySettings, resolveCoinPrice, resolveMaxDiscountPercentage } from '../utils/economy';
 import { db } from '../firebase';
 
@@ -21,7 +21,7 @@ interface ProfilePageProps {
   users: User[];
   setUsers: (users: User[]) => void;
   setCurrentUser: (user: User | null) => void;
-  onClaimMilestoneReward: (reward: { id: string; title: string; requirement: number; unlockProductIds?: number[] }) => boolean;
+  onClaimMilestoneReward: (reward: { id: string; title: string; requirement: number; unlockProductIds?: number[]; coinReward?: number; currentValue?: number }) => boolean;
 }
 
 interface LearningProgress {
@@ -45,22 +45,51 @@ interface Badge {
   description: string;
 }
 
-interface MilestoneReward {
-  id: string;
-  title: string;
-  requirement: number;
-  icon: string;
-  description: string;
-  actionLabel: string;
-  unlockProductIds?: number[];
-  downloadContent?: string;
+interface MilestoneReward extends ProfileMilestoneConfig {
+  currentValue: number;
+  progress: number;
+  reached: boolean;
+}
+
+interface DailyActivityState {
+  lastActiveDate: string;
+  streakDays: number;
 }
 
 const defaultCoverImage =
   'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1800&q=80';
 
 const glassCard =
-  'border border-white/55 bg-white/78 backdrop-blur-2xl shadow-[0_18px_55px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-white/70 hover:shadow-[0_22px_65px_rgba(15,23,42,0.12)]';
+  'profile-glass-card border border-white/55 backdrop-blur-2xl shadow-[0_18px_55px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-white/70 hover:shadow-[0_22px_65px_rgba(15,23,42,0.12)]';
+
+
+const fallbackProfileStyle = { backgroundColor: '#e2e8f0', backgroundTint: '#e0e7ff', cardOpacity: 82, heroOverlayOpacity: 76, accentColor: '#f97316' };
+
+const fallbackStreakConfigs: ProfileStreakConfig[] = [
+  { id: 'daily-login', title: 'Daily Login Spark', icon: '🔥', metric: 'dailyLogin', goal: 1, unit: 'day', coinReward: 10, accent: 'from-orange-400 via-amber-400 to-yellow-300', note: 'Open your hub every day and claim today’s flame.', active: true },
+  { id: 'study-15', title: '15 Minute Focus', icon: '⏱️', metric: 'studyMinutes', goal: 15, unit: 'mins', coinReward: 15, accent: 'from-cyan-400 via-blue-500 to-indigo-500', note: 'Watch lessons or read learning content for 15 minutes.', active: true },
+  { id: 'study-45', title: 'Deep Work Sprint', icon: '⚡', metric: 'studyMinutes', goal: 45, unit: 'mins', coinReward: 25, accent: 'from-violet-400 via-purple-500 to-fuchsia-500', note: 'Build a longer study session and earn a bigger boost.', active: true },
+  { id: 'watch-60', title: 'Video Warrior', icon: '🎬', metric: 'watchMinutes', goal: 60, unit: 'mins', coinReward: 30, accent: 'from-blue-400 via-sky-500 to-cyan-400', note: 'Complete one hour of course video watch time.', active: true },
+  { id: 'pdf-3', title: 'PDF Reader', icon: '📄', metric: 'pdfsRead', goal: 3, unit: 'PDFs', coinReward: 20, accent: 'from-emerald-400 via-teal-400 to-cyan-400', note: 'Read premium notes and document resources.', active: true },
+  { id: 'article-3', title: 'Knowledge Hunter', icon: '🧠', metric: 'articlesRead', goal: 3, unit: 'reads', coinReward: 20, accent: 'from-lime-400 via-emerald-500 to-teal-500', note: 'Read news or blog lessons to keep learning daily.', active: true },
+  { id: 'quiz-1', title: 'Quiz Ignition', icon: '🎯', metric: 'quizWins', goal: 1, unit: 'win', coinReward: 25, accent: 'from-pink-400 via-rose-500 to-orange-400', note: 'Finish a quiz and claim your first quiz streak.', active: true },
+  { id: 'quiz-3', title: 'Quiz Momentum', icon: '🏹', metric: 'quizWins', goal: 3, unit: 'wins', coinReward: 40, accent: 'from-fuchsia-400 via-purple-500 to-indigo-500', note: 'Stack multiple quiz rewards to keep momentum alive.', active: true },
+  { id: 'course-1', title: 'Course Starter', icon: '📚', metric: 'coursesOwned', goal: 1, unit: 'course', coinReward: 25, accent: 'from-indigo-400 via-blue-500 to-cyan-400', note: 'Own your first course and start your premium path.', active: true },
+  { id: 'complete-1', title: 'Completion Charge', icon: '✅', metric: 'completedCourses', goal: 1, unit: 'done', coinReward: 50, accent: 'from-green-400 via-emerald-500 to-teal-400', note: 'Complete one tracked course.', active: true },
+  { id: 'wallet-500', title: 'Coin Collector', icon: '🪙', metric: 'lifetimeCoins', goal: 500, unit: 'coins', coinReward: 35, accent: 'from-amber-300 via-yellow-400 to-orange-400', note: 'Earn lifetime coins from real activity.', active: true },
+  { id: 'badge-3', title: 'Badge Builder', icon: '🏅', metric: 'badgesUnlocked', goal: 3, unit: 'badges', coinReward: 30, accent: 'from-slate-500 via-indigo-500 to-purple-500', note: 'Unlock badges by learning and completing.', active: true },
+];
+
+const fallbackMilestoneConfigs: ProfileMilestoneConfig[] = [
+  { id: 'first-login-flame', title: 'First Login Flame', icon: '🔥', metric: 'studyMinutes', requirement: 1, description: 'Start learning with your first active minute.', actionLabel: 'Claim Coins', coinReward: 25, active: true },
+  { id: 'article-reader', title: 'Article Reader', icon: '📰', metric: 'articlesRead', requirement: 3, description: 'Read three learning articles or blog lessons.', actionLabel: 'Claim Reading Bonus', coinReward: 40, active: true },
+  { id: 'video-hour', title: 'One Hour Video Charge', icon: '🎬', metric: 'watchMinutes', requirement: 60, description: 'Complete 60 minutes of course video watch time.', actionLabel: 'Claim Watch Bonus', coinReward: 60, active: true },
+  { id: 'quiz-master-real', title: 'Quiz Master', icon: '🎯', metric: 'quizWins', requirement: 3, description: 'Claim rewards from three unique quizzes.', actionLabel: 'Claim Quiz Bonus', coinReward: 75, active: true },
+  { id: 'pdf-scholar', title: 'PDF Scholar', icon: '📄', metric: 'pdfsRead', requirement: 5, description: 'Read or own five PDF/document resources.', actionLabel: 'Download Scholar Pack', coinReward: 50, downloadContent: 'Digital Catalyst PDF Scholar Pack\n\n- Reading checklist\n- Revision tracker\n- Daily active planner', active: true },
+  { id: 'course-finisher', title: 'Course Finisher', icon: '✅', metric: 'completedCourses', requirement: 1, description: 'Reach 100% completion on a course tracker.', actionLabel: 'Claim Completion Bonus', coinReward: 100, active: true },
+  { id: 'wallet-elite', title: 'Wallet Elite', icon: '💎', metric: 'lifetimeCoins', requirement: 1000, description: 'Earn 1000 lifetime EduCoins.', actionLabel: 'Claim Elite Badge', coinReward: 125, active: true },
+  { id: 'premium-unlocker', title: 'Premium Unlocker', icon: '🎓', metric: 'coursesOwned', requirement: 2, description: 'Own two premium learning products.', actionLabel: 'Unlock Bonus Access', coinReward: 80, unlockProductIds: [], active: true },
+];
 
 const getStorageKey = (userId?: number) => `studentAchievementHubCover-${userId ?? 'guest'}`;
 
@@ -102,6 +131,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const [redeeming, setRedeeming] = React.useState<string | null>(null);
   const [coinTransactions, setCoinTransactions] = React.useState<CoinTransaction[]>([]);
   const [locallyRedeemedRewardIds, setLocallyRedeemedRewardIds] = React.useState<string[]>([]);
+  const [dailyActivity, setDailyActivity] = React.useState<DailyActivityState>({ lastActiveDate: '', streakDays: 0 });
 
   React.useEffect(() => {
     const storedCover = localStorage.getItem(getStorageKey(currentUser?.id));
@@ -136,20 +166,39 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     return unsubscribe;
   }, [currentUser?.id, currentUser?.coinTransactions]);
 
+
+  React.useEffect(() => {
+    if (!currentUser?.id) {
+      setDailyActivity({ lastActiveDate: '', streakDays: 0 });
+      return;
+    }
+    const today = new Date().toISOString().slice(0, 10);
+    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+    const key = `profileDailyActivity-${currentUser.id}`;
+    const stored = JSON.parse(localStorage.getItem(key) || 'null') as DailyActivityState | null;
+    const next = !stored
+      ? { lastActiveDate: today, streakDays: 1 }
+      : stored.lastActiveDate === today
+        ? stored
+        : { lastActiveDate: today, streakDays: stored.lastActiveDate === yesterday ? stored.streakDays + 1 : 1 };
+    setDailyActivity(next);
+    localStorage.setItem(key, JSON.stringify(next));
+  }, [currentUser?.id]);
+
   const activeCoupons = React.useMemo(() => coupons.filter(coupon => coupon.isActive), [coupons]);
   const coinRedeemRate = Math.max(1, Number(economySettings.coinToFiatRatio));
   const studyMinutes = currentUser?.studyMinutes ?? 0;
   const watchTimeMinutes = currentUser?.totalWatchTimeMinutes ?? studyMinutes;
   const eduPoints = currentUser?.eduCoins ?? 0;
   const totalLifetimeCoins = currentUser?.totalLifetimeCoins ?? eduPoints;
-  const milestoneRewards = React.useMemo<MilestoneReward[]>(() => {
-    const premiumProduct = products.find(product => !product.isFree && product.isVisible !== false);
-    return [
-      { id: 'premium-pdf-pack', title: 'Premium PDF Pack', requirement: 500, icon: '📦', description: 'Download a curated premium revision pack once you cross 500 lifetime coins.', actionLabel: 'Download Pack', downloadContent: 'Digital Catalyst Premium PDF Pack\n\n- Exam sprint checklist\n- Revision planner\n- AI study prompts\n- Career-readiness worksheet' },
-      { id: 'course-access-pass', title: 'Course Access Pass', requirement: 1000, icon: '🎓', description: premiumProduct ? `Unlock access to ${premiumProduct.title}.` : 'Unlock access to a featured premium course.', actionLabel: 'Unlock Course', unlockProductIds: premiumProduct ? [premiumProduct.id] : [] },
-      { id: 'elite-wallet-badge', title: 'Elite Wallet Badge', requirement: 2000, icon: '💎', description: 'Permanent profile recognition for serious learners.', actionLabel: 'Claim Badge' },
-    ];
-  }, [products]);
+  const profileStyle = { ...fallbackProfileStyle, ...((settings.content as any).profileStyle || {}) };
+  const profileStreakConfigs = (((settings.content as any).profileStreaks || fallbackStreakConfigs) as ProfileStreakConfig[]).filter(streak => streak.active !== false).slice(0, 12);
+  const profileMilestoneConfigs = (((settings.content as any).profileMilestones || fallbackMilestoneConfigs) as ProfileMilestoneConfig[]).filter(milestone => milestone.active !== false).slice(0, 12);
+  const purchasedProductIdSet = React.useMemo(() => new Set(purchasedProducts.map(product => product.id)), [purchasedProducts]);
+  const readArticleCount = new Set([...(currentUser?.rewardedArticleIds || []), ...(currentUser?.readArticles || [])]).size;
+  const quizWinCount = new Set(currentUser?.rewardedQuizIds || []).size;
+  const coinTransactionCount = coinTransactions.length || (currentUser?.coinTransactions || []).length;
+  const pdfsRead = Math.max(0, ((currentUser as any)?.pdfsRead || 0) + coinTransactions.filter(entry => /pdf|read|document/i.test(`${entry.title || ''} ${entry.description || ''}`)).length + purchasedProducts.filter(product => product.category?.toLowerCase().includes('pdf') || product.title.toLowerCase().includes('pdf') || (product.courseContent || []).some(module => (module.files || []).some(file => ['pdf', 'sheet'].includes(file.type)))).length);
 
   const dynamicClaimCards = React.useMemo(() => {
     const productCards = products
@@ -160,90 +209,110 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         const maxDiscount = Math.floor(price * (resolveMaxDiscountPercentage(economySettings, 'product', product.id) / 100));
         const outright = coinPrice > 0 && eduPoints >= coinPrice;
         const affordableDiscount = Math.min(price, maxDiscount, Math.floor(eduPoints / coinRedeemRate));
-        return {
-          id: `product-${product.id}`,
-          targetType: 'product' as const,
-          targetId: product.id,
-          name: product.title,
-          type: 'Product',
-          price,
-          coinPrice,
-          discount: outright ? price : affordableDiscount,
-          requiredCoins: outright ? coinPrice : affordableDiscount * coinRedeemRate,
-          mode: outright ? 'unlock' as const : 'discount' as const,
-          claimable: outright || affordableDiscount > 0,
-        };
+        return { id: `product-${product.id}`, targetType: 'product' as const, targetId: product.id, name: product.title, type: 'Product', price, coinPrice, discount: outright ? price : affordableDiscount, requiredCoins: outright ? coinPrice : affordableDiscount * coinRedeemRate, mode: outright ? 'unlock' as const : 'discount' as const, claimable: outright || affordableDiscount > 0 };
       });
-
     const planCards = ((settings.content as any).subscriptionPlans || []).map((plan: any) => {
       const price = Number(plan.price || 0);
       const coinPrice = resolveCoinPrice(plan.coinPrice, economySettings, 'subscription', plan.id);
       const maxDiscount = Math.floor(price * (resolveMaxDiscountPercentage(economySettings, 'subscription', plan.id) / 100));
       const outright = coinPrice > 0 && eduPoints >= coinPrice;
       const affordableDiscount = Math.min(price, maxDiscount, Math.floor(eduPoints / coinRedeemRate));
-      return {
-        id: `plan-${plan.id}`,
-        targetType: 'subscription' as const,
-        targetId: String(plan.id),
-        name: `${plan.name} Plan`,
-        type: 'Subscription',
-        price,
-        coinPrice,
-        discount: outright ? price : affordableDiscount,
-        requiredCoins: outright ? coinPrice : affordableDiscount * coinRedeemRate,
-        mode: outright ? 'unlock' as const : 'discount' as const,
-        claimable: outright || affordableDiscount > 0,
-      };
+      return { id: `plan-${plan.id}`, targetType: 'subscription' as const, targetId: String(plan.id), name: `${plan.name} Plan`, type: 'Subscription', price, coinPrice, discount: outright ? price : affordableDiscount, requiredCoins: outright ? coinPrice : affordableDiscount * coinRedeemRate, mode: outright ? 'unlock' as const : 'discount' as const, claimable: outright || affordableDiscount > 0 };
     });
-
-    return [...productCards, ...planCards]
-      .filter(item => item.price > 0)
-      .sort((a, b) => Number(b.claimable) - Number(a.claimable) || b.discount - a.discount)
-      .slice(0, 6);
+    return [...productCards, ...planCards].filter(item => item.price > 0).sort((a, b) => Number(b.claimable) - Number(a.claimable) || b.discount - a.discount).slice(0, 6);
   }, [coinRedeemRate, economySettings, eduPoints, products, settings.content]);
+
+  const getCourseFileCount = (modules: any[] = []): number => modules.reduce((total, module) => total + (module.files || []).length + getCourseFileCount(module.modules || []), 0);
+  const getStoredCompletion = (productId: number | string) => {
+    if (!currentUser?.id) return 0;
+    const stored = Number(localStorage.getItem(`courseProgress-${currentUser.id}-${productId}`) || localStorage.getItem(`courseCompletion-${currentUser.id}-${productId}`) || 0);
+    return Number.isFinite(stored) ? clamp(stored) : 0;
+  };
+
+  const learningProgress: LearningProgress[] = purchasedProducts.length
+    ? purchasedProducts.slice(0, 5).map((product, index) => {
+        const explicitCompletion = getStoredCompletion(product.id);
+        const requiredMinutes = Math.max(30, getCourseFileCount(product.courseContent || []) * 15 || 60);
+        const allocatedWatchMinutes = Math.max(0, watchTimeMinutes - index * requiredMinutes);
+        const watchCompletion = clamp((allocatedWatchMinutes / requiredMinutes) * 100);
+        const completion = explicitCompletion > 0 ? explicitCompletion : watchCompletion;
+        return {
+          id: product.id,
+          title: product.title,
+          category: product.category || 'Premium course',
+          completion: Math.round(completion),
+        };
+      })
+    : [];
+
+  const completedCourses = learningProgress.filter(course => course.completion >= 100).length;
   const level = Math.max(1, Math.floor(eduPoints / 500) + 1);
   const currentLevelStart = (level - 1) * 500;
   const pointsIntoLevel = eduPoints - currentLevelStart;
   const pointsForNextLevel = 500;
   const nextLevelProgress = clamp((pointsIntoLevel / pointsForNextLevel) * 100);
   const pointsRemaining = Math.max(0, pointsForNextLevel - pointsIntoLevel);
-  const streakDays = Math.max(0, Math.min(60, Math.floor(studyMinutes / 55) + purchasedProducts.length));
-  const purchasedProductIdSet = React.useMemo(() => new Set(purchasedProducts.map(product => product.id)), [purchasedProducts]);
-  const pdfsRead = Math.max(0, ((currentUser as any)?.pdfsRead || 0) + coinTransactions.filter(entry => /pdf|read|document/i.test(`${entry.title || ''} ${entry.description || ''}`)).length + purchasedProducts.filter(product => product.category?.toLowerCase().includes('pdf') || product.title.toLowerCase().includes('pdf')).length);
+  const streakDays = dailyActivity.streakDays || (currentUser?.lastLoginAt ? 1 : 0);
+  const continuousLearningDays = Math.max(streakDays, Math.min(90, Math.floor(watchTimeMinutes / 35) + completedCourses));
+  const badgesUnlockedCount = [quizWinCount >= 1, Boolean(currentUser?.createdAt), completedCourses >= 1, streakDays >= 5, purchasedProducts.length >= 3, level >= 5].filter(Boolean).length;
 
-  const learningProgress: LearningProgress[] = purchasedProducts.length
-    ? purchasedProducts.slice(0, 5).map((product, index) => ({
-        id: product.id,
-        title: product.title,
-        category: product.category || 'Premium course',
-        completion: clamp(42 + index * 13 + Math.round((product.rating || 4) * 4)),
-      }))
-    : [
-        { id: 'starter-path', title: 'Starter Learning Path', category: 'Recommended', completion: 18 },
-        { id: 'skill-lab', title: 'Skill Practice Lab', category: 'Practice', completion: 9 },
-      ];
+  const getMetricValue = (metric: ProfileStreakMetric | ProfileMilestoneMetric) => {
+    switch (metric) {
+      case 'dailyLogin': return streakDays;
+      case 'studyMinutes': return studyMinutes;
+      case 'watchMinutes': return watchTimeMinutes;
+      case 'pdfsRead': return pdfsRead;
+      case 'coursesOwned': return purchasedProducts.length;
+      case 'completedCourses': return completedCourses;
+      case 'quizWins': return quizWinCount;
+      case 'articlesRead': return readArticleCount;
+      case 'lifetimeCoins': return totalLifetimeCoins;
+      case 'coinTransactions': return coinTransactionCount;
+      case 'milestonesClaimed': return (currentUser?.claimedRewardIds || []).length;
+      case 'streakClaims': return Object.keys(currentUser?.profileStreakClaims || {}).length;
+      case 'badgesUnlocked': return badgesUnlockedCount;
+      default: return 0;
+    }
+  };
 
-  const quizScores: QuizScore[] = learningProgress.slice(0, 4).map((item, index) => ({
-    title: item.title,
-    score: clamp(72 + index * 6 + (item.completion % 12)),
+  const quizScores: QuizScore[] = (currentUser?.rewardedQuizIds || []).slice(0, 6).map((quizId, index) => ({
+    title: String(quizId).replace(/[-_]/g, ' ').replace(/\b\w/g, char => char.toUpperCase()),
+    score: 100,
     accent: ['from-cyan-400 to-blue-500', 'from-fuchsia-400 to-purple-500', 'from-amber-300 to-orange-500', 'from-emerald-300 to-teal-500'][index % 4],
   }));
 
-  const continuousLearningDays = Math.max(streakDays, Math.min(90, Math.floor(watchTimeMinutes / 35) + learningProgress.filter(course => course.completion >= 50).length));
-  const streakCards = [
-    { id: 'daily-login', title: 'Daily Login Streak', icon: '🔥', value: streakDays, goal: 30, unit: 'days', accent: 'from-orange-400 via-amber-400 to-yellow-300', note: streakDays >= 30 ? 'Legendary daily rhythm unlocked.' : `${Math.max(0, 30 - streakDays)} days to a 30-day flame.` },
-    { id: 'learning-days', title: 'Continuous Learning Days', icon: '⚡', value: continuousLearningDays, goal: 45, unit: 'days', accent: 'from-cyan-400 via-blue-500 to-indigo-500', note: continuousLearningDays >= 45 ? 'Elite consistency streak active.' : `${Math.max(0, 45 - continuousLearningDays)} days to elite consistency.` },
-    { id: 'pdfs-read', title: 'PDFs Read', icon: '📄', value: pdfsRead, goal: 20, unit: 'PDFs', accent: 'from-emerald-400 via-teal-400 to-cyan-400', note: pdfsRead >= 20 ? 'Reading vault mastered.' : `${Math.max(0, 20 - pdfsRead)} PDFs to master the vault.` },
-    { id: 'quiz-pulse', title: 'Quiz Momentum', icon: '🎯', value: quizScores.filter(score => score.score >= 80).length, goal: Math.max(4, quizScores.length || 4), unit: 'wins', accent: 'from-fuchsia-400 via-purple-500 to-indigo-500', note: 'Score 80%+ to stack quiz wins.' },
-  ];
+  const streakCards = profileStreakConfigs.map(streak => {
+    const value = getMetricValue(streak.metric);
+    const claimKey = `${streak.id}:${dailyActivity.lastActiveDate || new Date().toISOString().slice(0, 10)}`;
+    const claimedToday = currentUser?.profileStreakClaims?.[streak.id] === claimKey;
+    return {
+      ...streak,
+      value,
+      progress: clamp((value / Math.max(1, Number(streak.goal))) * 100),
+      claimKey,
+      claimedToday,
+      claimable: value >= Number(streak.goal) && !claimedToday && Number(streak.coinReward || 0) > 0,
+    };
+  });
+
+  const milestoneRewards: MilestoneReward[] = profileMilestoneConfigs.map(milestone => {
+    const currentValue = getMetricValue(milestone.metric);
+    return {
+      ...milestone,
+      currentValue,
+      progress: clamp((currentValue / Math.max(1, Number(milestone.requirement))) * 100),
+      reached: currentValue >= Number(milestone.requirement),
+    };
+  });
+
 
   const badges: Badge[] = [
     {
       id: 'quiz-master',
       label: 'Quiz Master',
       icon: '🎯',
-      unlocked: quizScores.some(score => score.score >= 90),
-      description: 'Score 90%+ on a quiz',
+      unlocked: quizWinCount >= 1,
+      description: 'Claim one quiz reward',
     },
     {
       id: 'early-adopter',
@@ -256,8 +325,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
       id: 'first-course',
       label: 'First Course Completed',
       icon: '🏆',
-      unlocked: learningProgress.some(course => course.completion >= 80),
-      description: 'Reach 80% course progress',
+      unlocked: completedCourses >= 1,
+      description: 'Reach 100% course progress',
     },
     {
       id: 'streak-flame',
@@ -282,15 +351,48 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     },
   ];
 
+  const syncProfileUser = (updated: User, entry?: CoinTransaction) => {
+    const userWithLedger = entry ? { ...updated, coinTransactions: [entry, ...(updated.coinTransactions || [])].slice(0, 25) } : updated;
+    const updatedUsers = users.some(user => user.id === userWithLedger.id) ? users.map(user => (user.id === userWithLedger.id ? userWithLedger : user)) : [...users, userWithLedger];
+    setUsers(updatedUsers);
+    localStorage.setItem('siteUsers', JSON.stringify(updatedUsers));
+    localStorage.setItem('currentUser', JSON.stringify(userWithLedger));
+    setCurrentUser(userWithLedger);
+    if (entry) {
+      const storageKey = `coinTransactions-${userWithLedger.id}`;
+      const localLedger = JSON.parse(localStorage.getItem(storageKey) || '[]') as CoinTransaction[];
+      localStorage.setItem(storageKey, JSON.stringify([entry, ...(Array.isArray(localLedger) ? localLedger : [])].slice(0, 100)));
+      setCoinTransactions(prev => [entry, ...prev].slice(0, 12));
+    }
+  };
+
+  const handleStreakClaim = (streak: typeof streakCards[number]) => {
+    if (!currentUser || !streak.claimable) return;
+    const coinReward = Math.max(0, Number(streak.coinReward || 0));
+    const entry: CoinTransaction = {
+      id: `streak-${streak.id}-${Date.now()}`,
+      amount: coinReward,
+      type: 'credit',
+      source: `Streak: ${streak.title}`,
+      title: `🔥 ${streak.title}`,
+      description: `Claimed ${coinReward} EduCoins for ${streak.title}`,
+      createdAt: new Date().toISOString(),
+    };
+    const updated: User = {
+      ...currentUser,
+      eduCoins: (currentUser.eduCoins || 0) + coinReward,
+      totalLifetimeCoins: (currentUser.totalLifetimeCoins || 0) + coinReward,
+      profileStreakClaims: { ...(currentUser.profileStreakClaims || {}), [streak.id]: streak.claimKey },
+    };
+    syncProfileUser(updated, entry);
+  };
+
   const redeem = (reward: any) => {
     if (!currentUser || redeeming || (currentUser.eduCoins || 0) < reward.cost) return;
 
     setRedeeming(reward.id);
     const updated = { ...currentUser, eduCoins: (currentUser.eduCoins || 0) - reward.cost };
-    const updatedUsers = users.map(user => (user.id === updated.id ? updated : user));
-    setUsers(updatedUsers);
-    localStorage.setItem('siteUsers', JSON.stringify(updatedUsers));
-    setCurrentUser(updated);
+    syncProfileUser(updated);
     setTimeout(() => setRedeeming(null), 500);
   };
 
@@ -351,18 +453,19 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   ];
 
   return (
-    <div className="min-h-screen overflow-hidden bg-slate-100 bg-gradient-to-br from-slate-100 via-indigo-100/45 to-slate-200 text-slate-900">
+    <div className="min-h-screen overflow-hidden text-slate-900" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}, ${profileStyle.backgroundTint}, #f8fafc)`, '--profile-card-opacity': String(Number(profileStyle.cardOpacity) / 100) } as React.CSSProperties}>
       <style>{`
         @keyframes hubFadeUp {
           from { opacity: 0; transform: translateY(28px); }
           to { opacity: 1; transform: translateY(0); }
         }
         .hub-animate { opacity: 0; animation: hubFadeUp 680ms ease-out forwards; }
+        .profile-glass-card { background-color: rgba(255,255,255,var(--profile-card-opacity,0.82)); }
       `}</style>
 
       <div className="pointer-events-none fixed inset-0 opacity-80">
-        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(226,232,240,0.82),rgba(224,231,255,0.62),rgba(241,245,249,0.9))]" />
-        <div className="absolute left-[-10%] top-10 h-72 w-72 rounded-full bg-indigo-500/18 blur-3xl" />
+        <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}d9, ${profileStyle.backgroundTint}b8, rgba(241,245,249,0.9))` }} />
+        <div className="absolute left-[-10%] top-10 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: `${profileStyle.accentColor}26` }} />
         <div className="absolute right-[-5%] top-1/3 h-96 w-96 rounded-full bg-cyan-500/12 blur-3xl" />
         <div className="absolute bottom-[-10%] left-1/3 h-80 w-80 rounded-full bg-fuchsia-500/12 blur-3xl" />
       </div>
@@ -378,7 +481,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <section className={`hub-animate overflow-hidden rounded-[2rem] ${glassCard}`} style={{ animationDelay: '80ms' }}>
           <div className="relative aspect-video min-h-[300px] w-full sm:min-h-[420px]">
             <img src={coverImage} alt="Student achievement cover" className="h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/78 via-slate-900/30 to-indigo-950/15" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/35 to-indigo-950/15" style={{ opacity: Number(profileStyle.heroOverlayOpacity) / 100 }} />
             <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4 sm:p-6">
               <div className="rounded-full border border-white/50 bg-white/70 px-4 py-2 text-xs font-black uppercase tracking-[0.28em] text-cyan-700 backdrop-blur-xl">
                 Student Achievement Hub
@@ -458,34 +561,42 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-sm font-black uppercase tracking-[0.3em] text-orange-600">Gamification / Streaks</p>
-              <h2 className="mt-2 text-3xl font-black sm:text-4xl">Retention Flame Board</h2>
+              <h2 className="mt-2 text-3xl font-black sm:text-4xl">12 Daily Coin Strips</h2>
+              <p className="mt-2 text-sm font-bold text-slate-600">Every strip uses real profile activity. Complete the target, claim coins, and come back tomorrow for the next claim.</p>
             </div>
-            <div className="rounded-full border border-orange-200/70 bg-orange-50/90 px-4 py-2 text-sm font-black text-orange-700 shadow-sm">🔥 {streakCards.reduce((total, streak) => total + streak.value, 0)} total streak points</div>
+            <div className="rounded-full border border-orange-200/70 bg-orange-50/90 px-4 py-2 text-sm font-black text-orange-700 shadow-sm">🔥 {streakCards.filter(streak => streak.claimable).length} ready now</div>
           </div>
-          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {streakCards.map((streak, index) => {
-              const progress = clamp((streak.value / streak.goal) * 100);
-              return (
-                <article key={streak.id} className="group relative overflow-hidden rounded-[1.75rem] border border-white/60 bg-white/82 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_rgba(15,23,42,0.13)]" style={{ animationDelay: `${360 + index * 70}ms` }}>
-                  <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${streak.accent}`} />
-                  <div className="flex items-start justify-between gap-3">
-                    <div>
-                      <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">{streak.title}</p>
-                      <p className="mt-3 text-4xl font-black text-slate-950">{streak.value}<span className="ml-1 text-sm font-black text-slate-500">{streak.unit}</span></p>
+          <div className="mt-6 grid gap-3 xl:grid-cols-2">
+            {streakCards.map((streak, index) => (
+              <article key={streak.id} className="group relative overflow-hidden rounded-[1.5rem] border border-white/60 bg-white/84 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_rgba(15,23,42,0.13)]" style={{ animationDelay: `${360 + index * 45}ms` }}>
+                <div className={`absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b ${streak.accent}`} />
+                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                  <div className={`flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${streak.accent} text-3xl shadow-[0_12px_30px_rgba(251,146,60,0.24)] transition group-hover:scale-110`}>{streak.icon}</div>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <h3 className="text-lg font-black text-slate-950">{streak.title}</h3>
+                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">+{streak.coinReward} coins</span>
                     </div>
-                    <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${streak.accent} text-3xl shadow-[0_12px_30px_rgba(251,146,60,0.24)] transition group-hover:scale-110`}>{streak.icon}</div>
+                    <p className="mt-1 text-xs font-bold leading-5 text-slate-600">{streak.note}</p>
+                    <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200/80">
+                      <div className={`h-full rounded-full bg-gradient-to-r ${streak.accent} shadow-[0_0_18px_rgba(59,130,246,0.25)]`} style={{ width: `${streak.progress}%` }} />
+                    </div>
+                    <div className="mt-2 flex items-center justify-between text-xs font-black text-slate-500">
+                      <span>{streak.value} / {streak.goal} {streak.unit}</span>
+                      <span>{Math.round(streak.progress)}%</span>
+                    </div>
                   </div>
-                  <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-200/80">
-                    <div className={`h-full rounded-full bg-gradient-to-r ${streak.accent} shadow-[0_0_18px_rgba(59,130,246,0.25)]`} style={{ width: `${progress}%` }} />
-                  </div>
-                  <div className="mt-3 flex items-center justify-between text-xs font-black text-slate-500">
-                    <span>{Math.round(progress)}% complete</span>
-                    <span>Goal {streak.goal}</span>
-                  </div>
-                  <p className="mt-4 rounded-2xl border border-slate-200/70 bg-slate-50/90 px-3 py-2 text-xs font-bold leading-5 text-slate-600">{streak.note}</p>
-                </article>
-              );
-            })}
+                  <button
+                    type="button"
+                    disabled={!streak.claimable}
+                    onClick={() => handleStreakClaim(streak)}
+                    className={`rounded-2xl px-4 py-3 text-sm font-black transition active:scale-95 sm:w-40 ${streak.claimedToday ? 'cursor-not-allowed bg-slate-200 text-slate-500' : streak.claimable ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-[0_12px_30px_rgba(251,146,60,0.28)] hover:-translate-y-0.5' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}
+                  >
+                    {streak.claimedToday ? 'Claimed Today' : streak.claimable ? 'Claim Coins' : 'Complete Target'}
+                  </button>
+                </div>
+              </article>
+            ))}
           </div>
         </section>
 
@@ -503,7 +614,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
               )}
             </div>
             <div className="mt-6 grid gap-4">
-              {learningProgress.map((course, index) => {
+              {learningProgress.length ? learningProgress.map((course, index) => {
                 const circumference = 2 * Math.PI * 38;
                 const dashOffset = circumference - (course.completion / 100) * circumference;
                 return (
@@ -537,7 +648,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     </div>
                   </div>
                 );
-              })}
+              }) : <div className="rounded-3xl border border-dashed border-indigo-200 bg-white/70 p-6 text-center font-bold text-slate-600">No purchased course progress yet. Buy or open a course to start real completion tracking.</div>}
             </div>
           </div>
 
@@ -545,22 +656,22 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             <p className="text-sm font-black uppercase tracking-[0.3em] text-fuchsia-700">Recent Quiz Scores</p>
             <h2 className="mt-2 text-3xl font-black">Performance Pulse</h2>
             <div className="mt-6 flex h-36 items-end gap-3 rounded-3xl border border-white/50 bg-white/70 p-4">
-              {quizScores.map(score => (
+              {quizScores.length ? quizScores.map(score => (
                 <div key={score.title} className="flex flex-1 flex-col items-center gap-2">
                   <div className={`w-full rounded-t-2xl bg-gradient-to-t ${score.accent} shadow-[0_8px_30px_rgb(0,0,0,0.04)]`} style={{ height: `${score.score}%` }} />
                   <span className="text-xs font-black text-slate-600">{score.score}%</span>
                 </div>
-              ))}
+              )) : <div className="flex h-full w-full items-center justify-center text-center text-sm font-bold text-slate-500">Complete quizzes to generate real performance pulse bars.</div>}
             </div>
             <div className="mt-5 space-y-3">
-              {quizScores.map(score => (
+              {quizScores.length ? quizScores.map(score => (
                 <div key={score.title} className="rounded-2xl border border-white/50 bg-white/70 p-3">
                   <div className="flex items-center justify-between gap-3 text-sm font-bold">
                     <span className="truncate">{score.title}</span>
                     <span className="text-cyan-700">{score.score}%</span>
                   </div>
                 </div>
-              ))}
+              )) : <div className="rounded-2xl border border-dashed border-fuchsia-200 bg-white/70 p-4 text-sm font-bold text-slate-600">No quiz rewards claimed yet.</div>}
             </div>
           </div>
         </section>
@@ -575,20 +686,23 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
           <div className="mt-6 grid gap-4 lg:grid-cols-3">
             {milestoneRewards.map(reward => {
-              const reached = totalLifetimeCoins >= reward.requirement;
               const claimed = (currentUser?.claimedRewardIds || []).includes(reward.id);
               return (
-                <article key={reward.id} className={`rounded-[1.75rem] border p-5 transition-all duration-300 hover:-translate-y-1 ${claimed ? 'border-emerald-300/60 bg-emerald-50/80 shadow-[0_0_18px_rgba(16,185,129,0.35)]' : reached ? 'border-indigo-400 bg-white/80 shadow-[0_0_15px_rgba(79,70,229,0.5)] animate-pulse' : 'border-white/50 bg-white/70 opacity-75'}`}>
+                <article key={reward.id} className={`relative overflow-hidden rounded-[1.75rem] border p-5 transition-all duration-300 hover:-translate-y-1 ${claimed ? 'border-emerald-300/60 bg-emerald-50/85 shadow-[0_0_22px_rgba(16,185,129,0.35)]' : reward.reached ? 'border-indigo-400 bg-white/85 shadow-[0_0_24px_rgba(79,70,229,0.44)]' : 'border-white/50 bg-white/72 opacity-90'}`}>
+                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-300 via-indigo-400 to-cyan-300" />
                   <div className="flex items-start gap-4">
-                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/60 bg-white/80 text-3xl shadow-sm">{reward.icon}</div>
+                    <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border border-white/60 bg-white/85 text-3xl shadow-sm">{reward.icon}</div>
                     <div>
                       <h3 className="text-lg font-black text-slate-900">{reward.title}</h3>
-                      <p className="mt-1 text-sm text-slate-600">{reward.description}</p>
-                      <p className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-amber-700">Requires 🪙 {reward.requirement}</p>
+                      <p className="mt-1 text-sm font-bold leading-6 text-slate-600">{reward.description}</p>
+                      <p className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-amber-700">{reward.currentValue} / {reward.requirement} {reward.metric}</p>
                     </div>
                   </div>
-                  <button type="button" disabled={!reached || claimed} onClick={() => handleMilestoneClaim(reward)} className="mt-5 w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 disabled:cursor-not-allowed disabled:opacity-60">
-                    {claimed ? 'Claimed / Unlocked' : reached ? reward.actionLabel : `Earn ${reward.requirement - totalLifetimeCoins} more coins`}
+                  <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-slate-200/80">
+                    <div className="h-full rounded-full bg-gradient-to-r from-amber-400 via-indigo-500 to-cyan-400" style={{ width: `${reward.progress}%` }} />
+                  </div>
+                  <button type="button" disabled={!reward.reached || claimed} onClick={() => handleMilestoneClaim(reward)} className={`mt-5 w-full rounded-2xl px-4 py-3 text-sm font-black shadow-sm transition active:scale-95 ${claimed ? 'cursor-not-allowed bg-slate-200 text-slate-500' : reward.reached ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:-translate-y-0.5' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}>
+                    {claimed ? 'Claimed / Unlocked' : reward.reached ? `${reward.actionLabel}${reward.coinReward ? ` (+${reward.coinReward})` : ''}` : `${Math.max(0, reward.requirement - reward.currentValue)} more to unlock`}
                   </button>
                 </article>
               );
