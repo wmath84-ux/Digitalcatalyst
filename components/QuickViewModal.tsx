@@ -7,24 +7,18 @@ interface QuickViewModalProps {
   product: ProductWithRating;
   onClose: () => void;
   onAddToCart: (productId: number, quantity: number) => void;
-  onBuyNow: (product: ProductWithRating) => void;
   isWishlisted: boolean;
   onToggleWishlist: (id: number) => void;
   onViewFullDetails: () => void;
 }
 
-const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onClose, onAddToCart, onBuyNow, isWishlisted, onToggleWishlist, onViewFullDetails }) => {
+const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onClose, onAddToCart, isWishlisted, onToggleWishlist, onViewFullDetails }) => {
   const [quantity, setQuantity] = useState(1);
   const [mainImage, setMainImage] = useState((product.images || [])[0] || `https://picsum.photos/seed/${product.imageSeed}/800/600`);
 
   const handleAddToCartClick = () => {
     onAddToCart(product.id, quantity);
     onClose();
-  };
-
-  const handleBuyNowClick = () => {
-    onClose();
-    onBuyNow(product);
   };
 
   return (
@@ -70,27 +64,25 @@ const QuickViewModal: React.FC<QuickViewModalProps> = ({ settings, product, onCl
           <ProductMusicPlayer product={product} variant="compact" className="mt-5" />
           
           <div className="mt-auto pt-6">
-            <div className="flex gap-4 items-center">
-                <div className="flex items-center border rounded-lg">
-                    <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="px-3 py-2 text-lg font-bold text-gray-600 hover:bg-gray-100 rounded-l-lg">-</button>
-                    <input type="number" value={quantity} onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} className="w-16 text-center border-l border-r font-semibold focus:outline-none" />
-                    <button onClick={() => setQuantity(q => q + 1)} className="px-3 py-2 text-lg font-bold text-gray-600 hover:bg-gray-100 rounded-r-lg">+</button>
+            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <div className="flex items-center justify-between rounded-xl border border-slate-200 bg-white/80 shadow-sm sm:justify-start">
+                    <button onClick={() => setQuantity(q => Math.max(1, q - 1))} className="px-4 py-3 text-lg font-bold text-gray-600 hover:bg-gray-100 rounded-l-xl">-</button>
+                    <input type="number" value={quantity} onChange={e => setQuantity(Math.max(1, parseInt(e.target.value) || 1))} className="w-20 border-l border-r border-slate-200 bg-transparent text-center font-semibold focus:outline-none" />
+                    <button onClick={() => setQuantity(q => q + 1)} className="px-4 py-3 text-lg font-bold text-gray-600 hover:bg-gray-100 rounded-r-xl">+</button>
                 </div>
-                <button onClick={handleBuyNowClick} className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold px-8 py-3 rounded-lg hover:opacity-90 transition-all duration-300 transform active:scale-95">
-                    Buy Now
-                </button>
                 {settings.features.showFavourites && (
-                    <button onClick={() => onToggleWishlist(product.id)} className="p-3 border rounded-lg text-slate-600 hover:text-red-500 hover:bg-red-50 transition-colors">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill={isWishlisted ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" /></svg>
+                    <button onClick={() => onToggleWishlist(product.id)} className="flex items-center justify-center gap-2 rounded-xl border border-slate-200 bg-white/80 px-5 py-3 font-black text-slate-600 transition-colors hover:bg-red-50 hover:text-red-500">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill={isWishlisted ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" /></svg>
+                        {isWishlisted ? 'Wishlisted' : 'Wishlist'}
                     </button>
                 )}
             </div>
-            <div className="mt-4 grid grid-cols-2 gap-3">
-              <button onClick={handleAddToCartClick} className="rounded-lg border border-indigo-200 bg-white/80 px-4 py-3 text-sm font-black text-indigo-700 hover:bg-indigo-50">
+            <div className="mt-4 grid gap-3 sm:grid-cols-2">
+              <button onClick={handleAddToCartClick} className="rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-4 text-sm font-black text-white shadow-sm transition hover:opacity-90 active:scale-95">
                 Add to Cart
               </button>
-              <button onClick={onViewFullDetails} className="rounded-lg border border-slate-200 bg-white/80 px-4 py-3 text-sm font-black text-primary hover:bg-slate-50">
-                Details →
+              <button onClick={onViewFullDetails} className="rounded-xl border border-indigo-200 bg-white/85 px-5 py-4 text-sm font-black text-primary transition hover:bg-indigo-50 active:scale-95">
+                View Details →
               </button>
             </div>
           </div>
