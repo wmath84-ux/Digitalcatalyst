@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { ProductWithRating, WebsiteSettings, Coupon } from '../App';
-import ProductMusicPlayer, { getProductAudioTracks } from './ProductMusicPlayer';
 
 interface ProductCardProps {
   settings: WebsiteSettings;
@@ -25,8 +24,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
         : '';
     
     const displayImage = product.images && product.images.length > 0 ? product.images[0] : `https://picsum.photos/seed/${product.imageSeed}/600/400`;
-    const hasAudioTracks = getProductAudioTracks(product).length > 0;
-
     const handleQuickViewClick = (event: React.MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
         event.stopPropagation();
@@ -126,10 +123,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                     {product.title}
                 </h3>
                 <p className="text-sm text-slate-600 line-clamp-2 mb-4 flex-grow">{product.description}</p>
-
-                {hasAudioTracks && (
-                    <ProductMusicPlayer product={product} variant="compact" className="mb-4" />
-                )}
 
                 {displayMode === 'showcase' ? (
                      <div className="flex items-end justify-between mt-auto pt-4 border-t border-gray-50">
