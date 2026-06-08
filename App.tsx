@@ -227,6 +227,7 @@ export interface User {
     readArticles?: Array<number | string>;
     rewardedQuizIds?: Array<number | string>;
     claimedRewardIds?: Array<string>;
+    profileStreakClaims?: Record<string, string>;
     coinTransactions?: CoinTransaction[];
 }
 
@@ -251,6 +252,42 @@ export interface ActiveCoinDiscount {
     coins: number;
     productId?: number;
     subscriptionId?: string;
+}
+
+
+export type ProfileStreakMetric = 'dailyLogin' | 'studyMinutes' | 'watchMinutes' | 'pdfsRead' | 'coursesOwned' | 'completedCourses' | 'quizWins' | 'articlesRead' | 'lifetimeCoins' | 'coinTransactions' | 'milestonesClaimed' | 'badgesUnlocked';
+export interface ProfileStreakConfig {
+    id: string;
+    title: string;
+    icon: string;
+    metric: ProfileStreakMetric;
+    goal: number;
+    unit: string;
+    coinReward: number;
+    accent: string;
+    note: string;
+    active?: boolean;
+}
+export type ProfileMilestoneMetric = 'lifetimeCoins' | 'studyMinutes' | 'watchMinutes' | 'coursesOwned' | 'completedCourses' | 'quizWins' | 'articlesRead' | 'pdfsRead' | 'streakClaims' | 'badgesUnlocked';
+export interface ProfileMilestoneConfig {
+    id: string;
+    title: string;
+    icon: string;
+    metric: ProfileMilestoneMetric;
+    requirement: number;
+    description: string;
+    actionLabel: string;
+    coinReward?: number;
+    unlockProductIds?: number[];
+    downloadContent?: string;
+    active?: boolean;
+}
+export interface ProfileStyleSettings {
+    backgroundColor: string;
+    backgroundTint: string;
+    cardOpacity: number;
+    heroOverlayOpacity: number;
+    accentColor: string;
 }
 
 // Coupon structure, now managed globally
@@ -452,6 +489,9 @@ export interface WebsiteSettings {
             accentColor: string;
             accentOpacity: number;
         };
+        profileStyle?: ProfileStyleSettings;
+        profileStreaks?: ProfileStreakConfig[];
+        profileMilestones?: ProfileMilestoneConfig[];
         socialLinks: {
             facebook: string;
             twitter: string;
@@ -700,6 +740,37 @@ const defaultWebsiteSettings: WebsiteSettings = {
             accentColor: '#4f46e5',
             accentOpacity: 16,
         },
+        profileStyle: {
+            backgroundColor: '#e2e8f0',
+            backgroundTint: '#e0e7ff',
+            cardOpacity: 82,
+            heroOverlayOpacity: 76,
+            accentColor: '#f97316',
+        },
+        profileStreaks: [
+            { id: 'daily-login', title: 'Daily Login Spark', icon: '🔥', metric: 'dailyLogin', goal: 1, unit: 'day', coinReward: 10, accent: 'from-orange-400 via-amber-400 to-yellow-300', note: 'Open your hub every day and claim today’s flame.', active: true },
+            { id: 'study-15', title: '15 Minute Focus', icon: '⏱️', metric: 'studyMinutes', goal: 15, unit: 'mins', coinReward: 15, accent: 'from-cyan-400 via-blue-500 to-indigo-500', note: 'Watch lessons or read learning content for 15 minutes.', active: true },
+            { id: 'study-45', title: 'Deep Work Sprint', icon: '⚡', metric: 'studyMinutes', goal: 45, unit: 'mins', coinReward: 25, accent: 'from-violet-400 via-purple-500 to-fuchsia-500', note: 'Build a longer study session and earn a bigger boost.', active: true },
+            { id: 'watch-60', title: 'Video Warrior', icon: '🎬', metric: 'watchMinutes', goal: 60, unit: 'mins', coinReward: 30, accent: 'from-blue-400 via-sky-500 to-cyan-400', note: 'Complete one hour of course video watch time.', active: true },
+            { id: 'pdf-3', title: 'PDF Reader', icon: '📄', metric: 'pdfsRead', goal: 3, unit: 'PDFs', coinReward: 20, accent: 'from-emerald-400 via-teal-400 to-cyan-400', note: 'Read premium notes and document resources.', active: true },
+            { id: 'article-3', title: 'Knowledge Hunter', icon: '🧠', metric: 'articlesRead', goal: 3, unit: 'reads', coinReward: 20, accent: 'from-lime-400 via-emerald-500 to-teal-500', note: 'Read news or blog lessons to keep learning daily.', active: true },
+            { id: 'quiz-1', title: 'Quiz Ignition', icon: '🎯', metric: 'quizWins', goal: 1, unit: 'wins', coinReward: 25, accent: 'from-pink-400 via-rose-500 to-orange-400', note: 'Finish a quiz and claim your first quiz streak.', active: true },
+            { id: 'quiz-3', title: 'Quiz Momentum', icon: '🏹', metric: 'quizWins', goal: 3, unit: 'wins', coinReward: 40, accent: 'from-fuchsia-400 via-purple-500 to-indigo-500', note: 'Stack multiple quiz rewards to keep momentum alive.', active: true },
+            { id: 'course-1', title: 'Course Starter', icon: '📚', metric: 'coursesOwned', goal: 1, unit: 'course', coinReward: 25, accent: 'from-indigo-400 via-blue-500 to-cyan-400', note: 'Own your first course and start your premium path.', active: true },
+            { id: 'complete-1', title: 'Completion Charge', icon: '✅', metric: 'completedCourses', goal: 1, unit: 'done', coinReward: 50, accent: 'from-green-400 via-emerald-500 to-teal-400', note: 'Complete a course progress target to unlock this.', active: true },
+            { id: 'wallet-500', title: 'Coin Collector', icon: '🪙', metric: 'lifetimeCoins', goal: 500, unit: 'coins', coinReward: 35, accent: 'from-amber-300 via-yellow-400 to-orange-400', note: 'Earn lifetime coins from real platform activity.', active: true },
+            { id: 'badge-3', title: 'Badge Builder', icon: '🏅', metric: 'badgesUnlocked', goal: 3, unit: 'badges', coinReward: 30, accent: 'from-slate-500 via-indigo-500 to-purple-500', note: 'Unlock badges by learning, reading, and completing.', active: true },
+        ],
+        profileMilestones: [
+            { id: 'first-login-flame', title: 'First Login Flame', icon: '🔥', metric: 'studyMinutes', requirement: 1, description: 'Start learning with your first active minute.', actionLabel: 'Claim Coins', coinReward: 25, active: true },
+            { id: 'article-reader', title: 'Article Reader', icon: '📰', metric: 'articlesRead', requirement: 3, description: 'Read three learning articles or blog lessons.', actionLabel: 'Claim Reading Bonus', coinReward: 40, active: true },
+            { id: 'video-hour', title: 'One Hour Video Charge', icon: '🎬', metric: 'watchMinutes', requirement: 60, description: 'Complete 60 minutes of real course video watch time.', actionLabel: 'Claim Watch Bonus', coinReward: 60, active: true },
+            { id: 'quiz-master-real', title: 'Quiz Master', icon: '🎯', metric: 'quizWins', requirement: 3, description: 'Claim rewards from three unique quizzes.', actionLabel: 'Claim Quiz Bonus', coinReward: 75, active: true },
+            { id: 'pdf-scholar', title: 'PDF Scholar', icon: '📄', metric: 'pdfsRead', requirement: 5, description: 'Read or own five PDF/document resources.', actionLabel: 'Download Scholar Pack', coinReward: 50, downloadContent: 'Digital Catalyst PDF Scholar Pack\n\n- Reading checklist\n- Revision tracker\n- Daily active planner', active: true },
+            { id: 'course-finisher', title: 'Course Finisher', icon: '✅', metric: 'completedCourses', requirement: 1, description: 'Reach 100% completion on a course progress tracker.', actionLabel: 'Claim Completion Bonus', coinReward: 100, active: true },
+            { id: 'wallet-elite', title: 'Wallet Elite', icon: '💎', metric: 'lifetimeCoins', requirement: 1000, description: 'Earn 1000 lifetime EduCoins from real activity.', actionLabel: 'Claim Elite Badge', coinReward: 125, active: true },
+            { id: 'premium-unlocker', title: 'Premium Unlocker', icon: '🎓', metric: 'coursesOwned', requirement: 2, description: 'Own two premium learning products.', actionLabel: 'Unlock Bonus Access', coinReward: 80, unlockProductIds: [], active: true },
+        ],
         socialLinks: {
             facebook: "https://www.facebook.com/profile.php?viewas=100000686899395&id=61565419447036",
             twitter: "https://x.com/MathW12385",
@@ -930,6 +1001,11 @@ const App: React.FC = () => {
         studyMinutes: user.studyMinutes ?? 0,
         totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0,
         rewardedArticleIds: user.rewardedArticleIds || [],
+        readArticles: user.readArticles || user.rewardedArticleIds || [],
+        rewardedQuizIds: user.rewardedQuizIds || [],
+        claimedRewardIds: user.claimedRewardIds || [],
+        profileStreakClaims: user.profileStreakClaims || {},
+        coinTransactions: user.coinTransactions || [],
     }));
     setUsers(loadedUsers);
     
@@ -937,7 +1013,10 @@ const App: React.FC = () => {
     if (storedAdminUsers) setAdminUsers(JSON.parse(storedAdminUsers)); else setAdminUsers(initialAdminUsers);
 
     const storedSettings = localStorage.getItem('websiteSettings');
-    if (storedSettings) setWebsiteSettings(JSON.parse(storedSettings));
+    if (storedSettings) {
+        const parsedSettings = JSON.parse(storedSettings);
+        setWebsiteSettings({ ...defaultWebsiteSettings, ...parsedSettings, content: { ...defaultWebsiteSettings.content, ...(parsedSettings.content || {}) } });
+    }
     
     const storedCoupons = localStorage.getItem('siteCoupons');
     if (storedCoupons) setCoupons(JSON.parse(storedCoupons)); else setCoupons(initialCoupons);
@@ -1047,7 +1126,11 @@ const App: React.FC = () => {
         theme: {
             ...newSettings.theme,
             ...themes.default.palette,
-        }
+        },
+        content: {
+            ...defaultWebsiteSettings.content,
+            ...newSettings.content,
+        },
     };
     setWebsiteSettings(mergedSettings);
     safeSetItem('websiteSettings', mergedSettings);
@@ -1274,7 +1357,7 @@ const App: React.FC = () => {
 
   // --- Auth Handlers ---
   const completeUserSession = (user: User) => {
-      const sessionUser = { ...user, eduCoins: user.eduCoins ?? 120, studyMinutes: user.studyMinutes ?? 0, totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0, rewardedArticleIds: user.rewardedArticleIds || [], readArticles: user.readArticles || user.rewardedArticleIds || [], rewardedQuizIds: user.rewardedQuizIds || [], claimedRewardIds: user.claimedRewardIds || [], totalLifetimeCoins: user.totalLifetimeCoins ?? user.eduCoins ?? 120, coinTransactions: user.coinTransactions || [], lastLoginAt: new Date().toISOString() };
+      const sessionUser = { ...user, eduCoins: user.eduCoins ?? 120, studyMinutes: user.studyMinutes ?? 0, totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0, rewardedArticleIds: user.rewardedArticleIds || [], readArticles: user.readArticles || user.rewardedArticleIds || [], rewardedQuizIds: user.rewardedQuizIds || [], claimedRewardIds: user.claimedRewardIds || [], profileStreakClaims: user.profileStreakClaims || {}, totalLifetimeCoins: user.totalLifetimeCoins ?? user.eduCoins ?? 120, coinTransactions: user.coinTransactions || [], lastLoginAt: new Date().toISOString() };
       setCurrentUser(sessionUser);
       safeSetItem('currentUser', sessionUser);
 
@@ -1493,19 +1576,25 @@ const App: React.FC = () => {
     return true;
   };
 
-  const handleClaimMilestoneReward = (reward: { id: string; title: string; requirement: number; unlockProductIds?: number[] }) => {
+  const handleClaimMilestoneReward = (reward: { id: string; title: string; requirement: number; unlockProductIds?: number[]; coinReward?: number; currentValue?: number }) => {
     if (!currentUser) return false;
-    if ((currentUser.totalLifetimeCoins || 0) < reward.requirement || (currentUser.claimedRewardIds || []).includes(reward.id)) return false;
+    if ((reward.currentValue ?? currentUser.totalLifetimeCoins ?? 0) < reward.requirement || (currentUser.claimedRewardIds || []).includes(reward.id)) return false;
+    const coinReward = Math.max(0, Number(reward.coinReward || 0));
     syncCurrentUser(
-      user => ({ ...user, claimedRewardIds: [...new Set([...(user.claimedRewardIds || []), reward.id])] }),
-      { amount: 0, type: 'credit', source: 'Milestone unlocked', description: `Unlocked: ${reward.title}` },
+      user => ({
+        ...user,
+        claimedRewardIds: [...new Set([...(user.claimedRewardIds || []), reward.id])],
+        eduCoins: (user.eduCoins || 0) + coinReward,
+        totalLifetimeCoins: (user.totalLifetimeCoins || 0) + coinReward,
+      }),
+      { amount: coinReward, type: 'credit', source: 'Milestone unlocked', description: `Unlocked: ${reward.title}${coinReward ? ` (+${coinReward} EduCoins)` : ''}` },
     );
     if (reward.unlockProductIds?.length) {
       const nextPurchasedIds = [...new Set([...purchasedProductIds, ...reward.unlockProductIds])];
       setPurchasedProductIds(nextPurchasedIds);
       safeSetItem('purchasedProducts', nextPurchasedIds);
     }
-    setInfoModal({ title: 'Milestone unlocked', message: `${reward.title} is now available.`, icon: '🏆' });
+    setInfoModal({ title: 'Milestone unlocked', message: `${reward.title} is now available.${coinReward ? ` +${coinReward} EduCoins credited.` : ''}`, icon: '🏆' });
     return true;
   };
 
@@ -2001,7 +2090,7 @@ const App: React.FC = () => {
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={handleBackToHome} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
       case 'myPurchases': return <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
-      case 'profile': return <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} />;
+      case 'profile': return <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} />;
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={handleBackToHome} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
       case 'home': default: return renderHomePageContent();

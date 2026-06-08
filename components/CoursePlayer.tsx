@@ -4,6 +4,7 @@ import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, QuizAnsw
 import { EconomySettings } from '../utils/economy';
 import AiMentor from './AiMentor';
 import ProductMusicPlayer, { type AudioTrack } from './ProductMusicPlayer';
+import GoogleAd from './GoogleAd';
 
 const FileIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -456,7 +457,19 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
         );
       }
       case 'pdf':
-      case 'sheet': return <GlassDownloadCard file={activeFile} />;
+      case 'sheet': return (
+        <div className="flex h-full w-full flex-col overflow-y-auto bg-white/55 p-3 backdrop-blur-xl sm:p-5">
+          <div className="my-4 shrink-0 rounded-3xl border border-white/60 bg-white/80 p-3 shadow-sm">
+            <GoogleAd variant="display" label="Sponsored" />
+          </div>
+          <div className="min-h-[28rem] flex-1 overflow-hidden rounded-[2rem] border border-white/60 shadow-sm">
+            <GlassDownloadCard file={activeFile} />
+          </div>
+          <div className="my-4 shrink-0 rounded-3xl border border-white/60 bg-white/80 p-3 shadow-sm">
+            <GoogleAd variant="inArticle" label="Sponsored" />
+          </div>
+        </div>
+      );
       case 'doc':
       case 'ebook': return <SmartDocsWorkspace file={activeFile} productId={product.id} />;
       case 'link': return <ExternalResourceCard file={activeFile} />;
