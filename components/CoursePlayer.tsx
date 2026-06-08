@@ -1,5 +1,5 @@
 // components/CoursePlayer.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, QuizAnswerState } from '../App';
 import { EconomySettings } from '../utils/economy';
 import AiMentor from './AiMentor';
@@ -393,9 +393,9 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const backgroundImage = useMemo(() => getCourseBackground(product, activeFile), [product, activeFile]);
   const accentGlow = settings.theme?.accentColor || '#a5f3fc';
 
-  const getActiveMediaElement = () => videoRef.current || audioRef.current;
+  const getActiveMediaElement = useCallback(() => videoRef.current || audioRef.current, []);
 
-  const saveCurrentMediaState = () => {
+  const saveCurrentMediaState = useCallback(() => {
     if (!activeFile || (activeFile.type !== 'video' && activeFile.type !== 'audio')) return;
     const media = getActiveMediaElement();
     if (!media) return;
@@ -403,9 +403,9 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     mediaWasPlayingRef.current[String(activeFile.id)] = !media.paused && !media.ended;
     media.pause();
     setIsVideoPlaying(false);
-  };
+  }, [activeFile, getActiveMediaElement]);
 
-  const restoreMediaState = (file: ProductFile, media: HTMLMediaElement | null) => {
+  const restoreMediaState = useCallback((file: ProductFile, media: HTMLMediaElement | null) => {
     if (!media) return;
     const fileKey = String(file.id);
     const savedTime = mediaProgressRef.current[fileKey];
@@ -416,16 +416,16 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     if (mediaWasPlayingRef.current[fileKey]) {
       media.play().catch(() => undefined);
     }
-  };
+  }, []);
 
-  const onSelectFile = (file: ProductFile) => {
+  const onSelectFile = useCallback((file: ProductFile) => {
     saveCurrentMediaState();
     setActiveFile(file);
     setIsSidebarOpen(false);
     setIsMentorOpen(false);
-  };
+  }, [saveCurrentMediaState]);
 
-  useEffect(() => () => saveCurrentMediaState(), [activeFile]);
+  useEffect(() => () => saveCurrentMediaState(), [saveCurrentMediaState]);
 
   useEffect(() => {
     if (activeFile?.type !== 'video' || !isVideoPlaying || !isPlaybackWindowFocused) return;
@@ -458,18 +458,30 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   ) : null;
 
   const renderMedia = () => {
-    if (!activeFile) return <div className="flex h-full items-center justify-center bg-white/70 text-slate-900/70 backdrop-blur-xl">Select content to begin.</div>;
-    if (mediaHasError) return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
+    if (!activeFile) return <div className="flex h-full min-h-[500px] items-center justify-center bg-white/70 text-slate-900/70 backdrop-blur-xl">Select content to begin.</div>;
+    if (mediaHasError) return <div className="flex h-full min-h-[500px] w-full flex-col"><GlassDownloadCard file={activeFile} headline="Preview unavailable" /></div>;
     switch (activeFile.type) {
       case 'youtube': {
         const videoId = extractYouTubeID(activeFile.url);
-        return videoId ? <iframe key={activeFile.id} className="h-full w-full bg-white/70" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaHasError(true)} /> : <VideoUnavailablePlaceholder />;
+        return videoId ? (
+          <div className="flex h-full min-h-[500px] w-full flex-col items-center justify-center overflow-hidden bg-white/70 p-3 backdrop-blur-xl">
+            <div className="w-full aspect-video overflow-hidden rounded-[2rem] border border-white/60 bg-black shadow-sm">
+              <iframe key={activeFile.id} className="h-full w-full bg-black" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaHasError(true)} />
+            </div>
+          </div>
+        ) : <div className="flex h-full min-h-[500px] w-full flex-col"><VideoUnavailablePlaceholder /></div>;
       }
-      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onLoadedMetadata={(event) => restoreMediaState(activeFile, event.currentTarget)} onTimeUpdate={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; }} onPlay={() => setIsVideoPlaying(true)} onPause={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; setIsVideoPlaying(false); }} onEnded={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; mediaWasPlayingRef.current[String(activeFile.id)] = false; setIsVideoPlaying(false); }} onError={() => { setIsVideoPlaying(false); setMediaHasError(true); }} />;
+      case 'video': return (
+        <div className="flex h-full min-h-[500px] w-full flex-col items-center justify-center overflow-hidden bg-white/70 p-3 backdrop-blur-xl">
+          <div className="w-full aspect-video overflow-hidden rounded-[2rem] border border-white/60 bg-black shadow-sm">
+            <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-black object-contain" onLoadedMetadata={(event) => restoreMediaState(activeFile, event.currentTarget)} onTimeUpdate={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; }} onPlay={() => setIsVideoPlaying(true)} onPause={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; setIsVideoPlaying(false); }} onEnded={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; mediaWasPlayingRef.current[String(activeFile.id)] = false; setIsVideoPlaying(false); }} onError={() => { setIsVideoPlaying(false); setMediaHasError(true); }} />
+          </div>
+        </div>
+      );
       case 'audio': return <div className="flex h-full w-full flex-col items-center justify-center bg-white/70 p-8 text-slate-900"><svg xmlns="http://www.w3.org/2000/svg" className="mb-4 h-24 w-24 text-slate-900/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z" /></svg><h3 className="mb-6 max-w-full truncate text-xl font-semibold">{activeFile.name}</h3><audio ref={audioRef} key={activeFile.id} src={activeFile.url} controls className="w-full max-w-md" onLoadedMetadata={(event) => restoreMediaState(activeFile, event.currentTarget)} onTimeUpdate={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; }} onPause={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; }} onEnded={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; mediaWasPlayingRef.current[String(activeFile.id)] = false; }} onError={() => setMediaHasError(true)} /></div>;
       case 'pdf':
       case 'sheet': return (
-        <div className="flex h-full w-full flex-col overflow-y-auto bg-white/55 p-3 backdrop-blur-xl sm:p-5">
+        <div className="flex h-full min-h-[500px] w-full flex-col overflow-y-auto bg-white/55 p-3 backdrop-blur-xl sm:p-5">
           <div className="my-4 shrink-0 rounded-3xl border border-white/60 bg-white/80 p-3 shadow-sm">
             <GoogleAd variant="display" label="Sponsored" />
           </div>
@@ -530,7 +542,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
             </div>
           </aside>
 
-          <div className="relative min-h-0 overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)]">
+          <div className="relative flex min-h-[500px] min-w-0 flex-1 flex-col overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)]">
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>
