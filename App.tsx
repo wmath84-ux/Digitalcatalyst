@@ -775,17 +775,55 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
+    const getDock = () => document.getElementById('main-bottom-dock');
+    const shouldUseDesktopPointerReveal = () => window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches;
+    const applyDockVisibility = () => {
+      const dock = getDock();
+      if (!dock) return;
+      const isScrollHidden = dock.dataset.scrollHidden === 'true';
+      const isPointerRevealActive = dock.dataset.pointerReveal === 'true';
+      dock.dataset.hidden = isScrollHidden && !isPointerRevealActive ? 'true' : 'false';
+    };
+
     const onScroll = () => {
-      const dock = document.getElementById('main-bottom-dock');
+      const dock = getDock();
       if (!dock) return;
       const y = window.scrollY;
-      const last = Number((dock as any).dataset.lastY || 0);
-      (dock as any).dataset.hidden = y > last && y > 120 ? 'true' : 'false';
-      (dock as any).dataset.lastY = String(y);
+      const last = Number(dock.dataset.lastY || 0);
+      dock.dataset.scrollHidden = y > last && y > 120 ? 'true' : 'false';
+      dock.dataset.lastY = String(y);
+      applyDockVisibility();
     };
+
+    const onPointerMove = (event: MouseEvent) => {
+      const dock = getDock();
+      if (!dock) return;
+      if (!shouldUseDesktopPointerReveal()) {
+        dock.dataset.pointerReveal = 'false';
+        applyDockVisibility();
+        return;
+      }
+      const revealZonePx = 120;
+      dock.dataset.pointerReveal = window.innerHeight - event.clientY <= revealZonePx ? 'true' : 'false';
+      applyDockVisibility();
+    };
+
+    const onPointerLeave = () => {
+      const dock = getDock();
+      if (!dock) return;
+      dock.dataset.pointerReveal = 'false';
+      applyDockVisibility();
+    };
+
     window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('mousemove', onPointerMove, { passive: true });
+    document.addEventListener('mouseleave', onPointerLeave);
     onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('mousemove', onPointerMove);
+      document.removeEventListener('mouseleave', onPointerLeave);
+    };
   }, []);
 
   useEffect(() => {
