@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Announcement, NewsArticle, User } from '../App';
+import { Announcement, NewsArticle, User, WebsiteSettings } from '../App';
 import { EconomySettings } from '../utils/economy';
 import GoogleAd from './GoogleAd';
 
@@ -7,6 +7,7 @@ type ReadingListType = 'news' | 'blog';
 type ReadingView = ReadingListType | 'article' | 'announcement';
 
 interface ReadingDrawerProps {
+  settings: WebsiteSettings;
   economySettings: EconomySettings;
   isOpen: boolean;
   view: ReadingView;
@@ -27,6 +28,30 @@ interface ReadingDrawerProps {
   onReadingReward?: (article: NewsArticle) => boolean;
 }
 
+
+
+const defaultReadingStyle = {
+  backgroundColor: '#e8edf6',
+  backgroundOpacity: 88,
+  panelOpacity: 90,
+  cardOpacity: 76,
+  accentColor: '#4f46e5',
+  accentOpacity: 16,
+};
+
+const clampPercent = (value: unknown, fallback: number) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(100, Math.max(0, numeric));
+};
+
+const hexToRgba = (hex: string, opacityPercent: number, fallback = defaultReadingStyle.backgroundColor) => {
+  const normalized = /^#?[0-9a-f]{6}$/i.test(hex || '') ? hex.replace('#', '') : fallback.replace('#', '');
+  const red = parseInt(normalized.slice(0, 2), 16);
+  const green = parseInt(normalized.slice(2, 4), 16);
+  const blue = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${clampPercent(opacityPercent, defaultReadingStyle.backgroundOpacity) / 100})`;
+};
 
 const estimateReadMinutes = (text?: string) => Math.max(1, Math.ceil((text || '').split(/\s+/).filter(Boolean).length / 180));
 const formatDate = (date: string) => new Date(date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
@@ -163,7 +188,7 @@ const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: s
   </button>
 );
 
-const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
+const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings, isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const progressRef = useRef(0);
@@ -282,20 +307,26 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
 
   const rewardMinutes = Math.floor(rewardSecondsLeft / 60);
   const rewardSeconds = String(rewardSecondsLeft % 60).padStart(2, '0');
+  const readingStyle = { ...defaultReadingStyle, ...((settings.content as any).readingStyle || {}) };
+  const readingBackground = hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity);
+  const panelBackground = hexToRgba(readingStyle.backgroundColor, readingStyle.panelOpacity);
+  const cardBackground = `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;
+  const accentSoftBackground = hexToRgba(readingStyle.accentColor, readingStyle.accentOpacity, defaultReadingStyle.accentColor);
+  const accentStrongBackground = hexToRgba(readingStyle.accentColor, 92, defaultReadingStyle.accentColor);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[1200] bg-white/70 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="reading-drawer-title" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[1200] backdrop-blur-sm" style={{ backgroundColor: readingBackground }} role="dialog" aria-modal="true" aria-labelledby="reading-drawer-title" onMouseDown={onClose}>
       <div className="absolute inset-y-0 right-0 flex w-full justify-end">
-        <section onMouseDown={(e) => e.stopPropagation()} className="relative h-full w-full overflow-hidden border-l border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw]">
+        <section onMouseDown={(e) => e.stopPropagation()} className="relative h-full w-full overflow-hidden border-l border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw]" style={{ backgroundColor: panelBackground }}>
           <div className="sticky top-0 z-30 h-1 bg-white/70">
-            <div className="h-full rounded-r-full bg-gradient-to-r from-cyan-600 via-indigo-600 to-violet-600 shadow-sm transition-all duration-150" style={{ width: `${progress}%` }} />
+            <div className="h-full rounded-r-full shadow-sm transition-all duration-150" style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${accentStrongBackground}, rgba(14, 165, 233, 0.86), rgba(124, 58, 237, 0.86))` }} />
           </div>
 
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.24),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.18),transparent_28%)]" />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(circle at top left, ${accentSoftBackground}, transparent 32%), radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.10), transparent 28%)` }} />
 
-          <header className="relative z-20 flex items-center justify-between gap-4 border-b border-white/50 bg-white/70 px-4 py-4 backdrop-blur-2xl sm:px-8">
+          <header className="relative z-20 flex items-center justify-between gap-4 border-b border-white/50 px-4 py-4 backdrop-blur-2xl sm:px-8" style={{ backgroundColor: cardBackground }}>
             <div className="flex min-w-0 items-center gap-4">
               {(view === 'article' || view === 'announcement') && (
                 <button onClick={onBackToList} className="shrink-0 rounded-full border border-indigo-200/60 bg-white px-4 py-2 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-x-0.5 hover:bg-indigo-50 hover:shadow-md">
@@ -316,9 +347,9 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
           <div ref={scrollRef} onScroll={handleScroll} className="relative z-10 h-[calc(100%-73px)] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="px-5 py-8 sm:px-10 lg:px-16">
               <div className="mx-auto max-w-3xl">
-                <div className="mb-8 rounded-[2rem] border border-white/50 bg-white/70 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
+                <div className="mb-8 rounded-[2rem] border border-white/50 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl" style={{ backgroundColor: cardBackground }}>
                   <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
-                    <span className="rounded-full bg-indigo-400/10 px-3 py-1 font-bold text-indigo-700">{activeMeta.source}</span>
+                    <span className="rounded-full px-3 py-1 font-bold text-indigo-700" style={{ backgroundColor: accentSoftBackground }}>{activeMeta.source}</span>
                     <span>{formatDate(activeMeta.date)}</span>
                     <span>⏳ {activeMeta.readTime} min read</span>
                   </div>

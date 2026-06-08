@@ -438,6 +438,20 @@ export interface WebsiteSettings {
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
         dockItems: ['Store','Purchases','Wishlist','Cart','News','Blog','Free','Profile','Subscriptions'],
+        dockStyle?: {
+            backgroundColor: string;
+            backgroundOpacity: number;
+            itemOpacity: number;
+            accentOpacity: number;
+        };
+        readingStyle?: {
+            backgroundColor: string;
+            backgroundOpacity: number;
+            panelOpacity: number;
+            cardOpacity: number;
+            accentColor: string;
+            accentOpacity: number;
+        };
         socialLinks: {
             facebook: string;
             twitter: string;
@@ -672,6 +686,20 @@ const defaultWebsiteSettings: WebsiteSettings = {
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
         dockItems: ['Store','Purchases','Wishlist','Cart','News','Blog','Free','Profile','Subscriptions'],
+        dockStyle: {
+            backgroundColor: '#020617',
+            backgroundOpacity: 82,
+            itemOpacity: 8,
+            accentOpacity: 45,
+        },
+        readingStyle: {
+            backgroundColor: '#e8edf6',
+            backgroundOpacity: 88,
+            panelOpacity: 90,
+            cardOpacity: 76,
+            accentColor: '#4f46e5',
+            accentOpacity: 16,
+        },
         socialLinks: {
             facebook: "https://www.facebook.com/profile.php?viewas=100000686899395&id=61565419447036",
             twitter: "https://x.com/MathW12385",
@@ -758,14 +786,6 @@ const App: React.FC = () => {
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
     return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => undefined);
-    }
-    if (navigator.clipboard) { navigator.clipboard.readText().catch(() => undefined); }
-    if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(() => undefined); }
   }, []);
 
   useEffect(() => {
@@ -1960,7 +1980,7 @@ const App: React.FC = () => {
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
-            <ReadingDrawer economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={currentUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
+            <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={currentUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
             <main key={currentView} className={appleOpenClass}>{renderContent()}</main>
             <Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} />
