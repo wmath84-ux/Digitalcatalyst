@@ -11,8 +11,8 @@ const SubscriptionPage: React.FC<{economySettings: EconomySettings; activeCoinDi
   const lowestPlanPrice = plans.length ? Math.min(...plans.map(plan => plan.price || 0)) : 0;
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 pb-36 text-slate-900">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(37,99,235,0.38),transparent_28%),radial-gradient(circle_at_82%_5%,rgba(168,85,247,0.28),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.72),rgba(248,250,252,0.95))]" />
+    <div className="relative min-h-screen overflow-hidden bg-slate-100 bg-gradient-to-br from-slate-100 via-indigo-100/45 to-slate-200 pb-36 text-slate-900">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(37,99,235,0.24),transparent_28%),radial-gradient(circle_at_82%_5%,rgba(168,85,247,0.20),transparent_30%),linear-gradient(180deg,rgba(226,232,240,0.72),rgba(248,250,252,0.94))]" />
       <div className="absolute left-1/2 top-0 h-px w-[84%] -translate-x-1/2 bg-gradient-to-r from-transparent via-cyan-200/50 to-transparent" />
 
       <main className="relative mx-auto max-w-7xl px-5 py-10 sm:px-8 lg:px-10">
@@ -61,7 +61,7 @@ const SubscriptionPage: React.FC<{economySettings: EconomySettings; activeCoinDi
             };
 
             return (
-              <article key={plan.id} className={`group relative flex min-h-[25rem] flex-col overflow-hidden rounded-[2rem] border p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 ${isHighlighted ? 'border-cyan-200/40 bg-cyan-200/[0.10]' : 'border-white/50 bg-white/70'}`}>
+              <article key={plan.id} className={`group relative flex min-h-[25rem] flex-col overflow-hidden rounded-[2rem] border p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 ${isHighlighted ? 'border-cyan-300/50 bg-cyan-100/45' : 'border-white/60 bg-white/78'}`}>
                 <div className="absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-white/60 to-transparent opacity-0 transition group-hover:opacity-100" />
                 {isHighlighted && <span className="mb-5 w-fit rounded-full border border-cyan-200/40 bg-cyan-200/15 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-cyan-700">{plan.badge || 'Best Value'}</span>}
                 <div className="flex items-start justify-between gap-4">
