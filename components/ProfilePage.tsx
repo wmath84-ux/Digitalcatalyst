@@ -8,6 +8,8 @@ interface ProfilePageProps {
   settings: WebsiteSettings;
   economySettings: EconomySettings;
   onApplyCoinClaim: (claim: ActiveCoinDiscount) => void;
+  activeCoinDiscount?: ActiveCoinDiscount | null;
+  onClearCoinClaim: () => void;
   currentUser: User | null;
   purchasedProducts: ProductWithRating[];
   products: ProductWithRating[];
@@ -58,7 +60,7 @@ const defaultCoverImage =
   'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1800&q=80';
 
 const glassCard =
-  'border border-white/50 bg-white/70 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition-all duration-300 hover:-translate-y-1 hover:border-white/50 hover:shadow-sm hover:shadow-black/5';
+  'border border-white/55 bg-white/78 backdrop-blur-2xl shadow-[0_18px_55px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-white/70 hover:shadow-[0_22px_65px_rgba(15,23,42,0.12)]';
 
 const getStorageKey = (userId?: number) => `studentAchievementHubCover-${userId ?? 'guest'}`;
 
@@ -80,6 +82,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   settings,
   economySettings,
   onApplyCoinClaim,
+  activeCoinDiscount = null,
+  onClearCoinClaim,
   currentUser,
   purchasedProducts,
   products,
@@ -97,6 +101,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const [coverImage, setCoverImage] = React.useState(defaultCoverImage);
   const [redeeming, setRedeeming] = React.useState<string | null>(null);
   const [coinTransactions, setCoinTransactions] = React.useState<CoinTransaction[]>([]);
+  const [locallyRedeemedRewardIds, setLocallyRedeemedRewardIds] = React.useState<string[]>([]);
 
   React.useEffect(() => {
     const storedCover = localStorage.getItem(getStorageKey(currentUser?.id));
@@ -202,7 +207,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const pointsForNextLevel = 500;
   const nextLevelProgress = clamp((pointsIntoLevel / pointsForNextLevel) * 100);
   const pointsRemaining = Math.max(0, pointsForNextLevel - pointsIntoLevel);
-  const streakDays = Math.max(0, Math.min(21, Math.floor(studyMinutes / 55) + purchasedProducts.length));
+  const streakDays = Math.max(0, Math.min(60, Math.floor(studyMinutes / 55) + purchasedProducts.length));
+  const purchasedProductIdSet = React.useMemo(() => new Set(purchasedProducts.map(product => product.id)), [purchasedProducts]);
+  const pdfsRead = Math.max(0, ((currentUser as any)?.pdfsRead || 0) + coinTransactions.filter(entry => /pdf|read|document/i.test(`${entry.title || ''} ${entry.description || ''}`)).length + purchasedProducts.filter(product => product.category?.toLowerCase().includes('pdf') || product.title.toLowerCase().includes('pdf')).length);
 
   const learningProgress: LearningProgress[] = purchasedProducts.length
     ? purchasedProducts.slice(0, 5).map((product, index) => ({
@@ -221,6 +228,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     score: clamp(72 + index * 6 + (item.completion % 12)),
     accent: ['from-cyan-400 to-blue-500', 'from-fuchsia-400 to-purple-500', 'from-amber-300 to-orange-500', 'from-emerald-300 to-teal-500'][index % 4],
   }));
+
+  const continuousLearningDays = Math.max(streakDays, Math.min(90, Math.floor(watchTimeMinutes / 35) + learningProgress.filter(course => course.completion >= 50).length));
+  const streakCards = [
+    { id: 'daily-login', title: 'Daily Login Streak', icon: '🔥', value: streakDays, goal: 30, unit: 'days', accent: 'from-orange-400 via-amber-400 to-yellow-300', note: streakDays >= 30 ? 'Legendary daily rhythm unlocked.' : `${Math.max(0, 30 - streakDays)} days to a 30-day flame.` },
+    { id: 'learning-days', title: 'Continuous Learning Days', icon: '⚡', value: continuousLearningDays, goal: 45, unit: 'days', accent: 'from-cyan-400 via-blue-500 to-indigo-500', note: continuousLearningDays >= 45 ? 'Elite consistency streak active.' : `${Math.max(0, 45 - continuousLearningDays)} days to elite consistency.` },
+    { id: 'pdfs-read', title: 'PDFs Read', icon: '📄', value: pdfsRead, goal: 20, unit: 'PDFs', accent: 'from-emerald-400 via-teal-400 to-cyan-400', note: pdfsRead >= 20 ? 'Reading vault mastered.' : `${Math.max(0, 20 - pdfsRead)} PDFs to master the vault.` },
+    { id: 'quiz-pulse', title: 'Quiz Momentum', icon: '🎯', value: quizScores.filter(score => score.score >= 80).length, goal: Math.max(4, quizScores.length || 4), unit: 'wins', accent: 'from-fuchsia-400 via-purple-500 to-indigo-500', note: 'Score 80%+ to stack quiz wins.' },
+  ];
 
   const badges: Badge[] = [
     {
@@ -308,6 +323,27 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     }
   };
 
+  const getRewardButtonState = (reward: typeof dynamicClaimCards[number]) => {
+    const linkedPlan = ((settings.content as any).subscriptionPlans || []).find((plan: any) => String(plan.id) === String(reward.targetId));
+    const linkedPlanProductIds = linkedPlan?.unlockProductIds || [];
+    const isRedeemed = locallyRedeemedRewardIds.includes(reward.id) || (reward.targetType === 'product'
+      ? purchasedProductIdSet.has(Number(reward.targetId))
+      : linkedPlanProductIds.length > 0 && linkedPlanProductIds.every((id: number) => purchasedProductIdSet.has(id)));
+    const isActive = activeCoinDiscount?.targetType === reward.targetType
+      && (reward.targetType === 'product' ? activeCoinDiscount.productId === Number(reward.targetId) : activeCoinDiscount.subscriptionId === String(reward.targetId));
+    return { isRedeemed, isActive };
+  };
+
+  const handleRewardToggle = (reward: typeof dynamicClaimCards[number]) => {
+    const { isActive, isRedeemed } = getRewardButtonState(reward);
+    if (isRedeemed || !reward.claimable) return;
+    if (isActive) {
+      onClearCoinClaim();
+      return;
+    }
+    onApplyCoinClaim({ type: 'coin', targetType: reward.targetType, amount: reward.discount, coins: reward.requiredCoins, productId: reward.targetType === 'product' ? Number(reward.targetId) : undefined, subscriptionId: reward.targetType === 'subscription' ? String(reward.targetId) : undefined });
+  };
+
   const statCards = [
     { label: 'Courses Owned', value: purchasedProducts.length, icon: '📚' },
     { label: 'Video Watch Time', value: `${Math.floor(watchTimeMinutes / 60)}h ${watchTimeMinutes % 60}m`, icon: '⏱️' },
@@ -315,7 +351,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   ];
 
   return (
-    <div className="min-h-screen overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
+    <div className="min-h-screen overflow-hidden bg-slate-100 bg-gradient-to-br from-slate-100 via-indigo-100/45 to-slate-200 text-slate-900">
       <style>{`
         @keyframes hubFadeUp {
           from { opacity: 0; transform: translateY(28px); }
@@ -324,10 +360,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         .hub-animate { opacity: 0; animation: hubFadeUp 680ms ease-out forwards; }
       `}</style>
 
-      <div className="pointer-events-none fixed inset-0 opacity-70">
-        <div className="absolute left-[-10%] top-10 h-72 w-72 rounded-full bg-indigo-500/20 blur-3xl" />
-        <div className="absolute right-[-5%] top-1/3 h-96 w-96 rounded-full bg-cyan-400/10 blur-3xl" />
-        <div className="absolute bottom-[-10%] left-1/3 h-80 w-80 rounded-full bg-fuchsia-500/10 blur-3xl" />
+      <div className="pointer-events-none fixed inset-0 opacity-80">
+        <div className="absolute inset-0 bg-[linear-gradient(135deg,rgba(226,232,240,0.82),rgba(224,231,255,0.62),rgba(241,245,249,0.9))]" />
+        <div className="absolute left-[-10%] top-10 h-72 w-72 rounded-full bg-indigo-500/18 blur-3xl" />
+        <div className="absolute right-[-5%] top-1/3 h-96 w-96 rounded-full bg-cyan-500/12 blur-3xl" />
+        <div className="absolute bottom-[-10%] left-1/3 h-80 w-80 rounded-full bg-fuchsia-500/12 blur-3xl" />
       </div>
 
       <main className="relative mx-auto max-w-7xl px-4 py-5 sm:px-6 lg:px-8">
@@ -341,7 +378,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <section className={`hub-animate overflow-hidden rounded-[2rem] ${glassCard}`} style={{ animationDelay: '80ms' }}>
           <div className="relative aspect-video min-h-[300px] w-full sm:min-h-[420px]">
             <img src={coverImage} alt="Student achievement cover" className="h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-50 via-indigo-50/30/55 to-indigo-950/15" />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-950/78 via-slate-900/30 to-indigo-950/15" />
             <div className="absolute inset-x-0 top-0 flex items-center justify-between p-4 sm:p-6">
               <div className="rounded-full border border-white/50 bg-white/70 px-4 py-2 text-xs font-black uppercase tracking-[0.28em] text-cyan-700 backdrop-blur-xl">
                 Student Achievement Hub
@@ -361,14 +398,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     {(currentUser?.name || 'S').slice(0, 1).toUpperCase()}
                   </div>
                   <div className="pb-2">
-                    <p className="text-sm font-black uppercase tracking-[0.35em] text-cyan-700">Level {level} Scholar</p>
-                    <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-6xl">{currentUser?.name || 'Student'}</h1>
-                    <p className="mt-2 max-w-2xl text-sm text-slate-600 sm:text-base">
+                    <p className="text-sm font-black uppercase tracking-[0.35em] text-cyan-100">Level {level} Scholar</p>
+                    <h1 className="mt-2 text-4xl font-black tracking-tight text-white drop-shadow sm:text-6xl">{currentUser?.name || 'Student'}</h1>
+                    <p className="mt-2 max-w-2xl text-sm font-semibold text-slate-100 sm:text-base">
                       {currentUser?.email || 'student@learninghub.dev'} {currentUser?.mobile ? `• +91 ${currentUser.mobile}` : ''}
                     </p>
                   </div>
                 </div>
-                <div className="rounded-3xl border border-orange-300/20 bg-orange-400/10 px-5 py-4 text-right backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5">
+                <div className="rounded-3xl border border-orange-200/40 bg-slate-950/35 px-5 py-4 text-right text-white backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.22)]">
                   <p className="text-sm font-bold text-orange-100">Activity Streak</p>
                   <p className="mt-1 text-3xl font-black">🔥 {streakDays} Days</p>
                   <p className="text-xs uppercase tracking-[0.2em] text-orange-200/80">Active streak</p>
@@ -414,6 +451,41 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 </div>
               </div>
             ))}
+          </div>
+        </section>
+
+        <section className={`hub-animate mt-6 rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '320ms' }}>
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+            <div>
+              <p className="text-sm font-black uppercase tracking-[0.3em] text-orange-600">Gamification / Streaks</p>
+              <h2 className="mt-2 text-3xl font-black sm:text-4xl">Retention Flame Board</h2>
+            </div>
+            <div className="rounded-full border border-orange-200/70 bg-orange-50/90 px-4 py-2 text-sm font-black text-orange-700 shadow-sm">🔥 {streakCards.reduce((total, streak) => total + streak.value, 0)} total streak points</div>
+          </div>
+          <div className="mt-6 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+            {streakCards.map((streak, index) => {
+              const progress = clamp((streak.value / streak.goal) * 100);
+              return (
+                <article key={streak.id} className="group relative overflow-hidden rounded-[1.75rem] border border-white/60 bg-white/82 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_rgba(15,23,42,0.13)]" style={{ animationDelay: `${360 + index * 70}ms` }}>
+                  <div className={`absolute inset-x-0 top-0 h-1 bg-gradient-to-r ${streak.accent}`} />
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <p className="text-xs font-black uppercase tracking-[0.24em] text-slate-500">{streak.title}</p>
+                      <p className="mt-3 text-4xl font-black text-slate-950">{streak.value}<span className="ml-1 text-sm font-black text-slate-500">{streak.unit}</span></p>
+                    </div>
+                    <div className={`flex h-14 w-14 items-center justify-center rounded-2xl bg-gradient-to-br ${streak.accent} text-3xl shadow-[0_12px_30px_rgba(251,146,60,0.24)] transition group-hover:scale-110`}>{streak.icon}</div>
+                  </div>
+                  <div className="mt-5 h-3 overflow-hidden rounded-full bg-slate-200/80">
+                    <div className={`h-full rounded-full bg-gradient-to-r ${streak.accent} shadow-[0_0_18px_rgba(59,130,246,0.25)]`} style={{ width: `${progress}%` }} />
+                  </div>
+                  <div className="mt-3 flex items-center justify-between text-xs font-black text-slate-500">
+                    <span>{Math.round(progress)}% complete</span>
+                    <span>Goal {streak.goal}</span>
+                  </div>
+                  <p className="mt-4 rounded-2xl border border-slate-200/70 bg-slate-50/90 px-3 py-2 text-xs font-bold leading-5 text-slate-600">{streak.note}</p>
+                </article>
+              );
+            })}
           </div>
         </section>
 
@@ -530,29 +602,34 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             <h2 className="mt-2 text-3xl font-black">What You Can Claim</h2>
             <p className="mt-2 text-sm text-slate-600">Live wallet: 🪙 {eduPoints} • {coinRedeemRate} EduCoins = ₹1 discount.</p>
             <div className="mt-5 grid gap-3">
-              {dynamicClaimCards.length ? dynamicClaimCards.map((reward) => (
-                <article
-                  key={reward.id}
-                  className={`rounded-2xl border bg-white/70 p-4 text-left transition-all duration-300 hover:-translate-y-1 hover:bg-white/80 ${reward.claimable ? 'border-indigo-400 shadow-[0_0_15px_rgba(79,70,229,0.5)] animate-pulse' : 'border-white/50 shadow-sm'}`}
-                >
-                  <div className="flex items-start justify-between gap-4">
-                    <div>
-                      <span className="rounded-full border border-amber-200/70 bg-amber-50/80 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-amber-700">{reward.type}</span>
-                      <h3 className="mt-3 text-lg font-black text-slate-900">{reward.mode === 'unlock' ? `Unlock ${reward.name} for ${reward.requiredCoins} Coins` : `Claim ₹${reward.discount} Discount on ${reward.name}`}</h3>
-                      <p className="mt-1 text-xs font-bold text-slate-600">{reward.mode === 'unlock' ? 'Full access via EduCoin wallet.' : `Uses 🪙 ${reward.requiredCoins} at checkout.`} {reward.claimable ? 'Ready to apply now.' : `Earn ${Math.max(0, reward.requiredCoins - eduPoints)} more coins.`}</p>
-                    </div>
-                    <span className="text-2xl">{reward.claimable ? '✨' : '🔒'}</span>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={!reward.claimable}
-                    onClick={() => onApplyCoinClaim({ type: 'coin', targetType: reward.targetType, amount: reward.discount, coins: reward.requiredCoins, productId: reward.targetType === 'product' ? Number(reward.targetId) : undefined, subscriptionId: reward.targetType === 'subscription' ? String(reward.targetId) : undefined })}
-                    className="mt-4 w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 text-sm font-black text-white shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50"
+              {dynamicClaimCards.length ? dynamicClaimCards.map((reward) => {
+                const { isActive, isRedeemed } = getRewardButtonState(reward);
+                const isDisabled = isRedeemed || !reward.claimable;
+                const buttonLabel = isRedeemed ? 'Redeemed / Disabled' : isActive ? 'Applied - Click to Remove' : reward.claimable ? 'Apply & Checkout' : 'Keep Earning';
+                return (
+                  <article
+                    key={reward.id}
+                    className={`rounded-2xl border p-4 text-left transition-all duration-300 ${isRedeemed ? 'border-slate-300 bg-slate-100/90 opacity-75' : isActive ? 'border-emerald-400 bg-emerald-50/90 shadow-[0_0_20px_rgba(16,185,129,0.35)]' : reward.claimable ? 'border-indigo-400 bg-white/80 shadow-[0_0_15px_rgba(79,70,229,0.42)] hover:-translate-y-1 hover:bg-white/90' : 'border-white/50 bg-white/70 shadow-sm'}`}
                   >
-                    {reward.claimable ? 'Apply & Checkout' : 'Keep Earning'}
-                  </button>
-                </article>
-              )) : <p className="rounded-2xl border border-white/50 bg-white/70 p-4 text-slate-600">Reward claims will appear here once products or subscriptions are available.</p>}
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] ${isRedeemed ? 'border-slate-300 bg-slate-200 text-slate-500' : isActive ? 'border-emerald-200 bg-emerald-100 text-emerald-700' : 'border-amber-200/70 bg-amber-50/80 text-amber-700'}`}>{reward.type}</span>
+                        <h3 className="mt-3 text-lg font-black text-slate-900">{reward.mode === 'unlock' ? `Unlock ${reward.name} for ${reward.requiredCoins} Coins` : `Claim ₹${reward.discount} Discount on ${reward.name}`}</h3>
+                        <p className="mt-1 text-xs font-bold text-slate-600">{isRedeemed ? 'This reward is already used and cannot be selected again.' : reward.mode === 'unlock' ? 'Full access via EduCoin wallet.' : `Uses 🪙 ${reward.requiredCoins} at checkout.`} {!isRedeemed && (reward.claimable ? 'Ready to apply now.' : `Earn ${Math.max(0, reward.requiredCoins - eduPoints)} more coins.`)}</p>
+                      </div>
+                      <span className="text-2xl">{isRedeemed ? '✅' : isActive ? '🔥' : reward.claimable ? '✨' : '🔒'}</span>
+                    </div>
+                    <button
+                      type="button"
+                      disabled={isDisabled}
+                      onClick={() => handleRewardToggle(reward)}
+                      className={`mt-4 w-full rounded-2xl px-4 py-3 text-sm font-black shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition active:scale-95 ${isRedeemed ? 'cursor-not-allowed bg-slate-300 text-slate-500' : isActive ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:-translate-y-0.5' : reward.claimable ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:-translate-y-0.5' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}
+                    >
+                      {buttonLabel}
+                    </button>
+                  </article>
+                );
+              }) : <p className="rounded-2xl border border-white/50 bg-white/70 p-4 text-slate-600">Reward claims will appear here once products or subscriptions are available.</p>}
             </div>
           </div>
 
