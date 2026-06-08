@@ -448,7 +448,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
               tracks={audioTracks}
               title={activeFile.name || product.title}
               variant="full"
-              className="w-full max-w-4xl"
+              className="w-full max-w-3xl xl:max-w-4xl"
               initialTrackId={activeFile.id}
               onError={() => setMediaHasError(true)}
             />
