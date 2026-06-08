@@ -111,6 +111,20 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
     }
   }, [activeIndex, isPlaying]);
 
+  useEffect(() => {
+    if (!isPlaying) return;
+    let frameId = 0;
+
+    const syncProgress = () => {
+      const audio = audioRef.current;
+      if (audio) setCurrentTime(audio.currentTime);
+      frameId = window.requestAnimationFrame(syncProgress);
+    };
+
+    frameId = window.requestAnimationFrame(syncProgress);
+    return () => window.cancelAnimationFrame(frameId);
+  }, [activeIndex, isPlaying]);
+
   if (tracks.length === 0 || !activeTrack) return null;
 
   const goToTrack = (index: number) => {
@@ -146,6 +160,15 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
     if (deltaX < 0) goToNext();
     else goToTrack(activeIndex - 1);
   };
+
+  const progress = duration > 0 ? clamp(currentTime / duration, 0, 1) : 0;
+  const beatLevel = isPlaying ? 0.35 + Math.abs(Math.sin(currentTime * 5.2)) * 0.35 + Math.abs(Math.sin(currentTime * 12.8)) * 0.3 : 0;
+  const waveformBars = Array.from({ length: isFull ? 52 : 32 }, (_, index) => {
+    const seed = activeTrack.id.charCodeAt(index % activeTrack.id.length) || 7;
+    const base = 34 + Math.abs(Math.sin(index * 0.82 + seed)) * 42;
+    const pulse = isPlaying ? Math.sin(currentTime * 8 + index * 0.62) * 18 * beatLevel : 0;
+    return clamp(base + pulse, 18, 96);
+  });
 
   const controlButtonClass = 'grid h-11 w-11 shrink-0 place-items-center rounded-full bg-white/10 text-white transition hover:bg-white/20';
   const cardSizeClass = isFull ? 'h-44 w-44 sm:h-52 sm:w-52 lg:h-56 lg:w-56 xl:h-64 xl:w-64' : 'h-28 w-28';
@@ -195,9 +218,16 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
                 type="button"
                 onClick={() => goToTrack(index)}
                 className={`${isActive ? `${cardSizeClass} opacity-100` : 'h-24 w-24 opacity-55 blur-[0.5px]'} relative shrink-0 overflow-hidden rounded-[1.6rem] border transition-all duration-300 ${isActive ? 'border-white/80 shadow-[0_0_32px_rgba(125,211,252,0.65),0_0_46px_rgba(217,70,239,0.35)]' : 'border-white/30'} bg-white/10`}
+                style={isActive && isPlaying ? { transform: `scale(${1 + beatLevel * 0.035})`, boxShadow: `0 0 ${34 + beatLevel * 30}px rgba(125,211,252,0.72), 0 0 ${46 + beatLevel * 34}px rgba(217,70,239,0.42)` } : undefined}
                 aria-label={`Play ${track.title}`}
               >
                 <img src={track.cover} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                {isActive && isPlaying && (
+                  <>
+                    <span className="absolute inset-0 bg-cyan-300/10 mix-blend-screen" style={{ opacity: beatLevel * 0.45 }} />
+                    <span className="absolute inset-3 rounded-[1.2rem] border border-white/45" style={{ transform: `scale(${1 + beatLevel * 0.08})`, opacity: 0.25 + beatLevel * 0.35 }} />
+                  </>
+                )}
                 <span className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/10 to-transparent" />
                 <span className="absolute bottom-3 left-3 right-3 text-left">
                   <span className="block truncate text-sm font-black uppercase tracking-wide">{track.title}</span>
@@ -223,17 +253,33 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
           </div>
 
           <label className="sr-only" htmlFor={progressId}>Audio progress</label>
-          <input
-            id={progressId}
-            type="range"
-            min="0"
-            max={duration || 0}
-            step="1"
-            value={clamp(currentTime, 0, duration || 0)}
-            onChange={handleScrub}
-            className="h-1 w-full accent-white"
-          />
-          <div className="mt-1 flex justify-between text-xs font-bold text-white/75">
+          <div className="relative overflow-hidden rounded-2xl border border-white/10 bg-slate-950/35 px-3 py-3 shadow-[inset_0_1px_10px_rgba(255,255,255,0.08)]">
+            <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_var(--wave-progress)_50%,rgba(56,189,248,0.32),transparent_26%),linear-gradient(90deg,rgba(34,211,238,0.12),rgba(217,70,239,0.14),rgba(251,191,36,0.10))]" style={{ ['--wave-progress' as string]: `${progress * 100}%` }} />
+            <div className="relative flex h-16 items-center gap-1 sm:h-20" aria-hidden="true">
+              {waveformBars.map((height, index) => {
+                const barProgress = waveformBars.length <= 1 ? 1 : index / (waveformBars.length - 1);
+                const isFilled = barProgress <= progress;
+                return (
+                  <span
+                    key={`${activeTrack.id}-wave-${index}`}
+                    className={`flex-1 rounded-full transition-all duration-150 ${isFilled ? 'bg-gradient-to-t from-cyan-300 via-fuchsia-300 to-amber-200 shadow-[0_0_12px_rgba(56,189,248,0.55)]' : 'bg-white/20'}`}
+                    style={{ height: `${isFilled ? height : Math.max(14, height * 0.42)}%`, opacity: isFilled ? 0.96 : 0.42 }}
+                  />
+                );
+              })}
+            </div>
+            <input
+              id={progressId}
+              type="range"
+              min="0"
+              max={duration || 0}
+              step="0.1"
+              value={clamp(currentTime, 0, duration || 0)}
+              onChange={handleScrub}
+              className="absolute inset-0 h-full w-full cursor-pointer opacity-0"
+            />
+          </div>
+          <div className="mt-2 flex justify-between text-xs font-bold text-white/75">
             <span>{formatTime(currentTime)}</span>
             <span>{formatTime(duration)}</span>
           </div>
