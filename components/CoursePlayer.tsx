@@ -443,12 +443,12 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           cover: backgroundImage,
         }];
         return (
-          <div className="flex h-full w-full items-center justify-center bg-white/70 p-4 text-slate-900 sm:p-8">
+          <div className="flex h-full w-full bg-white/70 p-3 text-slate-900 sm:p-5">
             <ProductMusicPlayer
               tracks={audioTracks}
               title={activeFile.name || product.title}
               variant="full"
-              className="w-full max-w-3xl xl:max-w-4xl"
+              className="h-full w-full"
               initialTrackId={activeFile.id}
               onError={() => setMediaHasError(true)}
             />
