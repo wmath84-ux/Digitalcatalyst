@@ -1,4 +1,5 @@
 import React from 'react';
+import { useNavigate } from 'react-router-dom';
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { ActiveCoinDiscount, CoinTransaction, Coupon, ProductWithRating, ProfileMilestoneConfig, ProfileStreakConfig, ProfileStreakMetric, ProfileMilestoneMetric, ThemeName, themes, User, WebsiteSettings } from '../App';
 import { EconomySettings, resolveCoinPrice, resolveMaxDiscountPercentage } from '../utils/economy';
@@ -22,6 +23,7 @@ interface ProfilePageProps {
   setUsers: (users: User[]) => void;
   setCurrentUser: (user: User | null) => void;
   onClaimMilestoneReward: (reward: { id: string; title: string; requirement: number; unlockProductIds?: number[]; coinReward?: number; currentValue?: number }) => boolean;
+  onOpenVerifiedCourse?: (course: ProductWithRating) => void;
 }
 
 interface LearningProgress {
@@ -29,6 +31,8 @@ interface LearningProgress {
   title: string;
   category: string;
   completion: number;
+  product: ProductWithRating;
+  totalLessons: number;
 }
 
 interface QuizScore {
@@ -125,13 +129,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   setUsers,
   setCurrentUser,
   onClaimMilestoneReward,
+  onOpenVerifiedCourse,
 }) => {
+  const navigate = useNavigate();
   const coverInputRef = React.useRef<HTMLInputElement | null>(null);
   const [coverImage, setCoverImage] = React.useState(defaultCoverImage);
   const [redeeming, setRedeeming] = React.useState<string | null>(null);
   const [coinTransactions, setCoinTransactions] = React.useState<CoinTransaction[]>([]);
   const [locallyRedeemedRewardIds, setLocallyRedeemedRewardIds] = React.useState<string[]>([]);
   const [dailyActivity, setDailyActivity] = React.useState<DailyActivityState>({ lastActiveDate: '', streakDays: 0 });
+  const [courseAccessError, setCourseAccessError] = React.useState('');
 
   React.useEffect(() => {
     const storedCover = localStorage.getItem(getStorageKey(currentUser?.id));
@@ -194,7 +201,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const profileStyle = { ...fallbackProfileStyle, ...((settings.content as any).profileStyle || {}) };
   const profileStreakConfigs = (((settings.content as any).profileStreaks || fallbackStreakConfigs) as ProfileStreakConfig[]).filter(streak => streak.active !== false).slice(0, 12);
   const profileMilestoneConfigs = (((settings.content as any).profileMilestones || fallbackMilestoneConfigs) as ProfileMilestoneConfig[]).filter(milestone => milestone.active !== false).slice(0, 12);
-  const purchasedProductIdSet = React.useMemo(() => new Set(purchasedProducts.map(product => product.id)), [purchasedProducts]);
+  const purchasedProductIdSet = React.useMemo(() => new Set(purchasedProducts.map(product => String(product.id))), [purchasedProducts]);
   const readArticleCount = new Set([...(currentUser?.rewardedArticleIds || []), ...(currentUser?.readArticles || [])]).size;
   const quizWinCount = new Set(currentUser?.rewardedQuizIds || []).size;
   const coinTransactionCount = coinTransactions.length || (currentUser?.coinTransactions || []).length;
@@ -241,9 +248,28 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           title: product.title,
           category: product.category || 'Premium course',
           completion: Math.round(completion),
+          product,
+          totalLessons: getCourseFileCount(product.courseContent || []),
         };
       })
     : [];
+
+  const verifyCoursePurchase = (courseId: number | string) => {
+    if (!currentUser?.id) return false;
+    const courseIdKey = String(courseId);
+    const localPurchasedIds = JSON.parse(localStorage.getItem('purchasedProducts') || '[]') as Array<number | string>;
+    return purchasedProductIdSet.has(courseIdKey) || localPurchasedIds.some(id => String(id) === courseIdKey);
+  };
+
+  const handleContinueLearning = (course: LearningProgress) => {
+    setCourseAccessError('');
+    if (!verifyCoursePurchase(course.id)) {
+      setCourseAccessError(`Purchase verification failed for ${course.title}. Please buy this course or refresh your account access.`);
+      return;
+    }
+    navigate(`/course/${course.id}`);
+    onOpenVerifiedCourse?.(course.product);
+  };
 
   const completedCourses = learningProgress.filter(course => course.completion >= 100).length;
   const level = Math.max(1, Math.floor(eduPoints / 500) + 1);
@@ -600,78 +626,105 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </section>
 
-        <section className="mt-6 grid gap-6 lg:grid-cols-[1fr_0.8fr]">
-          <div className={`hub-animate rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '360ms' }}>
-            <div className="flex items-center justify-between gap-4">
+        <section className="mt-6 grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+          <div className={`hub-animate overflow-hidden rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '360ms' }}>
+            <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-r from-indigo-500/15 via-cyan-400/15 to-fuchsia-400/15 blur-2xl" />
+            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-sm font-black uppercase tracking-[0.3em] text-indigo-700">Learning Analytics</p>
                 <h2 className="mt-2 text-3xl font-black">Course Completion</h2>
+                <p className="mt-2 text-sm font-bold text-slate-600">Every purchased course gets its own live progress card.</p>
               </div>
               {!purchasedProducts.length && (
-                <button onClick={onExplore} className="rounded-full bg-white px-4 py-2 text-sm font-black text-slate-900 transition-all duration-300 hover:-translate-y-1 hover:shadow-sm">
+                <button onClick={onExplore} className="rounded-full bg-white/85 px-4 py-2 text-sm font-black text-slate-900 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md">
                   Explore Courses
                 </button>
               )}
             </div>
-            <div className="mt-6 grid gap-4">
+            {courseAccessError && (
+              <div className="relative mt-5 rounded-2xl border border-rose-200 bg-rose-50/90 px-4 py-3 text-sm font-black text-rose-700 shadow-sm" role="alert">
+                {courseAccessError}
+              </div>
+            )}
+            <div className="relative mt-6 grid gap-4">
               {learningProgress.length ? learningProgress.map((course, index) => {
                 const circumference = 2 * Math.PI * 38;
                 const dashOffset = circumference - (course.completion / 100) * circumference;
+                const accent = [
+                  'from-cyan-400 via-blue-500 to-indigo-600',
+                  'from-fuchsia-400 via-purple-500 to-indigo-600',
+                  'from-amber-300 via-orange-400 to-rose-500',
+                  'from-emerald-300 via-teal-400 to-cyan-500',
+                ][index % 4];
                 return (
-                  <div key={course.id} className="rounded-3xl border border-white/50 bg-white/70 p-4 transition-all duration-300 hover:-translate-y-1 hover:bg-white/80 hover:shadow-sm">
-                    <div className="flex items-center gap-4">
-                      <div className="relative h-24 w-24 shrink-0">
-                        <svg viewBox="0 0 100 100" className="h-full w-full -rotate-90">
+                  <article key={course.id} className="group relative overflow-hidden rounded-[1.75rem] border border-white/60 bg-white/75 p-5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/90 hover:shadow-[0_24px_60px_rgba(15,23,42,0.12)]">
+                    <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${accent}`} />
+                    <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
+                      <div className="relative mx-auto h-28 w-28 shrink-0 sm:mx-0">
+                        <div className={`absolute inset-2 rounded-full bg-gradient-to-br ${accent} opacity-20 blur-xl transition group-hover:opacity-35`} />
+                        <svg viewBox="0 0 100 100" className="relative h-full w-full -rotate-90 drop-shadow-sm">
                           <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-slate-900/10" />
-                          <circle
-                            cx="50"
-                            cy="50"
-                            r="38"
-                            stroke="currentColor"
-                            strokeWidth="10"
-                            fill="transparent"
-                            strokeLinecap="round"
-                            strokeDasharray={circumference}
-                            strokeDashoffset={dashOffset}
-                            className={index % 2 === 0 ? 'text-cyan-300' : 'text-fuchsia-300'}
-                          />
+                          <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} className={index % 2 === 0 ? 'text-cyan-400' : 'text-fuchsia-400'} />
                         </svg>
-                        <span className="absolute inset-0 flex items-center justify-center text-lg font-black">{course.completion}%</span>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <p className="truncate text-xl font-black">{course.title}</p>
-                        <p className="mt-1 text-sm text-slate-600">{course.category}</p>
-                        <div className="mt-4 h-2 rounded-full bg-white/70">
-                          <div className="h-full rounded-full bg-gradient-to-r from-cyan-300 to-indigo-400" style={{ width: `${course.completion}%` }} />
+                        <div className="absolute inset-0 flex flex-col items-center justify-center rounded-full">
+                          <span className="text-2xl font-black text-slate-950">{course.completion}%</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Done</span>
                         </div>
                       </div>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="rounded-full border border-white/70 bg-white/85 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-indigo-700 shadow-sm">{course.category}</span>
+                          <span className="rounded-full bg-slate-900/5 px-3 py-1 text-xs font-black text-slate-600">{course.totalLessons || 1} lessons</span>
+                        </div>
+                        <h3 className="mt-3 truncate text-2xl font-black text-slate-950">{course.title}</h3>
+                        <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-900/10 ring-1 ring-white/70">
+                          <div className={`h-full rounded-full bg-gradient-to-r ${accent} shadow-[0_0_20px_rgba(59,130,246,0.35)]`} style={{ width: `${course.completion}%` }} />
+                        </div>
+                        <div className="mt-3 flex items-center justify-between text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                          <span>{course.completion >= 100 ? 'Completed' : 'In Progress'}</span>
+                          <span>{Math.max(0, 100 - course.completion)}% left</span>
+                        </div>
+                      </div>
+                      <button type="button" onClick={() => handleContinueLearning(course)} className={`rounded-2xl bg-gradient-to-r ${accent} px-5 py-3 text-sm font-black text-white shadow-[0_14px_35px_rgba(79,70,229,0.28)] transition active:scale-95 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(79,70,229,0.34)]`}>
+                        {course.completion >= 100 ? 'Continue Learning' : 'Complete Your Course'}
+                      </button>
                     </div>
-                  </div>
+                  </article>
                 );
               }) : <div className="rounded-3xl border border-dashed border-indigo-200 bg-white/70 p-6 text-center font-bold text-slate-600">No purchased course progress yet. Buy or open a course to start real completion tracking.</div>}
             </div>
           </div>
 
-          <div className={`hub-animate rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '440ms' }}>
-            <p className="text-sm font-black uppercase tracking-[0.3em] text-fuchsia-700">Recent Quiz Scores</p>
-            <h2 className="mt-2 text-3xl font-black">Performance Pulse</h2>
-            <div className="mt-6 flex h-36 items-end gap-3 rounded-3xl border border-white/50 bg-white/70 p-4">
-              {quizScores.length ? quizScores.map(score => (
-                <div key={score.title} className="flex flex-1 flex-col items-center gap-2">
-                  <div className={`w-full rounded-t-2xl bg-gradient-to-t ${score.accent} shadow-[0_8px_30px_rgb(0,0,0,0.04)]`} style={{ height: `${score.score}%` }} />
-                  <span className="text-xs font-black text-slate-600">{score.score}%</span>
+          <div className={`hub-animate overflow-hidden rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '440ms' }}>
+            <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-fuchsia-300/20 blur-3xl" />
+            <div className="relative">
+              <p className="text-sm font-black uppercase tracking-[0.3em] text-fuchsia-700">Recent Quiz Scores</p>
+              <h2 className="mt-2 text-3xl font-black">Performance Pulse</h2>
+              <div className="mt-6 rounded-[1.75rem] border border-white/60 bg-white/75 p-4 shadow-inner backdrop-blur-xl">
+                <div className="flex h-40 items-end gap-3">
+                  {quizScores.length ? quizScores.map(score => (
+                    <div key={score.title} className="flex flex-1 flex-col items-center gap-2">
+                      <div className="flex h-full w-full items-end rounded-2xl bg-slate-900/5 p-1">
+                        <div className={`w-full rounded-2xl bg-gradient-to-t ${score.accent} shadow-[0_14px_32px_rgba(15,23,42,0.16)] transition-all duration-500 hover:scale-[1.03]`} style={{ height: `${score.score}%` }} />
+                      </div>
+                      <span className="text-xs font-black text-slate-600">{score.score}%</span>
+                    </div>
+                  )) : <div className="flex h-full w-full items-center justify-center text-center text-sm font-bold text-slate-500">Complete quizzes to generate real performance pulse bars.</div>}
                 </div>
-              )) : <div className="flex h-full w-full items-center justify-center text-center text-sm font-bold text-slate-500">Complete quizzes to generate real performance pulse bars.</div>}
-            </div>
-            <div className="mt-5 space-y-3">
-              {quizScores.length ? quizScores.map(score => (
-                <div key={score.title} className="rounded-2xl border border-white/50 bg-white/70 p-3">
-                  <div className="flex items-center justify-between gap-3 text-sm font-bold">
-                    <span className="truncate">{score.title}</span>
-                    <span className="text-cyan-700">{score.score}%</span>
+              </div>
+              <div className="mt-5 space-y-3">
+                {quizScores.length ? quizScores.map(score => (
+                  <div key={score.title} className="rounded-2xl border border-white/60 bg-white/75 p-3 shadow-sm backdrop-blur-xl">
+                    <div className="flex items-center justify-between gap-3 text-sm font-bold">
+                      <span className="truncate">{score.title}</span>
+                      <span className="rounded-full bg-cyan-50 px-3 py-1 text-cyan-700">{score.score}%</span>
+                    </div>
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-900/10">
+                      <div className={`h-full rounded-full bg-gradient-to-r ${score.accent}`} style={{ width: `${score.score}%` }} />
+                    </div>
                   </div>
-                </div>
-              )) : <div className="rounded-2xl border border-dashed border-fuchsia-200 bg-white/70 p-4 text-sm font-bold text-slate-600">No quiz rewards claimed yet.</div>}
+                )) : <div className="rounded-2xl border border-dashed border-fuchsia-200 bg-white/70 p-4 text-sm font-bold text-slate-600">No quiz rewards claimed yet.</div>}
+              </div>
             </div>
           </div>
         </section>
