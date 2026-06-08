@@ -3,7 +3,7 @@ import type { CourseModule, ProductFile, ProductWithRating } from '../App';
 
 type PlayerVariant = 'compact' | 'full';
 
-type AudioTrack = {
+export type AudioTrack = {
   id: string;
   title: string;
   subtitle: string;
@@ -12,9 +12,13 @@ type AudioTrack = {
 };
 
 interface ProductMusicPlayerProps {
-  product: ProductWithRating;
+  product?: ProductWithRating;
+  tracks?: AudioTrack[];
+  title?: string;
   variant?: PlayerVariant;
   className?: string;
+  initialTrackId?: string;
+  onError?: () => void;
 }
 
 const isPlayableAudioFile = (file: ProductFile): boolean => file.type === 'audio' && Boolean(file.url);
@@ -53,8 +57,19 @@ const formatTime = (seconds: number): string => {
 
 const clamp = (value: number, min: number, max: number) => Math.min(max, Math.max(min, value));
 
-const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, variant = 'compact', className = '' }) => {
-  const tracks = useMemo(() => getProductAudioTracks(product), [product]);
+const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks: providedTracks, title, variant = 'compact', className = '', initialTrackId, onError }) => {
+  const fallbackTitle = title || product?.title || 'Course audio';
+  const fallbackCoverSeed = product?.imageSeed || product?.id || 'course-audio';
+  const tracks = useMemo(() => {
+    if (providedTracks) {
+      return providedTracks.map((track, index) => ({
+        ...track,
+        cover: track.cover || `https://picsum.photos/seed/${fallbackCoverSeed}-${index}/600/600`,
+      }));
+    }
+
+    return product ? getProductAudioTracks(product) : [];
+  }, [fallbackCoverSeed, product, providedTracks]);
   const [activeIndex, setActiveIndex] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
@@ -71,11 +86,12 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, varian
   const isFull = variant === 'full';
 
   useEffect(() => {
-    setActiveIndex(0);
+    const requestedIndex = initialTrackId ? tracks.findIndex(track => track.id === initialTrackId) : -1;
+    setActiveIndex(requestedIndex >= 0 ? requestedIndex : 0);
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
-  }, [product.id, tracks.length]);
+  }, [fallbackTitle, initialTrackId, tracks]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -136,7 +152,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, varian
     : 'rounded-3xl p-4';
 
   return (
-    <section className={`relative overflow-hidden border border-white/40 bg-slate-950 text-white shadow-[0_24px_70px_rgba(15,23,42,0.20)] ${shellClass} ${className}`} aria-label={`${product.title} music player`}>
+    <section className={`relative overflow-hidden border border-white/40 bg-slate-950 text-white shadow-[0_24px_70px_rgba(15,23,42,0.20)] ${shellClass} ${className}`} aria-label={`${fallbackTitle} music player`}>
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(125,211,252,0.36),transparent_32%),radial-gradient(circle_at_88%_24%,rgba(217,70,239,0.36),transparent_30%),linear-gradient(180deg,rgba(15,23,42,0.2),rgba(8,47,73,0.62))]" />
       <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-cyan-950/80 via-slate-900/10 to-transparent" />
 
@@ -148,6 +164,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, varian
         onLoadedMetadata={event => setDuration(event.currentTarget.duration || 0)}
         onTimeUpdate={event => setCurrentTime(event.currentTarget.currentTime)}
         onEnded={() => (isLooping ? undefined : goToNext())}
+        onError={onError}
       />
 
       <div className="relative z-10">
