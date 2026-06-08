@@ -725,6 +725,9 @@ const App: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [tickets, setTickets] = useState<SupportTicket[]>(initialSupportTickets);
   const [currentView, setCurrentView] = useState('home'); 
+  const currentViewRef = React.useRef(currentView);
+  const historyNavigationRef = React.useRef(false);
+  const lastHistoryViewRef = React.useRef(currentView);
   const [selectedProduct, setSelectedProduct] = useState<ProductWithRating | null>(null);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
@@ -773,6 +776,45 @@ const App: React.FC = () => {
     courseContent: normalizeCourseModules(product.courseContent || []),
     priceHistory: product.priceHistory || [],
   });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const currentState = window.history.state || {};
+    if (currentState.dcView !== currentView) {
+      window.history.replaceState({ ...currentState, dcView: currentView }, '', window.location.href);
+    }
+    lastHistoryViewRef.current = currentView;
+
+    const onPopState = (event: PopStateEvent) => {
+      const nextView = event.state?.dcView;
+      if (typeof nextView === 'string') {
+        historyNavigationRef.current = true;
+        setCurrentView(nextView);
+        return;
+      }
+      if (currentViewRef.current !== 'home') {
+        historyNavigationRef.current = true;
+        window.history.pushState({ dcView: 'home' }, '', window.location.href);
+        setCurrentView('home');
+      }
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    currentViewRef.current = currentView;
+    if (typeof window === 'undefined') return;
+    if (historyNavigationRef.current) {
+      historyNavigationRef.current = false;
+      lastHistoryViewRef.current = currentView;
+      return;
+    }
+    if (lastHistoryViewRef.current === currentView) return;
+    window.history.pushState({ ...(window.history.state || {}), dcView: currentView }, '', window.location.href);
+    lastHistoryViewRef.current = currentView;
+  }, [currentView]);
 
   useEffect(() => {
     const getDock = () => document.getElementById('main-bottom-dock');
@@ -1338,7 +1380,6 @@ const App: React.FC = () => {
     if (currentView === 'home') window.scrollTo({ top: 0, behavior: 'smooth' });
     else {
       setCurrentView('home');
-      setSelectedProduct(null);
       window.scrollTo(0, 0);
     }
   };
