@@ -1,6 +1,7 @@
 
 import React, { useRef, useEffect } from 'react';
 import { NewsArticle, WebsiteSettings } from '../App';
+import GoogleAd from './GoogleAd';
 
 interface LatestNewsProps {
   settings: WebsiteSettings;
@@ -81,6 +82,8 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
       className={`py-24 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
     >
       <div className="container mx-auto px-6">
+        <GoogleAd variant="display" label="Advertisement" className="mb-12 rounded-[2rem] border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl" />
+
         <div className="flex flex-col md:flex-row justify-between items-end mb-12">
             <div className="max-w-2xl">
                 <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight">{title}</h2>
@@ -98,19 +101,25 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
             className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
         >
           {newsArticles.map((article, index) => (
-            <NewsCard 
-              key={article.id}
-              settings={settings}
-              article={article} 
-              animationDelay={index}
-              onReadMoreClick={onReadMoreClick}
-            />
+            <React.Fragment key={article.id}>
+              <NewsCard 
+                settings={settings}
+                article={article} 
+                animationDelay={index}
+                onReadMoreClick={onReadMoreClick}
+              />
+              {(index + 1) % 3 === 0 && index < newsArticles.length - 1 && (
+                <GoogleAd variant="inFeed" label="Sponsored" className="md:col-span-2 lg:col-span-3 rounded-[2rem] border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl" />
+              )}
+            </React.Fragment>
           ))}
         </div>
         
         <button onClick={onOpenHub} className="md:hidden w-full mt-8 border border-white/50 bg-white/70 py-3 rounded-lg font-semibold text-indigo-700">
             Open News
         </button>
+
+        <GoogleAd variant="display" label="Advertisement" className="mt-12 rounded-[2rem] border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl" />
       </div>
     </section>
   );
