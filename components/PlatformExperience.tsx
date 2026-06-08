@@ -24,7 +24,7 @@ const PlatformExperience: React.FC<PlatformExperienceProps> = ({ settings }) => 
 
       <div className="relative container mx-auto px-6">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-black uppercase tracking-[0.32em] text-cyan-200">Creator commerce OS</p>
+          <p className="text-sm font-black uppercase tracking-[0.32em] text-cyan-700">Creator commerce OS</p>
           <h2 className="mt-4 text-4xl font-black leading-tight sm:text-5xl lg:text-6xl">
             A nested, premium learning app for selling notes, subscriptions, and video courses.
           </h2>

@@ -230,7 +230,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
       <div className="min-h-full bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
         <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.35em] text-cyan-200/80">News & Blog Management</p>
+            <p className="text-xs font-black uppercase tracking-[0.35em] text-cyan-700/80">News & Blog Management</p>
             <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-900">{editingPost.id ? 'Edit reading post' : 'Create reading post'}</h1>
             <p className="mt-3 max-w-3xl text-slate-600">Full-page editor with Smart Docs formatting, no cramped modals.</p>
           </div>
@@ -311,7 +311,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
     <div className="min-h-full bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
       <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.35em] text-cyan-200/80">Daily Reading Hub CMS</p>
+          <p className="text-xs font-black uppercase tracking-[0.35em] text-cyan-700/80">Daily Reading Hub CMS</p>
           <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-900">News & Blog Management</h1>
           <p className="mt-3 max-w-3xl text-slate-600">Manage manual posts or let AI Autopilot generate fresh student reading content every day.</p>
         </div>
@@ -321,7 +321,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
       <section className={`${glassCard} mb-8 overflow-hidden`}>
         <div className="flex flex-col gap-6 xl:flex-row xl:items-center xl:justify-between">
           <div>
-            <p className="text-xs font-black uppercase tracking-[0.35em] text-fuchsia-200/80">AI Autopilot Status</p>
+            <p className="text-xs font-black uppercase tracking-[0.35em] text-fuchsia-700/80">AI Autopilot Status</p>
             <h2 className="mt-3 text-2xl font-black text-slate-900">Daily AI Fetch</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Generates 10 educational news updates and 10 student-focused blogs, then permanently purges posts older than 72 hours.</p>
             <p className="mt-4 rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-sm text-slate-600">{automationStatus}</p>
@@ -372,8 +372,8 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
                     <td className="p-5 text-slate-600">{new Date(post.date).toLocaleDateString()}</td>
                     <td className="p-5 text-right">
                       <div className="flex justify-end gap-2">
-                        <button onClick={() => openEditView(post)} className="rounded-2xl border border-cyan-300/30 px-4 py-2 font-black text-cyan-200 transition hover:bg-cyan-400/10">Edit</button>
-                        <button onClick={() => deletePost(post.id)} className="rounded-2xl border border-red-300/30 px-4 py-2 font-black text-red-200 transition hover:bg-red-400/10">Delete</button>
+                        <button onClick={() => openEditView(post)} className="rounded-2xl border border-cyan-300/30 px-4 py-2 font-black text-cyan-700 transition hover:bg-cyan-400/10">Edit</button>
+                        <button onClick={() => deletePost(post.id)} className="rounded-2xl border border-red-300/30 px-4 py-2 font-black text-red-700 transition hover:bg-red-400/10">Delete</button>
                       </div>
                     </td>
                   </tr>

@@ -334,7 +334,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                             <label className={labelClass}>Resource Name</label>
                             <input value={formState.name} onChange={event => setFormState(prev => prev ? { ...prev, name: event.target.value } : prev)} className={fieldClass} />
                         </div>
-                        {formState.type === 'quiz' && <p className="rounded-2xl border border-cyan-300/20 bg-cyan-300/10 px-4 py-3 text-sm font-bold text-cyan-700">{quizQuestions.length} question{quizQuestions.length === 1 ? '' : 's'} added. Scroll inside this quiz builder to review every question before saving.</p>}
+                        {formState.type === 'quiz' && <p className="rounded-2xl border border-cyan-300/20 bg-cyan-600/10 px-4 py-3 text-sm font-bold text-cyan-700">{quizQuestions.length} question{quizQuestions.length === 1 ? '' : 's'} added. Scroll inside this quiz builder to review every question before saving.</p>}
                     </div>
 
                     <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5 custom-scrollbar">
@@ -361,7 +361,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                                         </div>
                                     ))}
                                 </div>
-                                <button type="button" onClick={addQuizQuestion} className="w-full rounded-2xl border border-dashed border-cyan-300/40 py-3 font-black text-cyan-200 hover:bg-cyan-400/10">+ Add Question</button>
+                                <button type="button" onClick={addQuizQuestion} className="w-full rounded-2xl border border-dashed border-cyan-300/40 py-3 font-black text-cyan-700 hover:bg-cyan-400/10">+ Add Question</button>
                             </div>
                         ) : (
                             <div>
@@ -374,14 +374,14 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                     <div className="shrink-0 border-t border-white/50 bg-white/70 p-4 backdrop-blur-xl sm:p-5">
                         <div className="flex justify-end gap-3">
                             <button type="button" onClick={() => setFormState(null)} className="rounded-2xl border border-white/50 px-5 py-3 font-bold text-slate-600 hover:bg-white/80 hover:shadow-sm">Back</button>
-                            <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-300 px-6 py-3 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 hover:bg-cyan-200">Add Content</button>
+                            <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-600 px-6 py-3 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 hover:bg-cyan-200">Add Content</button>
                         </div>
                     </div>
                 </div>
             )}
 
             <input ref={fileInputRef} type="file" accept={uploadConfig?.accept} onChange={handleFileSelected} className="hidden" />
-            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-200">Uploading content...</p>}
+            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content...</p>}
         </div>
     );
 };
@@ -427,7 +427,7 @@ const ModuleEditor: React.FC<{
                             <p className="font-black text-slate-900">{file.name}</p>
                             <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">{file.type}{file.quiz?.questions?.length ? ` • ${file.quiz.questions.length} questions` : ''}</p>
                         </div>
-                        <button type="button" onClick={() => onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles => (currentFiles || []).filter(item => item.id !== file.id)))} className="self-start rounded-xl border border-red-400/30 px-3 py-2 text-xs font-black text-red-200 hover:bg-red-500/10 sm:self-auto">Remove</button>
+                        <button type="button" onClick={() => onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles => (currentFiles || []).filter(item => item.id !== file.id)))} className="self-start rounded-xl border border-red-400/30 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-500/10 sm:self-auto">Remove</button>
                     </div>
                 )) : <p className="rounded-2xl border border-dashed border-white/50 p-4 text-sm text-slate-600">No content yet. Add videos, PDFs, Smart Docs, quizzes, and resource links here.</p>}
             </div>
@@ -637,7 +637,7 @@ const ProductForm: React.FC<{
 
                             <div className={glassCard}>
                                 <h2 className="text-xl font-black text-slate-900">Pricing</h2>
-                                {discountPercent > 0 && <p className="mt-3 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-black text-emerald-200">{discountPercent}% discount active</p>}
+                                {discountPercent > 0 && <p className="mt-3 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-black text-emerald-700">{discountPercent}% discount active</p>}
                                 <div className="mt-5 space-y-4">
                                     <div><label className={labelClass}>Regular Price</label><input required type="number" value={formData.price} onChange={event => setFormData(prev => ({ ...prev, price: event.target.value }))} className={fieldClass} placeholder="999" /></div>
                                     <div><label className={labelClass}>Sale Price</label><input type="number" value={formData.salePrice} onChange={event => setFormData(prev => ({ ...prev, salePrice: event.target.value }))} className={fieldClass} placeholder="499" /></div>
@@ -662,7 +662,7 @@ const ProductForm: React.FC<{
                             <div className={glassCard}>
                                 <h2 className="text-xl font-black text-slate-900">Image Upload</h2>
                                 <div className="mt-5 grid grid-cols-2 gap-2">
-                                    <button type="button" onClick={() => setImageMode('upload')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'upload' ? 'bg-cyan-300 text-slate-900' : 'border border-white/50 text-slate-600'}`}>Upload</button>
+                                    <button type="button" onClick={() => setImageMode('upload')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'upload' ? 'bg-cyan-600 text-slate-900' : 'border border-white/50 text-slate-600'}`}>Upload</button>
                                     <button type="button" onClick={() => setImageMode('ai')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'ai' ? 'bg-purple-300 text-slate-900' : 'border border-white/50 text-slate-600'}`}>AI Image</button>
                                 </div>
                                 <div className="mt-4">
@@ -795,25 +795,25 @@ const ProductManagement: React.FC<{
                                                         <img src={thumbnail} alt="" className="h-full w-full object-cover" />
                                                     </div>
                                                     <div className="min-w-0">
-                                                        <p className="truncate font-black text-slate-900 group-hover:text-cyan-200">{product.title}</p>
+                                                        <p className="truncate font-black text-slate-900 group-hover:text-cyan-700">{product.title}</p>
                                                         <p className="mt-1 text-xs font-mono text-slate-600">{product.sku || 'NO-SKU'} • {product.category || 'Uncategorized'}</p>
                                                     </div>
                                                 </div>
                                             </td>
                                             <td className="p-5">
                                                 <div className="flex flex-col gap-2">
-                                                    <span className={`w-fit rounded-full border px-3 py-1 text-xs font-black ${product.inStock !== false ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-200' : 'border-red-300/30 bg-red-400/10 text-red-200'}`}>{product.inStock !== false ? 'In Stock' : 'Out of Stock'}</span>
-                                                    {product.isFree && <span className="w-fit rounded-full border border-blue-300/30 bg-blue-400/10 px-3 py-1 text-xs font-black text-blue-200">Free Flow</span>}
+                                                    <span className={`w-fit rounded-full border px-3 py-1 text-xs font-black ${product.inStock !== false ? 'border-emerald-300/30 bg-emerald-400/10 text-emerald-700' : 'border-red-300/30 bg-red-400/10 text-red-700'}`}>{product.inStock !== false ? 'In Stock' : 'Out of Stock'}</span>
+                                                    {product.isFree && <span className="w-fit rounded-full border border-blue-300/30 bg-blue-400/10 px-3 py-1 text-xs font-black text-blue-700">Free Flow</span>}
                                                 </div>
                                             </td>
                                             <td className="p-5 font-bold text-slate-600">
-                                                {product.salePrice ? <div><p className="text-rose-200">{product.salePrice}</p><p className="text-xs text-slate-600 line-through">{product.price}</p></div> : product.price}
+                                                {product.salePrice ? <div><p className="text-rose-700">{product.salePrice}</p><p className="text-xs text-slate-600 line-through">{product.price}</p></div> : product.price}
                                             </td>
                                             <td className="p-5"><span className="rounded-full border border-white/50 bg-white/70 px-3 py-1 text-xs font-black text-slate-600">{contentCount} items</span></td>
                                             <td className="p-5 text-right">
                                                 <div className="flex justify-end gap-2">
-                                                    <button onClick={() => openEditView(product)} className="rounded-2xl border border-cyan-300/30 px-4 py-2 text-sm font-black text-cyan-200 transition hover:bg-cyan-400/10">Edit</button>
-                                                    <button onClick={() => onDeleteProduct(product.id)} className="rounded-2xl border border-red-300/30 px-4 py-2 text-sm font-black text-red-200 transition hover:bg-red-400/10">Delete</button>
+                                                    <button onClick={() => openEditView(product)} className="rounded-2xl border border-cyan-300/30 px-4 py-2 text-sm font-black text-cyan-700 transition hover:bg-cyan-400/10">Edit</button>
+                                                    <button onClick={() => onDeleteProduct(product.id)} className="rounded-2xl border border-red-300/30 px-4 py-2 text-sm font-black text-red-700 transition hover:bg-red-400/10">Delete</button>
                                                 </div>
                                             </td>
                                         </tr>

@@ -342,18 +342,18 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
     default: {
         name: 'Default',
         palette: {
-            primaryColor: '#02042b',
-            accentColor: '#528ff0',
-            backgroundColor: '#f9fafb',
-            textColor: '#1f2937',
-            textMutedColor: '#6b7280',
+            primaryColor: '#1e293b',
+            accentColor: '#4f46e5',
+            backgroundColor: '#f8fafc',
+            textColor: '#111827',
+            textMutedColor: '#475569',
         },
     },
     midnight: {
         name: 'Midnight',
         palette: {
-            primaryColor: '#38bdf8', // light-blue-400
-            accentColor: '#6366f1', // indigo-500
+            primaryColor: '#7dd3fc', // softer sky-300
+            accentColor: '#818cf8', // softer indigo-400
             backgroundColor: '#0f172a', // slate-900
             textColor: '#e2e8f0', // slate-200
             textMutedColor: '#94a3b8', // slate-400
@@ -362,9 +362,9 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
     sunset: {
         name: 'Sunset',
         palette: {
-            primaryColor: '#f97316', // orange-600
-            accentColor: '#f59e0b', // amber-500
-            backgroundColor: '#fff7ed', // orange-50
+            primaryColor: '#c2410c', // muted orange-700
+            accentColor: '#b45309', // muted amber-700
+            backgroundColor: '#fffaf3', // softer warm canvas
             textColor: '#44403c', // stone-700
             textMutedColor: '#78716c', // stone-500
         },
@@ -372,19 +372,19 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
     forest: {
         name: 'Forest',
         palette: {
-            primaryColor: '#16a34a', // green-600
-            accentColor: '#22c55e', // green-500
-            backgroundColor: '#f0fdf4', // green-50
-            textColor: '#1e3a8a', // blue-900
-            textMutedColor: '#4338ca', // indigo-700
+            primaryColor: '#166534', // green-800
+            accentColor: '#15803d', // green-700
+            backgroundColor: '#f6fbf7', // softened green canvas
+            textColor: '#14532d', // green-950
+            textMutedColor: '#3f6212', // olive-700
         },
     },
     rose: {
         name: 'Rose',
         palette: {
-            primaryColor: '#db2777', // pink-600
-            accentColor: '#e11d48', // rose-600
-            backgroundColor: '#fff1f2', // rose-50
+            primaryColor: '#be185d', // pink-700
+            accentColor: '#be123c', // rose-700
+            backgroundColor: '#fff7f8', // softer rose canvas
             textColor: '#500724', // rose-950
             textMutedColor: '#831843', // pink-900
         },
@@ -438,6 +438,20 @@ export interface WebsiteSettings {
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
         dockItems: ['Store','Purchases','Wishlist','Cart','News','Blog','Free','Profile','Subscriptions'],
+        dockStyle?: {
+            backgroundColor: string;
+            backgroundOpacity: number;
+            itemOpacity: number;
+            accentOpacity: number;
+        };
+        readingStyle?: {
+            backgroundColor: string;
+            backgroundOpacity: number;
+            panelOpacity: number;
+            cardOpacity: number;
+            accentColor: string;
+            accentOpacity: number;
+        };
         socialLinks: {
             facebook: string;
             twitter: string;
@@ -605,11 +619,11 @@ const initialAdminUsers: AdminUser[] = [
 
 const defaultWebsiteSettings: WebsiteSettings = {
     theme: {
-        primaryColor: '#02042b',
-        accentColor: '#528ff0',
-        backgroundColor: '#f9fafb', // gray-50
-        textColor: '#1f2937', // gray-800
-        textMutedColor: '#6b7280', // gray-500
+        primaryColor: '#1e293b',
+        accentColor: '#4f46e5',
+        backgroundColor: '#f8fafc', // slate-50
+        textColor: '#111827', // gray-900
+        textMutedColor: '#475569', // slate-600
         fontPairing: 'inter-lato',
         cornerRadius: '0.75rem', // lg
         shadowIntensity: 'medium',
@@ -672,6 +686,20 @@ const defaultWebsiteSettings: WebsiteSettings = {
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
         dockItems: ['Store','Purchases','Wishlist','Cart','News','Blog','Free','Profile','Subscriptions'],
+        dockStyle: {
+            backgroundColor: '#020617',
+            backgroundOpacity: 82,
+            itemOpacity: 8,
+            accentOpacity: 45,
+        },
+        readingStyle: {
+            backgroundColor: '#e8edf6',
+            backgroundOpacity: 88,
+            panelOpacity: 90,
+            cardOpacity: 76,
+            accentColor: '#4f46e5',
+            accentOpacity: 16,
+        },
         socialLinks: {
             facebook: "https://www.facebook.com/profile.php?viewas=100000686899395&id=61565419447036",
             twitter: "https://x.com/MathW12385",
@@ -697,6 +725,9 @@ const App: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [tickets, setTickets] = useState<SupportTicket[]>(initialSupportTickets);
   const [currentView, setCurrentView] = useState('home'); 
+  const currentViewRef = React.useRef(currentView);
+  const historyNavigationRef = React.useRef(false);
+  const lastHistoryViewRef = React.useRef(currentView);
   const [selectedProduct, setSelectedProduct] = useState<ProductWithRating | null>(null);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
@@ -747,25 +778,105 @@ const App: React.FC = () => {
   });
 
   useEffect(() => {
-    const onScroll = () => {
-      const dock = document.getElementById('main-bottom-dock');
-      if (!dock) return;
-      const y = window.scrollY;
-      const last = Number((dock as any).dataset.lastY || 0);
-      (dock as any).dataset.hidden = y > last && y > 120 ? 'true' : 'false';
-      (dock as any).dataset.lastY = String(y);
+    if (typeof window === 'undefined') return;
+    const currentState = window.history.state || {};
+    if (currentState.dcView !== currentView) {
+      window.history.replaceState({ ...currentState, dcView: currentView }, '', window.location.href);
+    }
+    lastHistoryViewRef.current = currentView;
+
+    const onPopState = (event: PopStateEvent) => {
+      const nextView = event.state?.dcView;
+      if (typeof nextView === 'string') {
+        historyNavigationRef.current = true;
+        setCurrentView(nextView);
+        return;
+      }
+      if (currentViewRef.current !== 'home') {
+        historyNavigationRef.current = true;
+        window.history.pushState({ dcView: 'home' }, '', window.location.href);
+        setCurrentView('home');
+      }
     };
-    window.addEventListener('scroll', onScroll, { passive: true });
-    onScroll();
-    return () => window.removeEventListener('scroll', onScroll);
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => undefined);
+    currentViewRef.current = currentView;
+    if (typeof window === 'undefined') return;
+    if (historyNavigationRef.current) {
+      historyNavigationRef.current = false;
+      lastHistoryViewRef.current = currentView;
+      return;
     }
-    if (navigator.clipboard) { navigator.clipboard.readText().catch(() => undefined); }
-    if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(() => undefined); }
+    if (lastHistoryViewRef.current === currentView) return;
+    window.history.pushState({ ...(window.history.state || {}), dcView: currentView }, '', window.location.href);
+    lastHistoryViewRef.current = currentView;
+  }, [currentView]);
+
+  useEffect(() => {
+    const getDock = () => document.getElementById('main-bottom-dock');
+    const shouldUseDesktopPointerReveal = () => window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches;
+    const revealZonePx = 180;
+    let lastPointerY = Number.POSITIVE_INFINITY;
+
+    const applyDockVisibility = () => {
+      const dock = getDock();
+      if (!dock) return;
+      const isScrollHidden = dock.dataset.scrollHidden === 'true';
+      const isPointerRevealActive = dock.dataset.pointerReveal === 'true';
+      dock.dataset.hidden = isScrollHidden && !isPointerRevealActive ? 'true' : 'false';
+    };
+
+    const updatePointerReveal = (clientY: number) => {
+      const dock = getDock();
+      if (!dock) return;
+      if (!shouldUseDesktopPointerReveal()) {
+        dock.dataset.pointerReveal = 'false';
+        applyDockVisibility();
+        return;
+      }
+      lastPointerY = clientY;
+      dock.dataset.pointerReveal = window.innerHeight - clientY <= revealZonePx ? 'true' : 'false';
+      applyDockVisibility();
+    };
+
+    const onScroll = () => {
+      const dock = getDock();
+      if (!dock) return;
+      const y = window.scrollY;
+      const last = Number(dock.dataset.lastY || 0);
+      dock.dataset.scrollHidden = y > last && y > 120 ? 'true' : 'false';
+      dock.dataset.lastY = String(y);
+      if (Number.isFinite(lastPointerY)) updatePointerReveal(lastPointerY);
+      else applyDockVisibility();
+    };
+
+    const onPointerMove = (event: PointerEvent | MouseEvent) => {
+      updatePointerReveal(event.clientY);
+    };
+
+    const onPointerLeave = () => {
+      const dock = getDock();
+      if (!dock) return;
+      lastPointerY = Number.POSITIVE_INFINITY;
+      dock.dataset.pointerReveal = 'false';
+      applyDockVisibility();
+    };
+
+    window.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    window.addEventListener('mousemove', onPointerMove, { passive: true });
+    document.addEventListener('mouseleave', onPointerLeave);
+    onScroll();
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('mousemove', onPointerMove);
+      document.removeEventListener('mouseleave', onPointerLeave);
+    };
   }, []);
 
   useEffect(() => {
@@ -1269,7 +1380,6 @@ const App: React.FC = () => {
     if (currentView === 'home') window.scrollTo({ top: 0, behavior: 'smooth' });
     else {
       setCurrentView('home');
-      setSelectedProduct(null);
       window.scrollTo(0, 0);
     }
   };
@@ -1960,7 +2070,7 @@ const App: React.FC = () => {
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
-            <ReadingDrawer economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={currentUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
+            <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={currentUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
             <main key={currentView} className={appleOpenClass}>{renderContent()}</main>
             <Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} />

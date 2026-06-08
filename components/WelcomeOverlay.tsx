@@ -22,7 +22,7 @@ const WelcomeOverlay: React.FC = () => {
         <p className="mx-auto max-w-3xl overflow-hidden whitespace-nowrap border-r-2 border-white/70 pr-2 text-xl sm:text-3xl font-semibold tracking-wide animate-[typing_3.2s_steps(70,end),blink_0.7s_step-end_infinite]" style={{ fontFamily: '"Brush Script MT", "Segoe Script", cursive' }}>
           Hello students, warm welcome to your own distraction free app — Eduvora Omaa.
         </p>
-        <p className="mt-5 text-sm uppercase tracking-[0.55em] text-cyan-200 animate-[slideUp_0.9s_ease-out_forwards]">Digital Catalyst</p>
+        <p className="mt-5 text-sm uppercase tracking-[0.55em] text-cyan-700 animate-[slideUp_0.9s_ease-out_forwards]">Digital Catalyst</p>
       </div>
     </div>
   );

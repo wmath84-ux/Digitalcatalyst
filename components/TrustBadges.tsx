@@ -45,7 +45,7 @@ const TrustBadges: React.FC<TrustBadgesProps> = ({ settings }) => {
 
       <div className="relative container mx-auto px-6">
         <div className="mx-auto max-w-3xl text-center">
-          <p className="text-sm font-black uppercase tracking-[0.32em] text-cyan-200">Trusted learning platform</p>
+          <p className="text-sm font-black uppercase tracking-[0.32em] text-cyan-700">Trusted learning platform</p>
           <h2 className="mt-4 text-4xl font-black leading-tight sm:text-5xl">Why Choose Digital Catalyst?</h2>
           <p className="mt-5 text-lg leading-8 text-slate-600">
             We are committed to providing a secure, reliable, and valuable experience for every learner and customer.
