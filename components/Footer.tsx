@@ -47,8 +47,8 @@ const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClic
   };
 
   return (
-    <footer id="contact" className="relative overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900 pt-16 pb-8">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.22),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(147,51,234,0.20),transparent_32%)]" />
+    <footer id="contact" className="relative overflow-hidden bg-sky-50 bg-gradient-to-br from-sky-50 via-indigo-100/50 to-violet-100 text-slate-900 pt-16 pb-8">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_0%,rgba(37,99,235,0.32),transparent_30%),radial-gradient(circle_at_80%_30%,rgba(124,58,237,0.30),transparent_32%)]" />
       <div className="container relative z-10 mx-auto px-6">
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
 
@@ -58,13 +58,13 @@ const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClic
               <LogoIcon />
               <span className="text-xl font-bold">Digital Catalyst</span>
             </div>
-             <p className="text-slate-600 text-sm">
+             <p className="text-slate-700 text-sm">
                 Your one-stop shop for digital marketing and e-commerce solutions.
             </p>
             <div className="flex space-x-4 mt-6">
                 {Object.entries(socialLinks).map(([key, url]) => (
                     socialIcons[key] && url ? (
-                        <a key={key} href={url} target="_blank" rel="noopener noreferrer" className="text-slate-600 hover:text-slate-900 transition-colors">
+                        <a key={key} href={url} target="_blank" rel="noopener noreferrer" className="text-slate-700 hover:text-slate-900 transition-colors">
                             {socialIcons[key]}
                         </a>
                     ) : null
@@ -75,7 +75,7 @@ const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClic
           {/* Column 2: Explore */}
           <div>
             <h3 className="text-lg font-semibold mb-4">Explore</h3>
-            <ul className="space-y-2 text-slate-600">
+            <ul className="space-y-2 text-slate-700">
               <li><button onClick={onNavigateToAllProducts} className="hover:text-slate-900 transition-colors">Products</button></li>
               <li><button onClick={() => onNavigateToHomeAndScroll('services')} className="hover:text-slate-900 transition-colors">Services</button></li>
               <li><button onClick={() => onNavigateToHomeAndScroll('faq')} className="hover:text-slate-900 transition-colors">FAQ</button></li>
@@ -85,7 +85,7 @@ const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClic
           {/* Column 3: Legal */}
           <div>
             <h3 className="text-lg font-semibold mb-4">Legal</h3>
-            <ul className="space-y-2 text-slate-600">
+            <ul className="space-y-2 text-slate-700">
               <li><button onClick={() => onNavigateToPolicies('terms-and-conditions')} className="hover:text-slate-900 transition-colors">Terms of Service</button></li>
               <li><button onClick={() => onNavigateToPolicies('privacy-policy')} className="hover:text-slate-900 transition-colors">Privacy Policy</button></li>
               <li><button onClick={() => onNavigateToPolicies('refund-policy')} className="hover:text-slate-900 transition-colors">Refund Policy</button></li>
@@ -97,24 +97,24 @@ const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClic
           {/* Column 4: Stay Updated */}
           <div>
             <h3 className="text-lg font-semibold mb-4">Stay Updated</h3>
-            <p className="text-slate-600 text-sm mb-4">Subscribe to our newsletter for the latest products and offers.</p>
-            <form onSubmit={handleSubscribeSubmit} className="flex items-center rounded-full border border-white/50 bg-white/70 p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 focus-within:border-purple-300/50 focus-within:shadow-sm">
+            <p className="text-slate-700 text-sm mb-4">Subscribe to our newsletter for the latest products and offers.</p>
+            <form onSubmit={handleSubscribeSubmit} className="flex items-center rounded-full border border-indigo-100/80 bg-white/80 p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 focus-within:border-purple-300/50 focus-within:shadow-sm">
                 <input
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="your@email.com"
                     required
-                    className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-slate-900 placeholder:text-slate-600 focus:outline-none"
+                    className="min-w-0 flex-1 bg-transparent px-4 py-3 text-sm text-slate-900 placeholder:text-slate-700 focus:outline-none"
                 />
-                <button type="submit" disabled={isSubscribed} className="rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 text-sm font-bold text-white shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-sm disabled:scale-100 disabled:animate-pulse disabled:opacity-70 sm:px-6">
+                <button type="submit" disabled={isSubscribed} className="rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-5 py-3 text-sm font-bold text-white shadow-sm transition-all duration-300 hover:scale-105 hover:shadow-sm disabled:scale-100 disabled:animate-pulse disabled:opacity-70 sm:px-6">
                     {isSubscribed ? 'Subscribed' : 'Subscribe'}
                 </button>
             </form>
           </div>
         </div>
         
-        <div className="border-t border-white/50 mt-12 pt-8 text-center text-sm text-slate-600">
+        <div className="border-t border-indigo-100/80 mt-12 pt-8 text-center text-sm text-slate-700">
           <p>{footerText}</p>
           <p className="mt-2">This is a demo site for a digital marketing and e-commerce business. All transactions are for demonstration purposes.</p>
         </div>
