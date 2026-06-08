@@ -63,7 +63,7 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
       <div className="container relative z-10 mx-auto px-6 py-28 text-center">
         <div className="mx-auto max-w-5xl">
           <div className="animate-child animate-delay-1 inline-flex items-center gap-2 rounded-full border border-white/50 bg-white/70 px-5 py-2 text-sm font-semibold tracking-wide text-indigo-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl">
-            <span className="h-2 w-2 rounded-full bg-cyan-300 shadow-sm" />
+            <span className="h-2 w-2 rounded-full bg-cyan-600 shadow-sm" />
             🚀 Boost Your Digital Growth
           </div>
 
@@ -82,7 +82,7 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
               onClick={onNavigateToAllProducts}
               className="group relative w-full overflow-hidden rounded-full border border-white/50 bg-white/70 px-9 py-4 text-lg font-bold text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:scale-105 hover:border-cyan-300/70 hover:shadow-sm sm:w-auto"
             >
-              <span className="absolute inset-0 bg-gradient-to-r from-blue-500/30 via-purple-500/30 to-cyan-400/30 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+              <span className="absolute inset-0 bg-gradient-to-r from-blue-600/15 via-violet-600/15 to-cyan-600/15 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
               <span className="relative">Explore Products</span>
             </button>
             <button

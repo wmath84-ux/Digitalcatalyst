@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Announcement, NewsArticle, User } from '../App';
+import { Announcement, NewsArticle, User, WebsiteSettings } from '../App';
 import { EconomySettings } from '../utils/economy';
 import GoogleAd from './GoogleAd';
 
@@ -7,6 +7,7 @@ type ReadingListType = 'news' | 'blog';
 type ReadingView = ReadingListType | 'article' | 'announcement';
 
 interface ReadingDrawerProps {
+  settings: WebsiteSettings;
   economySettings: EconomySettings;
   isOpen: boolean;
   view: ReadingView;
@@ -27,6 +28,30 @@ interface ReadingDrawerProps {
   onReadingReward?: (article: NewsArticle) => boolean;
 }
 
+
+
+const defaultReadingStyle = {
+  backgroundColor: '#e8edf6',
+  backgroundOpacity: 88,
+  panelOpacity: 90,
+  cardOpacity: 76,
+  accentColor: '#4f46e5',
+  accentOpacity: 16,
+};
+
+const clampPercent = (value: unknown, fallback: number) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(100, Math.max(0, numeric));
+};
+
+const hexToRgba = (hex: string, opacityPercent: number, fallback = defaultReadingStyle.backgroundColor) => {
+  const normalized = /^#?[0-9a-f]{6}$/i.test(hex || '') ? hex.replace('#', '') : fallback.replace('#', '');
+  const red = parseInt(normalized.slice(0, 2), 16);
+  const green = parseInt(normalized.slice(2, 4), 16);
+  const blue = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${clampPercent(opacityPercent, defaultReadingStyle.backgroundOpacity) / 100})`;
+};
 
 const estimateReadMinutes = (text?: string) => Math.max(1, Math.ceil((text || '').split(/\s+/).filter(Boolean).length / 180));
 const formatDate = (date: string) => new Date(date).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
@@ -132,11 +157,11 @@ const SponsoredPartnerCard: React.FC<{
     <div className="rounded-[1.75rem] bg-white/70 p-6 backdrop-blur-2xl sm:p-8">
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.35em] text-purple-200/80">Sponsored Partner</p>
+          <p className="text-xs font-black uppercase tracking-[0.35em] text-purple-700/80">Sponsored Partner</p>
           <h3 className="mt-3 text-2xl font-black text-slate-900">{promoTitle}</h3>
           <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-600">{promoDescription}</p>
         </div>
-        <button type="button" onClick={onExploreFeature} className="rounded-full bg-gradient-to-r from-indigo-400 via-fuchsia-400 to-purple-400 px-6 py-3 text-sm font-black text-slate-900 shadow-sm transition hover:scale-105">
+        <button type="button" onClick={onExploreFeature} className="rounded-full bg-gradient-to-r from-indigo-600 via-violet-600 to-purple-600 px-6 py-3 text-sm font-black text-white shadow-sm transition hover:scale-105">
           {promoCtaLabel}
         </button>
       </div>
@@ -153,17 +178,17 @@ const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: s
     )}
     <div className="p-5">
       <div className="flex items-center justify-between gap-4">
-        <span className="rounded-full border border-indigo-300/20 bg-indigo-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-indigo-200">{badge}</span>
+        <span className="rounded-full border border-indigo-300/20 bg-indigo-400/10 px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] text-indigo-700">{badge}</span>
         <span className="text-xs text-slate-600">{meta}</span>
       </div>
       <h3 className="mt-4 text-xl font-black leading-tight text-slate-900 transition group-hover:text-indigo-700">{title}</h3>
       <p className="mt-3 line-clamp-3 text-sm leading-6 text-slate-600">{excerpt}</p>
-      <div className="mt-5 text-sm font-black text-indigo-200">Open in reading hub →</div>
+      <div className="mt-5 text-sm font-black text-indigo-700">Open in reading hub →</div>
     </div>
   </button>
 );
 
-const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
+const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings, isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const progressRef = useRef(0);
@@ -282,20 +307,26 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
 
   const rewardMinutes = Math.floor(rewardSecondsLeft / 60);
   const rewardSeconds = String(rewardSecondsLeft % 60).padStart(2, '0');
+  const readingStyle = { ...defaultReadingStyle, ...((settings.content as any).readingStyle || {}) };
+  const readingBackground = hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity);
+  const panelBackground = hexToRgba(readingStyle.backgroundColor, readingStyle.panelOpacity);
+  const cardBackground = `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;
+  const accentSoftBackground = hexToRgba(readingStyle.accentColor, readingStyle.accentOpacity, defaultReadingStyle.accentColor);
+  const accentStrongBackground = hexToRgba(readingStyle.accentColor, 92, defaultReadingStyle.accentColor);
 
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[1200] bg-white/70 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="reading-drawer-title" onMouseDown={onClose}>
+    <div className="fixed inset-0 z-[1200] backdrop-blur-sm" style={{ backgroundColor: readingBackground }} role="dialog" aria-modal="true" aria-labelledby="reading-drawer-title" onMouseDown={onClose}>
       <div className="absolute inset-y-0 right-0 flex w-full justify-end">
-        <section onMouseDown={(e) => e.stopPropagation()} className="relative h-full w-full overflow-hidden border-l border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw]">
+        <section onMouseDown={(e) => e.stopPropagation()} className="relative h-full w-full overflow-hidden border-l border-white/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw]" style={{ backgroundColor: panelBackground }}>
           <div className="sticky top-0 z-30 h-1 bg-white/70">
-            <div className="h-full rounded-r-full bg-gradient-to-r from-cyan-300 via-indigo-400 to-fuchsia-400 shadow-sm transition-all duration-150" style={{ width: `${progress}%` }} />
+            <div className="h-full rounded-r-full shadow-sm transition-all duration-150" style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${accentStrongBackground}, rgba(14, 165, 233, 0.86), rgba(124, 58, 237, 0.86))` }} />
           </div>
 
-          <div className="absolute inset-0 pointer-events-none bg-[radial-gradient(circle_at_top_left,rgba(99,102,241,0.24),transparent_32%),radial-gradient(circle_at_bottom_right,rgba(168,85,247,0.18),transparent_28%)]" />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(circle at top left, ${accentSoftBackground}, transparent 32%), radial-gradient(circle at bottom right, rgba(14, 165, 233, 0.10), transparent 28%)` }} />
 
-          <header className="relative z-20 flex items-center justify-between gap-4 border-b border-white/50 bg-white/70 px-4 py-4 backdrop-blur-2xl sm:px-8">
+          <header className="relative z-20 flex items-center justify-between gap-4 border-b border-white/50 px-4 py-4 backdrop-blur-2xl sm:px-8" style={{ backgroundColor: cardBackground }}>
             <div className="flex min-w-0 items-center gap-4">
               {(view === 'article' || view === 'announcement') && (
                 <button onClick={onBackToList} className="shrink-0 rounded-full border border-indigo-200/60 bg-white px-4 py-2 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-x-0.5 hover:bg-indigo-50 hover:shadow-md">
@@ -303,7 +334,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
                 </button>
               )}
               <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.35em] text-indigo-200/80">Premium Reading Mode</p>
+              <p className="text-[10px] font-black uppercase tracking-[0.35em] text-indigo-700/80">Premium Reading Mode</p>
               <h2 id="reading-drawer-title" className="mt-1 truncate text-lg font-black text-slate-900 sm:text-2xl">{activeMeta.title}</h2>
               </div>
             </div>
@@ -316,9 +347,9 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
           <div ref={scrollRef} onScroll={handleScroll} className="relative z-10 h-[calc(100%-73px)] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="px-5 py-8 sm:px-10 lg:px-16">
               <div className="mx-auto max-w-3xl">
-                <div className="mb-8 rounded-[2rem] border border-white/50 bg-white/70 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
+                <div className="mb-8 rounded-[2rem] border border-white/50 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl" style={{ backgroundColor: cardBackground }}>
                   <div className="flex flex-wrap items-center gap-3 text-sm text-slate-600">
-                    <span className="rounded-full bg-indigo-400/10 px-3 py-1 font-bold text-indigo-200">{activeMeta.source}</span>
+                    <span className="rounded-full px-3 py-1 font-bold text-indigo-700" style={{ backgroundColor: accentSoftBackground }}>{activeMeta.source}</span>
                     <span>{formatDate(activeMeta.date)}</span>
                     <span>⏳ {activeMeta.readTime} min read</span>
                   </div>
@@ -328,7 +359,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
               {(view === 'news' || view === 'blog') && (
                 <div className="mx-auto max-w-7xl">
                   <div className="mb-10 max-w-3xl">
-                    <p className="text-xs font-black uppercase tracking-[0.35em] text-indigo-200/80">{listType === 'news' ? 'News Desk' : 'Learning Blog'}</p>
+                    <p className="text-xs font-black uppercase tracking-[0.35em] text-indigo-700/80">{listType === 'news' ? 'News Desk' : 'Learning Blog'}</p>
                     <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-900 sm:text-6xl">{listTitle}</h1>
                     <p className="mt-5 text-lg leading-8 text-slate-600">{listDescription}</p>
                   </div>
@@ -355,7 +386,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
 
               {view === 'article' && selectedArticle && (
                 <article className="mx-auto max-w-3xl">
-                  <p className="text-xs font-black uppercase tracking-[0.35em] text-indigo-200">{selectedArticle.category}</p>
+                  <p className="text-xs font-black uppercase tracking-[0.35em] text-indigo-700">{selectedArticle.category}</p>
                   <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-900 sm:text-6xl">{selectedArticle.title}</h1>
                   <p className="mt-6 text-xl leading-8 text-slate-600">{selectedArticle.excerpt}</p>
                   {isExternalArticle(selectedArticle) ? (
@@ -382,7 +413,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
 
               {view === 'announcement' && selectedAnnouncement && (
                 <article className="mx-auto max-w-3xl">
-                  <p className="text-xs font-black uppercase tracking-[0.35em] text-purple-200">Official Announcement</p>
+                  <p className="text-xs font-black uppercase tracking-[0.35em] text-purple-700">Official Announcement</p>
                   <h1 className="mt-4 text-4xl font-black tracking-tight text-slate-900 sm:text-6xl">{selectedAnnouncement.title}</h1>
                   <div className="mt-12 space-y-7 text-lg leading-9 text-slate-600">
                     {selectedAnnouncement.content.split('\n').filter(Boolean).map((paragraph, index) => (
