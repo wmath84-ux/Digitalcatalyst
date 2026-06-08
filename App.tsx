@@ -713,7 +713,6 @@ const App: React.FC = () => {
   const [productToBuyAfterLogin, setProductToBuyAfterLogin] = useState<ProductWithRating | null>(null);
   const [resumeCartCheckoutAfterLogin, setResumeCartCheckoutAfterLogin] = useState(false);
   const [autoOpenPaymentModalFor, setAutoOpenPaymentModalFor] = useState<number | null>(null);
-  const [autoStartRazorpayFor, setAutoStartRazorpayFor] = useState<number | null>(null);
   const [activeCoinDiscount, setActiveCoinDiscount] = useState<ActiveCoinDiscount | null>(null);
   const [eduCoinGuideRequest, setEduCoinGuideRequest] = useState<{ requiredCoins: number; balance: number; missingCoins: number; productTitle?: string } | null>(null);
   
@@ -1214,7 +1213,6 @@ const App: React.FC = () => {
           setSelectedProduct(productToBuyAfterLogin);
           setCurrentView('product');
           setAutoOpenPaymentModalFor(productToBuyAfterLogin.id);
-          setAutoStartRazorpayFor(productToBuyAfterLogin.id);
           setProductToBuyAfterLogin(null);
       } else if (resumeCartCheckoutAfterLogin && cart.length > 0) {
           setCurrentView('home');
@@ -1504,9 +1502,7 @@ const App: React.FC = () => {
     setSelectedProduct(selected);
     setActiveCoinDiscount(null);
     setScrollToProductSection(null);
-    window.open(product.paymentLink || 'https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view', '_blank');
     setAutoOpenPaymentModalFor(product.id);
-    setAutoStartRazorpayFor(product.id);
     setCurrentView('product');
     window.scrollTo(0, 0);
   };
@@ -1930,7 +1926,7 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (currentView) {
-      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToAllProducts} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} autoStartRazorpay={autoStartRazorpayFor === selectedProduct.id} onModalOpened={() => { setAutoOpenPaymentModalFor(null); setAutoStartRazorpayFor(null); }} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={currentUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
+      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToAllProducts} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={currentUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
       case 'coursePlayer': return selectedProduct && <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={handleNavigateToPurchases} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} />;
       case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={currentUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={handleBackToHome} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
