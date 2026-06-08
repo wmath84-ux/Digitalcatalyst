@@ -8,7 +8,7 @@ export interface ServiceItem {
 }
 
 const ServiceIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-cyan-200" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-cyan-700" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
         <path strokeLinecap="round" strokeLinejoin="round" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
     </svg>
 );
@@ -28,7 +28,7 @@ const ServiceCard: React.FC<ServiceCardProps> = ({ title, description, onRequest
         </div>
         <h3 className="text-xl font-bold text-slate-900 mb-3">{title}</h3>
         <p className="text-slate-600 flex-grow leading-relaxed">{description}</p>
-        <button onClick={onRequestQuote} className="mt-7 inline-flex items-center justify-center gap-2 rounded-full border border-white/50 bg-white/70 px-5 py-2.5 font-bold text-cyan-700 backdrop-blur-xl transition-all duration-300 hover:border-cyan-300/50 hover:bg-cyan-300/10 hover:text-slate-900 group-hover:translate-x-1">
+        <button onClick={onRequestQuote} className="mt-7 inline-flex items-center justify-center gap-2 rounded-full border border-white/50 bg-white/70 px-5 py-2.5 font-bold text-cyan-700 backdrop-blur-xl transition-all duration-300 hover:border-cyan-300/50 hover:bg-cyan-600/10 hover:text-slate-900 group-hover:translate-x-1">
             Request a Quote <span>&rarr;</span>
         </button>
     </div>
@@ -72,7 +72,7 @@ const Services: React.FC<ServicesProps> = ({ settings, services, onNavigateToHom
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(59,130,246,0.22),transparent_30%),radial-gradient(circle_at_85%_10%,rgba(168,85,247,0.18),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.25),rgba(248,250,252,0.9))]" />
             <div className="container relative z-10 mx-auto px-6">
                 <div className="animate-child animate-delay-1 mx-auto mb-16 max-w-3xl rounded-2xl border border-white/50 bg-white/70 p-8 text-center backdrop-blur-xl">
-                    <p className="text-sm font-bold uppercase tracking-[0.35em] text-cyan-200">Services</p>
+                    <p className="text-sm font-bold uppercase tracking-[0.35em] text-cyan-700">Services</p>
                     <h2 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-900">Our Marketing Services</h2>
                     <p className="mt-4 text-lg text-slate-600">
                         Let our experts handle the marketing, so you can focus on your business.

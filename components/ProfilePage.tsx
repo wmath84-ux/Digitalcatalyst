@@ -361,7 +361,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     {(currentUser?.name || 'S').slice(0, 1).toUpperCase()}
                   </div>
                   <div className="pb-2">
-                    <p className="text-sm font-black uppercase tracking-[0.35em] text-cyan-200">Level {level} Scholar</p>
+                    <p className="text-sm font-black uppercase tracking-[0.35em] text-cyan-700">Level {level} Scholar</p>
                     <h1 className="mt-2 text-4xl font-black tracking-tight sm:text-6xl">{currentUser?.name || 'Student'}</h1>
                     <p className="mt-2 max-w-2xl text-sm text-slate-600 sm:text-base">
                       {currentUser?.email || 'student@learninghub.dev'} {currentUser?.mobile ? `• +91 ${currentUser.mobile}` : ''}
@@ -382,7 +382,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className={`hub-animate rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '160ms' }}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.3em] text-cyan-200">EduCoin Engine</p>
+                <p className="text-sm font-black uppercase tracking-[0.3em] text-cyan-700">EduCoin Engine</p>
                 <h2 className="mt-2 text-4xl font-black sm:text-5xl">{eduPoints.toLocaleString()} EduCoins</h2>
                 <p className="mt-2 text-slate-600">Earned from purchases, module momentum, study time, and quiz performance.</p>
               </div>
@@ -397,7 +397,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 <span>{pointsRemaining} pts to next level</span>
               </div>
               <div className="h-4 overflow-hidden rounded-full border border-white/50 bg-white/70">
-                <div className="h-full rounded-full bg-gradient-to-r from-cyan-300 via-indigo-400 to-fuchsia-400 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5" style={{ width: `${nextLevelProgress}%` }} />
+                <div className="h-full rounded-full bg-gradient-to-r from-cyan-600 via-indigo-600 to-violet-600 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5" style={{ width: `${nextLevelProgress}%` }} />
               </div>
             </div>
           </div>
@@ -421,7 +421,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className={`hub-animate rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '360ms' }}>
             <div className="flex items-center justify-between gap-4">
               <div>
-                <p className="text-sm font-black uppercase tracking-[0.3em] text-indigo-200">Learning Analytics</p>
+                <p className="text-sm font-black uppercase tracking-[0.3em] text-indigo-700">Learning Analytics</p>
                 <h2 className="mt-2 text-3xl font-black">Course Completion</h2>
               </div>
               {!purchasedProducts.length && (
@@ -470,7 +470,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
 
           <div className={`hub-animate rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '440ms' }}>
-            <p className="text-sm font-black uppercase tracking-[0.3em] text-fuchsia-200">Recent Quiz Scores</p>
+            <p className="text-sm font-black uppercase tracking-[0.3em] text-fuchsia-700">Recent Quiz Scores</p>
             <h2 className="mt-2 text-3xl font-black">Performance Pulse</h2>
             <div className="mt-6 flex h-36 items-end gap-3 rounded-3xl border border-white/50 bg-white/70 p-4">
               {quizScores.map(score => (
@@ -485,7 +485,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 <div key={score.title} className="rounded-2xl border border-white/50 bg-white/70 p-3">
                   <div className="flex items-center justify-between gap-3 text-sm font-bold">
                     <span className="truncate">{score.title}</span>
-                    <span className="text-cyan-200">{score.score}%</span>
+                    <span className="text-cyan-700">{score.score}%</span>
                   </div>
                 </div>
               ))}
@@ -496,7 +496,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <section className={`hub-animate mt-6 rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '520ms' }}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-sm font-black uppercase tracking-[0.3em] text-amber-200">Actionable Milestones</p>
+              <p className="text-sm font-black uppercase tracking-[0.3em] text-amber-700">Actionable Milestones</p>
               <h2 className="mt-2 text-3xl font-black">Glowing Milestones</h2>
             </div>
             <p className="text-sm text-slate-600">Lifetime earned: 🪙 {totalLifetimeCoins}. Reached milestones unlock real downloads or access.</p>
@@ -526,7 +526,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
         <section className="mt-6 grid gap-6 lg:grid-cols-2">
           <div className={`hub-animate rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '600ms' }}>
-            <p className="text-sm font-black uppercase tracking-[0.3em] text-emerald-200">Rewards Vault</p>
+            <p className="text-sm font-black uppercase tracking-[0.3em] text-emerald-700">Rewards Vault</p>
             <h2 className="mt-2 text-3xl font-black">What You Can Claim</h2>
             <p className="mt-2 text-sm text-slate-600">Live wallet: 🪙 {eduPoints} • {coinRedeemRate} EduCoins = ₹1 discount.</p>
             <div className="mt-5 grid gap-3">
@@ -557,7 +557,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
 
           <div className={`hub-animate rounded-[2rem] p-6 ${glassCard}`} style={{ animationDelay: '680ms' }}>
-            <p className="text-sm font-black uppercase tracking-[0.3em] text-blue-200">Personalization</p>
+            <p className="text-sm font-black uppercase tracking-[0.3em] text-blue-700">Personalization</p>
             <h2 className="mt-2 text-3xl font-black">Theme & Coupons</h2>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               {Object.values(themes).filter(theme => theme.name !== 'Midnight').map(theme => {
@@ -566,7 +566,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                   <button
                     key={theme.name}
                     onClick={() => onThemeChange(key)}
-                    className={`rounded-2xl border p-3 text-left transition-all duration-300 hover:-translate-y-1 ${activeTheme === key ? 'border-cyan-300/50 bg-cyan-300/10' : 'border-white/50 bg-white/70'}`}
+                    className={`rounded-2xl border p-3 text-left transition-all duration-300 hover:-translate-y-1 ${activeTheme === key ? 'border-cyan-300/50 bg-cyan-600/10' : 'border-white/50 bg-white/70'}`}
                   >
                     <div className="flex -space-x-1">
                       <span className="h-4 w-4 rounded-full border border-white" style={{ background: theme.palette.primaryColor }} />
@@ -579,7 +579,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             </div>
             <div className="mt-5 grid gap-3">
               {activeCoupons.slice(0, 3).map(coupon => (
-                <div key={coupon.id} className="flex items-center justify-between rounded-2xl border border-dashed border-cyan-300/30 bg-cyan-300/10 p-4">
+                <div key={coupon.id} className="flex items-center justify-between rounded-2xl border border-dashed border-cyan-300/30 bg-cyan-600/10 p-4">
                   <span className="font-black text-cyan-700">{coupon.code}</span>
                   <span className="text-sm font-bold text-slate-600">{coupon.type === 'percentage' ? `${coupon.value}% off` : `₹${coupon.value} off`}</span>
                 </div>

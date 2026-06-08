@@ -114,7 +114,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
                 <div className="pt-4 border-t border-white/50 mt-2 space-y-2 p-4">
                     <button
                         onClick={onSwitchToHome}
-                        className="group w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center gap-3 text-blue-300 hover:bg-blue-500/10 hover:text-blue-200"
+                        className="group w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center gap-3 text-blue-300 hover:bg-blue-500/10 hover:text-white"
                     >
                         <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                         <span className="font-medium">Go to Website</span>

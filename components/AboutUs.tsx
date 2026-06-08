@@ -45,7 +45,7 @@ const AboutUs: React.FC<AboutUsProps> = ({ settings, title, text, imageSeed }) =
         <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
           <div className="order-2 rounded-3xl border border-white/50 bg-white/70 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] lg:order-1 lg:p-10">
             <div className="relative">
-                <p className="text-sm font-bold uppercase tracking-[0.35em] text-cyan-200">About us</p>
+                <p className="text-sm font-bold uppercase tracking-[0.35em] text-cyan-700">About us</p>
                 <h2 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-900">{title}</h2>
                 <div className="mt-5 h-1.5 w-24 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 shadow-sm"></div>
             </div>
