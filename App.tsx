@@ -379,11 +379,11 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
     default: {
         name: 'Default',
         palette: {
-            primaryColor: '#1e293b',
-            accentColor: '#4f46e5',
-            backgroundColor: '#f8fafc',
-            textColor: '#111827',
-            textMutedColor: '#475569',
+            primaryColor: '#172554',
+            accentColor: '#4338ca',
+            backgroundColor: '#eef4ff',
+            textColor: '#0f172a',
+            textMutedColor: '#334155',
         },
     },
     midnight: {
@@ -659,11 +659,11 @@ const initialAdminUsers: AdminUser[] = [
 
 const defaultWebsiteSettings: WebsiteSettings = {
     theme: {
-        primaryColor: '#1e293b',
-        accentColor: '#4f46e5',
-        backgroundColor: '#f8fafc', // slate-50
-        textColor: '#111827', // gray-900
-        textMutedColor: '#475569', // slate-600
+        primaryColor: '#172554',
+        accentColor: '#4338ca',
+        backgroundColor: '#eef4ff', // enhanced blue-tinted canvas
+        textColor: '#0f172a', // slate-900
+        textMutedColor: '#334155', // slate-700
         fontPairing: 'inter-lato',
         cornerRadius: '0.75rem', // lg
         shadowIntensity: 'medium',
@@ -733,12 +733,12 @@ const defaultWebsiteSettings: WebsiteSettings = {
             accentOpacity: 45,
         },
         readingStyle: {
-            backgroundColor: '#e8edf6',
-            backgroundOpacity: 88,
-            panelOpacity: 90,
-            cardOpacity: 76,
-            accentColor: '#4f46e5',
-            accentOpacity: 16,
+            backgroundColor: '#dfe8fb',
+            backgroundOpacity: 92,
+            panelOpacity: 92,
+            cardOpacity: 82,
+            accentColor: '#4338ca',
+            accentOpacity: 20,
         },
         profileStyle: {
             backgroundColor: '#e2e8f0',
@@ -796,6 +796,9 @@ const App: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [tickets, setTickets] = useState<SupportTicket[]>(initialSupportTickets);
   const [currentView, setCurrentView] = useState('home'); 
+  const currentViewRef = React.useRef(currentView);
+  const historyNavigationRef = React.useRef(false);
+  const lastHistoryViewRef = React.useRef(currentView);
   const [selectedProduct, setSelectedProduct] = useState<ProductWithRating | null>(null);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
@@ -844,6 +847,45 @@ const App: React.FC = () => {
     courseContent: normalizeCourseModules(product.courseContent || []),
     priceHistory: product.priceHistory || [],
   });
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const currentState = window.history.state || {};
+    if (currentState.dcView !== currentView) {
+      window.history.replaceState({ ...currentState, dcView: currentView }, '', window.location.href);
+    }
+    lastHistoryViewRef.current = currentView;
+
+    const onPopState = (event: PopStateEvent) => {
+      const nextView = event.state?.dcView;
+      if (typeof nextView === 'string') {
+        historyNavigationRef.current = true;
+        setCurrentView(nextView);
+        return;
+      }
+      if (currentViewRef.current !== 'home') {
+        historyNavigationRef.current = true;
+        window.history.pushState({ dcView: 'home' }, '', window.location.href);
+        setCurrentView('home');
+      }
+    };
+
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
+  }, []);
+
+  useEffect(() => {
+    currentViewRef.current = currentView;
+    if (typeof window === 'undefined') return;
+    if (historyNavigationRef.current) {
+      historyNavigationRef.current = false;
+      lastHistoryViewRef.current = currentView;
+      return;
+    }
+    if (lastHistoryViewRef.current === currentView) return;
+    window.history.pushState({ ...(window.history.state || {}), dcView: currentView }, '', window.location.href);
+    lastHistoryViewRef.current = currentView;
+  }, [currentView]);
 
   useEffect(() => {
     const getDock = () => document.getElementById('main-bottom-dock');
@@ -1421,7 +1463,6 @@ const App: React.FC = () => {
     if (currentView === 'home') window.scrollTo({ top: 0, behavior: 'smooth' });
     else {
       setCurrentView('home');
-      setSelectedProduct(null);
       window.scrollTo(0, 0);
     }
   };
