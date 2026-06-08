@@ -342,11 +342,11 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
     default: {
         name: 'Default',
         palette: {
-            primaryColor: '#1e293b',
-            accentColor: '#4f46e5',
-            backgroundColor: '#f8fafc',
-            textColor: '#111827',
-            textMutedColor: '#475569',
+            primaryColor: '#172554',
+            accentColor: '#4338ca',
+            backgroundColor: '#eef4ff',
+            textColor: '#0f172a',
+            textMutedColor: '#334155',
         },
     },
     midnight: {
@@ -619,11 +619,11 @@ const initialAdminUsers: AdminUser[] = [
 
 const defaultWebsiteSettings: WebsiteSettings = {
     theme: {
-        primaryColor: '#1e293b',
-        accentColor: '#4f46e5',
-        backgroundColor: '#f8fafc', // slate-50
-        textColor: '#111827', // gray-900
-        textMutedColor: '#475569', // slate-600
+        primaryColor: '#172554',
+        accentColor: '#4338ca',
+        backgroundColor: '#eef4ff', // enhanced blue-tinted canvas
+        textColor: '#0f172a', // slate-900
+        textMutedColor: '#334155', // slate-700
         fontPairing: 'inter-lato',
         cornerRadius: '0.75rem', // lg
         shadowIntensity: 'medium',
@@ -693,12 +693,12 @@ const defaultWebsiteSettings: WebsiteSettings = {
             accentOpacity: 45,
         },
         readingStyle: {
-            backgroundColor: '#e8edf6',
-            backgroundOpacity: 88,
-            panelOpacity: 90,
-            cardOpacity: 76,
-            accentColor: '#4f46e5',
-            accentOpacity: 16,
+            backgroundColor: '#dfe8fb',
+            backgroundOpacity: 92,
+            panelOpacity: 92,
+            cardOpacity: 82,
+            accentColor: '#4338ca',
+            accentOpacity: 20,
         },
         socialLinks: {
             facebook: "https://www.facebook.com/profile.php?viewas=100000686899395&id=61565419447036",

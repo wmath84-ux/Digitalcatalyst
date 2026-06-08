@@ -13,11 +13,11 @@ interface LatestNewsProps {
 
 
 const defaultReadingStyle = {
-  backgroundColor: '#e8edf6',
-  backgroundOpacity: 88,
-  cardOpacity: 76,
-  accentColor: '#4f46e5',
-  accentOpacity: 16,
+  backgroundColor: '#dfe8fb',
+  backgroundOpacity: 92,
+  cardOpacity: 82,
+  accentColor: '#4338ca',
+  accentOpacity: 20,
 };
 
 const clampPercent = (value: unknown, fallback: number) => {
@@ -51,13 +51,13 @@ const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, setting
                 </div>
             </div>
             <div className="p-6 flex flex-col flex-grow">
-                <div className="mb-3 text-xs text-slate-600 font-medium">
+                <div className="mb-3 text-xs text-slate-700 font-medium">
                     {new Date(article.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-700 transition-colors mb-3 leading-tight">
                     {article.title}
                 </h3>
-                <p className="text-sm text-slate-600 line-clamp-3 mb-6 flex-grow">
+                <p className="text-sm text-slate-700 line-clamp-3 mb-6 flex-grow">
                     {article.excerpt}
                 </p>
                 <button onClick={() => onReadMoreClick(article)} className="text-indigo-700 font-bold text-sm uppercase tracking-wide flex items-center gap-2 group-hover:gap-3 transition-all">
@@ -96,7 +96,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
 
   const newsArticles = articles.filter(article => article.type === 'news');
   const readingStyle = { ...defaultReadingStyle, ...((settings.content as any).readingStyle || {}) };
-  const sectionBackground = `linear-gradient(135deg, ${hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity)}, rgba(238, 242, 255, 0.72), rgba(241, 245, 249, 0.92))`;
+  const sectionBackground = `linear-gradient(135deg, ${hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity)}, rgba(224, 231, 255, 0.82), rgba(239, 246, 255, 0.94))`;
   const cardBackground = `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;
 
   if (newsArticles.length === 0) return null;
@@ -109,16 +109,16 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
       style={{ background: sectionBackground }}
     >
       <div className="container mx-auto px-6">
-        <GoogleAd variant="display" label="Advertisement" className="mb-12 rounded-[2rem] border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl" />
+        <GoogleAd variant="display" label="Advertisement" className="mb-12 rounded-[2rem] border border-indigo-100/80 bg-white/80 p-4 shadow-sm backdrop-blur-xl" />
 
         <div className="flex flex-col md:flex-row justify-between items-end mb-12">
             <div className="max-w-2xl">
                 <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight">{title}</h2>
-                <p className="mt-4 text-lg text-slate-600">
+                <p className="mt-4 text-lg text-slate-700">
                     Current student alerts, education updates, and opportunity signals from Digital Catalyst.
                 </p>
             </div>
-            <button onClick={onOpenHub} className="hidden md:block rounded-full border border-white/50 bg-white/70 px-5 py-2 text-sm font-bold text-indigo-700 backdrop-blur-xl transition hover:border-indigo-300/40 hover:bg-indigo-400/10">
+            <button onClick={onOpenHub} className="hidden md:block rounded-full border border-indigo-100/80 bg-white/80 px-5 py-2 text-sm font-bold text-indigo-700 backdrop-blur-xl transition hover:border-indigo-300/40 hover:bg-indigo-400/10">
                 Open News
             </button>
         </div>
@@ -137,17 +137,17 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
                 cardBackground={cardBackground}
               />
               {(index + 1) % 3 === 0 && index < newsArticles.length - 1 && (
-                <GoogleAd variant="inFeed" label="Sponsored" className="md:col-span-2 lg:col-span-3 rounded-[2rem] border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl" />
+                <GoogleAd variant="inFeed" label="Sponsored" className="md:col-span-2 lg:col-span-3 rounded-[2rem] border border-indigo-100/80 bg-white/80 p-5 shadow-sm backdrop-blur-xl" />
               )}
             </React.Fragment>
           ))}
         </div>
         
-        <button onClick={onOpenHub} className="md:hidden w-full mt-8 border border-white/50 bg-white/70 py-3 rounded-lg font-semibold text-indigo-700">
+        <button onClick={onOpenHub} className="md:hidden w-full mt-8 border border-indigo-100/80 bg-white/80 py-3 rounded-lg font-semibold text-indigo-700">
             Open News
         </button>
 
-        <GoogleAd variant="display" label="Advertisement" className="mt-12 rounded-[2rem] border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl" />
+        <GoogleAd variant="display" label="Advertisement" className="mt-12 rounded-[2rem] border border-indigo-100/80 bg-white/80 p-4 shadow-sm backdrop-blur-xl" />
       </div>
     </section>
   );
