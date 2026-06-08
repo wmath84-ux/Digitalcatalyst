@@ -5,9 +5,9 @@ interface EduCoinRewardSettingsProps {
   economySettings: EconomySettings;
 }
 
-const fieldClass = 'w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm font-black text-slate-900 shadow-sm outline-none backdrop-blur-xl transition focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100';
+const fieldClass = 'w-full rounded-2xl border border-white/60 bg-white/80 px-4 py-3 text-sm font-black text-slate-900 shadow-sm outline-none backdrop-blur-xl transition focus:border-indigo-300 focus:ring-4 focus:ring-indigo-100';
 const labelClass = 'text-xs font-black uppercase tracking-[0.24em] text-slate-500';
-const panelClass = 'rounded-[2rem] border border-white/60 bg-white/70 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl';
+const panelClass = 'rounded-[2rem] border border-white/60 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl';
 
 const EduCoinRewardSettings: React.FC<EduCoinRewardSettingsProps> = ({ economySettings }) => {
   const [draft, setDraft] = React.useState<EconomySettings>(economySettings);
@@ -35,7 +35,7 @@ const EduCoinRewardSettings: React.FC<EduCoinRewardSettingsProps> = ({ economySe
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-indigo-50/40 to-white p-4 text-slate-900 sm:p-8">
+    <div className="min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_12%_8%,rgba(79,70,229,0.14),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(14,165,233,0.12),transparent_26%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] p-4 text-slate-900 sm:p-8">
       <div className="mx-auto max-w-5xl space-y-8">
         <section className="relative overflow-hidden rounded-[2.5rem] border border-white/60 bg-white/75 p-8 shadow-[0_20px_70px_rgba(79,70,229,0.10)] backdrop-blur-3xl">
           <div className="pointer-events-none absolute -right-12 -top-16 h-64 w-64 rounded-full bg-emerald-300/30 blur-3xl" />
@@ -79,11 +79,11 @@ const EduCoinRewardSettings: React.FC<EduCoinRewardSettingsProps> = ({ economySe
         <section className={panelClass}>
           <p className="text-sm font-black uppercase tracking-[0.3em] text-slate-500">Integration contract</p>
           <div className="mt-4 grid gap-4 md:grid-cols-2">
-            <div className="rounded-3xl border border-white/60 bg-white/70 p-5">
+            <div className="rounded-3xl border border-white/60 bg-white/80 p-5">
               <h3 className="font-black">Global state</h3>
               <p className="mt-2 text-sm font-bold leading-6 text-slate-600">App subscribes to settings/economy via subscribeEconomySettings and passes the live EconomySettings object into the reading drawer.</p>
             </div>
-            <div className="rounded-3xl border border-white/60 bg-white/70 p-5">
+            <div className="rounded-3xl border border-white/60 bg-white/80 p-5">
               <h3 className="font-black">Database structure</h3>
               <p className="mt-2 text-sm font-bold leading-6 text-slate-600">Fields saved: coinPerArticleRead, articleReadTimeRequiredSec, articleReadScrollRequiredPercent, and the existing economy fields on the same Firebase document.</p>
             </div>

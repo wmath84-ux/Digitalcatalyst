@@ -21,14 +21,14 @@ interface ServiceCardProps {
 }
 
 const ServiceCard: React.FC<ServiceCardProps> = ({ title, description, onRequestQuote, animationDelay }) => (
-    <div className={`animate-child animate-delay-${animationDelay} product-card-shine group relative flex h-full flex-col overflow-hidden rounded-2xl border border-white/50 bg-white/70 p-8 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-purple-300/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]`}>
+    <div className={`animate-child animate-delay-${animationDelay} product-card-shine group relative flex h-full flex-col overflow-hidden rounded-2xl border border-indigo-100/80 bg-white/80 p-8 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-purple-300/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]`}>
         <div className="absolute inset-x-0 top-0 h-px bg-gradient-to-r from-transparent via-white/40 to-transparent" />
-        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-transform duration-300 group-hover:scale-110">
+        <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-2xl border border-indigo-100/80 bg-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-transform duration-300 group-hover:scale-110">
            <ServiceIcon />
         </div>
         <h3 className="text-xl font-bold text-slate-900 mb-3">{title}</h3>
-        <p className="text-slate-600 flex-grow leading-relaxed">{description}</p>
-        <button onClick={onRequestQuote} className="mt-7 inline-flex items-center justify-center gap-2 rounded-full border border-white/50 bg-white/70 px-5 py-2.5 font-bold text-cyan-700 backdrop-blur-xl transition-all duration-300 hover:border-cyan-300/50 hover:bg-cyan-600/10 hover:text-slate-900 group-hover:translate-x-1">
+        <p className="text-slate-700 flex-grow leading-relaxed">{description}</p>
+        <button onClick={onRequestQuote} className="mt-7 inline-flex items-center justify-center gap-2 rounded-full border border-indigo-100/80 bg-white/80 px-5 py-2.5 font-bold text-cyan-700 backdrop-blur-xl transition-all duration-300 hover:border-cyan-300/50 hover:bg-cyan-600/10 hover:text-slate-900 group-hover:translate-x-1">
             Request a Quote <span>&rarr;</span>
         </button>
     </div>
@@ -67,14 +67,14 @@ const Services: React.FC<ServicesProps> = ({ settings, services, onNavigateToHom
         <section 
             id="services" 
             ref={sectionRef}
-            className={`relative overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 py-24 text-slate-900 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+            className={`relative overflow-hidden bg-sky-50 bg-gradient-to-br from-sky-50 via-indigo-100/50 to-violet-100 py-24 text-slate-900 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
         >
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(59,130,246,0.22),transparent_30%),radial-gradient(circle_at_85%_10%,rgba(168,85,247,0.18),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.25),rgba(248,250,252,0.9))]" />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_20%,rgba(37,99,235,0.32),transparent_30%),radial-gradient(circle_at_85%_10%,rgba(124,58,237,0.28),transparent_32%),linear-gradient(180deg,rgba(255,255,255,0.16),rgba(239,246,255,0.78))]" />
             <div className="container relative z-10 mx-auto px-6">
-                <div className="animate-child animate-delay-1 mx-auto mb-16 max-w-3xl rounded-2xl border border-white/50 bg-white/70 p-8 text-center backdrop-blur-xl">
+                <div className="animate-child animate-delay-1 mx-auto mb-16 max-w-3xl rounded-2xl border border-indigo-100/80 bg-white/80 p-8 text-center backdrop-blur-xl">
                     <p className="text-sm font-bold uppercase tracking-[0.35em] text-cyan-700">Services</p>
                     <h2 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-900">Our Marketing Services</h2>
-                    <p className="mt-4 text-lg text-slate-600">
+                    <p className="mt-4 text-lg text-slate-700">
                         Let our experts handle the marketing, so you can focus on your business.
                     </p>
                 </div>

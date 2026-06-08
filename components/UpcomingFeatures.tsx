@@ -68,27 +68,27 @@ const UpcomingFeatures: React.FC<UpcomingFeaturesProps> = ({ settings, title, fe
     <section 
       id="upcoming"
       ref={sectionRef}
-      className={`relative overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 py-24 text-slate-900 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+      className={`relative overflow-hidden bg-sky-50 bg-gradient-to-br from-sky-50 via-indigo-100/50 to-violet-100 py-24 text-slate-900 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
     >
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(139,92,246,0.22),transparent_34%),radial-gradient(circle_at_10%_70%,rgba(37,99,235,0.16),transparent_30%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(124,58,237,0.34),transparent_34%),radial-gradient(circle_at_10%_70%,rgba(37,99,235,0.28),transparent_30%)]" />
       <div className="container relative z-10 mx-auto px-6">
-        <div className="animate-child animate-delay-1 mx-auto mb-16 max-w-3xl rounded-2xl border border-white/50 bg-white/70 p-8 text-center backdrop-blur-xl">
+        <div className="animate-child animate-delay-1 mx-auto mb-16 max-w-3xl rounded-2xl border border-indigo-100/80 bg-white/80 p-8 text-center backdrop-blur-xl">
           <p className="text-sm font-bold uppercase tracking-[0.35em] text-purple-700">Roadmap</p>
           <h2 className="mt-3 text-4xl font-extrabold text-slate-900">{title}</h2>
-          <p className="mt-4 text-lg text-slate-600">
+          <p className="mt-4 text-lg text-slate-700">
             We're always working on new ways to help you succeed. Here's a sneak peek at what's coming next.
           </p>
         </div>
         <div className="grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3">
           {features.map((feature, index) => (
-            <div key={feature.id} className={`animate-child animate-delay-${index + 2} product-card-shine group flex h-full flex-col rounded-2xl border border-white/50 bg-white/70 p-8 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-purple-300/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]`}>
+            <div key={feature.id} className={`animate-child animate-delay-${index + 2} product-card-shine group flex h-full flex-col rounded-2xl border border-indigo-100/80 bg-white/80 p-8 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-purple-300/30 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]`}>
                 <div className="mb-6 flex justify-center">
-                    <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-transform duration-300 group-hover:scale-110">
+                    <div className="flex h-20 w-20 items-center justify-center rounded-2xl border border-indigo-100/80 bg-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-transform duration-300 group-hover:scale-110">
                         <Icon name={feature.icon} />
                     </div>
                 </div>
                 <h3 className="text-xl font-bold text-slate-900 mb-2">{feature.title}</h3>
-                <p className="mt-2 flex-grow text-sm leading-relaxed text-slate-600">{feature.description}</p>
+                <p className="mt-2 flex-grow text-sm leading-relaxed text-slate-700">{feature.description}</p>
                 <div className="mt-6 border-t border-white/50 pt-6">
                     <span className={`rounded-full border px-4 py-1.5 text-xs font-bold uppercase tracking-wider shadow-sm backdrop-blur-xl ${statusColors[feature.status]}`}>
                         {feature.status}

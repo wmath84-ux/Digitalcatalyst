@@ -3,8 +3,8 @@ import { Order } from '../../App';
 
 type OrderViewState = 'list' | 'details';
 
-const glassCard = 'rounded-[2rem] border border-white/50 bg-white/70 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
-const subtleCard = 'rounded-[1.5rem] border border-white/50 bg-white/70 p-5 backdrop-blur-xl';
+const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
+const subtleCard = 'rounded-[1.5rem] border border-white/50 bg-white/80 p-5 backdrop-blur-xl';
 
 const parseCurrency = (value: string) => parseFloat((value || '0').replace('₹', '').replace(/,/g, '')) || 0;
 
@@ -32,7 +32,7 @@ const StatusBadge: React.FC<{ status: Order['status'] }> = ({ status }) => {
 };
 
 const MetricCard: React.FC<{ label: string; value: string | number; accent: string; helper?: string }> = ({ label, value, accent, helper }) => (
-    <div className="rounded-[1.5rem] border border-white/50 bg-white/70 p-5 backdrop-blur-xl">
+    <div className="rounded-[1.5rem] border border-white/50 bg-white/80 p-5 backdrop-blur-xl">
         <p className="text-sm font-bold text-slate-600">{label}</p>
         <p className={`mt-2 text-3xl font-black ${accent}`}>{value}</p>
         {helper && <p className="mt-1 text-xs font-semibold text-slate-600">{helper}</p>}
@@ -45,8 +45,8 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
     const subtotal = items.reduce((sum, item) => sum + parseCurrency(item.price) * (item.quantity || 0), 0);
 
     return (
-        <div className="min-h-screen bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
-            <header className="sticky top-0 z-30 border-b border-white/50 bg-white/70 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
+        <div className="min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_12%_8%,rgba(79,70,229,0.14),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(14,165,233,0.12),transparent_26%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] text-slate-900">
+            <header className="sticky top-0 z-30 border-b border-white/50 bg-white/80 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
                 <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                     <div className="flex items-center gap-4">
                         <button type="button" onClick={onBack} className="rounded-2xl border border-white/50 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm">← Back to Orders</button>
@@ -57,7 +57,7 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
                         <StatusBadge status={order.status} />
-                        <span className="rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-sm font-bold text-slate-600">{formatDate(order.date, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
+                        <span className="rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-sm font-bold text-slate-600">{formatDate(order.date, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                     </div>
                 </div>
             </header>
@@ -74,9 +74,9 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                                 <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 px-4 py-3 text-sm font-black text-cyan-700">{itemCount} total units</div>
                             </div>
 
-                            <div className="overflow-hidden rounded-[1.5rem] border border-white/50 bg-white/70">
+                            <div className="overflow-hidden rounded-[1.5rem] border border-white/50 bg-white/80">
                                 <table className="w-full text-left">
-                                    <thead className="border-b border-white/50 bg-white/70 text-xs uppercase tracking-[0.24em] text-slate-600">
+                                    <thead className="border-b border-white/50 bg-white/80 text-xs uppercase tracking-[0.24em] text-slate-600">
                                         <tr>
                                             <th className="p-4 font-black">Product</th>
                                             <th className="p-4 text-center font-black">Qty</th>
@@ -117,7 +117,7 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                                     { title: 'Verification', subtitle: order.status === 'Awaiting Verification' ? 'In progress' : 'Reviewed', active: order.status !== 'Pending' },
                                     { title: 'Delivery', subtitle: order.status === 'Completed' ? 'Completed' : order.status === 'Shipped' ? 'Shipped' : 'Pending', active: order.status === 'Completed' || order.status === 'Shipped' },
                                 ].map(step => (
-                                    <div key={step.title} className={`rounded-2xl border p-4 ${step.active ? 'border-cyan-300/30 bg-cyan-400/10' : 'border-white/50 bg-white/70'}`}>
+                                    <div key={step.title} className={`rounded-2xl border p-4 ${step.active ? 'border-cyan-300/30 bg-cyan-400/10' : 'border-white/50 bg-white/80'}`}>
                                         <p className="font-black text-slate-900">{step.title}</p>
                                         <p className="mt-1 text-sm text-slate-600">{step.subtitle}</p>
                                     </div>
@@ -130,11 +130,11 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                         <div className={glassCard}>
                             <h2 className="text-xl font-black text-slate-900">Payment Summary</h2>
                             <div className="mt-5 space-y-3">
-                                <div className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/70 p-4 text-sm">
+                                <div className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/80 p-4 text-sm">
                                     <span className="text-slate-600">Calculated subtotal</span>
                                     <span className="font-black text-slate-900">₹{subtotal.toLocaleString('en-IN')}</span>
                                 </div>
-                                <div className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/70 p-4 text-sm">
+                                <div className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/80 p-4 text-sm">
                                     <span className="text-slate-600">Recorded total</span>
                                     <span className="text-2xl font-black text-cyan-700">{order.total}</span>
                                 </div>
@@ -241,7 +241,7 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 p-4 text-slate-900 animate-fade-in-up sm:p-6 lg:p-8">
+        <div className="min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_12%_8%,rgba(79,70,229,0.14),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(14,165,233,0.12),transparent_26%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] p-4 text-slate-900 animate-fade-in-up sm:p-6 lg:p-8">
             <div className="mx-auto max-w-7xl">
                 <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div>
@@ -264,10 +264,10 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
                     <MetricCard label="Needs Attention" value={pendingOrders.length} accent="text-amber-300" helper="Pending or awaiting verification" />
                 </div>
 
-                <div className="mt-8 overflow-hidden rounded-[2rem] border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl">
+                <div className="mt-8 overflow-hidden rounded-[2rem] border border-white/50 bg-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl">
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-max text-left">
-                            <thead className="border-b border-white/50 bg-white/70 text-xs uppercase tracking-[0.24em] text-slate-600">
+                            <thead className="border-b border-white/50 bg-white/80 text-xs uppercase tracking-[0.24em] text-slate-600">
                                 <tr>
                                     <th className="p-5 font-black">Order ID</th>
                                     <th className="p-5 font-black">Customer</th>
@@ -291,7 +291,7 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
                                                 <p className="mt-1 text-xs text-slate-600">{order.customerEmail}</p>
                                             </td>
                                             <td className="p-5 text-sm font-bold text-slate-600">{formatDate(order.date)}</td>
-                                            <td className="p-5"><span className="rounded-full border border-white/50 bg-white/70 px-3 py-1 text-xs font-black text-slate-600">{quantity} units</span></td>
+                                            <td className="p-5"><span className="rounded-full border border-white/50 bg-white/80 px-3 py-1 text-xs font-black text-slate-600">{quantity} units</span></td>
                                             <td className="p-5 text-sm font-black text-slate-900">{order.total}</td>
                                             <td className="p-5"><StatusBadge status={order.status} /></td>
                                             <td className="p-5 text-right">

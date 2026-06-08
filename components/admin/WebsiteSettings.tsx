@@ -58,7 +58,7 @@ const ServiceManagement: React.FC<{ services: ServiceItem[], onUpdate: (services
             <button onClick={() => setEditing({ id: 0, title: '', description: '' })} className="mb-4 bg-green-500 text-white font-semibold px-4 py-2 rounded-lg text-sm">+ Add New Service</button>
             <div className="space-y-2">
                 {services.map(service => (
-                    <div key={service.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg border">
+                    <div key={service.id} className="flex justify-between items-center p-3 bg-slate-100/80 rounded-lg border">
                         <div>
                             <p className="font-bold">{service.title}</p>
                             <p className="text-sm text-slate-600">{service.description}</p>
@@ -76,8 +76,8 @@ const ServiceManagement: React.FC<{ services: ServiceItem[], onUpdate: (services
 const ServiceFormModal: React.FC<{ service: ServiceItem, onSave: (s: ServiceItem) => void, onCancel: () => void }> = ({ service, onSave, onCancel }) => {
     const [form, setForm] = useState(service);
     return (
-        <div className="fixed inset-0 bg-white/70 z-50 flex items-center justify-center p-4">
-            <div className="bg-white/70 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-white/80 z-50 flex items-center justify-center p-4">
+            <div className="bg-white/80 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{service.id ? 'Edit' : 'Add'} Service</h3>
                 <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
                 <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Description" className="w-full p-2 border rounded mb-4" rows={3}></textarea>
@@ -109,7 +109,7 @@ const FaqManagement: React.FC<{ faqs: FaqItem[], onUpdate: (faqs: FaqItem[]) => 
             <button onClick={() => setEditing({ id: 0, question: '', answer: '' })} className="mb-4 bg-green-500 text-white font-semibold px-4 py-2 rounded-lg text-sm">+ Add New FAQ</button>
             <div className="space-y-2">
                 {faqs.map(faq => (
-                    <div key={faq.id} className="flex justify-between items-start p-3 bg-gray-50 rounded-lg border">
+                    <div key={faq.id} className="flex justify-between items-start p-3 bg-slate-100/80 rounded-lg border">
                         <div className="flex-1">
                             <p className="font-bold">{faq.question}</p>
                             <p className="text-sm text-slate-600 mt-1">{faq.answer}</p>
@@ -127,8 +127,8 @@ const FaqManagement: React.FC<{ faqs: FaqItem[], onUpdate: (faqs: FaqItem[]) => 
 const FaqFormModal: React.FC<{ faq: FaqItem, onSave: (f: FaqItem) => void, onCancel: () => void }> = ({ faq, onSave, onCancel }) => {
     const [form, setForm] = useState(faq);
     return (
-        <div className="fixed inset-0 bg-white/70 z-50 flex items-center justify-center p-4">
-            <div className="bg-white/70 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-white/80 z-50 flex items-center justify-center p-4">
+            <div className="bg-white/80 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{faq.id ? 'Edit' : 'Add'} FAQ</h3>
                 <input value={form.question} onChange={e => setForm({...form, question: e.target.value})} placeholder="Question" className="w-full p-2 border rounded mb-2" />
                 <textarea value={form.answer} onChange={e => setForm({...form, answer: e.target.value})} placeholder="Answer" className="w-full p-2 border rounded mb-4" rows={4}></textarea>
@@ -160,7 +160,7 @@ const UpcomingFeatureManagement: React.FC<{ features: UpcomingFeatureItem[], onU
             <button onClick={() => setEditing({ id: 0, title: '', description: '', status: 'Coming Soon', icon: 'rocket' })} className="mb-4 bg-green-500 text-white font-semibold px-4 py-2 rounded-lg text-sm">+ Add New Feature</button>
             <div className="space-y-2">
                 {features.map(feature => (
-                    <div key={feature.id} className="flex justify-between items-start p-3 bg-gray-50 rounded-lg border">
+                    <div key={feature.id} className="flex justify-between items-start p-3 bg-slate-100/80 rounded-lg border">
                         <div className="flex-1">
                             <p className="font-bold">{feature.title} <span className="text-xs font-semibold bg-yellow-200 text-yellow-800 px-2 py-0.5 rounded-full ml-2">{feature.status}</span></p>
                             <p className="text-sm text-slate-600 mt-1">{feature.description}</p>
@@ -179,8 +179,8 @@ const UpcomingFeatureManagement: React.FC<{ features: UpcomingFeatureItem[], onU
 const UpcomingFeatureFormModal: React.FC<{ feature: UpcomingFeatureItem, onSave: (f: UpcomingFeatureItem) => void, onCancel: () => void }> = ({ feature, onSave, onCancel }) => {
     const [form, setForm] = useState(feature);
     return (
-        <div className="fixed inset-0 bg-white/70 z-50 flex items-center justify-center p-4">
-            <div className="bg-white/70 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-white/80 z-50 flex items-center justify-center p-4">
+            <div className="bg-white/80 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{feature.id ? 'Edit' : 'Add'} Feature</h3>
                 <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
                 <textarea value={form.description} onChange={e => setForm({...form, description: e.target.value})} placeholder="Description" className="w-full p-2 border rounded mb-2" rows={3}></textarea>
@@ -219,7 +219,7 @@ const AnnouncementManagement: React.FC<{ announcements: Announcement[], onUpdate
             <button onClick={() => setEditing({ id: 0, title: '', date: new Date().toISOString().split('T')[0], content: '' })} className="mb-4 bg-green-500 text-white font-semibold px-4 py-2 rounded-lg text-sm">+ Add New Announcement</button>
             <div className="space-y-2">
                 {announcements.map(announcement => (
-                    <div key={announcement.id} className="flex justify-between items-start p-3 bg-gray-50 rounded-lg border">
+                    <div key={announcement.id} className="flex justify-between items-start p-3 bg-slate-100/80 rounded-lg border">
                         <div className="flex-1">
                             <p className="font-bold">{announcement.title} <span className="text-xs font-normal text-slate-600 ml-2">{new Date(announcement.date).toLocaleDateString()}</span></p>
                             <p className="text-sm text-slate-600 mt-1">{announcement.content}</p>
@@ -237,8 +237,8 @@ const AnnouncementManagement: React.FC<{ announcements: Announcement[], onUpdate
 const AnnouncementFormModal: React.FC<{ announcement: Announcement, onSave: (a: Announcement) => void, onCancel: () => void }> = ({ announcement, onSave, onCancel }) => {
     const [form, setForm] = useState(announcement);
     return (
-        <div className="fixed inset-0 bg-white/70 z-50 flex items-center justify-center p-4">
-            <div className="bg-white/70 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
+        <div className="fixed inset-0 bg-white/80 z-50 flex items-center justify-center p-4">
+            <div className="bg-white/80 backdrop-blur-xl rounded-lg p-6 w-full max-w-md">
                 <h3 className="font-bold text-lg mb-4">{announcement.id ? 'Edit' : 'Add'} Announcement</h3>
                 <input value={form.title} onChange={e => setForm({...form, title: e.target.value})} placeholder="Title" className="w-full p-2 border rounded mb-2" />
                 <input type="date" value={form.date} onChange={e => setForm({...form, date: e.target.value})} className="w-full p-2 border rounded mb-2" />
@@ -413,7 +413,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
             case 'layout': return (
                 <div className="space-y-3">
                     {localSettings.layout.map((section, index) => (
-                        <div key={section.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border">
+                        <div key={section.id} className="flex items-center justify-between p-3 bg-slate-100/80 rounded-lg border">
                             <div className="flex items-center gap-4"><div className="flex flex-col gap-1"><button onClick={() => moveSection(index, 'up')} disabled={index === 0} className="disabled:opacity-20">▲</button><button onClick={() => moveSection(index, 'down')} disabled={index === localSettings.layout.length - 1} className="disabled:opacity-20">▼</button></div><div><p className="font-semibold text-gray-700">{sectionNames[section.id]}</p>{section.hasOwnProperty('title') && (<input type="text" value={section.title} onChange={e => handleLayoutChange(localSettings.layout.map(s => s.id === section.id ? { ...s, title: e.target.value } : s))} className="text-xs p-1 border rounded mt-1 w-full" placeholder="Section Title"/>)}</div></div>
                             <label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" checked={section.visible} onChange={e => handleLayoutChange(localSettings.layout.map(s => s.id === section.id ? { ...s, visible: e.target.checked } : s))} className="sr-only peer" /><div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div></label>
                         </div>
@@ -431,7 +431,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                         <FormRow label="Hero Image" description="Upload a meaningful learning/course image from your local file.">
                             <div className="space-y-3">
                                 {localSettings.content.heroImageUrl && <img src={localSettings.content.heroImageUrl} alt="Hero preview" className="h-36 w-full rounded-xl object-cover shadow-inner" />}
-                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-white/70 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-primary">
+                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-white/80 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-primary">
                                     Upload hero image
                                     <input type="file" accept="image/*" onChange={handleHeroImageUpload} className="hidden" />
                                 </label>
@@ -484,7 +484,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                     </div>
 
                     {/* About Us Section */}
-                    <div className="bg-gray-50 p-4 rounded-lg mb-6 border border-gray-200">
+                    <div className="bg-slate-100/80 p-4 rounded-lg mb-6 border border-slate-200/80">
                         <h3 className="font-bold text-gray-800 mb-2">About Us Section</h3>
                         <FormRow label="About Us Title"><input type="text" value={localSettings.content.aboutUsTitle} onChange={e => handleNestedChange('content', 'aboutUsTitle', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="About Us Text"><textarea value={localSettings.content.aboutUsText} onChange={e => handleNestedChange('content', 'aboutUsText', e.target.value)} className="w-full p-2 border rounded" rows={4}></textarea></FormRow>
@@ -492,7 +492,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                     </div>
 
 
-                    <div className="bg-slate-50 rounded-lg p-4 mt-4 border border-slate-200">
+                    <div className="bg-slate-100/80 rounded-lg p-4 mt-4 border border-slate-200">
                         <div className="mb-4">
                             <h3 className="font-bold text-gray-800">Gamification & Subscription</h3>
                             <p className="text-sm text-slate-600 mt-1">No JSON needed — edit rewards, coins, plans, unlocked products, and dock labels directly.</p>
@@ -519,7 +519,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                 </div>
                                 <div className="mt-3 space-y-3">
                                     {redeemRewards.map((reward, rewardIndex) => (
-                                        <div key={reward.id || rewardIndex} className="grid grid-cols-1 gap-2 rounded-lg border bg-gray-50 p-3 sm:grid-cols-[1fr_7rem_auto]">
+                                        <div key={reward.id || rewardIndex} className="grid grid-cols-1 gap-2 rounded-lg border bg-slate-100/80 p-3 sm:grid-cols-[1fr_7rem_auto]">
                                             <input value={reward.title} onChange={e => updateReward(rewardIndex, { title: e.target.value })} placeholder="Reward title" className="rounded border p-2" />
                                             <input type="number" min="0" value={reward.cost} onChange={e => updateReward(rewardIndex, { cost: Number(e.target.value) || 0 })} placeholder="Cost" className="rounded border p-2" />
                                             <button type="button" onClick={() => removeReward(rewardIndex)} className="rounded border border-red-200 px-3 py-2 text-sm font-bold text-red-600">Remove</button>
@@ -539,7 +539,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             </div>
                             <div className="mt-4 space-y-4">
                                 {subscriptionPlans.map((plan, planIndex) => (
-                                    <div key={plan.id || planIndex} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <div key={plan.id || planIndex} className="rounded-2xl border border-slate-200 bg-slate-100/80 p-4">
                                         <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
                                             <label className="text-sm font-semibold text-gray-700">Plan Name
                                                 <input value={plan.name} onChange={e => updatePlan(planIndex, { name: e.target.value })} className="mt-1 w-full rounded border p-2" />
@@ -581,7 +581,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                     </div>
 
                     {/* Footer & Social */}
-                    <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                    <div className="bg-slate-100/80 p-4 rounded-lg border border-slate-200/80">
                         <h3 className="font-bold text-gray-800 mb-2">Footer & Social</h3>
                         <FormRow label="Footer Text" description="Use {year} to automatically insert the current year."><input type="text" value={localSettings.content.footerText} onChange={e => handleNestedChange('content', 'footerText', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="Facebook URL"><input type="url" value={localSettings.content.socialLinks.facebook} onChange={e => handleNestedChange('content', 'socialLinks', {...localSettings.content.socialLinks, facebook: e.target.value})} className="w-full p-2 border rounded" /></FormRow>
@@ -641,7 +641,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                         <p className="text-sm text-slate-600">Choose which labels should appear in the bottom dock for every user.</p>
                         <div className="mt-3 flex flex-wrap gap-2">
                             {defaultDockItems.map(label => (
-                                <button type="button" key={label} onClick={() => toggleDockItem(label)} className={`rounded-full border px-4 py-2 text-sm font-bold ${dockItems.includes(label) ? 'border-blue-600 bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>{label}</button>
+                                <button type="button" key={label} onClick={() => toggleDockItem(label)} className={`rounded-full border px-4 py-2 text-sm font-bold ${dockItems.includes(label) ? 'border-blue-600 bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'border-slate-200/80 bg-slate-100/80 text-gray-700'}`}>{label}</button>
                             ))}
                         </div>
                     </div>
@@ -702,7 +702,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     };
 
     return (
-        <div className="bg-white/70 backdrop-blur-xl p-6 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] border">
+        <div className="bg-white/80 backdrop-blur-xl p-6 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] border">
             <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 border-b pb-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800">Site Customizer</h1>

@@ -145,8 +145,8 @@ const recursiveModuleUpdate = (
     return { ...module, modules: recursiveModuleUpdate(module.modules || [], moduleId, updateCallback) };
 });
 
-const glassCard = 'rounded-[2rem] border border-white/50 bg-white/70 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
-const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
+const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
+const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
 
 const editorCommands: Array<[string, string, string?]> = [
@@ -174,14 +174,14 @@ const AdminDocsEditor: React.FC<{ value: string; onChange: (value: string) => vo
     };
 
     return (
-        <div className="overflow-hidden rounded-3xl border border-white/50 bg-white/70">
-            <div className="flex flex-wrap gap-2 border-b border-white/50 bg-white/70 p-3 backdrop-blur-xl">
+        <div className="overflow-hidden rounded-3xl border border-white/50 bg-white/80">
+            <div className="flex flex-wrap gap-2 border-b border-white/50 bg-white/80 p-3 backdrop-blur-xl">
                 {(editorCommands || []).map(([command, label, value]) => (
                     <button
                         key={`${command}-${label}`}
                         type="button"
                         onClick={() => runCommand(command, value)}
-                        className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 text-xs font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm"
+                        className="rounded-xl border border-white/50 bg-white/80 px-3 py-2 text-xs font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm"
                     >
                         {label}
                     </button>
@@ -192,7 +192,7 @@ const AdminDocsEditor: React.FC<{ value: string; onChange: (value: string) => vo
                 contentEditable
                 suppressContentEditableWarning
                 onInput={() => onChange(editorRef.current?.innerHTML || '')}
-                className="prose prose-invert min-h-72 max-w-none bg-white/70 p-5 text-slate-900 outline-none"
+                className="prose prose-invert min-h-72 max-w-none bg-white/80 p-5 text-slate-900 outline-none"
             />
         </div>
     );
@@ -319,7 +319,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                             key={item.type}
                             type="button"
                             onClick={() => item.accept ? triggerFileUpload(item.type, item.accept) : showForm(item.type)}
-                            className="rounded-2xl border border-white/50 bg-white/70 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/50 hover:bg-white/80 hover:shadow-sm"
+                            className="rounded-2xl border border-white/50 bg-white/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/50 hover:bg-white/80 hover:shadow-sm"
                         >
                             <span className="text-2xl">{item.icon}</span>
                             <span className="mt-3 block font-black text-slate-900">{item.title}</span>
@@ -328,8 +328,8 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                     ))}
                 </div>
             ) : (
-                <div className="flex max-h-[78vh] flex-col overflow-hidden rounded-3xl border border-white/50 bg-white/70">
-                    <div className="shrink-0 space-y-5 border-b border-white/50 bg-white/70 p-4 backdrop-blur-xl sm:p-5">
+                <div className="flex max-h-[78vh] flex-col overflow-hidden rounded-3xl border border-white/50 bg-white/80">
+                    <div className="shrink-0 space-y-5 border-b border-white/50 bg-white/80 p-4 backdrop-blur-xl sm:p-5">
                         <div>
                             <label className={labelClass}>Resource Name</label>
                             <input value={formState.name} onChange={event => setFormState(prev => prev ? { ...prev, name: event.target.value } : prev)} className={fieldClass} />
@@ -344,7 +344,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                             <div className="space-y-4">
                                 <div ref={quizListRef} className="space-y-4">
                                     {(quizQuestions || []).map((question, questionIndex) => (
-                                        <div key={questionIndex} className="rounded-2xl border border-white/50 bg-white/70 p-4">
+                                        <div key={questionIndex} className="rounded-2xl border border-white/50 bg-white/80 p-4">
                                             <label className={labelClass}>Question {questionIndex + 1}</label>
                                             <input value={question.prompt} onChange={event => updateQuizQuestion(questionIndex, q => ({ ...q, prompt: event.target.value }))} className={fieldClass} placeholder="What should learners answer?" />
                                             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -371,7 +371,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                         )}
                     </div>
 
-                    <div className="shrink-0 border-t border-white/50 bg-white/70 p-4 backdrop-blur-xl sm:p-5">
+                    <div className="shrink-0 border-t border-white/50 bg-white/80 p-4 backdrop-blur-xl sm:p-5">
                         <div className="flex justify-end gap-3">
                             <button type="button" onClick={() => setFormState(null)} className="rounded-2xl border border-white/50 px-5 py-3 font-bold text-slate-600 hover:bg-white/80 hover:shadow-sm">Back</button>
                             <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-600 px-6 py-3 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 hover:bg-cyan-200">Add Content</button>
@@ -408,7 +408,7 @@ const ModuleEditor: React.FC<{
     };
 
     return (
-        <div className={`rounded-[1.75rem] border p-5 ${level === 0 ? 'border-white/50 bg-white/70' : 'border-white/50 bg-white/70'}`}>
+        <div className={`rounded-[1.75rem] border p-5 ${level === 0 ? 'border-white/50 bg-white/80' : 'border-white/50 bg-white/80'}`}>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex-1">
                     <label className={labelClass}>Module Title</label>
@@ -422,7 +422,7 @@ const ModuleEditor: React.FC<{
 
             <div className="mt-5 space-y-3">
                 {files.length > 0 ? (files || []).map(file => (
-                    <div key={file.id} className="flex flex-col gap-2 rounded-2xl border border-white/50 bg-white/70 p-4 sm:flex-row sm:items-center sm:justify-between">
+                    <div key={file.id} className="flex flex-col gap-2 rounded-2xl border border-white/50 bg-white/80 p-4 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                             <p className="font-black text-slate-900">{file.name}</p>
                             <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">{file.type}{file.quiz?.questions?.length ? ` • ${file.quiz.questions.length} questions` : ''}</p>
@@ -546,9 +546,9 @@ const ProductForm: React.FC<{
     };
 
     return (
-        <div className="min-h-screen bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
+        <div className="min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_12%_8%,rgba(79,70,229,0.14),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(14,165,233,0.12),transparent_26%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] text-slate-900">
             <form onSubmit={handleSubmit}>
-                <header className="sticky top-0 z-30 border-b border-white/50 bg-white/70 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
+                <header className="sticky top-0 z-30 border-b border-white/50 bg-white/80 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
                     <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                         <div className="flex items-center gap-4">
                             <button type="button" onClick={onCancel} className="rounded-2xl border border-white/50 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm">← Back to List</button>
@@ -620,15 +620,15 @@ const ProductForm: React.FC<{
                             <div className={glassCard}>
                                 <h2 className="text-xl font-black text-slate-900">Publish Status</h2>
                                 <div className="mt-5 space-y-4">
-                                    <label className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/70 p-4">
+                                    <label className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/80 p-4">
                                         <span><span className="block font-black text-slate-900">Visible</span><span className="text-sm text-slate-600">Show on storefront</span></span>
                                         <input type="checkbox" checked={formData.isVisible} onChange={event => setFormData(prev => ({ ...prev, isVisible: event.target.checked }))} className="h-5 w-5 accent-cyan-300" />
                                     </label>
-                                    <label className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/70 p-4">
+                                    <label className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/80 p-4">
                                         <span><span className="block font-black text-slate-900">In Stock</span><span className="text-sm text-slate-600">Purchasable now</span></span>
                                         <input type="checkbox" checked={formData.inStock} onChange={event => setFormData(prev => ({ ...prev, inStock: event.target.checked }))} className="h-5 w-5 accent-emerald-300" />
                                     </label>
-                                    <label className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/70 p-4">
+                                    <label className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/80 p-4">
                                         <span><span className="block font-black text-slate-900">Free via coupon</span><span className="text-sm text-slate-600">Enable free access flow</span></span>
                                         <input type="checkbox" checked={formData.isFree} onChange={event => setFormData(prev => ({ ...prev, isFree: event.target.checked }))} className="h-5 w-5 accent-blue-300" />
                                     </label>
@@ -675,7 +675,7 @@ const ProductForm: React.FC<{
                                 </div>
                                 <div className="mt-4 grid grid-cols-2 gap-3">
                                     {((images || []).filter(Boolean) || []).map((image, index) => (
-                                        <div key={`${image}-${index}`} className="group relative aspect-square overflow-hidden rounded-2xl border border-white/50 bg-white/70">
+                                        <div key={`${image}-${index}`} className="group relative aspect-square overflow-hidden rounded-2xl border border-white/50 bg-white/80">
                                             <img src={image} alt={`Product ${index + 1}`} className="h-full w-full object-cover" />
                                             <button type="button" onClick={() => setImages(prev => (prev || []).filter((_, currentIndex) => currentIndex !== index))} className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-sm font-black text-white opacity-90">×</button>
                                         </div>
@@ -754,7 +754,7 @@ const ProductManagement: React.FC<{
     }
 
     return (
-        <div className="min-h-screen bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 p-4 text-slate-900 animate-fade-in-up sm:p-6 lg:p-8">
+        <div className="min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_12%_8%,rgba(79,70,229,0.14),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(14,165,233,0.12),transparent_26%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] p-4 text-slate-900 animate-fade-in-up sm:p-6 lg:p-8">
             <div className="mx-auto max-w-7xl">
                 <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div>
@@ -766,15 +766,15 @@ const ProductManagement: React.FC<{
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-                    <div className="rounded-[1.5rem] border border-white/50 bg-white/70 p-5 backdrop-blur-xl"><p className="text-sm font-bold text-slate-600">Total Products</p><p className="mt-2 text-3xl font-black text-slate-900">{safeProducts.length}</p></div>
-                    <div className="rounded-[1.5rem] border border-white/50 bg-white/70 p-5 backdrop-blur-xl"><p className="text-sm font-bold text-slate-600">Visible</p><p className="mt-2 text-3xl font-black text-emerald-300">{safeProducts.filter(product => product.isVisible !== false).length}</p></div>
-                    <div className="rounded-[1.5rem] border border-white/50 bg-white/70 p-5 backdrop-blur-xl"><p className="text-sm font-bold text-slate-600">Out of Stock</p><p className="mt-2 text-3xl font-black text-rose-300">{safeProducts.filter(product => product.inStock === false).length}</p></div>
+                    <div className="rounded-[1.5rem] border border-white/50 bg-white/80 p-5 backdrop-blur-xl"><p className="text-sm font-bold text-slate-600">Total Products</p><p className="mt-2 text-3xl font-black text-slate-900">{safeProducts.length}</p></div>
+                    <div className="rounded-[1.5rem] border border-white/50 bg-white/80 p-5 backdrop-blur-xl"><p className="text-sm font-bold text-slate-600">Visible</p><p className="mt-2 text-3xl font-black text-emerald-300">{safeProducts.filter(product => product.isVisible !== false).length}</p></div>
+                    <div className="rounded-[1.5rem] border border-white/50 bg-white/80 p-5 backdrop-blur-xl"><p className="text-sm font-bold text-slate-600">Out of Stock</p><p className="mt-2 text-3xl font-black text-rose-300">{safeProducts.filter(product => product.inStock === false).length}</p></div>
                 </div>
 
-                <div className="mt-8 overflow-hidden rounded-[2rem] border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl">
+                <div className="mt-8 overflow-hidden rounded-[2rem] border border-white/50 bg-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl">
                     <div className="overflow-x-auto">
                         <table className="w-full text-left">
-                            <thead className="border-b border-white/50 bg-white/70 text-xs uppercase tracking-[0.24em] text-slate-600">
+                            <thead className="border-b border-white/50 bg-white/80 text-xs uppercase tracking-[0.24em] text-slate-600">
                                 <tr>
                                     <th className="p-5 font-black">Product</th>
                                     <th className="p-5 font-black">Status</th>
@@ -791,7 +791,7 @@ const ProductManagement: React.FC<{
                                         <tr key={product.id} className="group transition hover:bg-white/80 hover:shadow-sm">
                                             <td className="p-5">
                                                 <div className="flex items-center gap-4">
-                                                    <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-2xl border border-white/50 bg-white/70">
+                                                    <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-2xl border border-white/50 bg-white/80">
                                                         <img src={thumbnail} alt="" className="h-full w-full object-cover" />
                                                     </div>
                                                     <div className="min-w-0">
@@ -809,7 +809,7 @@ const ProductManagement: React.FC<{
                                             <td className="p-5 font-bold text-slate-600">
                                                 {product.salePrice ? <div><p className="text-rose-700">{product.salePrice}</p><p className="text-xs text-slate-600 line-through">{product.price}</p></div> : product.price}
                                             </td>
-                                            <td className="p-5"><span className="rounded-full border border-white/50 bg-white/70 px-3 py-1 text-xs font-black text-slate-600">{contentCount} items</span></td>
+                                            <td className="p-5"><span className="rounded-full border border-white/50 bg-white/80 px-3 py-1 text-xs font-black text-slate-600">{contentCount} items</span></td>
                                             <td className="p-5 text-right">
                                                 <div className="flex justify-end gap-2">
                                                     <button onClick={() => openEditView(product)} className="rounded-2xl border border-cyan-300/30 px-4 py-2 text-sm font-black text-cyan-700 transition hover:bg-cyan-400/10">Edit</button>

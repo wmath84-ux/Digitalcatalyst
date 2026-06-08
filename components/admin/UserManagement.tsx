@@ -17,11 +17,11 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onDeleteUser }) 
                 </div>
             </div>
             
-            <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden">
+            <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 overflow-hidden">
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-max text-left border-collapse">
                         <thead>
-                            <tr className="bg-slate-50 border-b border-slate-200">
+                            <tr className="bg-slate-100/80 border-b border-slate-200">
                                 <th className="p-3 sm:p-5 font-bold text-xs text-slate-600 uppercase tracking-wider">User ID</th>
                                 <th className="p-3 sm:p-5 font-bold text-xs text-slate-600 uppercase tracking-wider">Learner</th>
                                 <th className="p-3 sm:p-5 font-bold text-xs text-slate-600 uppercase tracking-wider">Mobile</th>
@@ -33,7 +33,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onDeleteUser }) 
                         <tbody className="divide-y divide-slate-100">
                             {users.length > 0 ? (
                                 users.map(user => (
-                                    <tr key={user.id} className="hover:bg-slate-50/80 transition-all duration-200 hover:shadow-inner group">
+                                    <tr key={user.id} className="hover:bg-slate-100/80/80 transition-all duration-200 hover:shadow-inner group">
                                         <td className="p-3 sm:p-5 font-mono text-xs text-slate-600">{user.id}</td>
                                         <td className="p-3 sm:p-5">
                                             <div className="flex items-center gap-3">

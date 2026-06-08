@@ -54,7 +54,7 @@ const AdminReviewManagement: React.FC<{
     return (
         <div>
             <h1 className="text-3xl font-bold text-gray-800 mb-6">Customer Reviews</h1>
-            <div className="bg-white/70 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-lg overflow-hidden border border-gray-200">
+            <div className="bg-white/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-lg overflow-hidden border border-slate-200/80">
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-max text-left">
                         <thead className="bg-gray-100">
@@ -69,7 +69,7 @@ const AdminReviewManagement: React.FC<{
                         <tbody>
                             {allReviews.length > 0 ? (
                                 allReviews.map((review, index) => (
-                                    <tr key={index} className="border-b hover:bg-gray-50">
+                                    <tr key={index} className="border-b hover:bg-slate-100/80">
                                         <td className="p-4 font-medium text-gray-800">{review.productTitle}</td>
                                         <td className="p-4 text-gray-600">{review.name}</td>
                                         <td className="p-4"><StarRating rating={review.rating} /></td>
