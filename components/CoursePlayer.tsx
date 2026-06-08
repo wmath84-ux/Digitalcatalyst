@@ -1,10 +1,84 @@
 // components/CoursePlayer.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, QuizAnswerState } from '../App';
 import { EconomySettings } from '../utils/economy';
 import AiMentor from './AiMentor';
 import ProductMusicPlayer, { type AudioTrack } from './ProductMusicPlayer';
 import GoogleAd from './GoogleAd';
+
+
+type MediaResumeState = {
+  time: number;
+  wasPlaying: boolean;
+};
+
+type QuizSessionState = {
+  answers: QuizAnswerState;
+  currentQuestion: number;
+  submitted: boolean;
+  rewardClaimed: boolean;
+  rewardCoins: number;
+};
+
+type YouTubePlayerInstance = {
+  getCurrentTime: () => number;
+  getPlayerState: () => number;
+  seekTo: (seconds: number, allowSeekAhead: boolean) => void;
+  playVideo: () => void;
+  pauseVideo: () => void;
+  destroy: () => void;
+};
+
+type YouTubePlayerConstructor = new (
+  element: HTMLElement,
+  options: {
+    videoId: string;
+    playerVars?: Record<string, number | string>;
+    events?: {
+      onReady?: (event: { target: YouTubePlayerInstance }) => void;
+      onStateChange?: (event: { target: YouTubePlayerInstance; data: number }) => void;
+      onError?: () => void;
+    };
+  }
+) => YouTubePlayerInstance;
+
+declare global {
+  interface Window {
+    YT?: {
+      Player: YouTubePlayerConstructor;
+      PlayerState: {
+        PLAYING: number;
+        PAUSED: number;
+        ENDED: number;
+        BUFFERING: number;
+      };
+    };
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
+
+let youtubeApiPromise: Promise<void> | null = null;
+
+const loadYouTubeIframeApi = () => {
+  if (typeof window === 'undefined') return Promise.reject(new Error('YouTube player requires a browser window.'));
+  if (window.YT?.Player) return Promise.resolve();
+  if (!youtubeApiPromise) {
+    youtubeApiPromise = new Promise<void>((resolve) => {
+      const previousReady = window.onYouTubeIframeAPIReady;
+      window.onYouTubeIframeAPIReady = () => {
+        previousReady?.();
+        resolve();
+      };
+      if (!document.querySelector('script[src="https://www.youtube.com/iframe_api"]')) {
+        const script = document.createElement('script');
+        script.src = 'https://www.youtube.com/iframe_api';
+        script.async = true;
+        document.body.appendChild(script);
+      }
+    });
+  }
+  return youtubeApiPromise;
+};
 
 const FileIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -242,13 +316,25 @@ const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
   </div>
 );
 
-const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ file, economySettings, onQuizReward }) => {
+const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings; initialState?: QuizSessionState; onSessionChange?: (fileId: string, state: QuizSessionState) => void; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ file, economySettings, initialState, onSessionChange, onQuizReward }) => {
   const questions = file.quiz?.questions || [];
-  const [answers, setAnswers] = useState<QuizAnswerState>({});
-  const [currentQuestion, setCurrentQuestion] = useState(0);
-  const [submitted, setSubmitted] = useState(false);
-  const [rewardClaimed, setRewardClaimed] = useState(false);
-  const [rewardCoins, setRewardCoins] = useState(0);
+  const [answers, setAnswers] = useState<QuizAnswerState>(initialState?.answers || {});
+  const [currentQuestion, setCurrentQuestion] = useState(initialState?.currentQuestion || 0);
+  const [submitted, setSubmitted] = useState(initialState?.submitted || false);
+  const [rewardClaimed, setRewardClaimed] = useState(initialState?.rewardClaimed || false);
+  const [rewardCoins, setRewardCoins] = useState(initialState?.rewardCoins || 0);
+  useEffect(() => {
+    setAnswers(initialState?.answers || {});
+    setCurrentQuestion(initialState?.currentQuestion || 0);
+    setSubmitted(initialState?.submitted || false);
+    setRewardClaimed(initialState?.rewardClaimed || false);
+    setRewardCoins(initialState?.rewardCoins || 0);
+  }, [file.id, initialState?.answers, initialState?.currentQuestion, initialState?.rewardClaimed, initialState?.rewardCoins, initialState?.submitted]);
+
+  useEffect(() => {
+    onSessionChange?.(file.id, { answers, currentQuestion, submitted, rewardClaimed, rewardCoins });
+  }, [answers, currentQuestion, file.id, onSessionChange, rewardClaimed, rewardCoins, submitted]);
+
   const score = questions.reduce((total, q, index) => total + (answers[index] === q.correctAnswer ? 1 : 0), 0);
   if (!questions.length) return <GlassDownloadCard file={file} headline="Quiz unavailable" />;
 
@@ -339,6 +425,95 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
   );
 };
 
+
+const YouTubeLessonPlayer: React.FC<{
+  file: ProductFile;
+  videoId: string;
+  resumeState?: MediaResumeState;
+  onResumeStateChange: (fileId: string, state: MediaResumeState) => void;
+  onError: () => void;
+}> = ({ file, videoId, resumeState, onResumeStateChange, onError }) => {
+  const mountRef = useRef<HTMLDivElement>(null);
+  const playerRef = useRef<YouTubePlayerInstance | null>(null);
+  const latestStateRef = useRef<MediaResumeState>(resumeState || { time: 0, wasPlaying: true });
+
+  useEffect(() => {
+    latestStateRef.current = resumeState || { time: 0, wasPlaying: true };
+  }, [resumeState]);
+
+  useEffect(() => {
+    let cancelled = false;
+    let intervalId: number | undefined;
+    const shouldAutoplay = resumeState?.wasPlaying ?? true;
+
+    const persist = (wasPlayingOverride?: boolean) => {
+      const player = playerRef.current;
+      if (!player) return;
+      const time = player.getCurrentTime();
+      const playerState = player.getPlayerState();
+      const wasPlaying = wasPlayingOverride ?? (playerState === window.YT?.PlayerState.PLAYING || playerState === window.YT?.PlayerState.BUFFERING);
+      if (Number.isFinite(time)) {
+        const nextState = { time, wasPlaying };
+        latestStateRef.current = nextState;
+        onResumeStateChange(file.id, nextState);
+      }
+    };
+
+    loadYouTubeIframeApi()
+      .then(() => {
+        if (cancelled || !mountRef.current || !window.YT?.Player) return;
+        playerRef.current = new window.YT.Player(mountRef.current, {
+          videoId,
+          playerVars: {
+            autoplay: shouldAutoplay ? 1 : 0,
+            rel: 0,
+            modestbranding: 1,
+            playsinline: 1,
+            start: Math.max(0, Math.floor(resumeState?.time || 0)),
+          },
+          events: {
+            onReady: (event) => {
+              const savedTime = latestStateRef.current.time;
+              if (Number.isFinite(savedTime) && savedTime > 0) event.target.seekTo(savedTime, true);
+              if (latestStateRef.current.wasPlaying) event.target.playVideo();
+            },
+            onStateChange: (event) => {
+              if (event.data === window.YT?.PlayerState.PAUSED || event.data === window.YT?.PlayerState.ENDED) persist(false);
+              if (event.data === window.YT?.PlayerState.PLAYING || event.data === window.YT?.PlayerState.BUFFERING) persist(true);
+            },
+            onError,
+          },
+        });
+        intervalId = window.setInterval(() => persist(), 1000);
+      })
+      .catch(onError);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) window.clearInterval(intervalId);
+      const player = playerRef.current;
+      if (player) {
+        const time = player.getCurrentTime();
+        const playerState = player.getPlayerState();
+        if (Number.isFinite(time)) {
+          onResumeStateChange(file.id, {
+            time,
+            wasPlaying: playerState === window.YT?.PlayerState.PLAYING || playerState === window.YT?.PlayerState.BUFFERING,
+          });
+        }
+        player.destroy();
+        playerRef.current = null;
+      }
+    };
+  }, [file.id, onResumeStateChange, videoId]);
+
+  return (
+    <div className="flex h-full min-h-[18rem] w-full items-center justify-center overflow-hidden bg-black">
+      <div ref={mountRef} className="h-full w-full" title={file.name} />
+    </div>
+  );
+};
+
 const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: EconomySettings; product: ProductWithRating; onBack: () => void; onWatchTimeMinutes?: (minutes: number, lessonTitle?: string) => void; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ settings, economySettings, product, onBack, onWatchTimeMinutes, onQuizReward }) => {
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
@@ -348,6 +523,8 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const audioRef = useRef<HTMLAudioElement>(null);
   const mediaProgressRef = useRef<Record<string, number>>({});
   const mediaWasPlayingRef = useRef<Record<string, boolean>>({});
+  const [youtubeResumeState, setYoutubeResumeState] = useState<Record<string, MediaResumeState>>({});
+  const [quizSessionState, setQuizSessionState] = useState<Record<string, QuizSessionState>>({});
   const [activeWatchSeconds, setActiveWatchSeconds] = useState(0);
   const [sessionEarnedCoins, setSessionEarnedCoins] = useState(0);
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
@@ -418,6 +595,14 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     }
   };
 
+  const handleYoutubeResumeStateChange = useCallback((fileId: string, state: MediaResumeState) => {
+    setYoutubeResumeState(previous => ({ ...previous, [fileId]: state }));
+  }, []);
+
+  const handleQuizSessionChange = useCallback((fileId: string, state: QuizSessionState) => {
+    setQuizSessionState(previous => ({ ...previous, [fileId]: state }));
+  }, []);
+
   const onSelectFile = (file: ProductFile) => {
     saveCurrentMediaState();
     setActiveFile(file);
@@ -463,7 +648,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     switch (activeFile.type) {
       case 'youtube': {
         const videoId = extractYouTubeID(activeFile.url);
-        return videoId ? <iframe key={activeFile.id} className="h-full w-full bg-white/70" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaHasError(true)} /> : <VideoUnavailablePlaceholder />;
+        return videoId ? <YouTubeLessonPlayer key={activeFile.id} file={activeFile} videoId={videoId} resumeState={youtubeResumeState[String(activeFile.id)]} onResumeStateChange={handleYoutubeResumeStateChange} onError={() => setMediaHasError(true)} /> : <VideoUnavailablePlaceholder />;
       }
       case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onLoadedMetadata={(event) => restoreMediaState(activeFile, event.currentTarget)} onTimeUpdate={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; }} onPlay={() => setIsVideoPlaying(true)} onPause={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; setIsVideoPlaying(false); }} onEnded={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; mediaWasPlayingRef.current[String(activeFile.id)] = false; setIsVideoPlaying(false); }} onError={() => { setIsVideoPlaying(false); setMediaHasError(true); }} />;
       case 'audio': return <div className="flex h-full w-full flex-col items-center justify-center bg-white/70 p-8 text-slate-900"><svg xmlns="http://www.w3.org/2000/svg" className="mb-4 h-24 w-24 text-slate-900/60" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19V6l12-3v13M9 19c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2zm12-3c0 1.1-.9 2-2 2s-2-.9-2-2 .9-2 2-2 2 .9 2 2z" /></svg><h3 className="mb-6 max-w-full truncate text-xl font-semibold">{activeFile.name}</h3><audio ref={audioRef} key={activeFile.id} src={activeFile.url} controls className="w-full max-w-md" onLoadedMetadata={(event) => restoreMediaState(activeFile, event.currentTarget)} onTimeUpdate={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; }} onPause={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; }} onEnded={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; mediaWasPlayingRef.current[String(activeFile.id)] = false; }} onError={() => setMediaHasError(true)} /></div>;
@@ -484,7 +669,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       case 'doc':
       case 'ebook': return <SmartDocsWorkspace file={activeFile} productId={product.id} />;
       case 'link': return <ExternalResourceCard file={activeFile} />;
-      case 'quiz': return <QuizPlayer file={activeFile} economySettings={economySettings} onQuizReward={onQuizReward} />;
+      case 'quiz': return <QuizPlayer file={activeFile} economySettings={economySettings} initialState={quizSessionState[String(activeFile.id)]} onSessionChange={handleQuizSessionChange} onQuizReward={onQuizReward} />;
       default: return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
     }
   };
@@ -517,8 +702,8 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           <span className="truncate text-right text-sm font-bold text-slate-900/60">Welcome to the Course</span>
         </div>
 
-        <section className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
-          <aside className={`fixed inset-y-0 left-0 z-40 w-[86vw] max-w-80 transform border-r border-slate-200/70 bg-slate-50/95 shadow-[12px_0_40px_rgba(15,23,42,0.14)] transition lg:relative lg:inset-auto lg:w-auto lg:max-w-none lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-slate-200/50 lg:bg-slate-900/[0.04] lg:shadow-[4px_0_30px_rgba(0,0,0,0.02)] lg:backdrop-blur-3xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <section className="grid min-h-0 flex-1 basis-0 grid-cols-1 gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
+          <aside className={`fixed inset-y-0 left-0 z-40 w-[86vw] max-w-80 transform border-r border-slate-200/70 bg-slate-50/95 shadow-[12px_0_40px_rgba(15,23,42,0.14)] transition lg:relative lg:inset-auto lg:w-auto lg:max-w-none lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-slate-200/50 lg:bg-slate-900/[0.04] lg:h-full lg:min-h-0 lg:shadow-[4px_0_30px_rgba(0,0,0,0.02)] lg:backdrop-blur-3xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col">
               <div className="shrink-0 border-b border-white/50 px-4 py-5">
                 <button onClick={onBack} className="mb-4 flex items-center gap-2 text-[22px] font-medium text-slate-900 hover:opacity-70">← <span>Back</span></button>
@@ -530,7 +715,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
             </div>
           </aside>
 
-          <div className="relative min-h-0 overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)]">
+          <div className="relative h-full min-h-[22rem] overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)] lg:min-h-0">
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>
