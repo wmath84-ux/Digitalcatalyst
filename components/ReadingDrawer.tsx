@@ -340,7 +340,14 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ economySettings, isOpen, 
                         <p className="mt-2">Run AI Fetch Now in the admin panel or add a manual {listType} post to fill this list.</p>
                       </div>
                     )}
-                    {visibleArticles.map((article) => <HubCard key={`article-${article.id}`} title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(stripMarkdown(article.content))} min`} excerpt={article.excerpt} badge={article.type === 'news' ? 'News' : article.category || 'Blog'} imageSeed={getArticleImage(article)} onClick={() => onSelectArticle(article)} />)}
+                    {visibleArticles.map((article, index) => (
+                      <React.Fragment key={`article-${article.id}`}>
+                        <HubCard title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(stripMarkdown(article.content))} min`} excerpt={article.excerpt} badge={article.type === 'news' ? 'News' : article.category || 'Blog'} imageSeed={getArticleImage(article)} onClick={() => onSelectArticle(article)} />
+                        {(index + 1) % 3 === 0 && index < visibleArticles.length - 1 && (
+                          <GoogleAd variant="inFeed" label="Sponsored" className="lg:col-span-3 rounded-[2rem] border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl" />
+                        )}
+                      </React.Fragment>
+                    ))}
                     {listType === 'news' && announcements.map((announcement) => <HubCard key={`announcement-${announcement.id}`} title={announcement.title} meta={formatDate(announcement.date)} excerpt={announcement.content} badge="Announcement" onClick={() => onSelectAnnouncement(announcement)} />)}
                   </div>
                 </div>

@@ -108,7 +108,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
                 animationDelay={index}
                 onReadMoreClick={onReadMoreClick}
               />
-              {(index + 1) % 4 === 0 && index < newsArticles.length - 1 && (
+              {(index + 1) % 3 === 0 && index < newsArticles.length - 1 && (
                 <GoogleAd variant="inFeed" label="Sponsored" className="md:col-span-2 lg:col-span-3 rounded-[2rem] border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl" />
               )}
             </React.Fragment>
