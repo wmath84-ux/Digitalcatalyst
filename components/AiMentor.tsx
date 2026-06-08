@@ -52,10 +52,10 @@ const MarkdownMessage: React.FC<{ text: string }> = ({ text }) => {
             }
             const lines = trimmed.split('\n').filter(Boolean);
             if (lines.every(line => /^[-*•]\s+/.test(line.trim()))) {
-                return <ul key={blockIndex} className="list-disc space-y-1 pl-5 marker:text-cyan-200">{lines.map((line, lineIndex) => <li key={lineIndex}><InlineMarkdown text={line.replace(/^[-*•]\s+/, '')} /></li>)}</ul>;
+                return <ul key={blockIndex} className="list-disc space-y-1 pl-5 marker:text-cyan-700">{lines.map((line, lineIndex) => <li key={lineIndex}><InlineMarkdown text={line.replace(/^[-*•]\s+/, '')} /></li>)}</ul>;
             }
             if (lines.every(line => /^\d+\.\s+/.test(line.trim()))) {
-                return <ol key={blockIndex} className="list-decimal space-y-1 pl-5 marker:text-cyan-200">{lines.map((line, lineIndex) => <li key={lineIndex}><InlineMarkdown text={line.replace(/^\d+\.\s+/, '')} /></li>)}</ol>;
+                return <ol key={blockIndex} className="list-decimal space-y-1 pl-5 marker:text-cyan-700">{lines.map((line, lineIndex) => <li key={lineIndex}><InlineMarkdown text={line.replace(/^\d+\.\s+/, '')} /></li>)}</ol>;
             }
             return <p key={blockIndex}><InlineMarkdown text={trimmed} /></p>;
         })}

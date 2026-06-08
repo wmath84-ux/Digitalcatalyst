@@ -20,7 +20,7 @@ const SubscriptionPage: React.FC<{economySettings: EconomySettings; activeCoinDi
 
         <section className="mt-10 grid gap-8 lg:grid-cols-[0.95fr_1.05fr] lg:items-end">
           <div>
-            <p className="text-sm font-black uppercase tracking-[0.32em] text-cyan-200">Premium learning access</p>
+            <p className="text-sm font-black uppercase tracking-[0.32em] text-cyan-700">Premium learning access</p>
             <h1 className="mt-4 text-5xl font-black leading-tight sm:text-6xl">Subscription Studio</h1>
             <p className="mt-5 max-w-2xl text-lg leading-8 text-slate-600">Choose a bundled plan and unlock premium notes, courses, and learning resources inside one focused workspace.</p>
           </div>

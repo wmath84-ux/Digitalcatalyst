@@ -31,13 +31,13 @@ const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, setting
                 <div className="mb-3 text-xs text-slate-600 font-medium">
                     {new Date(article.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-200 transition-colors mb-3 leading-tight">
+                <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-700 transition-colors mb-3 leading-tight">
                     {article.title}
                 </h3>
                 <p className="text-sm text-slate-600 line-clamp-3 mb-6 flex-grow">
                     {article.excerpt}
                 </p>
-                <button onClick={() => onReadMoreClick(article)} className="text-indigo-200 font-bold text-sm uppercase tracking-wide flex items-center gap-2 group-hover:gap-3 transition-all">
+                <button onClick={() => onReadMoreClick(article)} className="text-indigo-700 font-bold text-sm uppercase tracking-wide flex items-center gap-2 group-hover:gap-3 transition-all">
                     Read Article <span className="text-lg leading-none">&rarr;</span>
                 </button>
             </div>

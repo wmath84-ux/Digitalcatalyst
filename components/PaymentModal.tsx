@@ -296,7 +296,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     return (
       <div ref={pageRef} className="fixed inset-0 z-[90] overflow-y-auto bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 px-4 pb-16 pt-6 text-slate-900 sm:px-6 lg:px-8">
         <div className="pointer-events-none absolute -left-24 top-16 h-72 w-72 rounded-full bg-indigo-400/30 blur-3xl" />
-        <div className="pointer-events-none absolute -right-20 bottom-10 h-80 w-80 rounded-full bg-cyan-300/25 blur-3xl" />
+        <div className="pointer-events-none absolute -right-20 bottom-10 h-80 w-80 rounded-full bg-cyan-600/25 blur-3xl" />
         <div className="relative mx-auto w-full max-w-6xl">
           <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
             <button onClick={onClose} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-black text-white shadow-sm backdrop-blur-xl transition hover:-translate-x-0.5 hover:bg-white/15">

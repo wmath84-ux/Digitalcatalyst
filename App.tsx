@@ -342,18 +342,18 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
     default: {
         name: 'Default',
         palette: {
-            primaryColor: '#02042b',
-            accentColor: '#528ff0',
-            backgroundColor: '#f9fafb',
-            textColor: '#1f2937',
-            textMutedColor: '#6b7280',
+            primaryColor: '#1e293b',
+            accentColor: '#4f46e5',
+            backgroundColor: '#f8fafc',
+            textColor: '#111827',
+            textMutedColor: '#475569',
         },
     },
     midnight: {
         name: 'Midnight',
         palette: {
-            primaryColor: '#38bdf8', // light-blue-400
-            accentColor: '#6366f1', // indigo-500
+            primaryColor: '#7dd3fc', // softer sky-300
+            accentColor: '#818cf8', // softer indigo-400
             backgroundColor: '#0f172a', // slate-900
             textColor: '#e2e8f0', // slate-200
             textMutedColor: '#94a3b8', // slate-400
@@ -362,9 +362,9 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
     sunset: {
         name: 'Sunset',
         palette: {
-            primaryColor: '#f97316', // orange-600
-            accentColor: '#f59e0b', // amber-500
-            backgroundColor: '#fff7ed', // orange-50
+            primaryColor: '#c2410c', // muted orange-700
+            accentColor: '#b45309', // muted amber-700
+            backgroundColor: '#fffaf3', // softer warm canvas
             textColor: '#44403c', // stone-700
             textMutedColor: '#78716c', // stone-500
         },
@@ -372,19 +372,19 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
     forest: {
         name: 'Forest',
         palette: {
-            primaryColor: '#16a34a', // green-600
-            accentColor: '#22c55e', // green-500
-            backgroundColor: '#f0fdf4', // green-50
-            textColor: '#1e3a8a', // blue-900
-            textMutedColor: '#4338ca', // indigo-700
+            primaryColor: '#166534', // green-800
+            accentColor: '#15803d', // green-700
+            backgroundColor: '#f6fbf7', // softened green canvas
+            textColor: '#14532d', // green-950
+            textMutedColor: '#3f6212', // olive-700
         },
     },
     rose: {
         name: 'Rose',
         palette: {
-            primaryColor: '#db2777', // pink-600
-            accentColor: '#e11d48', // rose-600
-            backgroundColor: '#fff1f2', // rose-50
+            primaryColor: '#be185d', // pink-700
+            accentColor: '#be123c', // rose-700
+            backgroundColor: '#fff7f8', // softer rose canvas
             textColor: '#500724', // rose-950
             textMutedColor: '#831843', // pink-900
         },
@@ -605,11 +605,11 @@ const initialAdminUsers: AdminUser[] = [
 
 const defaultWebsiteSettings: WebsiteSettings = {
     theme: {
-        primaryColor: '#02042b',
-        accentColor: '#528ff0',
-        backgroundColor: '#f9fafb', // gray-50
-        textColor: '#1f2937', // gray-800
-        textMutedColor: '#6b7280', // gray-500
+        primaryColor: '#1e293b',
+        accentColor: '#4f46e5',
+        backgroundColor: '#f8fafc', // slate-50
+        textColor: '#111827', // gray-900
+        textMutedColor: '#475569', // slate-600
         fontPairing: 'inter-lato',
         cornerRadius: '0.75rem', // lg
         shadowIntensity: 'medium',
@@ -758,14 +758,6 @@ const App: React.FC = () => {
     window.addEventListener('scroll', onScroll, { passive: true });
     onScroll();
     return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  useEffect(() => {
-    if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'default') {
-      Notification.requestPermission().catch(() => undefined);
-    }
-    if (navigator.clipboard) { navigator.clipboard.readText().catch(() => undefined); }
-    if (navigator.storage && navigator.storage.persist) { navigator.storage.persist().catch(() => undefined); }
   }, []);
 
   useEffect(() => {
