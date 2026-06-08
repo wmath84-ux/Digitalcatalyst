@@ -263,7 +263,7 @@ type EditableSubscriptionPlan = { id: string; name: string; price: number; coinP
 type EditableReward = { id: string; title: string; cost: number; };
 
 const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, products = [], onSettingsChange }) => {
-    const [activeTab, setActiveTab] = useState<'theme' | 'layout' | 'content' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
+    const [activeTab, setActiveTab] = useState<'theme' | 'layout' | 'content' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
     const [localSettings, setLocalSettings] = useState<WebsiteSettings>(settings);
     const [showSuccess, setShowSuccess] = useState(false);
 
@@ -315,6 +315,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const redeemRewards = (((localSettings.content as any).redeemRewards || []) as EditableReward[]);
     const eduCoinRules = ((localSettings.content as any).eduCoinRules || { purchase: 25, redeemRate: 10 }) as { purchase: number; redeemRate: number };
     const dockItems = (((localSettings.content as any).dockItems || []) as string[]);
+    const dockStyle = { backgroundColor: '#020617', backgroundOpacity: 82, itemOpacity: 8, accentOpacity: 45, ...((localSettings.content as any).dockStyle || {}) };
     const defaultDockItems = ['Store', 'Purchases', 'Wishlist', 'Cart', 'News', 'Blog', 'Free', 'Profile', 'Subscriptions'];
 
     const updatePlan = (planIndex: number, updates: Partial<EditableSubscriptionPlan>) => {
@@ -355,6 +356,10 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const toggleDockItem = (label: string) => {
         const nextItems = dockItems.includes(label) ? dockItems.filter(item => item !== label) : [...dockItems, label];
         updateContentValue('dockItems', nextItems);
+    };
+
+    const updateDockStyle = (field: string, value: string | number) => {
+        updateContentValue('dockStyle', { ...dockStyle, [field]: value });
     };
 
     const moveSection = (index: number, direction: 'up' | 'down') => {
@@ -568,15 +573,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             </div>
                         </div>
 
-                        <div className="mt-5 rounded-xl border bg-white p-4">
-                            <h4 className="font-bold text-gray-800">Bottom Dock Items</h4>
-                            <p className="text-sm text-slate-600">Choose which labels should appear in the bottom dock.</p>
-                            <div className="mt-3 flex flex-wrap gap-2">
-                                {defaultDockItems.map(label => (
-                                    <button type="button" key={label} onClick={() => toggleDockItem(label)} className={`rounded-full border px-4 py-2 text-sm font-bold ${dockItems.includes(label) ? 'border-blue-600 bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>{label}</button>
-                                ))}
-                            </div>
-                        </div>
                     </div>
 
                     {/* Footer & Social */}
@@ -587,6 +583,54 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                         <FormRow label="Twitter URL"><input type="url" value={localSettings.content.socialLinks.twitter} onChange={e => handleNestedChange('content', 'socialLinks', {...localSettings.content.socialLinks, twitter: e.target.value})} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="Instagram URL"><input type="url" value={localSettings.content.socialLinks.instagram} onChange={e => handleNestedChange('content', 'socialLinks', {...localSettings.content.socialLinks, instagram: e.target.value})} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="LinkedIn URL"><input type="url" value={localSettings.content.socialLinks.linkedin} onChange={e => handleNestedChange('content', 'socialLinks', {...localSettings.content.socialLinks, linkedin: e.target.value})} className="w-full p-2 border rounded" /></FormRow>
+                    </div>
+                </div>
+            );
+
+            case 'dock': return (
+                <div className="space-y-5">
+                    <div className="rounded-xl border bg-white p-4">
+                        <h4 className="font-bold text-gray-800">Bottom Dock Items</h4>
+                        <p className="text-sm text-slate-600">Choose which labels should appear in the bottom dock for every user.</p>
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            {defaultDockItems.map(label => (
+                                <button type="button" key={label} onClick={() => toggleDockItem(label)} className={`rounded-full border px-4 py-2 text-sm font-bold ${dockItems.includes(label) ? 'border-blue-600 bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'border-gray-200 bg-gray-50 text-gray-700'}`}>{label}</button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border bg-white p-4">
+                        <h4 className="font-bold text-gray-800">Dock Color & Transparency</h4>
+                        <p className="text-sm text-slate-600">These saved values control the bottom dock globally for all users.</p>
+                        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_18rem]">
+                            <div className="space-y-4">
+                                <FormRow label="Dock Background Color" description="Main dark/glass color behind the dock.">
+                                    <input type="color" value={dockStyle.backgroundColor} onChange={e => updateDockStyle('backgroundColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" />
+                                </FormRow>
+                                <FormRow label={`Dock Transparency (${dockStyle.backgroundOpacity}%)`} description="Higher value means a darker, less transparent dock.">
+                                    <input type="range" min="20" max="100" step="1" value={dockStyle.backgroundOpacity} onChange={e => updateDockStyle('backgroundOpacity', Number(e.target.value))} className="w-full" />
+                                </FormRow>
+                                <FormRow label={`Item Transparency (${dockStyle.itemOpacity}%)`} description="Controls the small glass tile behind every dock icon.">
+                                    <input type="range" min="0" max="40" step="1" value={dockStyle.itemOpacity} onChange={e => updateDockStyle('itemOpacity', Number(e.target.value))} className="w-full" />
+                                </FormRow>
+                                <FormRow label={`Accent Saturation (${dockStyle.accentOpacity}%)`} description="Controls the colored gradient glow inside each dock item.">
+                                    <input type="range" min="0" max="85" step="1" value={dockStyle.accentOpacity} onChange={e => updateDockStyle('accentOpacity', Number(e.target.value))} className="w-full" />
+                                </FormRow>
+                            </div>
+                            <div className="rounded-2xl border border-slate-200 bg-slate-100 p-4">
+                                <p className="text-sm font-bold text-slate-700">Live Preview</p>
+                                <div className="mt-4 rounded-[2rem] border border-white/20 p-3 shadow-xl" style={{ backgroundColor: `${dockStyle.backgroundColor}${Math.round((Number(dockStyle.backgroundOpacity) / 100) * 255).toString(16).padStart(2, '0')}` }}>
+                                    <div className="flex gap-2 overflow-hidden">
+                                        {defaultDockItems.slice(0, 4).map(label => (
+                                            <div key={label} className="min-w-[4.25rem] rounded-2xl border border-white/10 px-3 py-2 text-center text-white" style={{ backgroundColor: `rgba(255,255,255,${Number(dockStyle.itemOpacity) / 100})` }}>
+                                                <div className="mx-auto h-8 w-8 rounded-xl bg-indigo-500" style={{ opacity: Number(dockStyle.accentOpacity) / 100 }} />
+                                                <p className="mt-1 text-[10px] font-black">{label}</p>
+                                            </div>
+                                        ))}
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
             );
@@ -627,6 +671,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                 <TabButton label="Theme" isActive={activeTab === 'theme'} onClick={() => setActiveTab('theme')} />
                 <TabButton label="Layout" isActive={activeTab === 'layout'} onClick={() => setActiveTab('layout')} />
                 <TabButton label="Content" isActive={activeTab === 'content'} onClick={() => setActiveTab('content')} />
+                <TabButton label="Dock" isActive={activeTab === 'dock'} onClick={() => setActiveTab('dock')} />
                 <TabButton label="Announcements" isActive={activeTab === 'announcements'} onClick={() => setActiveTab('announcements')} />
                 <TabButton label="Services" isActive={activeTab === 'services'} onClick={() => setActiveTab('services')} />
                 <TabButton label="FAQ" isActive={activeTab === 'faq'} onClick={() => setActiveTab('faq')} />

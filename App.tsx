@@ -438,6 +438,12 @@ export interface WebsiteSettings {
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
         dockItems: ['Store','Purchases','Wishlist','Cart','News','Blog','Free','Profile','Subscriptions'],
+        dockStyle?: {
+            backgroundColor: string;
+            backgroundOpacity: number;
+            itemOpacity: number;
+            accentOpacity: number;
+        };
         socialLinks: {
             facebook: string;
             twitter: string;
@@ -672,6 +678,12 @@ const defaultWebsiteSettings: WebsiteSettings = {
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
         dockItems: ['Store','Purchases','Wishlist','Cart','News','Blog','Free','Profile','Subscriptions'],
+        dockStyle: {
+            backgroundColor: '#020617',
+            backgroundOpacity: 82,
+            itemOpacity: 8,
+            accentOpacity: 45,
+        },
         socialLinks: {
             facebook: "https://www.facebook.com/profile.php?viewas=100000686899395&id=61565419447036",
             twitter: "https://x.com/MathW12385",
