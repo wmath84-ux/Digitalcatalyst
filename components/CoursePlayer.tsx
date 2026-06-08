@@ -466,7 +466,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   };
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
+    <div className="relative h-[100dvh] min-h-[100svh] w-screen overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
       <div className="absolute inset-0 scale-110 bg-cover bg-center opacity-20 blur-2xl" style={{ backgroundImage: `url(${backgroundImage})` }} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(99,102,241,0.28),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.16),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.82),rgba(238,242,255,0.72),rgba(248,250,252,0.94))]" />
       <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: accentGlow }} />
@@ -481,7 +481,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
         </div>
       </header>
 
-      <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
+      <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-slate-950/25 transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
       <main className="relative z-10 flex h-full flex-col gap-3 p-3 lg:p-3">
         <div className="hidden shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border border-white/50 bg-white/70 px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid">
@@ -494,7 +494,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
         </div>
 
         <section className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
-          <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-slate-900/[0.04] backdrop-blur-3xl border-r border-slate-200/50 shadow-[4px_0_30px_rgba(0,0,0,0.02)] transition lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl lg:border ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+          <aside className={`fixed inset-y-0 left-0 z-40 w-[86vw] max-w-80 transform border-r border-slate-200/70 bg-slate-50/95 shadow-[12px_0_40px_rgba(15,23,42,0.14)] transition lg:relative lg:inset-auto lg:w-auto lg:max-w-none lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-slate-200/50 lg:bg-slate-900/[0.04] lg:shadow-[4px_0_30px_rgba(0,0,0,0.02)] lg:backdrop-blur-3xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col">
               <div className="shrink-0 border-b border-white/50 px-4 py-5">
                 <button onClick={onBack} className="mb-4 flex items-center gap-2 text-[22px] font-medium text-slate-900 hover:opacity-70">← <span>Back</span></button>
