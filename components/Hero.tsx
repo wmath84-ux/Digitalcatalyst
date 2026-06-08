@@ -55,7 +55,7 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
     >
       <div className="absolute inset-0 -z-30 animate-gradient-flow bg-gradient-to-r from-sky-50 via-indigo-100/60 to-violet-100 bg-[length:400%_400%]" />
       <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_top_left,rgba(14,165,233,0.34),transparent_34%),radial-gradient(circle_at_70%_20%,rgba(124,58,237,0.38),transparent_32%),radial-gradient(circle_at_50%_85%,rgba(37,99,235,0.30),transparent_36%)]" />
-      <div className="absolute inset-0 -z-10 bg-white/52" />
+      <div className="absolute inset-0 -z-10 bg-white/50" />
       <div className="absolute inset-0 -z-10 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:72px_72px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_74%)]" />
       <div className="absolute -left-24 top-1/4 h-72 w-72 rounded-full bg-cyan-500/30 blur-3xl animate-pulse" />
       <div className="absolute -right-24 bottom-1/4 h-96 w-96 rounded-full bg-violet-600/30 blur-3xl animate-icon-float" />

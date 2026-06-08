@@ -65,7 +65,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({ adminUsers, currentAd
             <h1 className="text-3xl font-bold text-gray-800 mb-6">Admin User Management</h1>
 
             {/* Add New Admin Form */}
-            <div className="bg-white/70 backdrop-blur-xl p-6 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] border mb-8">
+            <div className="bg-white/80 backdrop-blur-xl p-6 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] border mb-8">
                 <h2 className="text-xl font-bold text-gray-800 mb-4">Add New Admin</h2>
                 <form onSubmit={handleAddAdmin} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                     <div className="md:col-span-2">
@@ -78,7 +78,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({ adminUsers, currentAd
                     </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700">Role</label>
-                        <select value={newAdminRole} onChange={e => setNewAdminRole(e.target.value as AdminUser['role'])} className="mt-1 w-full p-2 border rounded-md bg-white/70 backdrop-blur-xl">
+                        <select value={newAdminRole} onChange={e => setNewAdminRole(e.target.value as AdminUser['role'])} className="mt-1 w-full p-2 border rounded-md bg-white/80 backdrop-blur-xl">
                             <option value="Admin">Admin</option>
                             <option value="Developer">Developer</option>
                         </select>
@@ -93,7 +93,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({ adminUsers, currentAd
             </div>
 
             {/* List of Existing Admins */}
-            <div className="bg-white/70 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-lg overflow-hidden border border-gray-200">
+            <div className="bg-white/80 backdrop-blur-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] rounded-lg overflow-hidden border border-slate-200/80">
                 <div className="overflow-x-auto">
                     <table className="w-full min-w-max text-left">
                         <thead className="bg-gray-100">
@@ -105,7 +105,7 @@ const AdminManagement: React.FC<AdminManagementProps> = ({ adminUsers, currentAd
                         </thead>
                         <tbody>
                             {adminUsers.map(user => (
-                                <tr key={user.id} className="border-b hover:bg-gray-50">
+                                <tr key={user.id} className="border-b hover:bg-slate-100/80">
                                     <td className="p-4 font-medium text-gray-800">{user.email}</td>
                                     <td className="p-4"><RoleBadge role={user.role} /></td>
                                     <td className="p-4">

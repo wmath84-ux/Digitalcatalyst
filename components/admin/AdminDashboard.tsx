@@ -52,7 +52,7 @@ const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?
         <div className="absolute -bottom-4 -right-4 opacity-20 text-black transform rotate-12 scale-150">
             {icon}
         </div>
-        <div className="absolute top-0 right-0 w-32 h-32 bg-white/70 backdrop-blur-xl opacity-10 rounded-full blur-2xl -mr-16 -mt-16"></div>
+        <div className="absolute top-0 right-0 w-32 h-32 bg-white/80 backdrop-blur-xl opacity-10 rounded-full blur-2xl -mr-16 -mt-16"></div>
     </div>
 );
 
@@ -87,10 +87,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                                 <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-800 tracking-tight">
                                     Hello, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">{props.currentAdminUser.email.split('@')[0]}</span> 👋
                                 </h1>
-                                <p className="mt-2 text-lg text-slate-600">Here's what's happening in your store today.</p>
+                                <p className="mt-2 text-lg text-slate-700">Here's what's happening in your store today.</p>
                             </div>
                             <div className="mt-4 md:mt-0 hidden md:block">
-                                <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/70 backdrop-blur-xl border border-slate-200 text-slate-600 shadow-sm">
+                                <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/80 backdrop-blur-xl border border-slate-300/70 text-slate-700 shadow-sm">
                                     <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
                                     System Operational
                                 </span>
@@ -128,7 +128,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                             />
                         </div>
 
-                        <div className="bg-white/70 backdrop-blur-xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-100 p-6 sm:p-8">
+                        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_18px_45px_rgba(15,23,42,0.08)] border border-slate-200/80 p-6 sm:p-8">
                             <h2 className="text-2xl font-bold text-slate-800 mb-4">Quick Actions</h2>
                             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                                 <button onClick={() => setCurrentView('products')} className="p-4 bg-blue-50 text-blue-700 rounded-xl font-semibold hover:bg-blue-100 transition-colors flex items-center gap-3 justify-center sm:justify-start">
@@ -148,7 +148,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     }
 
     return (
-        <div className="flex min-h-screen bg-slate-50 font-sans">
+        <div className="flex min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_10%_10%,rgba(79,70,229,0.16),transparent_30%),radial-gradient(circle_at_90%_0%,rgba(14,165,233,0.13),transparent_28%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] font-sans">
             <Sidebar 
                 onNavigate={setCurrentView} 
                 onLogout={props.onLogout} 
@@ -160,22 +160,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 {/* Mobile Header */}
-                <header className="md:hidden bg-white/70 backdrop-blur-xl border-b border-gray-200 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+                <header className="md:hidden bg-white/80 backdrop-blur-xl border-b border-slate-300/70 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
                     <div className="flex items-center gap-3">
                         <button 
                             onClick={() => setIsMobileSidebarOpen(true)}
-                            className="p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+                            className="p-2 -ml-2 text-slate-700 hover:bg-white/80 rounded-lg"
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                         </button>
                         <span className="font-bold text-lg text-slate-800">Admin Panel</span>
                     </div>
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-full flex items-center justify-center text-slate-900 text-xs font-bold">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-700 to-indigo-800 rounded-full flex items-center justify-center text-white text-xs font-bold">
                         {props.currentAdminUser.email.charAt(0).toUpperCase()}
                     </div>
                 </header>
 
-                <main className="flex-1 p-4 sm:p-8 lg:p-10 overflow-y-auto custom-scrollbar">
+                <main className="flex-1 p-4 sm:p-8 lg:p-10 overflow-y-auto custom-scrollbar bg-white/20 backdrop-blur-sm">
                     <div className="max-w-7xl mx-auto">
                         {renderView()}
                     </div>

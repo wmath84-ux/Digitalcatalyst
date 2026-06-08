@@ -61,15 +61,15 @@ const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({ ticket, replyText
     }, [ticket.subject]);
     
     return (
-        <div className="fixed inset-0 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 bg-opacity-70 z-[60] flex justify-center items-center p-4 font-sans animate-fade-in">
+        <div className="fixed inset-0 bg-[#d8e0ef] bg-[radial-gradient(circle_at_12%_8%,rgba(79,70,229,0.14),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(14,165,233,0.12),transparent_26%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] bg-opacity-70 z-[60] flex justify-center items-center p-4 font-sans animate-fade-in">
             <div className="bg-gray-100 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] w-full max-w-3xl max-h-[90vh] flex flex-col animate-scale-in-up">
-                <div className="p-4 border-b bg-white/70 backdrop-blur-xl rounded-t-lg flex justify-between items-center">
+                <div className="p-4 border-b bg-white/80 backdrop-blur-xl rounded-t-lg flex justify-between items-center">
                     <h2 className="text-lg font-bold text-gray-800">Email Preview</h2>
                     <button onClick={onClose} className="text-slate-600 hover:text-gray-600 font-bold text-2xl">&times;</button>
                 </div>
 
                 <div className="flex-1 p-6 overflow-y-auto">
-                    <div className="bg-white/70 backdrop-blur-xl rounded-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden border">
+                    <div className="bg-white/80 backdrop-blur-xl rounded-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden border">
                          {/* Header Image */}
                         <div className="h-48 bg-gray-200 flex items-center justify-center">
                              {isLoadingImage ? (
@@ -121,7 +121,7 @@ const EmailPreviewModal: React.FC<EmailPreviewModalProps> = ({ ticket, replyText
                     </p>
                 </div>
 
-                <div className="p-4 bg-gray-50 border-t flex justify-end space-x-3">
+                <div className="p-4 bg-slate-100/80 border-t flex justify-end space-x-3">
                     <button onClick={onClose} className="px-5 py-2 bg-gray-200 text-gray-800 rounded-lg hover:bg-gray-300 font-semibold">Cancel</button>
                     <button onClick={onConfirmSend} className="px-5 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold rounded-lg hover:bg-blue-700 flex items-center gap-2">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">

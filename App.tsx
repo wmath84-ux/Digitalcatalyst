@@ -736,16 +736,9 @@ const defaultWebsiteSettings: WebsiteSettings = {
             backgroundColor: '#dfe8fb',
             backgroundOpacity: 92,
             panelOpacity: 92,
-            cardOpacity: 82,
+            cardOpacity: 86,
             accentColor: '#4338ca',
             accentOpacity: 20,
-        },
-        profileStyle: {
-            backgroundColor: '#e2e8f0',
-            backgroundTint: '#e0e7ff',
-            cardOpacity: 82,
-            heroOverlayOpacity: 76,
-            accentColor: '#f97316',
         },
         profileStreaks: [
             { id: 'daily-login', title: 'Daily Login Spark', icon: '🔥', metric: 'dailyLogin', goal: 1, unit: 'day', coinReward: 10, accent: 'from-orange-400 via-amber-400 to-yellow-300', note: 'Open your hub every day and claim today’s flame.', active: true },

@@ -15,7 +15,7 @@ interface LatestNewsProps {
 const defaultReadingStyle = {
   backgroundColor: '#dfe8fb',
   backgroundOpacity: 92,
-  cardOpacity: 82,
+  cardOpacity: 86,
   accentColor: '#4338ca',
   accentOpacity: 20,
 };
@@ -39,14 +39,14 @@ const getArticleCoverImage = (article: NewsArticle, size = '800/600') => article
 const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, settings: WebsiteSettings, cardBackground?: string, onReadMoreClick: (article: NewsArticle) => void }> = ({ article, animationDelay, settings, cardBackground, onReadMoreClick }) => {
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${(animationDelay % 8) + 1}` : '';
     return (
-        <div style={{ backgroundColor: cardBackground }} className={`backdrop-blur-2xl rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/50 overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
-            <div className="relative h-48 overflow-hidden rounded-t-xl bg-white/70">
+        <div style={{ backgroundColor: cardBackground }} className={`backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-indigo-100/80 overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
+            <div className="relative h-48 overflow-hidden rounded-t-2xl bg-white/80">
                 <img 
                     src={getArticleCoverImage(article)} 
                     alt={article.title} 
-                    className="h-full w-full rounded-t-xl object-cover transition-transform duration-700 group-hover:scale-110" 
+                    className="h-full w-full rounded-t-2xl object-cover transition-transform duration-700 group-hover:scale-110"
                 />
-                <div className="absolute top-4 left-4 bg-white/70 backdrop-blur-xl px-3 py-1 text-xs font-bold uppercase tracking-wider text-indigo-700 border border-white/50 rounded-md shadow-sm">
+                <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-xl px-3 py-1 text-xs font-bold uppercase tracking-wider text-indigo-700 border border-indigo-100/80 rounded-md shadow-sm">
                     {article.type === 'news' ? 'News' : article.category}
                 </div>
             </div>

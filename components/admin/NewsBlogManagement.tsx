@@ -4,8 +4,8 @@ import { NewsArticle, WebsiteSettings } from '../../App';
 import { storage } from '../../firebase';
 import { ContentDatabaseAdapter, ContentPostRecord, ContentPostType, runContentAutomation } from '../../utils/contentAutomator';
 
-const glassCard = 'rounded-[2rem] border border-white/50 bg-white/70 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
-const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
+const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
+const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
 
 const editorCommands: Array<[string, string, string?]> = [
@@ -63,15 +63,15 @@ const SmartDocsEditor: React.FC<{ value: string; onChange: (value: string) => vo
   };
 
   return (
-    <div className="overflow-hidden rounded-3xl border border-white/50 bg-white/70">
-      <div className="flex flex-wrap gap-2 border-b border-white/50 bg-white/70 p-3 backdrop-blur-xl">
+    <div className="overflow-hidden rounded-3xl border border-white/50 bg-white/80">
+      <div className="flex flex-wrap gap-2 border-b border-white/50 bg-white/80 p-3 backdrop-blur-xl">
         {(editorCommands || []).map(([command, label, value]) => (
-          <button key={`${command}-${label}`} type="button" onClick={() => runCommand(command, value)} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 text-xs font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm">
+          <button key={`${command}-${label}`} type="button" onClick={() => runCommand(command, value)} className="rounded-xl border border-white/50 bg-white/80 px-3 py-2 text-xs font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm">
             {label}
           </button>
         ))}
       </div>
-      <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={() => onChange(editorRef.current?.innerHTML || '')} className="prose prose-invert min-h-96 max-w-none bg-white/70 p-6 text-slate-900 outline-none" />
+      <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={() => onChange(editorRef.current?.innerHTML || '')} className="prose prose-invert min-h-96 max-w-none bg-white/80 p-6 text-slate-900 outline-none" />
     </div>
   );
 };
@@ -227,7 +227,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
 
   if (mode === 'form') {
     return (
-      <div className="min-h-full bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
+      <div className="min-h-full bg-[#d8e0ef] bg-[radial-gradient(circle_at_12%_8%,rgba(79,70,229,0.14),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(14,165,233,0.12),transparent_26%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] text-slate-900">
         <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
           <div>
             <p className="text-xs font-black uppercase tracking-[0.35em] text-cyan-700/80">News & Blog Management</p>
@@ -235,7 +235,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
             <p className="mt-3 max-w-3xl text-slate-600">Full-page editor with Smart Docs formatting, no cramped modals.</p>
           </div>
           <div className="flex gap-3">
-            <button onClick={() => setMode('list')} className="rounded-2xl border border-white/50 bg-white/70 px-5 py-3 font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm">Cancel</button>
+            <button onClick={() => setMode('list')} className="rounded-2xl border border-white/50 bg-white/80 px-5 py-3 font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm">Cancel</button>
             <button onClick={savePost} className="rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3 font-black text-white shadow-sm transition hover:scale-105">Save Post</button>
           </div>
         </div>
@@ -276,12 +276,12 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
                     <input type="file" accept="image/*" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadCoverImage(file); event.currentTarget.value = ''; }} />
                     {isUploadingCover ? 'Uploading cover…' : 'Upload Custom Cover'}
                   </label>
-                  <button type="button" onClick={() => setEditingPost({ ...editingPost, coverImage: '', thumbnailImage: '' })} className="rounded-2xl border border-white/50 bg-white/70 px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-white/90 hover:shadow-sm">Clear Image</button>
+                  <button type="button" onClick={() => setEditingPost({ ...editingPost, coverImage: '', thumbnailImage: '' })} className="rounded-2xl border border-white/50 bg-white/80 px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-white/90 hover:shadow-sm">Clear Image</button>
                 </div>
                 {coverUploadError && <p className="mt-4 rounded-2xl border border-rose-200/70 bg-rose-50/80 px-4 py-3 text-sm font-bold text-rose-700">{coverUploadError}</p>}
               </div>
               <div className="overflow-hidden rounded-[1.5rem] border border-white/60 bg-gradient-to-br from-indigo-50 via-white to-fuchsia-50 p-2 shadow-sm">
-                <div className="aspect-video overflow-hidden rounded-[1.15rem] bg-white/70">
+                <div className="aspect-video overflow-hidden rounded-[1.15rem] bg-white/80">
                   {editingPost.coverImage ? (
                     <img src={editingPost.coverImage} alt={`${editingPost.title || 'Article'} cover preview`} className="h-full w-full object-cover transition duration-700 hover:scale-105" />
                   ) : (
@@ -308,7 +308,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
   }
 
   return (
-    <div className="min-h-full bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
+    <div className="min-h-full bg-[#d8e0ef] bg-[radial-gradient(circle_at_12%_8%,rgba(79,70,229,0.14),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(14,165,233,0.12),transparent_26%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] text-slate-900">
       <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.35em] text-cyan-700/80">Daily Reading Hub CMS</p>
@@ -324,10 +324,10 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
             <p className="text-xs font-black uppercase tracking-[0.35em] text-fuchsia-700/80">AI Autopilot Status</p>
             <h2 className="mt-3 text-2xl font-black text-slate-900">Daily AI Fetch</h2>
             <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Generates 10 educational news updates and 10 student-focused blogs, then permanently purges posts older than 72 hours.</p>
-            <p className="mt-4 rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-sm text-slate-600">{automationStatus}</p>
+            <p className="mt-4 rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-sm text-slate-600">{automationStatus}</p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
-            <button onClick={toggleAutopilot} className={`rounded-2xl border px-5 py-3 font-black transition ${autopilotEnabled ? 'border-emerald-300/40 bg-emerald-400/15 text-emerald-700' : 'border-white/50 bg-white/70 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}>
+            <button onClick={toggleAutopilot} className={`rounded-2xl border px-5 py-3 font-black transition ${autopilotEnabled ? 'border-emerald-300/40 bg-emerald-400/15 text-emerald-700' : 'border-white/50 bg-white/80 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}>
               {autopilotEnabled ? 'Daily AI Fetch Enabled' : 'Enable Daily AI Fetch'}
             </button>
             <button onClick={runAiFetchNow} disabled={isRunning} className="rounded-2xl border border-purple-300/30 bg-purple-400/15 px-5 py-3 font-black text-purple-700 transition hover:bg-purple-400/25 disabled:cursor-not-allowed disabled:opacity-60">
@@ -346,12 +346,12 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
       <section className={glassCard}>
         <div className="mb-5 flex items-center justify-between">
           <h2 className="text-xl font-black text-slate-900">Current News & Blogs</h2>
-          <span className="rounded-full border border-white/50 bg-white/70 px-3 py-1 text-xs font-black text-slate-600">{posts.length} posts</span>
+          <span className="rounded-full border border-white/50 bg-white/80 px-3 py-1 text-xs font-black text-slate-600">{posts.length} posts</span>
         </div>
         <div className="overflow-hidden rounded-3xl border border-white/50">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-left text-sm">
-              <thead className="bg-white/70 text-xs uppercase tracking-[0.22em] text-slate-600">
+              <thead className="bg-white/80 text-xs uppercase tracking-[0.22em] text-slate-600">
                 <tr>
                   <th className="p-5">Title</th>
                   <th className="p-5">Type</th>
