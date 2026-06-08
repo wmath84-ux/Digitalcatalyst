@@ -449,13 +449,14 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     return () => window.clearInterval(timer);
   }, [activeFile, economySettings.coinPerVideoMinute, isPlaybackWindowFocused, isVideoPlaying, onWatchTimeMinutes]);
 
-  const liveEarningHud = activeFile?.type === 'video' ? (
-    <div className="bg-white/50 backdrop-blur-md border border-slate-200 shadow-sm rounded-full px-4 py-1.5 flex items-center gap-2 text-sm font-semibold text-slate-800 transition-all whitespace-nowrap max-sm:px-3 max-sm:text-xs" aria-live="polite">
+  const isNativeVideoActive = activeFile?.type === 'video';
+  const liveEarningHud = (
+    <div className={`bg-white/50 backdrop-blur-md border border-slate-200 shadow-sm rounded-full px-4 py-1.5 flex items-center gap-2 text-sm font-semibold text-slate-800 transition-opacity whitespace-nowrap max-sm:px-3 max-sm:text-xs ${isNativeVideoActive ? 'opacity-100' : 'invisible opacity-0'}`} aria-hidden={!isNativeVideoActive} aria-live={isNativeVideoActive ? 'polite' : undefined}>
       <span>⏱️ {formatActiveWatchTime(activeWatchSeconds)} Mins</span>
       <span className="h-4 w-px bg-slate-300" />
       <span className={`text-amber-700 transition-all duration-300 ${coinPulse ? 'animate-bounce scale-110 text-amber-600 drop-shadow-[0_0_10px_rgba(251,191,36,0.65)]' : ''}`}>✦ +{sessionEarnedCoins} Coins</span>
     </div>
-  ) : null;
+  );
 
   const renderMedia = () => {
     if (!activeFile) return <div className="flex h-full min-h-[500px] items-center justify-center bg-white/70 text-slate-900/70 backdrop-blur-xl">Select content to begin.</div>;
@@ -464,17 +465,17 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       case 'youtube': {
         const videoId = extractYouTubeID(activeFile.url);
         return videoId ? (
-          <div className="flex h-full min-h-[500px] w-full flex-col items-center justify-center overflow-hidden bg-white/70 p-3 backdrop-blur-xl">
-            <div className="w-full aspect-video overflow-hidden rounded-[2rem] border border-white/60 bg-black shadow-sm">
-              <iframe key={activeFile.id} className="h-full w-full bg-black" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaHasError(true)} />
+          <div className="flex h-full min-h-[500px] w-full flex-1 flex-col items-center justify-center overflow-y-auto overflow-x-hidden bg-white/70 p-3 backdrop-blur-xl">
+            <div className="relative aspect-video w-full max-w-full shrink-0 overflow-hidden rounded-[2rem] border border-white/60 bg-black shadow-sm" style={{ aspectRatio: '16 / 9' }}>
+              <iframe key={activeFile.id} className="absolute inset-0 h-full w-full bg-black" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onError={() => setMediaHasError(true)} />
             </div>
           </div>
         ) : <div className="flex h-full min-h-[500px] w-full flex-col"><VideoUnavailablePlaceholder /></div>;
       }
       case 'video': return (
-        <div className="flex h-full min-h-[500px] w-full flex-col items-center justify-center overflow-hidden bg-white/70 p-3 backdrop-blur-xl">
-          <div className="w-full aspect-video overflow-hidden rounded-[2rem] border border-white/60 bg-black shadow-sm">
-            <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-black object-contain" onLoadedMetadata={(event) => restoreMediaState(activeFile, event.currentTarget)} onTimeUpdate={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; }} onPlay={() => setIsVideoPlaying(true)} onPause={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; setIsVideoPlaying(false); }} onEnded={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; mediaWasPlayingRef.current[String(activeFile.id)] = false; setIsVideoPlaying(false); }} onError={() => { setIsVideoPlaying(false); setMediaHasError(true); }} />
+        <div className="flex h-full min-h-[500px] w-full flex-1 flex-col items-center justify-center overflow-y-auto overflow-x-hidden bg-white/70 p-3 backdrop-blur-xl">
+          <div className="relative aspect-video w-full max-w-full shrink-0 overflow-hidden rounded-[2rem] border border-white/60 bg-black shadow-sm" style={{ aspectRatio: '16 / 9' }}>
+            <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="absolute inset-0 h-full w-full bg-black object-contain" onLoadedMetadata={(event) => restoreMediaState(activeFile, event.currentTarget)} onTimeUpdate={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; }} onPlay={() => setIsVideoPlaying(true)} onPause={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; setIsVideoPlaying(false); }} onEnded={(event) => { mediaProgressRef.current[String(activeFile.id)] = event.currentTarget.currentTime; mediaWasPlayingRef.current[String(activeFile.id)] = false; setIsVideoPlaying(false); }} onError={() => { setIsVideoPlaying(false); setMediaHasError(true); }} />
           </div>
         </div>
       );
@@ -529,7 +530,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           <span className="truncate text-right text-sm font-bold text-slate-900/60">Welcome to the Course</span>
         </div>
 
-        <section className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
+        <section className="grid min-h-0 flex-1 grid-cols-1 grid-rows-[minmax(0,1fr)] gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
           <aside className={`fixed inset-y-0 left-0 z-40 w-[86vw] max-w-80 transform border-r border-slate-200/70 bg-slate-50/95 shadow-[12px_0_40px_rgba(15,23,42,0.14)] transition lg:relative lg:inset-auto lg:w-auto lg:max-w-none lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:border-slate-200/50 lg:bg-slate-900/[0.04] lg:shadow-[4px_0_30px_rgba(0,0,0,0.02)] lg:backdrop-blur-3xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col">
               <div className="shrink-0 border-b border-white/50 px-4 py-5">
@@ -542,7 +543,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
             </div>
           </aside>
 
-          <div className="relative flex min-h-[500px] min-w-0 flex-1 flex-col overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)]">
+          <div className="relative flex h-full min-h-[500px] min-w-0 flex-1 basis-0 flex-col overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)]">
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>
