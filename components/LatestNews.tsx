@@ -11,12 +11,35 @@ interface LatestNewsProps {
   onOpenHub: () => void;
 }
 
+
+const defaultReadingStyle = {
+  backgroundColor: '#e8edf6',
+  backgroundOpacity: 88,
+  cardOpacity: 76,
+  accentColor: '#4f46e5',
+  accentOpacity: 16,
+};
+
+const clampPercent = (value: unknown, fallback: number) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(100, Math.max(0, numeric));
+};
+
+const hexToRgba = (hex: string, opacityPercent: number, fallback = defaultReadingStyle.backgroundColor) => {
+  const normalized = /^#?[0-9a-f]{6}$/i.test(hex || '') ? hex.replace('#', '') : fallback.replace('#', '');
+  const red = parseInt(normalized.slice(0, 2), 16);
+  const green = parseInt(normalized.slice(2, 4), 16);
+  const blue = parseInt(normalized.slice(4, 6), 16);
+  return `rgba(${red}, ${green}, ${blue}, ${clampPercent(opacityPercent, defaultReadingStyle.backgroundOpacity) / 100})`;
+};
+
 const getArticleCoverImage = (article: NewsArticle, size = '800/600') => article.coverImage || article.thumbnailImage || `https://picsum.photos/seed/${article.imageSeed}/${size}`;
 
-const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, settings: WebsiteSettings, onReadMoreClick: (article: NewsArticle) => void }> = ({ article, animationDelay, settings, onReadMoreClick }) => {
+const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, settings: WebsiteSettings, cardBackground?: string, onReadMoreClick: (article: NewsArticle) => void }> = ({ article, animationDelay, settings, cardBackground, onReadMoreClick }) => {
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${(animationDelay % 8) + 1}` : '';
     return (
-        <div className={`bg-white/70 backdrop-blur-2xl rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/50 overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
+        <div style={{ backgroundColor: cardBackground }} className={`backdrop-blur-2xl rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-white/50 overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
             <div className="relative h-48 overflow-hidden rounded-t-xl bg-white/70">
                 <img 
                     src={getArticleCoverImage(article)} 
@@ -31,13 +54,13 @@ const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, setting
                 <div className="mb-3 text-xs text-slate-600 font-medium">
                     {new Date(article.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-200 transition-colors mb-3 leading-tight">
+                <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-700 transition-colors mb-3 leading-tight">
                     {article.title}
                 </h3>
                 <p className="text-sm text-slate-600 line-clamp-3 mb-6 flex-grow">
                     {article.excerpt}
                 </p>
-                <button onClick={() => onReadMoreClick(article)} className="text-indigo-200 font-bold text-sm uppercase tracking-wide flex items-center gap-2 group-hover:gap-3 transition-all">
+                <button onClick={() => onReadMoreClick(article)} className="text-indigo-700 font-bold text-sm uppercase tracking-wide flex items-center gap-2 group-hover:gap-3 transition-all">
                     Read Article <span className="text-lg leading-none">&rarr;</span>
                 </button>
             </div>
@@ -72,6 +95,9 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
   }, []);
 
   const newsArticles = articles.filter(article => article.type === 'news');
+  const readingStyle = { ...defaultReadingStyle, ...((settings.content as any).readingStyle || {}) };
+  const sectionBackground = `linear-gradient(135deg, ${hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity)}, rgba(238, 242, 255, 0.72), rgba(241, 245, 249, 0.92))`;
+  const cardBackground = `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;
 
   if (newsArticles.length === 0) return null;
 
@@ -79,7 +105,8 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
     <section 
       id="news" 
       ref={sectionRef}
-      className={`py-24 bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      className={`py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      style={{ background: sectionBackground }}
     >
       <div className="container mx-auto px-6">
         <GoogleAd variant="display" label="Advertisement" className="mb-12 rounded-[2rem] border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl" />
@@ -107,6 +134,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
                 article={article} 
                 animationDelay={index}
                 onReadMoreClick={onReadMoreClick}
+                cardBackground={cardBackground}
               />
               {(index + 1) % 3 === 0 && index < newsArticles.length - 1 && (
                 <GoogleAd variant="inFeed" label="Sponsored" className="md:col-span-2 lg:col-span-3 rounded-[2rem] border border-white/60 bg-white/70 p-5 shadow-sm backdrop-blur-xl" />
