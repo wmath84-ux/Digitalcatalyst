@@ -76,7 +76,7 @@ const Faq: React.FC<FaqProps> = ({ settings, faqs }) => {
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_25%,rgba(56,189,248,0.16),transparent_30%),radial-gradient(circle_at_30%_80%,rgba(139,92,246,0.20),transparent_34%)]" />
       <div className="container relative z-10 mx-auto px-6">
         <div className="mx-auto max-w-3xl rounded-2xl border border-white/50 bg-white/70 p-8 text-center backdrop-blur-xl">
-          <p className="text-sm font-bold uppercase tracking-[0.35em] text-cyan-200">FAQ</p>
+          <p className="text-sm font-bold uppercase tracking-[0.35em] text-cyan-700">FAQ</p>
           <h2 className="mt-3 text-3xl font-extrabold text-slate-900 sm:text-4xl">Frequently Asked Questions</h2>
           <p className="mt-4 text-lg text-slate-600">
             Have questions? We've got answers.

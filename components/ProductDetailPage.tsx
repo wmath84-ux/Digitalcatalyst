@@ -662,7 +662,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             <aside className="md:col-span-5">
               <div id="price-section" className={`sticky top-24 overflow-hidden rounded-[2rem] border border-white/60 bg-white/75 p-6 shadow-[0_28px_85px_rgba(79,70,229,0.14)] backdrop-blur-2xl ${priceJustUpdated ? 'price-flash' : ''}`}>
                 <div className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-indigo-300/20 blur-3xl" />
-                <div className="pointer-events-none absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-cyan-300/20 blur-3xl" />
+                <div className="pointer-events-none absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-cyan-600/20 blur-3xl" />
                 <div className="relative">
                 <p className="text-xs font-black uppercase tracking-[0.28em] text-indigo-500">Secure checkout</p>
                 <h2 className="mt-3 text-2xl font-black text-slate-950">Unlock instant access</h2>

@@ -73,7 +73,7 @@ const UpcomingFeatures: React.FC<UpcomingFeaturesProps> = ({ settings, title, fe
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_50%_0%,rgba(139,92,246,0.22),transparent_34%),radial-gradient(circle_at_10%_70%,rgba(37,99,235,0.16),transparent_30%)]" />
       <div className="container relative z-10 mx-auto px-6">
         <div className="animate-child animate-delay-1 mx-auto mb-16 max-w-3xl rounded-2xl border border-white/50 bg-white/70 p-8 text-center backdrop-blur-xl">
-          <p className="text-sm font-bold uppercase tracking-[0.35em] text-purple-200">Roadmap</p>
+          <p className="text-sm font-bold uppercase tracking-[0.35em] text-purple-700">Roadmap</p>
           <h2 className="mt-3 text-4xl font-extrabold text-slate-900">{title}</h2>
           <p className="mt-4 text-lg text-slate-600">
             We're always working on new ways to help you succeed. Here's a sneak peek at what's coming next.
