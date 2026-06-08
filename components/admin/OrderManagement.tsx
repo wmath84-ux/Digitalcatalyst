@@ -16,11 +16,11 @@ const formatDate = (date: string, options?: Intl.DateTimeFormatOptions) => {
 
 const StatusBadge: React.FC<{ status: Order['status'] }> = ({ status }) => {
     const styles: Record<Order['status'], string> = {
-        Completed: 'border-emerald-300/30 bg-emerald-400/10 text-emerald-200',
-        Shipped: 'border-blue-300/30 bg-blue-400/10 text-blue-200',
-        Pending: 'border-amber-300/30 bg-amber-400/10 text-amber-200',
-        'Awaiting Verification': 'border-purple-300/30 bg-purple-400/10 text-purple-200',
-        Cancelled: 'border-rose-300/30 bg-rose-400/10 text-rose-200',
+        Completed: 'border-emerald-300/30 bg-emerald-400/10 text-emerald-700',
+        Shipped: 'border-blue-300/30 bg-blue-400/10 text-blue-700',
+        Pending: 'border-amber-300/30 bg-amber-400/10 text-amber-700',
+        'Awaiting Verification': 'border-purple-300/30 bg-purple-400/10 text-purple-700',
+        Cancelled: 'border-rose-300/30 bg-rose-400/10 text-rose-700',
     };
 
     return (
@@ -95,7 +95,7 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                                                     </td>
                                                     <td className="p-4 text-center font-bold text-slate-600">{item.quantity}</td>
                                                     <td className="p-4 text-right font-mono text-slate-600">{item.price}</td>
-                                                    <td className="p-4 text-right font-black text-cyan-200">₹{lineTotal.toLocaleString('en-IN')}</td>
+                                                    <td className="p-4 text-right font-black text-cyan-700">₹{lineTotal.toLocaleString('en-IN')}</td>
                                                 </tr>
                                             );
                                         }) : (
@@ -136,7 +136,7 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                                 </div>
                                 <div className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/70 p-4 text-sm">
                                     <span className="text-slate-600">Recorded total</span>
-                                    <span className="text-2xl font-black text-cyan-200">{order.total}</span>
+                                    <span className="text-2xl font-black text-cyan-700">{order.total}</span>
                                 </div>
                             </div>
                         </div>
@@ -150,7 +150,7 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                                 </div>
                                 <div className={subtleCard}>
                                     <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-600">Email</p>
-                                    <p className="mt-2 break-words text-sm font-bold text-cyan-200">{order.customerEmail}</p>
+                                    <p className="mt-2 break-words text-sm font-bold text-cyan-700">{order.customerEmail}</p>
                                 </div>
                             </div>
                         </div>
@@ -285,9 +285,9 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
 
                                     return (
                                         <tr key={order.id} className="group transition hover:bg-white/80 hover:shadow-sm">
-                                            <td className="p-5 font-mono text-sm font-black text-cyan-200">#{order.id}</td>
+                                            <td className="p-5 font-mono text-sm font-black text-cyan-700">#{order.id}</td>
                                             <td className="p-5">
-                                                <p className="font-black text-slate-900 group-hover:text-cyan-200">{order.customerName}</p>
+                                                <p className="font-black text-slate-900 group-hover:text-cyan-700">{order.customerName}</p>
                                                 <p className="mt-1 text-xs text-slate-600">{order.customerEmail}</p>
                                             </td>
                                             <td className="p-5 text-sm font-bold text-slate-600">{formatDate(order.date)}</td>
@@ -297,7 +297,7 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
                                             <td className="p-5 text-right">
                                                 <button
                                                     onClick={() => openOrderDetails(order)}
-                                                    className="rounded-2xl border border-cyan-300/30 px-4 py-2 text-sm font-black text-cyan-200 transition hover:bg-cyan-400/10"
+                                                    className="rounded-2xl border border-cyan-300/30 px-4 py-2 text-sm font-black text-cyan-700 transition hover:bg-cyan-400/10"
                                                 >
                                                     View Details
                                                 </button>
