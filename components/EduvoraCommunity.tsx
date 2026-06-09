@@ -95,6 +95,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
   const activeChatStories = sharedStories.filter((story) => story.recipientId === activeChatCreator?.id);
 
   const pushPage = (nextPage: CommunityPage) => {
+    setShowStatusActions(false);
+    setShareStatusId(null);
     setExpandedReplyId(null);
     setPageStack((stack) => [...stack, page]);
     setPage(nextPage);
