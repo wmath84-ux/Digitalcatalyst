@@ -913,8 +913,11 @@ const App: React.FC = () => {
       if (!dock) return;
       const y = window.scrollY;
       const last = Number(dock.dataset.lastY || 0);
-      dock.dataset.scrollHidden = y > last && y > 120 ? 'true' : 'false';
-      dock.dataset.lastY = String(y);
+      const delta = y - last;
+      if (Math.abs(delta) > 2) {
+        dock.dataset.scrollHidden = delta > 0 && y > 120 ? 'true' : 'false';
+        dock.dataset.lastY = String(y);
+      }
       if (Number.isFinite(lastPointerY)) updatePointerReveal(lastPointerY);
       else applyDockVisibility();
     };
