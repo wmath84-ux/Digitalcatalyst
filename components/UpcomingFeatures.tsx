@@ -13,6 +13,7 @@ interface UpcomingFeaturesProps {
     settings: WebsiteSettings;
     title: string;
     features: UpcomingFeatureItem[];
+    onOpenCommunity?: () => void;
 }
 
 const Icon: React.FC<{ name: string }> = ({ name }) => {
@@ -35,7 +36,7 @@ const statusColors: { [key in UpcomingFeatureItem['status']]: string } = {
     'Beta': 'border-emerald-300/30 bg-emerald-400/10 text-emerald-700',
 };
 
-const UpcomingFeatures: React.FC<UpcomingFeaturesProps> = ({ settings, title, features }) => {
+const UpcomingFeatures: React.FC<UpcomingFeaturesProps> = ({ settings, title, features, onOpenCommunity }) => {
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -93,6 +94,11 @@ const UpcomingFeatures: React.FC<UpcomingFeaturesProps> = ({ settings, title, fe
                     <span className={`rounded-full border px-4 py-1.5 text-xs font-bold uppercase tracking-wider shadow-sm backdrop-blur-xl ${statusColors[feature.status]}`}>
                         {feature.status}
                     </span>
+                    {feature.title === 'Community Forum' && onOpenCommunity && (
+                        <button type="button" onClick={onOpenCommunity} className="mt-4 w-full rounded-full border border-white/70 bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-[0_16px_40px_rgba(15,23,42,0.22)] transition hover:-translate-y-0.5 hover:bg-indigo-950">
+                            Open Liquid Community
+                        </button>
+                    )}
                 </div>
             </div>
           ))}
