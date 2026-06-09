@@ -90,6 +90,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
     const shouldUseDesktopPointerReveal = () => window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches;
     const revealZonePx = 180;
     let lastPointerY = Number.POSITIVE_INFINITY;
+    let scrollRevealTimer: ReturnType<typeof setTimeout> | null = null;
 
     const setChromeHidden = (hidden: boolean) => {
       const hiddenValue = hidden ? 'true' : 'false';
@@ -125,8 +126,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
       if (!dock || !scrollContainer) return;
       const y = scrollContainer.scrollTop;
       const last = Number(dock.dataset.lastY || 0);
-      dock.dataset.scrollHidden = y > last && y > 120 ? 'true' : 'false';
+      const isActivelyScrolling = Math.abs(y - last) > 1 && y > 12;
+      dock.dataset.scrollHidden = isActivelyScrolling ? 'true' : 'false';
       dock.dataset.lastY = String(y);
+      if (scrollRevealTimer) clearTimeout(scrollRevealTimer);
+      if (isActivelyScrolling) {
+        scrollRevealTimer = setTimeout(() => {
+          const latestDock = getDock();
+          if (!latestDock) return;
+          latestDock.dataset.scrollHidden = 'false';
+          applyDockVisibility();
+        }, 650);
+      }
       if (Number.isFinite(lastPointerY)) updatePointerReveal(lastPointerY);
       else applyDockVisibility();
     };
@@ -145,8 +156,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
     window.addEventListener('pointermove', onPointerMove, { passive: true });
     window.addEventListener('mousemove', onPointerMove, { passive: true });
     document.addEventListener('mouseleave', onPointerLeave);
+    const dock = getDock();
+    if (dock) {
+      dock.dataset.hidden = 'false';
+      dock.dataset.scrollHidden = 'false';
+      dock.dataset.pointerReveal = 'false';
+      dock.dataset.lastY = String(scrollContainer?.scrollTop || 0);
+    }
     setChromeHidden(false);
     return () => {
+      if (scrollRevealTimer) clearTimeout(scrollRevealTimer);
       scrollContainer?.removeEventListener('scroll', onScroll);
       window.removeEventListener('pointermove', onPointerMove);
       window.removeEventListener('mousemove', onPointerMove);
