@@ -1,10 +1,10 @@
-import React, { useMemo, useState } from 'react';
+import React, { useRef, useState } from 'react';
 
 interface EduvoraCommunityProps {
   onClose?: () => void;
 }
 
-type CommunityView = 'feed' | 'status';
+type CommunityView = 'feed' | 'status' | 'calls';
 type Reply = {
   id: number;
   author: string;
@@ -74,23 +74,34 @@ const initialMessages: FeedMessage[] = [
 ];
 
 const statusCards = [
-  { id: 1, title: 'Morning sprint template', gradient: 'from-rose-400 via-fuchsia-500 to-indigo-500', likedBy: 28, slots: 'PDF · 780KB' },
-  { id: 2, title: 'Offer-stack swipe file', gradient: 'from-cyan-400 via-blue-500 to-violet-600', likedBy: 41, slots: 'Image · 940KB' },
-  { id: 3, title: 'Workshop poll snapshot', gradient: 'from-emerald-300 via-teal-400 to-sky-500', likedBy: 19, slots: 'Poll · 1 min' },
+  { id: 1, title: 'Morning sprint template', gradient: 'from-emerald-500 via-teal-500 to-cyan-600', likedBy: 28, slots: 'PDF · 780KB' },
+  { id: 2, title: 'Offer-stack swipe file', gradient: 'from-sky-500 via-blue-600 to-indigo-700', likedBy: 41, slots: 'Image · 940KB' },
+  { id: 3, title: 'Workshop poll snapshot', gradient: 'from-slate-900 via-zinc-800 to-emerald-700', likedBy: 19, slots: 'Poll · 1 min' },
 ];
-
-const menuOptions = ['File', 'Edit', 'View'];
 
 const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
   const [isAdmin, setIsAdmin] = useState(true);
   const [activeView, setActiveView] = useState<CommunityView>('feed');
-  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [expandedThreads, setExpandedThreads] = useState<number[]>([1]);
   const [messages, setMessages] = useState<FeedMessage[]>(initialMessages);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [adminDraft, setAdminDraft] = useState('');
+  const [isChromeHidden, setIsChromeHidden] = useState(false);
+  const lastScrollTop = useRef(0);
 
-  const currentTime = useMemo(() => new Intl.DateTimeFormat('en-US', { hour: 'numeric', minute: '2-digit' }).format(new Date()), []);
+  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
+    const nextTop = event.currentTarget.scrollTop;
+    const delta = nextTop - lastScrollTop.current;
+    if (nextTop < 20 || delta < -10) setIsChromeHidden(false);
+    if (delta > 14 && nextTop > 80) setIsChromeHidden(true);
+    lastScrollTop.current = nextTop;
+  };
+
+  const switchView = (view: CommunityView) => {
+    setActiveView(view);
+    setIsChromeHidden(false);
+    lastScrollTop.current = 0;
+  };
 
   const toggleThread = (messageId: number) => {
     setExpandedThreads((current) => (
@@ -125,7 +136,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
         id: Date.now(),
         admin: 'Admin You',
         badge: 'Fresh update',
-        avatar: '🍎',
+        avatar: '🛡️',
         title: 'Admin broadcast',
         body: draft,
         time: 'Just now',
@@ -137,68 +148,57 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
     setAdminDraft('');
   };
 
-  return (
-    <div className="fixed inset-0 z-[1200] overflow-hidden bg-[radial-gradient(circle_at_12%_8%,rgba(56,189,248,0.42),transparent_26%),radial-gradient(circle_at_86%_12%,rgba(168,85,247,0.38),transparent_28%),linear-gradient(135deg,#e0f2fe_0%,#f5f3ff_48%,#fdf2f8_100%)] text-slate-900">
-      <div className="pointer-events-none absolute inset-0 bg-[linear-gradient(120deg,rgba(255,255,255,0.72),rgba(255,255,255,0.18)),radial-gradient(circle_at_50%_115%,rgba(15,23,42,0.18),transparent_40%)]" />
-      <div className="pointer-events-none absolute left-1/2 top-1/2 h-[34rem] w-[34rem] -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/24 blur-3xl" />
+  const bottomChromeClass = isChromeHidden ? 'translate-y-32 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100';
 
-      <header className="absolute inset-x-0 top-0 z-30 h-8 border-b border-white/30 bg-white/40 shadow-[0_8px_34px_rgba(15,23,42,0.08)] backdrop-blur-md">
-        <div className="mx-auto flex h-full max-w-7xl items-center justify-between px-3 text-[13px] font-semibold text-slate-800 sm:px-5">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2" aria-label="Mac window controls">
-              <button type="button" onClick={onClose} className="h-3 w-3 rounded-full bg-[#ff5f57] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12),0_1px_4px_rgba(255,95,87,0.5)] transition hover:scale-110" aria-label="Close Eduvora Community" />
-              <span className="h-3 w-3 rounded-full bg-[#ffbd2e] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12)]" />
-              <span className="h-3 w-3 rounded-full bg-[#28c840] shadow-[inset_0_0_0_1px_rgba(0,0,0,0.12)]" />
-            </div>
-            <span className="font-black tracking-tight text-slate-950">EDUVORA</span>
-            <nav className="hidden items-center gap-5 md:flex" aria-label="Desktop menu">
-              {menuOptions.map((option) => <button type="button" key={option} className="text-slate-700 transition hover:text-slate-950">{option}</button>)}
-            </nav>
+  return (
+    <section className="relative h-screen overflow-hidden bg-[#f5fbfb] text-slate-950">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_5%_12%,rgba(20,184,166,0.20),transparent_32%),radial-gradient(circle_at_96%_0%,rgba(14,165,233,0.18),transparent_34%),linear-gradient(135deg,rgba(236,253,245,0.95),rgba(248,250,252,0.96)_42%,rgba(236,254,255,0.86))]" />
+      <div className="pointer-events-none absolute -left-28 bottom-0 h-80 w-80 rounded-full bg-emerald-300/20 blur-3xl" />
+      <div className="pointer-events-none absolute -right-24 top-24 h-96 w-96 rounded-full bg-sky-300/20 blur-3xl" />
+
+      <header className="relative z-30 flex h-[76px] items-center justify-between border-b border-white/70 bg-white/70 px-4 shadow-[0_10px_40px_rgba(15,23,42,0.06)] backdrop-blur-2xl sm:px-6 lg:px-10">
+        <div className="flex min-w-0 items-center gap-3">
+          {onClose && (
+            <button type="button" onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-emerald-100 bg-white/80 text-lg font-black text-slate-700 shadow-sm transition hover:-translate-x-0.5 hover:bg-emerald-50" aria-label="Back to home">
+              ←
+            </button>
+          )}
+          <div className="min-w-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.32em] text-emerald-600 sm:text-xs">Trusted Community</p>
+            <h1 className="truncate text-xl font-black tracking-tight text-slate-950 sm:text-3xl">Eduvora Community</h1>
           </div>
-          <div className="hidden items-center gap-3 text-xs text-slate-700 md:flex">
-            <span>Wi-Fi</span>
-            <span>Battery 96%</span>
-            <span>{currentTime}</span>
-          </div>
+        </div>
+        <div className="flex shrink-0 items-center gap-2 rounded-full border border-white/80 bg-white/75 p-1 shadow-[0_10px_32px_rgba(15,23,42,0.08)] backdrop-blur-2xl">
+          <button type="button" onClick={() => setIsAdmin(true)} className={`rounded-full px-4 py-2 text-xs font-black transition sm:px-5 ${isAdmin ? 'bg-[#07131f] text-white shadow-[0_10px_26px_rgba(7,19,31,0.28)]' : 'text-slate-600 hover:bg-emerald-50'}`}>Admin</button>
+          <button type="button" onClick={() => setIsAdmin(false)} className={`rounded-full px-4 py-2 text-xs font-black transition sm:px-5 ${!isAdmin ? 'bg-[#07131f] text-white shadow-[0_10px_26px_rgba(7,19,31,0.28)]' : 'text-slate-600 hover:bg-emerald-50'}`}>User</button>
         </div>
       </header>
 
-      <main className="relative z-10 mx-auto flex h-full max-w-6xl flex-col px-3 pb-32 pt-12 sm:px-6 md:pb-28 md:pt-14">
-        <div className="mb-4 flex flex-wrap items-center justify-between gap-3 rounded-[1.75rem] border border-white/45 bg-white/35 p-3 shadow-[0_22px_70px_rgba(30,41,59,0.14)] backdrop-blur-2xl">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.35em] text-indigo-700/80">Liquid Community</p>
-            <h1 className="mt-1 text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Eduvora Community</h1>
-          </div>
-          <div className="flex items-center gap-2 rounded-full border border-white/50 bg-white/45 p-1 shadow-inner backdrop-blur-xl">
-            <button type="button" onClick={() => setIsAdmin(true)} className={`rounded-full px-4 py-2 text-xs font-black transition ${isAdmin ? 'bg-slate-950 text-white shadow-lg' : 'text-slate-700 hover:bg-white/50'}`}>Admin</button>
-            <button type="button" onClick={() => setIsAdmin(false)} className={`rounded-full px-4 py-2 text-xs font-black transition ${!isAdmin ? 'bg-slate-950 text-white shadow-lg' : 'text-slate-700 hover:bg-white/50'}`}>User</button>
-          </div>
-        </div>
-
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-[2rem] border border-white/45 bg-white/25 p-3 shadow-[inset_0_1px_0_rgba(255,255,255,0.55),0_28px_90px_rgba(15,23,42,0.16)] backdrop-blur-3xl custom-scrollbar sm:p-5">
-          {activeView === 'feed' ? (
+      <main onScroll={handleScroll} className="relative z-10 h-[calc(100vh-76px)] overflow-y-auto px-3 pb-40 pt-4 custom-scrollbar sm:px-5 lg:px-8 xl:px-10">
+        <div className="mx-auto min-h-full w-full max-w-[1800px] rounded-[2rem] border border-white/80 bg-white/48 p-3 shadow-[0_28px_100px_rgba(15,23,42,0.10)] backdrop-blur-3xl sm:p-5 lg:p-7">
+          {activeView === 'feed' && (
             <div className="space-y-4">
               {messages.map((message) => {
                 const isExpanded = expandedThreads.includes(message.id);
                 return (
-                  <article key={message.id} className="overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/52 shadow-[0_18px_54px_rgba(15,23,42,0.12)] backdrop-blur-2xl transition duration-300 hover:-translate-y-0.5 hover:bg-white/62">
-                    <div className="p-4 sm:p-5">
-                      <div className="flex items-start gap-3">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/60 bg-white/55 text-2xl shadow-inner">{message.avatar}</div>
+                  <article key={message.id} className="overflow-hidden rounded-[1.8rem] border border-white/80 bg-white/78 shadow-[0_16px_50px_rgba(15,23,42,0.08)] ring-1 ring-slate-900/[0.025] backdrop-blur-2xl transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
+                    <div className="p-4 sm:p-6 lg:p-8">
+                      <div className="flex items-start gap-4">
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-100 to-cyan-100 text-2xl shadow-inner ring-1 ring-emerald-100 sm:h-14 sm:w-14">{message.avatar}</div>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <h2 className="font-black text-slate-950">{message.admin}</h2>
-                            <span className="rounded-full border border-indigo-200/60 bg-indigo-100/70 px-2.5 py-1 text-[11px] font-black text-indigo-700">{message.badge}</span>
+                            <h2 className="font-black text-slate-950 sm:text-lg">{message.admin}</h2>
+                            <span className="rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-700">{message.badge}</span>
                             <span className="text-xs font-bold text-slate-500">{message.time}</span>
                           </div>
-                          <h3 className="mt-3 text-lg font-black tracking-tight text-slate-950">{message.title}</h3>
-                          <p className="mt-2 text-sm leading-6 text-slate-700">{message.body}</p>
+                          <h3 className="mt-4 text-xl font-black tracking-tight text-slate-950 lg:text-2xl">{message.title}</h3>
+                          <p className="mt-3 max-w-6xl text-sm leading-7 text-slate-700 sm:text-base">{message.body}</p>
                         </div>
                       </div>
 
-                      <div className="mt-4 flex flex-wrap items-center gap-2 pl-0 sm:pl-[3.75rem]">
-                        {message.reactions.map((reaction) => <button type="button" key={reaction} className="rounded-full border border-white/55 bg-white/55 px-3 py-1.5 text-xs font-black text-slate-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/80">{reaction}</button>)}
-                        <button type="button" onClick={() => toggleThread(message.id)} className="rounded-full border border-cyan-200/70 bg-cyan-100/65 px-3 py-1.5 text-xs font-black text-cyan-800 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-cyan-100">
+                      <div className="mt-5 flex flex-wrap items-center gap-2 pl-0 sm:pl-[4.5rem]">
+                        {message.reactions.map((reaction) => <button type="button" key={reaction} className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50">{reaction}</button>)}
+                        <button type="button" onClick={() => toggleThread(message.id)} className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-cyan-100">
                           💬 {message.replies.length} Replies
                         </button>
                       </div>
@@ -206,21 +206,21 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
 
                     <div className={`grid transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isExpanded ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}>
                       <div className="overflow-hidden">
-                        <div className="border-t border-white/55 bg-white/35 p-4 backdrop-blur-2xl sm:p-5">
+                        <div className="border-t border-slate-100 bg-gradient-to-b from-slate-50/80 to-white/90 p-4 sm:p-6 lg:p-8">
                           <div className="space-y-3">
                             {message.replies.map((reply) => (
-                              <div key={reply.id} className="rounded-2xl border border-white/55 bg-white/60 px-4 py-3 shadow-sm">
+                              <div key={reply.id} className="rounded-[1.35rem] border border-slate-100 bg-white px-4 py-3 shadow-[0_10px_30px_rgba(15,23,42,0.04)] sm:px-5">
                                 <div className="flex items-center justify-between gap-3">
                                   <span className="text-sm font-black text-slate-900">{reply.author}</span>
                                   <span className="text-[11px] font-bold text-slate-500">{reply.time}</span>
                                 </div>
-                                <p className="mt-1 text-sm leading-5 text-slate-700">{reply.text}</p>
+                                <p className="mt-1 text-sm leading-6 text-slate-700">{reply.text}</p>
                               </div>
                             ))}
                           </div>
-                          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-white/60 bg-white/65 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.68)] backdrop-blur-2xl">
+                          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white p-2 shadow-[0_12px_34px_rgba(15,23,42,0.06)]">
                             <input value={replyDrafts[message.id] || ''} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter') submitReply(message.id); }} placeholder={isAdmin ? 'Preview a user suggestion...' : 'Write your reply suggestion...'} className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400" />
-                            <button type="button" onClick={() => submitReply(message.id)} className="rounded-xl bg-slate-950 px-4 py-2 text-xs font-black text-white shadow-lg transition hover:-translate-y-0.5">Reply</button>
+                            <button type="button" onClick={() => submitReply(message.id)} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white shadow-lg shadow-emerald-600/20 transition hover:-translate-y-0.5 hover:bg-emerald-700">Reply</button>
                           </div>
                         </div>
                       </div>
@@ -229,63 +229,64 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
                 );
               })}
             </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="rounded-[1.5rem] border border-amber-200/70 bg-amber-100/70 p-4 text-center shadow-[0_18px_54px_rgba(245,158,11,0.14)] backdrop-blur-2xl">
-                <p className="text-sm font-black text-amber-800">1MB Limit &amp; 150 Slots Left</p>
+          )}
+
+          {activeView === 'status' && (
+            <div className="min-h-[calc(100vh-12rem)] space-y-5">
+              <div className="rounded-[1.6rem] border border-amber-200/80 bg-gradient-to-r from-amber-50 via-yellow-50 to-emerald-50 p-4 text-center shadow-[0_18px_54px_rgba(245,158,11,0.12)]">
+                <p className="text-sm font-black text-amber-900 sm:text-base">1MB Limit &amp; 150 Slots Left</p>
               </div>
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid min-h-[58vh] gap-5 lg:grid-cols-3">
                 {statusCards.map((card) => (
-                  <article key={card.id} className="group relative min-h-[17rem] overflow-hidden rounded-[2rem] border border-white/45 bg-white/40 p-4 shadow-[0_22px_70px_rgba(15,23,42,0.16)] backdrop-blur-2xl">
-                    <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-80 transition duration-500 group-hover:scale-105`} />
-                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_16%,rgba(255,255,255,0.72),transparent_26%),linear-gradient(180deg,transparent,rgba(15,23,42,0.42))]" />
+                  <article key={card.id} className="group relative min-h-[22rem] overflow-hidden rounded-[2rem] border border-white/80 bg-white/40 p-6 shadow-[0_24px_80px_rgba(15,23,42,0.14)] backdrop-blur-2xl lg:min-h-[30rem]">
+                    <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient} opacity-95 transition duration-700 group-hover:scale-105`} />
+                    <div className="absolute inset-0 bg-[radial-gradient(circle_at_28%_16%,rgba(255,255,255,0.72),transparent_24%),linear-gradient(180deg,transparent,rgba(2,6,23,0.48))]" />
                     <div className="relative flex h-full flex-col justify-between text-white">
-                      <span className="w-max rounded-full border border-white/30 bg-white/25 px-3 py-1 text-xs font-black backdrop-blur-xl">{card.slots}</span>
+                      <span className="w-max rounded-full border border-white/35 bg-white/22 px-4 py-2 text-xs font-black backdrop-blur-xl">{card.slots}</span>
                       <div>
-                        <h3 className="text-2xl font-black tracking-tight">{card.title}</h3>
-                        <p className="mt-3 w-max rounded-full border border-white/25 bg-white/20 px-3 py-1.5 text-sm font-black backdrop-blur-xl">❤️ Liked by {card.likedBy}</p>
+                        <h3 className="text-3xl font-black tracking-tight lg:text-4xl">{card.title}</h3>
+                        <p className="mt-5 w-max rounded-full border border-white/25 bg-white/20 px-4 py-2 text-sm font-black backdrop-blur-xl">❤️ Liked by {card.likedBy}</p>
                       </div>
                     </div>
                   </article>
                 ))}
               </div>
-              <button type="button" className="fixed bottom-28 right-5 z-20 flex h-14 w-14 items-center justify-center rounded-full border border-white/45 bg-slate-950 text-2xl text-white shadow-[0_18px_54px_rgba(15,23,42,0.32)] transition hover:-translate-y-1 md:bottom-24 md:right-10" aria-label="Upload status">＋</button>
+              <button type="button" className="fixed bottom-28 right-5 z-20 flex h-14 w-14 items-center justify-center rounded-full border border-white/45 bg-[#07131f] text-2xl text-white shadow-[0_18px_54px_rgba(15,23,42,0.32)] transition hover:-translate-y-1 md:bottom-24 md:right-10" aria-label="Upload status">＋</button>
+            </div>
+          )}
+
+          {activeView === 'calls' && (
+            <div className="flex min-h-[calc(100vh-12rem)] items-center justify-center rounded-[2rem] border border-white/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-8 text-center text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+              <div className="max-w-xl">
+                <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2rem] bg-white/10 text-4xl shadow-inner ring-1 ring-white/15">📞</div>
+                <h2 className="mt-6 text-4xl font-black tracking-tight">Community Calls</h2>
+                <p className="mt-3 text-sm leading-7 text-slate-300 sm:text-base">Live voice rooms will open here as a full-screen nested page. For now, this keeps the dock interaction consistent and ready for the next call feature.</p>
+              </div>
             </div>
           )}
         </div>
       </main>
 
-      {isAdmin && (
-        <div className="absolute inset-x-3 bottom-24 z-20 mx-auto max-w-3xl rounded-[1.5rem] border border-white/50 bg-white/45 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.18)] backdrop-blur-3xl md:bottom-24">
-          <div className="flex items-center gap-2 rounded-[1.25rem] border border-white/45 bg-white/55 px-2 py-2 shadow-inner">
+      {isAdmin && activeView === 'feed' && (
+        <div className={`absolute inset-x-3 bottom-24 z-20 mx-auto max-w-4xl rounded-[1.5rem] border border-white/80 bg-white/78 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.16)] backdrop-blur-3xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] md:bottom-24 ${bottomChromeClass}`}>
+          <div className="flex items-center gap-2 rounded-[1.25rem] border border-slate-100 bg-white/90 px-2 py-2 shadow-inner">
             <div className="hidden items-center gap-1 sm:flex">
-              {['📄', '🖼️', '📊'].map((icon) => <button type="button" key={icon} className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/65 text-lg shadow-sm transition hover:-translate-y-0.5 hover:bg-white">{icon}</button>)}
+              {['📄', '🖼️', '📊'].map((icon) => <button type="button" key={icon} className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-lg shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-100">{icon}</button>)}
             </div>
             <input value={adminDraft} onChange={(event) => setAdminDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') submitAdminMessage(); }} placeholder="Admin-only broadcast message..." className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm font-bold text-slate-800 outline-none placeholder:text-slate-400" />
-            <button type="button" onClick={submitAdminMessage} className="rounded-xl bg-gradient-to-r from-slate-950 to-indigo-950 px-5 py-3 text-xs font-black text-white shadow-[0_12px_30px_rgba(15,23,42,0.28)] transition hover:-translate-y-0.5">Send</button>
+            <button type="button" onClick={submitAdminMessage} className="rounded-xl bg-[#07131f] px-5 py-3 text-xs font-black text-white shadow-[0_12px_30px_rgba(15,23,42,0.26)] transition hover:-translate-y-0.5 hover:bg-emerald-700">Send</button>
           </div>
         </div>
       )}
 
-      <div className="absolute inset-x-0 bottom-3 z-30 flex justify-center px-3">
-        <nav className="flex max-w-[96vw] items-center gap-2 rounded-[2rem] border border-white/35 bg-white/38 p-2 shadow-[0_22px_70px_rgba(15,23,42,0.22)] backdrop-blur-3xl" aria-label="Community dock">
-          <button type="button" onClick={() => setActiveView('feed')} className={`min-w-[72px] rounded-2xl px-3 py-2 text-center transition hover:-translate-y-1 ${activeView === 'feed' ? 'bg-white/75 shadow-lg' : 'bg-white/25'}`}><span className="block text-2xl">📢</span><span className="text-[11px] font-black">Feed</span></button>
-          <button type="button" onClick={() => setActiveView('status')} className={`min-w-[72px] rounded-2xl px-3 py-2 text-center transition hover:-translate-y-1 ${activeView === 'status' ? 'bg-white/75 shadow-lg' : 'bg-white/25'}`}><span className="block text-2xl">⭕</span><span className="text-[11px] font-black">Status</span></button>
-          <button type="button" className="min-w-[72px] rounded-2xl bg-white/15 px-3 py-2 text-center opacity-45 grayscale transition"><span className="block text-2xl">📞</span><span className="text-[11px] font-black">Calls</span></button>
-          <button type="button" onClick={() => setIsMenuOpen(true)} className="min-w-[72px] rounded-2xl bg-white/25 px-3 py-2 text-center transition hover:-translate-y-1 md:hidden"><span className="block text-2xl">🍔</span><span className="text-[11px] font-black">Menu</span></button>
+      <div className={`absolute inset-x-0 bottom-3 z-30 flex justify-center px-3 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${bottomChromeClass}`}>
+        <nav className="flex max-w-[96vw] items-center gap-2 rounded-[2rem] border border-white/70 bg-white/76 p-2 shadow-[0_22px_70px_rgba(15,23,42,0.18)] backdrop-blur-3xl" aria-label="Community dock">
+          <button type="button" onClick={() => switchView('feed')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center transition hover:-translate-y-1 ${activeView === 'feed' ? 'bg-white shadow-lg ring-1 ring-emerald-100' : 'bg-white/40'}`}><span className="block text-2xl">📢</span><span className="text-[11px] font-black">Feed</span></button>
+          <button type="button" onClick={() => switchView('status')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center transition hover:-translate-y-1 ${activeView === 'status' ? 'bg-white shadow-lg ring-1 ring-emerald-100' : 'bg-white/40'}`}><span className="block text-2xl">⭕</span><span className="text-[11px] font-black">Status</span></button>
+          <button type="button" onClick={() => switchView('calls')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center transition hover:-translate-y-1 ${activeView === 'calls' ? 'bg-white shadow-lg ring-1 ring-emerald-100' : 'bg-white/40'}`}><span className="block text-2xl">📞</span><span className="text-[11px] font-black">Calls</span></button>
         </nav>
       </div>
-
-      <div className={`fixed inset-0 z-40 bg-slate-950/20 backdrop-blur-sm transition md:hidden ${isMenuOpen ? 'pointer-events-auto opacity-100' : 'pointer-events-none opacity-0'}`} onClick={() => setIsMenuOpen(false)}>
-        <div className={`absolute inset-x-3 bottom-3 rounded-[2rem] border border-white/45 bg-white/62 p-4 shadow-[0_28px_90px_rgba(15,23,42,0.28)] backdrop-blur-3xl transition duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${isMenuOpen ? 'translate-y-0' : 'translate-y-[120%]'}`} onClick={(event) => event.stopPropagation()}>
-          <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-slate-400/60" />
-          <p className="mb-3 px-2 text-xs font-black uppercase tracking-[0.25em] text-slate-500">Menu</p>
-          <div className="space-y-2">
-            {menuOptions.map((option) => <button type="button" key={option} onClick={() => setIsMenuOpen(false)} className="w-full rounded-2xl border border-white/55 bg-white/55 px-4 py-3 text-left text-sm font-black text-slate-800 shadow-sm transition hover:bg-white">{option}</button>)}
-          </div>
-        </div>
-      </div>
-    </div>
+    </section>
   );
 };
 
