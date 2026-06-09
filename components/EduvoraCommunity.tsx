@@ -47,6 +47,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
   const [selectedMessageId, setSelectedMessageId] = useState(initialMessages[0].id);
   const [messages, setMessages] = useState<FeedMessage[]>(initialMessages);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
+  const [expandedReplyId, setExpandedReplyId] = useState<number | null>(null);
   const [postDraft, setPostDraft] = useState('');
   const [postType, setPostType] = useState<PostType>('text');
   const [creatorQuota, setCreatorQuota] = useState<Record<string, string[]>>({ [todayKey()]: [] });
@@ -55,6 +56,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
   const [networkSearch, setNetworkSearch] = useState('');
   const [profile, setProfile] = useState({ name: 'Eduvora Member', username: 'eduvora_member', avatar: '🧑‍🎓', bio: 'Building digital skills daily.' });
   const scrollContainerRef = useRef<HTMLDivElement | null>(null);
+  const replyInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedMessage = useMemo(() => messages.find((message) => message.id === selectedMessageId) || messages[0], [messages, selectedMessageId]);
   const allCreators = useMemo<Creator[]>(() => [{ id: 'me', username: profile.username, name: profile.name, avatar: profile.avatar, role: profile.bio, followers: 1, mutual: false, verified: true }, ...creators], [profile]);
@@ -62,12 +64,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
   const isPostUsedToday = creatorQuota[todayKey()]?.includes(postType) || false;
 
   const pushPage = (nextPage: CommunityPage) => {
+    setExpandedReplyId(null);
     setPageStack((stack) => [...stack, page]);
     setPage(nextPage);
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const goBack = () => {
+    setExpandedReplyId(null);
     const previous = pageStack[pageStack.length - 1];
     if (previous) {
       setPage(previous);
@@ -78,6 +82,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
   };
 
   const goHomeFeed = () => {
+    setExpandedReplyId(null);
     setActiveView('feed');
     setPage('chat');
     setPageStack([]);
@@ -93,10 +98,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
     let scrollRevealTimer: ReturnType<typeof setTimeout> | null = null;
 
     const setChromeHidden = (hidden: boolean) => {
-      const hiddenValue = hidden ? 'true' : 'false';
+      const dockHiddenValue = hidden || expandedReplyId !== null ? 'true' : 'false';
+      const replyHiddenValue = hidden && expandedReplyId === null ? 'true' : 'false';
       const dock = getDock();
-      if (dock) dock.dataset.hidden = hiddenValue;
-      getReplyBars().forEach((bar) => { bar.dataset.hidden = hiddenValue; });
+      if (dock) dock.dataset.hidden = dockHiddenValue;
+      getReplyBars().forEach((bar) => { bar.dataset.hidden = replyHiddenValue; });
     };
 
     const applyDockVisibility = () => {
@@ -171,9 +177,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
       window.removeEventListener('mousemove', onPointerMove);
       document.removeEventListener('mouseleave', onPointerLeave);
     };
-  }, [activeView, page, selectedMessageId]);
+  }, [activeView, page, selectedMessageId, expandedReplyId]);
+
+  useEffect(() => {
+    if (expandedReplyId !== null) replyInputRef.current?.focus();
+  }, [expandedReplyId]);
 
   const switchView = (view: CommunityView) => {
+    setExpandedReplyId(null);
     setActiveView(view);
     setPage('chat');
     setPageStack([]);
@@ -188,6 +199,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
   );
 
   const openMessage = (messageId: number) => {
+    setExpandedReplyId(null);
     setSelectedMessageId(messageId);
     if (window.matchMedia('(max-width: 767px)').matches) pushPage('thread');
   };
@@ -199,6 +211,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
       message.id === messageId ? { ...message, replies: [...message.replies, { id: Date.now(), author: profile.name, avatar: profile.avatar, text: draft, time: 'Just now' }] } : message
     )));
     setReplyDrafts((current) => ({ ...current, [messageId]: '' }));
+    setExpandedReplyId(null);
   };
 
   const submitCreatorPost = () => {
@@ -252,7 +265,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
         </div>
         <div className="mt-5 space-y-3 pb-4">{message.replies.map((reply) => <div key={reply.id} className="flex items-start gap-3"><Avatar value={reply.avatar || (reply.author === profile.name ? profile.avatar : '👤')} size="h-9 w-9" className="mt-1 text-base shadow-[0_8px_24px_rgba(37,99,235,0.12)]" /><div className="max-w-[92%] flex-1 rounded-[1.35rem] rounded-bl-md border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-emerald-50 px-4 py-3 shadow-[0_10px_30px_rgba(37,99,235,0.08)] ring-1 ring-blue-50 sm:px-5"><div className="flex items-center justify-between gap-3"><span className="text-sm font-black text-blue-950">{reply.author}</span><span className="text-[11px] font-bold text-slate-500">{reply.time}</span></div><p className="mt-1 text-sm leading-6 text-slate-700">{reply.text}</p></div></div>)}</div>
       </div>
-      <div data-community-replybar="true" className="sticky bottom-28 z-20 mx-2 mb-2 rounded-[1.5rem] border border-slate-200 bg-white/95 p-3 shadow-[0_18px_48px_rgba(15,23,42,0.12)] backdrop-blur-xl transition-all duration-500 data-[hidden=true]:translate-y-8 data-[hidden=true]:opacity-0 md:bottom-28"><div className="flex items-center gap-2 rounded-2xl border border-blue-100 bg-white p-2 shadow-inner"><input value={replyDrafts[message.id] || ''} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter') submitReply(message.id); }} placeholder="Write a thread reply..." className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400" /><button type="button" onClick={() => submitReply(message.id)} className="rounded-xl bg-blue-700 px-4 py-2 text-xs font-black text-white shadow-lg shadow-blue-700/20 transition hover:-translate-y-0.5 hover:bg-blue-800">Reply</button></div></div>
+      {expandedReplyId === message.id ? <div data-community-replybar="true" className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] left-3 right-3 z-[1400] rounded-[1.65rem] border border-blue-100 bg-white/95 p-3 shadow-[0_24px_80px_rgba(15,23,42,0.20)] backdrop-blur-2xl transition-all duration-500 data-[hidden=true]:translate-y-8 data-[hidden=true]:opacity-0 md:left-auto md:right-8 md:w-[min(760px,calc(100vw-4rem))]"><div className="flex items-center gap-2 rounded-2xl border border-blue-100 bg-gradient-to-r from-white via-sky-50/70 to-emerald-50/60 p-2 shadow-inner"><Avatar value={profile.avatar} size="h-10 w-10" className="hidden text-base sm:flex" /><input ref={replyInputRef} value={replyDrafts[message.id] || ''} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter') submitReply(message.id); }} placeholder="Write a thread reply..." className="min-w-0 flex-1 bg-transparent px-3 py-3 text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400" /><button type="button" onClick={() => setExpandedReplyId(null)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-500 transition hover:bg-slate-50">Close</button><button type="button" onClick={() => submitReply(message.id)} className="rounded-xl bg-blue-700 px-4 py-3 text-xs font-black text-white shadow-lg shadow-blue-700/20 transition hover:-translate-y-0.5 hover:bg-blue-800">Send</button></div></div> : <button data-community-replybar="true" type="button" onClick={() => setExpandedReplyId(message.id)} className="fixed bottom-[calc(env(safe-area-inset-bottom)+1.25rem)] right-4 z-[1200] rounded-full bg-blue-700 px-5 py-4 text-sm font-black text-white shadow-[0_18px_48px_rgba(37,99,235,0.28)] ring-1 ring-blue-200 transition-all duration-300 hover:-translate-y-1 hover:bg-blue-800 data-[hidden=true]:translate-y-8 data-[hidden=true]:opacity-0 md:bottom-8 md:right-8">💬 Reply</button>}
     </div>
   );
 
