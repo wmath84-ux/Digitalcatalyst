@@ -528,7 +528,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       <div className="absolute -top-12 right-12 h-72 w-72 rounded-full bg-indigo-300/15 blur-3xl" />
 
       <header className="relative z-30 flex items-center gap-3 border-b border-white/50 bg-white/70 p-3 shadow-sm backdrop-blur-xl lg:hidden">
-        <button onClick={() => setIsSidebarOpen(true)} className="shrink-0 rounded-lg border border-white/60 bg-white/40 p-2"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
+        <button onClick={() => setIsSidebarOpen(value => !value)} className="shrink-0 rounded-lg border border-white/60 bg-white/40 p-2" aria-label={isSidebarOpen ? 'Minimize modules panel' : 'Expand modules panel'} aria-expanded={isSidebarOpen}><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d={isSidebarOpen ? "M6 18L18 6M6 6l12 12" : "M4 6h16M4 12h16M4 18h7"} /></svg></button>
         <h1 className="min-w-0 flex-1 truncate text-lg font-black">{activeFile?.name || product.title}</h1>
         <div className="ml-auto flex shrink-0 items-center gap-2 overflow-x-auto">
           {liveEarningHud}
@@ -536,7 +536,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
         </div>
       </header>
 
-      <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
+      <button type="button" aria-label="Minimize modules panel" onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-slate-950/10 transition-opacity lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
       <main className="relative z-10 flex h-full flex-col gap-3 p-3 lg:p-3">
         <div className="hidden shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border border-white/50 bg-white/70 px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid">
@@ -549,10 +549,13 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
         </div>
 
         <section className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
-          <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-slate-900/[0.04] backdrop-blur-3xl border-r border-slate-200/50 shadow-[4px_0_30px_rgba(0,0,0,0.02)] transition lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl lg:border ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+          <aside className={`fixed inset-y-0 left-0 z-40 w-[86vw] max-w-sm transform bg-white/95 border-r border-slate-200/70 shadow-[14px_0_45px_rgba(15,23,42,0.18)] transition lg:relative lg:inset-auto lg:w-auto lg:max-w-none lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl lg:border lg:bg-slate-900/[0.04] lg:shadow-[4px_0_30px_rgba(0,0,0,0.02)] lg:backdrop-blur-3xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col">
               <div className="shrink-0 border-b border-white/50 px-4 py-5">
-                <button onClick={onBack} className="mb-4 flex items-center gap-2 text-[22px] font-medium text-slate-900 hover:opacity-70">← <span>Back</span></button>
+                <div className="mb-4 flex items-center justify-between gap-3">
+                  <button onClick={onBack} className="flex items-center gap-2 text-[22px] font-medium text-slate-900 hover:opacity-70">← <span>Back</span></button>
+                  <button type="button" onClick={() => setIsSidebarOpen(false)} className="rounded-full border border-slate-200 bg-white/80 px-3 py-2 text-sm font-black text-slate-700 shadow-sm lg:hidden" aria-label="Minimize modules panel">Minimize</button>
+                </div>
                 <h2 className="text-[25px] font-black leading-tight text-slate-900">{product.title}</h2>
               </div>
               <nav className="flex-1 overflow-y-auto p-3">

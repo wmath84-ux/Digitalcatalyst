@@ -14,127 +14,108 @@ import AiMentor from './AiMentor';
 const ImageZoomModal: React.FC<{ src: string; alt: string; onClose: () => void; }> = ({ src, alt, onClose }) => {
     const [offset, setOffset] = React.useState({ x: 0, y: 0 });
     const [scale, setScale] = React.useState(1);
-    
+    const [isInteracting, setIsInteracting] = React.useState(false);
     const imgRef = React.useRef<HTMLImageElement>(null);
-    const overlayRef = React.useRef<HTMLDivElement>(null);
-
-    // Using refs for values that change frequently in event listeners to avoid re-renders
-    const isZoomPanningRef = React.useRef(false);
+    const pointersRef = React.useRef<Map<number, globalThis.PointerEvent>>(new Map());
     const dragStartRef = React.useRef({ x: 0, y: 0 });
-    const pointersRef = React.useRef<PointerEvent[]>([]);
-    const initialPinchDistRef = React.useRef(0);
+    const pinchStartRef = React.useRef({ distance: 0, scale: 1 });
 
-    const handlePointerDown = (e: React.PointerEvent) => {
+    const clampScale = (value: number) => Math.max(1, Math.min(value, 5));
+
+    const resetZoom = () => {
+        setScale(1);
+        setOffset({ x: 0, y: 0 });
+    };
+
+    const zoomBy = (amount: number) => {
+        setScale(current => {
+            const next = clampScale(current + amount);
+            if (next === 1) setOffset({ x: 0, y: 0 });
+            return next;
+        });
+    };
+
+    const handlePointerDown = (e: React.PointerEvent<HTMLImageElement>) => {
         e.preventDefault();
-        pointersRef.current.push(e.nativeEvent);
-        
-        if (pointersRef.current.length === 1) { // Pan / Swipe start
-            isZoomPanningRef.current = true;
+        e.stopPropagation();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        pointersRef.current.set(e.pointerId, e.nativeEvent);
+        setIsInteracting(true);
+
+        if (pointersRef.current.size === 1) {
             dragStartRef.current = {
                 x: e.clientX - offset.x,
                 y: e.clientY - offset.y,
             };
-        } else if (pointersRef.current.length === 2) { // Pinch start
-            const [p1, p2] = pointersRef.current;
-            initialPinchDistRef.current = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
+        } else if (pointersRef.current.size === 2) {
+            const [p1, p2] = Array.from(pointersRef.current.values()) as globalThis.PointerEvent[];
+            pinchStartRef.current = {
+                distance: Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY),
+                scale,
+            };
         }
     };
-    
-    const handlePointerMove = (e: React.PointerEvent) => {
-        if (!isZoomPanningRef.current) return;
 
-        if (pointersRef.current.length === 1) { // Panning or Swiping
-            const currentX = e.clientX - dragStartRef.current.x;
-            const currentY = e.clientY - dragStartRef.current.y;
+    const handlePointerMove = (e: React.PointerEvent<HTMLImageElement>) => {
+        if (!pointersRef.current.has(e.pointerId)) return;
+        e.preventDefault();
+        e.stopPropagation();
+        pointersRef.current.set(e.pointerId, e.nativeEvent);
 
-            if (scale > 1) { // Panning
-                setOffset({ x: currentX, y: currentY });
-            } else { // Swiping to dismiss
-                setOffset({ x: 0, y: currentY }); // Only allow vertical movement
-                const opacity = Math.max(0.2, 1 - Math.abs(currentY) / 500);
-                if (overlayRef.current) {
-                    overlayRef.current.style.backgroundColor = `rgba(0, 0, 0, ${0.8 * opacity})`;
-                }
-            }
-        } else if (pointersRef.current.length === 2) { // Pinching
-            // Find and update the moved pointer
-            const pointerIndex = pointersRef.current.findIndex(p => p.pointerId === e.pointerId);
-            if (pointerIndex !== -1) {
-                pointersRef.current[pointerIndex] = e.nativeEvent;
-            }
-            const [p1, p2] = pointersRef.current;
-            const currentDist = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
-            
-            if (initialPinchDistRef.current > 0) {
-                const newScale = scale * (currentDist / initialPinchDistRef.current);
-                setScale(Math.max(1, Math.min(newScale, 5)));
-                initialPinchDistRef.current = currentDist;
+        if (pointersRef.current.size === 1) {
+            if (scale <= 1) return;
+            setOffset({
+                x: e.clientX - dragStartRef.current.x,
+                y: e.clientY - dragStartRef.current.y,
+            });
+            return;
+        }
+
+        if (pointersRef.current.size === 2) {
+            const [p1, p2] = Array.from(pointersRef.current.values()) as globalThis.PointerEvent[];
+            const currentDistance = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
+            if (pinchStartRef.current.distance > 0) {
+                setScale(clampScale(pinchStartRef.current.scale * (currentDistance / pinchStartRef.current.distance)));
             }
         }
     };
-    
-    const handlePointerUp = (e: React.PointerEvent) => {
-        pointersRef.current = pointersRef.current.filter(p => p.pointerId !== e.pointerId);
-        
-        if (pointersRef.current.length < 2) {
-            initialPinchDistRef.current = 0;
+
+    const handlePointerUp = (e: React.PointerEvent<HTMLImageElement>) => {
+        e.preventDefault();
+        e.stopPropagation();
+        pointersRef.current.delete(e.pointerId);
+        try {
+            e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+            // Pointer capture can already be released by the browser on cancel/leave.
         }
-        if (pointersRef.current.length < 1) {
-            isZoomPanningRef.current = false;
-            // Check for swipe-to-dismiss completion
-            if (scale === 1 && Math.abs(offset.y) > 100) {
-                onClose();
-            } else {
-                // Animate back to center if not dismissed
-                setOffset({ x: 0, y: 0 });
-                if (overlayRef.current) {
-                    overlayRef.current.style.transition = 'background-color 0.3s ease';
-                    overlayRef.current.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-                }
-            }
+
+        if (pointersRef.current.size === 0) {
+            setIsInteracting(false);
+            if (scale <= 1) setOffset({ x: 0, y: 0 });
+        } else if (pointersRef.current.size === 1) {
+            const [remainingPointer] = Array.from(pointersRef.current.values()) as globalThis.PointerEvent[];
+            dragStartRef.current = {
+                x: remainingPointer.clientX - offset.x,
+                y: remainingPointer.clientY - offset.y,
+            };
         }
     };
 
     const handleWheel = (e: React.WheelEvent) => {
         e.preventDefault();
-        const { clientX, clientY, deltaY } = e;
-        const img = imgRef.current;
-        if (!img) return;
-
-        const rect = img.getBoundingClientRect();
-        
-        // Position of the pointer inside the image element
-        const x = clientX - rect.left;
-        const y = clientY - rect.top;
-
-        const scaleMultiplier = 1 - deltaY * 0.001;
-        const newScale = Math.max(1, Math.min(scale * scaleMultiplier, 5));
-
-        // How much the image will grow from the pointer's perspective
-        const newX = offset.x - (x - offset.x) * (newScale / scale - 1);
-        const newY = offset.y - (y - offset.y) * (newScale / scale - 1);
-
-        setScale(newScale);
-        setOffset({ x: newX, y: newY });
+        const nextScale = clampScale(scale - e.deltaY * 0.002);
+        setScale(nextScale);
+        if (nextScale === 1) setOffset({ x: 0, y: 0 });
     };
-
-    const handleCloseClick = () => {
-        // If zoomed in, first zoom out. Otherwise, close.
-        if (scale > 1) {
-            setScale(1);
-            setOffset({ x: 0, y: 0 });
-        } else {
-            onClose();
-        }
-    }
 
     const imageStyle: React.CSSProperties = {
         transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`,
-        transition: isZoomPanningRef.current ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0.38, 0.9)',
-        cursor: isZoomPanningRef.current ? 'grabbing' : (scale > 1 ? 'grab' : 'zoom-out'),
+        transition: isInteracting ? 'none' : 'transform 0.25s cubic-bezier(0.2, 0, 0.38, 0.9)',
+        cursor: isInteracting ? 'grabbing' : (scale > 1 ? 'grab' : 'zoom-in'),
+        touchAction: 'none',
     };
-    
-    // Animate out on close
+
     React.useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
             if (e.key === 'Escape') onClose();
@@ -144,26 +125,28 @@ const ImageZoomModal: React.FC<{ src: string; alt: string; onClose: () => void; 
     }, [onClose]);
 
     return (
-        <div 
-            ref={overlayRef}
-            className="image-zoom-overlay" 
-            onClick={handleCloseClick}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            onPointerLeave={handlePointerUp}
-            onWheel={handleWheel}
-        >
+        <div className="image-zoom-overlay" onClick={onClose} onWheel={handleWheel}>
+            <div className="image-zoom-toolbar" onClick={e => e.stopPropagation()} aria-label="Image zoom controls">
+                <button type="button" onClick={() => zoomBy(-0.5)} aria-label="Zoom out">−</button>
+                <span>{Math.round(scale * 100)}%</span>
+                <button type="button" onClick={() => zoomBy(0.5)} aria-label="Zoom in">+</button>
+                <button type="button" onClick={resetZoom}>Reset</button>
+            </div>
             <div className="image-zoom-content" onClick={e => e.stopPropagation()}>
-                <img 
+                <img
                     ref={imgRef}
-                    src={src} 
+                    src={src}
                     alt={alt}
                     style={imageStyle}
                     onPointerDown={handlePointerDown}
+                    onPointerMove={handlePointerMove}
+                    onPointerUp={handlePointerUp}
+                    onPointerCancel={handlePointerUp}
+                    onDoubleClick={() => scale > 1 ? resetZoom() : setScale(2)}
+                    draggable={false}
                 />
             </div>
-             <button onClick={onClose} className="image-zoom-close" aria-label="Close image view">&times;</button>
+            <button type="button" onClick={onClose} className="image-zoom-close" aria-label="Close image view">&times;</button>
         </div>
     );
 };

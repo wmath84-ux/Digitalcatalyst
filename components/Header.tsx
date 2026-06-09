@@ -130,7 +130,20 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                     )}
                 </div>
                 <div className="flex items-center space-x-2 md:hidden">
-                    <button onClick={onCartClick} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your cart with ${cartItemCount} items`}>
+                    {settings.features.showFavourites && (
+                        <button onClick={onNavigateToWishlist} className="relative rounded-full border border-indigo-100/80 bg-white/80 p-2 text-text-muted shadow-sm transition-colors duration-300 hover:text-primary" aria-label={`View your wishlist with ${wishlistCount} items`}>
+                            <HeartIcon />
+                            {wishlistCount > 0 && (
+                                <span className="absolute -top-2 -right-2 flex h-5 w-5 items-center justify-center rounded-full bg-red-500 text-xs text-white">
+                                    {wishlistCount}
+                                </span>
+                            )}
+                        </button>
+                    )}
+                    <button onClick={currentUser ? onNavigateToProfile : onLoginClick} className="relative rounded-full border border-indigo-100/80 bg-white/80 p-2 text-text-muted shadow-sm transition-colors duration-300 hover:text-primary" aria-label={currentUser ? 'Open your profile' : 'Login'}>
+                        <UserIcon />
+                    </button>
+                    <button onClick={onCartClick} className="relative rounded-full border border-indigo-100/80 bg-white/80 p-2 text-text-muted shadow-sm transition-colors duration-300 hover:text-primary" aria-label={`View your cart with ${cartItemCount} items`}>
                         <CartIcon />
                         {cartItemCount > 0 && (
                             <span className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
