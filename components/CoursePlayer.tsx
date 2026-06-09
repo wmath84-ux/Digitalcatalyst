@@ -243,6 +243,29 @@ const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
   </div>
 );
 
+const DownloadAdModal: React.FC<{ file: ProductFile; onClose: () => void }> = ({ file, onClose }) => (
+  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/30 p-4 backdrop-blur-md" role="dialog" aria-modal="true" aria-labelledby="download-ad-title">
+    <div className="relative flex max-h-[88vh] w-full max-w-4xl flex-col overflow-hidden rounded-[2rem] border border-white/50 bg-white/80 text-slate-900 shadow-[0_30px_90px_rgba(15,23,42,0.22)] backdrop-blur-2xl">
+      <div className="border-b border-white/60 px-5 py-4 text-center sm:px-8">
+        <p className="text-[10px] font-black uppercase tracking-[0.34em] text-cyan-700">Sponsored</p>
+        <h2 id="download-ad-title" className="mt-1 text-2xl font-black leading-tight">Your download is ready</h2>
+        <p className="mt-1 truncate text-sm font-semibold text-slate-600" title={file.name}>{file.name}</p>
+      </div>
+      <div className="min-h-[18rem] flex-1 overflow-y-auto p-4 sm:p-6">
+        <div className="rounded-[1.5rem] border border-white/60 bg-white/70 p-3 shadow-sm">
+          <GoogleAd variant="multiplex" label="Sponsored recommendations" />
+        </div>
+      </div>
+      <div className="flex justify-center border-t border-white/60 bg-white/50 px-5 py-4">
+        <button type="button" onClick={onClose} className="group inline-flex items-center justify-center gap-2 rounded-full border border-white/70 bg-white/70 px-7 py-3 text-sm font-black text-slate-900 shadow-[0_8px_30px_rgba(15,23,42,0.08)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-cyan-50 hover:shadow-[0_16px_45px_rgba(8,145,178,0.16)]" aria-label="Close sponsored popup">
+          <span className="grid h-7 w-7 place-items-center rounded-full bg-slate-900 text-white transition group-hover:rotate-90">×</span>
+          Close and continue
+        </button>
+      </div>
+    </div>
+  </div>
+);
+
 const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ file, economySettings, onQuizReward }) => {
   const questions = file.quiz?.questions || [];
   const [answers, setAnswers] = useState<QuizAnswerState>({});
@@ -346,6 +369,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const [mediaHasError, setMediaHasError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
+  const [isDownloadAdOpen, setIsDownloadAdOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [activeWatchSeconds, setActiveWatchSeconds] = useState(0);
   const [sessionEarnedCoins, setSessionEarnedCoins] = useState(0);
@@ -375,6 +399,10 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   }, [activeFile]);
 
   useEffect(() => {
+    if (activeFile?.type !== 'pdf' && activeFile?.type !== 'sheet') setIsDownloadAdOpen(false);
+  }, [activeFile]);
+
+  useEffect(() => {
     const updateFocusState = () => {
       setIsPlaybackWindowFocused(document.visibilityState === 'visible' && document.hasFocus());
     };
@@ -396,6 +424,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     setActiveFile(file);
     setIsSidebarOpen(false);
     setIsMentorOpen(false);
+    setIsDownloadAdOpen(file.type === 'pdf' || file.type === 'sheet');
   };
 
   useEffect(() => {
@@ -439,19 +468,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onPlay={() => setIsVideoPlaying(true)} onPause={() => setIsVideoPlaying(false)} onEnded={() => setIsVideoPlaying(false)} onError={() => { setIsVideoPlaying(false); setMediaHasError(true); }} />;
       case 'audio': return <ProductMusicPlayer product={product} variant="full" initialTrackId={activeFile.id} className="h-full min-h-0 rounded-none border-0" onError={() => setMediaHasError(true)} />;
       case 'pdf':
-      case 'sheet': return (
-        <div className="flex h-full w-full flex-col overflow-y-auto bg-white/55 p-3 backdrop-blur-xl sm:p-5">
-          <div className="my-4 shrink-0 rounded-3xl border border-white/60 bg-white/80 p-3 shadow-sm">
-            <GoogleAd variant="display" label="Sponsored" />
-          </div>
-          <div className="min-h-[28rem] flex-1 overflow-hidden rounded-[2rem] border border-white/60 shadow-sm">
-            <GlassDownloadCard file={activeFile} />
-          </div>
-          <div className="my-4 shrink-0 rounded-3xl border border-white/60 bg-white/80 p-3 shadow-sm">
-            <GoogleAd variant="inArticle" label="Sponsored" />
-          </div>
-        </div>
-      );
+      case 'sheet': return <GlassDownloadCard file={activeFile} />;
       case 'doc':
       case 'ebook': return <SmartDocsWorkspace file={activeFile} productId={product.id} />;
       case 'link': return <ExternalResourceCard file={activeFile} />;
@@ -506,6 +523,10 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           </div>
         </section>
       </main>
+
+      {isDownloadAdOpen && activeFile && (activeFile.type === 'pdf' || activeFile.type === 'sheet') && (
+        <DownloadAdModal file={activeFile} onClose={() => setIsDownloadAdOpen(false)} />
+      )}
 
     </div>
   );
