@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface EduvoraCommunityProps {
   onClose?: () => void;
@@ -74,9 +74,9 @@ const initialMessages: FeedMessage[] = [
 ];
 
 const statusCards = [
-  { id: 1, title: 'Morning sprint template', gradient: 'from-emerald-500 via-teal-500 to-cyan-600', likedBy: 28, slots: 'PDF · 780KB' },
-  { id: 2, title: 'Offer-stack swipe file', gradient: 'from-sky-500 via-blue-600 to-indigo-700', likedBy: 41, slots: 'Image · 940KB' },
-  { id: 3, title: 'Workshop poll snapshot', gradient: 'from-slate-900 via-zinc-800 to-emerald-700', likedBy: 19, slots: 'Poll · 1 min' },
+  { id: 1, title: 'Morning sprint template', gradient: 'from-blue-500 via-sky-500 to-emerald-400', likedBy: 28, slots: 'PDF · 780KB' },
+  { id: 2, title: 'Offer-stack swipe file', gradient: 'from-white via-sky-400 to-blue-700', likedBy: 41, slots: 'Image · 940KB' },
+  { id: 3, title: 'Workshop poll snapshot', gradient: 'from-emerald-400 via-teal-500 to-blue-700', likedBy: 19, slots: 'Poll · 1 min' },
 ];
 
 const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
@@ -86,21 +86,85 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
   const [messages, setMessages] = useState<FeedMessage[]>(initialMessages);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [adminDraft, setAdminDraft] = useState('');
-  const [isChromeHidden, setIsChromeHidden] = useState(false);
-  const lastScrollTop = useRef(0);
+  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
 
-  const handleScroll = (event: React.UIEvent<HTMLDivElement>) => {
-    const nextTop = event.currentTarget.scrollTop;
-    const delta = nextTop - lastScrollTop.current;
-    if (nextTop < 20 || delta < -10) setIsChromeHidden(false);
-    if (delta > 14 && nextTop > 80) setIsChromeHidden(true);
-    lastScrollTop.current = nextTop;
-  };
+  useEffect(() => {
+    const getDock = () => document.getElementById('community-bottom-dock');
+    const getComposer = () => document.getElementById('community-admin-composer');
+    const shouldUseDesktopPointerReveal = () => window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches;
+    const revealZonePx = 180;
+    let lastPointerY = Number.POSITIVE_INFINITY;
+
+    const setChromeHidden = (hidden: boolean) => {
+      const hiddenValue = hidden ? 'true' : 'false';
+      const dock = getDock();
+      const composer = getComposer();
+      if (dock) dock.dataset.hidden = hiddenValue;
+      if (composer) composer.dataset.hidden = hiddenValue;
+    };
+
+    const applyDockVisibility = () => {
+      const dock = getDock();
+      if (!dock) return;
+      const isScrollHidden = dock.dataset.scrollHidden === 'true';
+      const isPointerRevealActive = dock.dataset.pointerReveal === 'true';
+      setChromeHidden(isScrollHidden && !isPointerRevealActive);
+    };
+
+    const updatePointerReveal = (clientY: number) => {
+      const dock = getDock();
+      if (!dock) return;
+      if (!shouldUseDesktopPointerReveal()) {
+        dock.dataset.pointerReveal = 'false';
+        applyDockVisibility();
+        return;
+      }
+      lastPointerY = clientY;
+      dock.dataset.pointerReveal = window.innerHeight - clientY <= revealZonePx ? 'true' : 'false';
+      applyDockVisibility();
+    };
+
+    const onScroll = () => {
+      const dock = getDock();
+      const scrollContainer = scrollContainerRef.current;
+      if (!dock || !scrollContainer) return;
+      const y = scrollContainer.scrollTop;
+      const last = Number(dock.dataset.lastY || 0);
+      dock.dataset.scrollHidden = y > last && y > 120 ? 'true' : 'false';
+      dock.dataset.lastY = String(y);
+      if (Number.isFinite(lastPointerY)) updatePointerReveal(lastPointerY);
+      else applyDockVisibility();
+    };
+
+    const onPointerMove = (event: PointerEvent | MouseEvent) => {
+      updatePointerReveal(event.clientY);
+    };
+
+    const onPointerLeave = () => {
+      const dock = getDock();
+      if (!dock) return;
+      lastPointerY = Number.POSITIVE_INFINITY;
+      dock.dataset.pointerReveal = 'false';
+      applyDockVisibility();
+    };
+
+    const scrollContainer = scrollContainerRef.current;
+    scrollContainer?.addEventListener('scroll', onScroll, { passive: true });
+    window.addEventListener('pointermove', onPointerMove, { passive: true });
+    window.addEventListener('mousemove', onPointerMove, { passive: true });
+    document.addEventListener('mouseleave', onPointerLeave);
+    setChromeHidden(false);
+    return () => {
+      scrollContainer?.removeEventListener('scroll', onScroll);
+      window.removeEventListener('pointermove', onPointerMove);
+      window.removeEventListener('mousemove', onPointerMove);
+      document.removeEventListener('mouseleave', onPointerLeave);
+    };
+  }, [activeView, isAdmin]);
 
   const switchView = (view: CommunityView) => {
     setActiveView(view);
-    setIsChromeHidden(false);
-    lastScrollTop.current = 0;
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const toggleThread = (messageId: number) => {
@@ -148,47 +212,45 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
     setAdminDraft('');
   };
 
-  const bottomChromeClass = isChromeHidden ? 'translate-y-32 opacity-0 pointer-events-none' : 'translate-y-0 opacity-100';
-
   return (
-    <section className="relative h-screen overflow-hidden bg-[#f5fbfb] text-slate-950">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_5%_12%,rgba(20,184,166,0.20),transparent_32%),radial-gradient(circle_at_96%_0%,rgba(14,165,233,0.18),transparent_34%),linear-gradient(135deg,rgba(236,253,245,0.95),rgba(248,250,252,0.96)_42%,rgba(236,254,255,0.86))]" />
-      <div className="pointer-events-none absolute -left-28 bottom-0 h-80 w-80 rounded-full bg-emerald-300/20 blur-3xl" />
-      <div className="pointer-events-none absolute -right-24 top-24 h-96 w-96 rounded-full bg-sky-300/20 blur-3xl" />
+    <section className="relative h-screen overflow-hidden bg-white text-slate-950">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.14),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.12),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(239,246,255,0.92),rgba(255,255,255,0.96))]" />
+      <div className="pointer-events-none absolute -left-28 bottom-0 h-80 w-80 rounded-full bg-blue-300/20 blur-3xl" />
+      <div className="pointer-events-none absolute -right-24 top-24 h-96 w-96 rounded-full bg-emerald-300/20 blur-3xl" />
 
-      <header className="relative z-30 flex h-[76px] items-center justify-between border-b border-white/70 bg-white/70 px-4 shadow-[0_10px_40px_rgba(15,23,42,0.06)] backdrop-blur-2xl sm:px-6 lg:px-10">
+      <header className="relative z-30 flex h-[76px] items-center justify-between border-b border-slate-200/80 bg-white/90 px-4 shadow-[0_10px_40px_rgba(15,23,42,0.06)] backdrop-blur-2xl sm:px-6 lg:px-10">
         <div className="flex min-w-0 items-center gap-3">
           {onClose && (
-            <button type="button" onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-emerald-100 bg-white/80 text-lg font-black text-slate-700 shadow-sm transition hover:-translate-x-0.5 hover:bg-emerald-50" aria-label="Back to home">
+            <button type="button" onClick={onClose} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white/90 text-lg font-black text-slate-800 shadow-sm transition hover:-translate-x-0.5 hover:bg-blue-50 hover:text-slate-950" aria-label="Back to home">
               ←
             </button>
           )}
           <div className="min-w-0">
-            <p className="text-[10px] font-black uppercase tracking-[0.32em] text-emerald-600 sm:text-xs">Trusted Community</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.32em] text-blue-800 sm:text-xs">Trusted Community</p>
             <h1 className="truncate text-xl font-black tracking-tight text-slate-950 sm:text-3xl">Eduvora Community</h1>
           </div>
         </div>
         <div className="flex shrink-0 items-center gap-2 rounded-full border border-white/80 bg-white/75 p-1 shadow-[0_10px_32px_rgba(15,23,42,0.08)] backdrop-blur-2xl">
-          <button type="button" onClick={() => setIsAdmin(true)} className={`rounded-full px-4 py-2 text-xs font-black transition sm:px-5 ${isAdmin ? 'bg-[#07131f] text-white shadow-[0_10px_26px_rgba(7,19,31,0.28)]' : 'text-slate-600 hover:bg-emerald-50'}`}>Admin</button>
-          <button type="button" onClick={() => setIsAdmin(false)} className={`rounded-full px-4 py-2 text-xs font-black transition sm:px-5 ${!isAdmin ? 'bg-[#07131f] text-white shadow-[0_10px_26px_rgba(7,19,31,0.28)]' : 'text-slate-600 hover:bg-emerald-50'}`}>User</button>
+          <button type="button" onClick={() => setIsAdmin(true)} className={`rounded-full px-4 py-2 text-xs font-black transition sm:px-5 ${isAdmin ? 'bg-blue-700 text-white shadow-[0_10px_26px_rgba(29,78,216,0.28)]' : 'text-slate-600 hover:bg-blue-50'}`}>Admin</button>
+          <button type="button" onClick={() => setIsAdmin(false)} className={`rounded-full px-4 py-2 text-xs font-black transition sm:px-5 ${!isAdmin ? 'bg-blue-700 text-white shadow-[0_10px_26px_rgba(29,78,216,0.28)]' : 'text-slate-600 hover:bg-blue-50'}`}>User</button>
         </div>
       </header>
 
-      <main onScroll={handleScroll} className="relative z-10 h-[calc(100vh-76px)] overflow-y-auto px-3 pb-40 pt-4 custom-scrollbar sm:px-5 lg:px-8 xl:px-10">
-        <div className="mx-auto min-h-full w-full max-w-[1800px] rounded-[2rem] border border-white/80 bg-white/48 p-3 shadow-[0_28px_100px_rgba(15,23,42,0.10)] backdrop-blur-3xl sm:p-5 lg:p-7">
+      <main ref={scrollContainerRef} className="relative z-10 h-[calc(100vh-76px)] overflow-y-auto px-3 pb-40 pt-4 custom-scrollbar sm:px-5 lg:px-8 xl:px-10">
+        <div className="mx-auto min-h-full w-full max-w-[1800px] rounded-[2rem] border border-white/80 bg-white/72 p-3 shadow-[0_28px_100px_rgba(15,23,42,0.10)] backdrop-blur-3xl sm:p-5 lg:p-7">
           {activeView === 'feed' && (
             <div className="space-y-4">
               {messages.map((message) => {
                 const isExpanded = expandedThreads.includes(message.id);
                 return (
-                  <article key={message.id} className="overflow-hidden rounded-[1.8rem] border border-white/80 bg-white/78 shadow-[0_16px_50px_rgba(15,23,42,0.08)] ring-1 ring-slate-900/[0.025] backdrop-blur-2xl transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
+                  <article key={message.id} className="overflow-hidden rounded-[1.8rem] border border-slate-200/80 bg-white/90 shadow-[0_16px_50px_rgba(15,23,42,0.08)] ring-1 ring-slate-900/[0.025] backdrop-blur-2xl transition duration-300 hover:-translate-y-0.5 hover:shadow-[0_24px_70px_rgba(15,23,42,0.12)]">
                     <div className="p-4 sm:p-6 lg:p-8">
                       <div className="flex items-start gap-4">
-                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-100 to-cyan-100 text-2xl shadow-inner ring-1 ring-emerald-100 sm:h-14 sm:w-14">{message.avatar}</div>
+                        <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-white via-sky-50 to-emerald-50 text-2xl shadow-inner ring-1 ring-blue-100 sm:h-14 sm:w-14">{message.avatar}</div>
                         <div className="min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
                             <h2 className="font-black text-slate-950 sm:text-lg">{message.admin}</h2>
-                            <span className="rounded-full border border-emerald-200/80 bg-emerald-50 px-2.5 py-1 text-[11px] font-black text-emerald-700">{message.badge}</span>
+                            <span className="rounded-full border border-blue-100 bg-white/90 px-2.5 py-1 text-[11px] font-black text-blue-800">{message.badge}</span>
                             <span className="text-xs font-bold text-slate-500">{message.time}</span>
                           </div>
                           <h3 className="mt-4 text-xl font-black tracking-tight text-slate-950 lg:text-2xl">{message.title}</h3>
@@ -197,7 +259,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
                       </div>
 
                       <div className="mt-5 flex flex-wrap items-center gap-2 pl-0 sm:pl-[4.5rem]">
-                        {message.reactions.map((reaction) => <button type="button" key={reaction} className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-emerald-200 hover:bg-emerald-50">{reaction}</button>)}
+                        {message.reactions.map((reaction) => <button type="button" key={reaction} className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50">{reaction}</button>)}
                         <button type="button" onClick={() => toggleThread(message.id)} className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-800 shadow-sm transition hover:-translate-y-0.5 hover:bg-cyan-100">
                           💬 {message.replies.length} Replies
                         </button>
@@ -218,9 +280,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
                               </div>
                             ))}
                           </div>
-                          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-emerald-100 bg-white p-2 shadow-[0_12px_34px_rgba(15,23,42,0.06)]">
+                          <div className="mt-4 flex items-center gap-2 rounded-2xl border border-blue-100 bg-white p-2 shadow-[0_12px_34px_rgba(15,23,42,0.06)]">
                             <input value={replyDrafts[message.id] || ''} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter') submitReply(message.id); }} placeholder={isAdmin ? 'Preview a user suggestion...' : 'Write your reply suggestion...'} className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400" />
-                            <button type="button" onClick={() => submitReply(message.id)} className="rounded-xl bg-emerald-600 px-4 py-2 text-xs font-black text-white shadow-lg shadow-emerald-600/20 transition hover:-translate-y-0.5 hover:bg-emerald-700">Reply</button>
+                            <button type="button" onClick={() => submitReply(message.id)} className="rounded-xl bg-blue-700 px-4 py-2 text-xs font-black text-white shadow-lg shadow-blue-700/20 transition hover:-translate-y-0.5 hover:bg-blue-800">Reply</button>
                           </div>
                         </div>
                       </div>
@@ -233,8 +295,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
 
           {activeView === 'status' && (
             <div className="min-h-[calc(100vh-12rem)] space-y-5">
-              <div className="rounded-[1.6rem] border border-amber-200/80 bg-gradient-to-r from-amber-50 via-yellow-50 to-emerald-50 p-4 text-center shadow-[0_18px_54px_rgba(245,158,11,0.12)]">
-                <p className="text-sm font-black text-amber-900 sm:text-base">1MB Limit &amp; 150 Slots Left</p>
+              <div className="rounded-[1.6rem] border border-blue-100 bg-gradient-to-r from-white via-sky-50/90 to-emerald-50/80 p-4 text-center shadow-[0_18px_54px_rgba(245,158,11,0.12)]">
+                <p className="text-sm font-black text-blue-900 sm:text-base">1MB Limit &amp; 150 Slots Left</p>
               </div>
               <div className="grid min-h-[58vh] gap-5 lg:grid-cols-3">
                 {statusCards.map((card) => (
@@ -251,12 +313,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
                   </article>
                 ))}
               </div>
-              <button type="button" className="fixed bottom-28 right-5 z-20 flex h-14 w-14 items-center justify-center rounded-full border border-white/45 bg-[#07131f] text-2xl text-white shadow-[0_18px_54px_rgba(15,23,42,0.32)] transition hover:-translate-y-1 md:bottom-24 md:right-10" aria-label="Upload status">＋</button>
+              <button type="button" className="fixed bottom-28 right-5 z-20 flex h-14 w-14 items-center justify-center rounded-full border border-white/45 bg-blue-700 text-2xl text-white shadow-[0_18px_54px_rgba(15,23,42,0.32)] transition hover:-translate-y-1 md:bottom-24 md:right-10" aria-label="Upload status">＋</button>
             </div>
           )}
 
           {activeView === 'calls' && (
-            <div className="flex min-h-[calc(100vh-12rem)] items-center justify-center rounded-[2rem] border border-white/80 bg-gradient-to-br from-slate-950 via-slate-900 to-emerald-950 p-8 text-center text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
+            <div className="flex min-h-[calc(100vh-12rem)] items-center justify-center rounded-[2rem] border border-white/80 bg-gradient-to-br from-blue-950 via-slate-950 to-emerald-950 p-8 text-center text-white shadow-[0_24px_80px_rgba(15,23,42,0.18)]">
               <div className="max-w-xl">
                 <div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2rem] bg-white/10 text-4xl shadow-inner ring-1 ring-white/15">📞</div>
                 <h2 className="mt-6 text-4xl font-black tracking-tight">Community Calls</h2>
@@ -268,22 +330,22 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
       </main>
 
       {isAdmin && activeView === 'feed' && (
-        <div className={`absolute inset-x-3 bottom-24 z-20 mx-auto max-w-4xl rounded-[1.5rem] border border-white/80 bg-white/78 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.16)] backdrop-blur-3xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] md:bottom-24 ${bottomChromeClass}`}>
+        <div id="community-admin-composer" className="absolute inset-x-3 bottom-24 z-20 mx-auto max-w-4xl rounded-[1.5rem] border border-slate-200/80 bg-white/90 p-2 shadow-[0_18px_60px_rgba(15,23,42,0.16)] backdrop-blur-3xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] data-[hidden=true]:translate-y-28 data-[hidden=true]:opacity-0 data-[hidden=true]:pointer-events-none md:bottom-24">
           <div className="flex items-center gap-2 rounded-[1.25rem] border border-slate-100 bg-white/90 px-2 py-2 shadow-inner">
             <div className="hidden items-center gap-1 sm:flex">
-              {['📄', '🖼️', '📊'].map((icon) => <button type="button" key={icon} className="flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-50 text-lg shadow-sm transition hover:-translate-y-0.5 hover:bg-emerald-100">{icon}</button>)}
+              {['📄', '🖼️', '📊'].map((icon) => <button type="button" key={icon} className="flex h-10 w-10 items-center justify-center rounded-xl bg-blue-50 text-lg shadow-sm transition hover:-translate-y-0.5 hover:bg-blue-100">{icon}</button>)}
             </div>
             <input value={adminDraft} onChange={(event) => setAdminDraft(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') submitAdminMessage(); }} placeholder="Admin-only broadcast message..." className="min-w-0 flex-1 bg-transparent px-3 py-2 text-sm font-bold text-slate-800 outline-none placeholder:text-slate-400" />
-            <button type="button" onClick={submitAdminMessage} className="rounded-xl bg-[#07131f] px-5 py-3 text-xs font-black text-white shadow-[0_12px_30px_rgba(15,23,42,0.26)] transition hover:-translate-y-0.5 hover:bg-emerald-700">Send</button>
+            <button type="button" onClick={submitAdminMessage} className="rounded-xl bg-blue-700 px-5 py-3 text-xs font-black text-white shadow-[0_12px_30px_rgba(15,23,42,0.26)] transition hover:-translate-y-0.5 hover:bg-blue-800">Send</button>
           </div>
         </div>
       )}
 
-      <div className={`absolute inset-x-0 bottom-3 z-30 flex justify-center px-3 transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] ${bottomChromeClass}`}>
-        <nav className="flex max-w-[96vw] items-center gap-2 rounded-[2rem] border border-white/70 bg-white/76 p-2 shadow-[0_22px_70px_rgba(15,23,42,0.18)] backdrop-blur-3xl" aria-label="Community dock">
-          <button type="button" onClick={() => switchView('feed')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center transition hover:-translate-y-1 ${activeView === 'feed' ? 'bg-white shadow-lg ring-1 ring-emerald-100' : 'bg-white/40'}`}><span className="block text-2xl">📢</span><span className="text-[11px] font-black">Feed</span></button>
-          <button type="button" onClick={() => switchView('status')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center transition hover:-translate-y-1 ${activeView === 'status' ? 'bg-white shadow-lg ring-1 ring-emerald-100' : 'bg-white/40'}`}><span className="block text-2xl">⭕</span><span className="text-[11px] font-black">Status</span></button>
-          <button type="button" onClick={() => switchView('calls')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center transition hover:-translate-y-1 ${activeView === 'calls' ? 'bg-white shadow-lg ring-1 ring-emerald-100' : 'bg-white/40'}`}><span className="block text-2xl">📞</span><span className="text-[11px] font-black">Calls</span></button>
+      <div className="absolute inset-x-0 bottom-3 z-30 flex justify-center px-3 pointer-events-none">
+        <nav id="community-bottom-dock" className="pointer-events-auto flex max-w-[96vw] items-center gap-2 rounded-[2rem] border border-slate-200/80 bg-white/90 p-2 shadow-[0_22px_70px_rgba(15,23,42,0.18)] backdrop-blur-3xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] data-[hidden=true]:translate-y-24 data-[hidden=true]:opacity-0" aria-label="Community dock">
+          <button type="button" onClick={() => switchView('feed')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center transition hover:-translate-y-1 ${activeView === 'feed' ? 'bg-blue-700 text-white shadow-lg shadow-blue-700/20 ring-1 ring-blue-100' : 'bg-white/75 text-slate-800' }`}><span className="block text-2xl">📢</span><span className="text-[11px] font-black">Feed</span></button>
+          <button type="button" onClick={() => switchView('status')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center transition hover:-translate-y-1 ${activeView === 'status' ? 'bg-blue-700 text-white shadow-lg shadow-blue-700/20 ring-1 ring-blue-100' : 'bg-white/75 text-slate-800' }`}><span className="block text-2xl">⭕</span><span className="text-[11px] font-black">Status</span></button>
+          <button type="button" onClick={() => switchView('calls')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center transition hover:-translate-y-1 ${activeView === 'calls' ? 'bg-blue-700 text-white shadow-lg shadow-blue-700/20 ring-1 ring-blue-100' : 'bg-white/75 text-slate-800' }`}><span className="block text-2xl">📞</span><span className="text-[11px] font-black">Calls</span></button>
         </nav>
       </div>
     </section>
