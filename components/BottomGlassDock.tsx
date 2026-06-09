@@ -15,6 +15,7 @@ interface BottomGlassDockProps {
   onCartClick: () => void;
   onProfileClick: () => void;
   onSubscriptionClick: () => void;
+  onOpenCommunity?: () => void;
   settings: WebsiteSettings;
 }
 
@@ -29,6 +30,7 @@ const dockToneClasses: Record<string, string> = {
   Profile: 'from-cyan-500/30 to-indigo-400/24 hover:border-cyan-300/40',
   Login: 'from-cyan-500/30 to-indigo-400/24 hover:border-cyan-300/40',
   Subscriptions: 'from-purple-500/32 to-indigo-400/25 hover:border-purple-300/40',
+  Community: 'from-emerald-500/32 to-cyan-400/25 hover:border-emerald-300/40',
 };
 
 
@@ -53,18 +55,22 @@ const hexToRgba = (hex: string, opacityPercent: number) => {
   return `rgba(${red}, ${green}, ${blue}, ${clampPercent(opacityPercent, defaultDockStyle.backgroundOpacity) / 100})`;
 };
 
-const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser, purchasedProducts, cartCount, wishlistCount, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick }) => {
+const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser, purchasedProducts, cartCount, wishlistCount, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity }) => {
   const defaultItems = useMemo(() => ([
     { label: 'Store', action: onNavigateToAllProducts, icon: '🛍️', badge: null },
     { label: 'Purchases', action: onNavigateToPurchases, icon: '📚', badge: purchasedProducts.length || null },
     { label: 'Wishlist', action: onNavigateToWishlist, icon: '❤️', badge: wishlistCount || null },
     { label: 'Cart', action: onCartClick, icon: '🛒', badge: cartCount || null },
     { label: 'News', action: onOpenAnnouncementsModal, icon: '📢', badge: null },
+    ...(onOpenCommunity ? [{ label: 'Community', action: onOpenCommunity, icon: '💬', badge: null }] : []),
     { label: 'Blog', action: onOpenBlogModal, icon: '📝', badge: null },
     { label: 'Free', action: onOpenFreeModal, icon: '🎁', badge: null },
     { label: currentUser ? 'Profile' : 'Login', action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null },
-  ]), [onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenBlogModal, onOpenFreeModal, currentUser, onProfileClick]);
-  const configured = ((settings.content as any).dockItems || defaultItems.map(i => i.label)) as string[];
+  ]), [onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenCommunity, onOpenBlogModal, onOpenFreeModal, currentUser, onProfileClick]);
+  const configuredBase = ((settings.content as any).dockItems || defaultItems.map(i => i.label)) as string[];
+  const configured = onOpenCommunity && !configuredBase.includes('Community')
+    ? [...configuredBase.slice(0, Math.max(configuredBase.indexOf('News') + 1, 0)), 'Community', ...configuredBase.slice(Math.max(configuredBase.indexOf('News') + 1, 0))]
+    : configuredBase;
   const map: any = Object.fromEntries(defaultItems.map(i => [i.label, i]));
   map['EduCoins'] = map['Profile'] || { label: 'Profile', action: onProfileClick, icon: '🪙', badge: null };
   map['Profile'] = map['Profile'] || { label: 'Profile', action: onProfileClick, icon: '🪙', badge: null };
