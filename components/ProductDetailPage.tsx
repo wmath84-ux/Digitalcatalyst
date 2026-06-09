@@ -151,19 +151,21 @@ const ImageZoomModal: React.FC<{ src: string; alt: string; onClose: () => void; 
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
             onPointerCancel={handlePointerUp}
-            onPointerLeave={handlePointerUp}
             onWheel={handleWheel}
         >
             <div className="image-zoom-content" onClick={e => e.stopPropagation()}>
                 <img 
                     ref={imgRef}
-                    src={src} 
+                    src={src}
                     alt={alt}
+                    className="image-zoom-media"
                     style={imageStyle}
                     onPointerDown={handlePointerDown}
+                    draggable={false}
                 />
             </div>
-             <button onClick={onClose} className="image-zoom-close" aria-label="Close image view">&times;</button>
+            <button onClick={onClose} className="image-zoom-close" aria-label="Close image view">&times;</button>
+            <button onClick={onClose} className="image-zoom-glass-close" aria-label="Close image view">Close Image</button>
         </div>
     );
 };

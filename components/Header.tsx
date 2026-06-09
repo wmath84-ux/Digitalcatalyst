@@ -130,14 +130,33 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                     )}
                 </div>
                 <div className="flex items-center space-x-2 md:hidden">
-                    <button onClick={onCartClick} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your cart with ${cartItemCount} items`}>
+                    {settings.features.showFavourites && (
+                        <button onClick={onNavigateToWishlist} className="relative rounded-full p-1.5 text-text-muted transition-colors duration-300 hover:bg-white/70 hover:text-primary" aria-label={`View your wishlist with ${wishlistCount} items`}>
+                            <HeartIcon />
+                            {wishlistCount > 0 && (
+                                <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">
+                                    {wishlistCount}
+                                </span>
+                            )}
+                        </button>
+                    )}
+                    <button onClick={onCartClick} className="relative rounded-full p-1.5 text-text-muted transition-colors duration-300 hover:bg-white/70 hover:text-primary" aria-label={`View your cart with ${cartItemCount} items`}>
                         <CartIcon />
                         {cartItemCount > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                            <span className="absolute -top-1 -right-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-1 text-[10px] font-bold text-white">
                                 {cartItemCount}
                             </span>
                         )}
                     </button>
+                    {currentUser ? (
+                        <button onClick={onNavigateToProfile} className="rounded-full p-1.5 text-text-muted transition-colors duration-300 hover:bg-white/70 hover:text-primary" aria-label="Open profile and EduCoins">
+                            <UserIcon />
+                        </button>
+                    ) : (
+                        <button onClick={onLoginClick} className="rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-3 py-2 text-xs font-black text-white shadow-sm transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90" aria-label="Login">
+                            Login
+                        </button>
+                    )}
                 </div>
             </div>
           </div>
