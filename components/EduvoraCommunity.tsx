@@ -4,12 +4,14 @@ interface EduvoraCommunityProps {
   onClose?: () => void;
 }
 
-type CommunityView = 'feed' | 'status' | 'calls';
-type CommunityPage = 'chat' | 'thread' | 'profile' | 'creators' | 'network' | 'following';
+type CommunityView = 'feed' | 'status';
+type CommunityPage = 'chat' | 'thread' | 'profile' | 'creators' | 'network' | 'following' | 'statusUpload' | 'statusMine' | 'statusReel' | 'directChat' | 'directChatThread' | 'statusDetail';
 type PostType = 'text' | 'image' | 'poll';
 type Reply = { id: number; author: string; text: string; time: string; avatar?: string };
-type FeedMessage = { id: number; admin: string; badge: string; avatar: string; title: string; body: string; time: string; reactions: string[]; replies: Reply[]; creatorId?: string; postType?: PostType };
+type FeedMessage = { id: number; admin: string; badge: string; avatar: string; title: string; body: string; time: string; reactions: string[]; replies: Reply[]; creatorId?: string; postType?: PostType; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; likeCount?: number };
 type Creator = { id: string; username: string; name: string; avatar: string; role: string; followers: number; mutual: boolean; verified?: boolean };
+type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number };
+type SharedStory = { id: number; statusId: number; recipientId: string; senderId: 'me'; senderName: string; time: string };
 
 const creators: Creator[] = [
   { id: 'riya', username: 'riyafunnels', name: 'Riya Sharma', avatar: '🧕', role: 'Funnel creator', followers: 1280, mutual: true },
@@ -21,14 +23,14 @@ const creators: Creator[] = [
 
 const initialMessages: FeedMessage[] = [
   { id: 1, admin: 'Admin Aarya', badge: 'Pinned announcement', avatar: '🧑‍💻', title: 'New creator funnel PDF is live', body: 'Batch 06 students can now download the revised funnel checklist. Reply below with your best landing page hook and we will review the strongest ones in tomorrow\'s sprint.', time: '9:41 AM', creatorId: 'riya', postType: 'text', reactions: ['🔥 24', '🚀 12', '✅ 31'], replies: [{ id: 1, author: 'Riya', avatar: '🧕', text: 'My hook: Stop wasting ad spend on cold pages. Build trust first.', time: '9:48 AM' }, { id: 2, author: 'Kabir', avatar: '🧑‍🎨', text: 'Can we include a one-page audit template too?', time: '9:55 AM' }, { id: 3, author: 'Meera', avatar: '👩‍💻', text: 'The CTA examples are super clear now.', time: '10:02 AM' }] },
-  { id: 2, admin: 'Admin Veer', badge: 'Daily task', avatar: '👨‍🏫', title: 'Drop your 3-line offer stack', body: 'Normal users cannot create main feed posts, but everyone can contribute inside the thread. Keep your offer short: product, bonus, guarantee.', time: '11:20 AM', creatorId: 'kabir', postType: 'poll', reactions: ['💡 18', '❤️ 29', '📌 7'], replies: [{ id: 1, author: 'Nisha', avatar: '👩‍🎓', text: 'Product: Canva kit. Bonus: 25 captions. Guarantee: 7-day launch clarity.', time: '11:26 AM' }, { id: 2, author: 'Arjun', avatar: '🧑‍💼', text: 'I need help making my guarantee stronger.', time: '11:31 AM' }] },
-  { id: 3, admin: 'Admin Sia', badge: 'Poll reminder', avatar: '👩‍🚀', title: 'Choose next workshop topic', body: 'Poll closes tonight. Vote for reels scripting, email automation, or beginner ads. Detailed notes will be uploaded in Status after the workshop.', time: '1:05 PM', creatorId: 'meera', postType: 'image', reactions: ['🗳️ 42', '✨ 16', '👀 22'], replies: [{ id: 1, author: 'Tara', avatar: '👩‍🎤', text: 'Email automation please. It feels most confusing right now.', time: '1:17 PM' }, { id: 2, author: 'Yash', avatar: '🧑‍🚀', text: 'Beginner ads + budget sheet would be amazing.', time: '1:22 PM' }] },
+  { id: 2, admin: 'Admin Veer', badge: 'Daily task', avatar: '👨‍🏫', title: 'Drop your 3-line offer stack', body: 'Normal users cannot create main feed posts, but everyone can contribute inside the thread. Keep your offer short: product, bonus, guarantee.', time: '11:20 AM', creatorId: 'kabir', postType: 'poll', pollOptions: ['Product', 'Bonus', 'Guarantee'], pollVotes: [12, 9, 6], reactions: ['💡 18', '❤️ 29', '📌 7'], replies: [{ id: 1, author: 'Nisha', avatar: '👩‍🎓', text: 'Product: Canva kit. Bonus: 25 captions. Guarantee: 7-day launch clarity.', time: '11:26 AM' }, { id: 2, author: 'Arjun', avatar: '🧑‍💼', text: 'I need help making my guarantee stronger.', time: '11:31 AM' }] },
+  { id: 3, admin: 'Admin Sia', badge: 'Poll reminder', avatar: '👩‍🚀', title: 'Choose next workshop topic', body: 'Poll closes tonight. Vote for reels scripting, email automation, or beginner ads. Detailed notes will be uploaded in Status after the workshop.', time: '1:05 PM', creatorId: 'meera', postType: 'image', imagePreview: '🖼️', reactions: ['🗳️ 42', '✨ 16', '👀 22'], replies: [{ id: 1, author: 'Tara', avatar: '👩‍🎤', text: 'Email automation please. It feels most confusing right now.', time: '1:17 PM' }, { id: 2, author: 'Yash', avatar: '🧑‍🚀', text: 'Beginner ads + budget sheet would be amazing.', time: '1:22 PM' }] },
 ];
 
-const statusCards = [
-  { id: 1, title: 'Morning sprint template', gradient: 'from-sky-200 via-blue-100 to-emerald-100', likedBy: 28, slots: 'PDF · 780KB' },
-  { id: 2, title: 'Offer-stack swipe file', gradient: 'from-slate-50 via-sky-100 to-blue-200', likedBy: 41, slots: 'Image · 940KB' },
-  { id: 3, title: 'Workshop poll snapshot', gradient: 'from-emerald-100 via-teal-100 to-sky-200', likedBy: 19, slots: 'Poll · 1 min' },
+const initialStatusCards: StatusCard[] = [
+  { id: 1, title: 'Morning sprint template', body: 'Use this prompt stack before your first sales call today.', gradient: 'from-sky-400 via-blue-300 to-emerald-300', likedBy: 0, views: 0, slots: 'Text · 1 min', type: 'text' },
+  { id: 2, title: 'Offer-stack swipe file', body: 'A clean preview board for offer, bonus, guarantee, and urgency blocks.', gradient: 'from-violet-400 via-fuchsia-300 to-sky-300', likedBy: 0, views: 0, slots: 'Image · 940KB', type: 'image', imagePreview: '🧩' },
+  { id: 3, title: 'Workshop poll snapshot', body: 'Vote for the topic we should break down in the next live workshop.', gradient: 'from-emerald-400 via-teal-300 to-cyan-300', likedBy: 0, views: 0, slots: 'Poll · 1 min', type: 'poll', pollOptions: ['Reels scripting', 'Email automation', 'Beginner ads'], pollVotes: [18, 27, 11] },
 ];
 
 const postOptions: Array<{ type: PostType; icon: string; label: string; helper: string }> = [
@@ -36,6 +38,12 @@ const postOptions: Array<{ type: PostType; icon: string; label: string; helper: 
   { type: 'image', icon: '🖼️', label: 'Image', helper: 'Daily image post' },
   { type: 'poll', icon: '📊', label: 'Poll', helper: 'Daily poll post' },
 ];
+
+const statusTone: Record<PostType, string> = {
+  text: 'from-amber-400 via-orange-300 to-rose-300',
+  image: 'from-indigo-500 via-sky-400 to-cyan-300',
+  poll: 'from-emerald-500 via-lime-300 to-teal-300',
+};
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
 const isImageAvatar = (value: string) => value.startsWith('data:') || value.startsWith('http://') || value.startsWith('https://');
@@ -45,27 +53,51 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
   const [page, setPage] = useState<CommunityPage>('chat');
   const [pageStack, setPageStack] = useState<CommunityPage[]>([]);
   const [selectedMessageId, setSelectedMessageId] = useState(initialMessages[0].id);
+  const [selectedStatusId, setSelectedStatusId] = useState(initialStatusCards[0].id);
   const [messages, setMessages] = useState<FeedMessage[]>(initialMessages);
+  const [statusCards, setStatusCards] = useState<StatusCard[]>(initialStatusCards);
+  const [likedStatuses, setLikedStatuses] = useState<number[]>([]);
+  const [likedMessages, setLikedMessages] = useState<number[]>([]);
+  const [imageLightbox, setImageLightbox] = useState<{ src: string; alt: string; mode: 'thumbnail' | 'original' } | null>(null);
+  const [sharedStories, setSharedStories] = useState<SharedStory[]>([]);
+  const [shareStatusId, setShareStatusId] = useState<number | null>(null);
+  const [selectedChatId, setSelectedChatId] = useState(creators[0].id);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [expandedReplyId, setExpandedReplyId] = useState<number | null>(null);
   const [postDraft, setPostDraft] = useState('');
+  const [statusDraft, setStatusDraft] = useState('');
+  const [statusImageName, setStatusImageName] = useState('');
+  const [statusPollOptions, setStatusPollOptions] = useState(['', '', '']);
+  const [postPollOptions, setPostPollOptions] = useState(['', '', '']);
+  const [postImageName, setPostImageName] = useState('');
+  const [postImagePreview, setPostImagePreview] = useState('');
+  const [statusImagePreview, setStatusImagePreview] = useState('');
   const [eduCoins, setEduCoins] = useState(0);
   const [postType, setPostType] = useState<PostType>('text');
+  const [statusType, setStatusType] = useState<PostType>('text');
   const [creatorQuota, setCreatorQuota] = useState<Record<string, string[]>>({ [todayKey()]: [] });
   const [followedIds, setFollowedIds] = useState<string[]>(['riya', 'meera']);
   const [networkTab, setNetworkTab] = useState<'mutual' | 'followers' | 'following' | 'forYou'>('following');
   const [networkSearch, setNetworkSearch] = useState('');
   const [profile, setProfile] = useState({ name: 'Eduvora Member', username: 'eduvora_member', avatar: '🧑‍🎓', bio: 'Building digital skills daily.' });
-  const scrollContainerRef = useRef<HTMLDivElement | null>(null);
-  const replyInputRef = useRef<HTMLInputElement | null>(null);
-  const replyComposerRef = useRef<HTMLDivElement | null>(null);
-
-  const selectedMessage = useMemo(() => messages.find((message) => message.id === selectedMessageId) || messages[0], [messages, selectedMessageId]);
-  const allCreators = useMemo<Creator[]>(() => [{ id: 'me', username: profile.username, name: profile.name, avatar: profile.avatar, role: profile.bio, followers: 1, mutual: false, verified: true }, ...creators], [profile]);
-  const followingMessages = useMemo(() => messages.filter((message) => message.creatorId && followedIds.includes(message.creatorId)), [messages, followedIds]);
-  const isPostUsedToday = (creatorQuota[todayKey()]?.length || 0) > 0;
+  const [showStatusActions, setShowStatusActions] = useState(false);
+  const scrollContainerRef = useRef<HTMLElement>(null);
+  const replyInputRef = useRef<HTMLInputElement>(null);
+  const replyComposerRef = useRef<HTMLDivElement>(null);
+  const selectedMessage = messages.find((message) => message.id === selectedMessageId) || messages[0];
+  const selectedStatus = statusCards.find((status) => status.id === selectedStatusId) || statusCards[0];
+  const allCreators = useMemo(() => creators.map((creator) => creator.id === 'me' ? { ...creator, name: profile.name, username: profile.username, avatar: profile.avatar } : creator), [profile]);
+  const followingMessages = messages.filter((message) => message.creatorId && (followedIds.includes(message.creatorId) || message.creatorId === 'me'));
+  const isPostUsedToday = (creatorQuota[todayKey()] || []).length > 0;
+  const myStatuses = statusCards.filter((status) => status.ownerId === 'me');
+  const chatCreators = allCreators.filter((creator) => sharedStories.some((story) => story.recipientId === creator.id));
+  const activeChatCreator = allCreators.find((creator) => creator.id === selectedChatId) || chatCreators[0] || allCreators[0];
+  const activeChatStories = sharedStories.filter((story) => story.recipientId === activeChatCreator?.id);
+  const shouldShowStatusDetail = (card: StatusCard) => card.body.length > 140 || Boolean(card.imagePreview && card.body.trim().length > 0);
 
   const pushPage = (nextPage: CommunityPage) => {
+    setShowStatusActions(false);
+    setShareStatusId(null);
     setExpandedReplyId(null);
     setPageStack((stack) => [...stack, page]);
     setPage(nextPage);
@@ -74,21 +106,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
 
   const goBack = () => {
     setExpandedReplyId(null);
-    const previous = pageStack[pageStack.length - 1];
-    if (previous) {
+    if (pageStack.length) {
+      const previous = pageStack[pageStack.length - 1];
       setPage(previous);
       setPageStack((stack) => stack.slice(0, -1));
       return;
     }
     onClose?.();
-  };
-
-  const goHomeFeed = () => {
-    setExpandedReplyId(null);
-    setActiveView('feed');
-    setPage('chat');
-    setPageStack([]);
-    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   useEffect(() => {
@@ -99,7 +123,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
     let lastPointerY = Number.POSITIVE_INFINITY;
 
     const setChromeHidden = (hidden: boolean) => {
-      const dockHiddenValue = hidden || expandedReplyId !== null ? 'true' : 'false';
+      const dockHiddenValue = hidden || expandedReplyId !== null || page === 'statusReel' ? 'true' : 'false';
       const replyHiddenValue = hidden && expandedReplyId === null ? 'true' : 'false';
       const dock = getDock();
       if (dock) dock.dataset.hidden = dockHiddenValue;
@@ -158,7 +182,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
     document.addEventListener('mouseleave', onPointerLeave);
     const dock = getDock();
     if (dock) {
-      dock.dataset.hidden = 'false';
+      dock.dataset.hidden = page === 'statusReel' ? 'true' : 'false';
       dock.dataset.scrollHidden = 'false';
       dock.dataset.pointerReveal = 'false';
       dock.dataset.lastY = String(scrollContainer?.scrollTop || 0);
@@ -188,6 +212,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
 
   const switchView = (view: CommunityView) => {
     setExpandedReplyId(null);
+    setShowStatusActions(false);
     setActiveView(view);
     setPage('chat');
     setPageStack([]);
@@ -207,6 +232,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
     if (window.matchMedia('(max-width: 767px)').matches) pushPage('thread');
   };
 
+  const openStatusReel = (statusId: number) => {
+    setSelectedStatusId(statusId);
+    setActiveView('status');
+    pushPage('statusReel');
+  };
+
   const submitReply = (messageId: number) => {
     const draft = (replyDrafts[messageId] || '').trim();
     if (!draft) return;
@@ -219,22 +250,76 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
 
   const submitCreatorPost = () => {
     const draft = postDraft.trim();
+    const cleanedOptions = postPollOptions.map((option) => option.trim()).filter(Boolean);
     if (!draft || isPostUsedToday) return;
+    if (postType === 'poll' && cleanedOptions.length < 2) return;
     const labels: Record<PostType, { badge: string; title: string; avatar: string }> = {
       text: { badge: 'Creator text · +1 EduCoin', title: `${profile.name} shared a note`, avatar: profile.avatar },
       image: { badge: 'Creator image · +1 EduCoin', title: `${profile.name} shared an image idea`, avatar: profile.avatar },
       poll: { badge: 'Creator poll · +1 EduCoin', title: `${profile.name} opened a poll`, avatar: profile.avatar },
     };
     const meta = labels[postType];
-    const newMessage: FeedMessage = { id: Date.now(), admin: profile.name, badge: meta.badge, avatar: meta.avatar, title: meta.title, body: draft, time: 'Just now', creatorId: 'me', postType, reactions: ['🪙 +1', '❤️ 0', '💬 0'], replies: [] };
+    const newMessage: FeedMessage = {
+      id: Date.now(),
+      admin: profile.name,
+      badge: meta.badge,
+      avatar: meta.avatar,
+      title: meta.title,
+      body: draft,
+      time: 'Just now',
+      creatorId: 'me',
+      postType,
+      imagePreview: postType === 'image' ? (postImagePreview || '🖼️') : undefined,
+      imageLayout: postType === 'image' ? 'thumbnail' : undefined,
+      pollOptions: postType === 'poll' ? cleanedOptions : undefined,
+      pollVotes: postType === 'poll' ? cleanedOptions.map(() => 0) : undefined,
+      reactions: [],
+      likeCount: 0,
+      replies: [],
+    };
     setMessages((current) => [newMessage, ...current]);
     setCreatorQuota((current) => ({ ...current, [todayKey()]: [postType] }));
     setEduCoins((coins) => coins + 1);
     setPostDraft('');
+    setPostImageName('');
+    setPostImagePreview('');
+    setPostPollOptions(['', '', '']);
     setSelectedMessageId(newMessage.id);
     setActiveView('feed');
     setPage('chat');
     setPageStack([]);
+  };
+
+  const submitStatus = () => {
+    const draft = statusDraft.trim();
+    const cleanedOptions = statusPollOptions.map((option) => option.trim()).filter(Boolean);
+    if (!draft && statusType !== 'image') return;
+    if (statusType === 'poll' && cleanedOptions.length < 2) return;
+    const title = statusType === 'image' ? (statusImageName || 'Image story') : draft.slice(0, 54) || 'Fresh status';
+    const statusId = Date.now();
+    const createdStatusCard: StatusCard = {
+      id: statusId,
+      title,
+      body: draft || 'Image story uploaded for today\'s community streak.',
+      gradient: statusTone[statusType],
+      likedBy: 0,
+      views: 0,
+      slots: `${statusType[0].toUpperCase()}${statusType.slice(1)} · Just now`,
+      type: statusType,
+      ownerId: 'me',
+      imagePreview: statusType === 'image' ? (statusImagePreview || '🖼️') : undefined,
+      imageLayout: statusType === 'image' ? 'original' : undefined,
+      pollOptions: statusType === 'poll' ? cleanedOptions : undefined,
+      pollVotes: statusType === 'poll' ? cleanedOptions.map(() => 0) : undefined,
+    };
+    setStatusCards((current) => [createdStatusCard, ...current]);
+    setSelectedStatusId(statusId);
+    setStatusDraft('');
+    setStatusImageName('');
+    setStatusImagePreview('');
+    setStatusPollOptions(['', '', '']);
+    setActiveView('status');
+    setPage('statusReel');
   };
 
   const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -247,41 +332,202 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
     reader.readAsDataURL(file);
   };
 
+  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>, setName: (value: string) => void, setPreview: (value: string) => void) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === 'string') setPreview(reader.result);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const renderUploadedImage = (src: string, alt: string, mode: 'thumbnail' | 'original' = 'original', className = '') => {
+    const isRealImage = isImageAvatar(src);
+    if (!isRealImage) return <button type="button" onClick={() => setImageLightbox({ src, alt, mode })} className={`flex h-full w-full items-center justify-center text-7xl ${className}`}>{src}</button>;
+    const imageClass = mode === 'thumbnail' ? 'h-full w-full object-cover' : 'max-h-full max-w-full object-contain';
+    return <button type="button" onClick={() => setImageLightbox({ src, alt, mode })} className="flex h-full w-full items-center justify-center"><img src={src} alt={alt} className={`${imageClass} ${className}`} /></button>;
+  };
+
+  const toggleStatusLike = (statusId: number) => {
+    const alreadyLiked = likedStatuses.includes(statusId);
+    setLikedStatuses((current) => alreadyLiked ? current.filter((id) => id !== statusId) : [...current, statusId]);
+    setStatusCards((current) => current.map((status) => status.id === statusId ? { ...status, likedBy: Math.max(0, status.likedBy + (alreadyLiked ? -1 : 1)) } : status));
+  };
+
+  const toggleMessageLike = (messageId: number) => {
+    const alreadyLiked = likedMessages.includes(messageId);
+    setLikedMessages((current) => alreadyLiked ? current.filter((id) => id !== messageId) : [...current, messageId]);
+    setMessages((current) => current.map((message) => message.id === messageId ? { ...message, likeCount: Math.max(0, (message.likeCount || 0) + (alreadyLiked ? -1 : 1)) } : message));
+  };
+
+
+  const voteOnStatusPoll = (statusId: number, optionIndex: number) => {
+    setStatusCards((current) => current.map((status) => {
+      if (status.id !== statusId || !status.pollOptions) return status;
+      if (status.selectedPollOption !== undefined) return status;
+      const votes = status.pollVotes || status.pollOptions.map(() => 0);
+      return { ...status, selectedPollOption: optionIndex, pollVotes: votes.map((count, index) => index === optionIndex ? count + 1 : count) };
+    }));
+  };
+
+  const voteOnMessagePoll = (messageId: number, optionIndex: number) => {
+    setMessages((current) => current.map((message) => {
+      if (message.id !== messageId || !message.pollOptions) return message;
+      if (message.selectedPollOption !== undefined) return message;
+      const votes = message.pollVotes || message.pollOptions.map(() => 0);
+      return { ...message, selectedPollOption: optionIndex, pollVotes: votes.map((count, index) => index === optionIndex ? count + 1 : count) };
+    }));
+  };
+
+  const shareStatusWithCreator = (statusId: number, recipientId: string) => {
+    const sharedStory: SharedStory = { id: Date.now() + Math.floor(Math.random() * 1000), statusId, recipientId, senderId: 'me', senderName: profile.name, time: 'Just now' };
+    setSharedStories((current) => [sharedStory, ...current]);
+    setSelectedChatId(recipientId);
+  };
+
+
   const MessageSummaryCard: React.FC<{ message: FeedMessage; isActive?: boolean }> = ({ message, isActive = false }) => (
-    <article className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition duration-300 ${isActive ? 'scale-[1.018] border-blue-300 shadow-[0_18px_48px_rgba(37,99,235,0.14)] ring-2 ring-blue-100' : 'border-slate-200 hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_16px_40px_rgba(37,99,235,0.10)]'}`}>
-      <button type="button" onClick={() => openMessage(message.id)} className={`flex w-full items-center gap-3 border-l-4 p-3 text-left transition sm:p-4 ${isActive ? 'border-blue-700 bg-blue-50' : 'border-transparent'}`}>
+    <article className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition duration-300 ${isActive ? 'scale-[1.012] border-sky-200 shadow-[0_18px_48px_rgba(14,165,233,0.10)] ring-2 ring-sky-50' : 'border-slate-200 hover:-translate-y-0.5 hover:border-sky-100 hover:shadow-[0_16px_40px_rgba(14,165,233,0.08)]'}`}>
+      <button type="button" onClick={() => openMessage(message.id)} className={`flex w-full items-center gap-3 border-l-4 p-3 text-left transition sm:p-4 ${isActive ? 'border-sky-400 bg-sky-50/55' : 'border-transparent'}`}>
         <Avatar value={resolveAvatar(message)} size="h-11 w-11" />
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-sm font-black text-slate-950 sm:text-base">{message.title}</h3>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-[11px] font-bold text-slate-500"><span>{resolveName(message)}</span><span>•</span><span>{message.time}</span><span className="rounded-full border border-blue-100 px-2 py-0.5 text-blue-800">{message.badge}</span></div>
-          <div className="mt-2 flex flex-wrap gap-1.5">{message.reactions.slice(0, 2).map((reaction) => <span key={reaction} className="rounded-full bg-blue-50 px-2 py-1 text-[11px] font-black text-blue-800">{reaction}</span>)}<span className="rounded-full bg-cyan-50 px-2 py-1 text-[11px] font-black text-cyan-800">💬 {message.replies.length}</span></div>
+          <h3 className="truncate text-base font-black text-slate-950 sm:text-lg">{message.title}</h3>
+          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-slate-500 sm:text-sm"><span>{resolveName(message)}</span><span>•</span><span>{message.time}</span><span className="rounded-full border border-sky-100 px-2 py-0.5 text-sky-700">{message.badge}</span></div>
+          <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-slate-600 sm:text-[15px]">{message.body}</p>
+          <div className="mt-2 flex flex-wrap gap-1.5"><span className="rounded-full bg-rose-50 px-2 py-1 text-[11px] font-black text-rose-700">❤️ {message.likeCount || 0}</span><span className="rounded-full bg-cyan-50 px-2 py-1 text-[11px] font-black text-cyan-700">💬 {message.replies.length}</span></div>
         </div>
       </button>
     </article>
   );
 
   const renderMessageDetails = (message: FeedMessage, fullScreen = false) => (
-    <div className={`flex min-h-0 flex-col overflow-visible bg-white ${fullScreen ? 'min-h-[calc(100dvh-9rem)]' : 'min-h-full rounded-[1.75rem] border border-slate-200 shadow-[0_16px_48px_rgba(15,23,42,0.07)]'}`}>
-      <div className="p-4 pb-6 lg:p-7">
+    <div className={`flex min-h-0 flex-col overflow-hidden bg-white ${fullScreen ? 'h-[calc(100dvh-10rem)]' : 'h-[calc(100dvh-11rem)] rounded-[1.75rem] border border-slate-200 shadow-[0_16px_48px_rgba(15,23,42,0.07)]'}`}>
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 pb-6 custom-scrollbar lg:p-7">
         <div className="flex items-start gap-3">
           <Avatar value={resolveAvatar(message)} />
-          <div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><h2 className="font-black text-slate-950 sm:text-lg">{resolveName(message)}</h2><span className="rounded-full border border-blue-100 bg-white px-2.5 py-1 text-[11px] font-black text-blue-800">{message.badge}</span><span className="text-xs font-bold text-slate-500">{message.time}</span></div><h3 className="mt-3 text-xl font-black tracking-tight text-slate-950 lg:text-3xl">{message.title}</h3><p className="mt-3 text-sm leading-7 text-slate-700 sm:text-base">{message.body}</p><div className="mt-5 flex flex-wrap items-center gap-2">{message.reactions.map((reaction) => <button type="button" key={reaction} className="rounded-full border border-slate-100 bg-white px-3 py-1.5 text-xs font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 hover:bg-blue-50">{reaction}</button>)}<span className="rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-black text-cyan-800">💬 {message.replies.length} Replies</span></div></div>
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-black text-slate-950 sm:text-xl">{resolveName(message)}</h2><span className="rounded-full border border-sky-100 bg-white px-2.5 py-1 text-[11px] font-black text-sky-700">{message.badge}</span><span className="text-xs font-bold text-slate-500">{message.time}</span></div>
+            <h3 className="mt-3 text-2xl font-black tracking-tight text-slate-950 lg:text-4xl">{message.title}</h3>
+            <p className="mt-3 whitespace-pre-wrap text-base font-semibold leading-8 text-slate-600 sm:text-lg">{message.body}</p>{message.imagePreview ? <div className="mt-5 aspect-square max-w-md overflow-hidden rounded-[2rem] border border-sky-100 bg-gradient-to-br from-sky-100 via-white to-cyan-100 shadow-inner">{renderUploadedImage(message.imagePreview, message.title, message.imageLayout || 'thumbnail')}</div> : null}{message.pollOptions ? <div className="mt-5 space-y-3 rounded-[1.6rem] border border-emerald-100 bg-emerald-50/50 p-4">{message.pollOptions.map((option, index) => { const votes = message.pollVotes || message.pollOptions!.map(() => 0); const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0)); const percent = Math.round((votes[index] / total) * 100); const selected = message.selectedPollOption === index; return <button key={option} type="button" onClick={() => voteOnMessagePoll(message.id, index)} className={`relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left font-black transition ${selected ? 'border-emerald-400 bg-white text-emerald-800' : 'border-emerald-100 bg-white/80 text-slate-800 hover:border-emerald-300'}`}><span className="absolute inset-y-0 left-0 bg-emerald-200/50" style={{ width: message.selectedPollOption !== undefined ? `${percent}%` : '0%' }} /><span className="relative flex items-center justify-between"><span>{option}</span>{message.selectedPollOption !== undefined ? <span>{percent}% · {votes[index]}</span> : <span>Vote</span>}</span></button>; })}</div> : null}
+            <div className="mt-5 flex flex-wrap gap-2"><button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-3 py-1.5 text-sm font-black transition ${likedMessages.includes(message.id) ? 'border-rose-200 bg-rose-50 text-rose-700' : 'border-sky-100 bg-sky-50 text-sky-700'}`}>❤️ {message.likeCount || 0}</button><span className="rounded-full border border-cyan-100 bg-cyan-50 px-3 py-1.5 text-sm font-black text-cyan-700">💬 {message.replies.length}</span></div>
+          </div>
         </div>
-        <div className="mt-5 space-y-3 pb-4">{message.replies.map((reply) => <div key={reply.id} className="flex items-start gap-3"><Avatar value={reply.avatar || (reply.author === profile.name ? profile.avatar : '👤')} size="h-9 w-9" className="mt-1 text-base shadow-[0_8px_24px_rgba(37,99,235,0.12)]" /><div className="max-w-[92%] flex-1 rounded-[1.35rem] rounded-bl-md border border-blue-200 border-l-4 border-l-slate-900/60 bg-gradient-to-br from-white via-blue-50 to-slate-50 px-4 py-3 shadow-[0_16px_42px_rgba(15,23,42,0.12)] ring-1 ring-blue-100 sm:px-5"><div className="flex items-center justify-between gap-3"><span className="text-sm font-black text-blue-950">{reply.author}</span><span className="text-[11px] font-bold text-slate-500">{reply.time}</span></div><p className="mt-1 text-sm leading-6 text-slate-700">{reply.text}</p></div></div>)}</div>
+        <div className="mt-5 space-y-3 pb-4">{message.replies.map((reply) => <div key={reply.id} className="flex items-start gap-3"><Avatar value={reply.avatar || (reply.author === profile.name ? profile.avatar : '👤')} size="h-9 w-9" className="mt-1 text-base shadow-[0_8px_24px_rgba(37,99,235,0.12)]" /><div className="max-w-[92%] flex-1 rounded-[1.35rem] rounded-bl-md border border-sky-100 border-l-4 border-l-slate-900/60 bg-gradient-to-br from-white via-sky-50 to-slate-50 px-4 py-3 shadow-[0_10px_32px_rgba(15,23,42,0.06)]"><div className="flex flex-wrap items-center gap-2"><span className="font-black text-slate-950">{reply.author}</span><span className="text-xs font-bold text-slate-400">{reply.time}</span></div><p className="mt-1 text-sm font-semibold leading-6 text-slate-600 sm:text-base">{reply.text}</p></div></div>)}</div>
       </div>
-      {expandedReplyId === message.id ? <div ref={replyComposerRef} data-community-replybar="true" className="fixed bottom-[calc(env(safe-area-inset-bottom)+7.75rem)] left-3 right-3 z-[1600] rounded-[1.65rem] border border-blue-100 bg-white/95 p-3 shadow-[0_24px_80px_rgba(15,23,42,0.20)] backdrop-blur-2xl transition-all duration-500 data-[hidden=true]:translate-y-8 data-[hidden=true]:opacity-0 md:bottom-28 md:left-auto md:right-8 md:w-[min(760px,calc(100vw-4rem))]"><div className="flex items-center gap-2 rounded-2xl border border-blue-100 bg-white p-2 shadow-inner"><Avatar value={profile.avatar} size="h-10 w-10" className="hidden text-base sm:flex" /><input ref={replyInputRef} value={replyDrafts[message.id] || ''} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value }))} onKeyDown={(event) => { if (event.key === 'Enter') submitReply(message.id); }} placeholder="Write a thread reply..." className="min-w-0 flex-1 bg-transparent px-3 py-3 text-sm font-semibold text-slate-800 outline-none placeholder:text-slate-400" /><button type="button" onClick={() => setExpandedReplyId(null)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-500 transition hover:bg-slate-50">Close</button><button type="button" onClick={() => submitReply(message.id)} className="rounded-xl bg-blue-700 px-4 py-3 text-xs font-black text-white shadow-lg shadow-blue-700/20 transition hover:-translate-y-0.5 hover:bg-blue-800">Send</button></div></div> : <button data-community-replybar="true" type="button" onClick={() => setExpandedReplyId(message.id)} className="fixed bottom-[calc(env(safe-area-inset-bottom)+7.75rem)] left-1/2 z-[1600] -translate-x-1/2 rounded-full border border-slate-900/15 bg-gradient-to-r from-blue-800 to-blue-600 px-5 py-4 text-sm font-black text-white shadow-[0_22px_58px_rgba(15,23,42,0.28)] ring-2 ring-blue-200 transition-all duration-300 hover:-translate-y-1 hover:bg-blue-800 data-[hidden=true]:translate-y-8 md:left-auto md:right-8 md:translate-x-0 data-[hidden=true]:opacity-0 md:bottom-28">💬 Reply</button>}
+      {expandedReplyId === message.id ? <div ref={replyComposerRef} data-community-replybar="true" className="fixed bottom-[calc(env(safe-area-inset-bottom)+7.75rem)] left-3 right-3 z-[1600] rounded-[1.65rem] border border-sky-100 bg-white/95 p-3 shadow-[0_24px_80px_rgba(15,23,42,0.20)] backdrop-blur-2xl transition-all duration-500 data-[hidden=true]:translate-y-8 data-[hidden=true]:opacity-0 md:bottom-28 md:left-auto md:right-8 md:w-[min(760px,calc(100vw-4rem))]"><div className="flex items-center gap-2"><input ref={replyInputRef} value={replyDrafts[message.id] || ''} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value }))} placeholder="Write a quick reply..." maxLength={1000} className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-bold outline-none transition focus:border-sky-300 focus:bg-white" /><button type="button" onClick={() => submitReply(message.id)} className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5">Send</button></div></div> : <div className="shrink-0 border-t border-slate-100 bg-white/95 p-3 backdrop-blur-xl lg:p-4"><button type="button" onClick={() => setExpandedReplyId(message.id)} className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-left text-sm font-black text-slate-700 transition hover:bg-sky-50">💬 Reply to this thread</button></div>}
     </div>
   );
 
   const renderFeedLayout = (feedMessages: FeedMessage[], title = 'Chats', subtitle = 'Thin updates. Click to expand on the right.') => {
     const activeMessage = feedMessages.find((message) => message.id === selectedMessageId) || feedMessages[0];
     const isFollowingFeed = title.toLowerCase().includes('followers');
-    const heroGradient = isFollowingFeed ? 'from-fuchsia-600 via-violet-600 to-sky-500' : 'from-slate-950 via-blue-900 to-cyan-600';
+    const heroGradient = isFollowingFeed ? 'from-fuchsia-500 via-violet-500 to-sky-400' : 'from-slate-900 via-sky-800 to-cyan-500';
     const heroEyebrow = isFollowingFeed ? 'Following pulse' : 'Chat feed live';
     const heroIcon = isFollowingFeed ? '👥' : '💬';
-    if (!feedMessages.length) return <div className="mx-auto max-w-5xl rounded-[2rem] border border-dashed border-blue-300 bg-gradient-to-br from-blue-50 via-white to-fuchsia-50 p-8 text-center font-bold text-slate-600 shadow-[0_18px_54px_rgba(37,99,235,0.10)]"><div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white text-3xl shadow-inner">👀</div>Follow creators to build this feed.</div>;
-    return <div className="mx-auto grid w-full max-w-[1800px] gap-5 md:min-h-[calc(100dvh-10rem)] md:grid-cols-[minmax(300px,440px)_1fr]"><aside className="hidden min-h-0 overflow-y-auto rounded-[2rem] border border-white/80 bg-white/90 p-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] ring-1 ring-blue-100/70 backdrop-blur-xl custom-scrollbar md:block"><div className={`relative mb-4 overflow-hidden rounded-[1.6rem] bg-gradient-to-br ${heroGradient} p-5 text-white shadow-[0_18px_50px_rgba(37,99,235,0.22)]`}><div className="absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/20 blur-2xl" /><div className="absolute -bottom-10 left-12 h-28 w-28 rounded-full bg-cyan-200/30 blur-2xl" /><div className="relative flex items-start justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/70">{heroEyebrow}</p><h2 className="mt-2 text-2xl font-black tracking-tight">{title}</h2><p className="mt-2 text-xs font-bold leading-5 text-white/80">{subtitle}</p></div><span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/25 bg-white/20 text-3xl shadow-inner backdrop-blur-xl">{heroIcon}</span></div><div className="relative mt-4 grid grid-cols-3 gap-2 text-center"><span className="rounded-2xl border border-white/20 bg-white/15 px-2 py-2 text-[11px] font-black backdrop-blur-xl">🔥 Daily</span><span className="rounded-2xl border border-white/20 bg-white/15 px-2 py-2 text-[11px] font-black backdrop-blur-xl">💬 Reply</span><span className="rounded-2xl border border-white/20 bg-white/15 px-2 py-2 text-[11px] font-black backdrop-blur-xl">🪙 Earn</span></div></div><div className="space-y-2">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} isActive={message.id === activeMessage.id} />)}</div></aside><section className="hidden min-h-0 md:block">{renderMessageDetails(activeMessage)}</section><section className="space-y-3 md:hidden"><div className={`relative overflow-hidden rounded-[1.6rem] bg-gradient-to-br ${heroGradient} p-5 text-white shadow-[0_18px_50px_rgba(37,99,235,0.22)]`}><div className="absolute -right-8 -top-10 h-32 w-32 rounded-full bg-white/20 blur-2xl" /><div className="relative flex items-center justify-between gap-3"><div><p className="text-[10px] font-black uppercase tracking-[0.26em] text-white/70">{heroEyebrow}</p><h2 className="mt-2 text-2xl font-black tracking-tight">{title}</h2><p className="mt-2 text-xs font-bold leading-5 text-white/80">{subtitle}</p></div><span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-white/25 bg-white/20 text-3xl shadow-inner">{heroIcon}</span></div></div>{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)}</section></div>;
+    if (!feedMessages.length) return <div className="mx-auto max-w-5xl rounded-[2rem] border border-dashed border-sky-300 bg-gradient-to-br from-sky-50 via-white to-fuchsia-50 p-8 text-center font-bold text-slate-600 shadow-[0_18px_54px_rgba(37,99,235,0.10)]"><div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white text-3xl shadow-inner">👀</div>Follow creators to build this feed.</div>;
+    return <div className="mx-auto grid h-[calc(100dvh-10.5rem)] w-full max-w-[1800px] gap-5 overflow-hidden md:grid-cols-[minmax(300px,440px)_1fr]"><aside className="hidden h-full min-h-0 overflow-y-auto rounded-[2rem] border border-white/80 bg-white/90 p-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] ring-1 ring-sky-100/70 backdrop-blur-xl custom-scrollbar md:block"><div className={`relative mb-4 overflow-hidden rounded-[1.6rem] bg-gradient-to-br ${heroGradient} p-5 text-white shadow-[0_18px_50px_rgba(37,99,235,0.18)]`}><div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/20 blur-2xl" /><p className="relative text-xs font-black uppercase tracking-[0.28em] text-white/80">{heroEyebrow}</p><h2 className="relative mt-2 text-3xl font-black tracking-tight">{heroIcon} {title}</h2><p className="relative mt-2 text-sm font-semibold leading-6 text-white/78">{subtitle}</p></div><div className="space-y-3">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} isActive={activeMessage?.id === message.id} />)}</div></aside><section className="hidden min-h-0 overflow-hidden md:block">{activeMessage ? renderMessageDetails(activeMessage) : null}</section><div className="h-full space-y-3 overflow-y-auto pb-4 custom-scrollbar md:hidden">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)}</div></div>;
   };
+
+  const renderTypeComposer = (activeType: PostType, setActiveType: (type: PostType) => void, accent: 'sky' | 'orange' = 'sky') => {
+    const activeClass = accent === 'orange'
+      ? 'border-orange-200 bg-white shadow-[0_18px_42px_rgba(249,115,22,0.16)] ring-2 ring-white'
+      : 'border-sky-200 bg-white shadow-[0_18px_42px_rgba(14,165,233,0.14)] ring-2 ring-white';
+
+    return (
+      <div className="grid gap-3 sm:grid-cols-3">
+        {postOptions.map((option) => (
+          <button key={option.type} type="button" onClick={() => setActiveType(option.type)} className={`rounded-[1.35rem] border p-4 text-left transition duration-300 hover:-translate-y-1 ${activeType === option.type ? activeClass : 'border-white/50 bg-white/55 hover:bg-white'}`}>
+            <span className="text-3xl">{option.icon}</span>
+            <span className="mt-3 block text-lg font-black text-slate-950">{option.label}</span>
+            <span className="mt-1 block text-sm font-bold text-slate-500">{option.helper}</span>
+          </button>
+        ))}
+      </div>
+    );
+  };
+
+  const renderUploadFields = (type: PostType, draft: string, setDraft: (value: string) => void, isStatus = false) => {
+    const imageName = isStatus ? statusImageName : postImageName;
+    const imagePreview = isStatus ? statusImagePreview : postImagePreview;
+    const setImageName = isStatus ? setStatusImageName : setPostImageName;
+    const setImagePreview = isStatus ? setStatusImagePreview : setPostImagePreview;
+    const options = isStatus ? statusPollOptions : postPollOptions;
+    const setOptions = isStatus ? setStatusPollOptions : setPostPollOptions;
+
+    if (type === 'image') {
+      return <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]"><label className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-[1.75rem] border-2 border-dashed border-sky-200 bg-white/70 p-4 text-center shadow-inner transition hover:bg-white"><input type="file" accept="image/*" className="hidden" onChange={(event) => handleImageUpload(event, setImageName, setImagePreview)} /><span className={`${isStatus ? 'min-h-44 w-full' : 'aspect-square w-36'} flex overflow-hidden rounded-[2rem] bg-gradient-to-br from-sky-100 to-cyan-100 shadow-inner`}>{imagePreview ? renderUploadedImage(imagePreview, imageName || 'Uploaded preview', isStatus ? 'original' : 'thumbnail') : <span className="m-auto text-5xl">🖼️</span>}</span><span className="mt-3 text-lg font-black text-slate-950">{isStatus ? 'Upload original-ratio image' : 'Upload thumbnail image'}</span><span className="mt-1 text-sm font-bold text-slate-500">{imageName || (isStatus ? 'Original ratio will be preserved' : 'Thumbnail will be square cropped')}</span></label><textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 1000))} maxLength={1000} placeholder={isStatus ? 'Add image status caption...' : 'Describe your image post...'} className="min-h-[180px] rounded-[1.75rem] border border-slate-200 bg-white/80 px-5 py-4 text-base font-semibold leading-7 outline-none transition focus:border-sky-300 focus:bg-white" /></div>;
+    }
+    if (type === 'poll') {
+      return <div className="space-y-4"><textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 1000))} maxLength={1000} placeholder={isStatus ? 'Ask your status poll question...' : 'Write your poll question...'} className="min-h-[120px] w-full rounded-[1.75rem] border border-slate-200 bg-white/80 px-5 py-4 text-base font-semibold leading-7 outline-none transition focus:border-emerald-300 focus:bg-white" /><div className="grid gap-3 sm:grid-cols-3">{options.map((option, index) => <input key={index} value={option} onChange={(event) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder={`Option ${index + 1}`} className="rounded-2xl border border-emerald-100 bg-white/80 px-4 py-3 text-sm font-bold outline-none focus:border-emerald-300" />)}</div></div>;
+    }
+    return <textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 1000))} maxLength={1000} placeholder={isStatus ? 'Write your daily text status...' : 'Write your daily creator post...'} className="min-h-[190px] w-full rounded-[1.75rem] border border-slate-200 bg-white/80 px-5 py-4 text-base font-semibold leading-7 outline-none transition focus:border-orange-300 focus:bg-white" />;
+  };
+
+  const renderStatusPoll = (card: StatusCard) => card.pollOptions ? <div className="mt-4 space-y-2">{card.pollOptions.map((option, index) => { const votes = card.pollVotes || card.pollOptions!.map(() => 0); const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0)); const percent = Math.round((votes[index] / total) * 100); const selected = card.selectedPollOption === index; return <button key={option} type="button" onClick={() => voteOnStatusPoll(card.id, index)} className={`relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left text-sm font-black shadow-inner transition sm:text-base ${selected ? 'border-white bg-white text-slate-950' : 'border-white/20 bg-white/15 text-white hover:bg-white/24'}`}><span className="absolute inset-y-0 left-0 bg-white/30" style={{ width: card.selectedPollOption !== undefined ? `${percent}%` : '0%' }} /><span className="relative flex items-center justify-between gap-3"><span className="min-w-0 flex-1 truncate"><span className="mr-2 opacity-70">{index + 1}.</span>{option}</span>{card.selectedPollOption !== undefined ? <span className="shrink-0">{percent}% · {votes[index]}</span> : <span className="shrink-0">Vote</span>}</span></button>; })}</div> : null;
+
+  const renderStatusReelContent = (card: StatusCard) => {
+    const hasDetail = shouldShowStatusDetail(card);
+    const title = card.title.length > 64 ? `${card.title.slice(0, 64)}...` : card.title;
+    const preview = hasDetail ? `${card.body.slice(0, card.imagePreview ? 96 : 150)}...` : card.body;
+
+    return <div className="min-h-0 flex-1 overflow-hidden"><div className="min-h-0 max-h-[62dvh] overflow-y-auto pr-1 custom-scrollbar">{card.imagePreview ? <div className={`mb-4 ${card.imageLayout === 'original' ? 'h-[min(34dvh,320px)] w-full' : 'mx-auto aspect-square w-full max-w-[320px]'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-white/14 shadow-2xl`}>{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'original')}</div> : null}<h2 className="line-clamp-3 text-2xl font-black tracking-tight sm:text-4xl">{title}</h2>{card.body ? <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-white/88 sm:text-base sm:leading-7">{preview}</p> : null}{hasDetail ? <button type="button" onClick={() => { setSelectedStatusId(card.id); pushPage('statusDetail'); }} className="mt-4 rounded-full border border-white/25 bg-white/18 px-4 py-2 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/28">Learn more</button> : null}{renderStatusPoll(card)}</div></div>;
+  };
+
+  const renderStatusTile = (card: StatusCard) => (
+    <button key={card.id} type="button" onClick={() => openStatusReel(card.id)} className="group relative aspect-[9/14] overflow-hidden rounded-[1.8rem] border border-white/80 bg-white p-3 text-left shadow-[0_18px_52px_rgba(15,23,42,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
+      <div className={`absolute inset-2 rounded-[1.35rem] bg-gradient-to-br ${card.gradient} transition duration-500 group-hover:scale-[1.04]`} />
+      <div className="absolute inset-2 rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.30),rgba(255,255,255,0.04)_38%,rgba(15,23,42,0.60))]" />
+      <div className="relative flex h-full flex-col justify-between p-2 text-white">
+        <span className="w-max rounded-full border border-white/70 bg-white/80 px-3 py-1 text-[10px] font-black text-slate-800 shadow-sm backdrop-blur-xl">{card.slots}</span>
+        <div>{card.imagePreview ? <div className="mb-5 aspect-square w-24 overflow-hidden rounded-2xl bg-white/18 shadow-inner">{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'thumbnail')}</div> : null}<h3 className="line-clamp-2 text-xl font-black tracking-tight drop-shadow sm:text-2xl">{card.title}</h3><p className="mt-2 line-clamp-2 text-sm font-bold text-white/86">{card.body}</p><p className="mt-3 w-max rounded-full border border-white/60 bg-white/85 px-3 py-1 text-[11px] font-black text-slate-800 shadow-sm backdrop-blur-xl">❤️ {card.likedBy} · 👁️ {card.views}</p></div>
+      </div>
+    </button>
+  );
+
+  const renderStatusReel = () => {
+    const selectedIndex = Math.max(0, statusCards.findIndex((card) => card.id === selectedStatus.id));
+    const reelStatuses = [...statusCards.slice(selectedIndex), ...statusCards.slice(0, selectedIndex)];
+
+    return (
+      <div className="fixed inset-0 z-[1500] bg-slate-950 text-white">
+      <button type="button" onClick={goBack} className="fixed left-4 top-4 z-20 rounded-full border border-white/20 bg-white/10 px-4 py-2 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/20">← Back</button>
+      <div className="h-full snap-y snap-mandatory overflow-y-auto scroll-smooth custom-scrollbar">
+        {reelStatuses.map((card) => (
+          <section key={card.id} className="relative flex h-[100dvh] snap-start items-center justify-center p-4" onMouseEnter={() => setSelectedStatusId(card.id)}>
+            <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient}`} />
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(255,255,255,0.36),transparent_24%),linear-gradient(180deg,rgba(2,6,23,0.06),rgba(2,6,23,0.72))]" />
+            <div className="relative grid w-full max-w-5xl items-center gap-5 md:grid-cols-[1fr_96px]">
+              <article className="mx-auto flex min-h-[74dvh] w-full max-w-[520px] flex-col justify-between rounded-[2.5rem] border border-white/20 bg-white/12 p-6 shadow-[0_32px_120px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
+                <div className="flex items-center justify-between gap-3"><span className="rounded-full border border-white/30 bg-white/18 px-4 py-2 text-xs font-black uppercase tracking-[0.22em]">{card.slots}</span><span className="text-sm font-black">{card.ownerId === 'me' ? 'Your status' : 'Community'}</span></div>
+                {renderStatusReelContent(card)}
+                <div className="flex items-center justify-between text-sm font-black text-white/80"><span>Swipe for next status</span><span>👁️ {card.views} views</span></div>
+              </article>
+              <div className="mx-auto flex flex-row justify-center gap-3 md:flex-col"><button type="button" onClick={() => toggleStatusLike(card.id)} className={`flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 ${likedStatuses.includes(card.id) ? 'bg-rose-500 text-white' : 'bg-white/12 text-white'} shadow-2xl backdrop-blur-xl transition hover:scale-105`}><span>❤️</span><span className="text-[11px] font-black">{card.likedBy}</span></button><button type="button" onClick={() => setShareStatusId(card.id)} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-white/12 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>↗️</span><span className="text-[11px] font-black">Share</span></button></div>
+            </div>
+          </section>
+        ))}
+      </div>
+      {shareStatusId !== null ? <div className="fixed inset-0 z-30 flex items-end justify-center bg-slate-950/45 p-4 backdrop-blur-sm sm:items-center"><div className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/20 bg-white text-slate-950 shadow-[0_28px_90px_rgba(0,0,0,0.35)]"><div className="bg-gradient-to-br from-slate-950 via-sky-900 to-cyan-700 p-5 text-white"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-100">Send story</p><h3 className="mt-2 text-2xl font-black">Share with followers</h3></div><button type="button" onClick={() => setShareStatusId(null)} className="rounded-full bg-white/15 px-3 py-2 text-sm font-black">✕</button></div><p className="mt-2 text-sm font-semibold text-white/75">Story chat abhi sirf shared stories dikhata hai — direct messages pending rakhe gaye hain.</p></div><div className="max-h-[55vh] space-y-2 overflow-y-auto p-3 custom-scrollbar">{allCreators.map((creator) => { const sent = sharedStories.some((story) => story.statusId === shareStatusId && story.recipientId === creator.id); return <button key={creator.id} type="button" onClick={() => shareStatusWithCreator(shareStatusId, creator.id)} className="flex w-full items-center gap-3 rounded-2xl border border-slate-100 bg-slate-50 p-3 text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"><Avatar value={creator.avatar} size="h-11 w-11" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-black text-slate-950">{creator.name}</span><span className="block truncate text-xs font-bold text-slate-500">@{creator.username}</span></span><span className={`rounded-full px-3 py-1 text-xs font-black ${sent ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-950 text-white'}`}>{sent ? 'Sent' : 'Send'}</span></button>; })}</div><button type="button" onClick={() => { setShareStatusId(null); pushPage('directChat'); }} className="m-3 mt-0 w-[calc(100%-1.5rem)] rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white">Open Chat</button></div></div> : null}
+      </div>
+    );
+  };
+
+  const openChatCreator = (creatorId: string) => {
+    setSelectedChatId(creatorId);
+    if (window.matchMedia('(max-width: 1023px)').matches) pushPage('directChatThread');
+  };
+
+  const renderChatPage = () => {
+    const sidebarCreators = chatCreators.length ? chatCreators : allCreators;
+
+    return <div className="mx-auto grid h-[calc(100dvh-10.5rem)] max-w-[1800px] overflow-hidden rounded-[2.4rem] border border-slate-200 bg-white shadow-[0_26px_80px_rgba(15,23,42,0.10)] lg:grid-cols-[380px_1fr]"><aside className="flex h-full min-h-0 flex-col border-b border-slate-200 bg-gradient-to-b from-slate-50 to-white lg:border-b-0 lg:border-r"><div className="border-b border-slate-200 p-5"><p className="text-xs font-black uppercase tracking-[0.28em] text-sky-600">Story inbox</p><h2 className="mt-2 text-3xl font-black tracking-tight">Chats</h2><p className="mt-2 text-sm font-bold leading-6 text-slate-500">Abhi yahan sirf shared stories dikhengi. Direct text chat baad mein enable hoga.</p></div><div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 custom-scrollbar">{sidebarCreators.map((creator) => { const count = sharedStories.filter((story) => story.recipientId === creator.id).length; const active = activeChatCreator?.id === creator.id; return <button key={creator.id} type="button" onClick={() => openChatCreator(creator.id)} className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${active ? 'border-sky-200 bg-sky-50 shadow-md' : 'border-transparent bg-white/70 hover:bg-white hover:shadow-sm'}`}><Avatar value={creator.avatar} size="h-12 w-12" /><span className="min-w-0 flex-1"><span className="block truncate text-base font-black text-slate-950">{creator.name}</span><span className="block truncate text-xs font-bold text-slate-500">{count ? `${count} shared ${count === 1 ? 'story' : 'stories'}` : 'No shared story yet'}</span></span>{count ? <span className="rounded-full bg-slate-950 px-2.5 py-1 text-xs font-black text-white">{count}</span> : null}</button>; })}</div></aside><section className="hidden min-h-0 flex-col bg-[radial-gradient(circle_at_18%_10%,rgba(14,165,233,0.10),transparent_28%),linear-gradient(180deg,#ffffff,#f8fafc)] lg:flex"><div className="flex items-center gap-3 border-b border-slate-200 bg-white/86 p-5 backdrop-blur-xl"><Avatar value={activeChatCreator?.avatar || '👤'} size="h-12 w-12" /><div className="min-w-0 flex-1"><h3 className="truncate text-2xl font-black text-slate-950">{activeChatCreator?.name || 'Story chat'}</h3><p className="text-sm font-bold text-slate-500">Stories shared with this follower appear here for both sides.</p></div><button type="button" onClick={() => { setActiveView('status'); setPage('chat'); }} className="rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:-translate-y-0.5">Share more</button></div><div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 custom-scrollbar sm:p-6">{activeChatStories.length ? activeChatStories.map((story) => { const status = statusCards.find((card) => card.id === story.statusId); if (!status) return null; return <div key={story.id} className="flex justify-end"><article className="max-w-[min(520px,92%)] overflow-hidden rounded-[2rem] rounded-br-md border border-slate-200 bg-white shadow-[0_18px_48px_rgba(15,23,42,0.10)]"><div className={`bg-gradient-to-br ${status.gradient} p-5 text-white`}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-white/82 px-3 py-1 text-xs font-black text-slate-800">{status.slots}</span><span className="text-xs font-black text-white/80">{story.time}</span></div>{status.imagePreview ? <div className="my-8 aspect-square overflow-hidden rounded-[1.5rem] bg-white/16 shadow-inner">{renderUploadedImage(status.imagePreview, status.title, status.imageLayout || 'thumbnail')}</div> : null}<h4 className="mt-16 text-3xl font-black tracking-tight">{status.title}</h4><p className="mt-3 text-sm font-semibold leading-6 text-white/84">{status.body}</p></div><div className="flex items-center justify-between gap-3 p-4"><p className="text-xs font-bold text-slate-500">Sent by {story.senderName}</p><button type="button" onClick={() => openStatusReel(status.id)} className="rounded-full bg-slate-950 px-4 py-2 text-xs font-black text-white">Open story</button></div></article></div>; }) : <div className="flex h-full items-center justify-center text-center"><div className="max-w-md rounded-[2rem] border border-dashed border-sky-200 bg-white/80 p-8 shadow-inner"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-sky-50 text-3xl">↗️</div><h3 className="mt-4 text-2xl font-black">No story shared yet</h3><p className="mt-2 text-sm font-bold leading-6 text-slate-500">Status reel mein Share dabao, follower select karo, phir story yahan chat mein dikhegi.</p></div></div>}</div><div className="border-t border-slate-200 bg-white/90 p-4 text-center text-xs font-black text-slate-500 backdrop-blur-xl">Text messages disabled · Stories only chat</div></section></div>;
+  };
+
+  const renderChatThreadPage = () => <div className="mx-auto flex h-[calc(100dvh-10.5rem)] max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.10)]"><div className="flex items-center gap-3 border-b border-slate-200 bg-white p-4"><button type="button" onClick={() => setPage('directChat')} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">← Back to Chat</button><Avatar value={activeChatCreator?.avatar || '👤'} size="h-11 w-11" /><div className="min-w-0"><h3 className="truncate text-xl font-black">{activeChatCreator?.name || 'Story chat'}</h3><p className="text-xs font-bold text-slate-500">Shared stories only</p></div></div><div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-slate-50 p-4 custom-scrollbar">{activeChatStories.length ? activeChatStories.map((story) => { const status = statusCards.find((card) => card.id === story.statusId); if (!status) return null; return <article key={story.id} className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_16px_44px_rgba(15,23,42,0.08)]"><div className={`bg-gradient-to-br ${status.gradient} p-5 text-white`}><span className="rounded-full bg-white/82 px-3 py-1 text-xs font-black text-slate-800">{status.slots}</span>{status.imagePreview ? <div className="my-8 aspect-square overflow-hidden rounded-[2rem] bg-white/16 shadow-inner">{renderUploadedImage(status.imagePreview, status.title, status.imageLayout || 'thumbnail')}</div> : null}<h4 className="mt-10 text-3xl font-black">{status.title}</h4><p className="mt-3 text-sm font-semibold leading-6 text-white/84">{status.body}</p></div><div className="flex items-center justify-between gap-3 p-4"><p className="text-xs font-bold text-slate-500">{story.time}</p><button type="button" onClick={() => openStatusReel(status.id)} className="rounded-full bg-slate-950 px-4 py-2 text-xs font-black text-white">Open story</button></div></article>; }) : <div className="flex h-full items-center justify-center text-center"><div className="rounded-[2rem] border border-dashed border-sky-200 bg-white p-8"><h3 className="text-2xl font-black">No story shared yet</h3><p className="mt-2 text-sm font-bold text-slate-500">Share a status to this follower first.</p></div></div>}</div><div className="border-t border-slate-200 p-3 text-center text-xs font-black text-slate-500">Text messages disabled · Stories only chat</div></div>;
+
+  const renderStatusDetailPage = () => <div className="mx-auto flex h-[calc(100dvh-10.5rem)] max-w-4xl flex-col overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-[0_22px_70px_rgba(15,23,42,0.10)]"><div className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white p-4"><button type="button" onClick={() => setPage('statusReel')} className="rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm font-black text-slate-700">← Back to story</button><span className="rounded-full bg-slate-100 px-3 py-1 text-xs font-black text-slate-600">{selectedStatus.slots}</span></div><div className={`min-h-0 flex-1 overflow-y-auto bg-gradient-to-br ${selectedStatus.gradient} p-5 text-white custom-scrollbar sm:p-8`}><article className="mx-auto max-w-3xl rounded-[2rem] border border-white/20 bg-white/14 p-5 shadow-2xl backdrop-blur-xl sm:p-8">{selectedStatus.imagePreview ? <div className={`mb-6 ${selectedStatus.imageLayout === 'original' ? 'max-h-[54dvh] min-h-48' : 'aspect-square'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-white/14 shadow-inner`}>{renderUploadedImage(selectedStatus.imagePreview, selectedStatus.title, selectedStatus.imageLayout || 'original')}</div> : null}<h2 className="text-4xl font-black tracking-tight sm:text-6xl">{selectedStatus.title}</h2><p className="mt-5 whitespace-pre-wrap text-lg font-semibold leading-9 text-white/90">{selectedStatus.body}</p>{renderStatusPoll(selectedStatus)}</article></div></div>;
 
   const filteredCreators = allCreators.filter((creator) => {
     const textMatches = `${creator.username} ${creator.name} ${creator.role}`.toLowerCase().includes(networkSearch.toLowerCase());
@@ -291,25 +537,31 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
 
   return (
     <section className="relative h-[100dvh] overflow-hidden bg-white text-slate-950">
+      {imageLightbox ? <div className="fixed inset-0 z-[1800] flex items-center justify-center bg-slate-950/88 p-4 backdrop-blur-xl"><button type="button" onClick={() => setImageLightbox(null)} className="absolute right-4 top-4 rounded-full bg-white px-4 py-2 text-sm font-black text-slate-950">Close</button><div className="flex max-h-[90dvh] max-w-[94vw] items-center justify-center overflow-hidden rounded-[2rem] bg-white/10 p-3 shadow-2xl">{renderUploadedImage(imageLightbox.src, imageLightbox.alt, 'original')}</div></div> : null}
+      {page === 'statusReel' ? renderStatusReel() : null}
       <header className="relative z-30 flex h-[76px] items-center justify-between gap-3 border-b border-slate-200 bg-white px-3 shadow-[0_10px_40px_rgba(15,23,42,0.04)] sm:px-6 lg:px-10">
-        <div className="flex min-w-0 items-center gap-3"><button type="button" onClick={goBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-lg font-black text-slate-800 shadow-sm transition duration-300 hover:-translate-x-0.5 hover:scale-105 hover:bg-blue-50 hover:text-slate-950 active:scale-95" aria-label="Back">←</button><h1 className="truncate text-xl font-black tracking-tight sm:text-4xl">EDUVORA BOND</h1></div>
-        <div className="flex shrink-0 items-center gap-2 sm:gap-3"><button type="button" onClick={goHomeFeed} className="group rounded-full border border-blue-100 bg-gradient-to-r from-blue-700 to-sky-600 px-4 py-3 text-xs font-black text-white shadow-[0_12px_30px_rgba(37,99,235,0.22)] transition duration-300 hover:-translate-y-0.5 hover:scale-105 hover:shadow-[0_16px_38px_rgba(37,99,235,0.30)] active:scale-95 sm:px-6 sm:text-sm">🏠 <span className="hidden sm:inline">Home Chat Feed</span><span className="sm:hidden">Home</span></button><button type="button" onClick={() => pushPage('profile')} className="group flex h-12 w-12 items-center justify-center rounded-full border border-blue-100 bg-blue-50 text-xl shadow-[0_10px_26px_rgba(37,99,235,0.12)] ring-2 ring-white transition duration-300 hover:-translate-y-0.5 hover:scale-110 hover:bg-blue-100 active:scale-95 sm:h-14 sm:w-14" aria-label="Profile"><Avatar value={profile.avatar} size="h-full w-full" /></button></div>
+        <div className="flex min-w-0 items-center gap-3"><button type="button" onClick={goBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-slate-200 bg-white text-lg font-black text-slate-800 shadow-sm transition duration-300 hover:-translate-x-0.5 hover:scale-105 hover:bg-sky-50 hover:text-slate-950 active:scale-95" aria-label="Back">←</button><h1 className="truncate text-xl font-black tracking-tight sm:text-4xl">EDUVORA BOND</h1></div>
+        <div className="flex shrink-0 items-center gap-2 sm:gap-3"><button type="button" onClick={() => pushPage('profile')} className="flex items-center gap-2 rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-800 shadow-sm transition duration-300 hover:-translate-y-0.5 hover:bg-sky-50 sm:px-4"><Avatar value={profile.avatar} size="h-8 w-8" /><span className="hidden sm:inline">Profile</span></button><span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-700">🪙 {eduCoins}</span></div>
       </header>
 
       <main ref={scrollContainerRef} className="relative z-10 h-[calc(100dvh-76px)] overflow-y-auto bg-white px-3 pb-60 pt-4 custom-scrollbar sm:px-5 lg:px-8 xl:px-10">
         <div key={`${page}-${activeView}`} className="animate-in fade-in slide-in-from-bottom-3 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]">
-        {page === 'chat' && activeView === 'feed' && renderFeedLayout(messages, 'Chat Feed', 'Fresh community prompts, replies, and streak ideas are shown here.')}
-        {page === 'thread' && renderMessageDetails(selectedMessage, true)}
-        {page === 'profile' && <div className="mx-auto max-w-5xl overflow-hidden rounded-[2.25rem] border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)]"><div className="relative bg-gradient-to-br from-slate-900 via-blue-800 to-sky-700 p-6 text-white sm:p-8"><div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.28),transparent_28%),radial-gradient(circle_at_78%_8%,rgba(255,255,255,0.18),transparent_20%)]" /><div className="relative flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between"><div className="flex items-center gap-4"><Avatar value={profile.avatar} size="h-24 w-24 sm:h-32 sm:w-32" className="text-5xl ring-4 ring-white/60 shadow-2xl" /><div><p className="text-xs font-black uppercase tracking-[0.24em] text-blue-100">Creator profile</p><h2 className="mt-2 text-3xl font-black sm:text-5xl">{profile.name}</h2><p className="mt-1 text-sm font-bold text-blue-50">@{profile.username}</p></div></div><div className="grid grid-cols-2 gap-3 text-center sm:min-w-72"><div className="rounded-2xl border border-white/25 bg-white/20 p-4 backdrop-blur-xl"><p className="text-3xl font-black">🪙 {eduCoins}</p><p className="text-xs font-black uppercase tracking-widest text-blue-50">EduCoins</p></div><div className="rounded-2xl border border-white/25 bg-white/20 p-4 backdrop-blur-xl"><p className="text-3xl font-black">24h</p><p className="text-xs font-black uppercase tracking-widest text-blue-50">1 post limit</p></div></div></div></div><div className="grid gap-5 p-5 sm:p-7 lg:grid-cols-[260px_1fr]"><div className="rounded-[1.75rem] border border-blue-100 bg-white p-5 shadow-inner"><label className="block cursor-pointer rounded-2xl bg-blue-700 px-4 py-3 text-center text-xs font-black text-white shadow-lg shadow-blue-700/20 transition hover:-translate-y-0.5"><input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />Upload profile image</label><input value={isImageAvatar(profile.avatar) ? '' : profile.avatar} onChange={(e) => setProfile((p) => ({ ...p, avatar: e.target.value || '🧑‍🎓' }))} className="mt-3 w-full rounded-2xl border border-blue-100 bg-white px-3 py-3 text-center text-xl font-bold outline-none focus:border-blue-300" placeholder="Emoji fallback" /><div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-900">Daily rule: har user 24 hour mein sirf 1 post kar sakta hai. Koi bhi format choose karo — Text, Image ya Poll — aur successful post par +1 EduCoin milega.</div></div><div className="space-y-3"><input value={profile.name} onChange={(e) => setProfile((p) => ({ ...p, name: e.target.value }))} className="w-full rounded-2xl border border-blue-100 bg-white px-4 py-4 font-bold outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-100" placeholder="Name" /><input value={profile.username} onChange={(e) => setProfile((p) => ({ ...p, username: e.target.value }))} className="w-full rounded-2xl border border-blue-100 bg-white px-4 py-4 font-bold outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-100" placeholder="Username" /><textarea value={profile.bio} onChange={(e) => setProfile((p) => ({ ...p, bio: e.target.value }))} className="min-h-32 w-full rounded-2xl border border-blue-100 bg-white px-4 py-4 font-semibold outline-none focus:border-blue-300 focus:ring-4 focus:ring-blue-100" placeholder="Bio" /><button type="button" onClick={() => pushPage('creators')} className="w-full rounded-2xl bg-gradient-to-r from-blue-700 to-sky-600 px-5 py-4 text-sm font-black text-white shadow-[0_16px_42px_rgba(37,99,235,0.24)] transition hover:-translate-y-0.5">Create today’s post & earn 1 EduCoin</button></div></div></div>}
-        {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-white/80 bg-white shadow-[0_28px_90px_rgba(37,99,235,0.16)] ring-1 ring-blue-100"><div className="relative overflow-hidden bg-gradient-to-br from-indigo-700 via-blue-700 to-cyan-500 p-6 text-white sm:p-8"><div className="absolute -right-14 -top-16 h-52 w-52 rounded-full bg-white/20 blur-3xl" /><div className="absolute -bottom-20 left-10 h-56 w-56 rounded-full bg-cyan-200/30 blur-3xl" /><div className="relative grid gap-6 lg:grid-cols-[1fr_320px]"><div className="flex items-center gap-4"><Avatar value={profile.avatar} size="h-20 w-20 sm:h-24 sm:w-24" className="text-4xl ring-4 ring-white/40 shadow-2xl" /><div><p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-100">Daily creator sprint</p><h2 className="mt-2 text-4xl font-black tracking-tight sm:text-5xl">Creators daily post</h2><p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-blue-50 sm:text-base">Post once every 24 hours, keep your streak alive, and earn +1 EduCoin for showing up today.</p></div></div><div className="grid grid-cols-3 gap-2 text-center lg:grid-cols-1"><div className="rounded-2xl border border-white/25 bg-white/18 p-3 backdrop-blur-xl"><p className="text-2xl font-black">🪙 +1</p><p className="text-[10px] font-black uppercase tracking-widest text-blue-50">Daily reward</p></div><div className="rounded-2xl border border-white/25 bg-white/18 p-3 backdrop-blur-xl"><p className="text-2xl font-black">24h</p><p className="text-[10px] font-black uppercase tracking-widest text-blue-50">Post window</p></div><div className="rounded-2xl border border-white/25 bg-white/18 p-3 backdrop-blur-xl"><p className="text-2xl font-black">🔥</p><p className="text-[10px] font-black uppercase tracking-widest text-blue-50">Streak mode</p></div></div></div></div><div className="grid gap-5 p-5 sm:p-7 lg:grid-cols-[360px_1fr]"><div className="rounded-[2rem] border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-5 shadow-inner"><p className="text-xs font-black uppercase tracking-[0.22em] text-blue-600">Choose format</p><div className="mt-4 grid gap-3">{postOptions.map((option) => <button key={option.type} type="button" onClick={() => setPostType(option.type)} className={`group rounded-2xl border p-4 text-left shadow-sm transition duration-300 hover:-translate-y-0.5 ${postType === option.type ? 'border-blue-300 bg-white shadow-[0_18px_42px_rgba(37,99,235,0.15)] ring-4 ring-blue-100' : 'border-white bg-white/80 hover:border-blue-200'}`}><div className="flex items-center gap-3"><span className="flex h-12 w-12 items-center justify-center rounded-2xl bg-blue-50 text-3xl transition group-hover:scale-110">{option.icon}</span><span><span className="block font-black text-slate-950">{option.label}</span><span className="text-xs font-bold text-slate-500">{isPostUsedToday ? 'Daily post already used' : option.helper}</span></span></div></button>)}</div><div className="mt-5 rounded-2xl border border-amber-200 bg-amber-50 p-4 text-sm font-bold leading-6 text-amber-900">Motivation rule: chhota post bhi chalega. Bas daily action miss mat karo — consistency se feed active dikhega.</div></div><div className="rounded-[2rem] border border-blue-100 bg-white p-4 shadow-[0_18px_54px_rgba(15,23,42,0.07)]"><div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-1"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-slate-400">Today’s idea</p><h3 className="text-2xl font-black text-slate-950">Share one useful win</h3></div><span className="rounded-full bg-blue-50 px-4 py-2 text-xs font-black text-blue-700">{postType.toUpperCase()} MODE</span></div><textarea value={postDraft} onChange={(e) => setPostDraft(e.target.value)} placeholder={`Write your daily ${postType} post...`} className="min-h-44 w-full resize-none rounded-[1.5rem] border border-slate-100 bg-gradient-to-br from-slate-50 to-white p-4 font-semibold leading-7 outline-none transition focus:border-blue-200 focus:ring-4 focus:ring-blue-100" /><button type="button" disabled={isPostUsedToday || !postDraft.trim()} onClick={submitCreatorPost} className="mt-4 w-full rounded-2xl bg-gradient-to-r from-blue-800 via-blue-700 to-cyan-600 px-5 py-4 text-sm font-black text-white shadow-[0_18px_46px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:from-slate-300 disabled:via-slate-300 disabled:to-slate-300 disabled:shadow-none">Post to chat feed & keep streak alive</button></div></div></div>}
-        {page === 'network' && <div className="mx-auto max-w-5xl bg-white"><div className="sticky top-0 z-10 bg-white pb-3"><div className="flex items-center gap-4"><h2 className="text-4xl font-black">{profile.username}</h2></div><div className="mt-6 grid grid-cols-4 border-b border-slate-200 text-center text-sm font-black sm:text-lg"><button type="button" onClick={() => setNetworkTab('mutual')} className={`pb-3 ${networkTab === 'mutual' ? 'border-b-4 border-black text-black' : 'text-slate-400'}`}>7 mutual</button><button type="button" onClick={() => setNetworkTab('followers')} className={`pb-3 ${networkTab === 'followers' ? 'border-b-4 border-black text-black' : 'text-slate-400'}`}>45.9M followers</button><button type="button" onClick={() => setNetworkTab('following')} className={`pb-3 ${networkTab === 'following' ? 'border-b-4 border-black text-black' : 'text-slate-400'}`}>5 following</button><button type="button" onClick={() => setNetworkTab('forYou')} className={`pb-3 ${networkTab === 'forYou' ? 'border-b-4 border-black text-black' : 'text-slate-400'}`}>For you</button></div><div className="mt-5 flex items-center gap-3 rounded-2xl bg-slate-100 px-5 py-4"><span className="text-3xl text-slate-500">⌕</span><input value={networkSearch} onChange={(e) => setNetworkSearch(e.target.value)} placeholder="Search" className="min-w-0 flex-1 bg-transparent text-xl font-semibold outline-none placeholder:text-slate-400" /></div></div><div className="space-y-3 py-4">{filteredCreators.map((creator) => { const followed = followedIds.includes(creator.id); const isSelf = creator.id === 'me'; return <article key={creator.id} className="flex items-center gap-3 rounded-2xl px-2 py-2 transition hover:bg-slate-50"><Avatar value={creator.avatar} size="h-14 w-14 sm:h-16 sm:w-16" className="text-2xl" /><div className="min-w-0 flex-1"><h3 className="truncate text-base font-black sm:text-lg">{creator.username}{creator.verified ? <span className="ml-2 text-blue-500">✹</span> : null}</h3><p className="truncate text-sm font-semibold text-slate-400">{creator.name}</p></div><button type="button" disabled={isSelf} onClick={() => setFollowedIds((ids) => followed ? ids.filter((id) => id !== creator.id) : [...ids, creator.id])} className={`min-w-[92px] rounded-lg px-4 py-2 text-sm font-black text-white shadow-sm ${isSelf ? 'bg-slate-900' : followed ? 'bg-slate-300' : 'bg-[#0a9bf2]'}`}>{isSelf ? 'You' : followed ? 'Following' : 'Follow'}</button></article>; })}</div></div>}
-        {page === 'following' && renderFeedLayout(followingMessages, 'Your followers feed', 'Only posts from creators you follow are shown here.')}
-        {page === 'chat' && activeView === 'status' && <div className="mx-auto max-w-[1800px] space-y-5 bg-white"><div className="rounded-[1.4rem] border border-slate-200 bg-white p-4 text-center shadow-[0_14px_40px_rgba(15,23,42,0.05)]"><p className="text-sm font-black text-slate-900 sm:text-base">1MB Limit &amp; 150 Slots Left</p><p className="mt-1 text-xs font-bold text-slate-500">Stories ab short-feed square grid mein hain — YouTube style quick cards.</p></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map((card) => <article key={card.id} className="group relative aspect-square overflow-hidden rounded-[1.65rem] border border-slate-200 bg-white p-3 shadow-[0_16px_42px_rgba(15,23,42,0.08)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_22px_56px_rgba(15,23,42,0.12)]"><div className={`absolute inset-2 rounded-[1.25rem] bg-gradient-to-br ${card.gradient} opacity-90 transition duration-500 group-hover:scale-[1.03]`} /><div className="absolute inset-2 rounded-[1.25rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.56),rgba(255,255,255,0.12)_42%,rgba(15,23,42,0.34))]" /><div className="relative flex h-full flex-col justify-between p-2 text-slate-950"><span className="w-max rounded-full border border-white/80 bg-white/75 px-3 py-1 text-[10px] font-black text-slate-700 shadow-sm backdrop-blur-xl">{card.slots}</span><div><h3 className="line-clamp-2 text-lg font-black tracking-tight text-white drop-shadow sm:text-xl">{card.title}</h3><p className="mt-2 w-max rounded-full border border-white/60 bg-white/80 px-3 py-1 text-[11px] font-black text-slate-800 shadow-sm backdrop-blur-xl">❤️ Liked by {card.likedBy}</p></div></div></article>)}</div></div>}
-        {page === 'chat' && activeView === 'calls' && <div className="mx-auto flex min-h-[calc(100vh-12rem)] max-w-[1800px] items-center justify-center rounded-[2rem] border border-slate-200 bg-white p-8 text-center text-slate-950 shadow-[0_18px_54px_rgba(15,23,42,0.06)]"><div className="max-w-xl"><div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[2rem] bg-slate-100 text-4xl shadow-inner ring-1 ring-slate-200">📞</div><h2 className="mt-6 text-4xl font-black tracking-tight">Community Calls</h2><p className="mt-3 text-sm leading-7 text-slate-500 sm:text-base">Live voice rooms will open here as a clean full-screen nested page.</p></div></div>}
+          {page === 'chat' && activeView === 'feed' && renderFeedLayout(messages, 'Chat Feed', 'Fresh community prompts, replies, and streak ideas are shown here.')}
+          {page === 'thread' && <div className="space-y-3"><button type="button" onClick={goBack} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 shadow-sm">← Back to posts</button>{renderMessageDetails(selectedMessage, true)}</div>}
+          {page === 'profile' && <div className="mx-auto max-w-5xl overflow-hidden rounded-[2.25rem] border border-slate-200 bg-white shadow-[0_24px_70px_rgba(15,23,42,0.08)]"><div className="relative bg-gradient-to-br from-slate-900 via-sky-800 to-cyan-600 p-6 text-white sm:p-8"><div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.28),transparent_28%),radial-gradient(circle_at_78%_8%,rgba(255,255,255,0.18),transparent_20%)]" /><div className="relative flex flex-col gap-5 sm:flex-row sm:items-end"><Avatar value={profile.avatar} size="h-24 w-24" className="text-4xl ring-white/80" /><div className="min-w-0 flex-1"><h2 className="text-4xl font-black tracking-tight">{profile.name}</h2><p className="mt-1 text-sm font-black text-white/75">@{profile.username}</p><p className="mt-3 max-w-2xl text-sm font-semibold leading-6 text-white/80">{profile.bio}</p></div><label className="w-max cursor-pointer rounded-2xl border border-white/30 bg-white/15 px-4 py-3 text-sm font-black shadow-lg backdrop-blur-xl transition hover:bg-white/25"><input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />Upload avatar</label></div></div><div className="grid gap-4 p-5 sm:grid-cols-2"><input value={profile.name} onChange={(event) => setProfile((current) => ({ ...current, name: event.target.value }))} className="rounded-2xl border border-slate-200 px-4 py-3 font-bold outline-none focus:border-sky-300" /><input value={profile.username} onChange={(event) => setProfile((current) => ({ ...current, username: event.target.value }))} className="rounded-2xl border border-slate-200 px-4 py-3 font-bold outline-none focus:border-sky-300" /><textarea value={profile.bio} onChange={(event) => setProfile((current) => ({ ...current, bio: event.target.value }))} className="min-h-28 rounded-2xl border border-slate-200 px-4 py-3 font-bold outline-none focus:border-sky-300 sm:col-span-2" /></div></div>}
+          {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-white/80 bg-white shadow-[0_28px_90px_rgba(37,99,235,0.16)] ring-1 ring-sky-100"><div className="relative overflow-hidden bg-gradient-to-br from-indigo-700 via-sky-700 to-cyan-500 p-6 text-white sm:p-8"><div className="absolute -right-14 -top-16 h-52 w-52 rounded-full bg-white/20 blur-3xl" /><div className="absolute -bottom-20 left-10 h-56 w-56 rounded-full bg-cyan-200/30 blur-3xl" /><div className="relative grid gap-6 lg:grid-cols-[1fr_0.86fr]"><div><p className="text-sm font-black uppercase tracking-[0.28em] text-cyan-100">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">One powerful post per day. Make it count.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-white/82">Choose text, image, or poll. The composer below changes instantly so creators get only the upload tools they need.</p></div><div className="rounded-[2rem] border border-white/25 bg-white/16 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-2xl"><div className="flex items-center justify-between"><span className="text-sm font-black text-white/80">Today reward</span><span className="rounded-full bg-white px-3 py-1 text-xs font-black text-sky-700">+1 EduCoin</span></div><div className="mt-5 h-3 overflow-hidden rounded-full bg-white/20"><div className={`h-full rounded-full bg-white transition-all ${isPostUsedToday ? 'w-full' : 'w-1/3'}`} /></div><p className="mt-3 text-sm font-bold text-white/75">{isPostUsedToday ? 'Daily creator slot used.' : 'Your creator slot is ready.'}</p></div></div></div><div className="bg-gradient-to-br from-sky-50 via-white to-cyan-50 p-5 sm:p-7"><div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={!postDraft.trim() || isPostUsedToday || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-slate-950 via-sky-900 to-cyan-700 px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(14,165,233,0.28)] transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-45">{isPostUsedToday ? 'Daily post already shared' : 'Publish creator post'}</button></div></div>}
+          {page === 'network' && <div className="mx-auto max-w-5xl bg-white"><div className="sticky top-0 z-10 bg-white pb-3"><div className="flex items-center gap-4"><h2 className="text-4xl font-black">{profile.username}</h2></div><div className="mt-6 grid grid-cols-4 border-b border-slate-200 text-center text-sm font-black sm:text-lg">{(['mutual', 'followers', 'following', 'forYou'] as const).map((tab) => <button key={tab} type="button" onClick={() => setNetworkTab(tab)} className={`pb-3 capitalize ${networkTab === tab ? 'border-b-4 border-black text-black' : 'text-slate-400'}`}>{tab === 'forYou' ? 'For you' : tab}</button>)}</div><input value={networkSearch} onChange={(event) => setNetworkSearch(event.target.value)} placeholder="Search creators..." className="mt-4 w-full rounded-2xl border border-slate-200 px-4 py-3 font-bold outline-none focus:border-sky-300" /></div><div className="space-y-3 pt-3">{filteredCreators.map((creator) => { const followed = followedIds.includes(creator.id); return <article key={creator.id} className="flex items-center gap-3 rounded-3xl border border-slate-200 bg-white p-4 shadow-sm"><Avatar value={creator.avatar} /><div className="min-w-0 flex-1"><h3 className="truncate text-xl font-black text-slate-950">{creator.name} {creator.verified ? '✅' : ''}</h3><p className="text-sm font-bold text-slate-500">@{creator.username} · {creator.role}</p><p className="text-sm font-black text-slate-700">{creator.followers.toLocaleString()} followers</p></div><button type="button" onClick={() => setFollowedIds((current) => followed ? current.filter((id) => id !== creator.id) : [...current, creator.id])} className={`rounded-full px-4 py-2 text-sm font-black transition ${followed ? 'bg-slate-100 text-slate-700' : 'bg-slate-950 text-white'}`}>{followed ? 'Following' : 'Follow'}</button></article>; })}</div></div>}
+          {page === 'following' && renderFeedLayout(followingMessages, 'Your followers feed', 'Only posts from creators you follow are shown here.')}
+          {page === 'directChat' && renderChatPage()}
+          {page === 'directChatThread' && renderChatThreadPage()}
+          {page === 'statusDetail' && renderStatusDetailPage()}
+          {page === 'chat' && activeView === 'status' && <div className="mx-auto max-w-[1800px] space-y-5 bg-white"><div className="rounded-[1.8rem] border border-slate-200 bg-gradient-to-br from-slate-950 via-sky-900 to-cyan-700 p-5 text-center text-white shadow-[0_22px_70px_rgba(14,165,233,0.20)]"><p className="text-lg font-black sm:text-2xl">1MB Limit &amp; 150 Slots Left</p><p className="mt-2 text-sm font-bold text-white/72">Tap any status to open a scroll-snap reel. Swipe/scroll to jump directly to the next feed like Shorts.</p></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
+          {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-white/70 bg-white shadow-[0_30px_90px_rgba(249,115,22,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-orange-500 via-rose-500 to-fuchsia-600 p-6 text-white sm:p-8"><div className="absolute -right-16 top-0 h-64 w-64 rounded-full bg-white/20 blur-3xl" /><p className="relative text-sm font-black uppercase tracking-[0.3em] text-orange-100">Story studio</p><h2 className="relative mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2><p className="relative mt-4 max-w-2xl text-base font-semibold leading-8 text-white/80">Pick text, image, or poll. The upload area changes to match your status type and keeps this page visually different from creator posts.</p></div><div className="bg-gradient-to-br from-orange-50 via-white to-fuchsia-50 p-5 sm:p-7"><div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange')}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={(statusType === 'image' && !statusImagePreview) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-orange-600 via-rose-600 to-fuchsia-700 px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(244,63,94,0.28)] transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-45">Publish status story</button></div></div>}
+          {page === 'statusMine' && <div className="mx-auto max-w-6xl space-y-5"><div className="rounded-[2rem] border border-violet-100 bg-gradient-to-br from-violet-50 via-white to-sky-50 p-6 shadow-[0_22px_70px_rgba(124,58,237,0.12)]"><p className="text-sm font-black uppercase tracking-[0.28em] text-violet-600">Your status analytics</p><h2 className="mt-2 text-4xl font-black tracking-tight">View your status</h2><p className="mt-2 text-base font-semibold text-slate-600">Check views, likes, and open any story in reel view.</p></div>{myStatuses.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{myStatuses.map((status) => <article key={status.id} className="overflow-hidden rounded-[2rem] border border-slate-200 bg-white p-4 shadow-[0_16px_48px_rgba(15,23,42,0.08)]"><div className={`rounded-[1.5rem] bg-gradient-to-br ${status.gradient} p-5 text-white`}><p className="text-xs font-black uppercase tracking-[0.2em] text-white/70">{status.slots}</p>{status.imagePreview ? <div className="my-5 aspect-square overflow-hidden rounded-2xl bg-white/16 shadow-inner">{renderUploadedImage(status.imagePreview, status.title, status.imageLayout || 'thumbnail')}</div> : null}<h3 className="mt-6 line-clamp-3 text-2xl font-black">{status.title}</h3></div><div className="mt-4 grid grid-cols-2 gap-3 text-center"><div className="rounded-2xl bg-slate-50 p-3"><p className="text-2xl font-black">{status.views}</p><p className="text-xs font-bold text-slate-500">Views</p></div><div className="rounded-2xl bg-rose-50 p-3"><p className="text-2xl font-black text-rose-600">{status.likedBy}</p><p className="text-xs font-bold text-slate-500">Likes</p></div></div><button type="button" onClick={() => openStatusReel(status.id)} className="mt-4 w-full rounded-2xl bg-slate-950 px-4 py-3 text-sm font-black text-white transition hover:-translate-y-0.5">Open reel view</button></article>)}</div> : <div className="rounded-[2rem] border border-dashed border-violet-200 bg-white p-10 text-center font-black text-slate-500">No status uploaded yet. Use “Upload your status” first.</div>}</div>}
         </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-[1300] flex justify-center px-3 pointer-events-none md:bottom-5"><nav id="community-bottom-dock" className="pointer-events-auto flex max-w-[96vw] items-center gap-2 overflow-x-auto rounded-[2rem] border border-slate-300/90 bg-slate-200/88 p-2 shadow-[0_28px_90px_rgba(15,23,42,0.24)] ring-1 ring-white/80 backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] data-[hidden=true]:translate-y-5 data-[hidden=true]:scale-75 data-[hidden=true]:opacity-80 custom-scrollbar" aria-label="Community dock"><button type="button" onClick={() => switchView('feed')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${activeView === 'feed' && page === 'chat' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/70' : 'bg-white/72 hover:bg-white'}`}><span className="block text-2xl">📢</span><span className="text-[11px] font-black">Feed</span></button><button type="button" onClick={() => switchView('status')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${activeView === 'status' && page === 'chat' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/70' : 'bg-white/72 hover:bg-white'}`}><span className="block text-2xl">⭕</span><span className="text-[11px] font-black">Status</span></button><button type="button" onClick={() => switchView('calls')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${activeView === 'calls' && page === 'chat' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/70' : 'bg-white/72 hover:bg-white'}`}><span className="block text-2xl">📞</span><span className="text-[11px] font-black">Calls</span></button><button type="button" onClick={() => pushPage('creators')} className={`min-w-[86px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'creators' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/70' : 'bg-white/72 hover:bg-white'}`}><span className="block text-2xl">✍️</span><span className="text-[11px] font-black">Creators</span></button><button type="button" onClick={() => pushPage('network')} className={`min-w-[86px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'network' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/70' : 'bg-white/72 hover:bg-white'}`}><span className="block text-2xl">🤝</span><span className="text-[11px] font-black">Follow</span></button><button type="button" onClick={() => pushPage('following')} className={`min-w-[96px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'following' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/70' : 'bg-white/72 hover:bg-white'}`}><span className="block text-2xl">👥</span><span className="text-[11px] font-black">Following</span></button></nav></div>
+      <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-[1300] flex justify-center px-3 pointer-events-none md:bottom-5"><div className="relative pointer-events-auto"><div className={`absolute bottom-[calc(100%+0.75rem)] left-1/2 z-10 flex -translate-x-1/2 flex-col gap-2 transition duration-300 ${showStatusActions ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-3 opacity-0'}`}><button type="button" onClick={() => { setShowStatusActions(false); pushPage('statusUpload'); }} className="whitespace-nowrap rounded-2xl border border-orange-200 bg-gradient-to-r from-orange-500 to-rose-500 px-4 py-3 text-xs font-black text-white shadow-[0_16px_40px_rgba(244,63,94,0.26)]">⬆️ Upload your status</button><button type="button" onClick={() => { setShowStatusActions(false); pushPage('statusMine'); }} className="whitespace-nowrap rounded-2xl border border-sky-200 bg-white px-4 py-3 text-xs font-black text-slate-900 shadow-[0_16px_40px_rgba(14,165,233,0.18)]">👁️ View your status</button></div><nav id="community-bottom-dock" className="flex max-w-[96vw] items-center gap-2 overflow-x-auto rounded-[2rem] border border-slate-300/90 bg-slate-200/88 p-2 shadow-[0_28px_90px_rgba(15,23,42,0.24)] ring-1 ring-white/80 backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] data-[hidden=true]:translate-y-5 data-[hidden=true]:scale-75 data-[hidden=true]:opacity-80 custom-scrollbar" aria-label="Community dock"><button type="button" onClick={() => switchView('feed')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${activeView === 'feed' && page === 'chat' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/70' : 'bg-white/72 hover:bg-white'}`}><span className="block text-2xl">📢</span><span className="text-[11px] font-black">Feed</span></button><button type="button" onClick={() => { setShowStatusActions((value) => !value); setActiveView('status'); if (page !== 'chat') { setPage('chat'); setPageStack([]); } }} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${activeView === 'status' && page === 'chat' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/70' : 'bg-white/72 hover:bg-white'}`}><span className="block text-2xl">⭕</span><span className="text-[11px] font-black">Status</span></button><button type="button" onClick={() => pushPage('directChat')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'directChat' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/70' : 'bg-white/72 hover:bg-white'}`}><span className="block text-2xl">💬</span><span className="text-[11px] font-black">Chat</span></button><button type="button" onClick={() => pushPage('creators')} className={`min-w-[86px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'creators' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/70' : 'bg-white/72 hover:bg-white'}`}><span className="block text-2xl">✍️</span><span className="text-[11px] font-black">Creators</span></button><button type="button" onClick={() => pushPage('network')} className={`min-w-[86px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'network' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/70' : 'bg-white/72 hover:bg-white'}`}><span className="block text-2xl">🤝</span><span className="text-[11px] font-black">Follow</span></button><button type="button" onClick={() => pushPage('following')} className={`min-w-[96px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'following' ? 'bg-slate-900 text-white shadow-lg shadow-slate-900/25 ring-1 ring-white/70' : 'bg-white/72 hover:bg-white'}`}><span className="block text-2xl">👥</span><span className="text-[11px] font-black">Following</span></button></nav></div></div>
     </section>
   );
 };
