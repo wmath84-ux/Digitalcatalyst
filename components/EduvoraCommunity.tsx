@@ -297,7 +297,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
     if (!draft && statusType !== 'image') return;
     if (statusType === 'poll' && cleanedOptions.length < 2) return;
     const title = statusType === 'image' ? (statusImageName || 'Image story') : draft.slice(0, 54) || 'Fresh status';
-    const newStatus: StatusCard = {
+    const statusCard: StatusCard = {
       id: Date.now(),
       title,
       body: draft || 'Image story uploaded for today\'s community streak.',
@@ -312,8 +312,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
       pollOptions: statusType === 'poll' ? cleanedOptions : undefined,
       pollVotes: statusType === 'poll' ? cleanedOptions.map(() => 0) : undefined,
     };
-    setStatusCards((current) => [newStatus, ...current]);
-    setSelectedStatusId(newStatus.id);
+    setStatusCards((current) => [statusCard, ...current]);
+    setSelectedStatusId(statusCard.id);
     setStatusDraft('');
     setStatusImageName('');
     setStatusImagePreview('');
