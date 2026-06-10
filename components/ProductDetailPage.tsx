@@ -144,9 +144,12 @@ const ImageZoomModal: React.FC<{ src: string; alt: string; onClose: () => void; 
     }, [onClose]);
 
     return (
-        <div 
+        <div
             ref={overlayRef}
-            className="image-zoom-overlay" 
+            className="fixed inset-0 z-[1000] flex touch-none select-none items-center justify-center bg-black/85 p-3 backdrop-blur-md sm:p-6"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Product image preview"
             onClick={handleCloseClick}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
@@ -154,16 +157,29 @@ const ImageZoomModal: React.FC<{ src: string; alt: string; onClose: () => void; 
             onPointerLeave={handlePointerUp}
             onWheel={handleWheel}
         >
-            <div className="image-zoom-content" onClick={e => e.stopPropagation()}>
-                <img 
+            <div className="pointer-events-none absolute left-1/2 top-4 -translate-x-1/2 rounded-full bg-white/90 px-4 py-2 text-center text-xs font-black uppercase tracking-[0.16em] text-slate-900 shadow-xl sm:text-sm">
+                Click outside or press Esc to close
+            </div>
+            <div className="flex h-full w-full items-center justify-center overflow-hidden">
+                <img
                     ref={imgRef}
-                    src={src} 
+                    src={src}
                     alt={alt}
+                    className="max-h-[88dvh] max-w-[94vw] rounded-3xl object-contain shadow-[0_24px_80px_rgba(0,0,0,0.45)]"
                     style={imageStyle}
                     onPointerDown={handlePointerDown}
+                    draggable={false}
+                    onClick={e => e.stopPropagation()}
                 />
             </div>
-             <button onClick={onClose} className="image-zoom-close" aria-label="Close image view">&times;</button>
+            <button
+                type="button"
+                onClick={onClose}
+                className="absolute right-4 top-4 flex h-12 w-12 items-center justify-center rounded-full bg-white text-3xl font-black leading-none text-slate-900 shadow-2xl transition hover:scale-105 hover:bg-cyan-50 focus:outline-none focus:ring-4 focus:ring-cyan-200"
+                aria-label="Close image view"
+            >
+                &times;
+            </button>
         </div>
     );
 };
@@ -593,13 +609,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
           <div ref={gridRef} className={`grid grid-cols-1 gap-8 md:grid-cols-12 ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
             <div className="md:col-span-7">
-              <button onClick={() => setIsImageZoomOpen(true)} className="group relative w-full overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 shadow-[0_24px_70px_rgba(15,23,42,0.10)]" aria-label="View larger image">
+              <button type="button" onClick={() => setIsImageZoomOpen(true)} className="group relative w-full overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 shadow-[0_24px_70px_rgba(15,23,42,0.10)] focus:outline-none focus:ring-4 focus:ring-cyan-200" aria-label="Click to view larger product image">
                 <div className="zoom-container" onMouseMove={handleImageZoom}>
                   <img src={mainImage} alt={product.title} className="aspect-video h-auto w-full object-cover" />
                 </div>
-                <div className="absolute inset-0 flex items-center justify-center bg-white/35 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
+                <div className="absolute inset-0 flex items-center justify-center bg-white/35 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
                   <div className="rounded-full bg-white/85 p-4 text-slate-900 shadow-xl"><svg xmlns="http://www.w3.org/2000/svg" className="h-9 w-9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" /></svg></div>
                 </div>
+                <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-slate-950/80 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white shadow-lg backdrop-blur-sm sm:bottom-5 sm:text-sm">Click / Tap to view</span>
                 {isWishlisted && <span className="absolute right-5 top-5 rounded-full bg-red-500 px-4 py-2 text-sm font-black text-white shadow-lg">♥ Wishlisted</span>}
               </button>
 

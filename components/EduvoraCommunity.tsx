@@ -259,8 +259,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
       poll: { badge: 'Creator poll · +1 EduCoin', title: `${profile.name} opened a poll`, avatar: profile.avatar },
     };
     const meta = labels[postType];
+    const createdAt = Date.now();
     const newMessage: FeedMessage = {
-      id: Date.now(),
+      id: createdAt,
       admin: profile.name,
       badge: meta.badge,
       avatar: meta.avatar,
@@ -277,8 +278,23 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
       likeCount: 0,
       replies: [],
     };
+    const mirroredStatus: StatusCard = {
+      id: createdAt + 1,
+      title: meta.title,
+      body: draft,
+      gradient: statusTone[postType],
+      likedBy: 0,
+      views: 0,
+      slots: `${postType[0].toUpperCase()}${postType.slice(1)} · Creator post`,
+      type: postType,
+      ownerId: 'me',
+      imagePreview: postType === 'image' ? (postImagePreview || '🖼️') : undefined,
+      imageLayout: postType === 'image' ? 'thumbnail' : undefined,
+      pollOptions: postType === 'poll' ? cleanedOptions : undefined,
+      pollVotes: postType === 'poll' ? cleanedOptions.map(() => 0) : undefined,
+    };
     setMessages((current) => [newMessage, ...current]);
-    setStatusCards((current) => [newStatus, ...current]);
+    setStatusCards((current) => [mirroredStatus, ...current]);
     setCreatorQuota((current) => ({ ...current, [todayKey()]: [postType] }));
     setEduCoins((coins) => coins + 1);
     setPostDraft('');
