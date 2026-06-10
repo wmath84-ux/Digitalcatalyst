@@ -309,6 +309,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
       replies: [],
     };
     setMessages((current) => [newMessage, ...current]);
+    setStatusCards((current) => [newStatus, ...current]);
     setCreatorQuota((current) => ({ ...current, [todayKey()]: [postType] }));
     setEduCoins((coins) => coins + 1);
     setPostDraft('');
