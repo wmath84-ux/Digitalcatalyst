@@ -50,28 +50,28 @@ const getArticleCoverImage = (article: NewsArticle, size = '800/600') => article
 const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, settings: WebsiteSettings, cardBackground?: string, onReadMoreClick: (article: NewsArticle) => void }> = ({ article, animationDelay, settings, cardBackground, onReadMoreClick }) => {
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${(animationDelay % 8) + 1}` : '';
     return (
-        <div style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }} className={`backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgba(60,64,67,0.08)] hover:shadow-[0_12px_34px_rgba(60,64,67,0.12)] border overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
-            <div className="relative h-48 overflow-hidden rounded-t-2xl" style={{ backgroundColor: chatPalette.searchBlue }}>
+        <div style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }} className={`backdrop-blur-2xl rounded-2xl lg:rounded-[1.75rem] shadow-[0_8px_30px_rgba(60,64,67,0.08)] hover:shadow-[0_16px_42px_rgba(60,64,67,0.14)] border overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
+            <div className="relative h-48 overflow-hidden rounded-t-2xl lg:h-56 lg:rounded-t-[1.75rem]" style={{ backgroundColor: chatPalette.searchBlue }}>
                 <img 
                     src={getArticleCoverImage(article)} 
                     alt={article.title} 
-                    className="h-full w-full rounded-t-2xl object-cover transition-transform duration-700 group-hover:scale-110"
+                    className="h-full w-full rounded-t-2xl object-cover transition-transform duration-700 group-hover:scale-110 lg:rounded-t-[1.75rem]"
                 />
-                <div className="absolute top-4 left-4 backdrop-blur-xl px-3 py-1 text-xs font-bold uppercase tracking-wider border rounded-md shadow-sm" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder, color: chatPalette.linkText }}>
+                <div className="absolute left-4 top-4 rounded-md border px-3 py-1 text-xs font-bold uppercase tracking-wider shadow-sm backdrop-blur-xl lg:left-5 lg:top-5 lg:px-4 lg:py-1.5 lg:text-[13px]" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder, color: chatPalette.linkText }}>
                     {article.type === 'news' ? 'News' : article.category}
                 </div>
             </div>
-            <div className="p-6 flex flex-col flex-grow">
-                <div className="mb-3 text-xs font-medium" style={{ color: chatPalette.secondaryText }}>
+            <div className="flex flex-grow flex-col p-6 lg:p-7 xl:p-8">
+                <div className="mb-3 text-xs font-medium lg:text-sm" style={{ color: chatPalette.secondaryText }}>
                     {new Date(article.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                 </div>
-                <h3 className="text-xl font-bold transition-colors mb-3 leading-tight" style={{ color: chatPalette.primaryText }}>
+                <h3 className="mb-3 text-xl font-bold leading-tight transition-colors lg:text-2xl lg:leading-snug" style={{ color: chatPalette.primaryText }}>
                     {article.title}
                 </h3>
-                <p className="text-sm line-clamp-3 mb-6 flex-grow" style={{ color: chatPalette.secondaryText }}>
+                <p className="mb-6 line-clamp-3 flex-grow text-sm leading-6 lg:text-base lg:leading-7" style={{ color: chatPalette.secondaryText }}>
                     {article.excerpt}
                 </p>
-                <button onClick={() => onReadMoreClick(article)} className="font-bold text-sm uppercase tracking-wide flex items-center gap-2 group-hover:gap-3 transition-all" style={{ color: chatPalette.linkText }}>
+                <button onClick={() => onReadMoreClick(article)} className="flex items-center gap-2 text-sm font-bold uppercase tracking-wide transition-all group-hover:gap-3 lg:text-base" style={{ color: chatPalette.linkText }}>
                     Read Article <span className="text-lg leading-none">&rarr;</span>
                 </button>
             </div>
@@ -116,27 +116,27 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
     <section 
       id="news" 
       ref={sectionRef}
-      className={`py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      className={`py-24 lg:py-28 xl:py-32 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
       style={{ background: sectionBackground }}
     >
-      <div className="container mx-auto px-6">
+      <div className="container mx-auto px-6 lg:px-10 xl:px-12 2xl:max-w-[1480px]">
         <GoogleAd variant="display" label="Advertisement" className="mb-12 rounded-[2rem] border p-4 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }} />
 
-        <div className="flex flex-col md:flex-row justify-between items-end mb-12">
-            <div className="max-w-2xl">
-                <h2 className="text-4xl font-extrabold tracking-tight" style={{ color: chatPalette.primaryText }}>{title}</h2>
-                <p className="mt-4 text-lg" style={{ color: chatPalette.secondaryText }}>
+        <div className="mb-12 flex flex-col items-end justify-between gap-6 md:flex-row lg:mb-14">
+            <div className="max-w-3xl">
+                <h2 className="text-4xl font-extrabold tracking-tight lg:text-5xl xl:text-6xl" style={{ color: chatPalette.primaryText }}>{title}</h2>
+                <p className="mt-4 text-lg leading-8 lg:text-xl" style={{ color: chatPalette.secondaryText }}>
                     Current student alerts, education updates, and opportunity signals from Digital Catalyst.
                 </p>
             </div>
-            <button onClick={onOpenHub} className="hidden md:block rounded-full border px-5 py-2 text-sm font-bold backdrop-blur-xl transition hover:shadow-md" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
+            <button onClick={onOpenHub} className="hidden rounded-full border px-6 py-3 text-sm font-bold backdrop-blur-xl transition hover:shadow-md md:block lg:px-8 lg:py-3.5 lg:text-base" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
                 Open News
             </button>
         </div>
 
         <div 
             ref={gridRef} 
-            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+            className={`grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 lg:gap-9 xl:gap-10 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
         >
           {newsArticles.map((article, index) => (
             <React.Fragment key={article.id}>
