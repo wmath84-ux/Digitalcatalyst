@@ -10,7 +10,7 @@ const WelcomeOverlay: React.FC = () => {
     const t = setTimeout(() => {
       setVisible(false);
       sessionStorage.setItem('welcomeOverlaySeen', '1');
-    }, 2400);
+    }, 3400);
     return () => clearTimeout(t);
   }, []);
 
@@ -32,12 +32,12 @@ const WelcomeOverlay: React.FC = () => {
             </linearGradient>
           </defs>
         </svg>
-        <div className="absolute left-[17%] top-[18%] h-3 w-3 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.8)] animate-[welcomeSpark_2s_ease-in-out_both]" />
+        <div className="absolute left-[17%] top-[18%] h-3 w-3 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.8)] animate-[welcomeSpark_3s_ease-in-out_both]" />
         <div className="relative z-10 flex max-w-[18rem] flex-col items-center">
           <p className="welcome-write-text text-5xl font-semibold leading-tight tracking-wide text-slate-950 sm:text-7xl" style={{ fontFamily: '"Brush Script MT", "Segoe Script", cursive' }}>
             Welcome
           </p>
-          <p className="mt-4 text-xs font-bold uppercase tracking-[0.42em] text-cyan-700 opacity-0 animate-[slideUp_0.45s_ease-out_1.55s_forwards] sm:text-sm">Digital Catalyst</p>
+          <p className="mt-4 text-xs font-bold uppercase tracking-[0.42em] text-cyan-700 opacity-0 animate-[slideUp_0.45s_ease-out_2.55s_forwards] sm:text-sm">Digital Catalyst</p>
         </div>
       </div>
     </div>
