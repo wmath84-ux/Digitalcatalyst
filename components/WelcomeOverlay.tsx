@@ -1,20 +1,28 @@
 import React, { useEffect, useState } from 'react';
 
-const WelcomeOverlay: React.FC = () => {
+interface WelcomeOverlayProps {
+  onAnimationComplete?: () => void;
+}
+
+const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ onAnimationComplete }) => {
   const [visible, setVisible] = useState(false);
 
   useEffect(() => {
     const seen = sessionStorage.getItem('welcomeOverlaySeen');
-    if (seen) return;
+    if (seen) {
+      const t = setTimeout(() => onAnimationComplete?.(), 250);
+      return () => clearTimeout(t);
+    }
 
     sessionStorage.setItem('welcomeOverlaySeen', '1');
     setVisible(true);
 
     const t = setTimeout(() => {
       setVisible(false);
+      onAnimationComplete?.();
     }, 3000);
     return () => clearTimeout(t);
-  }, []);
+  }, [onAnimationComplete]);
 
   if (!visible) return null;
 
