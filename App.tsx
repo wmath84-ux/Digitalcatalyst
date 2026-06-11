@@ -342,6 +342,21 @@ export interface OrderItem {
     price: string;
 }
 
+export interface OrderPaymentBreakdown {
+    purchaseKind: 'product' | 'cart' | 'subscription';
+    baseTotal: number;
+    finalPrice: number;
+    couponCode?: string | null;
+    couponDiscount?: number;
+    couponType?: 'percentage' | 'fixed';
+    couponValue?: number;
+    eduCoinsUsed?: number;
+    eduCoinDiscount?: number;
+    coinOnlyPurchase?: boolean;
+    paymentLabel?: string;
+    unlockedProductIds?: number[];
+}
+
 export interface Order {
     id: string;
     customerName: string;
@@ -352,6 +367,7 @@ export interface Order {
     items: OrderItem[];
     shippingAddress: string;
     billingAddress: string;
+    paymentBreakdown?: OrderPaymentBreakdown;
 }
 
 // New Support Ticket interface, centralized here
@@ -1326,7 +1342,20 @@ const App: React.FC = () => {
         status: 'Completed',
         items: newOrderItems,
         shippingAddress: 'N/A (Digital Product)',
-        billingAddress: '123 E-commerce St, Web City, WC 54321'
+        billingAddress: '123 E-commerce St, Web City, WC 54321',
+        paymentBreakdown: {
+          purchaseKind: 'cart',
+          baseTotal: currentCartSubtotal,
+          finalPrice,
+          couponCode: couponToApply?.code || null,
+          couponDiscount: finalDiscount,
+          couponType: couponToApply?.type,
+          couponValue: couponToApply?.value,
+          eduCoinsUsed: safeAppliedCoins,
+          eduCoinDiscount: coinDiscount,
+          coinOnlyPurchase: false,
+          paymentLabel: 'Cart checkout',
+        }
       };
       setOrders(prevOrders => [newOrder, ...prevOrders]);
 
@@ -1346,9 +1375,11 @@ const App: React.FC = () => {
     return product ? { ...item, product } : null;
   }).filter((i): i is { product: ProductWithRating } & CartItem => i !== null);
 
+  const parseCurrency = (value: string | number | undefined | null) => parseFloat(String(value || '0').replace('₹', '').replace('🪙', '').replace(/,/g, '')) || 0;
+
   const cartSubtotal = cartDetails.reduce((acc, item) => {
     const priceStr = item.product.salePrice || item.product.price;
-    const price = parseFloat(priceStr.replace('₹', ''));
+    const price = parseCurrency(priceStr);
     return acc + (price * item.quantity);
   }, 0);
 
@@ -1783,7 +1814,20 @@ const App: React.FC = () => {
                 price: selectedProduct.salePrice || selectedProduct.price
             }],
             shippingAddress: 'N/A (Digital Product)',
-            billingAddress: '123 E-commerce St, Web City, WC 54321'
+            billingAddress: '123 E-commerce St, Web City, WC 54321',
+            paymentBreakdown: {
+                purchaseKind: 'product',
+                baseTotal: preDiscountTotal,
+                finalPrice: robustFinalPrice,
+                couponCode: couponToApply?.code || null,
+                couponDiscount: finalDiscount,
+                couponType: couponToApply?.type,
+                couponValue: couponToApply?.value,
+                eduCoinsUsed: coinDiscount > 0 ? activeCoinDiscount?.coins || 0 : 0,
+                eduCoinDiscount: coinDiscount,
+                coinOnlyPurchase: false,
+                paymentLabel: 'Product checkout',
+            }
         };
         setOrders(prevOrders => [newOrder, ...prevOrders]);
     }
@@ -1828,6 +1872,15 @@ const App: React.FC = () => {
       items: [{ id: product.id, name: product.title, quantity, price: product.salePrice || product.price }],
       shippingAddress: 'N/A (Digital Product)',
       billingAddress: 'EduCoin Wallet',
+      paymentBreakdown: {
+        purchaseKind: 'product',
+        baseTotal: parseCurrency(product.salePrice || product.price) * quantity,
+        finalPrice: 0,
+        eduCoinsUsed: parseCurrency(totalLabel),
+        eduCoinDiscount: parseCurrency(product.salePrice || product.price) * quantity,
+        coinOnlyPurchase: true,
+        paymentLabel: 'EduCoin wallet purchase',
+      },
     }, ...prevOrders]);
     setSelectedProduct(product);
     setCurrentView('congratulations');
@@ -1884,6 +1937,15 @@ const App: React.FC = () => {
       items: cartDetails.map(item => ({ id: item.product.id, name: item.product.title, quantity: item.quantity, price: `🪙 ${resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id)}` })),
       shippingAddress: 'N/A (Digital Product)',
       billingAddress: 'EduCoin Wallet',
+      paymentBreakdown: {
+        purchaseKind: 'cart',
+        baseTotal: cartDetails.reduce((total, item) => total + (parseCurrency(item.product.salePrice || item.product.price) * item.quantity), 0),
+        finalPrice: 0,
+        eduCoinsUsed: totalCoinPrice,
+        eduCoinDiscount: cartDetails.reduce((total, item) => total + (parseCurrency(item.product.salePrice || item.product.price) * item.quantity), 0),
+        coinOnlyPurchase: true,
+        paymentLabel: 'Cart EduCoin wallet purchase',
+      },
     }, ...prevOrders]);
     setSelectedProduct(cartDetails[0]?.product || null);
     setCart([]);
@@ -1996,7 +2058,33 @@ const App: React.FC = () => {
     const paymentParts = [`₹${finalPrice.toFixed(2)}`];
     if (couponToApply) paymentParts.push(`${couponToApply.code} coupon`);
     if (coinDiscount > 0) paymentParts.push(`${activeCoinDiscount?.coins || 0} EduCoins`);
-    unlockSubscriptionPlan(plan, paymentParts.join(' + '));
+    const paymentLabel = paymentParts.join(' + ');
+    unlockSubscriptionPlan(plan, paymentLabel);
+    setOrders(prevOrders => [{
+      id: `DC-SUB-${Date.now()}`,
+      customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
+      customerEmail: currentUser.email || 'customer@example.com',
+      date: new Date().toISOString().split('T')[0],
+      total: paymentLabel,
+      status: 'Completed',
+      items: [{ id: Number(plan.id) || Date.now(), name: `${plan.name} Subscription`, quantity: 1, price: `₹${planPrice.toFixed(2)}` }],
+      shippingAddress: 'N/A (Digital Subscription)',
+      billingAddress: 'Subscription Checkout',
+      paymentBreakdown: {
+        purchaseKind: 'subscription',
+        baseTotal: planPrice,
+        finalPrice,
+        couponCode: couponToApply?.code || null,
+        couponDiscount,
+        couponType: couponToApply?.type,
+        couponValue: couponToApply?.value,
+        eduCoinsUsed: coinDiscount > 0 ? activeCoinDiscount?.coins || 0 : 0,
+        eduCoinDiscount: coinDiscount,
+        coinOnlyPurchase: false,
+        paymentLabel,
+        unlockedProductIds: plan.unlockProductIds || [],
+      },
+    }, ...prevOrders]);
   };
 
   const handleActivateSubscriptionWithCoins = (plan: any) => {
@@ -2004,7 +2092,29 @@ const App: React.FC = () => {
     const coinPrice = activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(plan.id) ? activeCoinDiscount.coins : resolveCoinPrice(plan.coinPrice, economySettings, 'subscription', plan.id);
     if (!coinPrice || !deductEduCoins(coinPrice, { source: 'Subscription EduCoin purchase', description: `Activated ${plan.name} with EduCoins` })) return;
     if (activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(plan.id)) setActiveCoinDiscount(null);
-    unlockSubscriptionPlan(plan, `${coinPrice} EduCoins`);
+    const paymentLabel = `${coinPrice} EduCoins`;
+    unlockSubscriptionPlan(plan, paymentLabel);
+    setOrders(prevOrders => [{
+      id: `DC-SUB-${Date.now()}`,
+      customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
+      customerEmail: currentUser.email || 'customer@example.com',
+      date: new Date().toISOString().split('T')[0],
+      total: `🪙 ${coinPrice}`,
+      status: 'Completed',
+      items: [{ id: Number(plan.id) || Date.now(), name: `${plan.name} Subscription`, quantity: 1, price: `🪙 ${coinPrice}` }],
+      shippingAddress: 'N/A (Digital Subscription)',
+      billingAddress: 'EduCoin Wallet',
+      paymentBreakdown: {
+        purchaseKind: 'subscription',
+        baseTotal: Number(plan.price || 0),
+        finalPrice: 0,
+        eduCoinsUsed: coinPrice,
+        eduCoinDiscount: Number(plan.price || 0),
+        coinOnlyPurchase: true,
+        paymentLabel,
+        unlockedProductIds: plan.unlockProductIds || [],
+      },
+    }, ...prevOrders]);
   };
   const handleNavigateToSubscription = () => { setCurrentView('subscription'); window.scrollTo(0,0); };
 
