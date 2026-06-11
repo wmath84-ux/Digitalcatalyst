@@ -1,4 +1,4 @@
-import React, { useEffect, useId } from 'react';
+import React, { CSSProperties, useEffect, useId } from 'react';
 
 type GoogleAdVariant = 'display' | 'inFeed' | 'inArticle' | 'multiplex';
 
@@ -6,6 +6,7 @@ interface GoogleAdProps {
   variant: GoogleAdVariant;
   className?: string;
   label?: string;
+  style?: CSSProperties;
 }
 
 declare global {
@@ -59,7 +60,7 @@ const ensureAdsenseScript = () => {
   document.head.appendChild(script);
 };
 
-const GoogleAd: React.FC<GoogleAdProps> = ({ variant, className = '', label }) => {
+const GoogleAd: React.FC<GoogleAdProps> = ({ variant, className = '', label, style }) => {
   const id = useId();
   const config = adUnitConfig[variant];
 
@@ -79,7 +80,7 @@ const GoogleAd: React.FC<GoogleAdProps> = ({ variant, className = '', label }) =
   }, [id, variant]);
 
   return (
-    <div className={`google-ad-slot ${className}`} data-ad-variant={variant}>
+    <div className={`google-ad-slot ${className}`} data-ad-variant={variant} style={style}>
       {label && <p className="mb-3 text-center text-[10px] font-black uppercase tracking-[0.3em] text-slate-400">{label}</p>}
       <ins key={`${variant}-${id}`} className="adsbygoogle" {...config} />
     </div>

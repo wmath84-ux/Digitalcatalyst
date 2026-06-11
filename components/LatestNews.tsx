@@ -13,11 +13,22 @@ interface LatestNewsProps {
 
 
 const defaultReadingStyle = {
-  backgroundColor: '#dfe8fb',
-  backgroundOpacity: 92,
-  cardOpacity: 86,
-  accentColor: '#4338ca',
-  accentOpacity: 20,
+  backgroundColor: '#f7f9fc',
+  backgroundOpacity: 96,
+  cardOpacity: 94,
+  accentColor: '#c2e7ff',
+  accentOpacity: 62,
+};
+
+const chatPalette = {
+  appCanvas: '#f7f9fc',
+  searchBlue: '#edf4ff',
+  activeBlue: '#c2e7ff',
+  bubbleGray: '#f1f3f4',
+  cardBorder: '#e0e3eb',
+  primaryText: '#202124',
+  secondaryText: '#5f6368',
+  linkText: '#0b57d0',
 };
 
 const clampPercent = (value: unknown, fallback: number) => {
@@ -39,28 +50,28 @@ const getArticleCoverImage = (article: NewsArticle, size = '800/600') => article
 const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, settings: WebsiteSettings, cardBackground?: string, onReadMoreClick: (article: NewsArticle) => void }> = ({ article, animationDelay, settings, cardBackground, onReadMoreClick }) => {
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${(animationDelay % 8) + 1}` : '';
     return (
-        <div style={{ backgroundColor: cardBackground }} className={`backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] hover:shadow-[0_8px_30px_rgb(0,0,0,0.06)] border border-indigo-100/80 overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
-            <div className="relative h-48 overflow-hidden rounded-t-2xl bg-white/80">
+        <div style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }} className={`backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgba(60,64,67,0.08)] hover:shadow-[0_12px_34px_rgba(60,64,67,0.12)] border overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
+            <div className="relative h-48 overflow-hidden rounded-t-2xl" style={{ backgroundColor: chatPalette.searchBlue }}>
                 <img 
                     src={getArticleCoverImage(article)} 
                     alt={article.title} 
                     className="h-full w-full rounded-t-2xl object-cover transition-transform duration-700 group-hover:scale-110"
                 />
-                <div className="absolute top-4 left-4 bg-white/80 backdrop-blur-xl px-3 py-1 text-xs font-bold uppercase tracking-wider text-indigo-700 border border-indigo-100/80 rounded-md shadow-sm">
+                <div className="absolute top-4 left-4 backdrop-blur-xl px-3 py-1 text-xs font-bold uppercase tracking-wider border rounded-md shadow-sm" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder, color: chatPalette.linkText }}>
                     {article.type === 'news' ? 'News' : article.category}
                 </div>
             </div>
             <div className="p-6 flex flex-col flex-grow">
-                <div className="mb-3 text-xs text-slate-700 font-medium">
+                <div className="mb-3 text-xs font-medium" style={{ color: chatPalette.secondaryText }}>
                     {new Date(article.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                 </div>
-                <h3 className="text-xl font-bold text-slate-900 group-hover:text-indigo-700 transition-colors mb-3 leading-tight">
+                <h3 className="text-xl font-bold transition-colors mb-3 leading-tight" style={{ color: chatPalette.primaryText }}>
                     {article.title}
                 </h3>
-                <p className="text-sm text-slate-700 line-clamp-3 mb-6 flex-grow">
+                <p className="text-sm line-clamp-3 mb-6 flex-grow" style={{ color: chatPalette.secondaryText }}>
                     {article.excerpt}
                 </p>
-                <button onClick={() => onReadMoreClick(article)} className="text-indigo-700 font-bold text-sm uppercase tracking-wide flex items-center gap-2 group-hover:gap-3 transition-all">
+                <button onClick={() => onReadMoreClick(article)} className="font-bold text-sm uppercase tracking-wide flex items-center gap-2 group-hover:gap-3 transition-all" style={{ color: chatPalette.linkText }}>
                     Read Article <span className="text-lg leading-none">&rarr;</span>
                 </button>
             </div>
@@ -96,7 +107,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
 
   const newsArticles = articles.filter(article => article.type === 'news');
   const readingStyle = { ...defaultReadingStyle, ...((settings.content as any).readingStyle || {}) };
-  const sectionBackground = `linear-gradient(135deg, ${hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity)}, rgba(224, 231, 255, 0.82), rgba(239, 246, 255, 0.94))`;
+  const sectionBackground = `linear-gradient(135deg, ${hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity)}, rgba(237, 244, 255, 0.92), rgba(247, 249, 252, 0.98))`;
   const cardBackground = `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;
 
   if (newsArticles.length === 0) return null;
@@ -109,16 +120,16 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
       style={{ background: sectionBackground }}
     >
       <div className="container mx-auto px-6">
-        <GoogleAd variant="display" label="Advertisement" className="mb-12 rounded-[2rem] border border-indigo-100/80 bg-white/80 p-4 shadow-sm backdrop-blur-xl" />
+        <GoogleAd variant="display" label="Advertisement" className="mb-12 rounded-[2rem] border p-4 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }} />
 
         <div className="flex flex-col md:flex-row justify-between items-end mb-12">
             <div className="max-w-2xl">
-                <h2 className="text-4xl font-extrabold text-slate-900 tracking-tight">{title}</h2>
-                <p className="mt-4 text-lg text-slate-700">
+                <h2 className="text-4xl font-extrabold tracking-tight" style={{ color: chatPalette.primaryText }}>{title}</h2>
+                <p className="mt-4 text-lg" style={{ color: chatPalette.secondaryText }}>
                     Current student alerts, education updates, and opportunity signals from Digital Catalyst.
                 </p>
             </div>
-            <button onClick={onOpenHub} className="hidden md:block rounded-full border border-indigo-100/80 bg-white/80 px-5 py-2 text-sm font-bold text-indigo-700 backdrop-blur-xl transition hover:border-indigo-300/40 hover:bg-indigo-400/10">
+            <button onClick={onOpenHub} className="hidden md:block rounded-full border px-5 py-2 text-sm font-bold backdrop-blur-xl transition hover:shadow-md" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
                 Open News
             </button>
         </div>
@@ -137,17 +148,17 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
                 cardBackground={cardBackground}
               />
               {(index + 1) % 3 === 0 && index < newsArticles.length - 1 && (
-                <GoogleAd variant="inFeed" label="Sponsored" className="md:col-span-2 lg:col-span-3 rounded-[2rem] border border-indigo-100/80 bg-white/80 p-5 shadow-sm backdrop-blur-xl" />
+                <GoogleAd variant="inFeed" label="Sponsored" className="md:col-span-2 lg:col-span-3 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }} />
               )}
             </React.Fragment>
           ))}
         </div>
         
-        <button onClick={onOpenHub} className="md:hidden w-full mt-8 border border-indigo-100/80 bg-white/80 py-3 rounded-lg font-semibold text-indigo-700">
+        <button onClick={onOpenHub} className="md:hidden w-full mt-8 border py-3 rounded-lg font-semibold" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
             Open News
         </button>
 
-        <GoogleAd variant="display" label="Advertisement" className="mt-12 rounded-[2rem] border border-indigo-100/80 bg-white/80 p-4 shadow-sm backdrop-blur-xl" />
+        <GoogleAd variant="display" label="Advertisement" className="mt-12 rounded-[2rem] border p-4 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }} />
       </div>
     </section>
   );
