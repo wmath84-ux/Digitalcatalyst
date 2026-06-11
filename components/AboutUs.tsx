@@ -38,49 +38,49 @@ const AboutUs: React.FC<AboutUsProps> = ({ settings, title, text, imageSeed }) =
     <section 
       id="about" 
       ref={sectionRef}
-      className={`relative overflow-hidden bg-sky-50 bg-gradient-to-br from-sky-50 via-indigo-100/50 to-violet-100 py-24 text-slate-900 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      className={`relative overflow-hidden bg-sky-50 bg-gradient-to-br from-sky-50 via-indigo-100/50 to-violet-100 py-14 text-slate-900 sm:py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_65%,rgba(14,165,233,0.30),transparent_30%),radial-gradient(circle_at_82%_36%,rgba(124,58,237,0.30),transparent_30%)]" />
-      <div className="container relative z-10 mx-auto px-6">
-        <div className="grid grid-cols-1 items-center gap-10 lg:grid-cols-2">
-          <div className="order-2 rounded-3xl border border-indigo-100/80 bg-white/80 p-8 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] lg:order-1 lg:p-10">
+      <div className="container relative z-10 mx-auto px-4 sm:px-6">
+        <div className="grid grid-cols-1 items-center gap-6 sm:gap-10 lg:grid-cols-2">
+          <div className="order-2 rounded-2xl border border-indigo-100/80 bg-white/80 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:rounded-3xl sm:p-8 lg:order-1 lg:p-10">
             <div className="relative">
-                <p className="text-sm font-bold uppercase tracking-[0.35em] text-cyan-700">About us</p>
-                <h2 className="mt-3 text-4xl font-extrabold tracking-tight text-slate-900">{title}</h2>
+                <p className="text-xs font-bold uppercase tracking-[0.28em] text-cyan-700 sm:text-sm sm:tracking-[0.35em]">About us</p>
+                <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-slate-900 sm:mt-3 sm:text-4xl">{title}</h2>
                 <div className="mt-5 h-1.5 w-24 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 shadow-sm"></div>
             </div>
-            <div className="mt-8 space-y-6 text-lg leading-relaxed text-slate-700">
+            <div className="mt-5 space-y-4 text-base leading-7 text-slate-700 sm:mt-8 sm:space-y-6 sm:text-lg sm:leading-relaxed">
                 {text.split('\n').map((paragraph, index) => (
                     <p key={index}>{paragraph}</p>
                 ))}
             </div>
-            <div className="mt-8 grid grid-cols-2 gap-4">
-                <div className="rounded-2xl border border-indigo-100/80 bg-white/80 p-5 text-center backdrop-blur-xl">
-                    <p className="text-3xl font-bold text-slate-900">5k+</p>
+            <div className="mt-5 grid grid-cols-2 gap-3 sm:mt-8 sm:gap-4">
+                <div className="rounded-2xl border border-indigo-100/80 bg-white/80 p-4 text-center backdrop-blur-xl sm:p-5">
+                    <p className="text-2xl font-bold text-slate-900 sm:text-3xl">5k+</p>
                     <p className="mt-1 text-sm text-slate-700">Happy Clients</p>
                 </div>
-                <div className="rounded-2xl border border-indigo-100/80 bg-white/80 p-5 text-center backdrop-blur-xl">
-                    <p className="text-3xl font-bold text-slate-900">150+</p>
+                <div className="rounded-2xl border border-indigo-100/80 bg-white/80 p-4 text-center backdrop-blur-xl sm:p-5">
+                    <p className="text-2xl font-bold text-slate-900 sm:text-3xl">150+</p>
                     <p className="mt-1 text-sm text-slate-700">Products</p>
                 </div>
             </div>
           </div>
 
           <div className="order-1 lg:order-2">
-            <div className="relative rounded-3xl border border-indigo-100/80 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+            <div className="relative rounded-2xl border border-indigo-100/80 bg-white/80 p-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:rounded-3xl sm:p-6">
               <div className="absolute -right-6 -top-6 h-32 w-32 rounded-full bg-cyan-500/30 blur-3xl" />
               <div className="absolute -bottom-6 -left-6 h-32 w-32 rounded-full bg-violet-600/30 blur-3xl" />
-              <div className="relative overflow-hidden rounded-2xl border border-indigo-100/80 bg-white/80 p-8">
+              <div className="relative overflow-hidden rounded-2xl border border-indigo-100/80 bg-white/80 p-4 sm:p-8">
                 <div className="absolute inset-0 opacity-30 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:36px_36px]" />
-                <div className="relative min-h-[340px] rounded-2xl bg-gradient-to-br from-blue-600/25 via-violet-600/25 to-cyan-500/20 p-8">
-                  <div className="flex h-full min-h-[284px] flex-col justify-between">
+                <div className="relative min-h-[230px] rounded-2xl bg-gradient-to-br from-blue-600/25 via-violet-600/25 to-cyan-500/20 p-4 sm:min-h-[340px] sm:p-8">
+                  <div className="flex h-full min-h-[198px] flex-col justify-between sm:min-h-[284px]">
                     <div>
-                      <p className="text-sm font-semibold uppercase tracking-[0.3em] text-cyan-700">Mission control</p>
-                      <h3 className="mt-4 text-3xl font-extrabold text-slate-900">Empowering your digital journey.</h3>
+                      <p className="text-xs font-semibold uppercase tracking-[0.24em] text-cyan-700 sm:text-sm sm:tracking-[0.3em]">Mission control</p>
+                      <h3 className="mt-3 text-2xl font-extrabold text-slate-900 sm:mt-4 sm:text-3xl">Empowering your digital journey.</h3>
                     </div>
-                    <div className="grid grid-cols-2 gap-4">
+                    <div className="grid grid-cols-2 gap-2 sm:gap-4">
                       {['Strategy', 'Automation', imageSeed || 'Growth', 'Scale'].map((item) => (
-                        <div key={item} className="rounded-2xl border border-indigo-100/80 bg-white/80 p-4 text-sm font-semibold text-slate-900 backdrop-blur-xl">
+                        <div key={item} className="rounded-xl border border-indigo-100/80 bg-white/80 p-3 text-xs font-semibold text-slate-900 backdrop-blur-xl sm:rounded-2xl sm:p-4 sm:text-sm">
                           {item}
                         </div>
                       ))}

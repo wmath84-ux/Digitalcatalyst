@@ -95,14 +95,14 @@ const ModuleItem: React.FC<{ module: CourseModule; activeFile: ProductFile | nul
   const [isExpanded, setIsExpanded] = useState(true);
   return (
     <div className={`${level > 0 ? "ml-4 border-l border-white/50 pl-3" : ""}`}>
-      <button onClick={() => setIsExpanded(!isExpanded)} className="flex w-full items-center gap-2 rounded-xl px-3 py-4 text-left text-slate-900 transition hover:bg-cyan-50/30" aria-expanded={isExpanded}>
+      <button onClick={() => setIsExpanded(!isExpanded)} className="module-item-button flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-slate-900 transition hover:bg-cyan-50/30 sm:py-4" aria-expanded={isExpanded}>
         <ModuleIcon className="h-5 w-5 shrink-0" />
         <span className="text-[15px] font-black leading-tight">{module.title}</span>
       </button>
       {isExpanded && (
         <div className="space-y-1 pb-2">
           {(module.files || []).map((file) => (
-            <button key={file.id} onClick={() => onSelectFile(file)} className={`flex w-full items-center gap-3 rounded-lg px-3 py-3 text-left text-sm transition ${activeFile?.id === file.id ? "bg-white border border-slate-200 font-black text-slate-900 shadow-sm shadow-slate-200/50" : "font-medium text-slate-900/90 hover:bg-cyan-50/25"}`}>
+            <button key={file.id} onClick={() => onSelectFile(file)} className={`module-item-button flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition sm:py-3 ${activeFile?.id === file.id ? "bg-white border border-slate-200 font-black text-slate-900 shadow-sm shadow-slate-200/50" : "font-medium text-slate-900/90 hover:bg-cyan-50/25"}`}>
               <span className="min-w-0 flex-1 truncate">{file.name}</span>
               {file.type === 'quiz' ? <QuizIcon className="h-5 w-5 shrink-0" /> : <FileIcon className="h-5 w-5 shrink-0" />}
             </button>
@@ -235,12 +235,12 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
           suppressContentEditableWarning
           onInput={persist}
           onBlur={persist}
-          className="smart-docs-page mx-auto min-h-full max-w-4xl rounded-[1.5rem] border border-white/50 bg-white/70 px-8 py-10 text-lg leading-8 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl md:px-14 [&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6"
+          className="smart-docs-page mx-auto min-h-full max-w-4xl rounded-[1.25rem] border border-white/50 bg-white/70 px-4 py-6 text-base leading-7 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl sm:rounded-[1.5rem] sm:px-8 sm:py-10 sm:text-lg sm:leading-8 md:px-14 [&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6"
         />
       </div>
       {isReadingMode && (
         <div className="absolute inset-4 z-20 flex flex-col overflow-hidden rounded-[2rem] border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
-          <div className="flex flex-wrap items-center gap-2 border-b border-white/50 bg-white/70 p-3">
+          <div className="smart-docs-toolbar flex flex-wrap items-center gap-2 border-b border-white/50 bg-white/70 p-2 sm:p-3">
             <span className="mr-auto font-black text-slate-900">Reading Mode</span>
             <button type="button" onClick={() => setFontSize(value => Math.max(14, value - 2))} className="rounded-xl bg-white/70 px-3 py-2 font-black hover:bg-white/80 hover:shadow-sm">A-</button>
             <button type="button" onClick={() => setFontSize(value => Math.min(28, value + 2))} className="rounded-xl bg-white/70 px-3 py-2 font-black hover:bg-white/80 hover:shadow-sm">A+</button>
@@ -521,24 +521,24 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   };
 
   return (
-    <div className="relative h-screen w-screen overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
+    <div className="course-player-mobile-scope relative h-screen w-screen overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100 text-slate-900">
       <div className="absolute inset-0 scale-110 bg-cover bg-center opacity-20 blur-2xl" style={{ backgroundImage: `url(${backgroundImage})` }} />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(99,102,241,0.28),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.16),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.82),rgba(238,242,255,0.72),rgba(248,250,252,0.94))]" />
       <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: accentGlow }} />
       <div className="absolute -top-12 right-12 h-72 w-72 rounded-full bg-indigo-300/15 blur-3xl" />
 
-      <header className="relative z-30 flex items-center gap-3 border-b border-white/50 bg-white/70 p-3 shadow-sm backdrop-blur-xl lg:hidden">
+      <header className="relative z-30 flex items-center gap-2 border-b border-white/50 bg-white/70 p-2.5 shadow-sm backdrop-blur-xl sm:gap-3 sm:p-3 lg:hidden">
         <button onClick={() => setIsSidebarOpen(true)} className="shrink-0 rounded-lg border border-white/60 bg-white/40 p-2"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
-        <h1 className="min-w-0 flex-1 truncate text-lg font-black">{activeFile?.name || product.title}</h1>
-        <div className="ml-auto flex shrink-0 items-center gap-2 overflow-x-auto">
+        <h1 className="min-w-0 flex-1 truncate text-base font-black sm:text-lg">{activeFile?.name || product.title}</h1>
+        <div className="ml-auto flex max-w-[48vw] shrink-0 items-center gap-2 overflow-x-auto sm:max-w-none">
           {liveEarningHud}
-          <button onClick={() => setIsMentorOpen(value => !value)} className="rounded-xl border border-cyan-200/30 bg-cyan-200/15 px-3 py-2 text-sm font-black shadow-sm">🧠 AI</button>
+          <button onClick={() => setIsMentorOpen(value => !value)} className="rounded-xl border border-cyan-200/30 bg-cyan-200/15 px-2.5 py-2 text-xs font-black shadow-sm sm:px-3 sm:text-sm">🧠 AI</button>
         </div>
       </header>
 
       <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
-      <main className="relative flex h-full flex-col gap-3 p-3 lg:p-3">
+      <main className="relative flex h-[calc(100%-3.75rem)] flex-col gap-2 p-2 sm:gap-3 sm:p-3 lg:h-full lg:p-3">
         <div className="hidden shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border border-white/50 bg-white/70 px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid">
           <span className="truncate">{activeFile?.name || product.title}</span>
           <div className="flex items-center justify-center gap-3">
@@ -548,20 +548,20 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           <span className="truncate text-right text-sm font-bold text-slate-900/60">Welcome to the Course</span>
         </div>
 
-        <section className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
-          <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform transition lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <section className="grid min-h-0 flex-1 grid-cols-1 gap-2 sm:gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
+          <aside className={`fixed inset-y-0 left-0 z-40 w-[18rem] transform transition sm:w-80 lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col border-r border-slate-200/70 bg-white/95 shadow-[4px_0_30px_rgba(0,0,0,0.06)] backdrop-blur-3xl lg:rounded-2xl lg:border lg:border-slate-200/50 lg:bg-slate-900/[0.04] lg:shadow-[4px_0_30px_rgba(0,0,0,0.02)]">
-              <div className="shrink-0 border-b border-slate-200/70 px-4 py-5 lg:border-white/50">
-                <button onClick={onBack} className="mb-4 flex items-center gap-2 text-[22px] font-medium text-slate-900 hover:opacity-70">← <span>Back</span></button>
-                <h2 className="text-[25px] font-black leading-tight text-slate-900">{product.title}</h2>
+              <div className="shrink-0 border-b border-slate-200/70 px-4 py-4 lg:border-white/50 lg:py-5">
+                <button onClick={onBack} className="mb-3 flex items-center gap-2 text-lg font-medium text-slate-900 hover:opacity-70 sm:mb-4 sm:text-[22px]">← <span>Back</span></button>
+                <h2 className="text-xl font-black leading-tight text-slate-900 sm:text-[25px]">{product.title}</h2>
               </div>
-              <nav className="flex-1 overflow-y-auto p-3">
+              <nav className="flex-1 overflow-y-auto p-2 sm:p-3">
                 {(product.courseContent || []).length > 0 ? (product.courseContent || []).map(m => <ModuleItem key={m.id} module={m} activeFile={activeFile} onSelectFile={onSelectFile} />) : <p className="p-4 text-center font-semibold text-slate-900/60">No content added yet.</p>}
               </nav>
             </div>
           </aside>
 
-          <div className="relative min-h-0 overflow-hidden bg-white/40 backdrop-blur-2xl border border-slate-200/60 rounded-3xl shadow-[0_20px_60px_rgba(0,0,0,0.05)]">
+          <div className="relative min-h-0 overflow-hidden rounded-2xl border border-slate-200/60 bg-white/40 shadow-[0_20px_60px_rgba(0,0,0,0.05)] backdrop-blur-2xl sm:rounded-3xl">
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>

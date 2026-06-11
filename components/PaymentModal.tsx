@@ -172,24 +172,24 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   const coinGuideContent = (
-    <div className="space-y-6 p-6 text-slate-900 sm:p-8">
-      <div className="relative overflow-hidden rounded-[2rem] border border-white/60 bg-white/75 p-6 text-center shadow-[0_24px_70px_rgba(15,23,42,0.10)] backdrop-blur-2xl">
+    <div className="space-y-4 p-4 text-slate-900 sm:space-y-6 sm:p-8">
+      <div className="relative overflow-hidden rounded-[1.5rem] border border-white/60 bg-white/75 p-4 text-center shadow-[0_24px_70px_rgba(15,23,42,0.10)] backdrop-blur-2xl sm:rounded-[2rem] sm:p-6">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(251,191,36,0.22),transparent_28%),radial-gradient(circle_at_86%_12%,rgba(99,102,241,0.18),transparent_24%)]" />
         <div className="relative">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full border border-amber-200 bg-amber-100/80 text-3xl shadow-inner">🪙</div>
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-amber-200 bg-amber-100/80 text-2xl shadow-inner sm:h-16 sm:w-16 sm:text-3xl">🪙</div>
           <p className="mt-4 text-xs font-black uppercase tracking-[0.28em] text-amber-600">EduCoin balance low</p>
-          <h3 className="mt-2 text-3xl font-black text-slate-950">Earn more EduCoins</h3>
+          <h3 className="mt-2 text-2xl font-black text-slate-950 sm:text-3xl">Earn more EduCoins</h3>
           <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-600">Your live wallet shows {eduCoinBalance} EduCoins. This checkout needs {coinPrice} EduCoins, so you need {missingCoins} more. These are the exact earning routes already connected in Digital Catalyst.</p>
         </div>
       </div>
 
       {coinStatus && <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm font-black text-amber-800">{coinStatus}</div>}
 
-      <div className="grid gap-4 md:grid-cols-2">
+      <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
         {earnMethods.map(method => (
-          <div key={method.title} className="rounded-[1.5rem] border border-white/70 bg-white/75 p-5 shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl">
-            <div className="flex items-start gap-4">
-              <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-100 to-cyan-100 text-2xl">{method.icon}</div>
+          <div key={method.title} className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl sm:rounded-[1.5rem] sm:p-5">
+            <div className="flex items-start gap-3 sm:gap-4">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-100 to-cyan-100 text-xl sm:h-12 sm:w-12 sm:rounded-2xl sm:text-2xl">{method.icon}</div>
               <div>
                 <h4 className="font-black text-slate-900">{method.title}</h4>
                 <p className="mt-1 text-sm font-black text-indigo-600">{method.text}</p>
@@ -201,14 +201,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <button onClick={() => setShowCoinGuide(false)} className="rounded-2xl border border-white/70 bg-white/80 px-6 py-4 text-base font-black text-slate-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white">Back to checkout</button>
-        <button onClick={onStartEarning || (() => setShowCoinGuide(false))} className="rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-4 text-base font-black text-white shadow-[0_12px_34px_rgba(79,70,229,0.22)] transition hover:-translate-y-0.5">Open Profile & Start Earning</button>
+        <button onClick={() => setShowCoinGuide(false)} className="rounded-2xl border border-white/70 bg-white/80 px-5 py-3.5 text-sm font-black text-slate-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white sm:px-6 sm:py-4 sm:text-base">Back to checkout</button>
+        <button onClick={onStartEarning || (() => setShowCoinGuide(false))} className="rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3.5 text-sm font-black text-white shadow-[0_12px_34px_rgba(79,70,229,0.22)] transition hover:-translate-y-0.5 sm:px-6 sm:py-4 sm:text-base">Open Profile & Start Earning</button>
       </div>
     </div>
   );
 
   const summaryCard = (
-    <div className="space-y-3 rounded-[1.75rem] border border-white/70 bg-white/75 p-5 shadow-[0_18px_55px_rgba(15,23,42,0.06)] backdrop-blur-xl">
+    <div className="space-y-3 rounded-[1.25rem] border border-white/70 bg-white/75 p-4 shadow-[0_18px_55px_rgba(15,23,42,0.06)] backdrop-blur-xl sm:rounded-[1.75rem] sm:p-5">
       <div className="flex justify-between text-xs font-black uppercase tracking-widest text-slate-500"><span>Item</span><span>Price</span></div>
       {isCartMode ? (
         <div className="max-h-36 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
@@ -220,68 +220,68 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           ))}
         </div>
       ) : (
-        <div className="flex justify-between gap-4"><span className="font-bold text-slate-800">{productTitle}</span><span className="font-bold text-slate-700">₹{originalPrice.toFixed(2)}</span></div>
+        <div className="flex justify-between gap-3"><span className="font-bold text-slate-800">{productTitle}</span><span className="font-bold text-slate-700">₹{originalPrice.toFixed(2)}</span></div>
       )}
       <div className="border-t border-dashed border-slate-200 pt-3 text-sm">
         {!isCartMode && salePrice !== null && salePrice !== undefined && <div className="flex justify-between"><span className="text-slate-600">Sale discount</span><span className="font-bold text-emerald-600">- ₹{(originalPrice - salePrice).toFixed(2)}</span></div>}
         {couponDiscount > 0 && <div className="flex justify-between"><span className="text-slate-600">Coupon savings</span><span className="font-bold text-emerald-600">- ₹{couponDiscount.toFixed(2)}</span></div>}
         {eduCoinDiscount > 0 && <div className="flex justify-between"><span className="text-slate-600">EduCoins applied ({appliedEduCoins} @ {coinRedeemRate}:1)</span><span className="font-bold text-emerald-600">- ₹{eduCoinDiscount.toFixed(2)}</span></div>}
-        <div className="mt-3 flex items-center justify-between"><span className="text-lg font-black text-slate-900">Total</span><span className="text-3xl font-black text-primary">₹{finalPrice.toFixed(2)}</span></div>
+        <div className="mt-3 flex items-center justify-between gap-3"><span className="text-lg font-black text-slate-900">Total</span><span className="text-2xl font-black text-primary sm:text-3xl">₹{finalPrice.toFixed(2)}</span></div>
         {coinPrice > 0 && <div className="mt-3 rounded-2xl bg-amber-50/90 px-4 py-3 text-sm font-black text-amber-700">EduCoin price: 🪙 {coinPrice} • Your balance: 🪙 {eduCoinBalance}</div>}
       </div>
     </div>
   );
 
   const razorpayDemoPage = (
-    <div className="space-y-6 p-6 sm:p-8">
-      <div className="relative overflow-hidden rounded-[2rem] border border-sky-200/60 bg-gradient-to-br from-[#0b72e7] via-[#146ef5] to-[#7c3aed] p-6 text-white shadow-[0_24px_80px_rgba(37,99,235,0.26)]">
+    <div className="space-y-4 p-4 sm:space-y-6 sm:p-8">
+      <div className="relative overflow-hidden rounded-[1.5rem] border border-sky-200/60 bg-gradient-to-br from-[#0b72e7] via-[#146ef5] to-[#7c3aed] p-4 text-white shadow-[0_24px_80px_rgba(37,99,235,0.26)] sm:rounded-[2rem] sm:p-6">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.28),transparent_24%),radial-gradient(circle_at_90%_80%,rgba(255,255,255,0.16),transparent_24%)]" />
         <div className="relative">
           <p className="text-xs font-black uppercase tracking-[0.32em] text-white/70">Razorpay payment page</p>
-          <h3 className="mt-3 text-3xl font-black">Complete payment in the Razorpay tab</h3>
+          <h3 className="mt-3 text-2xl font-black sm:text-3xl">Complete payment in the Razorpay tab</h3>
           <p className="mt-3 text-sm font-semibold leading-6 text-white/80">The real Razorpay payment page has been opened in a new tab. After completing payment there, return here and confirm so Digital Catalyst can show verification loading and unlock the product.</p>
         </div>
       </div>
       {summaryCard}
       <div className="grid gap-3 sm:grid-cols-2">
-        <a href={razorpayUrl} target="_blank" rel="noreferrer" className="rounded-2xl border border-sky-200 bg-white/85 px-6 py-4 text-center text-base font-black text-sky-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5">Open real Razorpay tab</a>
-        <button onClick={completeDemoRazorpayUnlock} className="rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-6 py-4 text-base font-black text-white shadow-[0_14px_40px_rgba(245,158,11,0.28)] transition hover:-translate-y-0.5">I've completed payment — unlock product</button>
+        <a href={razorpayUrl} target="_blank" rel="noreferrer" className="rounded-2xl border border-sky-200 bg-white/85 px-5 py-3.5 text-center text-sm font-black text-sky-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 sm:px-6 sm:py-4 sm:text-base">Open real Razorpay tab</a>
+        <button onClick={completeDemoRazorpayUnlock} className="rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3.5 text-sm font-black text-white shadow-[0_14px_40px_rgba(245,158,11,0.28)] transition hover:-translate-y-0.5 sm:px-6 sm:py-4 sm:text-base">I've completed payment — unlock product</button>
       </div>
       <button onClick={() => setCheckoutStep('checkout')} className="w-full rounded-2xl border border-white/70 bg-white/75 px-6 py-3 text-sm font-black text-slate-600 backdrop-blur-xl">Return to checkout options</button>
     </div>
   );
 
   const loadingContent = (
-    <div className="flex min-h-[420px] flex-col items-center justify-center p-8 text-center">
-      <div className="relative h-28 w-28">
+    <div className="flex min-h-[340px] flex-col items-center justify-center p-5 text-center sm:min-h-[420px] sm:p-8">
+      <div className="relative h-24 w-24 sm:h-28 sm:w-28">
         <div className="absolute inset-0 rounded-full border-8 border-indigo-100" />
         <div className="absolute inset-0 animate-spin rounded-full border-8 border-transparent border-t-indigo-600 border-r-cyan-500" />
         <div className="absolute inset-5 flex items-center justify-center rounded-full bg-white/80 text-3xl shadow-inner backdrop-blur-xl">🔐</div>
       </div>
       <p className="mt-6 text-xs font-black uppercase tracking-[0.32em] text-indigo-500">Demo verification</p>
-      <h3 className="mt-2 text-3xl font-black text-slate-950">Fetching payment status...</h3>
+      <h3 className="mt-2 text-2xl font-black text-slate-950 sm:text-3xl">Fetching payment status...</h3>
       <p className="mt-3 max-w-md text-sm font-semibold leading-6 text-slate-600">In live mode this is where Razorpay API verification will run. For now, demo mode safely unlocks after this loading animation.</p>
     </div>
   );
 
   const checkoutContent = showCoinGuide ? coinGuideContent : checkoutStep === 'razorpay' ? razorpayDemoPage : checkoutStep === 'loading' ? loadingContent : (
     <>
-      <div className="bg-gradient-to-br from-slate-50 via-indigo-50/40 to-cyan-50/40 p-6 text-slate-900 sm:p-8">
-        <div className="rounded-[1.75rem] border border-white/60 bg-white/75 p-5 shadow-sm backdrop-blur-xl">
+      <div className="bg-gradient-to-br from-slate-50 via-indigo-50/40 to-cyan-50/40 p-4 text-slate-900 sm:p-8">
+        <div className="rounded-[1.25rem] border border-white/60 bg-white/75 p-4 shadow-sm backdrop-blur-xl sm:rounded-[1.75rem] sm:p-5">
           <p className="text-xs font-black uppercase tracking-[0.25em] text-indigo-400">Secure demo checkout</p>
-          <h3 className="mt-2 text-2xl font-black">Choose Razorpay or instant EduCoin unlock</h3>
+          <h3 className="mt-2 text-xl font-black sm:text-2xl">Choose Razorpay or instant EduCoin unlock</h3>
           <p className="mt-2 text-sm text-slate-600">Razorpay opens a nested demo payment page. EduCoins check your latest wallet balance before product access is unlocked.</p>
         </div>
       </div>
 
-      <div className="space-y-6 p-6 sm:p-8">
+      <div className="space-y-4 p-4 sm:space-y-6 sm:p-8">
         {summaryCard}
         {coinStatus && <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm font-black text-amber-800">{coinStatus}</div>}
 
         <div className="space-y-3">
-          <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-500 px-6 py-4 text-lg font-black text-white shadow-[0_16px_45px_rgba(79,70,229,0.24)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70">{finalPrice <= 0 ? 'Complete ₹0 Checkout' : 'Pay with Razorpay'}</button>
+          <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-500 px-5 py-3.5 text-base font-black text-white shadow-[0_16px_45px_rgba(79,70,229,0.24)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg">{finalPrice <= 0 ? 'Complete ₹0 Checkout' : 'Pay with Razorpay'}</button>
           {onConfirmWithCoins && coinPrice > 0 && (
-            <button disabled={isCompleting} onClick={handleCoinCheckout} className={`w-full rounded-2xl border px-6 py-4 text-lg font-black shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 ${canPayWithCoins ? 'border-amber-200/60 bg-white/80 text-amber-700' : 'border-amber-200 bg-amber-50/90 text-amber-800'}`}>
+            <button disabled={isCompleting} onClick={handleCoinCheckout} className={`w-full rounded-2xl border px-5 py-3.5 text-base font-black shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg ${canPayWithCoins ? 'border-amber-200/60 bg-white/80 text-amber-700' : 'border-amber-200 bg-amber-50/90 text-amber-800'}`}>
               {isCompleting ? 'Checking live DB balance...' : canPayWithCoins ? `Pay with ${coinPrice} EduCoins` : `Need ${missingCoins} more EduCoins`}
             </button>
           )}
@@ -294,33 +294,33 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   if (presentation === 'page') {
     return (
-      <div ref={pageRef} className="fixed inset-0 z-[90] overflow-y-auto bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 px-4 pb-16 pt-6 text-slate-900 sm:px-6 lg:px-8">
+      <div ref={pageRef} className="fixed inset-0 z-[90] overflow-y-auto bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 px-3 pb-10 pt-4 text-slate-900 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
         <div className="pointer-events-none absolute -left-24 top-16 h-72 w-72 rounded-full bg-indigo-400/30 blur-3xl" />
         <div className="pointer-events-none absolute -right-20 bottom-10 h-80 w-80 rounded-full bg-cyan-600/25 blur-3xl" />
         <div className="relative mx-auto w-full max-w-6xl">
-          <div className="mb-5 flex flex-wrap items-center justify-between gap-4">
-            <button onClick={onClose} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-5 py-3 text-sm font-black text-white shadow-sm backdrop-blur-xl transition hover:-translate-x-0.5 hover:bg-white/15">
+          <div className="mb-4 flex items-center justify-between gap-3 sm:mb-5 sm:flex-wrap sm:gap-4">
+            <button onClick={onClose} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-black text-white shadow-sm backdrop-blur-xl transition hover:-translate-x-0.5 hover:bg-white/15 sm:px-5 sm:py-3 sm:text-sm">
               ← Back to product
             </button>
-            <div className="flex items-center gap-2 rounded-full border border-emerald-200/30 bg-emerald-400/10 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-100 shadow-sm backdrop-blur-xl">
+            <div className="hidden items-center gap-2 rounded-full border border-emerald-200/30 bg-emerald-400/10 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-100 shadow-sm backdrop-blur-xl sm:flex">
               <span className="h-2 w-2 rounded-full bg-emerald-400" /> Secure checkout
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-[2.5rem] border border-white/20 bg-white/10 shadow-[0_28px_100px_rgba(0,0,0,0.30)] backdrop-blur-2xl">
+          <div className="overflow-hidden rounded-[1.5rem] border border-white/20 bg-white/10 shadow-[0_28px_100px_rgba(0,0,0,0.30)] backdrop-blur-2xl sm:rounded-[2.5rem]">
             <div className="grid lg:grid-cols-[0.95fr_1.05fr]">
-              <aside className="relative overflow-hidden bg-gradient-to-br from-indigo-700/95 via-purple-600/95 to-cyan-500/95 p-8 text-white sm:p-10">
+              <aside className="relative overflow-hidden bg-gradient-to-br from-indigo-700/95 via-purple-600/95 to-cyan-500/95 p-4 text-white sm:p-10">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.28),transparent_24%),radial-gradient(circle_at_82%_75%,rgba(255,255,255,0.18),transparent_24%)]" />
-                <div className="relative flex h-full min-h-[360px] flex-col justify-between gap-10">
+                <div className="relative flex h-full min-h-0 flex-col justify-between gap-5 sm:min-h-[360px] sm:gap-10">
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.32em] text-white/70">Digital Catalyst checkout</p>
-                    <h2 className="mt-5 text-4xl font-black leading-tight sm:text-5xl">Review. Pay. Unlock.</h2>
+                    <h2 className="mt-3 text-2xl font-black leading-tight sm:mt-5 sm:text-5xl">Review. Pay. Unlock.</h2>
                     <p className="mt-4 max-w-md text-sm font-semibold leading-6 text-white/80">Use the glossy Razorpay demo page or spend EduCoins after a live wallet check.</p>
                   </div>
-                  <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                    <div className="rounded-3xl border border-white/20 bg-white/15 p-4 backdrop-blur-xl"><span className="font-black">🔒 Secure</span><p className="mt-1 text-sm text-white/75">Payment verification loader is ready for live API integration.</p></div>
-                    <div className="rounded-3xl border border-white/20 bg-white/15 p-4 backdrop-blur-xl"><span className="font-black">🪙 EduCoins</span><p className="mt-1 text-sm text-white/75">Wallet balance is checked before spending.</p></div>
-                    <div className="rounded-3xl border border-white/20 bg-white/15 p-4 backdrop-blur-xl"><span className="font-black">📚 Access</span><p className="mt-1 text-sm text-white/75">Unlocked products appear in My Purchases.</p></div>
+                  <div className="grid gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-1">
+                    <div className="rounded-2xl border border-white/20 bg-white/15 p-3 backdrop-blur-xl sm:rounded-3xl sm:p-4"><span className="font-black">🔒 Secure</span><p className="mt-1 text-sm text-white/75">Payment verification loader is ready for live API integration.</p></div>
+                    <div className="rounded-2xl border border-white/20 bg-white/15 p-3 backdrop-blur-xl sm:rounded-3xl sm:p-4"><span className="font-black">🪙 EduCoins</span><p className="mt-1 text-sm text-white/75">Wallet balance is checked before spending.</p></div>
+                    <div className="rounded-2xl border border-white/20 bg-white/15 p-3 backdrop-blur-xl sm:rounded-3xl sm:p-4"><span className="font-black">📚 Access</span><p className="mt-1 text-sm text-white/75">Unlocked products appear in My Purchases.</p></div>
                   </div>
                 </div>
               </aside>
