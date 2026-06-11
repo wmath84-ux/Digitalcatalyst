@@ -6,6 +6,7 @@ import { db } from '../firebase';
 
 interface EduvoraCommunityProps {
   onClose?: () => void;
+  isAuthenticated?: boolean;
 }
 
 type CommunityView = 'feed' | 'status';
@@ -148,7 +149,7 @@ const mapStatusDoc = (snapshotDoc: { id: string; data: () => Record<string, any>
   };
 };
 
-const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
+const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenticated = false }) => {
   const navigate = useNavigate();
   const guardedAuth = getAuth();
   const [isCommunityAllowed, setIsCommunityAllowed] = useState(false);
@@ -227,13 +228,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
   };
 
   useEffect(() => {
+    if (isAuthenticated) {
+      setIsCommunityAllowed(true);
+      return undefined;
+    }
     const unsubscribe = onAuthStateChanged(guardedAuth, (user) => {
       const allowed = Boolean(user);
       setIsCommunityAllowed(allowed);
       if (!allowed) redirectToAuth();
     });
     return unsubscribe;
-  }, [guardedAuth, navigate]);
+  }, [guardedAuth, isAuthenticated, navigate]);
 
   useEffect(() => {
     if (!isCommunityAllowed) return undefined;
