@@ -402,33 +402,42 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
               )}
 
               {view === 'article' && selectedArticle && (
-                <article className="mx-auto max-w-3xl">
-                  <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>{selectedArticle.category}</p>
-                  <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-6xl" style={{ color: chatPalette.primaryText }}>{selectedArticle.title}</h1>
-                  <p className="mt-6 text-xl leading-8" style={{ color: chatPalette.secondaryText }}>{selectedArticle.excerpt}</p>
-                  <div className="mt-7 flex flex-wrap gap-3 rounded-[1.5rem] border p-4 text-sm font-bold shadow-sm backdrop-blur-xl" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>
-                    <span>📖 Focus-friendly article</span>
-                    <span>•</span>
-                    <span>Comfort spacing</span>
-                    <span>•</span>
-                    <span>Soft trusted palette</span>
+                <article className="mx-auto max-w-6xl">
+                  <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
+                    <div className="min-w-0">
+                      <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>{selectedArticle.category}</p>
+                      <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl" style={{ color: chatPalette.primaryText }}>{selectedArticle.title}</h1>
+                      <p className="mt-5 text-lg leading-8 sm:text-xl lg:max-w-3xl" style={{ color: chatPalette.secondaryText }}>{selectedArticle.excerpt}</p>
+                      <div className="mt-6 flex flex-wrap gap-2 rounded-[1.5rem] border p-3 text-xs font-bold shadow-sm backdrop-blur-xl sm:gap-3 sm:p-4 sm:text-sm" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>
+                        <span>📖 Focus-friendly article</span>
+                        <span>•</span>
+                        <span>Comfort spacing</span>
+                        <span>•</span>
+                        <span>Soft trusted palette</span>
+                      </div>
+                    </div>
+                    {!isExternalArticle(selectedArticle) && (
+                      <div className="hidden overflow-hidden rounded-[2rem] border shadow-sm backdrop-blur-2xl lg:block" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
+                        <img src={getArticleImage(selectedArticle, '900/700')} alt={selectedArticle.title} className="aspect-[4/3] h-full w-full object-cover opacity-90 animate-article-hero-image" />
+                      </div>
+                    )}
                   </div>
                   {isExternalArticle(selectedArticle) ? (
                     <>
-                      <div className="mt-10 overflow-hidden rounded-[2rem] border p-2 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
-                        <iframe src={getArticleUrl(selectedArticle)} title={selectedArticle.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-white [scrollbar-width:none]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
+                      <div className="mt-8 overflow-hidden rounded-[2rem] border p-2 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl lg:mt-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
+                        <iframe src={getArticleUrl(selectedArticle)} title={selectedArticle.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-white [scrollbar-width:none] lg:h-[76vh]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
                       </div>
-                      <GoogleAd variant="multiplex" label="Related Content" className="mt-12 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
+                      <GoogleAd variant="multiplex" label="Related Content" className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
                     </>
                   ) : (
                     <>
-                      <div className="mb-6 mt-10 aspect-video overflow-hidden rounded-2xl border shadow-sm backdrop-blur-2xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
+                      <div className="mb-6 mt-8 aspect-video overflow-hidden rounded-2xl border shadow-sm backdrop-blur-2xl lg:hidden" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
                         <img src={getArticleImage(selectedArticle, '1400/800')} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" />
                       </div>
-                      <div className="mt-12 rounded-[2rem] border p-6 text-lg leading-9 shadow-[0_18px_50px_rgba(60,64,67,0.08)] backdrop-blur-2xl sm:p-8" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
+                      <div className="mx-auto mt-8 max-w-4xl rounded-[2rem] border p-6 text-lg leading-9 shadow-[0_18px_50px_rgba(60,64,67,0.08)] backdrop-blur-2xl sm:p-8 lg:mt-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
                         <MarkdownContent content={selectedArticle.content} includeInArticleAd />
                         <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} />
-                        <GoogleAd variant="multiplex" label="Related Content" className="mt-12 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
+                        <GoogleAd variant="multiplex" label="Related Content" className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
                       </div>
                     </>
                   )}
