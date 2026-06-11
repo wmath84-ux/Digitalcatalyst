@@ -538,7 +538,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
 
       <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
-      <main className="relative z-10 flex h-full flex-col gap-3 p-3 lg:p-3">
+      <main className="relative flex h-full flex-col gap-3 p-3 lg:p-3">
         <div className="hidden shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border border-white/50 bg-white/70 px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid">
           <span className="truncate">{activeFile?.name || product.title}</span>
           <div className="flex items-center justify-center gap-3">
@@ -549,9 +549,9 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
         </div>
 
         <section className="grid min-h-0 flex-1 grid-cols-1 gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
-          <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform bg-slate-900/[0.04] backdrop-blur-3xl border-r border-slate-200/50 shadow-[4px_0_30px_rgba(0,0,0,0.02)] transition lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl lg:border ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-            <div className="flex h-full flex-col">
-              <div className="shrink-0 border-b border-white/50 px-4 py-5">
+          <aside className={`fixed inset-y-0 left-0 z-40 w-80 transform transition lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+            <div className="flex h-full flex-col border-r border-slate-200/70 bg-white/95 shadow-[4px_0_30px_rgba(0,0,0,0.06)] backdrop-blur-3xl lg:rounded-2xl lg:border lg:border-slate-200/50 lg:bg-slate-900/[0.04] lg:shadow-[4px_0_30px_rgba(0,0,0,0.02)]">
+              <div className="shrink-0 border-b border-slate-200/70 px-4 py-5 lg:border-white/50">
                 <button onClick={onBack} className="mb-4 flex items-center gap-2 text-[22px] font-medium text-slate-900 hover:opacity-70">← <span>Back</span></button>
                 <h2 className="text-[25px] font-black leading-tight text-slate-900">{product.title}</h2>
               </div>
