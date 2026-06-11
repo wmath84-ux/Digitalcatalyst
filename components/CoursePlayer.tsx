@@ -538,7 +538,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
 
       <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
-      <main className="relative z-10 flex h-full flex-col gap-3 p-3 lg:p-3">
+      <main className="relative flex h-full flex-col gap-3 p-3 lg:p-3">
         <div className="hidden shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border border-white/50 bg-white/70 px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid">
           <span className="truncate">{activeFile?.name || product.title}</span>
           <div className="flex items-center justify-center gap-3">
