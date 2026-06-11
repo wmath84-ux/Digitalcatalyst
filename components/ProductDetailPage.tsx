@@ -9,166 +9,6 @@ import FeaturedProducts from './FeaturedProducts';
 import ShareModal from './ShareModal';
 import AiMentor from './AiMentor';
 
-// ... (ImageZoomModal and PriceChart components remain unchanged, keeping them here for brevity) ...
-// A new, self-contained component for the image zoom modal with pan, zoom, and swipe-to-dismiss
-const ImageZoomModal: React.FC<{ src: string; alt: string; onClose: () => void; }> = ({ src, alt, onClose }) => {
-    const [offset, setOffset] = React.useState({ x: 0, y: 0 });
-    const [scale, setScale] = React.useState(1);
-    
-    const imgRef = React.useRef<HTMLImageElement>(null);
-    const overlayRef = React.useRef<HTMLDivElement>(null);
-
-    // Using refs for values that change frequently in event listeners to avoid re-renders
-    const isZoomPanningRef = React.useRef(false);
-    const dragStartRef = React.useRef({ x: 0, y: 0 });
-    const pointersRef = React.useRef<PointerEvent[]>([]);
-    const initialPinchDistRef = React.useRef(0);
-
-    const handlePointerDown = (e: React.PointerEvent) => {
-        e.preventDefault();
-        pointersRef.current.push(e.nativeEvent);
-        
-        if (pointersRef.current.length === 1) { // Pan / Swipe start
-            isZoomPanningRef.current = true;
-            dragStartRef.current = {
-                x: e.clientX - offset.x,
-                y: e.clientY - offset.y,
-            };
-        } else if (pointersRef.current.length === 2) { // Pinch start
-            const [p1, p2] = pointersRef.current;
-            initialPinchDistRef.current = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
-        }
-    };
-    
-    const handlePointerMove = (e: React.PointerEvent) => {
-        if (!isZoomPanningRef.current) return;
-
-        if (pointersRef.current.length === 1) { // Panning or Swiping
-            const currentX = e.clientX - dragStartRef.current.x;
-            const currentY = e.clientY - dragStartRef.current.y;
-
-            if (scale > 1) { // Panning
-                setOffset({ x: currentX, y: currentY });
-            } else { // Swiping to dismiss
-                setOffset({ x: 0, y: currentY }); // Only allow vertical movement
-                const opacity = Math.max(0.2, 1 - Math.abs(currentY) / 500);
-                if (overlayRef.current) {
-                    overlayRef.current.style.backgroundColor = `rgba(0, 0, 0, ${0.8 * opacity})`;
-                }
-            }
-        } else if (pointersRef.current.length === 2) { // Pinching
-            // Find and update the moved pointer
-            const pointerIndex = pointersRef.current.findIndex(p => p.pointerId === e.pointerId);
-            if (pointerIndex !== -1) {
-                pointersRef.current[pointerIndex] = e.nativeEvent;
-            }
-            const [p1, p2] = pointersRef.current;
-            const currentDist = Math.hypot(p1.clientX - p2.clientX, p1.clientY - p2.clientY);
-            
-            if (initialPinchDistRef.current > 0) {
-                const newScale = scale * (currentDist / initialPinchDistRef.current);
-                setScale(Math.max(1, Math.min(newScale, 5)));
-                initialPinchDistRef.current = currentDist;
-            }
-        }
-    };
-    
-    const handlePointerUp = (e: React.PointerEvent) => {
-        pointersRef.current = pointersRef.current.filter(p => p.pointerId !== e.pointerId);
-        
-        if (pointersRef.current.length < 2) {
-            initialPinchDistRef.current = 0;
-        }
-        if (pointersRef.current.length < 1) {
-            isZoomPanningRef.current = false;
-            // Check for swipe-to-dismiss completion
-            if (scale === 1 && Math.abs(offset.y) > 100) {
-                onClose();
-            } else {
-                // Animate back to center if not dismissed
-                setOffset({ x: 0, y: 0 });
-                if (overlayRef.current) {
-                    overlayRef.current.style.transition = 'background-color 0.3s ease';
-                    overlayRef.current.style.backgroundColor = 'rgba(0, 0, 0, 0.8)';
-                }
-            }
-        }
-    };
-
-    const handleWheel = (e: React.WheelEvent) => {
-        e.preventDefault();
-        const { clientX, clientY, deltaY } = e;
-        const img = imgRef.current;
-        if (!img) return;
-
-        const rect = img.getBoundingClientRect();
-        
-        // Position of the pointer inside the image element
-        const x = clientX - rect.left;
-        const y = clientY - rect.top;
-
-        const scaleMultiplier = 1 - deltaY * 0.001;
-        const newScale = Math.max(1, Math.min(scale * scaleMultiplier, 5));
-
-        // How much the image will grow from the pointer's perspective
-        const newX = offset.x - (x - offset.x) * (newScale / scale - 1);
-        const newY = offset.y - (y - offset.y) * (newScale / scale - 1);
-
-        setScale(newScale);
-        setOffset({ x: newX, y: newY });
-    };
-
-    const handleCloseClick = () => {
-        // If zoomed in, first zoom out. Otherwise, close.
-        if (scale > 1) {
-            setScale(1);
-            setOffset({ x: 0, y: 0 });
-        } else {
-            onClose();
-        }
-    }
-
-    const imageStyle: React.CSSProperties = {
-        transform: `translate3d(${offset.x}px, ${offset.y}px, 0) scale(${scale})`,
-        transition: isZoomPanningRef.current ? 'none' : 'transform 0.3s cubic-bezier(0.2, 0, 0.38, 0.9)',
-        cursor: isZoomPanningRef.current ? 'grabbing' : (scale > 1 ? 'grab' : 'zoom-out'),
-    };
-    
-    // Animate out on close
-    React.useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            if (e.key === 'Escape') onClose();
-        };
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [onClose]);
-
-    return (
-        <div 
-            ref={overlayRef}
-            className="image-zoom-overlay" 
-            onClick={handleCloseClick}
-            onPointerMove={handlePointerMove}
-            onPointerUp={handlePointerUp}
-            onPointerCancel={handlePointerUp}
-            onPointerLeave={handlePointerUp}
-            onWheel={handleWheel}
-        >
-            <div className="image-zoom-content" onClick={e => e.stopPropagation()}>
-                <img 
-                    ref={imgRef}
-                    src={src} 
-                    alt={alt}
-                    style={imageStyle}
-                    onPointerDown={handlePointerDown}
-                />
-            </div>
-             <button onClick={onClose} className="image-zoom-close" aria-label="Close image view">&times;</button>
-        </div>
-    );
-};
-
-
 const PriceChart: React.FC<{ basePrice: number, priceHistory?: PriceHistoryEntry[] }> = ({ basePrice, priceHistory }) => {
     const data: { date: Date; price: number; }[] = (() => {
         if (priceHistory && priceHistory.length > 1) {
@@ -298,7 +138,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const [mainImage, setMainImage] = useState((product.images || [])[0] || `https://picsum.photos/seed/${product.imageSeed}/800/600`);
   const quantity = 1;
-  const [isImageZoomOpen, setIsImageZoomOpen] = useState(false);
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
 
@@ -546,14 +385,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     );
   }
 
-  const handleImageZoom = (e: React.MouseEvent<HTMLDivElement>) => {
-    const zoomer = e.currentTarget.firstChild as HTMLElement;
-    const { left, top, width, height } = e.currentTarget.getBoundingClientRect();
-    const x = ((e.clientX - left) / width) * 100;
-    const y = ((e.clientY - top) / height) * 100;
-    zoomer.style.transformOrigin = `${x}% ${y}%`;
-  };
-
   const handleShare = async () => {
     const shareData = {
         title: product.title,
@@ -593,15 +424,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
           <div ref={gridRef} className={`grid grid-cols-1 gap-8 md:grid-cols-12 ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
             <div className="md:col-span-7">
-              <button onClick={() => setIsImageZoomOpen(true)} className="group relative w-full overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 shadow-[0_24px_70px_rgba(15,23,42,0.10)]" aria-label="View larger image">
-                <div className="zoom-container" onMouseMove={handleImageZoom}>
-                  <img src={mainImage} alt={product.title} className="aspect-video h-auto w-full object-cover" />
-                </div>
-                <div className="absolute inset-0 flex items-center justify-center bg-white/35 opacity-0 backdrop-blur-sm transition-opacity group-hover:opacity-100">
-                  <div className="rounded-full bg-white/85 p-4 text-slate-900 shadow-xl"><svg xmlns="http://www.w3.org/2000/svg" className="h-9 w-9" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0zM10 7v6m3-3H7" /></svg></div>
-                </div>
+              <div className="relative w-full overflow-hidden rounded-[2rem] border border-white/70 bg-white/80 shadow-[0_24px_70px_rgba(15,23,42,0.10)]">
+                <img src={mainImage} alt={product.title} className="aspect-video h-auto w-full object-cover" />
                 {isWishlisted && <span className="absolute right-5 top-5 rounded-full bg-red-500 px-4 py-2 text-sm font-black text-white shadow-lg">♥ Wishlisted</span>}
-              </button>
+              </div>
 
               <div className="mt-5 grid gap-3 sm:grid-cols-3">
                 <div className="rounded-3xl border border-white/70 bg-white/70 p-4 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl"><p className="text-2xl">⚡</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Instant</p><p className="text-sm font-black text-slate-900">Unlock</p></div>
@@ -772,10 +598,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             title={product.title}
             onClose={() => setIsShareModalOpen(false)}
         />
-      )}
-
-      {isImageZoomOpen && (
-        <ImageZoomModal src={mainImage} alt={product.title} onClose={() => setIsImageZoomOpen(false)} />
       )}
 
     </>
