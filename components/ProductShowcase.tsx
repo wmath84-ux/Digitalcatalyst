@@ -86,18 +86,18 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
     <section 
       id="products" 
       ref={sectionRef}
-      className={`py-24 bg-gradient-to-br from-white via-sky-50/80 to-indigo-100/50 backdrop-blur-xl ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+      className={`py-14 sm:py-24 bg-gradient-to-br from-white via-sky-50/80 to-indigo-100/50 backdrop-blur-xl ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
     >
-      <div className="container mx-auto px-6">
-        <div className="text-center max-w-3xl mx-auto mb-12 animate-child animate-delay-1">
-          <h2 className="text-4xl font-extrabold text-primary tracking-tight">All Products</h2>
-          <p className="mt-4 text-lg text-text-muted">
+      <div className="container mx-auto px-4 sm:px-6">
+        <div className="mx-auto mb-8 max-w-3xl text-center sm:mb-12 animate-child animate-delay-1">
+          <h2 className="text-3xl font-extrabold tracking-tight text-primary sm:text-4xl">All Products</h2>
+          <p className="mt-3 text-base text-text-muted sm:mt-4 sm:text-lg">
             Browse our full catalog or use the search bar to find exactly what you need.
           </p>
         </div>
 
         <div className="max-w-4xl mx-auto animate-child animate-delay-2">
-          <div className="flex flex-col md:flex-row gap-4 items-center justify-between bg-white/80 p-4 rounded-xl border border-indigo-100/80 shadow-sm">
+          <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-indigo-100/80 bg-white/80 p-3 shadow-sm sm:p-4 md:flex-row md:gap-4">
               {/* Search */}
               <div className="relative w-full md:w-1/2">
                 <input 
@@ -127,12 +127,12 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
           </div>
           
           {/* Filters */}
-          <div className="mt-6 flex flex-wrap justify-center gap-2 animate-child animate-delay-3">
+          <div className="mt-5 flex flex-nowrap justify-start gap-2 overflow-x-auto pb-2 sm:mt-6 sm:flex-wrap sm:justify-center sm:overflow-visible sm:pb-0 animate-child animate-delay-3">
             {filters.map(filter => (
                 <button 
                     key={filter} 
                     onClick={() => setActiveFilter(filter)} 
-                    className={`px-4 py-1.5 text-sm font-semibold rounded-full transition-all duration-200 ${
+                    className={`shrink-0 px-3 py-1.5 text-xs font-semibold rounded-full transition-all duration-200 sm:px-4 sm:text-sm ${
                         activeFilter === filter 
                         ? 'bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] scale-105'
                         : 'bg-indigo-50 text-slate-700 hover:bg-indigo-100 hover:text-slate-950'
@@ -146,7 +146,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
 
         <div 
             ref={gridRef} 
-            className={`mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+            className={`mt-10 grid grid-cols-1 gap-5 sm:mt-16 sm:gap-8 md:grid-cols-2 lg:grid-cols-3 lg:gap-10 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
         >
           {displayProducts.length > 0 ? (
             displayProducts.map((product, index) => (
