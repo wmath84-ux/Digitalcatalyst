@@ -10,10 +10,11 @@ export interface FaqItem {
 interface FaqItemProps {
   question: string;
   answer: string;
+  defaultOpen?: boolean;
 }
 
-const FaqItemDisplay: React.FC<FaqItemProps> = ({ question, answer }) => {
-  const [isOpen, setIsOpen] = useState(false);
+const FaqItemDisplay: React.FC<FaqItemProps> = ({ question, answer, defaultOpen = false }) => {
+  const [isOpen, setIsOpen] = useState(defaultOpen);
 
   return (
     <div className={`rounded-2xl border bg-white/70 p-5 backdrop-blur-xl transition-all duration-300 ${isOpen ? 'border-purple-300/50 shadow-[0_8px_30px_rgb(0,0,0,0.04)]' : 'border-white/50 hover:border-white/50 hover:shadow-sm'}`}>
@@ -83,8 +84,8 @@ const Faq: React.FC<FaqProps> = ({ settings, faqs }) => {
           </p>
         </div>
         <div className="mx-auto mt-12 max-w-3xl space-y-4">
-          {faqs.map((item) => (
-            <FaqItemDisplay key={item.id} question={item.question} answer={item.answer} />
+          {faqs.map((item, index) => (
+            <FaqItemDisplay key={item.id} question={item.question} answer={item.answer} defaultOpen={index === 0} />
           ))}
         </div>
       </div>
