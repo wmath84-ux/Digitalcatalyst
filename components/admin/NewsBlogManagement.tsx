@@ -33,6 +33,7 @@ const normalizePost = (post: NewsArticle): EditablePost => ({
   createdAt: (post as NewsArticle & { createdAt?: string }).createdAt || `${post.date || new Date().toISOString().split('T')[0]}T00:00:00.000Z`,
   thumbnailImage: (post as NewsArticle & { thumbnailImage?: string }).thumbnailImage || '',
   coverImage: (post as NewsArticle & { coverImage?: string }).coverImage || (post as NewsArticle & { thumbnailImage?: string }).thumbnailImage || '',
+  showPremiumLearningCta: Boolean((post as NewsArticle & { showPremiumLearningCta?: boolean }).showPremiumLearningCta),
 });
 
 const emptyPost = (): EditablePost => ({
@@ -47,6 +48,7 @@ const emptyPost = (): EditablePost => ({
   coverImage: '',
   excerpt: '',
   content: '<h2>Start with the big idea</h2><p>Write a clear, student-focused introduction here.</p><ul><li>Add practical takeaways.</li><li>Keep paragraphs readable.</li></ul>',
+  showPremiumLearningCta: false,
 });
 
 const SmartDocsEditor: React.FC<{ value: string; onChange: (value: string) => void; }> = ({ value, onChange }) => {
@@ -161,6 +163,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
       coverImage: editingPost.coverImage || editingPost.thumbnailImage || '',
       thumbnailImage: editingPost.thumbnailImage || editingPost.coverImage || '',
       excerpt: editingPost.excerpt || editingPost.content.replace(/<[^>]+>/g, ' ').trim().slice(0, 180),
+      showPremiumLearningCta: Boolean(editingPost.showPremiumLearningCta),
     };
 
     const nextPosts = editingPost.id
@@ -204,6 +207,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
         coverImage: post.coverImage || post.thumbnailImage || '',
         excerpt: post.excerpt,
         content: post.content,
+        showPremiumLearningCta: false,
       })) as EditablePost[];
       const purgedPostIds = new Set(result.purgedIds);
       const nextPosts = [...newArticles, ...workingPosts.filter((post) => !purgedPostIds.has(post.id))];
@@ -263,6 +267,18 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
           <div className="lg:col-span-8">
             <label className={labelClass}>Cover Image URL</label>
             <input value={editingPost.coverImage || ''} onChange={(event) => setEditingPost({ ...editingPost, coverImage: event.target.value, thumbnailImage: event.target.value })} className={fieldClass} placeholder="AI placeholder or uploaded Firebase Storage URL" />
+          </div>
+          <div className="lg:col-span-12 rounded-[1.5rem] border border-white/50 bg-white/70 p-5 shadow-sm">
+            <label className="flex cursor-pointer flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+              <span>
+                <span className="block text-sm font-black text-slate-900">Enable “Explore premium learning resources” button</span>
+                <span className="mt-1 block text-sm font-semibold text-slate-600">Keep this off unless this specific news/blog should show the premium resources CTA inside the reading view. AI-generated posts also stay off by default.</span>
+              </span>
+              <span className={`relative inline-flex h-8 w-14 shrink-0 items-center rounded-full transition ${editingPost.showPremiumLearningCta ? 'bg-indigo-600' : 'bg-slate-300'}`}>
+                <input type="checkbox" checked={Boolean(editingPost.showPremiumLearningCta)} onChange={(event) => setEditingPost({ ...editingPost, showPremiumLearningCta: event.target.checked })} className="sr-only" />
+                <span className={`h-6 w-6 rounded-full bg-white shadow-sm transition ${editingPost.showPremiumLearningCta ? 'translate-x-7' : 'translate-x-1'}`} />
+              </span>
+            </label>
           </div>
 
           <section className="lg:col-span-12 overflow-hidden rounded-[2rem] border border-white/50 bg-white/60 p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">

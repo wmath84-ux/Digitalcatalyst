@@ -323,6 +323,7 @@ export interface NewsArticle {
   thumbnailImage?: string;
   coverImage: string;
   createdAt?: string;
+  showPremiumLearningCta?: boolean;
 }
 
 // New Announcement structure

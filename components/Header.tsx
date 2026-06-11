@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, WebsiteSettings, ThemeName, themes } from '../App';
 
 const LogoIcon = () => (
@@ -49,6 +49,7 @@ interface HeaderProps {
 const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount, cartToastMessage, onHomeClick, onCartClick, onNavigateToAllProducts, onNavigateToPurchases, onNavigateToWishlist, onNavigateToProfile, onNavigateToHomeAndScroll, currentUser, onLogout, onLoginClick, authButtonLabel, activeTheme, onThemeChange }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isToastVisible, setIsToastVisible] = useState(false);
+  const accountMenuAreaRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (cartToastMessage) {
@@ -60,6 +61,29 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
         return () => clearTimeout(timer);
     }
   }, [cartToastMessage]);
+
+  useEffect(() => {
+    if (!isUserMenuOpen) return;
+
+    const handleOutsideClick = (event: MouseEvent | TouchEvent) => {
+      const target = event.target;
+      if (target instanceof Node && !accountMenuAreaRef.current?.contains(target)) {
+        setIsUserMenuOpen(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+    };
+  }, [isUserMenuOpen]);
+
+  useEffect(() => {
+    if (!currentUser) setIsUserMenuOpen(false);
+  }, [currentUser]);
 
   const navItems = [
     { name: 'Home', action: onHomeClick },
@@ -100,7 +124,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
               ))}
             </nav>
 
-            <div className="flex items-center justify-end">
+            <div ref={accountMenuAreaRef} className="flex items-center justify-end">
                 <div className="hidden md:flex items-center gap-x-4 lg:gap-x-5">
                     {settings.features.showFavourites && (
                         <button onClick={onNavigateToWishlist} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your wishlist with ${wishlistCount} items`}>
