@@ -393,6 +393,14 @@
       @keyframes typing { from { width: 0 } to { width: 100% } }
       @keyframes blink { 50% { border-color: transparent; } }
       @keyframes slideUp { from { opacity: 0; transform: translateY(16px);} to { opacity: 1; transform: translateY(0);} }
+      @keyframes welcomeCirclePop {
+        from { opacity: 0; transform: scale(0.86) rotate(-4deg); }
+        to { opacity: 1; transform: scale(1) rotate(0); }
+      }
+      @keyframes circleTextReveal {
+        from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateY(10px); }
+        to { opacity: 1; clip-path: inset(0 0 0 0); transform: translateY(0); }
+      }
 
 
       @keyframes slide-in-right {
