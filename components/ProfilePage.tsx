@@ -135,6 +135,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const coverInputRef = React.useRef<HTMLInputElement | null>(null);
   const [coverImage, setCoverImage] = React.useState(defaultCoverImage);
   const [redeeming, setRedeeming] = React.useState<string | null>(null);
+  const [redeemedCouponCode, setRedeemedCouponCode] = React.useState<string | null>(null);
   const [coinTransactions, setCoinTransactions] = React.useState<CoinTransaction[]>([]);
   const [locallyRedeemedRewardIds, setLocallyRedeemedRewardIds] = React.useState<string[]>([]);
   const [dailyActivity, setDailyActivity] = React.useState<DailyActivityState>({ lastActiveDate: '', streakDays: 0 });
@@ -192,7 +193,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     localStorage.setItem(key, JSON.stringify(next));
   }, [currentUser?.id]);
 
-  const activeCoupons = React.useMemo(() => coupons.filter(coupon => coupon.isActive), [coupons]);
+  const profileCoupons = React.useMemo(() => coupons, [coupons]);
   const coinRedeemRate = Math.max(1, Number(economySettings.coinToFiatRatio));
   const studyMinutes = currentUser?.studyMinutes ?? 0;
   const watchTimeMinutes = currentUser?.totalWatchTimeMinutes ?? studyMinutes;
@@ -206,6 +207,21 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const quizWinCount = new Set(currentUser?.rewardedQuizIds || []).size;
   const coinTransactionCount = coinTransactions.length || (currentUser?.coinTransactions || []).length;
   const pdfsRead = Math.max(0, ((currentUser as any)?.pdfsRead || 0) + coinTransactions.filter(entry => /pdf|read|document/i.test(`${entry.title || ''} ${entry.description || ''}`)).length + purchasedProducts.filter(product => product.category?.toLowerCase().includes('pdf') || product.title.toLowerCase().includes('pdf') || (product.courseContent || []).some(module => (module.files || []).some(file => ['pdf', 'sheet'].includes(file.type)))).length);
+
+  const handleCouponRedeem = React.useCallback((coupon: Coupon) => {
+    if (!coupon.isActive) return;
+    const markRedeemed = () => {
+      setRedeemedCouponCode(coupon.code);
+      window.setTimeout(() => setRedeemedCouponCode(current => current === coupon.code ? null : current), 2200);
+    };
+
+    if (navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(coupon.code).then(markRedeemed).catch(markRedeemed);
+      return;
+    }
+
+    markRedeemed();
+  }, []);
 
   const dynamicClaimCards = React.useMemo(() => {
     const productCards = products
@@ -821,13 +837,43 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 );
               })}
             </div>
-            <div className="mt-5 grid gap-3">
-              {activeCoupons.slice(0, 3).map(coupon => (
-                <div key={coupon.id} className="flex flex-col items-start gap-1 rounded-2xl border border-dashed border-cyan-300/30 bg-cyan-600/10 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
-                  <span className="font-black text-cyan-700">{coupon.code}</span>
-                  <span className="text-sm font-bold text-slate-600">{coupon.type === 'percentage' ? `${coupon.value}% off` : `₹${coupon.value} off`}</span>
+            <div className="mt-6">
+              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                  <h3 className="text-xl font-black text-slate-900">Available Coupons</h3>
+                  <p className="text-xs font-bold text-slate-500 sm:text-sm">Admin panel mein listed sabhi coupons yahan live status ke saath dikhte hain.</p>
                 </div>
-              ))}
+                <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-black text-cyan-700 shadow-sm">{profileCoupons.length} total</span>
+              </div>
+              <div className="mt-3 grid gap-3">
+                {profileCoupons.length ? profileCoupons.map(coupon => {
+                  const isCouponActive = coupon.isActive;
+                  const buttonLabel = isCouponActive ? (redeemedCouponCode === coupon.code ? 'Code copied' : 'Redeem') : 'Not available';
+                  return (
+                    <div key={coupon.id} className={`rounded-2xl border p-3 transition-all duration-300 sm:p-4 ${isCouponActive ? 'border-dashed border-emerald-300/70 bg-emerald-50/80 shadow-[0_10px_30px_rgba(16,185,129,0.10)]' : 'border-slate-200/80 bg-slate-100/80 opacity-80'}`}>
+                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                        <div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className={`font-black ${isCouponActive ? 'text-emerald-700' : 'text-slate-500'}`}>{coupon.code}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${isCouponActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>{isCouponActive ? 'Active' : 'Inactive'}</span>
+                          </div>
+                          <p className="mt-1 text-sm font-bold text-slate-600">{coupon.type === 'percentage' ? `${coupon.value}% off` : `₹${coupon.value} off`} • expires {coupon.expiryDate}</p>
+                        </div>
+                        <button
+                          type="button"
+                          disabled={!isCouponActive}
+                          onClick={() => handleCouponRedeem(coupon)}
+                          className={`w-full rounded-2xl px-4 py-2.5 text-sm font-black transition active:scale-95 sm:w-auto ${isCouponActive ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-[0_10px_25px_rgba(16,185,129,0.25)] hover:-translate-y-0.5' : 'cursor-not-allowed bg-slate-300 text-slate-500'}`}
+                        >
+                          {buttonLabel}
+                        </button>
+                      </div>
+                    </div>
+                  );
+                }) : (
+                  <p className="rounded-2xl border border-white/50 bg-white/70 p-3 text-sm text-slate-600 sm:p-4">No coupons are listed from admin panel yet.</p>
+                )}
+              </div>
             </div>
           </div>
         </section>

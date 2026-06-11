@@ -1946,9 +1946,57 @@ const App: React.FC = () => {
     setInfoModal({ title: 'Subscription active', message: `${plan.name} activated successfully via ${paymentLabel}.`, icon: '✅' });
   };
 
-  const handleActivateSubscription = (plan: any) => {
+  const handleActivateSubscription = (plan: any, appliedCouponCode?: string | null) => {
     if (!currentUser) { setCurrentView('auth'); return; }
-    unlockSubscriptionPlan(plan);
+
+    const planPrice = Number(plan.price || 0);
+    const couponToApply = appliedCouponCode ? coupons.find(c => c.code.toUpperCase() === appliedCouponCode.toUpperCase()) : null;
+    let couponDiscount = 0;
+
+    if (appliedCouponCode) {
+      if (!couponToApply || !couponToApply.isActive) {
+        setInfoModal({ title: 'Coupon unavailable', message: 'This coupon is invalid or inactive now. Please apply another coupon.', icon: '🎟️' });
+        return;
+      }
+
+      if (couponToApply.expiryDate) {
+        const [year, month, day] = couponToApply.expiryDate.split('-').map(Number);
+        const expiry = new Date(year, month - 1, day);
+        if (Number.isNaN(expiry.getTime())) {
+          setInfoModal({ title: 'Coupon unavailable', message: 'This coupon has an invalid expiry date.', icon: '🎟️' });
+          return;
+        }
+        expiry.setHours(23, 59, 59, 999);
+        if (expiry < new Date()) {
+          setInfoModal({ title: 'Coupon expired', message: 'This coupon has expired. Please remove it or use another coupon.', icon: '⌛' });
+          return;
+        }
+      }
+
+      if (couponToApply.timesUsed >= couponToApply.usageLimit) {
+        setInfoModal({ title: 'Coupon limit reached', message: 'This coupon has reached its usage limit.', icon: '🎟️' });
+        return;
+      }
+
+      couponDiscount = calculateDiscount(couponToApply, planPrice);
+    }
+
+    const coinDiscount = activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(plan.id) ? Math.min(planPrice - couponDiscount, activeCoinDiscount.amount) : 0;
+    const finalPrice = Math.max(0, planPrice - couponDiscount - coinDiscount);
+
+    if (coinDiscount > 0 && activeCoinDiscount?.coins) {
+      if (!deductEduCoins(activeCoinDiscount.coins, { source: 'Subscription EduCoin discount', description: `Applied ${activeCoinDiscount.coins} EduCoins for ₹${coinDiscount.toFixed(2)} subscription discount` })) return;
+      setActiveCoinDiscount(null);
+    }
+
+    if (couponToApply) {
+      setCoupons(prev => prev.map(c => c.code === couponToApply.code ? { ...c, timesUsed: c.timesUsed + 1 } : c));
+    }
+
+    const paymentParts = [`₹${finalPrice.toFixed(2)}`];
+    if (couponToApply) paymentParts.push(`${couponToApply.code} coupon`);
+    if (coinDiscount > 0) paymentParts.push(`${activeCoinDiscount?.coins || 0} EduCoins`);
+    unlockSubscriptionPlan(plan, paymentParts.join(' + '));
   };
 
   const handleActivateSubscriptionWithCoins = (plan: any) => {
@@ -2134,7 +2182,7 @@ const App: React.FC = () => {
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
       case 'myPurchases': return <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
       case 'profile': return <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} />;
-      case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={handleBackToHome} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} />;
+      case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={handleBackToHome} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
       case 'home': default: return renderHomePageContent();
     }
