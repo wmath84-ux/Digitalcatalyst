@@ -1,5 +1,5 @@
 import React from 'react';
-import { ActiveCoinDiscount, ProductWithRating, WebsiteSettings, User } from '../App';
+import { ActiveCoinDiscount, Coupon, ProductWithRating, WebsiteSettings, User } from '../App';
 import { EconomySettings, resolveCoinPrice } from '../utils/economy';
 
 interface Plan { 
@@ -20,9 +20,10 @@ const SubscriptionPage: React.FC<{
   products: ProductWithRating[]; 
   purchasedProductIds: number[]; 
   onBack: () => void; 
-  onActivatePlan: (plan: Plan) => void; 
+  onActivatePlan: (plan: Plan, appliedCouponCode?: string | null) => void;
   currentUser?: User | null; 
   onActivatePlanWithCoins?: (plan: Plan) => void;
+  coupons: Coupon[];
 }> = ({ 
   economySettings, 
   activeCoinDiscount = null, 
@@ -33,11 +34,74 @@ const SubscriptionPage: React.FC<{
   onBack, 
   onActivatePlan, 
   currentUser, 
-  onActivatePlanWithCoins 
+  onActivatePlanWithCoins,
+  coupons
 }) => {
   const plans: Plan[] = (settings.content as any).subscriptionPlans || [];
   const highlightedPlanIndex = plans.length > 1 ? 1 : 0;
   const accentLines = ['from-yellow-300 to-yellow-100', 'from-cyan-300 to-cyan-100', 'from-pink-300 to-pink-100'];
+  const [couponInputs, setCouponInputs] = React.useState<Record<string, string>>({});
+  const [appliedCouponCodes, setAppliedCouponCodes] = React.useState<Record<string, string>>({});
+  const [couponErrors, setCouponErrors] = React.useState<Record<string, string>>({});
+
+  const calculateCouponDiscount = React.useCallback((coupon: Coupon, price: number) => {
+    if (coupon.type === 'fixed') return Math.min(coupon.value, price);
+    return Math.min(price, (price * coupon.value) / 100);
+  }, []);
+
+  const getCouponError = React.useCallback((coupon: Coupon | undefined) => {
+    if (!coupon) return 'Invalid coupon code.';
+    if (!coupon.isActive) return 'This coupon is not active.';
+
+    if (coupon.expiryDate) {
+      const [year, month, day] = coupon.expiryDate.split('-').map(Number);
+      const expiry = new Date(year, month - 1, day);
+      if (Number.isNaN(expiry.getTime())) return 'Invalid coupon date format.';
+      expiry.setHours(23, 59, 59, 999);
+      if (expiry < new Date()) return 'This coupon has expired.';
+    }
+
+    if (coupon.timesUsed >= coupon.usageLimit) return 'Coupon usage limit reached.';
+    return '';
+  }, []);
+
+  const handleApplyCoupon = React.useCallback((planId: string, rawCode: string) => {
+    const normalizedCode = rawCode.trim().toUpperCase();
+    if (!normalizedCode) {
+      setCouponErrors(prev => ({ ...prev, [planId]: 'Please enter a coupon code.' }));
+      setAppliedCouponCodes(prev => {
+        const next = { ...prev };
+        delete next[planId];
+        return next;
+      });
+      return;
+    }
+
+    const coupon = coupons.find(item => item.code.toUpperCase() === normalizedCode);
+    const error = getCouponError(coupon);
+    if (error) {
+      setCouponErrors(prev => ({ ...prev, [planId]: error }));
+      setAppliedCouponCodes(prev => {
+        const next = { ...prev };
+        delete next[planId];
+        return next;
+      });
+      return;
+    }
+
+    setCouponInputs(prev => ({ ...prev, [planId]: normalizedCode }));
+    setAppliedCouponCodes(prev => ({ ...prev, [planId]: normalizedCode }));
+    setCouponErrors(prev => ({ ...prev, [planId]: '' }));
+  }, [coupons, getCouponError]);
+
+  const handleRemoveCoupon = React.useCallback((planId: string) => {
+    setAppliedCouponCodes(prev => {
+      const next = { ...prev };
+      delete next[planId];
+      return next;
+    });
+    setCouponErrors(prev => ({ ...prev, [planId]: '' }));
+  }, []);
 
   return (
     <div className="relative min-h-screen overflow-hidden bg-[#eaf3fb] pb-32 text-slate-900">
@@ -68,16 +132,20 @@ const SubscriptionPage: React.FC<{
               const coinBalance = currentUser?.eduCoins || 0;
               const canPayWithCoins = coinPrice > 0 && coinBalance >= coinPrice;
               const missingCoins = Math.max(0, coinPrice - coinBalance);
-              const activeDiscount = activeCoinDiscount?.subscriptionId === String(plan.id) ? activeCoinDiscount : null;
-              const finalPlanPrice = Math.max(0, Number(plan.price || 0) - (activeDiscount?.amount || 0));
+              const planId = String(plan.id);
+              const planPrice = Number(plan.price || 0);
+              const activeDiscount = activeCoinDiscount?.subscriptionId === planId ? activeCoinDiscount : null;
+              const appliedCouponCode = appliedCouponCodes[planId];
+              const appliedCoupon = appliedCouponCode ? coupons.find(coupon => coupon.code.toUpperCase() === appliedCouponCode.toUpperCase()) : undefined;
+              const appliedCouponError = appliedCoupon ? getCouponError(appliedCoupon) : '';
+              const validAppliedCoupon = appliedCoupon && !appliedCouponError ? appliedCoupon : null;
+              const couponDiscount = validAppliedCoupon ? calculateCouponDiscount(validAppliedCoupon, planPrice) : 0;
+              const eduCoinDiscount = activeDiscount ? Math.min(planPrice - couponDiscount, activeDiscount.amount) : 0;
+              const totalDiscount = Math.min(planPrice, couponDiscount + eduCoinDiscount);
+              const finalPlanPrice = Math.max(0, planPrice - totalDiscount);
               
               const handlePlanCheckout = () => {
-                if (activeDiscount?.coins) {
-                  onActivatePlanWithCoins?.({ ...plan, coinPrice: activeDiscount.coins });
-                  onConsumeCoinDiscount?.();
-                  return;
-                }
-                onActivatePlan(plan);
+                onActivatePlan(plan, validAppliedCoupon?.code || null);
               };
 
               return (
@@ -89,20 +157,46 @@ const SubscriptionPage: React.FC<{
 
                   <div className="mt-4 flex items-start justify-center text-slate-950">
                     <span className="mt-2 text-2xl font-light">₹</span>
-                    <span className="text-5xl font-light leading-none tracking-tight">{finalPlanPrice}</span>
+                    <span className="text-5xl font-light leading-none tracking-tight">{finalPlanPrice.toFixed(0)}</span>
                   </div>
                   <p className="mt-2 text-xs font-medium text-slate-500">Price Example</p>
                   
                   {}
-                  {activeDiscount && (
+                  {(activeDiscount || validAppliedCoupon) && (
                     <div className="mx-auto mt-3 w-full rounded-2xl border border-emerald-100 bg-white/55 p-3 text-xs font-semibold text-emerald-700">
-                      <div className="flex justify-between"><span>Subtotal</span><span>₹{plan.price}</span></div>
-                      <div className="flex justify-between"><span>EduCoin Discount</span><span>-₹{activeDiscount.amount}</span></div>
-                      <div className="mt-1 flex justify-between font-black"><span>Final Price</span><span>₹{finalPlanPrice}</span></div>
+                      <div className="flex justify-between"><span>Subtotal</span><span>₹{planPrice}</span></div>
+                      {validAppliedCoupon && <div className="flex justify-between"><span>Coupon ({validAppliedCoupon.code})</span><span>-₹{couponDiscount.toFixed(2)}</span></div>}
+                      {activeDiscount && <div className="flex justify-between"><span>EduCoin Discount</span><span>-₹{eduCoinDiscount}</span></div>}
+                      <div className="mt-1 flex justify-between font-black"><span>Final Price</span><span>₹{finalPlanPrice.toFixed(2)}</span></div>
                     </div>
                   )}
                   
                   <p className="mx-auto mt-4 min-h-10 max-w-[12rem] text-[11px] leading-5 text-slate-400">{plan.description}</p>
+
+                  <div className="mt-4 rounded-3xl border border-white/75 bg-white/45 p-3 text-left shadow-inner">
+                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-slate-400">Have a coupon?</p>
+                    <div className="mt-2 flex gap-2">
+                      <input
+                        type="text"
+                        value={couponInputs[planId] || ''}
+                        onChange={event => setCouponInputs(prev => ({ ...prev, [planId]: event.target.value.toUpperCase() }))}
+                        placeholder="Coupon code"
+                        disabled={allUnlocked}
+                        className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white/80 px-3 py-2 text-xs font-bold outline-none transition focus:border-violet-300 focus:ring-2 focus:ring-violet-100 disabled:cursor-not-allowed disabled:bg-slate-100"
+                        aria-label={`Coupon code for ${plan.name}`}
+                      />
+                      <button
+                        type="button"
+                        disabled={allUnlocked}
+                        onClick={() => validAppliedCoupon ? handleRemoveCoupon(planId) : handleApplyCoupon(planId, couponInputs[planId] || '')}
+                        className={`rounded-2xl px-3 py-2 text-xs font-black transition active:scale-95 disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-400 ${validAppliedCoupon ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : 'bg-slate-950 text-white hover:-translate-y-0.5'}`}
+                      >
+                        {validAppliedCoupon ? 'Remove' : 'Apply'}
+                      </button>
+                    </div>
+                    {(couponErrors[planId] || appliedCouponError) && <p className="mt-2 text-xs font-bold text-rose-500">{couponErrors[planId] || appliedCouponError}</p>}
+                    {validAppliedCoupon && <p className="mt-2 text-xs font-black text-emerald-600">{validAppliedCoupon.code} applied. You saved ₹{couponDiscount.toFixed(2)}.</p>}
+                  </div>
 
                   <ul className="mx-auto mt-4 flex-1 space-y-2 text-left text-[11px] leading-4 text-slate-500">
                     {unlockedProducts.length ? unlockedProducts.slice(0, 5).map((title, productIndex) => (
@@ -116,7 +210,7 @@ const SubscriptionPage: React.FC<{
                   {}
                   <div className="mt-5 space-y-2">
                     <button disabled={allUnlocked} onClick={handlePlanCheckout} className={`mx-auto block rounded-full px-7 py-2.5 text-[11px] font-bold text-white shadow-[0_10px_20px_rgba(168,85,247,0.24)] transition active:scale-95 ${allUnlocked ? 'cursor-not-allowed bg-slate-300' : 'bg-violet-400 hover:-translate-y-0.5 hover:bg-violet-500'}`}>
-                      {allUnlocked ? 'Already Active' : activeDiscount ? 'Apply & Activate' : 'Get this plan'}
+                      {allUnlocked ? 'Already Active' : validAppliedCoupon || activeDiscount ? 'Apply & Activate' : 'Get this plan'}
                     </button>
                     
                     {coinPrice > 0 && (
