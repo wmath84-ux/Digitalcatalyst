@@ -41,11 +41,12 @@ interface HeaderProps {
     currentUser: User | null;
     onLogout: () => void;
     onLoginClick: () => void;
+    authButtonLabel: string;
     activeTheme: ThemeName;
     onThemeChange: (themeName: ThemeName) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount, cartToastMessage, onHomeClick, onCartClick, onNavigateToAllProducts, onNavigateToPurchases, onNavigateToWishlist, onNavigateToProfile, onNavigateToHomeAndScroll, currentUser, onLogout, onLoginClick, activeTheme, onThemeChange }) => {
+const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount, cartToastMessage, onHomeClick, onCartClick, onNavigateToAllProducts, onNavigateToPurchases, onNavigateToWishlist, onNavigateToProfile, onNavigateToHomeAndScroll, currentUser, onLogout, onLoginClick, authButtonLabel, activeTheme, onThemeChange }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isToastVisible, setIsToastVisible] = useState(false);
 
@@ -67,6 +68,19 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
     { name: 'FAQ', action: () => onNavigateToHomeAndScroll('faq') },
     { name: 'Contact', action: () => onNavigateToHomeAndScroll('contact') },
   ];
+
+  const handleProfileClick = () => {
+    setIsUserMenuOpen(false);
+    onNavigateToProfile();
+  };
+
+  const handleLogoutClick = () => {
+    setIsUserMenuOpen(false);
+    onLogout();
+  };
+
+  const authButtonClass = "rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-6 py-2 font-semibold text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90";
+  const mobileAuthButtonClass = "rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-4 py-2 text-sm font-bold text-white shadow-[0_8px_24px_rgba(79,70,229,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90";
 
   return (
     <>
@@ -114,22 +128,22 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                             </button>
                             {isUserMenuOpen && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white/70 backdrop-blur-xl rounded-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] py-1 z-20">
-                                    <button onClick={onNavigateToProfile} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                    <button onClick={handleProfileClick} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                             Profile & EduCoins
                                         </button>
-                                        <button onClick={onLogout} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
+                                        <button onClick={handleLogoutClick} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                         Logout
                                     </button>
                                 </div>
                             )}
                         </div>
                     ) : (
-                         <button onClick={onLoginClick} className="rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-6 py-2 font-semibold text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90">
-                            Login
+                         <button onClick={onLoginClick} className={authButtonClass}>
+                            {authButtonLabel}
                         </button>
                     )}
                 </div>
-                <div className="flex items-center space-x-2 md:hidden">
+                <div className="flex items-center space-x-3 md:hidden">
                     <button onClick={onCartClick} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your cart with ${cartItemCount} items`}>
                         <CartIcon />
                         {cartItemCount > 0 && (
@@ -138,6 +152,28 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                             </span>
                         )}
                     </button>
+                    {currentUser ? (
+                        <div className="relative">
+                            <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white shadow-[0_8px_24px_rgba(79,70,229,0.18)]" aria-label="Open account menu">
+                                <UserIcon />
+                            </button>
+                            {isUserMenuOpen && (
+                                <div className="absolute right-0 mt-3 w-48 overflow-hidden rounded-2xl border border-slate-100 bg-white/90 py-1 shadow-[0_16px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl z-20">
+                                    <div className="px-4 py-2 text-xs font-bold text-slate-500">{currentUser.name || currentUser.email.split('@')[0]}</div>
+                                    <button onClick={handleProfileClick} className="block w-full text-left px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100">
+                                        Profile & EduCoins
+                                    </button>
+                                    <button onClick={handleLogoutClick} className="block w-full text-left px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100">
+                                        Logout
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    ) : (
+                        <button onClick={onLoginClick} className={mobileAuthButtonClass}>
+                            {authButtonLabel}
+                        </button>
+                    )}
                 </div>
             </div>
           </div>
