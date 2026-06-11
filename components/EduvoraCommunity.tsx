@@ -6,6 +6,7 @@ import { db } from '../firebase';
 
 interface EduvoraCommunityProps {
   onClose?: () => void;
+  isAuthenticated?: boolean;
 }
 
 type CommunityView = 'feed' | 'status';
@@ -148,7 +149,7 @@ const mapStatusDoc = (snapshotDoc: { id: string; data: () => Record<string, any>
   };
 };
 
-const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
+const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenticated = false }) => {
   const navigate = useNavigate();
   const guardedAuth = getAuth();
   const [isCommunityAllowed, setIsCommunityAllowed] = useState(false);
@@ -219,14 +220,25 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
     onClose?.();
   };
 
+  const redirectToAuth = () => {
+    const nextState = { ...(window.history.state || {}), dcView: 'auth' };
+    window.history.replaceState(nextState, '', '/auth');
+    window.dispatchEvent(new PopStateEvent('popstate', { state: nextState }));
+    navigate('/auth', { replace: true, state: { from: 'community' } });
+  };
+
   useEffect(() => {
+    if (isAuthenticated) {
+      setIsCommunityAllowed(true);
+      return undefined;
+    }
     const unsubscribe = onAuthStateChanged(guardedAuth, (user) => {
       const allowed = Boolean(user);
       setIsCommunityAllowed(allowed);
-      if (!allowed) navigate('/auth', { replace: true });
+      if (!allowed) redirectToAuth();
     });
     return unsubscribe;
-  }, [guardedAuth, navigate]);
+  }, [guardedAuth, isAuthenticated, navigate]);
 
   useEffect(() => {
     if (!isCommunityAllowed) return undefined;
@@ -688,7 +700,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose }) => {
     return textMatches && tabMatches;
   });
 
-  if (!isCommunityAllowed) return null;
+  if (!isCommunityAllowed) {
+    return (
+      <section className="flex h-[100dvh] items-center justify-center bg-[#0B0F19] px-4 text-slate-200">
+        <div className="max-w-md rounded-[2rem] border border-slate-800 bg-[#111827]/85 p-6 text-center shadow-[0_0_35px_rgba(34,211,238,0.16)] backdrop-blur-xl">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-cyan-950/50 text-2xl shadow-[0_0_18px_rgba(34,211,238,0.25)]">🔐</div>
+          <h2 className="mt-4 text-2xl font-black text-white">Login required</h2>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-400">Community is protected. Redirecting you to login...</p>
+          <button type="button" onClick={redirectToAuth} className="mt-5 rounded-2xl border border-cyan-400/40 bg-[#0B0F19] px-5 py-3 text-sm font-black text-cyan-200 shadow-[0_0_15px_rgba(236,72,153,0.25)]">Open login</button>
+        </div>
+      </section>
+    );
+  }
 
   return (
     <section className="relative h-[100dvh] overflow-hidden bg-[#0B0F19] text-slate-200">
