@@ -43,10 +43,10 @@ interface AdminDashboardProps {
 export type AdminView = 'dashboard' | 'economy' | 'rewardSettings' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'analytics' | 'websiteSettings';
 
 const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?: string; icon: React.ReactNode; gradient: string }> = ({ title, value, subtitle, icon, gradient }) => (
-    <div className={`relative overflow-hidden rounded-2xl p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-slate-900 ${gradient} transform transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]`}>
+    <div className={`relative overflow-hidden rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-slate-900 sm:p-6 ${gradient} transform transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]`}>
         <div className="relative z-10">
             <p className="text-sm font-medium opacity-90 uppercase tracking-wider">{title}</p>
-            <h3 className="text-4xl font-extrabold mt-2">{value}</h3>
+            <h3 className="mt-2 text-3xl font-extrabold sm:text-4xl">{value}</h3>
             {subtitle && <p className="text-xs mt-2 opacity-75 font-medium">{subtitle}</p>}
         </div>
         <div className="absolute -bottom-4 -right-4 opacity-20 text-black transform rotate-12 scale-150">
@@ -81,13 +81,13 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 const totalReviews = Object.values(props.reviews).flat().length;
                 
                 return (
-                    <div className="space-y-10 animate-fade-in">
-                        <div className="flex flex-col md:flex-row justify-between items-end">
+                    <div className="space-y-6 animate-fade-in sm:space-y-10">
+                        <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-end">
                             <div>
                                 <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-800 tracking-tight">
                                     Hello, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">{props.currentAdminUser.email.split('@')[0]}</span> 👋
                                 </h1>
-                                <p className="mt-2 text-lg text-slate-700">Here's what's happening in your store today.</p>
+                                <p className="mt-2 text-base text-slate-700 sm:text-lg">Here's what's happening in your store today.</p>
                             </div>
                             <div className="mt-4 md:mt-0 hidden md:block">
                                 <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/80 backdrop-blur-xl border border-slate-300/70 text-slate-700 shadow-sm">
@@ -97,7 +97,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                             </div>
                         </div>
 
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                        <div className="grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-6 lg:grid-cols-4">
                             <DashboardCard 
                                 title="Total Revenue" 
                                 value={`₹${totalRevenue.toLocaleString('en-IN')}`} 
@@ -128,16 +128,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                             />
                         </div>
 
-                        <div className="bg-white/80 backdrop-blur-xl rounded-2xl shadow-[0_18px_45px_rgba(15,23,42,0.08)] border border-slate-200/80 p-6 sm:p-8">
-                            <h2 className="text-2xl font-bold text-slate-800 mb-4">Quick Actions</h2>
-                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                                <button onClick={() => setCurrentView('products')} className="p-4 bg-blue-50 text-blue-700 rounded-xl font-semibold hover:bg-blue-100 transition-colors flex items-center gap-3 justify-center sm:justify-start">
+                        <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-8">
+                            <h2 className="mb-3 text-xl font-bold text-slate-800 sm:mb-4 sm:text-2xl">Quick Actions</h2>
+                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
+                                <button onClick={() => setCurrentView('products')} className="flex items-center justify-center gap-3 rounded-xl bg-blue-50 p-3 font-semibold text-blue-700 transition-colors hover:bg-blue-100 sm:justify-start sm:p-4">
                                     <span className="bg-blue-200 p-2 rounded-lg">📦</span> Manage Products
                                 </button>
-                                <button onClick={() => setCurrentView('orders')} className="p-4 bg-green-50 text-green-700 rounded-xl font-semibold hover:bg-green-100 transition-colors flex items-center gap-3 justify-center sm:justify-start">
+                                <button onClick={() => setCurrentView('orders')} className="flex items-center justify-center gap-3 rounded-xl bg-green-50 p-3 font-semibold text-green-700 transition-colors hover:bg-green-100 sm:justify-start sm:p-4">
                                     <span className="bg-green-200 p-2 rounded-lg">💰</span> View Orders
                                 </button>
-                                <button onClick={() => setCurrentView('support')} className="p-4 bg-purple-50 text-purple-700 rounded-xl font-semibold hover:bg-purple-100 transition-colors flex items-center gap-3 justify-center sm:justify-start">
+                                <button onClick={() => setCurrentView('support')} className="flex items-center justify-center gap-3 rounded-xl bg-purple-50 p-3 font-semibold text-purple-700 transition-colors hover:bg-purple-100 sm:justify-start sm:p-4">
                                     <span className="bg-purple-200 p-2 rounded-lg">💬</span> Support Tickets
                                 </button>
                             </div>
@@ -148,7 +148,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     }
 
     return (
-        <div className="flex min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_10%_10%,rgba(79,70,229,0.16),transparent_30%),radial-gradient(circle_at_90%_0%,rgba(14,165,233,0.13),transparent_28%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] font-sans">
+        <div className="admin-mobile-scope flex min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_10%_10%,rgba(79,70,229,0.16),transparent_30%),radial-gradient(circle_at_90%_0%,rgba(14,165,233,0.13),transparent_28%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] font-sans">
             <Sidebar 
                 onNavigate={setCurrentView} 
                 onLogout={props.onLogout} 
@@ -160,7 +160,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             
             <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
                 {/* Mobile Header */}
-                <header className="md:hidden bg-white/80 backdrop-blur-xl border-b border-slate-300/70 p-4 flex items-center justify-between sticky top-0 z-30 shadow-sm">
+                <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-300/70 bg-white/80 p-3 shadow-sm backdrop-blur-xl md:hidden">
                     <div className="flex items-center gap-3">
                         <button 
                             onClick={() => setIsMobileSidebarOpen(true)}
@@ -168,14 +168,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                         </button>
-                        <span className="font-bold text-lg text-slate-800">Admin Panel</span>
+                        <span className="text-base font-bold text-slate-800">Admin Panel</span>
                     </div>
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-700 to-indigo-800 rounded-full flex items-center justify-center text-white text-xs font-bold">
                         {props.currentAdminUser.email.charAt(0).toUpperCase()}
                     </div>
                 </header>
 
-                <main className="flex-1 p-4 sm:p-8 lg:p-10 overflow-y-auto custom-scrollbar bg-white/20 backdrop-blur-sm">
+                <main className="flex-1 overflow-y-auto bg-white/20 p-3 backdrop-blur-sm custom-scrollbar sm:p-8 lg:p-10">
                     <div className="max-w-7xl mx-auto">
                         {renderView()}
                     </div>

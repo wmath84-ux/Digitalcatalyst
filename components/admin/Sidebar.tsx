@@ -65,7 +65,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
 
     // Mobile overlay classes vs Desktop static classes
     const containerClasses = isOpen 
-        ? "fixed inset-y-0 left-0 z-50 w-72 bg-gradient-to-b from-[#cbd5e8] via-[#dbe3f1] to-[#c8d3e6] shadow-[0_18px_55px_rgba(51,65,85,0.18)] transition-transform transform translate-x-0"
+        ? "fixed inset-y-0 left-0 z-50 w-[17rem] bg-gradient-to-b from-[#cbd5e8] via-[#dbe3f1] to-[#c8d3e6] shadow-[0_18px_55px_rgba(51,65,85,0.18)] transition-transform transform translate-x-0"
         : "hidden md:flex md:w-72 bg-gradient-to-b from-[#cbd5e8] via-[#dbe3f1] to-[#c8d3e6] shadow-[0_18px_55px_rgba(51,65,85,0.16)] flex-col md:fixed md:left-0 md:top-0 md:bottom-0 md:z-40 md:translate-x-[-248px] md:hover:translate-x-0 md:transition-transform md:duration-300";
 
     return (
@@ -79,13 +79,13 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
             )}
 
             <aside className={`${containerClasses} flex flex-col h-full text-slate-900`}>
-                <div className="px-4 py-6 mb-2 flex items-center justify-between border-b border-white/60">
+                <div className="mb-2 flex items-center justify-between border-b border-white/60 px-4 py-4 sm:py-6">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 bg-gradient-to-br from-blue-700 to-indigo-800 rounded-lg flex items-center justify-center shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-700 to-indigo-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:h-10 sm:w-10">
                             <span className="text-xl font-bold text-white">DC</span>
                         </div>
                         <div>
-                            <div className="text-lg font-bold tracking-tight">Digital Catalyst</div>
+                            <div className="text-base font-bold tracking-tight sm:text-lg">Digital Catalyst</div>
                             <div className="text-xs text-slate-700 font-medium uppercase tracking-widest">Admin Panel</div>
                         </div>
                     </div>
@@ -97,7 +97,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
                     </button>
                 </div>
                 
-                <div className="flex-1 overflow-y-auto py-4 space-y-1 custom-scrollbar">
+                <div className="flex-1 space-y-1 overflow-y-auto py-2 custom-scrollbar sm:py-4">
                     {navItems.map(item => (
                         <NavLink
                             key={item.view}
@@ -111,17 +111,17 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
                     ))}
                 </div>
                 
-                <div className="pt-4 border-t border-white/60 mt-2 space-y-2 p-4">
+                <div className="mt-2 space-y-2 border-t border-white/60 p-3 pt-3 sm:p-4 sm:pt-4">
                     <button
                         onClick={onSwitchToHome}
-                        className="group w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center gap-3 text-blue-800 hover:bg-white/80 hover:text-slate-950"
+                        className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-blue-800 transition-colors hover:bg-white/80 hover:text-slate-950 sm:px-4 sm:py-3"
                     >
                         <svg className="w-5 h-5 group-hover:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
                         <span className="font-medium">Go to Website</span>
                     </button>
                     <button
                         onClick={onLogout}
-                        className="group w-full text-left px-4 py-3 rounded-xl transition-colors flex items-center gap-3 text-red-700 hover:bg-white/80 hover:text-red-800"
+                        className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-red-700 transition-colors hover:bg-white/80 hover:text-red-800 sm:px-4 sm:py-3"
                     >
                         <svg className="w-5 h-5 group-hover:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
                         <span className="font-medium">Sign Out</span>
