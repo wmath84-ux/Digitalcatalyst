@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { Order } from '../../App';
 
 type OrderViewState = 'list' | 'details';
+type OrderFilter = 'all' | 'coinsOnly' | 'priceOnly' | 'couponPrice' | 'allBenefits';
 
 const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
 const subtleCard = 'rounded-[1.5rem] border border-white/50 bg-white/80 p-5 backdrop-blur-xl';
 
-const parseCurrency = (value: string) => parseFloat((value || '0').replace('₹', '').replace(/,/g, '')) || 0;
+const parseCurrency = (value: string | number | undefined | null) => parseFloat(String(value || '0').replace('₹', '').replace('🪙', '').replace(/,/g, '')) || 0;
+const formatMoney = (value: number) => `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
 
 const formatDate = (date: string, options?: Intl.DateTimeFormatOptions) => {
     const parsed = new Date(date);
@@ -39,10 +41,60 @@ const MetricCard: React.FC<{ label: string; value: string | number; accent: stri
     </div>
 );
 
+const getOrderBreakdown = (order: Order) => {
+    const items = order.items || [];
+    const itemSubtotal = items.reduce((sum, item) => sum + parseCurrency(item.price) * (item.quantity || 0), 0);
+    const saved = order.paymentBreakdown;
+    const baseTotal = saved?.baseTotal ?? itemSubtotal;
+    const finalPrice = saved?.finalPrice ?? (order.total?.includes('🪙') && !order.total.includes('₹') ? 0 : parseCurrency(order.total));
+    const couponDiscount = saved?.couponDiscount || 0;
+    const eduCoinsUsed = saved?.eduCoinsUsed || (order.total?.includes('🪙') ? parseCurrency(order.total) : 0);
+    const eduCoinDiscount = saved?.eduCoinDiscount || 0;
+    const coinOnlyPurchase = Boolean(saved?.coinOnlyPurchase || (eduCoinsUsed > 0 && finalPrice === 0 && !saved?.couponCode));
+    const hasCoupon = Boolean(saved?.couponCode && couponDiscount > 0);
+    const hasCoins = coinOnlyPurchase || eduCoinsUsed > 0 || eduCoinDiscount > 0;
+
+    return {
+        purchaseKind: saved?.purchaseKind || 'product',
+        baseTotal,
+        finalPrice,
+        couponCode: saved?.couponCode || null,
+        couponDiscount,
+        couponType: saved?.couponType,
+        couponValue: saved?.couponValue,
+        eduCoinsUsed,
+        eduCoinDiscount,
+        coinOnlyPurchase,
+        hasCoupon,
+        hasCoins,
+        paymentLabel: saved?.paymentLabel,
+        unlockedProductIds: saved?.unlockedProductIds || [],
+    };
+};
+
+const getOrderSegment = (order: Order): OrderFilter => {
+    const breakdown = getOrderBreakdown(order);
+    if (breakdown.coinOnlyPurchase) return 'coinsOnly';
+    if (breakdown.hasCoupon && breakdown.hasCoins && breakdown.finalPrice > 0) return 'allBenefits';
+    if (breakdown.hasCoupon && breakdown.finalPrice > 0) return 'couponPrice';
+    if (!breakdown.hasCoupon && !breakdown.hasCoins && breakdown.finalPrice > 0) return 'priceOnly';
+    return 'all';
+};
+
+const segmentLabels: Record<OrderFilter, { title: string; shortTitle: string; description: string; accent: string }> = {
+    all: { title: 'All orders', shortTitle: 'All', description: 'Every order together', accent: 'from-slate-700 to-slate-900' },
+    coinsOnly: { title: 'Only EduCoin purchases', shortTitle: 'Coin only', description: 'Product/subscription bought only with coins', accent: 'from-amber-400 to-orange-500' },
+    priceOnly: { title: 'Only price purchases', shortTitle: 'Price only', description: 'No coupon and no coin discount', accent: 'from-emerald-400 to-teal-500' },
+    couponPrice: { title: 'Coupon discount + price', shortTitle: 'Coupon + price', description: 'Coupon used and balance paid by price', accent: 'from-violet-400 to-fuchsia-500' },
+    allBenefits: { title: 'Coupon + coin + price', shortTitle: 'All used', description: 'Coupon, EduCoins, and price all used', accent: 'from-cyan-400 to-blue-600' },
+};
+
 const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ order, onBack }) => {
     const items = order.items || [];
     const itemCount = items.reduce((sum, item) => sum + (item.quantity || 0), 0);
     const subtotal = items.reduce((sum, item) => sum + parseCurrency(item.price) * (item.quantity || 0), 0);
+    const breakdown = getOrderBreakdown(order);
+    const finalDiscount = breakdown.couponDiscount + breakdown.eduCoinDiscount;
 
     return (
         <div className="min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_12%_8%,rgba(79,70,229,0.14),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(14,165,233,0.12),transparent_26%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] text-slate-900">
@@ -56,6 +108,7 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                         </div>
                     </div>
                     <div className="flex flex-wrap items-center gap-3">
+                        <span className="rounded-full border border-cyan-300/30 bg-cyan-400/10 px-3 py-1 text-xs font-black uppercase text-cyan-700">{breakdown.purchaseKind}</span>
                         <StatusBadge status={order.status} />
                         <span className="rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-sm font-bold text-slate-600">{formatDate(order.date, { year: 'numeric', month: 'long', day: 'numeric' })}</span>
                     </div>
@@ -78,9 +131,9 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                                 <table className="w-full text-left">
                                     <thead className="border-b border-white/50 bg-white/80 text-xs uppercase tracking-[0.24em] text-slate-600">
                                         <tr>
-                                            <th className="p-4 font-black">Product</th>
+                                            <th className="p-4 font-black">Product / Subscription</th>
                                             <th className="p-4 text-center font-black">Qty</th>
-                                            <th className="p-4 text-right font-black">Price</th>
+                                            <th className="p-4 text-right font-black">Listed Price</th>
                                             <th className="p-4 text-right font-black">Line Total</th>
                                         </tr>
                                     </thead>
@@ -95,7 +148,7 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                                                     </td>
                                                     <td className="p-4 text-center font-bold text-slate-600">{item.quantity}</td>
                                                     <td className="p-4 text-right font-mono text-slate-600">{item.price}</td>
-                                                    <td className="p-4 text-right font-black text-cyan-700">₹{lineTotal.toLocaleString('en-IN')}</td>
+                                                    <td className="p-4 text-right font-black text-cyan-700">{item.price.includes('🪙') ? `🪙 ${lineTotal.toLocaleString('en-IN')}` : formatMoney(lineTotal)}</td>
                                                 </tr>
                                             );
                                         }) : (
@@ -105,6 +158,36 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                                         )}
                                     </tbody>
                                 </table>
+                            </div>
+                        </div>
+
+                        <div className={glassCard}>
+                            <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-300">Purchase Logic</p>
+                            <h2 className="mt-2 text-2xl font-black text-slate-900">How this order was purchased</h2>
+                            <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+                                <div className={subtleCard}>
+                                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-600">Base amount</p>
+                                    <p className="mt-2 text-2xl font-black text-slate-900">{formatMoney(breakdown.baseTotal || subtotal)}</p>
+                                </div>
+                                <div className={subtleCard}>
+                                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-600">Final payable</p>
+                                    <p className="mt-2 text-2xl font-black text-cyan-700">{breakdown.coinOnlyPurchase ? `🪙 ${breakdown.eduCoinsUsed.toLocaleString('en-IN')}` : formatMoney(breakdown.finalPrice)}</p>
+                                </div>
+                                <div className={subtleCard}>
+                                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-600">Coupon used</p>
+                                    <p className="mt-2 font-black text-slate-900">{breakdown.couponCode || 'No coupon used'}</p>
+                                    <p className="mt-1 text-sm font-bold text-slate-600">Discount: {formatMoney(breakdown.couponDiscount)}{breakdown.couponType ? ` • ${breakdown.couponType} ${breakdown.couponValue}` : ''}</p>
+                                </div>
+                                <div className={subtleCard}>
+                                    <p className="text-xs font-black uppercase tracking-[0.22em] text-slate-600">EduCoins used</p>
+                                    <p className="mt-2 font-black text-slate-900">{breakdown.eduCoinsUsed > 0 ? `🪙 ${breakdown.eduCoinsUsed.toLocaleString('en-IN')}` : 'No EduCoins used'}</p>
+                                    <p className="mt-1 text-sm font-bold text-slate-600">Coin discount value: {formatMoney(breakdown.eduCoinDiscount)}</p>
+                                </div>
+                            </div>
+                            <div className="mt-5 rounded-[1.5rem] border border-cyan-300/20 bg-cyan-400/10 p-5">
+                                <p className="text-sm font-black text-cyan-800">Payment path: {breakdown.paymentLabel || (breakdown.coinOnlyPurchase ? 'EduCoin only' : breakdown.hasCoupon ? 'Coupon + price checkout' : 'Regular price checkout')}</p>
+                                <p className="mt-2 text-sm font-semibold text-slate-600">Total discount received: {formatMoney(finalDiscount)}. Recorded total: <span className="font-black text-slate-900">{order.total}</span></p>
+                                {breakdown.unlockedProductIds.length > 0 && <p className="mt-2 text-sm font-semibold text-slate-600">Unlocked product IDs: {breakdown.unlockedProductIds.join(', ')}</p>}
                             </div>
                         </div>
 
@@ -132,7 +215,7 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
                             <div className="mt-5 space-y-3">
                                 <div className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/80 p-4 text-sm">
                                     <span className="text-slate-600">Calculated subtotal</span>
-                                    <span className="font-black text-slate-900">₹{subtotal.toLocaleString('en-IN')}</span>
+                                    <span className="font-black text-slate-900">{formatMoney(subtotal)}</span>
                                 </div>
                                 <div className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/80 p-4 text-sm">
                                     <span className="text-slate-600">Recorded total</span>
@@ -178,6 +261,7 @@ const OrderDetailsPage: React.FC<{ order: Order; onBack: () => void }> = ({ orde
 const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
     const [viewState, setViewState] = useState<OrderViewState>('list');
     const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+    const [activeFilter, setActiveFilter] = useState<OrderFilter>('all');
     const safeOrders = orders || [];
 
     const openOrderDetails = (order: Order) => {
@@ -196,7 +280,7 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
             return;
         }
 
-        const headers = ['Order ID', 'Customer Name', 'Email', 'Date', 'Status', 'Total', 'Items'];
+        const headers = ['Order ID', 'Customer Name', 'Email', 'Date', 'Status', 'Segment', 'Total', 'Coupon', 'EduCoins Used', 'Coin Discount', 'Items'];
         const escapeCsv = (field: string | number) => {
             const str = String(field);
             if (str.includes(',') || str.includes('"') || str.includes('\n')) {
@@ -205,15 +289,22 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
             return str;
         };
 
-        const rows = safeOrders.map(order => [
-            escapeCsv(order.id),
-            escapeCsv(order.customerName),
-            escapeCsv(order.customerEmail),
-            escapeCsv(order.date),
-            escapeCsv(order.status),
-            escapeCsv((order.total || '').replace(/,/g, '')),
-            escapeCsv((order.items || []).map(item => `${item.quantity}x ${item.name}`).join('; ')),
-        ]);
+        const rows = safeOrders.map(order => {
+            const breakdown = getOrderBreakdown(order);
+            return [
+                escapeCsv(order.id),
+                escapeCsv(order.customerName),
+                escapeCsv(order.customerEmail),
+                escapeCsv(order.date),
+                escapeCsv(order.status),
+                escapeCsv(segmentLabels[getOrderSegment(order)].shortTitle),
+                escapeCsv((order.total || '').replace(/,/g, '')),
+                escapeCsv(breakdown.couponCode || ''),
+                escapeCsv(breakdown.eduCoinsUsed),
+                escapeCsv(breakdown.eduCoinDiscount),
+                escapeCsv((order.items || []).map(item => `${item.quantity}x ${item.name}`).join('; ')),
+            ];
+        });
 
         const csvContent = [
             headers.join(','),
@@ -234,7 +325,12 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
 
     const completedOrders = safeOrders.filter(order => order.status === 'Completed');
     const pendingOrders = safeOrders.filter(order => order.status === 'Pending' || order.status === 'Awaiting Verification');
-    const totalRevenue = completedOrders.reduce((sum, order) => sum + parseCurrency(order.total), 0);
+    const totalRevenue = completedOrders.reduce((sum, order) => sum + getOrderBreakdown(order).finalPrice, 0);
+    const filteredOrders = activeFilter === 'all' ? safeOrders : safeOrders.filter(order => getOrderSegment(order) === activeFilter);
+    const segmentCounts = (['coinsOnly', 'priceOnly', 'couponPrice', 'allBenefits'] as OrderFilter[]).reduce<Record<string, number>>((counts, segment) => {
+        counts[segment] = safeOrders.filter(order => getOrderSegment(order) === segment).length;
+        return counts;
+    }, { all: safeOrders.length });
 
     if (viewState === 'details' && selectedOrder) {
         return <OrderDetailsPage order={selectedOrder} onBack={closeOrderDetails} />;
@@ -247,7 +343,7 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
                     <div>
                         <p className="text-xs font-black uppercase tracking-[0.3em] text-cyan-300">Admin Orders</p>
                         <h1 className="mt-2 text-4xl font-black tracking-tight text-slate-900">Order Management</h1>
-                        <p className="mt-2 max-w-2xl text-slate-600">Track customer purchases from a nested full-page workflow. Order details now open as a dedicated page instead of a cramped modal window.</p>
+                        <p className="mt-2 max-w-2xl text-slate-600">Track product and subscription purchases with coupon, EduCoin, discount, and final payable details.</p>
                     </div>
                     <button
                         onClick={handleExportCSV}
@@ -264,7 +360,26 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
                     <MetricCard label="Needs Attention" value={pendingOrders.length} accent="text-amber-300" helper="Pending or awaiting verification" />
                 </div>
 
+                <div className="mt-8 grid grid-cols-1 gap-4 lg:grid-cols-5">
+                    {(['all', 'coinsOnly', 'priceOnly', 'couponPrice', 'allBenefits'] as OrderFilter[]).map(filter => {
+                        const isActive = activeFilter === filter;
+                        const meta = segmentLabels[filter];
+                        const count = filter === 'all' ? safeOrders.length : segmentCounts[filter] || 0;
+                        return (
+                            <button key={filter} type="button" onClick={() => setActiveFilter(filter)} className={`rounded-[1.5rem] border p-5 text-left transition hover:-translate-y-0.5 ${isActive ? 'border-cyan-300/40 bg-white shadow-[0_12px_35px_rgb(14,165,233,0.16)]' : 'border-white/50 bg-white/70 hover:bg-white/90'}`}>
+                                <span className={`inline-flex rounded-full bg-gradient-to-r ${meta.accent} px-3 py-1 text-xs font-black text-white`}>{count} orders</span>
+                                <p className="mt-4 text-lg font-black text-slate-900">{meta.shortTitle}</p>
+                                <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">{meta.description}</p>
+                            </button>
+                        );
+                    })}
+                </div>
+
                 <div className="mt-8 overflow-hidden rounded-[2rem] border border-white/50 bg-white/80 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl">
+                    <div className="border-b border-white/50 bg-white/70 p-5">
+                        <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-400">{segmentLabels[activeFilter].title}</p>
+                        <h2 className="mt-1 text-2xl font-black text-slate-900">{filteredOrders.length} matching orders</h2>
+                    </div>
                     <div className="overflow-x-auto">
                         <table className="w-full min-w-max text-left">
                             <thead className="border-b border-white/50 bg-white/80 text-xs uppercase tracking-[0.24em] text-slate-600">
@@ -272,16 +387,19 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
                                     <th className="p-5 font-black">Order ID</th>
                                     <th className="p-5 font-black">Customer</th>
                                     <th className="p-5 font-black">Date</th>
-                                    <th className="p-5 font-black">Items</th>
-                                    <th className="p-5 font-black">Total</th>
+                                    <th className="p-5 font-black">Segment</th>
+                                    <th className="p-5 font-black">Coupon / Coins</th>
+                                    <th className="p-5 font-black">Final</th>
                                     <th className="p-5 font-black">Status</th>
                                     <th className="p-5 text-right font-black">Actions</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/10">
-                                {safeOrders.length > 0 ? safeOrders.map(order => {
+                                {filteredOrders.length > 0 ? filteredOrders.map(order => {
                                     const orderItems = order.items || [];
                                     const quantity = orderItems.reduce((sum, item) => sum + (item.quantity || 0), 0);
+                                    const breakdown = getOrderBreakdown(order);
+                                    const segment = getOrderSegment(order);
 
                                     return (
                                         <tr key={order.id} className="group transition hover:bg-white/80 hover:shadow-sm">
@@ -289,10 +407,15 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
                                             <td className="p-5">
                                                 <p className="font-black text-slate-900 group-hover:text-cyan-700">{order.customerName}</p>
                                                 <p className="mt-1 text-xs text-slate-600">{order.customerEmail}</p>
+                                                <p className="mt-1 text-xs font-bold text-slate-500">{quantity} units</p>
                                             </td>
                                             <td className="p-5 text-sm font-bold text-slate-600">{formatDate(order.date)}</td>
-                                            <td className="p-5"><span className="rounded-full border border-white/50 bg-white/80 px-3 py-1 text-xs font-black text-slate-600">{quantity} units</span></td>
-                                            <td className="p-5 text-sm font-black text-slate-900">{order.total}</td>
+                                            <td className="p-5"><span className="rounded-full border border-white/50 bg-white/80 px-3 py-1 text-xs font-black text-slate-600">{segmentLabels[segment].shortTitle}</span></td>
+                                            <td className="p-5 text-xs font-bold text-slate-600">
+                                                <p>{breakdown.couponCode ? `🎟️ ${breakdown.couponCode} (${formatMoney(breakdown.couponDiscount)} off)` : '🎟️ No coupon'}</p>
+                                                <p className="mt-1">{breakdown.eduCoinsUsed > 0 ? `🪙 ${breakdown.eduCoinsUsed.toLocaleString('en-IN')} used` : '🪙 No coins'}</p>
+                                            </td>
+                                            <td className="p-5 text-sm font-black text-slate-900">{breakdown.coinOnlyPurchase ? `🪙 ${breakdown.eduCoinsUsed.toLocaleString('en-IN')}` : formatMoney(breakdown.finalPrice)}</td>
                                             <td className="p-5"><StatusBadge status={order.status} /></td>
                                             <td className="p-5 text-right">
                                                 <button
@@ -306,10 +429,10 @@ const OrderManagement: React.FC<{ orders: Order[] }> = ({ orders }) => {
                                     );
                                 }) : (
                                     <tr>
-                                        <td colSpan={7} className="p-12 text-center text-slate-600">
+                                        <td colSpan={8} className="p-12 text-center text-slate-600">
                                             <p className="text-4xl">🧾</p>
-                                            <p className="mt-3 text-lg font-black text-slate-900">No orders yet</p>
-                                            <p className="mt-1">Customer purchases will appear here when orders are created.</p>
+                                            <p className="mt-3 text-lg font-black text-slate-900">No matching orders</p>
+                                            <p className="mt-1">Try the All filter or wait for purchases in this payment category.</p>
                                         </td>
                                     </tr>
                                 )}
