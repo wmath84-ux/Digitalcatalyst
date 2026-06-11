@@ -79,7 +79,7 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, on
     const [activeSessionId, setActiveSessionId] = useState('');
     const [chatInput, setChatInput] = useState('');
     const [isChatLoading, setIsChatLoading] = useState(false);
-    const [isHistoryOpen, setIsHistoryOpen] = useState(true);
+    const [isHistoryOpen, setIsHistoryOpen] = useState(() => typeof window === 'undefined' ? true : window.innerWidth >= 768);
     const chatContainerRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -171,36 +171,53 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, on
         }
     };
 
+    const historyPanel = (
+        <div className="flex min-h-0 flex-1 flex-col p-4">
+            <button onClick={createNewChat} className="rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-left font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm">＋ New chat</button>
+            <div className="mt-4 flex-1 space-y-2 overflow-y-auto pr-1">
+                {sessions.map(session => (
+                    <button
+                        key={session.id}
+                        onClick={() => {
+                            setActiveSessionId(session.id);
+                            if (typeof window !== 'undefined' && window.innerWidth < 768) setIsHistoryOpen(false);
+                        }}
+                        className={`w-full rounded-2xl border px-4 py-3 text-left transition ${session.id === activeSession?.id ? 'border-cyan-200/50 bg-cyan-200/15 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)]' : 'border-white/50 bg-white/70 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}
+                    >
+                        <span className="block truncate text-sm font-black">{session.title}</span>
+                        <span className="mt-1 block text-xs text-slate-600/70">{new Date(session.updatedAt).toLocaleDateString()}</span>
+                    </button>
+                ))}
+            </div>
+        </div>
+    );
+
     return (
-        <div className="flex h-full min-h-0 overflow-hidden rounded-[1.75rem] border border-white/50 bg-white/70 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
-            <aside className={`${isHistoryOpen ? 'w-72' : 'w-0'} hidden shrink-0 overflow-hidden border-r border-white/50 bg-white/70 transition-all duration-300 md:block`}>
-                <div className="flex h-full flex-col p-4">
-                    <button onClick={createNewChat} className="rounded-2xl border border-white/50 bg-white/70 px-4 py-3 text-left font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm">＋ New chat</button>
-                    <div className="mt-4 flex-1 space-y-2 overflow-y-auto pr-1">
-                        {sessions.map(session => (
-                            <button key={session.id} onClick={() => setActiveSessionId(session.id)} className={`w-full rounded-2xl border px-4 py-3 text-left transition ${session.id === activeSession?.id ? 'border-cyan-200/50 bg-cyan-200/15 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)]' : 'border-white/50 bg-white/70 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}>
-                                <span className="block truncate text-sm font-black">{session.title}</span>
-                                <span className="mt-1 block text-xs text-slate-600/70">{new Date(session.updatedAt).toLocaleDateString()}</span>
-                            </button>
-                        ))}
-                    </div>
+        <div className="relative flex h-full min-h-0 overflow-hidden rounded-[1.25rem] border border-white/50 bg-white/70 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl sm:rounded-[1.75rem]">
+            <div onClick={() => setIsHistoryOpen(false)} className={`absolute inset-0 z-20 bg-slate-950/30 backdrop-blur-sm transition-opacity md:hidden ${isHistoryOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`} aria-hidden="true" />
+
+            <aside className={`${isHistoryOpen ? 'translate-x-0' : '-translate-x-full'} absolute inset-y-0 left-0 z-30 flex w-[min(86vw,18rem)] flex-col overflow-hidden border-r border-white/50 bg-white/90 shadow-[16px_0_45px_rgba(15,23,42,0.16)] backdrop-blur-2xl transition-transform duration-300 md:relative md:z-auto md:block md:shrink-0 md:translate-x-0 md:shadow-none ${isHistoryOpen ? 'md:w-72' : 'md:w-0'}`}>
+                <div className="flex items-center justify-between border-b border-white/50 bg-white/70 px-4 py-3 md:hidden">
+                    <span className="text-sm font-black uppercase tracking-[0.2em] text-cyan-700/80">Chats</span>
+                    <button onClick={() => setIsHistoryOpen(false)} className="rounded-xl border border-white/50 bg-white/80 px-3 py-2 text-sm font-black text-slate-900">Close</button>
                 </div>
+                {historyPanel}
             </aside>
 
             <section className="flex min-w-0 flex-1 flex-col">
-                <header className="flex shrink-0 items-center gap-3 border-b border-white/50 bg-white/70 px-4 py-3 backdrop-blur-xl">
-                    <button onClick={() => setIsHistoryOpen(value => !value)} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm">☰</button>
+                <header className="flex shrink-0 items-center gap-2 border-b border-white/50 bg-white/70 px-3 py-2.5 backdrop-blur-xl sm:gap-3 sm:px-4 sm:py-3">
+                    <button onClick={() => setIsHistoryOpen(value => !value)} className="shrink-0 rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm" aria-label="Open mentor chat history">☰</button>
                     <div className="min-w-0 flex-1">
-                        <p className="text-xs font-black uppercase tracking-[0.32em] text-cyan-700/80">Dedicated AI Workspace</p>
-                        <h2 className="truncate text-xl font-black text-slate-900">AI Mentor · {activeContentName || productTitle}</h2>
+                        <p className="truncate text-[10px] font-black uppercase tracking-[0.2em] text-cyan-700/80 sm:text-xs sm:tracking-[0.32em]">Dedicated AI Workspace</p>
+                        <h2 className="truncate text-base font-black text-slate-900 sm:text-xl">AI Mentor · {activeContentName || productTitle}</h2>
                     </div>
-                    {onClose && <button onClick={onClose} className="rounded-2xl border border-white/50 bg-white/70 px-4 py-2 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm">Close</button>}
+                    {onClose && <button onClick={onClose} className="shrink-0 rounded-xl border border-white/50 bg-white/70 px-3 py-2 text-sm font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm sm:rounded-2xl sm:px-4 sm:text-base">Close</button>}
                 </header>
 
-                <div ref={chatContainerRef} className="flex-1 space-y-5 overflow-y-auto px-4 py-5 md:px-8">
+                <div ref={chatContainerRef} className="flex-1 space-y-4 overflow-y-auto px-3 py-4 sm:space-y-5 sm:px-4 sm:py-5 md:px-8">
                     {messages.map((msg, index) => (
                         <div key={`${msg.createdAt}-${index}`} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-3xl rounded-[1.5rem] border p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl ${msg.sender === 'user' ? 'border-cyan-200/50 bg-cyan-100/80 text-slate-900' : 'border-white/50 bg-white/70 text-slate-900'}`}>
+                            <div className={`max-w-[92%] overflow-hidden rounded-[1.25rem] border p-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:max-w-3xl sm:rounded-[1.5rem] sm:p-4 ${msg.sender === 'user' ? 'border-cyan-200/50 bg-cyan-100/80 text-slate-900' : 'border-white/50 bg-white/70 text-slate-900'}`}>
                                 <MarkdownMessage text={msg.text} />
                             </div>
                         </div>
@@ -208,18 +225,18 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, on
                     {isChatLoading && <TypingIndicator />}
                 </div>
 
-                <footer className="shrink-0 border-t border-white/50 bg-white/70 p-4 backdrop-blur-xl">
-                    <div className="flex gap-3 rounded-3xl border border-white/50 bg-white/70 p-2 shadow-inner">
+                <footer className="shrink-0 border-t border-white/50 bg-white/70 p-2.5 backdrop-blur-xl sm:p-4">
+                    <div className="flex gap-2 rounded-2xl border border-white/50 bg-white/70 p-2 shadow-inner sm:gap-3 sm:rounded-3xl">
                         <input
                             type="text"
                             value={chatInput}
                             onChange={(e) => setChatInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                             placeholder="Ask for a summary, quiz, explanation, or study plan..."
-                            className="min-w-0 flex-1 bg-transparent px-4 py-3 text-slate-900 outline-none placeholder:text-slate-600/60"
+                            className="min-w-0 flex-1 bg-transparent px-3 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-600/60 sm:px-4 sm:text-base"
                             disabled={isChatLoading}
                         />
-                        <button onClick={handleSendMessage} disabled={isChatLoading || !chatInput.trim()} className="rounded-2xl bg-cyan-200 px-6 py-3 font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50">Send</button>
+                        <button onClick={handleSendMessage} disabled={isChatLoading || !chatInput.trim()} className="shrink-0 rounded-2xl bg-cyan-200 px-4 py-3 text-sm font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:text-base">Send</button>
                     </div>
                 </footer>
             </section>
