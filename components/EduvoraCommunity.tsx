@@ -10,13 +10,14 @@ interface EduvoraCommunityProps {
 }
 
 type CommunityView = 'feed' | 'status';
-type CommunityPage = 'chat' | 'thread' | 'profile' | 'creators' | 'network' | 'following' | 'statusUpload' | 'statusMine' | 'statusReel' | 'directChat' | 'directChatThread' | 'statusDetail';
+type CommunityPage = 'chat' | 'thread' | 'profile' | 'creators' | 'network' | 'following' | 'tagMaster' | 'masterTags' | 'masterTagDetail' | 'statusUpload' | 'statusMine' | 'statusReel' | 'directChat' | 'directChatThread' | 'statusDetail';
 type PostType = 'text' | 'image' | 'poll';
 type Reply = { id: number; author: string; text: string; time: string; avatar?: string; docId?: string; createdAt?: number };
 type FeedMessage = { id: number; admin: string; badge: string; avatar: string; title: string; body: string; time: string; reactions: string[]; replies: Reply[]; creatorId?: string; postType?: PostType; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; likeCount?: number; docId?: string; createdAt?: number; reactionCounts?: Record<string, number>; replyCount?: number };
 type Creator = { id: string; username: string; name: string; avatar: string; role: string; followers: number; mutual: boolean; verified?: boolean };
 type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; docId?: string; createdAt?: number };
 type SharedStory = { id: number; statusId: number; recipientId: string; senderId: 'me'; senderName: string; time: string };
+type MasterTagRequest = { id: number; author: string; avatar: string; category: string; title: string; detail: string; time: string; likes: number; reactions: Record<string, number> };
 
 const creators: Creator[] = [
   { id: 'riya', username: 'riyafunnels', name: 'Riya Sharma', avatar: '🧕', role: 'Funnel creator', followers: 1280, mutual: true },
@@ -36,6 +37,14 @@ const initialStatusCards: StatusCard[] = [
   { id: 1, title: 'Morning sprint template', body: 'Use this prompt stack before your first sales call today.', gradient: 'from-[#1A73E8] via-[#34A853] to-[#C2E7FF]', likedBy: 0, views: 0, slots: 'Text · 1 min', type: 'text' },
   { id: 2, title: 'Offer-stack swipe file', body: 'A clean preview board for offer, bonus, guarantee, and urgency blocks.', gradient: 'from-[#1A73E8] via-[#AECBFA] to-[#FBBC04]', likedBy: 0, views: 0, slots: 'Image · 940KB', type: 'image', imagePreview: '🧩' },
   { id: 3, title: 'Workshop poll snapshot', body: 'Vote for the topic we should break down in the next live workshop.', gradient: 'from-[#34A853] via-[#81C995] to-[#C2E7FF]', likedBy: 0, views: 0, slots: 'Poll · 1 min', type: 'poll', pollOptions: ['Reels scripting', 'Email automation', 'Beginner ads'], pollVotes: [18, 27, 11] },
+];
+
+const masterTagCategories = ['Feature request', 'Doubt', 'Query', 'Update', 'Bug or issue', 'Demand'] as const;
+
+const initialMasterTagRequests: MasterTagRequest[] = [
+  { id: 1, author: 'Nisha Verma', avatar: '👩‍🎓', category: 'Feature request', title: 'Master, please add weekly live doubt room', detail: 'Many students need one fixed slot for funnel review, offer doubts, and quick action feedback.', time: '8:30 AM', likes: 38, reactions: { '👍': 14, '🔥': 9, '🙏': 11 } },
+  { id: 2, author: 'Arjun Mehta', avatar: '🧑‍💼', category: 'Bug or issue', title: 'Video lesson notes are not opening on mobile', detail: 'The PDF opens on desktop but keeps loading on my Android phone. Please check the download button.', time: '10:05 AM', likes: 24, reactions: { '👍': 8, '😮': 5, '✅': 4 } },
+  { id: 3, author: 'Riya Sharma', avatar: '🧕', category: 'Update', title: 'Need an update on next automation template', detail: 'Can master upload the promised WhatsApp automation template before the weekend sprint?', time: '12:15 PM', likes: 51, reactions: { '🔥': 18, '❤️': 12, '🙏': 10 } },
 ];
 
 const postOptions: Array<{ type: PostType; icon: string; label: string; helper: string }> = [
@@ -184,6 +193,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [followedIds, setFollowedIds] = useState<string[]>(['riya', 'meera']);
   const [networkTab, setNetworkTab] = useState<'mutual' | 'followers' | 'following' | 'forYou'>('following');
   const [networkSearch, setNetworkSearch] = useState('');
+  const [masterTagRequests, setMasterTagRequests] = useState<MasterTagRequest[]>(initialMasterTagRequests);
+  const [masterTagTitle, setMasterTagTitle] = useState('');
+  const [masterTagDetail, setMasterTagDetail] = useState('');
+  const [masterTagCategory, setMasterTagCategory] = useState<(typeof masterTagCategories)[number]>('Feature request');
+  const [masterTagFilter, setMasterTagFilter] = useState<'All' | (typeof masterTagCategories)[number]>('All');
+  const [selectedMasterTagId, setSelectedMasterTagId] = useState(initialMasterTagRequests[0].id);
+  const [likedMasterTagIds, setLikedMasterTagIds] = useState<number[]>([]);
   const [profile, setProfile] = useState({ name: 'Eduvora Member', username: 'eduvora_member', avatar: '🧑‍🎓', bio: 'Building digital skills daily.' });
   const [showStatusActions, setShowStatusActions] = useState(false);
   const scrollContainerRef = useRef<HTMLElement>(null);
@@ -552,6 +568,162 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setSelectedChatId(recipientId);
   };
 
+  const submitMasterTag = () => {
+    const title = masterTagTitle.trim();
+    const detail = masterTagDetail.trim();
+    if (!title || !detail) return;
+    const request: MasterTagRequest = {
+      id: Date.now(),
+      author: profile.name,
+      avatar: profile.avatar,
+      category: masterTagCategory,
+      title,
+      detail,
+      time: 'Just now',
+      likes: 0,
+      reactions: {},
+    };
+    setMasterTagRequests((current) => [request, ...current]);
+    setMasterTagTitle('');
+    setMasterTagDetail('');
+  };
+
+  const likeMasterTag = (requestId: number) => {
+    const alreadyLiked = likedMasterTagIds.includes(requestId);
+    setLikedMasterTagIds((current) => alreadyLiked ? current.filter((id) => id !== requestId) : [...current, requestId]);
+    setMasterTagRequests((current) => current.map((request) => request.id === requestId ? { ...request, likes: Math.max(0, request.likes + (alreadyLiked ? -1 : 1)) } : request));
+  };
+
+  const reactToMasterTag = (requestId: number, emoji: string) => {
+    setMasterTagRequests((current) => current.map((request) => request.id === requestId ? { ...request, reactions: { ...request.reactions, [emoji]: (request.reactions[emoji] || 0) + 1 } } : request));
+  };
+
+  const filteredMasterTagRequests = masterTagFilter === 'All' ? masterTagRequests : masterTagRequests.filter((request) => request.category === masterTagFilter);
+  const selectedMasterTag = masterTagRequests.find((request) => request.id === selectedMasterTagId) || masterTagRequests[0];
+  const masterTagGroupedRequests = masterTagCategories.map((category) => ({
+    category,
+    requests: filteredMasterTagRequests.filter((request) => request.category === category),
+  })).filter((group) => group.requests.length);
+
+  const renderMasterTagCard = (request: MasterTagRequest, compact = false) => (
+    <article key={request.id} className="overflow-hidden rounded-[1.75rem] border border-[#E0E3EB] bg-white shadow-[0_16px_42px_rgba(60,64,67,0.08)] transition duration-300 hover:-translate-y-0.5 hover:border-[#C2E7FF]">
+      <div className="border-l-4 border-[#1A73E8] p-4 sm:p-5">
+        <div className="flex items-start gap-3">
+          <Avatar value={request.avatar} size="h-11 w-11" />
+          <div className="min-w-0 flex-1">
+            <div className="flex flex-wrap items-center gap-2 text-xs font-black text-[#5F6368]"><span className="text-[#202124]">{request.author}</span><span>•</span><span>{request.time}</span><span className="rounded-full border border-[#D2E3FC] bg-[#E8F0FE] px-2 py-1 text-[#1967D2]">{request.category}</span></div>
+            <h3 className="mt-2 text-xl font-black tracking-tight text-[#202124] sm:text-2xl">@Master {request.title}</h3>
+            <p className={`mt-2 whitespace-pre-wrap text-sm font-semibold leading-7 text-[#5F6368] ${compact ? 'line-clamp-3' : ''}`}>{request.detail}</p>
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button type="button" onClick={() => likeMasterTag(request.id)} className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${likedMasterTagIds.includes(request.id) ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#DADCE0] bg-white text-[#202124] hover:border-[#1A73E8] hover:text-[#1967D2]'}`}>❤️ {request.likes}</button>
+              {REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMasterTag(request.id, emoji)} className="rounded-full border border-[#DADCE0] bg-white px-3 py-1.5 text-xs font-black text-[#202124] transition hover:border-[#1A73E8] hover:text-[#1967D2]">{emoji} {request.reactions[emoji] || 0}</button>)}
+            </div>
+          </div>
+        </div>
+      </div>
+    </article>
+  );
+
+  const openMasterTagDetail = (requestId: number) => {
+    setSelectedMasterTagId(requestId);
+    pushPage('masterTagDetail');
+  };
+
+  const renderMasterTagStrip = (request: MasterTagRequest) => (
+    <article key={request.id} role="button" tabIndex={0} onClick={() => openMasterTagDetail(request.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openMasterTagDetail(request.id); }} className="group flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-[#E0E3EB] bg-white px-3 py-2.5 text-left shadow-[0_8px_24px_rgba(60,64,67,0.06)] transition duration-300 hover:-translate-y-0.5 hover:border-[#C2E7FF] hover:bg-[#F8FAFD] sm:px-4">
+      <Avatar value={request.avatar} size="h-10 w-10" />
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-center gap-2"><span className="truncate text-sm font-black text-[#202124]">@Master {request.title}</span><span className="rounded-full bg-[#E8F0FE] px-2 py-0.5 text-[10px] font-black text-[#1967D2]">{request.category}</span></div>
+        <p className="mt-1 line-clamp-1 text-xs font-semibold text-[#5F6368]">{request.detail}</p>
+      </div>
+      <div className="flex shrink-0 items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
+        <button type="button" onClick={() => likeMasterTag(request.id)} className={`rounded-full px-2.5 py-1 text-[11px] font-black transition ${likedMasterTagIds.includes(request.id) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#F8FAFD] text-[#202124] hover:bg-[#E8F0FE]'}`}>❤️ {request.likes}</button>
+        {REACTION_EMOJIS.slice(0, 3).map((emoji) => <button key={emoji} type="button" onClick={() => reactToMasterTag(request.id, emoji)} className="rounded-full bg-[#F8FAFD] px-2 py-1 text-[11px] font-black text-[#202124] transition hover:bg-[#E8F0FE] hover:text-[#1967D2]">{emoji} {request.reactions[emoji] || 0}</button>)}
+      </div>
+      <span className="hidden rounded-full bg-[#D3E3FD] px-3 py-1 text-[10px] font-black text-[#174EA6] transition group-hover:bg-[#1A73E8] group-hover:text-white sm:inline">Read</span>
+    </article>
+  );
+
+  const renderMasterTagDetailPage = () => selectedMasterTag ? (
+    <div className="mx-auto max-w-4xl space-y-4">
+      <button type="button" onClick={() => setPage('masterTags')} className="rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-sm font-black text-[#5F6368] shadow-sm transition hover:bg-[#E8F0FE]">← Back to Masster'Tags</button>
+      <section className="overflow-hidden rounded-[2.4rem] border border-[#D2E3FC] bg-white shadow-[0_28px_86px_rgba(26,115,232,0.14)]">
+        <div className="bg-gradient-to-br from-[#E8F0FE] via-[#D3E3FD] to-[#C2E7FF] p-6 sm:p-8">
+          <div className="flex items-start gap-4"><Avatar value={selectedMasterTag.avatar} size="h-14 w-14" /><div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1967D2]">{selectedMasterTag.category}</p><h2 className="mt-2 text-3xl font-black tracking-tight text-[#202124] sm:text-5xl">@Master {selectedMasterTag.title}</h2><p className="mt-2 text-sm font-bold text-[#5F6368]">{selectedMasterTag.author} • {selectedMasterTag.time}</p></div></div>
+        </div>
+        <div className="space-y-5 p-5 sm:p-7">
+          <p className="whitespace-pre-wrap rounded-[2rem] border border-[#E0E3EB] bg-[#F8FAFD] p-5 text-base font-semibold leading-8 text-[#5F6368] sm:text-lg">{selectedMasterTag.detail}</p>
+          <div className="rounded-[2rem] border border-[#E0E3EB] bg-white p-4"><p className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-[#1967D2]">React only</p><div className="flex flex-wrap gap-2"><button type="button" onClick={() => likeMasterTag(selectedMasterTag.id)} className={`rounded-full border px-4 py-2 text-sm font-black transition ${likedMasterTagIds.includes(selectedMasterTag.id) ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#DADCE0] bg-white text-[#202124] hover:border-[#1A73E8] hover:text-[#1967D2]'}`}>❤️ {selectedMasterTag.likes}</button>{REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMasterTag(selectedMasterTag.id, emoji)} className="rounded-full border border-[#DADCE0] bg-white px-4 py-2 text-sm font-black text-[#202124] transition hover:border-[#1A73E8] hover:text-[#1967D2]">{emoji} {selectedMasterTag.reactions[emoji] || 0}</button>)}</div></div>
+        </div>
+      </section>
+    </div>
+  ) : null;
+
+  const renderMasterTagDock = () => (
+    <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-[1350] flex justify-center px-3 pointer-events-none md:bottom-5">
+      <nav className="pointer-events-auto flex max-w-[94vw] items-center gap-2 overflow-x-auto rounded-[2rem] border border-[#D2E3FC] bg-white/95 p-2 shadow-[0_18px_60px_rgba(26,115,232,0.22)] ring-1 ring-[#C2E7FF] backdrop-blur-2xl custom-scrollbar" aria-label="Master tag dock">
+        <button type="button" onClick={() => setPage('tagMaster')} className={`min-w-[120px] rounded-2xl px-4 py-3 text-center transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'tagMaster' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC]' : 'bg-white text-[#202124] hover:bg-[#E8F0FE]'}`}><span className="block text-2xl">🏷️</span><span className="text-[11px] font-black">Tag'master</span></button>
+        <button type="button" onClick={() => setPage('masterTags')} className={`min-w-[120px] rounded-2xl px-4 py-3 text-center transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'masterTags' || page === 'masterTagDetail' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC]' : 'bg-white text-[#202124] hover:bg-[#E8F0FE]'}`}><span className="block text-2xl">📚</span><span className="text-[11px] font-black">Masster'Tags</span></button>
+      </nav>
+    </div>
+  );
+
+  const renderTagMasterPage = () => (
+    <div className="mx-auto max-w-7xl space-y-5">
+      <section className="overflow-hidden rounded-[2.6rem] border border-[#D2E3FC] bg-white shadow-[0_30px_90px_rgba(26,115,232,0.16)]">
+        <div className="relative overflow-hidden bg-gradient-to-br from-[#E8F0FE] via-[#D3E3FD] to-[#C2E7FF] p-6 text-[#202124] sm:p-8 lg:p-10">
+          <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-white/35 blur-3xl" />
+          <div className="absolute bottom-0 left-12 h-44 w-44 rounded-full bg-[#1A73E8]/10 blur-3xl" />
+          <div className="relative grid gap-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-end">
+            <div>
+              <p className="text-left text-sm font-black uppercase tracking-[0.28em] text-[#1967D2]">tag your master</p>
+              <h2 className="mt-3 max-w-3xl text-4xl font-black tracking-tight sm:text-6xl">Directly tag master for action-worthy student demands.</h2>
+              <p className="mt-4 max-w-3xl text-sm font-semibold leading-7 text-[#202124]/72 sm:text-base">You can request feature, submit doubt, queries, updates you want, feature you want, any bug or issues, any demand, and other students can also react your comment with likes and emojis. After a huge request or demand master definitely take action on it.</p>
+            </div>
+            <div className="rounded-[2rem] border border-white/55 bg-white/70 p-4 shadow-[0_18px_54px_rgba(26,115,232,0.14)] backdrop-blur-xl">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1967D2]">Live request meter</p>
+              <div className="mt-4 grid grid-cols-3 gap-3 text-center">
+                <div className="rounded-2xl bg-[#E8F0FE] p-3"><p className="text-2xl font-black text-[#174EA6]">{masterTagRequests.length}</p><p className="text-[11px] font-bold text-[#5F6368]">Requests</p></div>
+                <div className="rounded-2xl bg-[#E6F4EA] p-3"><p className="text-2xl font-black text-[#137333]">{masterTagRequests.reduce((sum, item) => sum + item.likes, 0)}</p><p className="text-[11px] font-bold text-[#5F6368]">Likes</p></div>
+                <div className="rounded-2xl bg-[#FEF7E0] p-3"><p className="text-2xl font-black text-[#B06000]">{masterTagGroupedRequests.length}</p><p className="text-[11px] font-bold text-[#5F6368]">Categories</p></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div className="bg-gradient-to-br from-[#F8FAFD] via-white to-[#E8F0FE] p-5 sm:p-7">
+          <div className="mx-auto max-w-3xl rounded-[2rem] border border-[#E0E3EB] bg-white p-5 shadow-sm">
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1967D2]">Direct tag composer</p>
+            <label className="mt-4 block text-sm font-black text-[#202124]">Category</label>
+            <select value={masterTagCategory} onChange={(event) => setMasterTagCategory(event.target.value as (typeof masterTagCategories)[number])} className="mt-2 w-full rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-sm font-bold text-[#202124] outline-none focus:border-[#1A73E8]">
+              {masterTagCategories.map((category) => <option key={category} value={category}>{category}</option>)}
+            </select>
+            <label className="mt-4 block text-sm font-black text-[#202124]">Tag title</label>
+            <input value={masterTagTitle} onChange={(event) => setMasterTagTitle(event.target.value)} placeholder="Example: Master, please add doubt session" className="mt-2 w-full rounded-2xl border border-[#E0E3EB] px-4 py-3 text-sm font-bold outline-none focus:border-[#1A73E8]" />
+            <label className="mt-4 block text-sm font-black text-[#202124]">Detailed request</label>
+            <textarea value={masterTagDetail} onChange={(event) => setMasterTagDetail(event.target.value)} placeholder="Write your doubt, query, bug, feature demand, update request, or any important student need..." rows={8} className="mt-2 w-full resize-none rounded-2xl border border-[#E0E3EB] px-4 py-3 text-sm font-bold leading-6 outline-none focus:border-[#1A73E8]" />
+            <button type="button" onClick={submitMasterTag} disabled={!masterTagTitle.trim() || !masterTagDetail.trim()} className="mt-4 w-full rounded-2xl bg-[#1A73E8] px-5 py-3 text-sm font-black text-white shadow-[0_14px_34px_rgba(26,115,232,0.24)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:bg-[#AECBFA]">Tag master now</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  );
+
+  const renderMasterTagsPage = () => (
+    <div className="mx-auto max-w-7xl space-y-5">
+      <div className="rounded-[2.4rem] border border-[#D2E3FC] bg-gradient-to-br from-[#E8F0FE] via-white to-[#C2E7FF] p-6 shadow-[0_26px_80px_rgba(26,115,232,0.14)] sm:p-8">
+        <p className="text-sm font-black uppercase tracking-[0.28em] text-[#1967D2]">Masster'Tags</p>
+        <h2 className="mt-3 text-4xl font-black tracking-tight text-[#202124] sm:text-5xl">Category-wise student queries and demands.</h2>
+        <p className="mt-3 max-w-3xl text-base font-semibold leading-7 text-[#5F6368]">All students can view these comments as thin rows. Use the filter tags below, open any row for full reading, and react only with likes or emojis.</p>
+        <div className="mt-5 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+          {(['All', ...masterTagCategories] as Array<'All' | (typeof masterTagCategories)[number]>).map((category) => <button key={category} type="button" onClick={() => setMasterTagFilter(category)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black transition ${masterTagFilter === category ? 'border-[#1A73E8] bg-[#1A73E8] text-white shadow-[0_10px_28px_rgba(26,115,232,0.24)]' : 'border-[#D2E3FC] bg-white/85 text-[#1967D2] hover:bg-[#E8F0FE]'}`}>{category === 'All' ? 'All tags' : category}</button>)}
+        </div>
+      </div>
+      <div className="rounded-[2rem] border border-[#E0E3EB] bg-white p-3 shadow-[0_18px_54px_rgba(60,64,67,0.08)] sm:p-4">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-1"><div><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1967D2]">{masterTagFilter === 'All' ? 'All request rows' : masterTagFilter}</p><h3 className="mt-1 text-2xl font-black text-[#202124]">{filteredMasterTagRequests.length} visible student {filteredMasterTagRequests.length === 1 ? 'tag' : 'tags'}</h3></div><span className="rounded-full bg-[#E8F0FE] px-4 py-2 text-xs font-black text-[#174EA6]">Click row to read</span></div>
+        <div className="space-y-2">{filteredMasterTagRequests.length ? filteredMasterTagRequests.map(renderMasterTagStrip) : <div className="rounded-2xl border border-dashed border-[#C2E7FF] bg-[#F8FAFD] p-8 text-center text-sm font-black text-[#5F6368]">No comments found for this tag yet.</div>}</div>
+      </div>
+    </div>
+  );
 
   const MessageSummaryCard: React.FC<{ message: FeedMessage; isActive?: boolean }> = ({ message, isActive = false }) => (
     <article className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition duration-300 ${isActive ? 'scale-[1.012] border-[#C2E7FF] shadow-[0_18px_48px_rgba(26,115,232,0.10)] ring-2 ring-[#E8F0FE]' : 'border-[#E0E3EB] hover:-translate-y-0.5 hover:border-[#C2E7FF] hover:shadow-[0_16px_40px_rgba(60,64,67,0.10)]'}`}>
@@ -730,6 +902,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E0E3EB] bg-white shadow-[0_28px_90px_rgba(37,99,235,0.16)] ring-1 ring-[#D2E3FC]"><div className="relative overflow-hidden bg-gradient-to-br from-[#E8F0FE] via-[#D3E3FD] to-[#C2E7FF] p-6 text-[#202124] sm:p-8"><div className="absolute -right-14 -top-16 h-52 w-52 rounded-full bg-white/20 blur-3xl" /><div className="absolute -bottom-20 left-10 h-56 w-56 rounded-full bg-[#C2E7FF]/40 blur-3xl" /><div className="relative grid gap-6 lg:grid-cols-[1fr_0.86fr]"><div><p className="text-sm font-black uppercase tracking-[0.28em] text-[#202124]/80">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">One powerful post per day. Make it count.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#202124]/78">Choose text, image, or poll. The composer below changes instantly so creators get only the upload tools they need.</p></div><div className="rounded-[2rem] border border-[#D2E3FC] bg-white/80 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.18)] backdrop-blur-2xl"><div className="flex items-center justify-between"><span className="text-sm font-black text-[#202124]/80">Today reward</span><span className="rounded-full bg-[#D3E3FD]/95 px-3 py-1 text-xs font-black text-[#174EA6]">+1 EduCoin</span></div><div className="mt-5 h-3 overflow-hidden rounded-full bg-white/20"><div className={`h-full rounded-full bg-white transition-all ${isPostUsedToday ? 'w-full' : 'w-1/3'}`} /></div><p className="mt-3 text-sm font-bold text-[#202124]/75">{isPostUsedToday ? 'Daily creator slot used.' : 'Your creator slot is ready.'}</p></div></div></div><div className="bg-gradient-to-br from-[#F8FAFD] via-white to-[#E8F0FE] p-5 sm:p-7"><div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={!postDraft.trim() || isPostUsedToday || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#1A73E8] via-[#1967D2] to-[#174EA6] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(14,165,233,0.28)] transition hover:-translate-y-1 disabled:cursor-not-allowed disabled:opacity-45">{isPostUsedToday ? 'Daily post already shared' : 'Publish creator post'}</button></div></div>}
           {page === 'network' && <div className="mx-auto max-w-5xl bg-white"><div className="sticky top-0 z-10 bg-white pb-3"><div className="flex items-center gap-4"><h2 className="text-4xl font-black">{profile.username}</h2></div><div className="mt-6 grid grid-cols-4 border-b border-[#E0E3EB] text-center text-sm font-black sm:text-lg">{(['mutual', 'followers', 'following', 'forYou'] as const).map((tab) => <button key={tab} type="button" onClick={() => setNetworkTab(tab)} className={`pb-3 capitalize ${networkTab === tab ? 'border-b-4 border-[#1A73E8] text-[#174EA6]' : 'text-[#5F6368]'}`}>{tab === 'forYou' ? 'For you' : tab}</button>)}</div><input value={networkSearch} onChange={(event) => setNetworkSearch(event.target.value)} placeholder="Search creators..." className="mt-4 w-full rounded-2xl border border-[#E0E3EB] px-4 py-3 font-bold outline-none focus:border-[#1A73E8]" /></div><div className="space-y-3 pt-3">{filteredCreators.map((creator) => { const followed = followedIds.includes(creator.id); return <article key={creator.id} className="flex items-center gap-3 rounded-3xl border border-[#E0E3EB] bg-white p-4 shadow-sm"><Avatar value={creator.avatar} /><div className="min-w-0 flex-1"><h3 className="truncate text-xl font-black text-[#202124]">{creator.name} {creator.verified ? '✅' : ''}</h3><p className="text-sm font-bold text-[#5F6368]">@{creator.username} · {creator.role}</p><p className="text-sm font-black text-[#5F6368]">{creator.followers.toLocaleString()} followers</p></div><button type="button" onClick={() => setFollowedIds((current) => followed ? current.filter((id) => id !== creator.id) : [...current, creator.id])} className={`rounded-full px-4 py-2 text-sm font-black transition ${followed ? 'bg-[#E8F0FE] text-[#1967D2]' : 'bg-[#1A73E8] text-white'}`}>{followed ? 'Following' : 'Follow'}</button></article>; })}</div></div>}
           {page === 'following' && renderFeedLayout(followingMessages, 'Your followers feed', 'Only posts from creators you follow are shown here.')}
+          {page === 'tagMaster' && renderTagMasterPage()}
+          {page === 'masterTags' && renderMasterTagsPage()}
+          {page === 'masterTagDetail' && renderMasterTagDetailPage()}
           {page === 'directChat' && renderChatPage()}
           {page === 'directChatThread' && renderChatThreadPage()}
           {page === 'statusDetail' && renderStatusDetailPage()}
@@ -739,7 +914,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         </div>
       </main>
 
-      <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-[1300] flex justify-center px-3 pointer-events-none md:bottom-5"><div className="relative pointer-events-auto"><div className={`absolute bottom-[calc(100%+0.75rem)] left-1/2 z-10 flex -translate-x-1/2 flex-col gap-2 transition duration-300 ${showStatusActions ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-3 opacity-0'}`}><button type="button" onClick={() => { setShowStatusActions(false); pushPage('statusUpload'); }} className="whitespace-nowrap rounded-2xl border border-[#C2E7FF] bg-[#1A73E8] px-4 py-3 text-xs font-black text-white shadow-[0_16px_40px_rgba(244,63,94,0.26)]">⬆️ Upload your status</button><button type="button" onClick={() => { setShowStatusActions(false); pushPage('statusMine'); }} className="whitespace-nowrap rounded-2xl border border-[#C2E7FF] bg-white px-4 py-3 text-xs font-black text-[#202124] shadow-[0_16px_40px_rgba(14,165,233,0.18)]">👁️ View your status</button></div><nav id="community-bottom-dock" className="flex max-w-[96vw] items-center gap-2 overflow-x-auto rounded-[2rem] border border-[#E0E3EB] bg-white/95 p-2 shadow-[0_4px_16px_rgba(60,64,67,0.18)] ring-1 ring-[#D2E3FC] backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] data-[hidden=true]:translate-y-5 data-[hidden=true]:scale-75 data-[hidden=true]:opacity-80 custom-scrollbar" aria-label="Community dock"><button type="button" onClick={() => switchView('feed')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${activeView === 'feed' && page === 'chat' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC] ring-1 ring-[#D2E3FC]' : 'bg-white hover:bg-[#E8F0FE] text-[#202124]'}`}><span className="block text-2xl">📢</span><span className="text-[11px] font-black">Feed</span></button><button type="button" onClick={() => { setShowStatusActions((value) => !value); setActiveView('status'); if (page !== 'chat') { setPage('chat'); setPageStack([]); } }} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${activeView === 'status' && page === 'chat' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC] ring-1 ring-[#D2E3FC]' : 'bg-white hover:bg-[#E8F0FE] text-[#202124]'}`}><span className="block text-2xl">⭕</span><span className="text-[11px] font-black">Status</span></button><button type="button" onClick={() => pushPage('directChat')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'directChat' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC] ring-1 ring-[#D2E3FC]' : 'bg-white hover:bg-[#E8F0FE] text-[#202124]'}`}><span className="block text-2xl">💬</span><span className="text-[11px] font-black">Chat</span></button><button type="button" onClick={() => pushPage('creators')} className={`min-w-[86px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'creators' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC] ring-1 ring-[#D2E3FC]' : 'bg-white hover:bg-[#E8F0FE] text-[#202124]'}`}><span className="block text-2xl">✍️</span><span className="text-[11px] font-black">Creators</span></button><button type="button" onClick={() => pushPage('network')} className={`min-w-[86px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'network' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC] ring-1 ring-[#D2E3FC]' : 'bg-white hover:bg-[#E8F0FE] text-[#202124]'}`}><span className="block text-2xl">🤝</span><span className="text-[11px] font-black">Follow</span></button><button type="button" onClick={() => pushPage('following')} className={`min-w-[96px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'following' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC] ring-1 ring-[#D2E3FC]' : 'bg-white hover:bg-[#E8F0FE] text-[#202124]'}`}><span className="block text-2xl">👥</span><span className="text-[11px] font-black">Following</span></button></nav></div></div>
+      {page === 'tagMaster' || page === 'masterTags' || page === 'masterTagDetail' ? renderMasterTagDock() : (<div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-[1300] flex justify-center px-3 pointer-events-none md:bottom-5"><div className="relative pointer-events-auto"><div className={`absolute bottom-[calc(100%+0.75rem)] left-1/2 z-10 flex -translate-x-1/2 flex-col gap-2 transition duration-300 ${showStatusActions ? 'translate-y-0 opacity-100' : 'pointer-events-none translate-y-3 opacity-0'}`}><button type="button" onClick={() => { setShowStatusActions(false); pushPage('statusUpload'); }} className="whitespace-nowrap rounded-2xl border border-[#C2E7FF] bg-[#1A73E8] px-4 py-3 text-xs font-black text-white shadow-[0_16px_40px_rgba(244,63,94,0.26)]">⬆️ Upload your status</button><button type="button" onClick={() => { setShowStatusActions(false); pushPage('statusMine'); }} className="whitespace-nowrap rounded-2xl border border-[#C2E7FF] bg-white px-4 py-3 text-xs font-black text-[#202124] shadow-[0_16px_40px_rgba(14,165,233,0.18)]">👁️ View your status</button></div><nav id="community-bottom-dock" className="flex max-w-[96vw] items-center gap-2 overflow-x-auto rounded-[2rem] border border-[#E0E3EB] bg-white/95 p-2 shadow-[0_4px_16px_rgba(60,64,67,0.18)] ring-1 ring-[#D2E3FC] backdrop-blur-2xl transition-all duration-500 ease-[cubic-bezier(0.16,1,0.3,1)] data-[hidden=true]:translate-y-5 data-[hidden=true]:scale-75 data-[hidden=true]:opacity-80 custom-scrollbar" aria-label="Community dock"><button type="button" onClick={() => switchView('feed')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${activeView === 'feed' && page === 'chat' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC] ring-1 ring-[#D2E3FC]' : 'bg-white hover:bg-[#E8F0FE] text-[#202124]'}`}><span className="block text-2xl">📢</span><span className="text-[11px] font-black">Feed</span></button><button type="button" onClick={() => { setShowStatusActions((value) => !value); setActiveView('status'); if (page !== 'chat') { setPage('chat'); setPageStack([]); } }} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${activeView === 'status' && page === 'chat' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC] ring-1 ring-[#D2E3FC]' : 'bg-white hover:bg-[#E8F0FE] text-[#202124]'}`}><span className="block text-2xl">⭕</span><span className="text-[11px] font-black">Status</span></button><button type="button" onClick={() => pushPage('directChat')} className={`min-w-[76px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'directChat' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC] ring-1 ring-[#D2E3FC]' : 'bg-white hover:bg-[#E8F0FE] text-[#202124]'}`}><span className="block text-2xl">💬</span><span className="text-[11px] font-black">Chat</span></button><button type="button" onClick={() => pushPage('creators')} className={`min-w-[86px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'creators' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC] ring-1 ring-[#D2E3FC]' : 'bg-white hover:bg-[#E8F0FE] text-[#202124]'}`}><span className="block text-2xl">✍️</span><span className="text-[11px] font-black">Creators</span></button><button type="button" onClick={() => pushPage('network')} className={`min-w-[86px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'network' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC] ring-1 ring-[#D2E3FC]' : 'bg-white hover:bg-[#E8F0FE] text-[#202124]'}`}><span className="block text-2xl">🤝</span><span className="text-[11px] font-black">Follow</span></button><button type="button" onClick={() => pushPage('following')} className={`min-w-[96px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'following' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC] ring-1 ring-[#D2E3FC]' : 'bg-white hover:bg-[#E8F0FE] text-[#202124]'}`}><span className="block text-2xl">👥</span><span className="text-[11px] font-black">Following</span></button><button type="button" onClick={() => pushPage('tagMaster')} className={`min-w-[104px] rounded-2xl px-3 py-2 text-center text-black transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'tagMaster' || page === 'masterTags' ? 'bg-[#D3E3FD] text-[#174EA6] shadow-lg shadow-[#D2E3FC] ring-1 ring-[#D2E3FC]' : 'bg-white hover:bg-[#E8F0FE] text-[#202124]'}`}><span className="block text-2xl">🏷️</span><span className="text-[11px] font-black">Master tag</span></button></nav></div></div>)}
     </section>
   );
 };

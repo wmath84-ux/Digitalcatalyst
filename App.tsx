@@ -1,6 +1,6 @@
 
 // FIX: Corrected the React import statement by removing the erroneous 'a' and fixing the destructuring syntax.
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import ProductShowcase from './components/ProductShowcase';
@@ -964,7 +964,7 @@ const App: React.FC = () => {
     };
   }, []);
 
-  useEffect(() => {
+  const playWelcomeVoice = useCallback(() => {
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     const played = localStorage.getItem('welcomeVoicePlayed');
     if (played) return;
@@ -972,8 +972,9 @@ const App: React.FC = () => {
     msg.rate = 0.95;
     msg.pitch = 1.2;
     msg.volume = 0.9;
+    msg.onend = () => localStorage.setItem('welcomeVoicePlayed', '1');
+    window.speechSynthesis.cancel();
     window.speechSynthesis.speak(msg);
-    localStorage.setItem('welcomeVoicePlayed', '1');
   }, []);
   const [appliedCartCoupon, setAppliedCartCoupon] = useState<Coupon | null>(null);
   const [cartCouponError, setCartCouponError] = useState<string | null>(null);
@@ -2311,7 +2312,7 @@ const App: React.FC = () => {
     return (
        <ErrorBoundary>
          <div className="font-sans">
-            <WelcomeOverlay />
+            <WelcomeOverlay onAnimationComplete={playWelcomeVoice} />
             <Header settings={websiteSettings} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} authButtonLabel={authButtonLabel} activeTheme={activeTheme} onThemeChange={setActiveTheme} />
             {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={currentUser?.eduCoins || 0} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
