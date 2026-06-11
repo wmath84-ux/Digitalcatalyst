@@ -103,7 +103,7 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean 
     const current = bullets;
     bullets = [];
     nodes.push(
-      <ul key={`ul-${nodes.length}`} className="my-6 space-y-3 rounded-[1.5rem] border p-5 shadow-sm backdrop-blur-xl lg:my-8 lg:p-6" style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderColor: chatPalette.cardBorder }}>
+      <ul key={`ul-${nodes.length}`} className="my-6 space-y-3 rounded-[1.5rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderColor: chatPalette.cardBorder }}>
         {current.map((item, index) => <li key={index} className="flex gap-3"><span className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: chatPalette.activeBlue }} /><span><InlineMarkdown text={item} /></span></li>)}
       </ul>
     );
@@ -114,7 +114,7 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean 
     const text = paragraph.join(' ').trim();
     paragraph = [];
     if (text) {
-      nodes.push(<p key={`p-${nodes.length}`} className="my-5 text-lg leading-9 lg:text-xl lg:leading-10" style={{ color: chatPalette.secondaryText }}><InlineMarkdown text={text} /></p>);
+      nodes.push(<p key={`p-${nodes.length}`} className="my-5 text-lg leading-9" style={{ color: chatPalette.secondaryText }}><InlineMarkdown text={text} /></p>);
       const paragraphCount = nodes.filter(node => React.isValidElement(node) && node.type === 'p').length;
       if (includeInArticleAd && paragraphCount === 2) {
         nodes.push(<GoogleAd key={`in-article-ad-${nodes.length}`} variant="inArticle" label="Advertisement" className="my-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderColor: chatPalette.cardBorder }} />);
@@ -132,13 +132,13 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean 
     if (line.startsWith('## ')) {
       flushParagraph();
       flushBullets();
-      nodes.push(<h2 key={`h2-${nodes.length}`} className="mb-4 mt-12 text-3xl font-black tracking-tight lg:text-4xl" style={{ color: chatPalette.primaryText }}><InlineMarkdown text={line.slice(3).trim()} /></h2>);
+      nodes.push(<h2 key={`h2-${nodes.length}`} className="mb-4 mt-12 text-3xl font-black tracking-tight" style={{ color: chatPalette.primaryText }}><InlineMarkdown text={line.slice(3).trim()} /></h2>);
       return;
     }
     if (line.startsWith('### ')) {
       flushParagraph();
       flushBullets();
-      nodes.push(<h3 key={`h3-${nodes.length}`} className="mb-3 mt-8 text-2xl font-black lg:text-3xl" style={{ color: chatPalette.primaryText }}><InlineMarkdown text={line.slice(4).trim()} /></h3>);
+      nodes.push(<h3 key={`h3-${nodes.length}`} className="mb-3 mt-8 text-2xl font-black" style={{ color: chatPalette.primaryText }}><InlineMarkdown text={line.slice(4).trim()} /></h3>);
       return;
     }
     if (line.startsWith('- ')) {
@@ -166,14 +166,14 @@ const SponsoredPartnerCard: React.FC<{
   onExploreFeature,
 }) => (
   <aside className="my-12 overflow-hidden rounded-[2rem] border bg-gradient-to-r from-[#edf4ff] via-[#f7f9fc] to-[#e6f4ea] p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-    <div className="rounded-[1.75rem] p-6 backdrop-blur-2xl sm:p-8 lg:p-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}>
+    <div className="rounded-[1.75rem] p-6 backdrop-blur-2xl sm:p-8" style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>Sponsored Partner</p>
-          <h3 className="mt-3 text-2xl font-black lg:text-3xl" style={{ color: chatPalette.primaryText }}>{promoTitle}</h3>
-          <p className="mt-3 max-w-2xl text-sm leading-6 lg:text-base lg:leading-7" style={{ color: chatPalette.secondaryText }}>{promoDescription}</p>
+          <h3 className="mt-3 text-2xl font-black" style={{ color: chatPalette.primaryText }}>{promoTitle}</h3>
+          <p className="mt-3 max-w-2xl text-sm leading-6" style={{ color: chatPalette.secondaryText }}>{promoDescription}</p>
         </div>
-        <button type="button" onClick={onExploreFeature} className="rounded-full px-6 py-3 text-sm font-black shadow-sm transition hover:scale-105 lg:px-8 lg:py-3.5 lg:text-base" style={{ backgroundColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
+        <button type="button" onClick={onExploreFeature} className="rounded-full px-6 py-3 text-sm font-black shadow-sm transition hover:scale-105" style={{ backgroundColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
           {promoCtaLabel}
         </button>
       </div>
@@ -182,20 +182,20 @@ const SponsoredPartnerCard: React.FC<{
 );
 
 const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: string; imageSeed?: string; onClick: () => void; }> = ({ title, meta, excerpt, badge, imageSeed, onClick }) => (
-  <button onClick={onClick} className="group relative overflow-hidden rounded-[1.75rem] border text-left shadow-[0_12px_36px_rgba(60,64,67,0.10)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_48px_rgba(60,64,67,0.14)] lg:rounded-[2rem]" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
+  <button onClick={onClick} className="group relative overflow-hidden rounded-[1.75rem] border text-left shadow-[0_12px_36px_rgba(60,64,67,0.10)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_48px_rgba(60,64,67,0.14)]" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
     {imageSeed && (
-      <div className="aspect-video overflow-hidden rounded-t-[1.75rem] lg:rounded-t-[2rem]" style={{ backgroundColor: chatPalette.searchBlue }}>
-        <img src={imageSeed || ''} alt="" className="h-full w-full rounded-t-[1.75rem] object-cover opacity-90 transition duration-700 group-hover:scale-110 group-hover:opacity-100 lg:rounded-t-[2rem]" />
+      <div className="aspect-video overflow-hidden rounded-t-[1.75rem]" style={{ backgroundColor: chatPalette.searchBlue }}>
+        <img src={imageSeed || ''} alt="" className="h-full w-full rounded-t-[1.75rem] object-cover opacity-90 transition duration-700 group-hover:scale-110 group-hover:opacity-100" />
       </div>
     )}
-    <div className="p-5 lg:p-7">
+    <div className="p-5">
       <div className="flex items-center justify-between gap-4">
-        <span className="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em] lg:px-4 lg:py-1.5 lg:text-[11px]" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>{badge}</span>
-        <span className="text-xs font-semibold lg:text-sm" style={{ color: chatPalette.secondaryText }}>{meta}</span>
+        <span className="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em]" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>{badge}</span>
+        <span className="text-xs font-semibold" style={{ color: chatPalette.secondaryText }}>{meta}</span>
       </div>
-      <h3 className="mt-4 text-xl font-black leading-tight transition lg:text-2xl lg:leading-snug" style={{ color: chatPalette.primaryText }}>{title}</h3>
-      <p className="mt-3 line-clamp-3 text-sm leading-6 lg:text-base lg:leading-7" style={{ color: chatPalette.secondaryText }}>{excerpt}</p>
-      <div className="mt-5 text-sm font-black lg:text-base" style={{ color: chatPalette.linkText }}>Read comfortably →</div>
+      <h3 className="mt-4 text-xl font-black leading-tight transition" style={{ color: chatPalette.primaryText }}>{title}</h3>
+      <p className="mt-3 line-clamp-3 text-sm leading-6" style={{ color: chatPalette.secondaryText }}>{excerpt}</p>
+      <div className="mt-5 text-sm font-black" style={{ color: chatPalette.linkText }}>Read comfortably →</div>
     </div>
   </button>
 );
@@ -331,36 +331,36 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
   return (
     <div className="fixed inset-0 z-[1200] backdrop-blur-sm" style={{ backgroundColor: readingBackground }} role="dialog" aria-modal="true" aria-labelledby="reading-drawer-title" onMouseDown={onClose}>
       <div className="absolute inset-y-0 right-0 flex w-full justify-end">
-        <section onMouseDown={(e) => e.stopPropagation()} className="relative h-full w-full overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[92vw] xl:w-[88vw] 2xl:w-[84vw]" style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder }}>
+        <section onMouseDown={(e) => e.stopPropagation()} className="relative h-full w-full overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw]" style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder }}>
           <div className="sticky top-0 z-30 h-1" style={{ backgroundColor: 'rgba(255,255,255,0.9)' }}>
             <div className="h-full rounded-r-full shadow-sm transition-all duration-150" style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${accentStrongBackground}, rgba(194, 231, 255, 0.92), rgba(11, 87, 208, 0.72))` }} />
           </div>
 
           <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(circle at top left, ${accentSoftBackground}, transparent 32%), radial-gradient(circle at bottom right, rgba(194, 231, 255, 0.34), transparent 28%)` }} />
 
-          <header className="relative z-20 flex items-center justify-between gap-4 border-b px-4 py-4 backdrop-blur-2xl sm:px-8 lg:px-10 lg:py-5" style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }}>
+          <header className="relative z-20 flex items-center justify-between gap-4 border-b px-4 py-4 backdrop-blur-2xl sm:px-8" style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }}>
             <div className="flex min-w-0 items-center gap-4">
               {(view === 'article' || view === 'announcement') && (
-                <button onClick={onBackToList} className="shrink-0 rounded-full border px-4 py-2 text-sm font-black shadow-sm transition hover:-translate-x-0.5 hover:shadow-md lg:px-6 lg:py-3 lg:text-base" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
+                <button onClick={onBackToList} className="shrink-0 rounded-full border px-4 py-2 text-sm font-black shadow-sm transition hover:-translate-x-0.5 hover:shadow-md" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
                   ← Back to List
                 </button>
               )}
               <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>Premium Reading Mode</p>
-              <h2 id="reading-drawer-title" className="mt-1 truncate text-lg font-black sm:text-2xl lg:text-3xl" style={{ color: chatPalette.primaryText }}>{activeMeta.title}</h2>
+              <h2 id="reading-drawer-title" className="mt-1 truncate text-lg font-black sm:text-2xl" style={{ color: chatPalette.primaryText }}>{activeMeta.title}</h2>
               </div>
             </div>
             <div className="flex shrink-0 items-center gap-3">
-              <button onClick={handleShare} className="rounded-full border p-3 transition hover:shadow-sm lg:p-3.5" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }} aria-label="Share reading item">↗</button>
-              <button onClick={onClose} className="rounded-full border p-3 transition hover:shadow-sm lg:p-3.5" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }} aria-label="Close reading drawer">✕</button>
+              <button onClick={handleShare} className="rounded-full border p-3 transition hover:shadow-sm" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }} aria-label="Share reading item">↗</button>
+              <button onClick={onClose} className="rounded-full border p-3 transition hover:shadow-sm" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }} aria-label="Close reading drawer">✕</button>
             </div>
           </header>
 
           <div ref={scrollRef} onScroll={handleScroll} className="relative z-10 h-[calc(100%-73px)] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div className="px-5 py-8 sm:px-10 lg:px-16 lg:py-10 xl:px-20">
-              <div className="mx-auto max-w-3xl lg:max-w-4xl">
-                <div className="mb-8 rounded-[2rem] border p-6 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl lg:mb-10 lg:p-7" style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }}>
-                  <div className="flex flex-wrap items-center gap-3 text-sm lg:text-base" style={{ color: chatPalette.secondaryText }}>
+            <div className="px-5 py-8 sm:px-10 lg:px-16">
+              <div className="mx-auto max-w-3xl">
+                <div className="mb-8 rounded-[2rem] border p-6 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl" style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }}>
+                  <div className="flex flex-wrap items-center gap-3 text-sm" style={{ color: chatPalette.secondaryText }}>
                     <span className="rounded-full px-3 py-1 font-bold" style={{ backgroundColor: accentSoftBackground, color: chatPalette.primaryText }} >{activeMeta.source}</span>
                     <span>{formatDate(activeMeta.date)}</span>
                     <span>⏳ {activeMeta.readTime} min read</span>
@@ -369,22 +369,22 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
               </div>
 
               {(view === 'news' || view === 'blog') && (
-                <div className="mx-auto max-w-7xl 2xl:max-w-[1500px]">
-                  <div className="mb-10 max-w-3xl lg:mb-12 lg:max-w-4xl">
+                <div className="mx-auto max-w-7xl">
+                  <div className="mb-10 max-w-3xl">
                     <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>{listType === 'news' ? 'News Desk' : 'Learning Blog'}</p>
-                    <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl" style={{ color: chatPalette.primaryText }}>{listTitle}</h1>
-                    <p className="mt-5 text-lg leading-8 lg:text-xl lg:leading-9" style={{ color: chatPalette.secondaryText }}>{listDescription}</p>
+                    <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl" style={{ color: chatPalette.primaryText }}>{listTitle}</h1>
+                    <p className="mt-5 text-lg leading-8" style={{ color: chatPalette.secondaryText }}>{listDescription}</p>
                     <div className="mt-6 flex flex-wrap gap-3">
                       {['Comfort reading', 'Fresh insights', 'Calm layout'].map((label) => (
-                        <span key={label} className="rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.22em] shadow-sm lg:px-5 lg:py-2.5" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>{label}</span>
+                        <span key={label} className="rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.22em] shadow-sm" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>{label}</span>
                       ))}
                     </div>
                   </div>
-                  <div className="grid gap-6 lg:grid-cols-3 lg:gap-8 2xl:grid-cols-4">
+                  <div className="grid gap-6 lg:grid-cols-3">
                     {visibleArticles.length === 0 && (
-                      <div className="rounded-[2rem] border p-8 shadow-sm backdrop-blur-xl lg:col-span-3 lg:p-10 2xl:col-span-4" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
+                      <div className="rounded-[2rem] border p-8 shadow-sm backdrop-blur-xl lg:col-span-3" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
                         <p className="text-3xl">📚</p>
-                        <h3 className="mt-3 text-2xl font-black lg:text-3xl" style={{ color: chatPalette.primaryText }}>No {listType} posts yet</h3>
+                        <h3 className="mt-3 text-2xl font-black" style={{ color: chatPalette.primaryText }}>No {listType} posts yet</h3>
                         <p className="mt-2">Run AI Fetch Now in the admin panel or add a manual {listType} post to fill this list.</p>
                       </div>
                     )}
@@ -392,7 +392,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                       <React.Fragment key={`article-${article.id}`}>
                         <HubCard title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(stripMarkdown(article.content))} min`} excerpt={article.excerpt} badge={article.type === 'news' ? 'News' : article.category || 'Blog'} imageSeed={getArticleImage(article)} onClick={() => onSelectArticle(article)} />
                         {(index + 1) % 3 === 0 && index < visibleArticles.length - 1 && (
-                          <GoogleAd variant="inFeed" label="Sponsored" className="rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl lg:col-span-3 lg:p-6 2xl:col-span-4" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
+                          <GoogleAd variant="inFeed" label="Sponsored" className="lg:col-span-3 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
                         )}
                       </React.Fragment>
                     ))}
@@ -402,33 +402,42 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
               )}
 
               {view === 'article' && selectedArticle && (
-                <article className="mx-auto max-w-3xl lg:max-w-4xl">
-                  <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>{selectedArticle.category}</p>
-                  <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl" style={{ color: chatPalette.primaryText }}>{selectedArticle.title}</h1>
-                  <p className="mt-6 text-xl leading-8 lg:text-2xl lg:leading-10" style={{ color: chatPalette.secondaryText }}>{selectedArticle.excerpt}</p>
-                  <div className="mt-7 flex flex-wrap gap-3 rounded-[1.5rem] border p-4 text-sm font-bold shadow-sm backdrop-blur-xl lg:p-5 lg:text-base" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>
-                    <span>📖 Focus-friendly article</span>
-                    <span>•</span>
-                    <span>Comfort spacing</span>
-                    <span>•</span>
-                    <span>Soft trusted palette</span>
+                <article className="mx-auto max-w-6xl">
+                  <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
+                    <div className="min-w-0">
+                      <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>{selectedArticle.category}</p>
+                      <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl" style={{ color: chatPalette.primaryText }}>{selectedArticle.title}</h1>
+                      <p className="mt-5 text-lg leading-8 sm:text-xl lg:max-w-3xl" style={{ color: chatPalette.secondaryText }}>{selectedArticle.excerpt}</p>
+                      <div className="mt-6 flex flex-wrap gap-2 rounded-[1.5rem] border p-3 text-xs font-bold shadow-sm backdrop-blur-xl sm:gap-3 sm:p-4 sm:text-sm" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>
+                        <span>📖 Focus-friendly article</span>
+                        <span>•</span>
+                        <span>Comfort spacing</span>
+                        <span>•</span>
+                        <span>Soft trusted palette</span>
+                      </div>
+                    </div>
+                    {!isExternalArticle(selectedArticle) && (
+                      <div className="hidden overflow-hidden rounded-[2rem] border shadow-sm backdrop-blur-2xl lg:block" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
+                        <img src={getArticleImage(selectedArticle, '900/700')} alt={selectedArticle.title} className="aspect-[4/3] h-full w-full object-cover opacity-90 animate-article-hero-image" />
+                      </div>
+                    )}
                   </div>
                   {isExternalArticle(selectedArticle) ? (
                     <>
-                      <div className="mt-10 overflow-hidden rounded-[2rem] border p-2 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl lg:p-3" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
+                      <div className="mt-8 overflow-hidden rounded-[2rem] border p-2 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl lg:mt-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
                         <iframe src={getArticleUrl(selectedArticle)} title={selectedArticle.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-white [scrollbar-width:none] lg:h-[76vh]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
                       </div>
-                      <GoogleAd variant="multiplex" label="Related Content" className="mt-12 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
+                      <GoogleAd variant="multiplex" label="Related Content" className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
                     </>
                   ) : (
                     <>
-                      <div className="mb-6 mt-10 aspect-video overflow-hidden rounded-2xl border shadow-sm backdrop-blur-2xl lg:rounded-[2rem]" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
+                      <div className="mb-6 mt-8 aspect-video overflow-hidden rounded-2xl border shadow-sm backdrop-blur-2xl lg:hidden" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
                         <img src={getArticleImage(selectedArticle, '1400/800')} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" />
                       </div>
-                      <div className="mt-12 rounded-[2rem] border p-6 text-lg leading-9 shadow-[0_18px_50px_rgba(60,64,67,0.08)] backdrop-blur-2xl sm:p-8 lg:p-10 lg:text-xl lg:leading-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
+                      <div className="mx-auto mt-8 max-w-4xl rounded-[2rem] border p-6 text-lg leading-9 shadow-[0_18px_50px_rgba(60,64,67,0.08)] backdrop-blur-2xl sm:p-8 lg:mt-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
                         <MarkdownContent content={selectedArticle.content} includeInArticleAd />
                         <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} />
-                        <GoogleAd variant="multiplex" label="Related Content" className="mt-12 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
+                        <GoogleAd variant="multiplex" label="Related Content" className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
                       </div>
                     </>
                   )}
@@ -436,10 +445,10 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
               )}
 
               {view === 'announcement' && selectedAnnouncement && (
-                <article className="mx-auto max-w-3xl lg:max-w-4xl">
+                <article className="mx-auto max-w-3xl">
                   <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>Official Announcement</p>
-                  <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl" style={{ color: chatPalette.primaryText }}>{selectedAnnouncement.title}</h1>
-                  <div className="mt-12 space-y-7 rounded-[2rem] border p-6 text-lg leading-9 shadow-sm backdrop-blur-2xl sm:p-8 lg:p-10 lg:text-xl lg:leading-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
+                  <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-6xl" style={{ color: chatPalette.primaryText }}>{selectedAnnouncement.title}</h1>
+                  <div className="mt-12 space-y-7 rounded-[2rem] border p-6 text-lg leading-9 shadow-sm backdrop-blur-2xl sm:p-8" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
                     {selectedAnnouncement.content.split('\n').filter(Boolean).map((paragraph, index) => (
                       <React.Fragment key={index}>
                         {index === 1 && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} />}
