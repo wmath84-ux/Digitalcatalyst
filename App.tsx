@@ -734,12 +734,12 @@ const defaultWebsiteSettings: WebsiteSettings = {
             accentOpacity: 45,
         },
         readingStyle: {
-            backgroundColor: '#dfe8fb',
-            backgroundOpacity: 92,
-            panelOpacity: 92,
-            cardOpacity: 86,
-            accentColor: '#4338ca',
-            accentOpacity: 20,
+            backgroundColor: '#f7f9fc',
+            backgroundOpacity: 96,
+            panelOpacity: 94,
+            cardOpacity: 94,
+            accentColor: '#c2e7ff',
+            accentOpacity: 62,
         },
         profileStreaks: [
             { id: 'daily-login', title: 'Daily Login Spark', icon: '🔥', metric: 'dailyLogin', goal: 1, unit: 'day', coinReward: 10, accent: 'from-orange-400 via-amber-400 to-yellow-300', note: 'Open your hub every day and claim today’s flame.', active: true },
