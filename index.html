@@ -368,12 +368,46 @@
       @keyframes blink { 50% { border-color: transparent; } }
       @keyframes slideUp { from { opacity: 0; transform: translateY(16px);} to { opacity: 1; transform: translateY(0);} }
       @keyframes welcomeCirclePop {
-        from { opacity: 0; transform: scale(0.86) rotate(-4deg); }
-        to { opacity: 1; transform: scale(1) rotate(0); }
+        from { opacity: 0; transform: scale(0.9); }
+        to { opacity: 1; transform: scale(1); }
       }
-      @keyframes circleTextReveal {
-        from { opacity: 0; clip-path: inset(0 100% 0 0); transform: translateY(10px); }
-        to { opacity: 1; clip-path: inset(0 0 0 0); transform: translateY(0); }
+      @keyframes welcomeCircleDraw {
+        from { stroke-dashoffset: 295.31; }
+        to { stroke-dashoffset: 0; }
+      }
+      @keyframes welcomeTextWrite {
+        from { opacity: 1; clip-path: inset(0 100% 0 0); }
+        to { opacity: 1; clip-path: inset(0 0 0 0); }
+      }
+      @keyframes welcomeCaretBlink {
+        0%, 45% { opacity: 1; }
+        46%, 100% { opacity: 0; }
+      }
+      @keyframes welcomeSpark {
+        0% { opacity: 0; transform: scale(0.4); }
+        20%, 82% { opacity: 1; transform: scale(1); }
+        100% { opacity: 0; transform: scale(0.35); }
+      }
+      .welcome-circle-draw {
+        stroke-dasharray: 295.31;
+        stroke-dashoffset: 295.31;
+        animation: welcomeCircleDraw 2s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+      }
+      .welcome-write-text {
+        display: inline-block;
+        opacity: 0;
+        position: relative;
+        animation: welcomeTextWrite 2s steps(7, end) forwards;
+      }
+      .welcome-write-text::after {
+        background: currentColor;
+        content: '';
+        height: 0.88em;
+        position: absolute;
+        right: -0.14em;
+        top: 0.12em;
+        width: 0.045em;
+        animation: welcomeCaretBlink 0.55s steps(1, end) 4 both;
       }
 
 
