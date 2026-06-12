@@ -19,6 +19,11 @@ const replyToneOptions: Array<{ value: ReplyTone; label: string; hint: string }>
   { value: 'concise', label: 'Short & Clear', hint: 'Seedha, brief, action-focused answer.' },
 ];
 
+const dispatchSupportTicketsUpdate = (updatedTickets: SupportTicket[]) => {
+  localStorage.setItem('siteSupportTickets', JSON.stringify(updatedTickets));
+  window.dispatchEvent(new Event('siteSupportTicketsUpdated'));
+};
+
 const buildLocalAiReply = (ticket: SupportTicket, note: string, tone: ReplyTone) => {
   const normalizedNote = note.trim() || 'Please acknowledge the concern and share that our support team is checking it with priority.';
   const toneLine = tone === 'according'
@@ -48,7 +53,11 @@ const SupportManagement: React.FC<{ tickets: SupportTicket[]; onUpdate: (updated
   const activeTicket = useMemo(() => tickets.find(ticket => ticket.id === activeTicketId) || null, [activeTicketId, tickets]);
   const stats = useMemo(() => ({ open: tickets.filter(t => t.status === 'Open').length, pending: tickets.filter(t => t.status === 'Pending').length, resolved: tickets.filter(t => t.status === 'Resolved').length }), [tickets]);
   const visibleTickets = tickets.filter(ticket => (filter === 'All' || ticket.status === filter) && `${ticket.subject} ${ticket.customerName} ${ticket.customerEmail} ${ticket.message}`.toLowerCase().includes(query.toLowerCase()));
-  const handleStatusChange = (id: string, status: SupportTicket['status']) => onUpdate(tickets.map(t => t.id === id ? { ...t, status } : t));
+  const handleStatusChange = (id: string, status: SupportTicket['status']) => {
+    const updatedTickets = tickets.map(t => t.id === id ? { ...t, status } : t);
+    onUpdate(updatedTickets);
+    dispatchSupportTicketsUpdate(updatedTickets);
+  };
 
   const openTicketPage = (ticket: SupportTicket, mode: Exclude<TicketPageMode, 'list'>) => {
     setActiveTicketId(ticket.id);
@@ -72,10 +81,14 @@ const SupportManagement: React.FC<{ tickets: SupportTicket[]; onUpdate: (updated
 
   const handleSendReply = () => {
     if (!activeTicket || !replyText.trim()) return;
+    const trimmedReply = replyText.trim();
+    const repliedAt = new Date().toISOString();
     const subject = encodeURIComponent(`Re: ${activeTicket.subject}`);
-    const body = encodeURIComponent(replyText);
+    const body = encodeURIComponent(trimmedReply);
     window.open(`mailto:${activeTicket.customerEmail}?subject=${subject}&body=${body}`);
-    handleStatusChange(activeTicket.id, 'Resolved');
+    const updatedTickets = tickets.map(t => t.id === activeTicket.id ? { ...t, status: 'Resolved' as const, adminReply: trimmedReply, repliedAt } : t);
+    onUpdate(updatedTickets);
+    dispatchSupportTicketsUpdate(updatedTickets);
     closeTicketPage();
   };
 
@@ -122,7 +135,7 @@ const SupportManagement: React.FC<{ tickets: SupportTicket[]; onUpdate: (updated
           <div className="bg-gradient-to-br from-indigo-600 via-purple-600 to-sky-500 p-6 text-white sm:p-8">
             <div className="flex flex-col gap-5 lg:flex-row lg:items-start lg:justify-between">
               <div>
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-white/75">Nested ticket page • #{activeTicket.id}</p>
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-white/75">{activeTicket.source === 'masterTag' ? 'Eduvora master tag' : 'Nested ticket page'} • #{activeTicket.id}</p>
                 <h1 className="mt-2 text-3xl font-black sm:text-4xl">{isReplyPage ? 'Compose customer reply' : 'Ticket details'}</h1>
                 <p className="mt-2 max-w-2xl text-sm font-semibold text-white/80">{activeTicket.subject}</p>
               </div>
@@ -139,6 +152,7 @@ const SupportManagement: React.FC<{ tickets: SupportTicket[]; onUpdate: (updated
                 <p className="text-xs font-black uppercase tracking-widest text-slate-400">Customer</p>
                 <h2 className="mt-2 text-2xl font-black text-slate-900">{activeTicket.customerName}</h2>
                 <a href={`mailto:${activeTicket.customerEmail}`} className="mt-1 block break-all text-sm font-bold text-indigo-600">{activeTicket.customerEmail}</a>
+                {activeTicket.source === 'masterTag' && <p className="mt-3 rounded-2xl bg-indigo-50 px-3 py-2 text-xs font-black text-indigo-700">Community Master Tag • {activeTicket.category || 'General'}</p>}
               </div>
 
               <div className="rounded-3xl bg-white p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
@@ -156,6 +170,7 @@ const SupportManagement: React.FC<{ tickets: SupportTicket[]; onUpdate: (updated
                 <p className="text-xs font-black uppercase tracking-widest text-slate-400">Customer message</p>
                 <h3 className="mt-2 text-2xl font-black text-slate-900">{activeTicket.subject}</h3>
                 <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-slate-600">{activeTicket.message}</p>
+                {activeTicket.adminReply && <div className="mt-5 rounded-2xl border border-emerald-100 bg-emerald-50 p-4"><p className="text-xs font-black uppercase tracking-widest text-emerald-700">Last admin reply</p><p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-6 text-emerald-900">{activeTicket.adminReply}</p></div>}
               </div>
 
               {isReplyPage ? (
@@ -221,7 +236,7 @@ const SupportManagement: React.FC<{ tickets: SupportTicket[]; onUpdate: (updated
       <div><p className="font-black uppercase tracking-[0.25em] text-blue-500">Help desk</p><h1 className="text-4xl font-black text-slate-900">Support</h1><p className="text-slate-600">A cleaner ticket board for replies, details, nested pages, and AI-assisted responses.</p></div>
       <div className="grid gap-4 sm:grid-cols-3"><div className="rounded-3xl bg-rose-50 p-5 text-rose-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)]"><p className="font-bold opacity-70">Open</p><p className="text-3xl font-black">{stats.open}</p></div><div className="rounded-3xl bg-amber-50 p-5 text-amber-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)]"><p className="font-bold opacity-70">Pending</p><p className="text-3xl font-black">{stats.pending}</p></div><div className="rounded-3xl bg-emerald-50 p-5 text-emerald-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)]"><p className="font-bold opacity-70">Resolved</p><p className="text-3xl font-black">{stats.resolved}</p></div></div>
       <div className="rounded-[1.5rem] border border-slate-100 bg-white/80 backdrop-blur-xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)]"><div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between"><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Search tickets..." className="rounded-2xl border border-slate-200 bg-slate-100/80 px-4 py-3 lg:w-96" /><div className="flex flex-wrap gap-2">{(['All', 'Open', 'Pending', 'Resolved'] as const).map(tab => <button key={tab} onClick={() => setFilter(tab)} className={`rounded-full px-4 py-2 text-sm font-black ${filter === tab ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'bg-slate-100 text-slate-600'}`}>{tab}</button>)}</div></div></div>
-      <div className="grid gap-4 xl:grid-cols-2">{visibleTickets.map(ticket => <article key={ticket.id} className="rounded-[1.5rem] border border-slate-100 bg-white/80 backdrop-blur-xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-widest text-slate-600">#{ticket.id}</p><h3 className="mt-1 text-xl font-black text-slate-900">{ticket.subject}</h3><p className="text-sm text-slate-600">{ticket.customerName} • {ticket.customerEmail}</p></div><StatusBadge status={ticket.status} /></div><p className="mt-4 line-clamp-2 text-sm leading-6 text-slate-600">{ticket.message}</p><div className="mt-5 flex flex-wrap justify-end gap-2"><button onClick={() => openTicketPage(ticket, 'details')} className="rounded-xl bg-slate-100 px-4 py-2 font-bold text-slate-700">Details</button><button onClick={() => openTicketPage(ticket, 'reply')} className="rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 font-bold text-white">Reply</button><button onClick={() => openTicketPage(ticket, 'reply')} className="rounded-xl bg-indigo-50 px-4 py-2 font-bold text-indigo-700">AI Reply</button></div></article>)}</div>
+      <div className="grid gap-4 xl:grid-cols-2">{visibleTickets.map(ticket => <article key={ticket.id} className="rounded-[1.5rem] border border-slate-100 bg-white/80 backdrop-blur-xl p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]"><div className="flex items-start justify-between gap-4"><div><p className="text-xs font-black uppercase tracking-widest text-slate-600">#{ticket.id}</p><h3 className="mt-1 text-xl font-black text-slate-900">{ticket.subject}</h3><p className="text-sm text-slate-600">{ticket.customerName} • {ticket.customerEmail}</p>{ticket.source === 'masterTag' && <p className="mt-2 inline-flex rounded-full bg-indigo-50 px-2.5 py-1 text-[11px] font-black text-indigo-700">Eduvora Master Tag</p>}</div><StatusBadge status={ticket.status} /></div><p className="mt-4 line-clamp-2 text-sm leading-6 text-slate-600">{ticket.message}</p><div className="mt-5 flex flex-wrap justify-end gap-2"><button onClick={() => openTicketPage(ticket, 'details')} className="rounded-xl bg-slate-100 px-4 py-2 font-bold text-slate-700">Details</button><button onClick={() => openTicketPage(ticket, 'reply')} className="rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2 font-bold text-white">Reply</button><button onClick={() => openTicketPage(ticket, 'reply')} className="rounded-xl bg-indigo-50 px-4 py-2 font-bold text-indigo-700">AI Reply</button></div></article>)}</div>
       {!visibleTickets.length && <div className="rounded-[1.5rem] border border-dashed border-slate-300 bg-white/60 p-8 text-center font-bold text-slate-500">No support tickets found.</div>}
     </div>
   );
