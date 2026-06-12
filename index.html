@@ -479,13 +479,13 @@
         color: var(--tagmaster-blue-strong) !important;
       }
 
-      .tagmaster-section-theme :is([class*="text-slate-900"], [class*="text-gray-900"], [class*="text-slate-950"], [class*="text-black"]),
-      .tagmaster-admin-theme :is([class*="text-slate-900"], [class*="text-gray-900"], [class*="text-slate-950"], [class*="text-black"], th) {
+      .tagmaster-section-theme :is([class*="text-slate-800"], [class*="text-slate-900"], [class*="text-slate-950"], [class*="text-gray-800"], [class*="text-gray-900"], [class*="text-gray-950"], [class*="text-black"]),
+      .tagmaster-admin-theme :is([class*="text-slate-800"], [class*="text-slate-900"], [class*="text-slate-950"], [class*="text-gray-800"], [class*="text-gray-900"], [class*="text-gray-950"], [class*="text-black"], th) {
         color: var(--tagmaster-ink) !important;
       }
 
-      .tagmaster-section-theme :is([class*="text-slate-700"], [class*="text-slate-600"], [class*="text-gray-700"], [class*="text-gray-600"]),
-      .tagmaster-admin-theme :is([class*="text-slate-700"], [class*="text-slate-600"], [class*="text-gray-700"], [class*="text-gray-600"]) {
+      .tagmaster-section-theme :is([class*="text-slate-400"], [class*="text-slate-500"], [class*="text-slate-600"], [class*="text-slate-700"], [class*="text-gray-400"], [class*="text-gray-500"], [class*="text-gray-600"], [class*="text-gray-700"]),
+      .tagmaster-admin-theme :is([class*="text-slate-400"], [class*="text-slate-500"], [class*="text-slate-600"], [class*="text-slate-700"], [class*="text-gray-400"], [class*="text-gray-500"], [class*="text-gray-600"], [class*="text-gray-700"]) {
         color: var(--tagmaster-muted) !important;
       }
 
@@ -505,9 +505,15 @@
         border-color: var(--tagmaster-blue-border) !important;
       }
 
-      .tagmaster-section-theme :is([class*="bg-sky"], [class*="bg-indigo"], [class*="bg-cyan"], [class*="bg-purple"], [class*="bg-blue-50"], [class*="bg-blue-100"]),
-      .tagmaster-admin-theme :is([class*="bg-sky"], [class*="bg-indigo"], [class*="bg-cyan"], [class*="bg-blue-50"], [class*="bg-blue-100"], [class*="bg-slate-50"], [class*="bg-gray-50"]) {
+      .tagmaster-section-theme :is([class*="bg-sky"], [class*="bg-indigo"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-purple"], [class*="bg-blue-50"], [class*="bg-blue-100"], [class*="bg-slate-50"], [class*="bg-slate-100"], [class*="bg-gray-50"], [class*="bg-gray-100"]),
+      .tagmaster-admin-theme :is([class*="bg-sky"], [class*="bg-indigo"], [class*="bg-cyan"], [class*="bg-violet"], [class*="bg-purple"], [class*="bg-blue-50"], [class*="bg-blue-100"], [class*="bg-slate-50"], [class*="bg-slate-100"], [class*="bg-gray-50"], [class*="bg-gray-100"]) {
         background-color: var(--tagmaster-blue-soft) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="bg-slate-800"], [class*="bg-slate-900"], [class*="bg-slate-950"], [class*="bg-gray-800"], [class*="bg-gray-900"], [class*="bg-black"]),
+      .tagmaster-admin-theme :is([class*="bg-slate-800"], [class*="bg-slate-900"], [class*="bg-slate-950"], [class*="bg-gray-800"], [class*="bg-gray-900"], [class*="bg-black"]) {
+        background-color: var(--tagmaster-blue) !important;
+        color: #fff !important;
       }
 
       .tagmaster-section-theme :is(button, a[role="button"], .product-card-shine button),
@@ -520,20 +526,20 @@
         border-color: var(--tagmaster-blue-border-strong) !important;
       }
 
-      .tagmaster-section-theme :is([class*="from-blue"], [class*="from-cyan"], [class*="from-indigo"], [class*="from-purple"]),
-      .tagmaster-admin-theme :is([class*="from-blue"], [class*="from-cyan"], [class*="from-indigo"], [class*="from-purple"]) {
+      .tagmaster-section-theme :is([class*="from-blue"], [class*="from-cyan"], [class*="from-indigo"], [class*="from-violet"], [class*="from-purple"], [class*="from-["]),
+      .tagmaster-admin-theme :is([class*="from-blue"], [class*="from-cyan"], [class*="from-indigo"], [class*="from-violet"], [class*="from-purple"], [class*="from-"]) {
         --tw-gradient-from: var(--tagmaster-blue-soft) var(--tw-gradient-from-position) !important;
         --tw-gradient-to: rgba(232,240,254,0) var(--tw-gradient-to-position) !important;
         --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
       }
 
-      .tagmaster-section-theme :is([class*="to-blue"], [class*="to-cyan"], [class*="to-indigo"], [class*="to-purple"]),
-      .tagmaster-admin-theme :is([class*="to-blue"], [class*="to-cyan"], [class*="to-indigo"], [class*="to-purple"]) {
+      .tagmaster-section-theme :is([class*="to-blue"], [class*="to-cyan"], [class*="to-indigo"], [class*="to-violet"], [class*="to-purple"], [class*="to-"]),
+      .tagmaster-admin-theme :is([class*="to-blue"], [class*="to-cyan"], [class*="to-indigo"], [class*="to-violet"], [class*="to-purple"], [class*="to-"]) {
         --tw-gradient-to: var(--tagmaster-blue-border-strong) var(--tw-gradient-to-position) !important;
       }
 
-      .tagmaster-section-theme :is([class*="via-indigo"], [class*="via-blue"], [class*="via-cyan"], [class*="via-purple"]),
-      .tagmaster-admin-theme :is([class*="via-indigo"], [class*="via-blue"], [class*="via-cyan"], [class*="via-purple"]) {
+      .tagmaster-section-theme :is([class*="via-indigo"], [class*="via-blue"], [class*="via-cyan"], [class*="via-violet"], [class*="via-purple"], [class*="via-"]),
+      .tagmaster-admin-theme :is([class*="via-indigo"], [class*="via-blue"], [class*="via-cyan"], [class*="via-violet"], [class*="via-purple"], [class*="via-"]) {
         --tw-gradient-via: var(--tagmaster-blue-mid) var(--tw-gradient-via-position) !important;
         --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important;
       }
@@ -563,6 +569,37 @@
         background-color: var(--tagmaster-red-soft) !important;
         color: var(--tagmaster-red) !important;
         border-color: var(--tagmaster-red-border) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="text-green"], [class*="text-emerald"]),
+      .tagmaster-admin-theme :is([class*="text-green"], [class*="text-emerald"]) {
+        color: var(--tagmaster-green) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="text-yellow"], [class*="text-amber"], [class*="text-orange"]),
+      .tagmaster-admin-theme :is([class*="text-yellow"], [class*="text-amber"], [class*="text-orange"]) {
+        color: var(--tagmaster-yellow) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="text-red"], [class*="text-rose"]),
+      .tagmaster-admin-theme :is([class*="text-red"], [class*="text-rose"]) {
+        color: var(--tagmaster-red) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="bg-[radial-gradient"], [class*="bg-[linear-gradient"]),
+      .tagmaster-admin-theme :is([class*="bg-[radial-gradient"], [class*="bg-[linear-gradient"]) {
+        background-image: radial-gradient(circle at 18% 18%, rgba(26,115,232,0.16), transparent 30%), radial-gradient(circle at 82% 8%, rgba(194,231,255,0.48), transparent 28%), linear-gradient(180deg, rgba(255,255,255,0.32), rgba(248,250,253,0.82)) !important;
+      }
+
+      .tagmaster-admin-theme aside {
+        background: linear-gradient(180deg, var(--tagmaster-blue-soft), var(--tagmaster-page) 52%, var(--tagmaster-blue-mid)) !important;
+        color: var(--tagmaster-ink) !important;
+      }
+
+      .tagmaster-admin-theme header,
+      .tagmaster-admin-theme main {
+        background-color: rgba(255,255,255,0.72) !important;
+        border-color: var(--tagmaster-blue-border) !important;
       }
 
       .tagmaster-section-theme :is(input, textarea, select):focus,
