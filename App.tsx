@@ -35,7 +35,7 @@ import WelcomeOverlay from './components/WelcomeOverlay';
 import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
 import EduvoraCommunity from './components/EduvoraCommunity';
-import { addDoc, collection, doc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
 
@@ -805,6 +805,50 @@ const defaultWebsiteSettings: WebsiteSettings = {
     },
 };
 
+
+const GLOBAL_PRODUCTS_COLLECTION = 'siteProducts';
+const GLOBAL_COUPONS_COLLECTION = 'siteCoupons';
+const GLOBAL_TICKETS_COLLECTION = 'siteSupportTickets';
+const GLOBAL_ORDERS_COLLECTION = 'siteOrders';
+const GLOBAL_REVIEWS_DOC = ['siteData', 'productReviews'] as const;
+const GLOBAL_WEBSITE_SETTINGS_DOC = ['settings', 'website'] as const;
+
+const stripUndefinedDeep = <T,>(value: T): T => {
+  if (Array.isArray(value)) return value.map(item => stripUndefinedDeep(item)) as T;
+  if (value && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).reduce((acc, [key, entry]) => {
+      if (entry !== undefined) (acc as Record<string, unknown>)[key] = stripUndefinedDeep(entry);
+      return acc;
+    }, {} as Record<string, unknown>) as T;
+  }
+  return value;
+};
+
+const syncArrayCollectionToFirestore = async <T extends Record<string, any>>(
+  collectionName: string,
+  items: T[],
+  getId: (item: T) => string,
+) => {
+  const collectionRef = collection(db, collectionName);
+  const existingSnapshot = await getDocs(collectionRef);
+  const batch = writeBatch(db);
+  const nextIds = new Set(items.map(getId));
+
+  existingSnapshot.docs.forEach(snapshot => {
+    if (!nextIds.has(snapshot.id)) batch.delete(snapshot.ref);
+  });
+
+  items.forEach(item => {
+    batch.set(doc(db, collectionName, getId(item)), stripUndefinedDeep(item), { merge: false });
+  });
+
+  await batch.commit();
+};
+
+const logGlobalSyncWarning = (scope: string, error: unknown) => {
+  console.warn(`${scope} global sync failed; local data remains available.`, error);
+};
+
 const App: React.FC = () => {
   // Initialize products with default data immediately to prevent "white screen" or empty state
   const [products, setProducts] = useState<Product[]>([]);
@@ -1122,6 +1166,69 @@ const App: React.FC = () => {
 
   }, []);
   
+  useEffect(() => {
+    const unsubscribeProducts = onSnapshot(collection(db, GLOBAL_PRODUCTS_COLLECTION), (snapshot) => {
+      if (snapshot.empty) return;
+      const remoteProducts = snapshot.docs
+        .map(item => normalizeProductArrays(item.data() as Product))
+        .sort((a, b) => Number(a.id) - Number(b.id));
+      setProducts(remoteProducts);
+      safeSetItem('siteProducts', remoteProducts);
+      localStorage.setItem('legacyProductsPurged', 'true');
+    }, error => logGlobalSyncWarning('Products', error));
+
+    const unsubscribeCoupons = onSnapshot(collection(db, GLOBAL_COUPONS_COLLECTION), (snapshot) => {
+      if (snapshot.empty) return;
+      const remoteCoupons = snapshot.docs
+        .map(item => item.data() as Coupon)
+        .sort((a, b) => Number(b.id) - Number(a.id));
+      setCoupons(remoteCoupons);
+      safeSetItem('siteCoupons', remoteCoupons);
+    }, error => logGlobalSyncWarning('Coupons', error));
+
+    const unsubscribeTickets = onSnapshot(collection(db, GLOBAL_TICKETS_COLLECTION), (snapshot) => {
+      if (snapshot.empty) return;
+      const remoteTickets = snapshot.docs
+        .map(item => item.data() as SupportTicket)
+        .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      setTickets(remoteTickets);
+      safeSetItem('siteSupportTickets', remoteTickets);
+    }, error => logGlobalSyncWarning('Support tickets', error));
+
+    const unsubscribeOrders = onSnapshot(collection(db, GLOBAL_ORDERS_COLLECTION), (snapshot) => {
+      if (snapshot.empty) return;
+      const remoteOrders = snapshot.docs
+        .map(item => item.data() as Order)
+        .sort((a, b) => String(b.date).localeCompare(String(a.date)));
+      setOrders(remoteOrders);
+      safeSetItem('siteOrders', remoteOrders);
+    }, error => logGlobalSyncWarning('Orders', error));
+
+    const unsubscribeReviews = onSnapshot(doc(db, ...GLOBAL_REVIEWS_DOC), (snapshot) => {
+      if (!snapshot.exists()) return;
+      const remoteReviews = (snapshot.data()?.reviews || {}) as { [productId: number]: Review[] };
+      setReviews(remoteReviews);
+      safeSetItem('productReviews', remoteReviews);
+    }, error => logGlobalSyncWarning('Reviews', error));
+
+    const unsubscribeWebsiteSettings = onSnapshot(doc(db, ...GLOBAL_WEBSITE_SETTINGS_DOC), (snapshot) => {
+      if (!snapshot.exists()) return;
+      const remoteSettings = snapshot.data() as WebsiteSettings;
+      const mergedSettings = { ...defaultWebsiteSettings, ...remoteSettings, content: { ...defaultWebsiteSettings.content, ...(remoteSettings.content || {}) } };
+      setWebsiteSettings(mergedSettings);
+      safeSetItem('websiteSettings', mergedSettings);
+    }, error => logGlobalSyncWarning('Website settings', error));
+
+    return () => {
+      unsubscribeProducts();
+      unsubscribeCoupons();
+      unsubscribeTickets();
+      unsubscribeOrders();
+      unsubscribeReviews();
+      unsubscribeWebsiteSettings();
+    };
+  }, []);
+
   // Use safeSetItem everywhere instead of direct localStorage.setItem
   useEffect(() => {
     safeSetItem('shoppingCart', cart);
@@ -1221,6 +1328,8 @@ const App: React.FC = () => {
     };
     setWebsiteSettings(mergedSettings);
     safeSetItem('websiteSettings', mergedSettings);
+    void setDoc(doc(db, ...GLOBAL_WEBSITE_SETTINGS_DOC), stripUndefinedDeep(mergedSettings), { merge: true })
+      .catch(error => logGlobalSyncWarning('Website settings', error));
   };
   
   useEffect(() => {
@@ -1268,6 +1377,23 @@ const App: React.FC = () => {
   const realMetrics = {
       revenue: totalRevenueValue,
       users: users.length
+  };
+
+  const addGlobalOrder = (order: Order) => {
+    setOrders(prevOrders => [order, ...prevOrders.filter(existingOrder => existingOrder.id !== order.id)]);
+    void setDoc(doc(db, GLOBAL_ORDERS_COLLECTION, String(order.id)), stripUndefinedDeep(order), { merge: false })
+      .catch(error => logGlobalSyncWarning('Order create', error));
+  };
+
+  const updateCouponUsage = (couponCode: string) => {
+    const updatedCoupons = coupons.map(c => c.code === couponCode ? { ...c, timesUsed: c.timesUsed + 1 } : c);
+    setCoupons(updatedCoupons);
+    safeSetItem('siteCoupons', updatedCoupons);
+    const changedCoupon = updatedCoupons.find(c => c.code === couponCode);
+    if (changedCoupon) {
+      void setDoc(doc(db, GLOBAL_COUPONS_COLLECTION, String(changedCoupon.id)), stripUndefinedDeep(changedCoupon), { merge: false })
+        .catch(error => logGlobalSyncWarning('Coupon usage', error));
+    }
   };
 
   // --- Cart Handlers ---
@@ -1354,7 +1480,7 @@ const App: React.FC = () => {
       safeSetItem('purchasedProducts', newPurchasedIds);
 
       if (appliedCouponCode) {
-        setCoupons(prev => prev.map(c => c.code === appliedCouponCode ? { ...c, timesUsed: c.timesUsed + 1 } : c));
+        updateCouponUsage(appliedCouponCode);
       }
       
       const newOrderItems: OrderItem[] = cartDetails.map(item => ({
@@ -1388,7 +1514,7 @@ const App: React.FC = () => {
           paymentLabel: 'Cart checkout',
         }
       };
-      setOrders(prevOrders => [newOrder, ...prevOrders]);
+      addGlobalOrder(newOrder);
 
       const firstCartItemProduct = productsWithRatings.find(p => p.id === cart[0].productId);
       setSelectedProduct(firstCartItemProduct || null);
@@ -1737,6 +1863,8 @@ const App: React.FC = () => {
     const updatedReviews = { ...reviews, [productId]: [newReview, ...(reviews[productId] || [])] };
     setReviews(updatedReviews);
     safeSetItem('productReviews', updatedReviews);
+    void setDoc(doc(db, ...GLOBAL_REVIEWS_DOC), { reviews: stripUndefinedDeep(updatedReviews) }, { merge: true })
+      .catch(error => logGlobalSyncWarning('Reviews', error));
   };
 
   const handleViewProduct = (product: ProductWithRating, sectionId?: string) => {
@@ -1860,10 +1988,10 @@ const App: React.FC = () => {
                 paymentLabel: 'Product checkout',
             }
         };
-        setOrders(prevOrders => [newOrder, ...prevOrders]);
+        addGlobalOrder(newOrder);
     }
     if (appliedCouponCode) {
-        setCoupons(prev => prev.map(c => c.code === appliedCouponCode ? { ...c, timesUsed: c.timesUsed + 1 } : c));
+        updateCouponUsage(appliedCouponCode);
     }
     setCart([]); // Clear cart after single product purchase
     setCurrentView('congratulations');
@@ -1893,7 +2021,7 @@ const App: React.FC = () => {
         console.warn('Purchase database sync failed before request; local unlock remains available.', error);
       }
     }
-    setOrders(prevOrders => [{
+    addGlobalOrder({
       id: `DC-${Date.now()}`,
       customerName: currentUser?.name || currentUser?.email.split('@')[0] || 'Valued Customer',
       customerEmail: currentUser?.email || 'customer@example.com',
@@ -1912,7 +2040,7 @@ const App: React.FC = () => {
         coinOnlyPurchase: true,
         paymentLabel: 'EduCoin wallet purchase',
       },
-    }, ...prevOrders]);
+    });
     setSelectedProduct(product);
     setCurrentView('congratulations');
     window.scrollTo(0, 0);
@@ -1958,7 +2086,7 @@ const App: React.FC = () => {
     const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
     setPurchasedProductIds(newPurchasedIds);
     safeSetItem('purchasedProducts', newPurchasedIds);
-    setOrders(prevOrders => [{
+    addGlobalOrder({
       id: `DC-${Date.now()}`,
       customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
       customerEmail: currentUser.email || 'customer@example.com',
@@ -1977,7 +2105,7 @@ const App: React.FC = () => {
         coinOnlyPurchase: true,
         paymentLabel: 'Cart EduCoin wallet purchase',
       },
-    }, ...prevOrders]);
+    });
     setSelectedProduct(cartDetails[0]?.product || null);
     setCart([]);
     setAppliedCartCoupon(null);
@@ -2083,7 +2211,7 @@ const App: React.FC = () => {
     }
 
     if (couponToApply) {
-      setCoupons(prev => prev.map(c => c.code === couponToApply.code ? { ...c, timesUsed: c.timesUsed + 1 } : c));
+      updateCouponUsage(couponToApply.code);
     }
 
     const paymentParts = [`₹${finalPrice.toFixed(2)}`];
@@ -2091,7 +2219,7 @@ const App: React.FC = () => {
     if (coinDiscount > 0) paymentParts.push(`${activeCoinDiscount?.coins || 0} EduCoins`);
     const paymentLabel = paymentParts.join(' + ');
     unlockSubscriptionPlan(plan, paymentLabel);
-    setOrders(prevOrders => [{
+    addGlobalOrder({
       id: `DC-SUB-${Date.now()}`,
       customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
       customerEmail: currentUser.email || 'customer@example.com',
@@ -2115,7 +2243,7 @@ const App: React.FC = () => {
         paymentLabel,
         unlockedProductIds: plan.unlockProductIds || [],
       },
-    }, ...prevOrders]);
+    });
   };
 
   const handleActivateSubscriptionWithCoins = (plan: any) => {
@@ -2125,7 +2253,7 @@ const App: React.FC = () => {
     if (activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(plan.id)) setActiveCoinDiscount(null);
     const paymentLabel = `${coinPrice} EduCoins`;
     unlockSubscriptionPlan(plan, paymentLabel);
-    setOrders(prevOrders => [{
+    addGlobalOrder({
       id: `DC-SUB-${Date.now()}`,
       customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
       customerEmail: currentUser.email || 'customer@example.com',
@@ -2145,7 +2273,7 @@ const App: React.FC = () => {
         paymentLabel,
         unlockedProductIds: plan.unlockProductIds || [],
       },
-    }, ...prevOrders]);
+    });
   };
   const handleNavigateToSubscription = () => { setCurrentView('subscription'); window.scrollTo(0,0); };
 
@@ -2240,7 +2368,7 @@ const App: React.FC = () => {
     setCurrentView('home');
   };
 
-  // Product CRUD - Updated to use LocalStorage instead of Firebase to prevent crashes
+  // Product CRUD keeps a local fallback and publishes admin changes through Firestore for all sessions.
   const handleAddProduct = async (product: Omit<Product, 'id'>) => {
       try {
           const newId = Date.now();
@@ -2249,6 +2377,8 @@ const App: React.FC = () => {
           const updatedProducts = [...products, productWithId];
           setProducts(updatedProducts);
           safeSetItem('siteProducts', updatedProducts); // Save to LocalStorage
+          void setDoc(doc(db, GLOBAL_PRODUCTS_COLLECTION, String(productWithId.id)), stripUndefinedDeep(productWithId))
+            .catch(error => logGlobalSyncWarning('Product add', error));
       } catch (e) {
           console.error("Error adding product: ", e);
           alert("Failed to add product locally.");
@@ -2261,6 +2391,8 @@ const App: React.FC = () => {
             const updatedProducts = products.map(p => p.id === normalizedProduct.id ? normalizedProduct : p);
             setProducts(updatedProducts);
             safeSetItem('siteProducts', updatedProducts); // Save to LocalStorage
+            void setDoc(doc(db, GLOBAL_PRODUCTS_COLLECTION, String(normalizedProduct.id)), stripUndefinedDeep(normalizedProduct), { merge: false })
+              .catch(error => logGlobalSyncWarning('Product update', error));
       } catch (e) {
           console.error("Error updating product: ", e);
           alert("Failed to update product.");
@@ -2272,12 +2404,16 @@ const App: React.FC = () => {
           const updatedProducts = products.filter(p => p.id !== productId);
           setProducts(updatedProducts);
           safeSetItem('siteProducts', updatedProducts); // Save to LocalStorage
+          void deleteDoc(doc(db, GLOBAL_PRODUCTS_COLLECTION, String(productId)))
+            .catch(error => logGlobalSyncWarning('Product delete', error));
           
           // Also clean up local reviews
           const updatedReviews = { ...reviews };
           delete updatedReviews[productId];
           setReviews(updatedReviews);
           safeSetItem('productReviews', updatedReviews);
+          void setDoc(doc(db, ...GLOBAL_REVIEWS_DOC), { reviews: stripUndefinedDeep(updatedReviews) }, { merge: true })
+            .catch(error => logGlobalSyncWarning('Reviews cleanup', error));
       } catch (e) {
           console.error("Error deleting product: ", e);
           alert("Failed to delete product.");
@@ -2290,6 +2426,21 @@ const App: React.FC = () => {
         setUsers(updatedUsers);
         safeSetItem('siteUsers', updatedUsers);
     }
+  };
+
+  const handleCouponsUpdate = (updatedCoupons: Coupon[]) => {
+    setCoupons(updatedCoupons);
+    safeSetItem('siteCoupons', updatedCoupons);
+    void syncArrayCollectionToFirestore(GLOBAL_COUPONS_COLLECTION, updatedCoupons, coupon => String(coupon.id))
+      .catch(error => logGlobalSyncWarning('Coupons update', error));
+  };
+
+  const handleTicketsUpdate = (updatedTickets: SupportTicket[]) => {
+    setTickets(updatedTickets);
+    safeSetItem('siteSupportTickets', updatedTickets);
+    void syncArrayCollectionToFirestore(GLOBAL_TICKETS_COLLECTION, updatedTickets, ticket => String(ticket.id))
+      .catch(error => logGlobalSyncWarning('Support tickets update', error));
+    window.dispatchEvent(new Event('siteSupportTicketsUpdated'));
   };
 
   // --- RENDER LOGIC ---
@@ -2334,7 +2485,7 @@ const App: React.FC = () => {
   const renderPage = () => {
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={handleBackToHome} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
     if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} onOtpAuthenticate={handleOtpAuthenticate} onBack={handleBackFromAuth} /></div>;
-    if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} onTicketsUpdate={setTickets} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={setCoupons} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
+    if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={handleBackToHome} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent()}</div>;
     if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity onClose={handleBackToHome} isAuthenticated={Boolean(currentUser)} /></div>;
