@@ -64,24 +64,24 @@ const defaultCoverImage =
   'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1800&q=80';
 
 const glassCard =
-  'profile-glass-card border border-white/55 backdrop-blur-2xl shadow-[0_18px_55px_rgba(15,23,42,0.08)] transition-all duration-300 hover:-translate-y-1 hover:border-white/70 hover:shadow-[0_22px_65px_rgba(15,23,42,0.12)]';
+  'profile-glass-card border border-[#D2E3FC] backdrop-blur-2xl shadow-[0_28px_86px_rgba(26,115,232,0.14)] transition-all duration-300 hover:-translate-y-1 hover:border-[#C2E7FF] hover:shadow-[0_30px_90px_rgba(26,115,232,0.16)]';
 
 
-const fallbackProfileStyle = { backgroundColor: '#e2e8f0', backgroundTint: '#e0e7ff', cardOpacity: 82, heroOverlayOpacity: 76, accentColor: '#f97316' };
+const fallbackProfileStyle = { backgroundColor: '#E8F0FE', backgroundTint: '#D3E3FD', cardOpacity: 95, heroOverlayOpacity: 76, accentColor: '#1A73E8' };
 
 const fallbackStreakConfigs: ProfileStreakConfig[] = [
-  { id: 'daily-login', title: 'Daily Login Spark', icon: '🔥', metric: 'dailyLogin', goal: 1, unit: 'day', coinReward: 10, accent: 'from-orange-400 via-amber-400 to-yellow-300', note: 'Open your hub every day and claim today’s flame.', active: true },
-  { id: 'study-15', title: '15 Minute Focus', icon: '⏱️', metric: 'studyMinutes', goal: 15, unit: 'mins', coinReward: 15, accent: 'from-cyan-400 via-blue-500 to-indigo-500', note: 'Watch lessons or read learning content for 15 minutes.', active: true },
-  { id: 'study-45', title: 'Deep Work Sprint', icon: '⚡', metric: 'studyMinutes', goal: 45, unit: 'mins', coinReward: 25, accent: 'from-violet-400 via-purple-500 to-fuchsia-500', note: 'Build a longer study session and earn a bigger boost.', active: true },
-  { id: 'watch-60', title: 'Video Warrior', icon: '🎬', metric: 'watchMinutes', goal: 60, unit: 'mins', coinReward: 30, accent: 'from-blue-400 via-sky-500 to-cyan-400', note: 'Complete one hour of course video watch time.', active: true },
-  { id: 'pdf-3', title: 'PDF Reader', icon: '📄', metric: 'pdfsRead', goal: 3, unit: 'PDFs', coinReward: 20, accent: 'from-emerald-400 via-teal-400 to-cyan-400', note: 'Read premium notes and document resources.', active: true },
-  { id: 'article-3', title: 'Knowledge Hunter', icon: '🧠', metric: 'articlesRead', goal: 3, unit: 'reads', coinReward: 20, accent: 'from-lime-400 via-emerald-500 to-teal-500', note: 'Read news or blog lessons to keep learning daily.', active: true },
-  { id: 'quiz-1', title: 'Quiz Ignition', icon: '🎯', metric: 'quizWins', goal: 1, unit: 'win', coinReward: 25, accent: 'from-pink-400 via-rose-500 to-orange-400', note: 'Finish a quiz and claim your first quiz streak.', active: true },
-  { id: 'quiz-3', title: 'Quiz Momentum', icon: '🏹', metric: 'quizWins', goal: 3, unit: 'wins', coinReward: 40, accent: 'from-fuchsia-400 via-purple-500 to-indigo-500', note: 'Stack multiple quiz rewards to keep momentum alive.', active: true },
-  { id: 'course-1', title: 'Course Starter', icon: '📚', metric: 'coursesOwned', goal: 1, unit: 'course', coinReward: 25, accent: 'from-indigo-400 via-blue-500 to-cyan-400', note: 'Own your first course and start your premium path.', active: true },
-  { id: 'complete-1', title: 'Completion Charge', icon: '✅', metric: 'completedCourses', goal: 1, unit: 'done', coinReward: 50, accent: 'from-green-400 via-emerald-500 to-teal-400', note: 'Complete one tracked course.', active: true },
-  { id: 'wallet-500', title: 'Coin Collector', icon: '🪙', metric: 'lifetimeCoins', goal: 500, unit: 'coins', coinReward: 35, accent: 'from-amber-300 via-yellow-400 to-orange-400', note: 'Earn lifetime coins from real activity.', active: true },
-  { id: 'badge-3', title: 'Badge Builder', icon: '🏅', metric: 'badgesUnlocked', goal: 3, unit: 'badges', coinReward: 30, accent: 'from-slate-500 via-indigo-500 to-purple-500', note: 'Unlock badges by learning and completing.', active: true },
+  { id: 'daily-login', title: 'Daily Login Spark', icon: '🔥', metric: 'dailyLogin', goal: 1, unit: 'day', coinReward: 10, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Open your hub every day and claim today’s flame.', active: true },
+  { id: 'study-15', title: '15 Minute Focus', icon: '⏱️', metric: 'studyMinutes', goal: 15, unit: 'mins', coinReward: 15, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Watch lessons or read learning content for 15 minutes.', active: true },
+  { id: 'study-45', title: 'Deep Work Sprint', icon: '⚡', metric: 'studyMinutes', goal: 45, unit: 'mins', coinReward: 25, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Build a longer study session and earn a bigger boost.', active: true },
+  { id: 'watch-60', title: 'Video Warrior', icon: '🎬', metric: 'watchMinutes', goal: 60, unit: 'mins', coinReward: 30, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Complete one hour of course video watch time.', active: true },
+  { id: 'pdf-3', title: 'PDF Reader', icon: '📄', metric: 'pdfsRead', goal: 3, unit: 'PDFs', coinReward: 20, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Read premium notes and document resources.', active: true },
+  { id: 'article-3', title: 'Knowledge Hunter', icon: '🧠', metric: 'articlesRead', goal: 3, unit: 'reads', coinReward: 20, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Read news or blog lessons to keep learning daily.', active: true },
+  { id: 'quiz-1', title: 'Quiz Ignition', icon: '🎯', metric: 'quizWins', goal: 1, unit: 'win', coinReward: 25, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Finish a quiz and claim your first quiz streak.', active: true },
+  { id: 'quiz-3', title: 'Quiz Momentum', icon: '🏹', metric: 'quizWins', goal: 3, unit: 'wins', coinReward: 40, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Stack multiple quiz rewards to keep momentum alive.', active: true },
+  { id: 'course-1', title: 'Course Starter', icon: '📚', metric: 'coursesOwned', goal: 1, unit: 'course', coinReward: 25, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Own your first course and start your premium path.', active: true },
+  { id: 'complete-1', title: 'Completion Charge', icon: '✅', metric: 'completedCourses', goal: 1, unit: 'done', coinReward: 50, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Complete one tracked course.', active: true },
+  { id: 'wallet-500', title: 'Coin Collector', icon: '🪙', metric: 'lifetimeCoins', goal: 500, unit: 'coins', coinReward: 35, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Earn lifetime coins from real activity.', active: true },
+  { id: 'badge-3', title: 'Badge Builder', icon: '🏅', metric: 'badgesUnlocked', goal: 3, unit: 'badges', coinReward: 30, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Unlock badges by learning and completing.', active: true },
 ];
 
 const fallbackMilestoneConfigs: ProfileMilestoneConfig[] = [
@@ -199,7 +199,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const watchTimeMinutes = currentUser?.totalWatchTimeMinutes ?? studyMinutes;
   const eduPoints = currentUser?.eduCoins ?? 0;
   const totalLifetimeCoins = currentUser?.totalLifetimeCoins ?? eduPoints;
-  const profileStyle = { ...fallbackProfileStyle, ...((settings.content as any).profileStyle || {}) };
+  const profileStyle = { ...fallbackProfileStyle, ...((settings.content as any).profileStyle || {}), backgroundColor: '#E8F0FE', backgroundTint: '#D3E3FD', accentColor: '#1A73E8' };
   const profileStreakConfigs = (((settings.content as any).profileStreaks || fallbackStreakConfigs) as ProfileStreakConfig[]).filter(streak => streak.active !== false).slice(0, 12);
   const profileMilestoneConfigs = (((settings.content as any).profileMilestones || fallbackMilestoneConfigs) as ProfileMilestoneConfig[]).filter(milestone => milestone.active !== false).slice(0, 12);
   const purchasedProductIdSet = React.useMemo(() => new Set(purchasedProducts.map(product => String(product.id))), [purchasedProducts]);
@@ -320,7 +320,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const quizScores: QuizScore[] = (currentUser?.rewardedQuizIds || []).slice(0, 6).map((quizId, index) => ({
     title: String(quizId).replace(/[-_]/g, ' ').replace(/\b\w/g, char => char.toUpperCase()),
     score: 100,
-    accent: ['from-cyan-400 to-blue-500', 'from-fuchsia-400 to-purple-500', 'from-amber-300 to-orange-500', 'from-emerald-300 to-teal-500'][index % 4],
+    accent: ['from-[#1A73E8] to-[#C2E7FF]', 'from-[#34A853] to-[#C2E7FF]', 'from-[#FBBC04] to-[#C2E7FF]', 'from-[#D3E3FD] to-[#E8F0FE]'][index % 4],
   }));
 
   const streakCards = profileStreakConfigs.map(streak => {
@@ -495,27 +495,27 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   ];
 
   return (
-    <div className="min-h-screen overflow-hidden text-slate-900" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}, ${profileStyle.backgroundTint}, #f8fafc)`, '--profile-card-opacity': String(Number(profileStyle.cardOpacity) / 100) } as React.CSSProperties}>
+    <div className="min-h-screen overflow-hidden text-[#202124]" style={{ background: `linear-gradient(135deg, #E8F0FE, #D3E3FD, #C2E7FF)`, '--profile-card-opacity': String(Number(profileStyle.cardOpacity) / 100) } as React.CSSProperties}>
       <style>{`
         @keyframes hubFadeUp {
           from { opacity: 0; transform: translateY(28px); }
           to { opacity: 1; transform: translateY(0); }
         }
         .hub-animate { opacity: 0; animation: hubFadeUp 680ms ease-out forwards; }
-        .profile-glass-card { background-color: rgba(255,255,255,var(--profile-card-opacity,0.82)); }
+        .profile-glass-card { background-color: rgba(255,255,255,var(--profile-card-opacity,0.95)); }
       `}</style>
 
       <div className="pointer-events-none fixed inset-0 opacity-80">
-        <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}d9, ${profileStyle.backgroundTint}b8, rgba(241,245,249,0.9))` }} />
+        <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, #E8F0FE, #D3E3FD, #C2E7FF)` }} />
         <div className="absolute left-[-10%] top-10 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: `${profileStyle.accentColor}26` }} />
-        <div className="absolute right-[-5%] top-1/3 h-96 w-96 rounded-full bg-cyan-500/12 blur-3xl" />
-        <div className="absolute bottom-[-10%] left-1/3 h-80 w-80 rounded-full bg-fuchsia-500/12 blur-3xl" />
+        <div className="absolute right-[-5%] top-1/3 h-96 w-96 rounded-full bg-[#1A73E8]/10 blur-3xl" />
+        <div className="absolute bottom-[-10%] left-1/3 h-80 w-80 rounded-full bg-[#C2E7FF]/50 blur-3xl" />
       </div>
 
       <main className="relative mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-5 lg:px-8">
         <button
           onClick={onBack}
-          className="hub-animate mb-4 rounded-2xl border border-white/50 bg-white/70 px-4 py-2.5 text-xs font-black uppercase tracking-[0.16em] text-slate-900 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/80 hover:shadow-sm hover:shadow-sm hover:shadow-black/5 sm:mb-5 sm:px-5 sm:py-3 sm:text-sm sm:tracking-[0.2em]"
+          className="hub-animate mb-4 rounded-2xl border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-xs font-black uppercase tracking-[0.16em] text-[#202124] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/95 hover:shadow-sm hover:shadow-sm hover:shadow-[#202124]/5 sm:mb-5 sm:px-5 sm:py-3 sm:text-sm sm:tracking-[0.2em]"
         >
           ← Back
         </button>
@@ -523,15 +523,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <section className={`hub-animate overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] ${glassCard}`} style={{ animationDelay: '80ms' }}>
           <div className="relative min-h-[430px] w-full sm:aspect-video sm:min-h-[420px]">
             <img src={coverImage} alt="Student achievement cover" className="h-full w-full object-cover" />
-            <div className="absolute inset-0 bg-gradient-to-t from-slate-950 via-slate-900/35 to-indigo-950/15" style={{ opacity: Number(profileStyle.heroOverlayOpacity) / 100 }} />
+            <div className="absolute inset-0 bg-gradient-to-t from-[#202124] via-[#202124]/35 to-[#1A73E8]/15" style={{ opacity: Number(profileStyle.heroOverlayOpacity) / 100 }} />
             <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3 sm:items-center sm:p-6">
-              <div className="max-w-[9.5rem] rounded-full border border-white/50 bg-white/70 px-3 py-1.5 text-[9px] font-black uppercase leading-4 tracking-[0.18em] text-cyan-700 backdrop-blur-xl sm:max-w-none sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.28em]">
+              <div className="max-w-[9.5rem] rounded-full border border-[#D2E3FC] bg-white/95 px-3 py-1.5 text-[9px] font-black uppercase leading-4 tracking-[0.18em] text-[#174EA6] backdrop-blur-xl sm:max-w-none sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.28em]">
                 Student Achievement Hub
               </div>
               <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
               <button
                 onClick={() => coverInputRef.current?.click()}
-                className="rounded-full border border-white/50 bg-white/70 px-3 py-1.5 text-xs font-bold text-slate-900 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/80 hover:shadow-sm hover:shadow-sm sm:px-4 sm:py-2 sm:text-sm"
+                className="rounded-full border border-[#D2E3FC] bg-white/95 px-3 py-1.5 text-xs font-bold text-[#202124] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/95 hover:shadow-sm hover:shadow-sm sm:px-4 sm:py-2 sm:text-sm"
               >
                 📷 Upload Cover
               </button>
@@ -539,21 +539,21 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             <div className="absolute -bottom-1 left-0 right-0 p-4 sm:p-8 lg:p-10">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-5">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-[1.5rem] border-4 border-white/50 bg-gradient-to-br from-cyan-300 via-indigo-400 to-fuchsia-500 text-3xl font-black shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 sm:h-36 sm:w-36 sm:rounded-[2rem] sm:text-5xl">
+                  <div className="flex h-20 w-20 items-center justify-center rounded-[1.5rem] border-4 border-[#D2E3FC] bg-gradient-to-br from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF] text-3xl font-black shadow-[0_8px_30px_rgba(32,33,36,0.04)] shadow-[#202124]/5 sm:h-36 sm:w-36 sm:rounded-[2rem] sm:text-5xl">
                     {(currentUser?.name || 'S').slice(0, 1).toUpperCase()}
                   </div>
                   <div className="pb-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-cyan-100 sm:text-sm sm:tracking-[0.35em]">Level {level} Scholar</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#E8F0FE] sm:text-sm sm:tracking-[0.35em]">Level {level} Scholar</p>
                     <h1 className="mt-1 text-3xl font-black tracking-tight text-white drop-shadow sm:mt-2 sm:text-6xl">{currentUser?.name || 'Student'}</h1>
-                    <p className="mt-1 max-w-2xl break-words text-xs font-semibold text-slate-100 sm:mt-2 sm:text-base">
+                    <p className="mt-1 max-w-2xl break-words text-xs font-semibold text-[#E8F0FE] sm:mt-2 sm:text-base">
                       {currentUser?.email || 'student@learninghub.dev'} {currentUser?.mobile ? `• +91 ${currentUser.mobile}` : ''}
                     </p>
                   </div>
                 </div>
-                <div className="w-fit rounded-2xl border border-orange-200/40 bg-slate-950/35 px-4 py-3 text-left text-white backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.22)] sm:rounded-3xl sm:px-5 sm:py-4 sm:text-right">
-                  <p className="text-sm font-bold text-orange-100">Activity Streak</p>
+                <div className="w-fit rounded-2xl border border-[#D2E3FC] bg-[#202124]/35 px-4 py-3 text-left text-white backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.22)] sm:rounded-3xl sm:px-5 sm:py-4 sm:text-right">
+                  <p className="text-sm font-bold text-[#FEF7E0]">Activity Streak</p>
                   <p className="mt-1 text-2xl font-black sm:text-3xl">🔥 {streakDays} Days</p>
-                  <p className="text-xs uppercase tracking-[0.2em] text-orange-200/80">Active streak</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#FEF7E0]/80">Active streak</p>
                 </div>
               </div>
             </div>
@@ -564,22 +564,22 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className={`hub-animate rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '160ms' }}>
             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-cyan-700 sm:text-sm sm:tracking-[0.3em]">EduCoin Engine</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#174EA6] sm:text-sm sm:tracking-[0.3em]">EduCoin Engine</p>
                 <h2 className="mt-2 text-3xl font-black sm:text-5xl">{eduPoints.toLocaleString()} EduCoins</h2>
-                <p className="mt-2 text-sm leading-5 text-slate-600 sm:text-base">Earned from purchases, module momentum, study time, and quiz performance.</p>
+                <p className="mt-2 text-sm leading-5 text-[#5F6368] sm:text-base">Earned from purchases, module momentum, study time, and quiz performance.</p>
               </div>
-              <div className="rounded-2xl border border-cyan-300/20 bg-cyan-400/10 p-4 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 sm:rounded-3xl sm:p-5">
-                <p className="text-xs font-black uppercase tracking-[0.25em] text-cyan-700">Next Rank</p>
+              <div className="rounded-2xl border border-[#D2E3FC] bg-[#E8F0FE] p-4 text-center shadow-[0_8px_30px_rgba(32,33,36,0.04)] shadow-[#202124]/5 sm:rounded-3xl sm:p-5">
+                <p className="text-xs font-black uppercase tracking-[0.25em] text-[#174EA6]">Next Rank</p>
                 <p className="mt-1 text-2xl font-black">Level {level + 1}</p>
               </div>
             </div>
             <div className="mt-6">
-              <div className="mb-2 flex flex-col gap-1 text-xs font-bold text-slate-600 sm:flex-row sm:justify-between sm:text-sm">
+              <div className="mb-2 flex flex-col gap-1 text-xs font-bold text-[#5F6368] sm:flex-row sm:justify-between sm:text-sm">
                 <span>Level {level} Scholar progress</span>
                 <span>{pointsRemaining} pts to next level</span>
               </div>
-              <div className="h-3 overflow-hidden rounded-full border border-white/50 bg-white/70 sm:h-4">
-                <div className="h-full rounded-full bg-gradient-to-r from-cyan-600 via-indigo-600 to-violet-600 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5" style={{ width: `${nextLevelProgress}%` }} />
+              <div className="h-3 overflow-hidden rounded-full border border-[#D2E3FC] bg-white/95 sm:h-4">
+                <div className="h-full rounded-full bg-gradient-to-r from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF] shadow-[0_8px_30px_rgba(32,33,36,0.04)] shadow-[#202124]/5" style={{ width: `${nextLevelProgress}%` }} />
               </div>
             </div>
           </div>
@@ -589,10 +589,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
               <div key={stat.label} className={`hub-animate rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-5 ${glassCard}`} style={{ animationDelay: `${220 + index * 80}ms` }}>
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="text-sm font-bold text-slate-600">{stat.label}</p>
+                    <p className="text-sm font-bold text-[#5F6368]">{stat.label}</p>
                     <p className="mt-1 text-2xl font-black sm:text-3xl">{stat.value}</p>
                   </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-white/50 bg-white/70 text-xl sm:h-14 sm:w-14 sm:text-2xl">{stat.icon}</div>
+                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#D2E3FC] bg-white/95 text-xl sm:h-14 sm:w-14 sm:text-2xl">{stat.icon}</div>
                 </div>
               </div>
             ))}
@@ -602,28 +602,28 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <section className={`hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '320ms' }}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-orange-600 sm:text-sm sm:tracking-[0.3em]">Gamification / Streaks</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#B06000] sm:text-sm sm:tracking-[0.3em]">Gamification / Streaks</p>
               <h2 className="mt-2 text-2xl font-black sm:text-4xl">12 Daily Coin Strips</h2>
-              <p className="mt-2 text-xs font-bold leading-5 text-slate-600 sm:text-sm">Every strip uses real profile activity. Complete the target, claim coins, and come back tomorrow for the next claim.</p>
+              <p className="mt-2 text-xs font-bold leading-5 text-[#5F6368] sm:text-sm">Every strip uses real profile activity. Complete the target, claim coins, and come back tomorrow for the next claim.</p>
             </div>
-            <div className="w-fit rounded-full border border-orange-200/70 bg-orange-50/90 px-3 py-2 text-xs font-black text-orange-700 shadow-sm sm:px-4 sm:text-sm">🔥 {streakCards.filter(streak => streak.claimable).length} ready now</div>
+            <div className="w-fit rounded-full border border-[#FBBC04] bg-[#FEF7E0] px-3 py-2 text-xs font-black text-[#B06000] shadow-sm sm:px-4 sm:text-sm">🔥 {streakCards.filter(streak => streak.claimable).length} ready now</div>
           </div>
           <div className="mt-4 grid gap-3 sm:mt-6 xl:grid-cols-2">
             {streakCards.map((streak, index) => (
-              <article key={streak.id} className="group relative overflow-hidden rounded-[1.25rem] border border-white/60 bg-white/84 p-3.5 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_rgba(15,23,42,0.13)] sm:rounded-[1.5rem] sm:p-4" style={{ animationDelay: `${360 + index * 45}ms` }}>
+              <article key={streak.id} className="group relative overflow-hidden rounded-[1.25rem] border border-[#D2E3FC] bg-white/84 p-3.5 shadow-[0_18px_45px_rgba(26,115,232,0.14)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_rgba(26,115,232,0.16)] sm:rounded-[1.5rem] sm:p-4" style={{ animationDelay: `${360 + index * 45}ms` }}>
                 <div className={`absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b ${streak.accent}`} />
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${streak.accent} text-2xl shadow-[0_12px_30px_rgba(251,146,60,0.24)] transition group-hover:scale-110 sm:h-14 sm:w-14 sm:text-3xl`}>{streak.icon}</div>
+                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${streak.accent} text-2xl shadow-[0_12px_30px_rgba(251,188,4,0.24)] transition group-hover:scale-110 sm:h-14 sm:w-14 sm:text-3xl`}>{streak.icon}</div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-black text-slate-950 sm:text-lg">{streak.title}</h3>
-                      <span className="rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-amber-700">+{streak.coinReward} coins</span>
+                      <h3 className="text-base font-black text-[#202124] sm:text-lg">{streak.title}</h3>
+                      <span className="rounded-full bg-[#FEF7E0] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#B06000]">+{streak.coinReward} coins</span>
                     </div>
-                    <p className="mt-1 text-xs font-bold leading-5 text-slate-600">{streak.note}</p>
-                    <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-slate-200/80">
+                    <p className="mt-1 text-xs font-bold leading-5 text-[#5F6368]">{streak.note}</p>
+                    <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#E0E3EB]">
                       <div className={`h-full rounded-full bg-gradient-to-r ${streak.accent} shadow-[0_0_18px_rgba(59,130,246,0.25)]`} style={{ width: `${streak.progress}%` }} />
                     </div>
-                    <div className="mt-2 flex items-center justify-between text-xs font-black text-slate-500">
+                    <div className="mt-2 flex items-center justify-between text-xs font-black text-[#5F6368]">
                       <span>{streak.value} / {streak.goal} {streak.unit}</span>
                       <span>{Math.round(streak.progress)}%</span>
                     </div>
@@ -632,7 +632,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     type="button"
                     disabled={!streak.claimable}
                     onClick={() => handleStreakClaim(streak)}
-                    className={`w-full rounded-2xl px-4 py-2.5 text-xs font-black transition active:scale-95 sm:w-40 sm:py-3 sm:text-sm ${streak.claimedToday ? 'cursor-not-allowed bg-slate-200 text-slate-500' : streak.claimable ? 'bg-gradient-to-r from-orange-500 to-amber-400 text-white shadow-[0_12px_30px_rgba(251,146,60,0.28)] hover:-translate-y-0.5' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}
+                    className={`w-full rounded-2xl px-4 py-2.5 text-xs font-black transition active:scale-95 sm:w-40 sm:py-3 sm:text-sm ${streak.claimedToday ? 'cursor-not-allowed bg-[#E0E3EB] text-[#5F6368]' : streak.claimable ? 'bg-gradient-to-r from-[#FBBC04] to-[#C2E7FF] text-white shadow-[0_12px_30px_rgba(251,188,4,0.28)] hover:-translate-y-0.5' : 'cursor-not-allowed bg-[#E0E3EB] text-[#5F6368]'}`}
                   >
                     {streak.claimedToday ? 'Claimed Today' : streak.claimable ? 'Claim Coins' : 'Complete Target'}
                   </button>
@@ -644,21 +644,21 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
         <section className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[1.15fr_0.85fr]">
           <div className={`hub-animate overflow-hidden rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '360ms' }}>
-            <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-r from-indigo-500/15 via-cyan-400/15 to-fuchsia-400/15 blur-2xl" />
+            <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-r from-[#1A73E8]/15 via-[#D3E3FD]/60 to-[#C2E7FF]/70 blur-2xl" />
             <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-indigo-700 sm:text-sm sm:tracking-[0.3em]">Learning Analytics</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#174EA6] sm:text-sm sm:tracking-[0.3em]">Learning Analytics</p>
                 <h2 className="mt-2 text-2xl font-black sm:text-3xl">Course Completion</h2>
-                <p className="mt-2 text-xs font-bold leading-5 text-slate-600 sm:text-sm">Every purchased course gets its own live progress card.</p>
+                <p className="mt-2 text-xs font-bold leading-5 text-[#5F6368] sm:text-sm">Every purchased course gets its own live progress card.</p>
               </div>
               {!purchasedProducts.length && (
-                <button onClick={onExplore} className="w-full rounded-full bg-white/85 px-4 py-2 text-xs font-black text-slate-900 shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md sm:w-auto sm:text-sm">
+                <button onClick={onExplore} className="w-full rounded-full bg-white/85 px-4 py-2 text-xs font-black text-[#202124] shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md sm:w-auto sm:text-sm">
                   Explore Courses
                 </button>
               )}
             </div>
             {courseAccessError && (
-              <div className="relative mt-5 rounded-2xl border border-rose-200 bg-rose-50/90 px-4 py-3 text-sm font-black text-rose-700 shadow-sm" role="alert">
+              <div className="relative mt-5 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6]/90 px-4 py-3 text-sm font-black text-[#C5221F] shadow-sm" role="alert">
                 {courseAccessError}
               </div>
             )}
@@ -667,79 +667,79 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 const circumference = 2 * Math.PI * 38;
                 const dashOffset = circumference - (course.completion / 100) * circumference;
                 const accent = [
-                  'from-cyan-400 via-blue-500 to-indigo-600',
-                  'from-fuchsia-400 via-purple-500 to-indigo-600',
-                  'from-amber-300 via-orange-400 to-rose-500',
-                  'from-emerald-300 via-teal-400 to-cyan-500',
+                  'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]',
+                  'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]',
+                  'from-[#FBBC04] via-[#D3E3FD] to-[#C2E7FF]',
+                  'from-[#34A853] via-[#D3E3FD] to-[#C2E7FF]',
                 ][index % 4];
                 return (
-                  <article key={course.id} className="group relative overflow-hidden rounded-[1.35rem] border border-white/60 bg-white/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/90 hover:shadow-[0_24px_60px_rgba(15,23,42,0.12)] sm:rounded-[1.75rem] sm:p-5">
+                  <article key={course.id} className="group relative overflow-hidden rounded-[1.35rem] border border-[#D2E3FC] bg-white/75 p-4 shadow-[0_18px_45px_rgba(26,115,232,0.14)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-white/95 hover:shadow-[0_24px_60px_rgba(26,115,232,0.16)] sm:rounded-[1.75rem] sm:p-5">
                     <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${accent}`} />
                     <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                       <div className="relative mx-auto h-24 w-24 shrink-0 sm:mx-0 sm:h-28 sm:w-28">
                         <div className={`absolute inset-2 rounded-full bg-gradient-to-br ${accent} opacity-20 blur-xl transition group-hover:opacity-35`} />
                         <svg viewBox="0 0 100 100" className="relative h-full w-full -rotate-90 drop-shadow-sm">
-                          <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-slate-900/10" />
-                          <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} className={index % 2 === 0 ? 'text-cyan-400' : 'text-fuchsia-400'} />
+                          <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-[#202124]/10" />
+                          <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} className={index % 2 === 0 ? 'text-[#1A73E8]' : 'text-[#34A853]'} />
                         </svg>
                         <div className="absolute inset-0 flex flex-col items-center justify-center rounded-full">
-                          <span className="text-2xl font-black text-slate-950">{course.completion}%</span>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-slate-500">Done</span>
+                          <span className="text-2xl font-black text-[#202124]">{course.completion}%</span>
+                          <span className="text-[10px] font-black uppercase tracking-widest text-[#5F6368]">Done</span>
                         </div>
                       </div>
                       <div className="min-w-0 flex-1">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full border border-white/70 bg-white/85 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-indigo-700 shadow-sm">{course.category}</span>
-                          <span className="rounded-full bg-slate-900/5 px-3 py-1 text-xs font-black text-slate-600">{course.totalLessons || 1} lessons</span>
+                          <span className="rounded-full border border-[#D2E3FC] bg-white/85 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-[#174EA6] shadow-sm">{course.category}</span>
+                          <span className="rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-black text-[#5F6368]">{course.totalLessons || 1} lessons</span>
                         </div>
-                        <h3 className="mt-3 line-clamp-2 text-xl font-black text-slate-950 sm:truncate sm:text-2xl">{course.title}</h3>
-                        <div className="mt-4 h-3 overflow-hidden rounded-full bg-slate-900/10 ring-1 ring-white/70">
+                        <h3 className="mt-3 line-clamp-2 text-xl font-black text-[#202124] sm:truncate sm:text-2xl">{course.title}</h3>
+                        <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#E8F0FE] ring-1 ring-white/70">
                           <div className={`h-full rounded-full bg-gradient-to-r ${accent} shadow-[0_0_20px_rgba(59,130,246,0.35)]`} style={{ width: `${course.completion}%` }} />
                         </div>
-                        <div className="mt-3 flex items-center justify-between text-xs font-black uppercase tracking-[0.18em] text-slate-500">
+                        <div className="mt-3 flex items-center justify-between text-xs font-black uppercase tracking-[0.18em] text-[#5F6368]">
                           <span>{course.completion >= 100 ? 'Completed' : 'In Progress'}</span>
                           <span>{Math.max(0, 100 - course.completion)}% left</span>
                         </div>
                       </div>
-                      <button type="button" onClick={() => handleContinueLearning(course)} className={`w-full rounded-2xl bg-gradient-to-r ${accent} px-4 py-2.5 text-xs font-black text-white shadow-[0_14px_35px_rgba(79,70,229,0.28)] transition active:scale-95 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(79,70,229,0.34)] sm:w-auto sm:px-5 sm:py-3 sm:text-sm`}>
+                      <button type="button" onClick={() => handleContinueLearning(course)} className={`w-full rounded-2xl bg-gradient-to-r ${accent} px-4 py-2.5 text-xs font-black text-white shadow-[0_14px_35px_rgba(26,115,232,0.28)] transition active:scale-95 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(26,115,232,0.34)] sm:w-auto sm:px-5 sm:py-3 sm:text-sm`}>
                         {course.completion >= 100 ? 'Continue Learning' : 'Complete Your Course'}
                       </button>
                     </div>
                   </article>
                 );
-              }) : <div className="rounded-2xl border border-dashed border-indigo-200 bg-white/70 p-4 text-center text-sm font-bold text-slate-600 sm:rounded-3xl sm:p-6 sm:text-base">No purchased course progress yet. Buy or open a course to start real completion tracking.</div>}
+              }) : <div className="rounded-2xl border border-dashed border-[#D2E3FC] bg-white/95 p-4 text-center text-sm font-bold text-[#5F6368] sm:rounded-3xl sm:p-6 sm:text-base">No purchased course progress yet. Buy or open a course to start real completion tracking.</div>}
             </div>
           </div>
 
           <div className={`hub-animate overflow-hidden rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '440ms' }}>
-            <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-fuchsia-300/20 blur-3xl" />
+            <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#C2E7FF]/45 blur-3xl" />
             <div className="relative">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-fuchsia-700 sm:text-sm sm:tracking-[0.3em]">Recent Quiz Scores</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#174EA6] sm:text-sm sm:tracking-[0.3em]">Recent Quiz Scores</p>
               <h2 className="mt-2 text-2xl font-black sm:text-3xl">Performance Pulse</h2>
-              <div className="mt-4 rounded-[1.5rem] border border-white/60 bg-white/75 p-3 shadow-inner backdrop-blur-xl sm:mt-6 sm:rounded-[1.75rem] sm:p-4">
+              <div className="mt-4 rounded-[1.5rem] border border-[#D2E3FC] bg-white/75 p-3 shadow-inner backdrop-blur-xl sm:mt-6 sm:rounded-[1.75rem] sm:p-4">
                 <div className="flex h-32 items-end gap-2 sm:h-40 sm:gap-3">
                   {quizScores.length ? quizScores.map(score => (
                     <div key={score.title} className="flex flex-1 flex-col items-center gap-2">
-                      <div className="flex h-full w-full items-end rounded-2xl bg-slate-900/5 p-1">
+                      <div className="flex h-full w-full items-end rounded-2xl bg-[#F8FAFD] p-1">
                         <div className={`w-full rounded-2xl bg-gradient-to-t ${score.accent} shadow-[0_14px_32px_rgba(15,23,42,0.16)] transition-all duration-500 hover:scale-[1.03]`} style={{ height: `${score.score}%` }} />
                       </div>
-                      <span className="text-xs font-black text-slate-600">{score.score}%</span>
+                      <span className="text-xs font-black text-[#5F6368]">{score.score}%</span>
                     </div>
-                  )) : <div className="flex h-full w-full items-center justify-center text-center text-sm font-bold text-slate-500">Complete quizzes to generate real performance pulse bars.</div>}
+                  )) : <div className="flex h-full w-full items-center justify-center text-center text-sm font-bold text-[#5F6368]">Complete quizzes to generate real performance pulse bars.</div>}
                 </div>
               </div>
               <div className="mt-5 space-y-3">
                 {quizScores.length ? quizScores.map(score => (
-                  <div key={score.title} className="rounded-2xl border border-white/60 bg-white/75 p-3 shadow-sm backdrop-blur-xl">
+                  <div key={score.title} className="rounded-2xl border border-[#D2E3FC] bg-white/75 p-3 shadow-sm backdrop-blur-xl">
                     <div className="flex items-center justify-between gap-3 text-sm font-bold">
                       <span className="truncate">{score.title}</span>
-                      <span className="rounded-full bg-cyan-50 px-3 py-1 text-cyan-700">{score.score}%</span>
+                      <span className="rounded-full bg-[#E8F0FE] px-3 py-1 text-[#174EA6]">{score.score}%</span>
                     </div>
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-slate-900/10">
+                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#E8F0FE]">
                       <div className={`h-full rounded-full bg-gradient-to-r ${score.accent}`} style={{ width: `${score.score}%` }} />
                     </div>
                   </div>
-                )) : <div className="rounded-2xl border border-dashed border-fuchsia-200 bg-white/70 p-3 text-xs font-bold text-slate-600 sm:p-4 sm:text-sm">No quiz rewards claimed yet.</div>}
+                )) : <div className="rounded-2xl border border-dashed border-[#D2E3FC] bg-white/95 p-3 text-xs font-bold text-[#5F6368] sm:p-4 sm:text-sm">No quiz rewards claimed yet.</div>}
               </div>
             </div>
           </div>
@@ -748,29 +748,29 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <section className={`hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '520ms' }}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-amber-700 sm:text-sm sm:tracking-[0.3em]">Actionable Milestones</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#B06000] sm:text-sm sm:tracking-[0.3em]">Actionable Milestones</p>
               <h2 className="mt-2 text-2xl font-black sm:text-3xl">Glowing Milestones</h2>
             </div>
-            <p className="text-xs leading-5 text-slate-600 sm:text-sm">Lifetime earned: 🪙 {totalLifetimeCoins}. Reached milestones unlock real downloads or access.</p>
+            <p className="text-xs leading-5 text-[#5F6368] sm:text-sm">Lifetime earned: 🪙 {totalLifetimeCoins}. Reached milestones unlock real downloads or access.</p>
           </div>
           <div className="mt-4 grid gap-3 sm:mt-6 sm:gap-4 lg:grid-cols-3">
             {milestoneRewards.map(reward => {
               const claimed = (currentUser?.claimedRewardIds || []).includes(reward.id);
               return (
-                <article key={reward.id} className={`relative overflow-hidden rounded-[1.35rem] border p-4 transition-all duration-300 hover:-translate-y-1 sm:rounded-[1.75rem] sm:p-5 ${claimed ? 'border-emerald-300/60 bg-emerald-50/85 shadow-[0_0_22px_rgba(16,185,129,0.35)]' : reward.reached ? 'border-indigo-400 bg-white/85 shadow-[0_0_24px_rgba(79,70,229,0.44)]' : 'border-white/50 bg-white/72 opacity-90'}`}>
-                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-300 via-indigo-400 to-cyan-300" />
+                <article key={reward.id} className={`relative overflow-hidden rounded-[1.35rem] border p-4 transition-all duration-300 hover:-translate-y-1 sm:rounded-[1.75rem] sm:p-5 ${claimed ? 'border-[#34A853] bg-[#E6F4EA]/85 shadow-[0_0_22px_rgba(52,168,83,0.35)]' : reward.reached ? 'border-[#1A73E8] bg-white/85 shadow-[0_0_24px_rgba(26,115,232,0.44)]' : 'border-[#D2E3FC] bg-white/72 opacity-90'}`}>
+                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#FBBC04] via-[#1A73E8] to-[#C2E7FF]" />
                   <div className="flex items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/60 bg-white/85 text-2xl shadow-sm sm:h-16 sm:w-16 sm:text-3xl">{reward.icon}</div>
+                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-[#D2E3FC] bg-white/85 text-2xl shadow-sm sm:h-16 sm:w-16 sm:text-3xl">{reward.icon}</div>
                     <div>
-                      <h3 className="text-base font-black text-slate-900 sm:text-lg">{reward.title}</h3>
-                      <p className="mt-1 text-xs font-bold leading-5 text-slate-600 sm:text-sm sm:leading-6">{reward.description}</p>
-                      <p className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-amber-700">{reward.currentValue} / {reward.requirement} {reward.metric}</p>
+                      <h3 className="text-base font-black text-[#202124] sm:text-lg">{reward.title}</h3>
+                      <p className="mt-1 text-xs font-bold leading-5 text-[#5F6368] sm:text-sm sm:leading-6">{reward.description}</p>
+                      <p className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-[#B06000]">{reward.currentValue} / {reward.requirement} {reward.metric}</p>
                     </div>
                   </div>
-                  <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-slate-200/80">
-                    <div className="h-full rounded-full bg-gradient-to-r from-amber-400 via-indigo-500 to-cyan-400" style={{ width: `${reward.progress}%` }} />
+                  <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-[#E0E3EB]">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#FBBC04] via-[#1A73E8] to-[#C2E7FF]" style={{ width: `${reward.progress}%` }} />
                   </div>
-                  <button type="button" disabled={!reward.reached || claimed} onClick={() => handleMilestoneClaim(reward)} className={`mt-4 w-full rounded-2xl px-4 py-2.5 text-xs font-black shadow-sm transition active:scale-95 sm:mt-5 sm:py-3 sm:text-sm ${claimed ? 'cursor-not-allowed bg-slate-200 text-slate-500' : reward.reached ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:-translate-y-0.5' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}>
+                  <button type="button" disabled={!reward.reached || claimed} onClick={() => handleMilestoneClaim(reward)} className={`mt-4 w-full rounded-2xl px-4 py-2.5 text-xs font-black shadow-sm transition active:scale-95 sm:mt-5 sm:py-3 sm:text-sm ${claimed ? 'cursor-not-allowed bg-[#E0E3EB] text-[#5F6368]' : reward.reached ? 'bg-gradient-to-r from-[#1A73E8] to-[#C2E7FF] text-white hover:-translate-y-0.5' : 'cursor-not-allowed bg-[#E0E3EB] text-[#5F6368]'}`}>
                     {claimed ? 'Claimed / Unlocked' : reward.reached ? `${reward.actionLabel}${reward.coinReward ? ` (+${reward.coinReward})` : ''}` : `${Math.max(0, reward.requirement - reward.currentValue)} more to unlock`}
                   </button>
                 </article>
@@ -781,9 +781,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
         <section className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2">
           <div className={`hub-animate rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '600ms' }}>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700 sm:text-sm sm:tracking-[0.3em]">Rewards Vault</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#137333] sm:text-sm sm:tracking-[0.3em]">Rewards Vault</p>
             <h2 className="mt-2 text-2xl font-black sm:text-3xl">What You Can Claim</h2>
-            <p className="mt-2 text-xs leading-5 text-slate-600 sm:text-sm">Live wallet: 🪙 {eduPoints} • {coinRedeemRate} EduCoins = ₹1 discount.</p>
+            <p className="mt-2 text-xs leading-5 text-[#5F6368] sm:text-sm">Live wallet: 🪙 {eduPoints} • {coinRedeemRate} EduCoins = ₹1 discount.</p>
             <div className="mt-5 grid gap-3">
               {dynamicClaimCards.length ? dynamicClaimCards.map((reward) => {
                 const { isActive, isRedeemed } = getRewardButtonState(reward);
@@ -792,13 +792,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 return (
                   <article
                     key={reward.id}
-                    className={`rounded-2xl border p-3.5 text-left transition-all duration-300 sm:p-4 ${isRedeemed ? 'border-slate-300 bg-slate-100/90 opacity-75' : isActive ? 'border-emerald-400 bg-emerald-50/90 shadow-[0_0_20px_rgba(16,185,129,0.35)]' : reward.claimable ? 'border-indigo-400 bg-white/80 shadow-[0_0_15px_rgba(79,70,229,0.42)] hover:-translate-y-1 hover:bg-white/90' : 'border-white/50 bg-white/70 shadow-sm'}`}
+                    className={`rounded-2xl border p-3.5 text-left transition-all duration-300 sm:p-4 ${isRedeemed ? 'border-[#DADCE0] bg-[#F8FAFD]/90 opacity-75' : isActive ? 'border-[#34A853] bg-[#E6F4EA] shadow-[0_0_20px_rgba(52,168,83,0.35)]' : reward.claimable ? 'border-[#1A73E8] bg-white/95 shadow-[0_0_15px_rgba(26,115,232,0.42)] hover:-translate-y-1 hover:bg-white/95' : 'border-[#D2E3FC] bg-white/95 shadow-sm'}`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
-                        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] ${isRedeemed ? 'border-slate-300 bg-slate-200 text-slate-500' : isActive ? 'border-emerald-200 bg-emerald-100 text-emerald-700' : 'border-amber-200/70 bg-amber-50/80 text-amber-700'}`}>{reward.type}</span>
-                        <h3 className="mt-3 text-base font-black text-slate-900 sm:text-lg">{reward.mode === 'unlock' ? `Unlock ${reward.name} for ${reward.requiredCoins} Coins` : `Claim ₹${reward.discount} Discount on ${reward.name}`}</h3>
-                        <p className="mt-1 text-xs font-bold text-slate-600">{isRedeemed ? 'This reward is already used and cannot be selected again.' : reward.mode === 'unlock' ? 'Full access via EduCoin wallet.' : `Uses 🪙 ${reward.requiredCoins} at checkout.`} {!isRedeemed && (reward.claimable ? 'Ready to apply now.' : `Earn ${Math.max(0, reward.requiredCoins - eduPoints)} more coins.`)}</p>
+                        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] ${isRedeemed ? 'border-[#DADCE0] bg-[#E0E3EB] text-[#5F6368]' : isActive ? 'border-[#34A853] bg-[#E6F4EA] text-[#137333]' : 'border-[#FBBC04] bg-[#FEF7E0] text-[#B06000]'}`}>{reward.type}</span>
+                        <h3 className="mt-3 text-base font-black text-[#202124] sm:text-lg">{reward.mode === 'unlock' ? `Unlock ${reward.name} for ${reward.requiredCoins} Coins` : `Claim ₹${reward.discount} Discount on ${reward.name}`}</h3>
+                        <p className="mt-1 text-xs font-bold text-[#5F6368]">{isRedeemed ? 'This reward is already used and cannot be selected again.' : reward.mode === 'unlock' ? 'Full access via EduCoin wallet.' : `Uses 🪙 ${reward.requiredCoins} at checkout.`} {!isRedeemed && (reward.claimable ? 'Ready to apply now.' : `Earn ${Math.max(0, reward.requiredCoins - eduPoints)} more coins.`)}</p>
                       </div>
                       <span className="text-2xl">{isRedeemed ? '✅' : isActive ? '🔥' : reward.claimable ? '✨' : '🔒'}</span>
                     </div>
@@ -806,18 +806,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                       type="button"
                       disabled={isDisabled}
                       onClick={() => handleRewardToggle(reward)}
-                      className={`mt-3 w-full rounded-2xl px-4 py-2.5 text-xs font-black shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition active:scale-95 sm:mt-4 sm:py-3 sm:text-sm ${isRedeemed ? 'cursor-not-allowed bg-slate-300 text-slate-500' : isActive ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white hover:-translate-y-0.5' : reward.claimable ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white hover:-translate-y-0.5' : 'cursor-not-allowed bg-slate-200 text-slate-500'}`}
+                      className={`mt-3 w-full rounded-2xl px-4 py-2.5 text-xs font-black shadow-[0_8px_30px_rgba(32,33,36,0.08)] transition active:scale-95 sm:mt-4 sm:py-3 sm:text-sm ${isRedeemed ? 'cursor-not-allowed bg-[#E0E3EB] text-[#5F6368]' : isActive ? 'bg-gradient-to-r from-[#34A853] to-[#C2E7FF] text-white hover:-translate-y-0.5' : reward.claimable ? 'bg-gradient-to-r from-[#1A73E8] to-[#C2E7FF] text-white hover:-translate-y-0.5' : 'cursor-not-allowed bg-[#E0E3EB] text-[#5F6368]'}`}
                     >
                       {buttonLabel}
                     </button>
                   </article>
                 );
-              }) : <p className="rounded-2xl border border-white/50 bg-white/70 p-3 text-sm text-slate-600 sm:p-4">Reward claims will appear here once products or subscriptions are available.</p>}
+              }) : <p className="rounded-2xl border border-[#D2E3FC] bg-white/95 p-3 text-sm text-[#5F6368] sm:p-4">Reward claims will appear here once products or subscriptions are available.</p>}
             </div>
           </div>
 
           <div className={`hub-animate rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '680ms' }}>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-blue-700 sm:text-sm sm:tracking-[0.3em]">Personalization</p>
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Personalization</p>
             <h2 className="mt-2 text-2xl font-black sm:text-3xl">Theme & Coupons</h2>
             <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
               {Object.values(themes).filter(theme => theme.name !== 'Midnight').map(theme => {
@@ -826,7 +826,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                   <button
                     key={theme.name}
                     onClick={() => onThemeChange(key)}
-                    className={`rounded-2xl border p-2.5 text-left transition-all duration-300 hover:-translate-y-1 sm:p-3 ${activeTheme === key ? 'border-cyan-300/50 bg-cyan-600/10' : 'border-white/50 bg-white/70'}`}
+                    className={`rounded-2xl border p-2.5 text-left transition-all duration-300 hover:-translate-y-1 sm:p-3 ${activeTheme === key ? 'border-[#C2E7FF] bg-[#E8F0FE]' : 'border-[#D2E3FC] bg-white/95'}`}
                   >
                     <div className="flex -space-x-1">
                       <span className="h-4 w-4 rounded-full border border-white" style={{ background: theme.palette.primaryColor }} />
@@ -840,30 +840,30 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             <div className="mt-6">
               <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <h3 className="text-xl font-black text-slate-900">Available Coupons</h3>
-                  <p className="text-xs font-bold text-slate-500 sm:text-sm">Admin panel mein listed sabhi coupons yahan live status ke saath dikhte hain.</p>
+                  <h3 className="text-xl font-black text-[#202124]">Available Coupons</h3>
+                  <p className="text-xs font-bold text-[#5F6368] sm:text-sm">Admin panel mein listed sabhi coupons yahan live status ke saath dikhte hain.</p>
                 </div>
-                <span className="rounded-full bg-white/70 px-3 py-1 text-xs font-black text-cyan-700 shadow-sm">{profileCoupons.length} total</span>
+                <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[#174EA6] shadow-sm">{profileCoupons.length} total</span>
               </div>
               <div className="mt-3 grid gap-3">
                 {profileCoupons.length ? profileCoupons.map(coupon => {
                   const isCouponActive = coupon.isActive;
                   const buttonLabel = isCouponActive ? (redeemedCouponCode === coupon.code ? 'Code copied' : 'Redeem') : 'Not available';
                   return (
-                    <div key={coupon.id} className={`rounded-2xl border p-3 transition-all duration-300 sm:p-4 ${isCouponActive ? 'border-dashed border-emerald-300/70 bg-emerald-50/80 shadow-[0_10px_30px_rgba(16,185,129,0.10)]' : 'border-slate-200/80 bg-slate-100/80 opacity-80'}`}>
+                    <div key={coupon.id} className={`rounded-2xl border p-3 transition-all duration-300 sm:p-4 ${isCouponActive ? 'border-dashed border-[#34A853] bg-[#E6F4EA] shadow-[0_10px_30px_rgba(16,185,129,0.10)]' : 'border-[#E0E3EB] bg-[#F8FAFD] opacity-80'}`}>
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className={`font-black ${isCouponActive ? 'text-emerald-700' : 'text-slate-500'}`}>{coupon.code}</span>
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${isCouponActive ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-200 text-slate-500'}`}>{isCouponActive ? 'Active' : 'Inactive'}</span>
+                            <span className={`font-black ${isCouponActive ? 'text-[#137333]' : 'text-[#5F6368]'}`}>{coupon.code}</span>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${isCouponActive ? 'bg-[#E6F4EA] text-[#137333]' : 'bg-[#E0E3EB] text-[#5F6368]'}`}>{isCouponActive ? 'Active' : 'Inactive'}</span>
                           </div>
-                          <p className="mt-1 text-sm font-bold text-slate-600">{coupon.type === 'percentage' ? `${coupon.value}% off` : `₹${coupon.value} off`} • expires {coupon.expiryDate}</p>
+                          <p className="mt-1 text-sm font-bold text-[#5F6368]">{coupon.type === 'percentage' ? `${coupon.value}% off` : `₹${coupon.value} off`} • expires {coupon.expiryDate}</p>
                         </div>
                         <button
                           type="button"
                           disabled={!isCouponActive}
                           onClick={() => handleCouponRedeem(coupon)}
-                          className={`w-full rounded-2xl px-4 py-2.5 text-sm font-black transition active:scale-95 sm:w-auto ${isCouponActive ? 'bg-gradient-to-r from-emerald-500 to-teal-500 text-white shadow-[0_10px_25px_rgba(16,185,129,0.25)] hover:-translate-y-0.5' : 'cursor-not-allowed bg-slate-300 text-slate-500'}`}
+                          className={`w-full rounded-2xl px-4 py-2.5 text-sm font-black transition active:scale-95 sm:w-auto ${isCouponActive ? 'bg-gradient-to-r from-[#34A853] to-[#C2E7FF] text-white shadow-[0_10px_25px_rgba(52,168,83,0.25)] hover:-translate-y-0.5' : 'cursor-not-allowed bg-[#E0E3EB] text-[#5F6368]'}`}
                         >
                           {buttonLabel}
                         </button>
@@ -871,7 +871,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     </div>
                   );
                 }) : (
-                  <p className="rounded-2xl border border-white/50 bg-white/70 p-3 text-sm text-slate-600 sm:p-4">No coupons are listed from admin panel yet.</p>
+                  <p className="rounded-2xl border border-[#D2E3FC] bg-white/95 p-3 text-sm text-[#5F6368] sm:p-4">No coupons are listed from admin panel yet.</p>
                 )}
               </div>
             </div>
@@ -881,22 +881,22 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <section className={`hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '760ms' }}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-indigo-300 sm:text-sm sm:tracking-[0.3em]">Coin History</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Coin History</p>
               <h2 className="mt-2 text-2xl font-black sm:text-3xl">Live Earning Ledger</h2>
             </div>
-            <p className="text-xs leading-5 text-slate-600 sm:text-sm">Synced from your coinTransactions wallet ledger.</p>
+            <p className="text-xs leading-5 text-[#5F6368] sm:text-sm">Synced from your coinTransactions wallet ledger.</p>
           </div>
           <div className="mt-5 grid gap-3">
             {coinTransactions.length ? coinTransactions.slice(0, 8).map((entry) => (
-              <div key={entry.id || `${entry.createdAt}-${entry.description}`} className="flex flex-col items-start gap-3 rounded-2xl border border-white/50 bg-white/70 p-3 shadow-sm backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-4">
+              <div key={entry.id || `${entry.createdAt}-${entry.description}`} className="flex flex-col items-start gap-3 rounded-2xl border border-[#D2E3FC] bg-white/95 p-3 shadow-sm backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-4">
                 <div>
-                  <p className="font-black text-slate-900">{entry.amount >= 0 ? '🟢' : '🔴'} {entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</p>
-                  <p className="mt-1 text-xs leading-5 text-slate-600 sm:text-sm">{entry.amount >= 0 ? '📝' : '🛒'} <span className="font-bold">{entry.title || entry.source}</span> — {entry.description}</p>
+                  <p className="font-black text-[#202124]">{entry.amount >= 0 ? '🟢' : '🔴'} {entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</p>
+                  <p className="mt-1 text-xs leading-5 text-[#5F6368] sm:text-sm">{entry.amount >= 0 ? '📝' : '🛒'} <span className="font-bold">{entry.title || entry.source}</span> — {entry.description}</p>
                 </div>
-                <div className="text-left sm:text-right"><div className={`text-lg font-black ${entry.amount >= 0 ? 'text-emerald-700' : 'text-rose-700'}`}>{entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</div><div className="mt-1 text-xs font-bold text-slate-500">{formatLedgerTime(entry.timestamp || entry.createdAt)}</div></div>
+                <div className="text-left sm:text-right"><div className={`text-lg font-black ${entry.amount >= 0 ? 'text-[#137333]' : 'text-[#C5221F]'}`}>{entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</div><div className="mt-1 text-xs font-bold text-[#5F6368]">{formatLedgerTime(entry.timestamp || entry.createdAt)}</div></div>
               </div>
             )) : (
-              <div className="rounded-2xl border border-white/50 bg-white/70 p-4 text-sm text-slate-600 sm:p-5 sm:text-base">No coin movements yet. Read an article or complete a purchase to start your live ledger.</div>
+              <div className="rounded-2xl border border-[#D2E3FC] bg-white/95 p-4 text-sm text-[#5F6368] sm:p-5 sm:text-base">No coin movements yet. Read an article or complete a purchase to start your live ledger.</div>
             )}
           </div>
         </section>
