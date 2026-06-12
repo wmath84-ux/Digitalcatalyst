@@ -116,7 +116,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
     <section 
       id="news" 
       ref={sectionRef}
-      className={`py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      className={`tagmaster-section-theme py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
       style={{ background: sectionBackground }}
     >
       <div className="container mx-auto px-6">

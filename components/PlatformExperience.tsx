@@ -18,7 +18,7 @@ const PlatformExperience: React.FC<PlatformExperienceProps> = ({ settings }) => 
   const siteName = settings.content.siteName || 'Digital Catalyst';
 
   return (
-    <section className="relative overflow-hidden bg-sky-50 bg-gradient-to-br from-sky-50 via-indigo-100/50 to-violet-100 py-20 text-slate-900 sm:py-24">
+    <section className="tagmaster-section-theme relative overflow-hidden bg-sky-50 bg-gradient-to-br from-sky-50 via-indigo-100/50 to-violet-100 py-20 text-slate-900 sm:py-24">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(37,99,235,0.42),transparent_30%),radial-gradient(circle_at_82%_8%,rgba(124,58,237,0.34),transparent_28%),linear-gradient(180deg,rgba(255,255,255,0.18),rgba(255,255,255,0.62))]" />
       <div className="absolute left-1/2 top-0 h-px w-[82%] -translate-x-1/2 bg-gradient-to-r from-transparent via-cyan-200/40 to-transparent" />
 

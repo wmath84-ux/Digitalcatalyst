@@ -38,7 +38,7 @@ const AboutUs: React.FC<AboutUsProps> = ({ settings, title, text, imageSeed }) =
     <section 
       id="about" 
       ref={sectionRef}
-      className={`relative overflow-hidden bg-sky-50 bg-gradient-to-br from-sky-50 via-indigo-100/50 to-violet-100 py-14 text-slate-900 sm:py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      className={`tagmaster-section-theme relative overflow-hidden bg-sky-50 bg-gradient-to-br from-sky-50 via-indigo-100/50 to-violet-100 py-14 text-slate-900 sm:py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_65%,rgba(14,165,233,0.30),transparent_30%),radial-gradient(circle_at_82%_36%,rgba(124,58,237,0.30),transparent_30%)]" />
       <div className="container relative z-10 mx-auto px-4 sm:px-6">

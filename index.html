@@ -430,6 +430,148 @@
       }
 
 
+      /* Tagmaster color system shared from the Community > Tag'master page. */
+      :where(.tagmaster-section-theme, .tagmaster-admin-theme) {
+        --tagmaster-ink: #202124;
+        --tagmaster-muted: #5F6368;
+        --tagmaster-blue: #1A73E8;
+        --tagmaster-blue-strong: #1967D2;
+        --tagmaster-blue-deep: #174EA6;
+        --tagmaster-blue-soft: #E8F0FE;
+        --tagmaster-blue-mid: #D3E3FD;
+        --tagmaster-blue-border: #D2E3FC;
+        --tagmaster-blue-border-strong: #C2E7FF;
+        --tagmaster-border: #E0E3EB;
+        --tagmaster-surface: #FFFFFF;
+        --tagmaster-page: #F8FAFD;
+        --tagmaster-green-soft: #E6F4EA;
+        --tagmaster-green: #137333;
+        --tagmaster-yellow-soft: #FEF7E0;
+        --tagmaster-yellow: #B06000;
+        --tagmaster-red-soft: #FCE8E6;
+        --tagmaster-red-border: #FAD2CF;
+        --tagmaster-red: #C5221F;
+        color: var(--tagmaster-ink) !important;
+      }
+
+      .tagmaster-section-theme,
+      .tagmaster-admin-theme {
+        background: linear-gradient(135deg, var(--tagmaster-page) 0%, var(--tagmaster-surface) 46%, var(--tagmaster-blue-soft) 100%) !important;
+      }
+
+      .tagmaster-section-theme > .absolute.inset-0,
+      .tagmaster-admin-theme::before {
+        background: radial-gradient(circle at 18% 18%, rgba(26,115,232,0.16), transparent 30%), radial-gradient(circle at 82% 8%, rgba(194,231,255,0.48), transparent 28%), linear-gradient(180deg, rgba(255,255,255,0.32), rgba(248,250,253,0.82)) !important;
+      }
+
+      .tagmaster-section-theme :is(h1, h2, h3, h4, h5, h6),
+      .tagmaster-admin-theme :is(h1, h2, h3, h4, h5, h6, .admin-page-title, .admin-section-title) {
+        color: var(--tagmaster-ink) !important;
+      }
+
+      .tagmaster-section-theme :is(p, li, dd, small),
+      .tagmaster-admin-theme :is(p, li, dd, small, td) {
+        color: var(--tagmaster-muted) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="text-cyan"], [class*="text-blue"], [class*="text-indigo"], [class*="text-purple"]),
+      .tagmaster-admin-theme :is([class*="text-cyan"], [class*="text-blue"], [class*="text-indigo"], [class*="text-purple"]) {
+        color: var(--tagmaster-blue-strong) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="text-slate-900"], [class*="text-gray-900"], [class*="text-slate-950"], [class*="text-black"]),
+      .tagmaster-admin-theme :is([class*="text-slate-900"], [class*="text-gray-900"], [class*="text-slate-950"], [class*="text-black"], th) {
+        color: var(--tagmaster-ink) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="text-slate-700"], [class*="text-slate-600"], [class*="text-gray-700"], [class*="text-gray-600"]),
+      .tagmaster-admin-theme :is([class*="text-slate-700"], [class*="text-slate-600"], [class*="text-gray-700"], [class*="text-gray-600"]) {
+        color: var(--tagmaster-muted) !important;
+      }
+
+      .tagmaster-section-theme :is(article, form, input, textarea, select, [class*="rounded-2xl"], [class*="rounded-3xl"], [class*="rounded-[2"]),
+      .tagmaster-admin-theme :is(article, section, form, table, thead, tbody, input, textarea, select, [class*="rounded-2xl"], [class*="rounded-3xl"], [class*="rounded-[2"]) {
+        border-color: var(--tagmaster-border) !important;
+        box-shadow: 0 16px 42px rgba(60,64,67,0.08) !important;
+      }
+
+      .tagmaster-section-theme :is(article, form, input, textarea, select, [class*="bg-white"]),
+      .tagmaster-admin-theme :is(article, section, form, table, thead, tbody, input, textarea, select, [class*="bg-white"]) {
+        background-color: rgba(255,255,255,0.94) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="border-indigo"], [class*="border-sky"], [class*="border-cyan"], [class*="border-blue"], [class*="border-purple"]),
+      .tagmaster-admin-theme :is([class*="border-indigo"], [class*="border-sky"], [class*="border-cyan"], [class*="border-blue"], [class*="border-purple"], [class*="border-slate"], [class*="border-gray"]) {
+        border-color: var(--tagmaster-blue-border) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="bg-sky"], [class*="bg-indigo"], [class*="bg-cyan"], [class*="bg-purple"], [class*="bg-blue-50"], [class*="bg-blue-100"]),
+      .tagmaster-admin-theme :is([class*="bg-sky"], [class*="bg-indigo"], [class*="bg-cyan"], [class*="bg-blue-50"], [class*="bg-blue-100"], [class*="bg-slate-50"], [class*="bg-gray-50"]) {
+        background-color: var(--tagmaster-blue-soft) !important;
+      }
+
+      .tagmaster-section-theme :is(button, a[role="button"], .product-card-shine button),
+      .tagmaster-admin-theme :is(button, a[role="button"], input[type="submit"]) {
+        border-color: var(--tagmaster-blue-border) !important;
+      }
+
+      .tagmaster-section-theme :is(button, a):hover,
+      .tagmaster-admin-theme :is(button, a):hover {
+        border-color: var(--tagmaster-blue-border-strong) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="from-blue"], [class*="from-cyan"], [class*="from-indigo"], [class*="from-purple"]),
+      .tagmaster-admin-theme :is([class*="from-blue"], [class*="from-cyan"], [class*="from-indigo"], [class*="from-purple"]) {
+        --tw-gradient-from: var(--tagmaster-blue-soft) var(--tw-gradient-from-position) !important;
+        --tw-gradient-to: rgba(232,240,254,0) var(--tw-gradient-to-position) !important;
+        --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="to-blue"], [class*="to-cyan"], [class*="to-indigo"], [class*="to-purple"]),
+      .tagmaster-admin-theme :is([class*="to-blue"], [class*="to-cyan"], [class*="to-indigo"], [class*="to-purple"]) {
+        --tw-gradient-to: var(--tagmaster-blue-border-strong) var(--tw-gradient-to-position) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="via-indigo"], [class*="via-blue"], [class*="via-cyan"], [class*="via-purple"]),
+      .tagmaster-admin-theme :is([class*="via-indigo"], [class*="via-blue"], [class*="via-cyan"], [class*="via-purple"]) {
+        --tw-gradient-via: var(--tagmaster-blue-mid) var(--tw-gradient-via-position) !important;
+        --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-via), var(--tw-gradient-to) !important;
+      }
+
+      .tagmaster-section-theme :is([class*="bg-blue-600"], [class*="bg-blue-700"], [class*="bg-indigo-600"], [class*="bg-cyan-600"], [class*="bg-purple-600"]),
+      .tagmaster-admin-theme :is([class*="bg-blue-600"], [class*="bg-blue-700"], [class*="bg-indigo-600"], [class*="bg-cyan-600"], [class*="bg-purple-600"]) {
+        background-color: var(--tagmaster-blue) !important;
+        color: #fff !important;
+      }
+
+      .tagmaster-section-theme :is([class*="bg-green"], [class*="bg-emerald"]),
+      .tagmaster-admin-theme :is([class*="bg-green"], [class*="bg-emerald"]) {
+        background-color: var(--tagmaster-green-soft) !important;
+        color: var(--tagmaster-green) !important;
+        border-color: #CEEAD6 !important;
+      }
+
+      .tagmaster-section-theme :is([class*="bg-yellow"], [class*="bg-amber"], [class*="bg-orange"]),
+      .tagmaster-admin-theme :is([class*="bg-yellow"], [class*="bg-amber"], [class*="bg-orange"]) {
+        background-color: var(--tagmaster-yellow-soft) !important;
+        color: var(--tagmaster-yellow) !important;
+        border-color: #FEEFC3 !important;
+      }
+
+      .tagmaster-section-theme :is([class*="bg-red"], [class*="bg-rose"]),
+      .tagmaster-admin-theme :is([class*="bg-red"], [class*="bg-rose"]) {
+        background-color: var(--tagmaster-red-soft) !important;
+        color: var(--tagmaster-red) !important;
+        border-color: var(--tagmaster-red-border) !important;
+      }
+
+      .tagmaster-section-theme :is(input, textarea, select):focus,
+      .tagmaster-admin-theme :is(input, textarea, select):focus {
+        border-color: var(--tagmaster-blue) !important;
+        box-shadow: 0 0 0 3px rgba(210,227,252,0.72) !important;
+        outline: none !important;
+      }
+
       /* Mobile-only density pass for admin and course workspaces. */
       @media (max-width: 640px) {
         .admin-mobile-scope :is(h1, .admin-page-title) {
@@ -443,7 +585,7 @@
           line-height: 1.65rem !important;
         }
 
-        .admin-mobile-scope :is(.rounded-\[2rem\], .rounded-\[2\.5rem\], .rounded-3xl) {
+        .admin-mobile-scope :is(.rounded-[2rem\], .rounded-[2\.5rem\], .rounded-3xl) {
           border-radius: 1.25rem !important;
         }
 
