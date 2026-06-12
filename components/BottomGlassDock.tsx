@@ -21,25 +21,25 @@ interface BottomGlassDockProps {
 }
 
 const dockToneClasses: Record<string, string> = {
-  Store: 'from-indigo-500/35 to-cyan-400/25 hover:border-indigo-300/40',
-  Purchases: 'from-emerald-500/30 to-teal-400/25 hover:border-emerald-300/40',
-  Wishlist: 'from-rose-500/30 to-pink-400/25 hover:border-rose-300/40',
-  Cart: 'from-amber-500/30 to-orange-400/25 hover:border-amber-300/40',
-  News: 'from-sky-500/30 to-blue-400/25 hover:border-sky-300/40',
-  Blog: 'from-violet-500/32 to-fuchsia-400/24 hover:border-violet-300/40',
-  Free: 'from-lime-500/28 to-emerald-400/22 hover:border-lime-300/40',
-  Profile: 'from-cyan-500/30 to-indigo-400/24 hover:border-cyan-300/40',
-  Login: 'from-cyan-500/30 to-indigo-400/24 hover:border-cyan-300/40',
-  Subscriptions: 'from-purple-500/32 to-indigo-400/25 hover:border-purple-300/40',
-  Community: 'from-emerald-500/32 to-cyan-400/25 hover:border-emerald-300/40',
+  Store: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
+  Purchases: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
+  Wishlist: 'from-[#E8F0FE] to-[#D3E3FD] hover:border-[#D2E3FC]',
+  Cart: 'from-[#FEF7E0] to-[#E8F0FE] hover:border-[#D2E3FC]',
+  News: 'from-[#E8F0FE] to-[#D3E3FD] hover:border-[#D2E3FC]',
+  Blog: 'from-[#E8F0FE] to-[#D3E3FD] hover:border-[#D2E3FC]',
+  Free: 'from-[#E6F4EA] to-[#E8F0FE] hover:border-[#CEEAD6]',
+  Profile: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
+  Login: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
+  Subscriptions: 'from-[#E8F0FE] to-[#D3E3FD] hover:border-[#D2E3FC]',
+  Community: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
 };
 
 
 const defaultDockStyle = {
-  backgroundColor: '#020617',
-  backgroundOpacity: 82,
-  itemOpacity: 8,
-  accentOpacity: 45,
+  backgroundColor: '#FFFFFF',
+  backgroundOpacity: 95,
+  itemOpacity: 100,
+  accentOpacity: 100,
 };
 
 const clampPercent = (value: unknown, fallback: number) => {
@@ -84,18 +84,18 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
 
   return (
     <div className="fixed inset-x-0 bottom-2 md:bottom-4 z-[65] flex justify-center pointer-events-none px-3">
-      <div className="pointer-events-auto group relative max-w-[95vw] overflow-hidden rounded-[2rem] border border-white/15 px-3 py-3 shadow-[0_24px_80px_rgba(15,23,42,0.34)] ring-1 ring-slate-900/10 backdrop-blur-3xl transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_28px_90px_rgba(30,41,59,0.38)] data-[hidden=true]:translate-y-24 md:px-4" id="main-bottom-dock" style={{ backgroundColor: dockBackground }}>
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(56,189,248,0.18),transparent_30%),radial-gradient(circle_at_82%_10%,rgba(139,92,246,0.20),transparent_30%),linear-gradient(180deg,rgba(255,255,255,0.14),rgba(255,255,255,0.03))]" />
-        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-cyan-200/60 to-transparent" />
+      <div className="pointer-events-auto group relative max-w-[95vw] overflow-hidden rounded-[2rem] border border-[#D2E3FC] px-3 py-3 shadow-[0_18px_60px_rgba(26,115,232,0.22)] ring-1 ring-[#C2E7FF] backdrop-blur-3xl transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_24px_80px_rgba(26,115,232,0.24)] data-[hidden=true]:translate-y-24 md:px-4" id="main-bottom-dock" style={{ backgroundColor: dockBackground }}>
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(26,115,232,0.12),transparent_30%),radial-gradient(circle_at_82%_10%,rgba(194,231,255,0.40),transparent_30%),linear-gradient(180deg,rgba(232,240,254,0.42),rgba(255,255,255,0.16))]" />
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#C2E7FF] to-transparent" />
         <div className="relative flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
           {items.map((item) => {
-            const tone = dockToneClasses[item.label] || 'from-slate-400/24 to-white/10 hover:border-white/30';
+            const tone = dockToneClasses[item.label] || 'from-[#F8FAFD] to-[#E8F0FE] hover:border-[#D2E3FC]';
             return (
-              <button key={item.label} onClick={item.action} className={`group/item relative flex min-w-[86px] flex-col items-center rounded-2xl border border-white/10 px-3 py-2.5 text-slate-100 shadow-[inset_0_1px_0_rgba(255,255,255,0.10)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_14px_32px_rgba(15,23,42,0.28)] md:min-w-[92px] ${tone}`} style={{ backgroundColor: itemBackground }}>
+              <button key={item.label} onClick={item.action} className={`group/item relative flex min-w-[86px] flex-col items-center rounded-2xl border border-[#DADCE0] px-3 py-2.5 text-[#202124] shadow-[0_8px_24px_rgba(60,64,67,0.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_34px_rgba(26,115,232,0.14)] md:min-w-[92px] ${tone}`} style={{ backgroundColor: itemBackground }}>
                 <span className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${tone.split(' hover:')[0]} transition duration-300 group-hover/item:opacity-75`} style={{ opacity: accentOpacity }} />
-                <span className="relative flex h-9 w-9 items-center justify-center rounded-2xl border border-white/10 bg-slate-950/35 text-xl shadow-inner transition duration-300 group-hover/item:scale-110 group-hover/item:bg-slate-900/45">{item.icon}</span>
-                <span className="relative mt-1.5 text-[11px] font-black tracking-wide text-slate-100/90 transition group-hover/item:text-white">{item.label}</span>
-                {item.badge ? <span className="absolute -right-1 -top-1 rounded-full border border-white/20 bg-gradient-to-r from-indigo-500 to-violet-500 px-1.5 py-0.5 text-[10px] font-black text-white shadow-[0_8px_20px_rgba(79,70,229,0.38)]">{item.badge}</span> : null}
+                <span className="relative flex h-9 w-9 items-center justify-center rounded-2xl border border-[#D2E3FC] bg-[#E8F0FE] text-xl shadow-inner transition duration-300 group-hover/item:scale-110 group-hover/item:bg-[#D3E3FD]">{item.icon}</span>
+                <span className="relative mt-1.5 text-[11px] font-black tracking-wide text-[#202124] transition group-hover/item:text-[#174EA6]">{item.label}</span>
+                {item.badge ? <span className="absolute -right-1 -top-1 rounded-full border border-[#D2E3FC] bg-gradient-to-r from-[#1A73E8] to-[#174EA6] px-1.5 py-0.5 text-[10px] font-black text-white shadow-[0_8px_20px_rgba(79,70,229,0.38)]">{item.badge}</span> : null}
               </button>
             );
           })}
