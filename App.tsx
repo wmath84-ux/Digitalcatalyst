@@ -379,6 +379,12 @@ export interface SupportTicket {
     message: string;
     date: string;
     status: 'Open' | 'Resolved' | 'Pending';
+    source?: 'contact' | 'masterTag';
+    communityThreadId?: number;
+    customerAvatar?: string;
+    category?: string;
+    adminReply?: string;
+    repliedAt?: string;
 }
 
 
@@ -1132,6 +1138,30 @@ const App: React.FC = () => {
   useEffect(() => {
     safeSetItem('siteSupportTickets', tickets);
   }, [tickets]);
+  useEffect(() => {
+    const syncTicketsFromStorage = () => {
+      const storedTickets = localStorage.getItem('siteSupportTickets');
+      if (!storedTickets) return;
+      try {
+        setTickets(JSON.parse(storedTickets));
+      } catch (error) {
+        console.error('Error syncing support tickets:', error);
+      }
+    };
+
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === 'siteSupportTickets') syncTicketsFromStorage();
+    };
+
+    window.addEventListener('siteSupportTicketsUpdated', syncTicketsFromStorage);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('siteSupportTicketsUpdated', syncTicketsFromStorage);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
+
 
   useEffect(() => {
     safeSetItem('activeTheme', activeTheme);

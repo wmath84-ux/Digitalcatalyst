@@ -18,6 +18,28 @@ type Creator = { id: string; username: string; name: string; avatar: string; rol
 type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; docId?: string; createdAt?: number };
 type SharedStory = { id: number; statusId: number; recipientId: string; senderId: 'me'; senderName: string; time: string };
 type MasterTagRequest = { id: number; author: string; avatar: string; category: string; title: string; detail: string; time: string; likes: number; reactions: Record<string, number> };
+type CommunitySupportTicket = { id: string; customerName: string; customerEmail: string; subject: string; message: string; date: string; status: 'Open' | 'Resolved' | 'Pending'; source?: 'contact' | 'masterTag'; communityThreadId?: number; customerAvatar?: string; category?: string; adminReply?: string; repliedAt?: string };
+
+const MASTER_TAG_STORAGE_KEY = 'eduvoraMasterTagRequests';
+const SUPPORT_TICKETS_STORAGE_KEY = 'siteSupportTickets';
+
+const readJsonArray = <T,>(key: string, fallback: T[]): T[] => {
+  if (typeof window === 'undefined') return fallback;
+  try {
+    const storedValue = localStorage.getItem(key);
+    return storedValue ? JSON.parse(storedValue) : fallback;
+  } catch (error) {
+    console.warn(`Unable to read ${key}:`, error);
+    return fallback;
+  }
+};
+
+const formatCommunityReplyTime = (value?: string) => {
+  if (!value) return 'Just now';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return 'Just now';
+  return parsed.toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+};
 
 const creators: Creator[] = [
   { id: 'riya', username: 'riyafunnels', name: 'Riya Sharma', avatar: '🧕', role: 'Funnel creator', followers: 1280, mutual: true },
@@ -193,7 +215,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [followedIds, setFollowedIds] = useState<string[]>(['riya', 'meera']);
   const [networkTab, setNetworkTab] = useState<'mutual' | 'followers' | 'following' | 'forYou'>('following');
   const [networkSearch, setNetworkSearch] = useState('');
-  const [masterTagRequests, setMasterTagRequests] = useState<MasterTagRequest[]>(initialMasterTagRequests);
+  const [masterTagRequests, setMasterTagRequests] = useState<MasterTagRequest[]>(() => readJsonArray(MASTER_TAG_STORAGE_KEY, initialMasterTagRequests));
+  const [supportTickets, setSupportTickets] = useState<CommunitySupportTicket[]>(() => readJsonArray(SUPPORT_TICKETS_STORAGE_KEY, []));
   const [masterTagTitle, setMasterTagTitle] = useState('');
   const [masterTagDetail, setMasterTagDetail] = useState('');
   const [masterTagCategory, setMasterTagCategory] = useState<(typeof masterTagCategories)[number]>('Feature request');
@@ -242,6 +265,25 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     window.dispatchEvent(new PopStateEvent('popstate', { state: nextState }));
     navigate('/auth', { replace: true, state: { from: 'community' } });
   };
+
+  useEffect(() => {
+    localStorage.setItem(MASTER_TAG_STORAGE_KEY, JSON.stringify(masterTagRequests));
+  }, [masterTagRequests]);
+
+  useEffect(() => {
+    const syncSupportTickets = () => setSupportTickets(readJsonArray(SUPPORT_TICKETS_STORAGE_KEY, []));
+    const handleStorage = (event: StorageEvent) => {
+      if (event.key === SUPPORT_TICKETS_STORAGE_KEY) syncSupportTickets();
+    };
+
+    window.addEventListener('siteSupportTicketsUpdated', syncSupportTickets);
+    window.addEventListener('storage', handleStorage);
+
+    return () => {
+      window.removeEventListener('siteSupportTicketsUpdated', syncSupportTickets);
+      window.removeEventListener('storage', handleStorage);
+    };
+  }, []);
 
   useEffect(() => {
     if (isAuthenticated) {
@@ -572,8 +614,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const title = masterTagTitle.trim();
     const detail = masterTagDetail.trim();
     if (!title || !detail) return;
+    const requestId = Date.now();
     const request: MasterTagRequest = {
-      id: Date.now(),
+      id: requestId,
       author: profile.name,
       avatar: profile.avatar,
       category: masterTagCategory,
@@ -583,6 +626,23 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       likes: 0,
       reactions: {},
     };
+    const supportTicket: CommunitySupportTicket = {
+      id: `MT-${requestId}`,
+      customerName: profile.name,
+      customerEmail: `${profile.username || 'eduvora_member'}@eduvora.community`,
+      subject: `@Master ${title}`,
+      message: detail,
+      date: new Date().toISOString(),
+      status: 'Open',
+      source: 'masterTag',
+      communityThreadId: requestId,
+      customerAvatar: profile.avatar,
+      category: masterTagCategory,
+    };
+    const updatedTickets = [supportTicket, ...readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []).filter((ticket) => ticket.id !== supportTicket.id)];
+    localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(updatedTickets));
+    window.dispatchEvent(new Event('siteSupportTicketsUpdated'));
+    setSupportTickets(updatedTickets);
     setMasterTagRequests((current) => [request, ...current]);
     setMasterTagTitle('');
     setMasterTagDetail('');
@@ -600,6 +660,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const filteredMasterTagRequests = masterTagFilter === 'All' ? masterTagRequests : masterTagRequests.filter((request) => request.category === masterTagFilter);
   const selectedMasterTag = masterTagRequests.find((request) => request.id === selectedMasterTagId) || masterTagRequests[0];
+  const masterTagAdminReplies = useMemo(() => supportTickets.reduce<Record<number, CommunitySupportTicket>>((replyMap, ticket) => {
+    if (ticket.source === 'masterTag' && ticket.communityThreadId && ticket.adminReply) replyMap[ticket.communityThreadId] = ticket;
+    return replyMap;
+  }, {}), [supportTickets]);
+  const selectedMasterTagReply = selectedMasterTag ? masterTagAdminReplies[selectedMasterTag.id] : undefined;
   const masterTagGroupedRequests = masterTagCategories.map((category) => ({
     category,
     requests: filteredMasterTagRequests.filter((request) => request.category === category),
@@ -612,7 +677,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <Avatar value={request.avatar} size="h-11 w-11" />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2 text-xs font-black text-[#5F6368]"><span className="text-[#202124]">{request.author}</span><span>•</span><span>{request.time}</span><span className="rounded-full border border-[#D2E3FC] bg-[#E8F0FE] px-2 py-1 text-[#1967D2]">{request.category}</span></div>
-            <h3 className="mt-2 text-xl font-black tracking-tight text-[#202124] sm:text-2xl">@Master {request.title}</h3>
+            <h3 className="mt-2 text-xl font-black tracking-tight text-[#202124] sm:text-2xl">@Master {request.title}</h3>{masterTagAdminReplies[request.id] && <span className="mt-2 inline-flex rounded-full bg-[#E6F4EA] px-3 py-1 text-[11px] font-black text-[#137333]">Master replied</span>}
             <p className={`mt-2 whitespace-pre-wrap text-sm font-semibold leading-7 text-[#5F6368] ${compact ? 'line-clamp-3' : ''}`}>{request.detail}</p>
             <div className="mt-4 flex flex-wrap items-center gap-2">
               <button type="button" onClick={() => likeMasterTag(request.id)} className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${likedMasterTagIds.includes(request.id) ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#DADCE0] bg-white text-[#202124] hover:border-[#1A73E8] hover:text-[#1967D2]'}`}>❤️ {request.likes}</button>
@@ -633,7 +698,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     <article key={request.id} role="button" tabIndex={0} onClick={() => openMasterTagDetail(request.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openMasterTagDetail(request.id); }} className="group flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-[#E0E3EB] bg-white px-3 py-2.5 text-left shadow-[0_8px_24px_rgba(60,64,67,0.06)] transition duration-300 hover:-translate-y-0.5 hover:border-[#C2E7FF] hover:bg-[#F8FAFD] sm:px-4">
       <Avatar value={request.avatar} size="h-10 w-10" />
       <div className="min-w-0 flex-1">
-        <div className="flex flex-wrap items-center gap-2"><span className="truncate text-sm font-black text-[#202124]">@Master {request.title}</span><span className="rounded-full bg-[#E8F0FE] px-2 py-0.5 text-[10px] font-black text-[#1967D2]">{request.category}</span></div>
+        <div className="flex flex-wrap items-center gap-2"><span className="truncate text-sm font-black text-[#202124]">@Master {request.title}</span><span className="rounded-full bg-[#E8F0FE] px-2 py-0.5 text-[10px] font-black text-[#1967D2]">{request.category}</span>{masterTagAdminReplies[request.id] && <span className="rounded-full bg-[#E6F4EA] px-2 py-0.5 text-[10px] font-black text-[#137333]">Master replied</span>}</div>
         <p className="mt-1 line-clamp-1 text-xs font-semibold text-[#5F6368]">{request.detail}</p>
       </div>
       <div className="flex shrink-0 items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
@@ -653,6 +718,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         </div>
         <div className="space-y-5 p-5 sm:p-7">
           <p className="whitespace-pre-wrap rounded-[2rem] border border-[#E0E3EB] bg-[#F8FAFD] p-5 text-base font-semibold leading-8 text-[#5F6368] sm:text-lg">{selectedMasterTag.detail}</p>
+          {selectedMasterTagReply?.adminReply && <div className="rounded-[2rem] border border-[#CEEAD6] bg-[#E6F4EA] p-5 shadow-[0_12px_34px_rgba(52,168,83,0.10)]"><div className="flex items-start gap-3"><Avatar value="🧑‍💻" size="h-11 w-11" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-black text-[#137333]">Master / Admin reply</p><span className="text-xs font-bold text-[#5F6368]">{formatCommunityReplyTime(selectedMasterTagReply.repliedAt)}</span></div><p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-7 text-[#202124] sm:text-base">{selectedMasterTagReply.adminReply}</p></div></div></div>}
           <div className="rounded-[2rem] border border-[#E0E3EB] bg-white p-4"><p className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-[#1967D2]">React only</p><div className="flex flex-wrap gap-2"><button type="button" onClick={() => likeMasterTag(selectedMasterTag.id)} className={`rounded-full border px-4 py-2 text-sm font-black transition ${likedMasterTagIds.includes(selectedMasterTag.id) ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#DADCE0] bg-white text-[#202124] hover:border-[#1A73E8] hover:text-[#1967D2]'}`}>❤️ {selectedMasterTag.likes}</button>{REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMasterTag(selectedMasterTag.id, emoji)} className="rounded-full border border-[#DADCE0] bg-white px-4 py-2 text-sm font-black text-[#202124] transition hover:border-[#1A73E8] hover:text-[#1967D2]">{emoji} {selectedMasterTag.reactions[emoji] || 0}</button>)}</div></div>
         </div>
       </section>
