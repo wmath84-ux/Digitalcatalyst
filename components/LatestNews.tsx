@@ -13,7 +13,7 @@ interface LatestNewsProps {
 
 
 const defaultReadingStyle = {
-  backgroundColor: '#f7f9fc',
+  backgroundColor: '#F8FAFD',
   backgroundOpacity: 96,
   cardOpacity: 94,
   accentColor: '#c2e7ff',
@@ -21,14 +21,14 @@ const defaultReadingStyle = {
 };
 
 const chatPalette = {
-  appCanvas: '#f7f9fc',
-  searchBlue: '#edf4ff',
-  activeBlue: '#c2e7ff',
-  bubbleGray: '#f1f3f4',
-  cardBorder: '#e0e3eb',
+  appCanvas: '#F8FAFD',
+  searchBlue: '#E8F0FE',
+  activeBlue: '#C2E7FF',
+  bubbleGray: '#F8FAFD',
+  cardBorder: '#E0E3EB',
   primaryText: '#202124',
-  secondaryText: '#5f6368',
-  linkText: '#0b57d0',
+  secondaryText: '#5F6368',
+  linkText: '#1967D2',
 };
 
 const clampPercent = (value: unknown, fallback: number) => {
@@ -116,7 +116,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
     <section 
       id="news" 
       ref={sectionRef}
-      className={`py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      className={`tagmaster-section-theme py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
       style={{ background: sectionBackground }}
     >
       <div className="container mx-auto px-6">

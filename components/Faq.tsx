@@ -72,7 +72,7 @@ const Faq: React.FC<FaqProps> = ({ settings, faqs }) => {
     <section 
       id="faq" 
       ref={sectionRef}
-      className={`relative overflow-hidden bg-sky-50 bg-gradient-to-br from-sky-50 via-indigo-100/50 to-violet-100 py-20 text-slate-900 sm:py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      className={`tagmaster-section-theme relative overflow-hidden bg-sky-50 bg-gradient-to-br from-sky-50 via-indigo-100/50 to-violet-100 py-20 text-slate-900 sm:py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
     >
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_70%_25%,rgba(14,165,233,0.28),transparent_30%),radial-gradient(circle_at_30%_80%,rgba(124,58,237,0.30),transparent_34%)]" />
       <div className="container relative z-10 mx-auto px-6">

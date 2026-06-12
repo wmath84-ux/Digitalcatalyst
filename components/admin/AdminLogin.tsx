@@ -23,7 +23,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ settings, onLogin, onBack }) =>
     };
 
     return (
-        <div className="relative min-h-screen overflow-hidden bg-[#d8e0ef] bg-[radial-gradient(circle_at_18%_10%,rgba(79,70,229,0.16),transparent_30%),radial-gradient(circle_at_82%_18%,rgba(14,165,233,0.14),transparent_28%),linear-gradient(135deg,#d8e0ef,#e8edf5_48%,#d2dceb)] flex flex-col justify-center items-center p-4">
+        <div className="tagmaster-admin-theme relative min-h-screen overflow-hidden bg-[#d8e0ef] bg-[radial-gradient(circle_at_18%_10%,rgba(79,70,229,0.16),transparent_30%),radial-gradient(circle_at_82%_18%,rgba(14,165,233,0.14),transparent_28%),linear-gradient(135deg,#d8e0ef,#e8edf5_48%,#d2dceb)] flex flex-col justify-center items-center p-4">
              <div className="absolute top-4 left-4 z-10">
                 <button onClick={onBack} className="rounded-full border border-slate-300/70 bg-white/80 px-4 py-2 text-slate-800 font-bold shadow-sm backdrop-blur-xl hover:bg-white">
                     &larr; Back to Home
