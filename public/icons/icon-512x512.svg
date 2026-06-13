@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Digital Catalyst app icon">
+  <defs>
+    <linearGradient id="bg" x1="80" y1="40" x2="432" y2="472" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+  <rect x="22" y="22" width="468" height="468" rx="112" fill="url(#bg)"/>
+  <circle cx="256" cy="250" r="182" fill="#4f46e5" opacity=".7"/>
+  <path d="M122 322h268v38H122z" fill="#fff" opacity=".94"/>
+  <text x="256" y="290" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="144" font-weight="800" fill="#fff">DC</text>
+</svg>

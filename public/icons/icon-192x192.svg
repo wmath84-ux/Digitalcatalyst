@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="192" height="192" viewBox="0 0 192 192" role="img" aria-label="Digital Catalyst app icon">
+  <rect x="8" y="8" width="176" height="176" rx="42" fill="#2563eb"/>
+  <circle cx="96" cy="96" r="72" fill="#4f46e5"/>
+  <path d="M46 122h100v14H46z" fill="#fff" opacity=".94"/>
+  <text x="96" y="108" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="54" font-weight="800" fill="#fff">DC</text>
+</svg>

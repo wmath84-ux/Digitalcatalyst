@@ -55,3 +55,13 @@ npm run build
 - Build command: `npm run build`
 - Output directory: `dist`
 - Environment variables: none required for demo mode
+
+## PWA install testing notes
+
+Digital Catalyst is configured as an installable PWA. To test installability after deployment:
+
+- Deploy the production build on HTTPS; service workers and app installation require a secure origin, except for localhost during development.
+- Open the deployed site in Chrome and wait for the browser to evaluate the manifest and service worker.
+- If the install prompt does not appear immediately, wait a moment and tap/click the page once, then use the visible **Install App** / **Add to Home Screen** button or Chrome's menu.
+- In Chrome DevTools, check **Application > Manifest** for the Digital Catalyst manifest and icons, and **Application > Service Workers** for the registered service worker.
+- Run Lighthouse and review the PWA/installability checks if Lighthouse is available in your Chrome version.
