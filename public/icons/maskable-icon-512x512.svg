@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Digital Catalyst maskable app logo">
+  <defs>
+    <linearGradient id="dc-mask-bg" x1="64" y1="32" x2="448" y2="480" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38bdf8"/>
+      <stop offset="0.5" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" fill="url(#dc-mask-bg)"/>
+  <circle cx="378" cy="132" r="30" fill="#facc15"/>
+  <path d="M378 66v34M378 164v34M312 132h34M410 132h34" stroke="#fef3c7" stroke-width="14" stroke-linecap="round"/>
+  <path d="M112 166c0-22 18-40 40-40h78c28 0 52 16 64 40v202c-14-18-36-29-64-29h-78c-22 0-40-18-40-40V166z" fill="#ffffff"/>
+  <path d="M400 126c22 0 40 18 40 40v133c0 22-18 40-40 40h-78c-28 0-50 11-64 29V166c12-24 36-40 64-40h78z" fill="#eff6ff"/>
+  <path d="M184 210h58M184 254h58M322 210h68M322 254h68" stroke="#2563eb" stroke-width="17" stroke-linecap="round" opacity=".72"/>
+  <text x="256" y="438" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="88" font-weight="900" fill="#fff">DC</text>
+</svg>

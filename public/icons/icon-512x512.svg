@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" role="img" aria-label="Digital Catalyst app logo">
+  <defs>
+    <linearGradient id="dc-bg-512" x1="76" y1="48" x2="436" y2="464" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#38bdf8"/>
+      <stop offset="0.46" stop-color="#2563eb"/>
+      <stop offset="1" stop-color="#4f46e5"/>
+    </linearGradient>
+    <linearGradient id="dc-page-512" x1="146" y1="170" x2="366" y2="356" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#dbeafe"/>
+    </linearGradient>
+  </defs>
+  <rect x="24" y="24" width="464" height="464" rx="116" fill="url(#dc-bg-512)"/>
+  <circle cx="382" cy="128" r="28" fill="#facc15"/>
+  <path d="M382 62v34M382 160v34M316 128h34M414 128h34" stroke="#fef3c7" stroke-width="14" stroke-linecap="round"/>
+  <path d="M130 178c0-22 18-40 40-40h70c24 0 45 13 56 33 11-20 32-33 56-33h70c22 0 40 18 40 40v198c0 10-9 17-19 15l-104-22c-16-3-31 1-43 12-12-11-27-15-43-12l-104 22c-10 2-19-5-19-15V178z" fill="#0f172a" opacity=".23"/>
+  <path d="M112 160c0-22 18-40 40-40h76c27 0 50 15 62 38v203c-13-18-35-30-62-30h-76c-22 0-40-18-40-40V160z" fill="url(#dc-page-512)"/>
+  <path d="M400 120c22 0 40 18 40 40v131c0 22-18 40-40 40h-76c-27 0-49 12-62 30V158c12-23 35-38 62-38h76z" fill="#eff6ff"/>
+  <path d="M186 204h54M186 248h54M324 204h66M324 248h66" stroke="#2563eb" stroke-width="17" stroke-linecap="round" opacity=".72"/>
+  <text x="256" y="430" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="86" font-weight="900" fill="#fff">DC</text>
+</svg>

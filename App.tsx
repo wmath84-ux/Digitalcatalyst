@@ -35,6 +35,7 @@ import WelcomeOverlay from './components/WelcomeOverlay';
 import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
 import EduvoraCommunity from './components/EduvoraCommunity';
+import InstallAppButton from './components/InstallAppButton';
 import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
@@ -852,6 +853,7 @@ const logGlobalSyncWarning = (scope: string, error: unknown) => {
 const App: React.FC = () => {
   // Initialize products with default data immediately to prevent "white screen" or empty state
   const [products, setProducts] = useState<Product[]>([]);
+  const [canShowInstallPrompt, setCanShowInstallPrompt] = useState(false);
   const [reviews, setReviews] = useState<{ [productId: number]: Review[] }>({});
   const [coupons, setCoupons] = useState<Coupon[]>(initialCoupons);
   const [orders, setOrders] = useState<Order[]>(initialOrders);
@@ -1015,6 +1017,7 @@ const App: React.FC = () => {
   }, []);
 
   const playWelcomeVoice = useCallback(() => {
+    setCanShowInstallPrompt(true);
     if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     const played = localStorage.getItem('welcomeVoicePlayed');
     if (played) return;
@@ -2505,6 +2508,7 @@ const App: React.FC = () => {
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={currentUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
             <main key={currentView} className={appleOpenClass}>{renderContent()}</main>
+            <InstallAppButton enabled={canShowInstallPrompt} />
             <Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} />
          </div>
        </ErrorBoundary>

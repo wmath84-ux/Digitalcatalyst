@@ -2,9 +2,11 @@ import React, { useState, useEffect, useRef } from 'react';
 import { User, WebsiteSettings, ThemeName, themes } from '../App';
 
 const LogoIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-primary" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14.59L5.41 12 4 13.41l7 7 9-9L18.59 10 11 17.59z" />
-    </svg>
+    <img
+        src="/icons/icon-192x192.svg"
+        alt="Digital Catalyst logo"
+        className="h-11 w-11 rounded-2xl shadow-[0_10px_28px_rgba(37,99,235,0.22)] ring-1 ring-white/70 sm:h-12 sm:w-12"
+    />
 );
 
 const HeartIcon = () => (
@@ -111,7 +113,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
       <header className="border-b border-indigo-100/70 bg-background/90 shadow-[0_12px_34px_rgba(79,70,229,0.08)] backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto px-6 py-4">
           <div className="flex items-center justify-between">
-            <button onClick={onHomeClick} className="flex items-center space-x-2 cursor-pointer" aria-label="Back to Homepage">
+            <button onClick={onHomeClick} className="flex items-center space-x-3 cursor-pointer" aria-label="Back to Homepage">
               <LogoIcon />
               <span className="text-xl font-bold text-primary">{(settings.content as any).siteName || "Digital Catalyst"}</span>
             </button>
