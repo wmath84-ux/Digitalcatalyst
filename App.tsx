@@ -505,6 +505,10 @@ export interface WebsiteSettings {
             backgroundOpacity: number;
             itemOpacity: number;
             accentOpacity: number;
+            height?: number;
+            iconSize?: number;
+            labelSize?: number;
+            padding?: number;
         };
         readingStyle?: {
             backgroundColor: string;
@@ -684,11 +688,11 @@ const initialAdminUsers: AdminUser[] = [
 
 const defaultWebsiteSettings: WebsiteSettings = {
     theme: {
-        primaryColor: '#172554',
-        accentColor: '#4338ca',
-        backgroundColor: '#eef4ff', // enhanced blue-tinted canvas
-        textColor: '#0f172a', // slate-900
-        textMutedColor: '#334155', // slate-700
+        primaryColor: '#1769FF',
+        accentColor: '#7B61FF',
+        backgroundColor: '#F8FBFF',
+        textColor: '#081A45',
+        textMutedColor: '#536178',
         fontPairing: 'inter-lato',
         cornerRadius: '0.75rem', // lg
         shadowIntensity: 'medium',
@@ -752,10 +756,14 @@ const defaultWebsiteSettings: WebsiteSettings = {
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
         dockItems: ['Store','Purchases','Wishlist','Cart','News','Community','Blog','Free','Profile','Subscriptions'],
         dockStyle: {
-            backgroundColor: '#020617',
-            backgroundOpacity: 82,
-            itemOpacity: 8,
-            accentOpacity: 45,
+            backgroundColor: '#FBFDFF',
+            backgroundOpacity: 92,
+            itemOpacity: 96,
+            accentOpacity: 22,
+            height: 76,
+            iconSize: 36,
+            labelSize: 11,
+            padding: 12,
         },
         readingStyle: {
             backgroundColor: '#f7f9fc',
@@ -2452,16 +2460,16 @@ const App: React.FC = () => {
           {websiteSettings.layout.map(section => {
               if (!section.visible) return null;
               switch(section.id) {
-                  case 'hero': return <React.Fragment key={section.id}><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => openReadingHub('news')} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></React.Fragment>;
+                  case 'hero': return <React.Fragment key={section.id}><div className="mobile-home-secondary"><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => openReadingHub('news')} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></div></React.Fragment>;
                   case 'purchased': return purchasedProducts.length > 0 && <PurchasedProducts settings={websiteSettings} key={section.id} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
                   case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
                   case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
-                  case 'services': return <Services settings={websiteSettings} key={section.id} services={websiteSettings.content.services} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} />;
-                  case 'news': return <LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Daily Reading Hub'} articles={websiteSettings.content.newsArticles.filter(article => article.type === 'news')} onReadMoreClick={handleViewBlogArticle} onOpenHub={() => openReadingHub('news')} />;
-                  case 'about': return <AboutUs settings={websiteSettings} key={section.id} title={websiteSettings.content.aboutUsTitle} text={websiteSettings.content.aboutUsText} imageSeed={websiteSettings.content.aboutUsImageSeed} />;
-                  case 'trust': return <TrustBadges settings={websiteSettings} key={section.id} />;
-                  case 'upcoming': return <UpcomingFeatures settings={websiteSettings} key={section.id} title={section.title || "What's Next?"} features={websiteSettings.content.upcomingFeatures} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />;
-                  case 'faq': return <Faq settings={websiteSettings} key={section.id} faqs={websiteSettings.content.faqs} />;
+                  case 'services': return <div className="mobile-home-secondary"><Services settings={websiteSettings} key={section.id} services={websiteSettings.content.services} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} /></div>;
+                  case 'news': return <div className="mobile-home-secondary"><LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Daily Reading Hub'} articles={websiteSettings.content.newsArticles.filter(article => article.type === 'news')} onReadMoreClick={handleViewBlogArticle} onOpenHub={() => openReadingHub('news')} /></div>;
+                  case 'about': return <div className="mobile-home-secondary"><AboutUs settings={websiteSettings} key={section.id} title={websiteSettings.content.aboutUsTitle} text={websiteSettings.content.aboutUsText} imageSeed={websiteSettings.content.aboutUsImageSeed} /></div>;
+                  case 'trust': return <div className="mobile-home-secondary"><TrustBadges settings={websiteSettings} key={section.id} /></div>;
+                  case 'upcoming': return <div className="mobile-home-secondary"><UpcomingFeatures settings={websiteSettings} key={section.id} title={section.title || "What's Next?"} features={websiteSettings.content.upcomingFeatures} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} /></div>;
+                  case 'faq': return <div className="mobile-home-secondary"><Faq settings={websiteSettings} key={section.id} faqs={websiteSettings.content.faqs} /></div>;
                   default: return null;
               }
           })}
