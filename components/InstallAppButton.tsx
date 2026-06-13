@@ -9,13 +9,22 @@ const isStandaloneDisplay = () =>
   window.matchMedia('(display-mode: standalone)').matches ||
   (window.navigator as Navigator & { standalone?: boolean }).standalone === true;
 
-const InstallAppButton: React.FC = () => {
+interface InstallAppButtonProps {
+  enabled?: boolean;
+}
+
+const INSTALL_DISMISSED_SESSION_KEY = 'digitalCatalystInstallDismissed';
+
+const InstallAppButton: React.FC<InstallAppButtonProps> = ({ enabled = true }) => {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
   const [isInstalled, setIsInstalled] = useState(false);
   const [showFallback, setShowFallback] = useState(false);
 
   useEffect(() => {
     setIsInstalled(isStandaloneDisplay());
+    if (sessionStorage.getItem(INSTALL_DISMISSED_SESSION_KEY)) {
+      setShowFallback(false);
+    }
 
     const handleBeforeInstallPrompt = (event: Event) => {
       event.preventDefault();
@@ -33,7 +42,9 @@ const InstallAppButton: React.FC = () => {
     window.addEventListener('appinstalled', handleAppInstalled);
 
     const fallbackTimer = window.setTimeout(() => {
-      if (!isStandaloneDisplay()) setShowFallback(true);
+      if (!isStandaloneDisplay() && !sessionStorage.getItem(INSTALL_DISMISSED_SESSION_KEY)) {
+        setShowFallback(true);
+      }
     }, 2500);
 
     return () => {
@@ -60,13 +71,19 @@ const InstallAppButton: React.FC = () => {
     }
   };
 
-  if (isInstalled) return null;
+  const handleLaterClick = () => {
+    sessionStorage.setItem(INSTALL_DISMISSED_SESSION_KEY, '1');
+    setInstallPrompt(null);
+    setShowFallback(false);
+  };
+
+  if (!enabled || isInstalled || sessionStorage.getItem(INSTALL_DISMISSED_SESSION_KEY)) return null;
 
   return (
     <aside className="fixed bottom-24 right-4 z-[1450] max-w-xs rounded-3xl border border-blue-100/80 bg-white/90 p-4 text-slate-900 shadow-[0_18px_50px_rgba(37,99,235,0.18)] backdrop-blur-2xl md:bottom-6 md:right-6">
       <div className="flex items-start gap-3">
-        <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-600 text-sm font-black text-white shadow-lg">
-          DC
+        <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-2xl bg-gradient-to-br from-sky-400 via-blue-600 to-indigo-600 shadow-lg">
+          <img src="/icons/icon-192x192.svg" alt="" className="h-full w-full" aria-hidden="true" />
         </div>
         <div>
           <h2 className="text-sm font-black">Install Digital Catalyst</h2>
@@ -75,13 +92,22 @@ const InstallAppButton: React.FC = () => {
           </p>
         </div>
       </div>
-      <button
-        type="button"
-        onClick={handleInstallClick}
-        className="mt-4 w-full rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:opacity-95"
-      >
-        {installPrompt ? 'Install App' : 'Add to Home Screen'}
-      </button>
+      <div className="mt-4 flex gap-2">
+        <button
+          type="button"
+          onClick={handleInstallClick}
+          className="flex-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:opacity-95"
+        >
+          {installPrompt ? 'Install App' : 'Add to Home Screen'}
+        </button>
+        <button
+          type="button"
+          onClick={handleLaterClick}
+          className="rounded-full border border-blue-100 bg-white/80 px-4 py-2.5 text-sm font-bold text-slate-600 transition hover:bg-blue-50 hover:text-blue-700"
+        >
+          Later
+        </button>
+      </div>
       {showFallback && (
         <p className="mt-3 text-xs leading-5 text-slate-600">
           Chrome mobile: open the browser menu ⋮, then tap <strong>Install app</strong> or <strong>Add to Home screen</strong>. If it does not appear yet, wait a moment and tap the page once.
