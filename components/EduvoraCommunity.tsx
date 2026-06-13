@@ -69,6 +69,21 @@ const initialMasterTagRequests: MasterTagRequest[] = [
   { id: 3, author: 'Riya Sharma', avatar: '🧕', category: 'Update', title: 'Need an update on next automation template', detail: 'Can master upload the promised WhatsApp automation template before the weekend sprint?', time: '12:15 PM', likes: 51, reactions: { '🔥': 18, '❤️': 12, '🙏': 10 } },
 ];
 
+
+const buildMasterTagTicket = (request: MasterTagRequest): CommunitySupportTicket => ({
+  id: `MT-${request.id}`,
+  customerName: request.author,
+  customerEmail: `${request.author.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '') || 'eduvora.member'}@eduvora.community`,
+  subject: `@Master ${request.title}`,
+  message: request.detail,
+  date: new Date().toISOString(),
+  status: 'Open',
+  source: 'masterTag',
+  communityThreadId: request.id,
+  customerAvatar: request.avatar,
+  category: request.category,
+});
+
 const postOptions: Array<{ type: PostType; icon: string; label: string; helper: string }> = [
   { type: 'text', icon: '✍️', label: 'Text', helper: 'Daily text post' },
   { type: 'image', icon: '🖼️', label: 'Image', helper: 'Daily image post' },
@@ -216,7 +231,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [networkTab, setNetworkTab] = useState<'mutual' | 'followers' | 'following' | 'forYou'>('following');
   const [networkSearch, setNetworkSearch] = useState('');
   const [masterTagRequests, setMasterTagRequests] = useState<MasterTagRequest[]>(() => readJsonArray(MASTER_TAG_STORAGE_KEY, initialMasterTagRequests));
-  const [supportTickets, setSupportTickets] = useState<CommunitySupportTicket[]>(() => readJsonArray(SUPPORT_TICKETS_STORAGE_KEY, []));
+  const [supportTickets, setSupportTickets] = useState<CommunitySupportTicket[]>(() => {
+    const storedTickets = readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []);
+    const seededTickets = initialMasterTagRequests.map(buildMasterTagTicket);
+    const mergedTickets = [...storedTickets];
+    seededTickets.forEach(ticket => { if (!mergedTickets.some(item => item.id === ticket.id)) mergedTickets.push(ticket); });
+    if (typeof window !== 'undefined') localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(mergedTickets));
+    return mergedTickets;
+  });
   const [masterTagTitle, setMasterTagTitle] = useState('');
   const [masterTagDetail, setMasterTagDetail] = useState('');
   const [masterTagCategory, setMasterTagCategory] = useState<(typeof masterTagCategories)[number]>('Feature request');
@@ -626,19 +648,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       likes: 0,
       reactions: {},
     };
-    const supportTicket: CommunitySupportTicket = {
-      id: `MT-${requestId}`,
-      customerName: profile.name,
-      customerEmail: `${profile.username || 'eduvora_member'}@eduvora.community`,
-      subject: `@Master ${title}`,
-      message: detail,
-      date: new Date().toISOString(),
-      status: 'Open',
-      source: 'masterTag',
-      communityThreadId: requestId,
-      customerAvatar: profile.avatar,
-      category: masterTagCategory,
-    };
+    const supportTicket: CommunitySupportTicket = buildMasterTagTicket(request);
     const updatedTickets = [supportTicket, ...readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []).filter((ticket) => ticket.id !== supportTicket.id)];
     localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(updatedTickets));
     window.dispatchEvent(new Event('siteSupportTicketsUpdated'));
