@@ -86,18 +86,18 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
     <section 
       id="products" 
       ref={sectionRef}
-      className={`py-14 sm:py-24 bg-gradient-to-br from-white via-sky-50/80 to-indigo-100/50 backdrop-blur-xl ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+      className={`premium-section py-20 sm:py-24 lg:py-24 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
     >
       <div className="container mx-auto px-4 sm:px-6">
         <div className="mx-auto mb-8 max-w-3xl text-center sm:mb-12 animate-child animate-delay-1">
-          <h2 className="text-3xl font-extrabold tracking-tight text-primary sm:text-4xl">All Products</h2>
-          <p className="mt-3 text-base text-text-muted sm:mt-4 sm:text-lg">
+          <h2 className="text-[clamp(2.5rem,4vw,4.2rem)] font-[820] leading-[1.05] tracking-[-0.045em] text-[var(--text-heading)]">All Products</h2>
+          <p className="mt-3 text-lg leading-8 text-[var(--text-body)] sm:mt-4">
             Browse our full catalog or use the search bar to find exactly what you need.
           </p>
         </div>
 
-        <div className="max-w-4xl mx-auto animate-child animate-delay-2">
-          <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-indigo-100/80 bg-white/80 p-3 shadow-sm sm:p-4 md:flex-row md:gap-4">
+        <div className="mx-auto max-w-5xl animate-child animate-delay-2">
+          <div className="flex flex-col items-center justify-between gap-3 rounded-[22px] border border-[var(--border-soft)] bg-white p-4 shadow-[var(--shadow-soft)] sm:p-5 md:flex-row md:gap-4">
               {/* Search */}
               <div className="relative w-full md:w-1/2">
                 <input 
@@ -105,9 +105,9 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   placeholder="Search..."
-                  className="w-full pl-12 pr-4 py-3 border border-indigo-200/80 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition bg-white/70 backdrop-blur-xl"
+                  className="w-full pl-12 pr-4 py-3 rounded-2xl border border-[var(--border-soft)] bg-white text-[var(--text-title)] placeholder:text-[#8A95A8] transition focus:border-[var(--primary)] focus:ring-2 focus:ring-blue-100"
                 />
-                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[var(--text-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               </div>
 
               {/* Sort */}
@@ -115,7 +115,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
                 <select
                     value={sortBy}
                     onChange={(e) => setSortBy(e.target.value)}
-                    className="w-full px-4 py-3 border border-indigo-200/80 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition bg-white/70 backdrop-blur-xl cursor-pointer"
+                    className="w-full px-4 py-3 rounded-2xl border border-[var(--border-soft)] bg-white text-[var(--text-title)] placeholder:text-[#8A95A8] transition focus:border-[var(--primary)] focus:ring-2 focus:ring-blue-100 cursor-pointer"
                 >
                     <option value="default">Default Sorting</option>
                     <option value="newest">Newest Arrivals</option>
@@ -134,8 +134,8 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
                     onClick={() => setActiveFilter(filter)} 
                     className={`shrink-0 px-3 py-1.5 text-xs font-semibold rounded-full transition-all duration-200 sm:px-4 sm:text-sm ${
                         activeFilter === filter 
-                        ? 'bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] scale-105'
-                        : 'bg-indigo-50 text-slate-700 hover:bg-indigo-100 hover:text-slate-950'
+                        ? 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-[var(--shadow-blue)]'
+                        : 'border border-[var(--border-soft)] bg-white text-[var(--text-body)] hover:-translate-y-0.5 hover:border-[var(--border-active)]'
                     }`}
                 >
                 {filter}
@@ -146,7 +146,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
 
         <div 
             ref={gridRef} 
-            className={`mt-10 grid grid-cols-1 gap-5 sm:mt-16 sm:gap-8 md:grid-cols-2 lg:grid-cols-3 lg:gap-10 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+            className={`mt-10 grid grid-cols-1 gap-6 sm:mt-16 sm:gap-8 md:grid-cols-2 lg:grid-cols-3 lg:gap-8 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
         >
           {displayProducts.length > 0 ? (
             displayProducts.map((product, index) => (
@@ -165,10 +165,10 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
               />
             ))
           ) : (
-            <div className="col-span-full text-center py-16 bg-gray-50 rounded-xl border border-dashed border-gray-300">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-slate-700 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-              <p className="text-lg text-slate-700">No products found matching your criteria.</p>
-              <button onClick={() => {setSearchQuery(''); setActiveFilter('All');}} className="mt-4 text-primary font-semibold hover:underline">Clear Filters</button>
+            <div className="col-span-full rounded-[28px] border border-dashed border-[var(--border-active)] bg-white/70 py-16 text-center shadow-[var(--shadow-soft)]">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 mx-auto text-[var(--text-muted)] mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+              <p className="text-lg font-bold text-[var(--text-body)]">No products found matching your criteria.</p>
+              <button onClick={() => {setSearchQuery(''); setActiveFilter('All');}} className="mt-4 font-bold text-[var(--primary)] hover:underline">Clear Filters</button>
             </div>
           )}
         </div>

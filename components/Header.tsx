@@ -5,7 +5,7 @@ const LogoIcon = () => (
     <img
         src="/icons/icon-192x192.svg"
         alt="Digital Catalyst logo"
-        className="h-11 w-11 rounded-2xl shadow-[0_10px_28px_rgba(37,99,235,0.22)] ring-1 ring-white/70 sm:h-12 sm:w-12"
+        className="h-10 w-10 rounded-2xl ring-1 ring-[var(--border-soft)] sm:h-11 sm:w-11"
     />
 );
 
@@ -105,22 +105,22 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
     onLogout();
   };
 
-  const authButtonClass = "rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-6 py-2 font-semibold text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90";
+  const authButtonClass = "rounded-full bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-6 py-2.5 font-bold text-white shadow-[var(--shadow-blue)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-95";
   const mobileAuthButtonClass = "rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-4 py-2 text-sm font-bold text-white shadow-[0_8px_24px_rgba(79,70,229,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90";
 
   return (
     <>
-      <header className="border-b border-indigo-100/70 bg-background/90 shadow-[0_12px_34px_rgba(79,70,229,0.08)] backdrop-blur-md sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+      <header className="sticky top-0 z-50 border-b border-[rgba(217,231,248,0.9)] bg-[rgba(248,251,255,0.82)] backdrop-blur-[18px]">
+        <div className="container mx-auto px-6">
+          <div className="flex h-[76px] items-center justify-between">
             <button onClick={onHomeClick} className="flex items-center space-x-3 cursor-pointer" aria-label="Back to Homepage">
               <LogoIcon />
-              <span className="text-xl font-bold text-primary">{(settings.content as any).siteName || "Digital Catalyst"}</span>
+              <span className="text-xl font-black text-[var(--text-heading)]">{(settings.content as any).siteName || "Digital Catalyst"}</span>
             </button>
             
             <nav className="hidden md:flex items-center justify-center gap-x-7 lg:gap-x-9">
               {navItems.map((item) => (
-                  <button key={item.name} onClick={item.action} className="text-text-muted hover:text-primary transition-colors duration-300">
+                  <button key={item.name} onClick={item.action} className="font-semibold text-[#25324A] transition-colors duration-300 hover:text-[var(--primary)]">
                     {item.name}
                   </button>
               ))}
@@ -129,7 +129,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
             <div ref={accountMenuAreaRef} className="flex items-center justify-end">
                 <div className="hidden md:flex items-center gap-x-4 lg:gap-x-5">
                     {settings.features.showFavourites && (
-                        <button onClick={onNavigateToWishlist} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your wishlist with ${wishlistCount} items`}>
+                        <button onClick={onNavigateToWishlist} className="relative text-[#536178] transition-colors duration-300 hover:text-[var(--primary)]" aria-label={`View your wishlist with ${wishlistCount} items`}>
                             <HeartIcon />
                             {wishlistCount > 0 && (
                                 <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -138,7 +138,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                             )}
                         </button>
                     )}
-                    <button onClick={onCartClick} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your cart with ${cartItemCount} items`}>
+                    <button onClick={onCartClick} className="relative text-[#536178] transition-colors duration-300 hover:text-[var(--primary)]" aria-label={`View your cart with ${cartItemCount} items`}>
                         <CartIcon />
                         {cartItemCount > 0 && (
                             <span className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -170,7 +170,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                     )}
                 </div>
                 <div className="flex items-center space-x-3 md:hidden">
-                    <button onClick={onCartClick} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your cart with ${cartItemCount} items`}>
+                    <button onClick={onCartClick} className="relative text-[#536178] transition-colors duration-300 hover:text-[var(--primary)]" aria-label={`View your cart with ${cartItemCount} items`}>
                         <CartIcon />
                         {cartItemCount > 0 && (
                             <span className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">

@@ -51,9 +51,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
     }
 
     return (
-        <div className={`group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-sm hover:shadow-sm transition-all duration-300 ease-out border border-gray-100 flex flex-col overflow-hidden hover:-translate-y-2 product-card-shine ${animationClass}`}>
+        <div className={`group relative bg-white rounded-[28px] shadow-[var(--shadow-card)] hover:shadow-[0_22px_55px_rgba(8,26,69,0.11)] transition-all duration-300 ease-out border border-[var(--border-soft)] flex flex-col overflow-hidden hover:-translate-y-2 product-card-shine ${animationClass}`}>
             {/* Image Container */}
-            <div className="relative w-full overflow-hidden aspect-[4/3] bg-gray-100">
+            <div className="relative w-full overflow-hidden aspect-[4/3] bg-[#EEF6FF]">
                 <img 
                     src={displayImage} 
                     alt={product.title} 
@@ -111,21 +111,21 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
             <div className="flex flex-grow flex-col p-4 sm:p-5">
                 <div className="mb-1 flex items-center justify-between gap-2">
                     {settings.features.showReviews && product.rating > 0 && (
-                        <div className="flex items-center gap-1 text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">
+                        <div className="flex items-center gap-1 text-xs font-medium text-[#B06000] bg-[#FEF7E0] px-2 py-0.5 rounded-full">
                             <svg className="w-3 h-3 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00.951-.69l1.07-3.292z" /></svg>
-                            {product.rating.toFixed(1)} <span className="text-slate-600">({product.reviewCount})</span>
+                            {product.rating.toFixed(1)} <span className="text-[var(--text-muted)]">({product.reviewCount})</span>
                         </div>
                     )}
-                    {product.category && <span className="text-xs text-slate-600 font-medium uppercase tracking-wide">{product.category}</span>}
+                    {product.category && <span className="text-xs font-bold uppercase tracking-wide text-[var(--text-muted)]">{product.category}</span>}
                 </div>
 
-                <h3 className="mb-2 line-clamp-2 text-base font-bold leading-tight text-gray-900 transition-colors group-hover:text-primary sm:text-lg" title={product.title}>
+                <h3 className="mb-2 line-clamp-2 text-base font-black leading-tight text-[var(--text-title)] transition-colors group-hover:text-[var(--primary)] sm:text-lg" title={product.title}>
                     {product.title}
                 </h3>
-                <p className="mb-3 line-clamp-2 flex-grow text-sm leading-6 text-slate-600 sm:mb-4">{product.description}</p>
+                <p className="mb-3 line-clamp-2 flex-grow text-sm leading-6 text-[var(--text-body)] sm:mb-4">{product.description}</p>
 
                 {displayMode === 'showcase' ? (
-                     <div className="mt-auto flex items-end justify-between gap-3 border-t border-gray-50 pt-3 sm:pt-4">
+                     <div className="mt-auto flex items-end justify-between gap-3 border-t border-[var(--border-soft)] pt-3 sm:pt-4">
                         <div className="flex flex-col">
                             {product.isFree ? (
                                 <>
@@ -138,16 +138,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                             ) : product.salePrice ? (
                                 <>
                                     <span className="text-xs text-slate-600 font-medium line-through">{product.price}</span>
-                                    <span className="text-lg font-bold text-gray-900 sm:text-xl">{product.salePrice}</span>
+                                    <span className="text-lg font-black text-[var(--text-heading)] sm:text-xl">{product.salePrice}</span>
                                 </>
                             ) : (
                                 <>
                                     <span className="text-xs text-slate-600 font-medium">Price</span>
-                                    <span className="text-lg font-bold text-gray-900 sm:text-xl">{product.price}</span>
+                                    <span className="text-lg font-black text-[var(--text-heading)] sm:text-xl">{product.price}</span>
                                 </>
                             )}
                         </div>
-                        <button onClick={() => onViewDetails()} className="flex shrink-0 items-center rounded-full border border-indigo-200/70 bg-white/85 px-3 py-2 text-xs font-black text-primary shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 sm:px-4 sm:text-sm">
+                        <button onClick={() => onViewDetails()} className="flex shrink-0 items-center rounded-full border border-[var(--border-soft)] bg-white px-3 py-2 text-xs font-black text-[var(--primary)] shadow-[var(--shadow-soft)] transition hover:-translate-y-0.5 hover:border-[var(--border-active)] hover:bg-[#F8FBFF] active:scale-95 sm:px-4 sm:text-sm">
                             Details <span className="ml-1">&rarr;</span>
                         </button>
                     </div>

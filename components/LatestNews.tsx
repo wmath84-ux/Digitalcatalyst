@@ -25,10 +25,10 @@ const chatPalette = {
   searchBlue: '#E8F0FE',
   activeBlue: '#C2E7FF',
   bubbleGray: '#F8FAFD',
-  cardBorder: '#E0E3EB',
-  primaryText: '#202124',
-  secondaryText: '#5F6368',
-  linkText: '#1967D2',
+  cardBorder: '#D9E7F8',
+  primaryText: '#081A45',
+  secondaryText: '#536178',
+  linkText: '#1769FF',
 };
 
 const clampPercent = (value: unknown, fallback: number) => {
@@ -50,7 +50,7 @@ const getArticleCoverImage = (article: NewsArticle, size = '800/600') => article
 const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, settings: WebsiteSettings, cardBackground?: string, onReadMoreClick: (article: NewsArticle) => void }> = ({ article, animationDelay, settings, cardBackground, onReadMoreClick }) => {
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${(animationDelay % 8) + 1}` : '';
     return (
-        <div style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }} className={`backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgba(60,64,67,0.08)] hover:shadow-[0_12px_34px_rgba(60,64,67,0.12)] border overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
+        <div style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }} className={`backdrop-blur-2xl rounded-[28px] shadow-[var(--shadow-card)] hover:shadow-[0_22px_55px_rgba(8,26,69,0.11)] border overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
             <div className="relative h-48 overflow-hidden rounded-t-2xl" style={{ backgroundColor: chatPalette.searchBlue }}>
                 <img 
                     src={getArticleCoverImage(article)} 
@@ -116,7 +116,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
     <section 
       id="news" 
       ref={sectionRef}
-      className={`tagmaster-section-theme py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
+      className={`tagmaster-section-theme relative overflow-hidden py-24 ${settings.animations.enabled ? 'scroll-animate' : ''}`}
       style={{ background: sectionBackground }}
     >
       <div className="container mx-auto px-6">
@@ -124,19 +124,19 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
 
         <div className="flex flex-col md:flex-row justify-between items-end mb-12">
             <div className="max-w-2xl">
-                <h2 className="text-4xl font-extrabold tracking-tight" style={{ color: chatPalette.primaryText }}>{title}</h2>
+                <h2 className="text-[clamp(2.5rem,4vw,4.2rem)] font-[820] leading-[1.05] tracking-[-0.045em]" style={{ color: chatPalette.primaryText }}>{title}</h2>
                 <p className="mt-4 text-lg" style={{ color: chatPalette.secondaryText }}>
                     Current student alerts, education updates, and opportunity signals from Digital Catalyst.
                 </p>
             </div>
-            <button onClick={onOpenHub} className="hidden md:block rounded-full border px-5 py-2 text-sm font-bold backdrop-blur-xl transition hover:shadow-md" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
+            <button onClick={onOpenHub} className="hidden md:block rounded-full border px-5 py-3 text-sm font-bold shadow-[var(--shadow-soft)] backdrop-blur-xl transition hover:shadow-md" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
                 Open News
             </button>
         </div>
 
         <div 
             ref={gridRef} 
-            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+            className={`grid grid-cols-1 gap-8 md:grid-cols-2 lg:grid-cols-3 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
         >
           {newsArticles.map((article, index) => (
             <React.Fragment key={article.id}>

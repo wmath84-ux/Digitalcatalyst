@@ -60,17 +60,17 @@ const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, pr
   return (
     <section 
       ref={sectionRef}
-      className={`py-14 sm:py-24 ${bgColor}`}
+      className={`premium-section py-20 sm:py-24`}
     >
       <div className="container mx-auto px-4 sm:px-6">
         <div className={`text-center max-w-3xl mx-auto mb-10 sm:mb-16 ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
-          <h2 className="mb-3 text-3xl font-extrabold tracking-tight text-primary sm:mb-4 sm:text-4xl">{title}</h2>
-          <div className="w-24 h-1 bg-accent mx-auto rounded-full"></div>
+          <h2 className="mb-3 text-[clamp(2.5rem,4vw,4.2rem)] font-[820] leading-[1.05] tracking-[-0.045em] text-[var(--text-heading)] sm:mb-4">{title}</h2>
+          <div className="mx-auto h-1.5 w-24 rounded-full bg-gradient-to-r from-[#1769FF] to-[#7B61FF]"></div>
         </div>
         
         <div 
             ref={gridRef} 
-            className={`grid grid-cols-1 gap-5 sm:gap-8 md:grid-cols-2 lg:grid-cols-3 lg:gap-10 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+            className={`grid grid-cols-1 gap-6 sm:gap-8 md:grid-cols-2 lg:grid-cols-3 lg:gap-8 ${products.length === 1 ? 'mx-auto max-w-md' : ''} ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
         >
           {products.map((product, index) => (
             <ProductCard 

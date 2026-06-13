@@ -15,35 +15,18 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
-    const observer = new IntersectionObserver(
-        (entries) => {
-            const [entry] = entries;
-            if (entry.isIntersecting) {
-                entry.target.classList.add('is-visible');
-            }
-        },
-        { threshold: 0.1 }
-    );
-
+    const observer = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) entry.target.classList.add('is-visible');
+    }, { threshold: 0.1 });
     const currentRef = sectionRef.current;
-    if (currentRef) {
-        observer.observe(currentRef);
-    }
-
-    return () => {
-        if (currentRef) {
-            observer.unobserve(currentRef);
-        }
-    };
+    if (currentRef) observer.observe(currentRef);
+    return () => { if (currentRef) observer.unobserve(currentRef); };
   }, []);
 
   const useRealData = settings.content.heroMetrics?.enableRealData;
   const revenueDisplay = useRealData && realMetrics
     ? `₹${realMetrics.revenue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`
     : settings.content.heroMetrics?.customRevenue || '₹0';
-  const revenueChange = useRealData
-    ? '+100%'
-    : settings.content.heroMetrics?.customRevenueChange || '+0%';
   const usersDisplay = useRealData && realMetrics
     ? `${realMetrics.users}`
     : settings.content.heroMetrics?.customActiveUsers || '0+';
@@ -51,77 +34,51 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
   return (
     <section
       ref={sectionRef}
-      className="relative isolate min-h-[82vh] overflow-hidden bg-[#F8FAFD] bg-gradient-to-br from-[#F8FAFD] via-[#E8F0FE] to-[#C2E7FF] text-[#202124] stagger-animate-container flex items-center sm:min-h-[92vh]"
+      className="relative isolate overflow-hidden text-[var(--text-body)] stagger-animate-container"
+      style={{
+        background: 'radial-gradient(circle at 12% 12%, rgba(191, 231, 255, 0.75), transparent 32%), radial-gradient(circle at 88% 18%, rgba(219, 210, 255, 0.65), transparent 30%), radial-gradient(circle at 50% 80%, rgba(232, 242, 255, 0.9), transparent 42%), linear-gradient(135deg, #FAFCFF 0%, #F8FBFF 42%, #EEF6FF 100%)'
+      }}
     >
-      <div className="absolute inset-0 -z-30 animate-gradient-flow bg-gradient-to-r from-[#F8FAFD] via-[#E8F0FE] to-[#C2E7FF] bg-[length:400%_400%]" />
-      <div className="absolute inset-0 -z-20 bg-[radial-gradient(circle_at_top_left,rgba(26,115,232,0.22),transparent_34%),radial-gradient(circle_at_70%_20%,rgba(211,227,253,0.78),transparent_32%),radial-gradient(circle_at_50%_85%,rgba(194,231,255,0.62),transparent_36%)]" />
-      <div className="absolute inset-0 -z-10 bg-white/45" />
-      <div className="absolute inset-0 -z-10 opacity-20 [background-image:linear-gradient(rgba(255,255,255,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.08)_1px,transparent_1px)] [background-size:72px_72px] [mask-image:radial-gradient(ellipse_at_center,black,transparent_74%)]" />
-      <div className="absolute -left-24 top-1/4 h-72 w-72 rounded-full bg-[#C2E7FF]/55 blur-3xl animate-pulse" />
-      <div className="absolute -right-24 bottom-1/4 h-96 w-96 rounded-full bg-[#1A73E8]/18 blur-3xl animate-icon-float" />
-
-      <div className="container relative z-10 mx-auto px-4 py-16 text-center sm:px-6 sm:py-28">
-        <div className="mx-auto max-w-5xl">
-          <div className="animate-child animate-delay-1 inline-flex items-center gap-2 rounded-full border border-[#D2E3FC] bg-white/95 px-4 py-2 text-xs font-semibold tracking-wide text-[#1967D2] shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:px-5 sm:text-sm">
-            <span className="h-2 w-2 rounded-full bg-[#1A73E8] shadow-sm" />
-            🚀 Boost Your Digital Growth
-          </div>
-
-          <h1
-            className="animate-child animate-delay-2 mt-6 text-[2.55rem] font-black leading-[1.04] tracking-[-0.04em] [text-shadow:_0_8px_30px_rgba(255,255,255,0.7)] sm:mt-8 sm:text-6xl lg:text-8xl"
-          >
-            {settings.content.heroTitle}
-          </h1>
-
-          <p className="animate-child animate-delay-3 mx-auto mt-5 max-w-3xl text-base leading-7 text-[#5F6368] sm:mt-7 sm:text-xl sm:leading-8">
-            {settings.content.heroSubtitle}
-          </p>
-
-          <div className="animate-child animate-delay-4 mt-8 flex flex-col items-center justify-center gap-3 sm:mt-10 sm:flex-row sm:gap-4">
-            <button
-              onClick={onNavigateToAllProducts}
-              className="group relative w-full overflow-hidden rounded-full border border-[#D2E3FC] bg-white/95 px-6 py-3.5 text-base font-bold text-[#202124] shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:scale-105 hover:border-[#1A73E8] hover:shadow-sm sm:w-auto sm:px-9 sm:py-4 sm:text-lg"
-            >
-              <span className="absolute inset-0 bg-gradient-to-r from-[#1A73E8]/18 via-[#D3E3FD]/55 to-[#C2E7FF]/45 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-              <span className="relative">Explore Products</span>
-            </button>
-            <button
-              onClick={onNavigateToPolicies}
-              className="w-full rounded-full border border-[#D2E3FC] bg-white/95 px-6 py-3.5 text-base font-semibold text-[#202124] shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:scale-105 hover:border-[#1A73E8] hover:bg-white/80 hover:shadow-sm sm:w-auto sm:px-9 sm:py-4 sm:text-lg"
-            >
-              Our Policies
-            </button>
-          </div>
-
-          <div className="animate-child animate-delay-5 mx-auto mt-8 grid max-w-3xl grid-cols-3 gap-2 sm:mt-12 sm:gap-4">
-            <div className="rounded-2xl border border-[#D2E3FC] bg-white/95 p-3 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-[#C2E7FF] hover:shadow-sm sm:p-5">
-              <p className="text-xl font-extrabold text-[#202124] sm:text-2xl">{revenueChange}</p>
-              <p className="mt-1 text-xs uppercase tracking-[0.25em] text-[#5F6368]">Revenue Lift</p>
-              {useRealData && <p className="mt-2 text-sm text-[#1967D2]">{revenueDisplay}</p>}
+      <div className="absolute -left-24 top-24 h-80 w-80 rounded-full bg-[#BFE7FF]/60 blur-3xl" />
+      <div className="absolute -right-20 top-28 h-96 w-96 rounded-full bg-[#DBD2FF]/55 blur-3xl" />
+      <div className="container relative z-10 mx-auto px-6 pb-20 pt-16 lg:pb-24 lg:pt-24">
+        <div className="grid items-center gap-12 lg:grid-cols-[1.05fr_0.95fr]">
+          <div className="text-center lg:text-left">
+            <div className="animate-child animate-delay-1 inline-flex items-center gap-2 rounded-full border border-[var(--border-soft)] bg-white px-5 py-2.5 text-sm font-bold text-[var(--primary)] shadow-[var(--shadow-soft)]">
+              🚀 Boost Your Digital Growth
             </div>
-            <div className="rounded-2xl border border-[#D2E3FC] bg-white/95 p-3 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-[#D2E3FC] hover:shadow-sm sm:p-5">
-              <p className="text-xl font-extrabold text-[#202124] sm:text-2xl">{usersDisplay}</p>
-              <p className="mt-1 text-xs uppercase tracking-[0.25em] text-[#5F6368]">Active Users</p>
+            <h1 className="animate-child animate-delay-2 mt-7 text-[clamp(3.8rem,6vw,6.4rem)] font-[850] leading-[0.95] tracking-[-0.055em] text-[var(--text-heading)]">
+              Your Premium Storefront for Notes, Courses & Digital Products
+            </h1>
+            <p className="animate-child animate-delay-3 mt-7 max-w-2xl text-[1.12rem] leading-[1.7] text-[var(--text-body)] lg:mx-0 mx-auto">
+              Sell premium notes, video courses, subscriptions, and focused learning resources inside one polished digital workspace.
+            </p>
+            <div className="animate-child animate-delay-4 mt-9 flex flex-col items-center gap-3 sm:flex-row lg:items-start">
+              <button onClick={onNavigateToAllProducts} className="rounded-full bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-9 py-4 text-base font-bold text-white shadow-[var(--shadow-blue)] transition hover:-translate-y-1 hover:shadow-[0_18px_42px_rgba(23,105,255,0.28)]">
+                Explore Products
+              </button>
+              <button onClick={onNavigateToPolicies} className="rounded-full border border-[var(--border-soft)] bg-white px-9 py-4 text-base font-bold text-[var(--text-heading)] shadow-[var(--shadow-soft)] transition hover:-translate-y-1 hover:border-[var(--border-active)]">
+                Our Policies
+              </button>
             </div>
-            <div className="rounded-2xl border border-[#D2E3FC] bg-white/95 p-3 backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:border-[#C2E7FF] hover:shadow-sm sm:p-5">
-              <p className="text-xl font-extrabold text-[#202124] sm:text-2xl">24/7</p>
-              <p className="mt-1 text-xs uppercase tracking-[0.25em] text-[#5F6368]">Digital Support</p>
+            <div className="animate-child animate-delay-5 mt-10 grid gap-3 rounded-[2rem] border border-[var(--border-soft)] bg-white/80 p-3 shadow-[var(--shadow-card)] backdrop-blur-xl sm:grid-cols-3">
+              <div className="rounded-[1.35rem] bg-white p-5"><p className="text-2xl font-black text-[var(--text-heading)]">+128%</p><p className="mt-1 text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-muted)]">Revenue Lift</p>{useRealData && <p className="mt-2 text-sm font-bold text-[var(--primary)]">{revenueDisplay}</p>}</div>
+              <div className="rounded-[1.35rem] bg-white p-5"><p className="text-2xl font-black text-[var(--text-heading)]">2.4k+</p><p className="mt-1 text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-muted)]">Active Users</p>{useRealData && <p className="mt-2 text-sm font-bold text-[var(--primary)]">Live: {usersDisplay}</p>}</div>
+              <div className="rounded-[1.35rem] bg-white p-5"><p className="text-2xl font-black text-[var(--text-heading)]">24/7</p><p className="mt-1 text-xs font-bold uppercase tracking-[0.2em] text-[var(--text-muted)]">Digital Support</p></div>
+            </div>
+            <div className="animate-child animate-delay-6 mt-7 flex flex-wrap justify-center gap-3 lg:justify-start">
+              {[[onOpenBlogModal,'📝','Read Blog'],[onOpenFreeModal,'🎁','Free Resources'],[onOpenAnnouncementsModal,'📢','News']].map(([fn, icon, label]) => (
+                <button key={label as string} onClick={fn as () => void} className="rounded-full border border-[var(--border-soft)] bg-white px-5 py-3 text-sm font-bold text-[var(--primary)] shadow-[var(--shadow-soft)] transition hover:-translate-y-1 hover:border-[var(--border-active)]">{icon as string} {label as string}</button>
+              ))}
             </div>
           </div>
-
-          <div className="animate-child animate-delay-6 mt-8 grid grid-cols-1 gap-3 border-t border-[#D2E3FC] pt-6 sm:mt-12 sm:flex sm:flex-wrap sm:justify-center sm:gap-4 sm:pt-8">
-            <button onClick={onOpenBlogModal} className="group flex w-full items-center justify-center gap-2 rounded-full border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-sm font-medium text-[#1967D2] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-[#C2E7FF] hover:bg-[#E8F0FE] hover:shadow-sm hover:text-[#202124] sm:w-auto sm:justify-start sm:py-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F8FAFD] transition-colors group-hover:bg-[#E8F0FE] hover:shadow-sm">📝</span>
-              <span>Read Blog</span>
-            </button>
-            <button onClick={onOpenFreeModal} className="group flex w-full items-center justify-center gap-2 rounded-full border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-sm font-medium text-[#1967D2] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-[#C2E7FF] hover:bg-[#E8F0FE] hover:shadow-sm hover:text-[#202124] sm:w-auto sm:justify-start sm:py-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F8FAFD] transition-colors group-hover:bg-[#E8F0FE] hover:shadow-sm">🎁</span>
-              <span>Free Resources</span>
-            </button>
-            <button onClick={onOpenAnnouncementsModal} className="group flex w-full items-center justify-center gap-2 rounded-full border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-sm font-medium text-[#1967D2] backdrop-blur-xl transition-all duration-300 hover:-translate-y-0.5 hover:border-[#C2E7FF] hover:bg-[#E8F0FE] hover:shadow-sm hover:text-[#202124] sm:w-auto sm:justify-start sm:py-2">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-[#F8FAFD] transition-colors group-hover:bg-[#E8F0FE] hover:shadow-sm">📢</span>
-              <span>News</span>
-            </button>
+          <div className="animate-child animate-delay-4 hidden lg:block">
+            <div className="relative rounded-[2.25rem] border border-[var(--border-soft)] bg-white/86 p-5 shadow-[var(--shadow-card)] backdrop-blur-2xl">
+              <div className="rounded-[1.75rem] bg-gradient-to-br from-[#FBFDFF] to-[#EEF6FF] p-6">
+                <div className="flex items-center justify-between"><span className="text-sm font-black text-[var(--text-heading)]">Learning Commerce Dashboard</span><span className="rounded-full bg-[#E8F2FF] px-3 py-1 text-xs font-bold text-[var(--primary)]">Live</span></div>
+                <div className="mt-6 grid gap-4"><div className="rounded-3xl border border-[var(--border-soft)] bg-white p-5 shadow-[var(--shadow-soft)]"><p className="text-xs font-bold uppercase tracking-[0.22em] text-[var(--text-muted)]">Catalog Health</p><div className="mt-4 h-3 rounded-full bg-[#E8F2FF]"><div className="h-3 w-[78%] rounded-full bg-gradient-to-r from-[#1769FF] to-[#7B61FF]" /></div></div>{['Premium Notes','Private Courses','Subscriptions'].map((x,i)=><div key={x} className="flex items-center justify-between rounded-2xl border border-[var(--border-soft)] bg-white px-5 py-4"><span className="font-bold text-[var(--text-title)]">{x}</span><span className="text-sm font-black text-[var(--primary)]">{[128,46,12][i]} items</span></div>)}</div>
+              </div>
+            </div>
           </div>
         </div>
       </div>
