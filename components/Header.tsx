@@ -148,9 +148,9 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                     </button>
                     {currentUser ? (
                          <div className="relative">
-                            <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center space-x-2 text-text-muted">
-                                <UserIcon />
-                                <span className="text-sm font-medium">{currentUser.name || currentUser.email.split('@')[0]}</span>
+                            <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-4 py-2 font-bold text-white shadow-[0_8px_24px_rgba(79,70,229,0.18)] transition hover:-translate-y-0.5 hover:opacity-95">
+                                <span className="grid h-7 w-7 place-items-center rounded-full bg-white/15"><UserIcon /></span>
+                                <span className="max-w-32 truncate text-sm">{currentUser.name || currentUser.email.split('@')[0]}</span>
                             </button>
                             {isUserMenuOpen && (
                                 <div className="absolute right-0 mt-2 w-48 bg-white/70 backdrop-blur-xl rounded-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] py-1 z-20">

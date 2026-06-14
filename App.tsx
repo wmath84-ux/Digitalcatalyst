@@ -372,6 +372,12 @@ export interface Order {
 }
 
 // New Support Ticket interface, centralized here
+export interface NewsletterSubscriber {
+    id: string;
+    email: string;
+    date: string;
+}
+
 export interface SupportTicket {
     id: string;
     customerName: string;
@@ -858,6 +864,7 @@ const App: React.FC = () => {
   const [coupons, setCoupons] = useState<Coupon[]>(initialCoupons);
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [tickets, setTickets] = useState<SupportTicket[]>(initialSupportTickets);
+  const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [currentView, setCurrentView] = useState('home'); 
   const currentViewRef = React.useRef(currentView);
   const historyNavigationRef = React.useRef(false);
@@ -1136,6 +1143,9 @@ const App: React.FC = () => {
 
     const storedTickets = localStorage.getItem('siteSupportTickets');
     if (storedTickets) setTickets(JSON.parse(storedTickets)); else setTickets(initialSupportTickets);
+
+    const storedSubscribers = localStorage.getItem('newsletterSubscribers');
+    if (storedSubscribers) setNewsletterSubscribers(JSON.parse(storedSubscribers));
 
     const storedCurrentUser = localStorage.getItem('currentUser');
     if (storedCurrentUser) {
@@ -1645,7 +1655,21 @@ const App: React.FC = () => {
 
   const handleLogout = () => {
       setCurrentUser(null);
+      setPurchasedProductIds([]);
+      setWishlist([]);
+      setCart([]);
+      setAppliedCartCoupon(null);
+      setCartCouponError(null);
+      setApplyCartEduCoins(false);
+      setActiveCoinDiscount(null);
+      setProductToBuyAfterLogin(null);
+      setResumeCartCheckoutAfterLogin(false);
+      setIsCartOpen(false);
+      setIsCartPaymentModalOpen(false);
       localStorage.removeItem('currentUser');
+      localStorage.removeItem('purchasedProducts');
+      localStorage.removeItem('wishlist');
+      localStorage.removeItem('shoppingCart');
       setCurrentView('home');
   };
   
@@ -2296,13 +2320,20 @@ const App: React.FC = () => {
   };
 
   const handleSubscribe = (email: string) => {
-    const key = `subscribed:${email.toLowerCase()}`;
-    if (localStorage.getItem(key)) return;
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return;
+    const key = `subscribed:${normalizedEmail}`;
+    const subscriber: NewsletterSubscriber = { id: normalizedEmail, email: normalizedEmail, date: new Date().toISOString() };
+    setNewsletterSubscribers(prev => {
+      const exists = prev.some(item => item.email.toLowerCase() === normalizedEmail);
+      const next = exists ? prev : [subscriber, ...prev];
+      safeSetItem('newsletterSubscribers', next);
+      return next;
+    });
     localStorage.setItem(key, '1');
-    console.log(`Subscribing ${email} to the newsletter.`);
-    setSubscribedEmail(email);
+    console.log(`Subscribing ${normalizedEmail} to the newsletter.`);
+    setSubscribedEmail(normalizedEmail);
     setIsSubscriptionModalOpen(true);
-    // In a real app, you would make an API call here to your backend.
   };
 
   const openReadingHub = (type: ReadingListType = 'blog') => {
@@ -2488,7 +2519,7 @@ const App: React.FC = () => {
   const renderPage = () => {
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={handleBackToHome} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
     if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} onOtpAuthenticate={handleOtpAuthenticate} onBack={handleBackFromAuth} /></div>;
-    if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
+    if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} newsletterSubscribers={newsletterSubscribers} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={handleBackToHome} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent()}</div>;
     if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity onClose={handleBackToHome} isAuthenticated={Boolean(currentUser)} /></div>;

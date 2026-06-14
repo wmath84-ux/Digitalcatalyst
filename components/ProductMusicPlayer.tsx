@@ -84,6 +84,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
   const swipeStartXRef = useRef<number | null>(null);
   const progressId = useId();
 
+  const tracksSignature = useMemo(() => tracks.map(track => `${track.id}:${track.url}`).join('|'), [tracks]);
   const activeTrack = tracks[activeIndex];
   const isFull = variant === 'full';
   const hasMultipleTracks = tracks.length > 1;
@@ -94,7 +95,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
     setIsPlaying(false);
     setCurrentTime(0);
     setDuration(0);
-  }, [fallbackTitle, initialTrackId, tracks]);
+  }, [fallbackTitle, initialTrackId, tracksSignature]);
 
   useEffect(() => {
     const audio = audioRef.current;

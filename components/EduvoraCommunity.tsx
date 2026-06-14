@@ -69,6 +69,21 @@ const initialMasterTagRequests: MasterTagRequest[] = [
   { id: 3, author: 'Riya Sharma', avatar: '🧕', category: 'Update', title: 'Need an update on next automation template', detail: 'Can master upload the promised WhatsApp automation template before the weekend sprint?', time: '12:15 PM', likes: 51, reactions: { '🔥': 18, '❤️': 12, '🙏': 10 } },
 ];
 
+
+const masterTagRequestToTicket = (request: MasterTagRequest): CommunitySupportTicket => ({
+  id: `MT-${request.id}`,
+  customerName: request.author,
+  customerEmail: `${request.author.toLowerCase().replace(/[^a-z0-9]+/g, '.').replace(/^\.|\.$/g, '') || 'eduvora.member'}@eduvora.community`,
+  subject: `@Master ${request.title}`,
+  message: request.detail,
+  date: new Date().toISOString(),
+  status: 'Open',
+  source: 'masterTag',
+  communityThreadId: request.id,
+  customerAvatar: request.avatar,
+  category: request.category,
+});
+
 const postOptions: Array<{ type: PostType; icon: string; label: string; helper: string }> = [
   { type: 'text', icon: '✍️', label: 'Text', helper: 'Daily text post' },
   { type: 'image', icon: '🖼️', label: 'Image', helper: 'Daily image post' },
@@ -271,6 +286,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [masterTagRequests]);
 
   useEffect(() => {
+    const existingTickets = readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []);
+    const seededTickets = initialMasterTagRequests.map(masterTagRequestToTicket);
+    const mergedTickets = [...existingTickets];
+    seededTickets.forEach(seed => { if (!mergedTickets.some(ticket => ticket.id === seed.id)) mergedTickets.push(seed); });
+    if (mergedTickets.length !== existingTickets.length) {
+      localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(mergedTickets));
+      window.dispatchEvent(new Event('siteSupportTicketsUpdated'));
+    }
+    setSupportTickets(mergedTickets);
+
     const syncSupportTickets = () => setSupportTickets(readJsonArray(SUPPORT_TICKETS_STORAGE_KEY, []));
     const handleStorage = (event: StorageEvent) => {
       if (event.key === SUPPORT_TICKETS_STORAGE_KEY) syncSupportTickets();

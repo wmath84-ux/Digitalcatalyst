@@ -373,6 +373,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [activeWatchSeconds, setActiveWatchSeconds] = useState(0);
@@ -529,14 +530,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: isAudioExperience ? '#7dd3fc' : accentGlow }} />
       <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-cyan-200/45' : 'bg-indigo-300/15'}`} />
 
-      <header className={`relative z-30 flex items-center gap-2 border-b p-2.5 shadow-sm backdrop-blur-xl sm:gap-3 sm:p-3 lg:hidden ${isAudioExperience ? 'border-cyan-100/70 bg-[#d9fbff]/88' : 'border-white/50 bg-white/70'}`}>
-        <button onClick={() => setIsSidebarOpen(true)} className="shrink-0 rounded-lg border border-white/60 bg-white/40 p-2"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
-        <h1 className="min-w-0 flex-1 truncate text-base font-black sm:text-lg">{activeFile?.name || product.title}</h1>
-        <div className="ml-auto flex max-w-[48vw] shrink-0 items-center gap-2 overflow-x-auto sm:max-w-none">
-          {liveEarningHud}
-          <button onClick={() => setIsMentorOpen(value => !value)} className="rounded-xl border border-cyan-200/30 bg-cyan-200/15 px-2.5 py-2 text-xs font-black shadow-sm sm:px-3 sm:text-sm">🧠 AI</button>
-        </div>
-      </header>
+      <button onClick={() => setIsSidebarOpen(true)} className="fixed left-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-40 rounded-2xl border border-white/60 bg-white/75 p-3 shadow-[0_12px_30px_rgba(15,23,42,0.16)] backdrop-blur-xl lg:hidden" aria-label="Open course modules"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
 
       <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
@@ -550,8 +544,9 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           <span className="truncate text-right text-sm font-bold text-slate-900/60">Welcome to the Course</span>
         </div>
 
-        <section className="grid min-h-0 flex-1 grid-cols-1 gap-2 sm:gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
-          <aside className={`fixed inset-y-0 left-0 z-40 w-[18rem] transform transition sm:w-80 lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <section className={`grid min-h-0 flex-1 grid-cols-1 gap-2 sm:gap-3 ${isDesktopSidebarCollapsed ? 'lg:grid-cols-[minmax(0,1fr)]' : 'lg:grid-cols-[28rem_minmax(0,1fr)]'}`}>
+          <button onClick={() => setIsDesktopSidebarCollapsed(value => !value)} className="hidden lg:fixed lg:left-3 lg:top-24 lg:z-50 lg:block rounded-2xl border border-white/70 bg-white/85 px-3 py-2 text-sm font-black text-slate-800 shadow-[0_12px_30px_rgba(15,23,42,0.14)] backdrop-blur-xl">{isDesktopSidebarCollapsed ? '☰ Modules' : '⇤ Hide modules'}</button>
+          <aside className={`fixed inset-y-0 left-0 z-40 w-[18rem] transform transition sm:w-80 lg:relative lg:inset-auto lg:w-auto lg:overflow-hidden lg:rounded-2xl ${isDesktopSidebarCollapsed ? 'lg:hidden' : ''} ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col border-r border-slate-200/70 bg-white/95 shadow-[4px_0_30px_rgba(0,0,0,0.06)] backdrop-blur-3xl lg:rounded-2xl lg:border lg:border-slate-200/50 lg:bg-slate-900/[0.04] lg:shadow-[4px_0_30px_rgba(0,0,0,0.02)]">
               <div className="shrink-0 border-b border-slate-200/70 px-4 py-4 lg:border-white/50 lg:py-5">
                 <button onClick={onBack} className="mb-3 flex items-center gap-2 text-lg font-medium text-slate-900 hover:opacity-70 sm:mb-4 sm:text-[22px]">← <span>Back</span></button>

@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Product, ProductWithRating, Review, User, Coupon, WebsiteSettings, Order, AdminUser, SupportTicket } from '../../App';
+import { Product, ProductWithRating, Review, User, Coupon, WebsiteSettings, Order, AdminUser, SupportTicket, NewsletterSubscriber } from '../../App';
 import { EconomySettings } from '../../utils/economy';
 import Sidebar from './Sidebar';
 import ProductManagement from './ProductManagement';
@@ -16,6 +16,7 @@ import AdminManagement from './AdminManagement';
 import NewsBlogManagement from './NewsBlogManagement';
 import CoinEconomyManagement from './CoinEconomyManagement';
 import EduCoinRewardSettings from './EduCoinRewardSettings';
+import NewsletterSubscribers from './NewsletterSubscribers';
 
 interface AdminDashboardProps {
     products: ProductWithRating[];
@@ -27,6 +28,7 @@ interface AdminDashboardProps {
     orders: Order[];
     tickets: SupportTicket[];
     websiteSettings: WebsiteSettings;
+    newsletterSubscribers: NewsletterSubscriber[];
     economySettings: EconomySettings;
     onAddProduct: (product: Omit<Product, 'id'>) => void;
     onUpdateProduct: (product: Product) => void;
@@ -40,7 +42,7 @@ interface AdminDashboardProps {
     onSwitchToHome: () => void;
 }
 
-export type AdminView = 'dashboard' | 'economy' | 'rewardSettings' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'analytics' | 'websiteSettings';
+export type AdminView = 'dashboard' | 'subscribers' | 'economy' | 'rewardSettings' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'analytics' | 'websiteSettings';
 
 const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?: string; icon: React.ReactNode; gradient: string }> = ({ title, value, subtitle, icon, gradient }) => (
     <div className={`relative overflow-hidden rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-slate-900 sm:p-6 ${gradient} transform transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]`}>
@@ -73,6 +75,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             case 'orders': return <OrderManagement orders={props.orders} />;
             case 'coupons': return <CouponManagement coupons={props.coupons} onUpdate={props.onCouponsUpdate} />;
             case 'support': return <SupportManagement tickets={props.tickets} onUpdate={props.onTicketsUpdate} />;
+            case 'subscribers': return <NewsletterSubscribers subscribers={props.newsletterSubscribers} />;
             case 'analytics': return <Analytics orders={props.orders} products={props.products} users={props.users} reviews={props.reviews} />;
             case 'websiteSettings': return <WebsiteSettingsComponent settings={props.websiteSettings} products={props.products} onSettingsChange={props.onWebsiteSettingsChange} />;
             case 'dashboard': default: 
