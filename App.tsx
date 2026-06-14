@@ -386,6 +386,8 @@ export interface SupportTicket {
     category?: string;
     adminReply?: string;
     repliedAt?: string;
+    inboxMessage?: string;
+    inboxRead?: boolean;
 }
 
 export interface NewsletterSubscriber {
