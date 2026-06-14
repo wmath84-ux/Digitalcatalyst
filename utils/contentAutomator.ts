@@ -73,7 +73,7 @@ The JSON shape must be:
       "type": "news" | "blog",
       "category": "Short category label",
       "excerpt": "A punchy two-sentence summary for cards.",
-      "coverImage": "A reliable contextual 16:9 cover image URL. Prefer https://placehold.co/800x400/e0e7ff/312e81?text=Education+Technology style URLs with 2-4 topic keywords encoded in the text parameter, or another stable educational stock/placeholder image URL. Never leave this empty.",
+      "coverImage": "Leave empty or provide a premium 16:9 editorial image URL. If you provide one, it MUST match this visual direction: soft white/ice-blue reading UI, deep navy text, blue-to-violet pastel gradient, simple education/AI/exam/course vector illustration, clean rounded-card look, no realistic noisy photos, no dark backgrounds.",
       "thumbnailImage": "Same value as coverImage for backward compatibility",
       "content": "Rich Markdown with ## Headings, ### Subheadings, - bullet lists, short paragraphs, and a ## Key Takeaways section. Write 550-850 words per post with useful student-focused examples, concrete actions, and no fake citations."
     }
@@ -85,20 +85,29 @@ Quality rules:
 - Avoid promising real-time breaking news unless phrased as trend analysis or an alert-style explainer.
 - Markdown must be clean enough to render directly in a reading view.
 - Include actionable takeaways in every post.
-- Every post must include a coverImage URL that visually matches the article topic (education, exams, AI learning, career readiness, scholarships, digital skills, etc.).
+- Cover images must look like premium calm editorial cards: soft white/ice-blue reading UI, deep navy text, blue-to-violet pastel gradients, simple education/AI/exam/course vector illustration, rounded corners, and clean spacious composition. Do not use realistic noisy stock photos.
 `;
 
-
-const buildContextualCoverImage = (post: GeneratedContentPost) => {
-  const source = `${post.category || ''} ${post.title || ''}`.toLowerCase();
-  const keywords = ['education', 'students', 'learning'];
-  if (source.includes('ai') || source.includes('technology') || source.includes('digital')) keywords.push('technology');
-  if (source.includes('exam') || source.includes('revision') || source.includes('study')) keywords.push('study');
-  if (source.includes('career') || source.includes('job') || source.includes('skill')) keywords.push('career');
-  if (source.includes('scholarship') || source.includes('policy')) keywords.push('opportunity');
-  const label = Array.from(new Set(keywords)).slice(0, 4).map((word) => word[0].toUpperCase() + word.slice(1)).join(' + ');
-  return `https://placehold.co/800x400/e0e7ff/312e81?text=${encodeURIComponent(label)}`;
+const premiumImagePromptForPost = (post: Pick<GeneratedContentPost, 'title' | 'type' | 'category'>) => {
+  const topic = `${post.category || (post.type === 'news' ? 'Student News' : 'Study Blog')} ${post.title || ''}`.trim();
+  return [
+    'premium calm education editorial hero card',
+    topic,
+    'soft white and ice blue background',
+    'deep navy typography space',
+    'blue to violet pastel gradient',
+    'minimal vector illustration',
+    'rounded glass card',
+    'subtle geometric lines and dots',
+    'student friendly reading mode',
+    'no realistic photo',
+    'no clutter',
+    '16:9'
+  ].join(', ');
 };
+
+const buildContextualCoverImage = (post: Pick<GeneratedContentPost, 'title' | 'type' | 'category'>) =>
+  `https://image.pollinations.ai/prompt/${encodeURIComponent(premiumImagePromptForPost(post))}?width=1200&height=675&nologo=true&enhance=true&model=flux`;
 
 const safeJsonParse = (raw: string): { posts?: GeneratedContentPost[] } => {
   const trimmed = raw.trim().replace(/^```json\s*/i, '').replace(/^```\s*/i, '').replace(/```$/i, '').trim();
@@ -115,8 +124,8 @@ const fallbackGeneratedPosts = (): GeneratedContentPost[] => {
     type,
     category: type === 'news' ? 'Education News' : 'Student Success',
     excerpt: `A premium ${type} briefing for ${nowLabel} with practical takeaways for focused learners.`,
-    coverImage: `https://placehold.co/800x400/e0e7ff/312e81?text=${encodeURIComponent(type === 'news' ? 'Education News' : 'Study Strategy')}`,
-    thumbnailImage: `https://placehold.co/800x400/e0e7ff/312e81?text=${encodeURIComponent(type === 'news' ? 'Education News' : 'Study Strategy')}`,
+    coverImage: buildContextualCoverImage({ title: `${type === 'news' ? 'Student Learning Update' : 'Study Strategy Brief'} ${index + 1}`, type, category: type === 'news' ? 'Education News' : 'Student Success' }),
+    thumbnailImage: buildContextualCoverImage({ title: `${type === 'news' ? 'Student Learning Update' : 'Study Strategy Brief'} ${index + 1}`, type, category: type === 'news' ? 'Education News' : 'Student Success' }),
     content: `## Why this ${type === 'news' ? 'update' : 'guide'} matters\n\nThis demo-mode ${type} item is generated locally because no Gemini API key is configured. It mirrors the Markdown structure the AI autopilot will produce in production with short paragraphs and scannable sections.\n\n### Quick context\n\nStudents can use this item as a focused reading prompt before a study sprint. The goal is to turn reading into action instead of passive scrolling.\n\n## What to do next\n\n### Student action plan\n\n- **Focus:** Turn the idea into one concrete study action today.\n- **Review:** Summarize the lesson in three bullet points.\n- **Apply:** Use a 25-minute sprint to practice the skill.\n\n## Key Takeaways\n\n- Small daily reading habits compound into better exam confidence.\n- Separate news alerts from deeper blog guides to keep your learning workflow clear.`,
   });
 
@@ -175,8 +184,8 @@ export const runContentAutomation = async <TPost extends ContentPostRecord = Con
     type: post.type,
     category: post.category || (post.type === 'news' ? 'Education News' : 'Student Success'),
     excerpt: post.excerpt || post.content.replace(/<[^>]+>/g, ' ').replace(/[#*_`>-]/g, ' ').slice(0, 180),
-    coverImage: post.coverImage || post.thumbnailImage || buildContextualCoverImage(post),
-    thumbnailImage: post.thumbnailImage || post.coverImage || buildContextualCoverImage(post),
+    coverImage: buildContextualCoverImage(post),
+    thumbnailImage: buildContextualCoverImage(post),
     imageSeed: `${post.type}-${now.getTime()}-${index}`,
     date: now.toISOString().split('T')[0],
     createdAt: now.toISOString(),
