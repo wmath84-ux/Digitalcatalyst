@@ -45,8 +45,10 @@ const SubscriptionPage: React.FC<{
   const [couponErrors, setCouponErrors] = React.useState<Record<string, string>>({});
 
   const calculateCouponDiscount = React.useCallback((coupon: Coupon, price: number) => {
-    if (coupon.type === 'fixed') return Math.min(coupon.value, price);
-    return Math.min(price, (price * coupon.value) / 100);
+    const safePrice = Math.max(0, Number(price) || 0);
+    const safeValue = Math.max(0, Number(coupon.value) || 0);
+    if (coupon.type === 'fixed') return Math.min(safeValue, safePrice);
+    return Math.min(safePrice, (safePrice * safeValue) / 100);
   }, []);
 
   const getCouponError = React.useCallback((coupon: Coupon | undefined) => {
@@ -77,7 +79,7 @@ const SubscriptionPage: React.FC<{
       return;
     }
 
-    const coupon = coupons.find(item => item.code.toUpperCase() === normalizedCode);
+    const coupon = coupons.find(item => item.code.trim().toUpperCase() === normalizedCode);
     const error = getCouponError(coupon);
     if (error) {
       setCouponErrors(prev => ({ ...prev, [planId]: error }));
@@ -93,6 +95,19 @@ const SubscriptionPage: React.FC<{
     setAppliedCouponCodes(prev => ({ ...prev, [planId]: normalizedCode }));
     setCouponErrors(prev => ({ ...prev, [planId]: '' }));
   }, [coupons, getCouponError]);
+
+  const handleCouponInputChange = React.useCallback((planId: string, value: string) => {
+    const normalizedValue = value.toUpperCase();
+    setCouponInputs(prev => ({ ...prev, [planId]: normalizedValue }));
+    setCouponErrors(prev => ({ ...prev, [planId]: '' }));
+    setAppliedCouponCodes(prev => {
+      const appliedCode = prev[planId];
+      if (!appliedCode || appliedCode === normalizedValue.trim()) return prev;
+      const next = { ...prev };
+      delete next[planId];
+      return next;
+    });
+  }, []);
 
   const handleRemoveCoupon = React.useCallback((planId: string) => {
     setAppliedCouponCodes(prev => {
@@ -136,7 +151,7 @@ const SubscriptionPage: React.FC<{
               const planPrice = Number(plan.price || 0);
               const activeDiscount = activeCoinDiscount?.subscriptionId === planId ? activeCoinDiscount : null;
               const appliedCouponCode = appliedCouponCodes[planId];
-              const appliedCoupon = appliedCouponCode ? coupons.find(coupon => coupon.code.toUpperCase() === appliedCouponCode.toUpperCase()) : undefined;
+              const appliedCoupon = appliedCouponCode ? coupons.find(coupon => coupon.code.trim().toUpperCase() === appliedCouponCode.toUpperCase()) : undefined;
               const appliedCouponError = appliedCoupon ? getCouponError(appliedCoupon) : '';
               const validAppliedCoupon = appliedCoupon && !appliedCouponError ? appliedCoupon : null;
               const couponDiscount = validAppliedCoupon ? calculateCouponDiscount(validAppliedCoupon, planPrice) : 0;
@@ -173,23 +188,24 @@ const SubscriptionPage: React.FC<{
                   
                   <p className="mx-auto mt-4 min-h-10 max-w-[12rem] text-[11px] leading-5 text-[#5F6368]">{plan.description}</p>
 
-                  <div className="mt-4 rounded-3xl border border-[#E0E3EB] bg-[#F8FAFD] p-3 text-left shadow-inner">
+                  <div className="mt-4 rounded-3xl border border-[#E0E3EB] bg-[#F8FAFD] p-3 text-left shadow-inner sm:p-4">
                     <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1967D2]">Have a coupon?</p>
-                    <div className="mt-2 flex gap-2">
+                    <div className="mt-2 flex flex-col gap-2 sm:flex-row">
                       <input
                         type="text"
                         value={couponInputs[planId] || ''}
-                        onChange={event => setCouponInputs(prev => ({ ...prev, [planId]: event.target.value.toUpperCase() }))}
+                        onChange={event => handleCouponInputChange(planId, event.target.value)}
+                        onKeyDown={event => { if (event.key === 'Enter' && !validAppliedCoupon) handleApplyCoupon(planId, couponInputs[planId] || ''); }}
                         placeholder="Coupon code"
                         disabled={allUnlocked}
-                        className="min-w-0 flex-1 rounded-2xl border border-[#DADCE0] bg-white px-3 py-2 text-xs font-bold outline-none transition focus:border-[#1A73E8] focus:ring-2 focus:ring-[#D2E3FC] disabled:cursor-not-allowed disabled:bg-[#F8FAFD]"
+                        className="min-h-11 w-full min-w-0 flex-1 rounded-2xl border border-[#DADCE0] bg-white px-4 py-3 text-sm font-bold outline-none transition placeholder:text-[#9AA0A6] focus:border-[#1A73E8] focus:ring-2 focus:ring-[#D2E3FC] disabled:cursor-not-allowed disabled:bg-[#F8FAFD] sm:min-h-0 sm:py-2 sm:text-xs"
                         aria-label={`Coupon code for ${plan.name}`}
                       />
                       <button
                         type="button"
                         disabled={allUnlocked}
                         onClick={() => validAppliedCoupon ? handleRemoveCoupon(planId) : handleApplyCoupon(planId, couponInputs[planId] || '')}
-                        className={`rounded-2xl px-3 py-2 text-xs font-black transition active:scale-95 disabled:cursor-not-allowed disabled:bg-[#DADCE0] disabled:text-[#5F6368] ${validAppliedCoupon ? 'bg-[#FCE8E6] text-[#C5221F] hover:bg-[#FAD2CF]' : 'bg-[#1A73E8] text-white hover:-translate-y-0.5'}`}
+                        className={`min-h-11 rounded-2xl px-4 py-3 text-sm font-black transition active:scale-95 sm:min-h-0 sm:px-3 sm:py-2 sm:text-xs disabled:cursor-not-allowed disabled:bg-[#DADCE0] disabled:text-[#5F6368] ${validAppliedCoupon ? 'bg-[#FCE8E6] text-[#C5221F] hover:bg-[#FAD2CF]' : 'bg-[#1A73E8] text-white hover:-translate-y-0.5'}`}
                       >
                         {validAppliedCoupon ? 'Remove' : 'Apply'}
                       </button>
