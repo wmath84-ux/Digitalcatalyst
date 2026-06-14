@@ -36,7 +36,7 @@ import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
 import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
-import { addDoc, collection, deleteDoc, doc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { db } from './firebase';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
 
@@ -386,6 +386,8 @@ export interface SupportTicket {
     category?: string;
     adminReply?: string;
     repliedAt?: string;
+    inboxMessage?: string;
+    inboxRead?: boolean;
 }
 
 export interface NewsletterSubscriber {
@@ -598,10 +600,10 @@ const initialReviews: { [productId: number]: Review[] } = {
 };
 
 const initialCoupons: Coupon[] = [
-    { id: 1, code: 'SUMMER25', type: 'percentage', value: 25, expiryDate: '2025-12-31', isActive: true, usageLimit: 100, timesUsed: 42 },
-    { id: 2, code: 'WELCOME500', type: 'fixed', value: 500, expiryDate: '2024-12-31', isActive: true, usageLimit: 500, timesUsed: 150 },
-    { id: 3, code: 'MONSOON10', type: 'percentage', value: 10, expiryDate: '2025-12-31', isActive: true, usageLimit: 200, timesUsed: 198 },
-    { id: 4, code: 'FLAT150', type: 'fixed', value: 150, expiryDate: '2025-01-01', isActive: true, usageLimit: 1000, timesUsed: 0 },
+    { id: 1, code: 'SUMMER25', type: 'percentage', value: 25, expiryDate: '2027-12-31', isActive: true, usageLimit: 100, timesUsed: 42 },
+    { id: 2, code: 'WELCOME500', type: 'fixed', value: 500, expiryDate: '2027-12-31', isActive: true, usageLimit: 500, timesUsed: 150 },
+    { id: 3, code: 'MONSOON10', type: 'percentage', value: 10, expiryDate: '2027-12-31', isActive: true, usageLimit: 200, timesUsed: 198 },
+    { id: 4, code: 'FLAT150', type: 'fixed', value: 150, expiryDate: '2027-12-31', isActive: true, usageLimit: 1000, timesUsed: 0 },
 ];
 
 const initialOrders: Order[] = [
@@ -1117,8 +1119,9 @@ const App: React.FC = () => {
     const storedReviews = localStorage.getItem('productReviews');
     if (storedReviews) setReviews(JSON.parse(storedReviews)); else setReviews(initialReviews);
     
-    const storedPurchases = localStorage.getItem('purchasedProducts');
-    if (storedPurchases) setPurchasedProductIds(JSON.parse(storedPurchases));
+    // Purchases are authenticated state. Do not hydrate them globally because a
+    // previous user's cached unlocks must never leak into a logged-out or newly
+    // logged-in session. Per-user access is restored in completeUserSession().
 
     const storedCart = localStorage.getItem('shoppingCart');
     if (storedCart) setCart(JSON.parse(storedCart));
@@ -1173,7 +1176,7 @@ const App: React.FC = () => {
         try {
             const currentUserData: User = JSON.parse(storedCurrentUser);
             const userIsValid = loadedUsers.some(user => user.id === currentUserData.id);
-            if (userIsValid) setCurrentUser(currentUserData);
+            if (userIsValid) void completeUserSession(currentUserData, { redirect: false });
             else localStorage.removeItem('currentUser');
         } catch (error) {
             console.error("Error parsing current user:", error);
@@ -1512,6 +1515,7 @@ const App: React.FC = () => {
       const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
       setPurchasedProductIds(newPurchasedIds);
       safeSetItem('purchasedProducts', newPurchasedIds);
+      persistUserPurchasedProducts(newPurchasedIds);
 
       if (appliedCouponCode) {
         updateCouponUsage(appliedCouponCode);
@@ -1576,7 +1580,7 @@ const App: React.FC = () => {
 
   const calculateDiscount = (coupon: Coupon, price: number): number => {
     if (coupon.type === 'fixed') return Math.min(coupon.value, price);
-    if (coupon.type === 'percentage') return (price * coupon.value) / 100;
+    if (coupon.type === 'percentage') return Math.min(price, (price * coupon.value) / 100);
     return 0;
   };
   
@@ -1619,18 +1623,42 @@ const App: React.FC = () => {
   const authButtonLabel = users.length > 0 ? 'Login' : 'Sign up';
 
   // --- Auth Handlers ---
-  const completeUserSession = (user: User) => {
+  const normalizePurchaseIds = (ids: unknown): number[] => {
+      if (!Array.isArray(ids)) return [];
+      return [...new Set(ids.map(id => Number(id)).filter(id => Number.isFinite(id)))];
+  };
+
+  const fetchUserPurchaseIdsFromBackend = async (userId: number | string): Promise<number[]> => {
+      const userDoc = await getDoc(doc(db, 'users', String(userId)));
+      const idsFromUserDoc = normalizePurchaseIds(userDoc.exists() ? userDoc.data()?.purchasedProductIds : []);
+      const purchasesSnapshot = await getDocs(collection(db, 'users', String(userId), 'purchases'));
+      const idsFromPurchaseDocs = normalizePurchaseIds(purchasesSnapshot.docs.map(item => item.data()?.productId ?? item.id));
+      return [...new Set([...idsFromUserDoc, ...idsFromPurchaseDocs])];
+  };
+
+  const completeUserSession = async (user: User, options: { redirect?: boolean } = {}) => {
+      const { redirect = true } = options;
       const sessionUser = { ...user, eduCoins: user.eduCoins ?? 120, studyMinutes: user.studyMinutes ?? 0, totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0, rewardedArticleIds: user.rewardedArticleIds || [], readArticles: user.readArticles || user.rewardedArticleIds || [], rewardedQuizIds: user.rewardedQuizIds || [], claimedRewardIds: user.claimedRewardIds || [], profileStreakClaims: user.profileStreakClaims || {}, totalLifetimeCoins: user.totalLifetimeCoins ?? user.eduCoins ?? 120, coinTransactions: user.coinTransactions || [], lastLoginAt: new Date().toISOString() };
       setCurrentUser(sessionUser);
       safeSetItem('currentUser', sessionUser);
-      const userPurchaseKey = `purchasedProducts:${sessionUser.id}`;
-      const storedUserPurchases = localStorage.getItem(userPurchaseKey);
-      const restoredPurchasedIds = Array.isArray((sessionUser as any).purchasedProductIds)
-          ? (sessionUser as any).purchasedProductIds
-          : storedUserPurchases ? JSON.parse(storedUserPurchases) : [];
-      setPurchasedProductIds(restoredPurchasedIds);
-      safeSetItem('purchasedProducts', restoredPurchasedIds);
+      setPurchasedProductIds([]);
+      localStorage.removeItem('purchasedProducts');
 
+      try {
+          const backendPurchasedIds = await fetchUserPurchaseIdsFromBackend(sessionUser.id);
+          setPurchasedProductIds(backendPurchasedIds);
+          safeSetItem(`purchasedProducts:${sessionUser.id}`, backendPurchasedIds);
+          safeSetItem('purchasedProducts', backendPurchasedIds);
+          if (backendPurchasedIds.length) {
+              const updatedSessionUser = { ...(sessionUser as any), purchasedProductIds: backendPurchasedIds };
+              setCurrentUser(updatedSessionUser);
+              safeSetItem('currentUser', updatedSessionUser);
+          }
+      } catch (error) {
+          console.warn('Purchase access restore failed; keeping this session locked until backend data is available.', error);
+      }
+
+      if (!redirect) return;
       if (productToBuyAfterLogin) {
           setSelectedProduct(productToBuyAfterLogin);
           setCurrentView('product');
@@ -1650,7 +1678,7 @@ const App: React.FC = () => {
   const handleLogin = (email: string, password: string): boolean => {
       const user = users.find(u => (u.email === email || u.mobile === email) && u.password === password);
       if (user) {
-          completeUserSession(user);
+          void completeUserSession(user);
           return true;
       }
       return false;
@@ -1664,7 +1692,7 @@ const App: React.FC = () => {
       const updatedUsers = [...users, newUser];
       setUsers(updatedUsers);
       safeSetItem('siteUsers', updatedUsers);
-      completeUserSession(newUser);
+      void completeUserSession(newUser);
       return { success: true, message: 'Account created successfully!' };
   };
 
@@ -1675,7 +1703,7 @@ const App: React.FC = () => {
           const updatedUsers = users.map(u => u.id === existingUser.id ? updatedUser : u);
           setUsers(updatedUsers);
           safeSetItem('siteUsers', updatedUsers);
-          completeUserSession(updatedUser);
+          void completeUserSession(updatedUser);
           return { success: true, message: 'Logged in successfully.' };
       }
       return handleSignup(profile.email, `otp-${profile.mobile}`, profile.name, profile.mobile);
@@ -1696,11 +1724,22 @@ const App: React.FC = () => {
       setPurchasedProductIds([]);
       setWishlist([]);
       setCart([]);
+      setSelectedProduct(null);
+      setProductToBuyAfterLogin(null);
+      setResumeCartCheckoutAfterLogin(false);
+      setAutoOpenPaymentModalFor(null);
+      setActiveCoinDiscount(null);
+      setEduCoinGuideRequest(null);
+      setQuickViewProduct(null);
+      setIsCartOpen(false);
+      setIsCartPaymentModalOpen(false);
       localStorage.removeItem('currentUser');
       localStorage.removeItem('purchasedProducts');
       localStorage.removeItem('productWishlist');
       localStorage.removeItem('shoppingCart');
+      sessionStorage.removeItem('welcomeOverlaySeen');
       setCurrentView('home');
+      window.scrollTo(0, 0);
   };
   
   const handleBackToHome = () => {
@@ -1982,6 +2021,12 @@ const App: React.FC = () => {
   };
   
   const handleViewPurchasedProduct = (product: ProductWithRating) => {
+    if (!currentUser || !purchasedProductIds.includes(product.id)) {
+      setSelectedProduct(null);
+      setCurrentView(currentUser ? 'myPurchases' : 'auth');
+      window.scrollTo(0, 0);
+      return;
+    }
     setSelectedProduct(product);
     setCurrentView('coursePlayer');
     window.scrollTo(0, 0);
@@ -2010,6 +2055,22 @@ const App: React.FC = () => {
         const newPurchasedIds = [...new Set([...purchasedProductIds, selectedProduct.id])];
         setPurchasedProductIds(newPurchasedIds);
         safeSetItem('purchasedProducts', newPurchasedIds);
+        persistUserPurchasedProducts(newPurchasedIds);
+        if (currentUser) {
+          void setDoc(doc(db, 'users', String(currentUser.id)), { purchasedProductIds: newPurchasedIds }, { merge: true }).catch(error => {
+            console.warn('Purchased product database sync failed; local unlock remains available.', error);
+          });
+          void setDoc(doc(db, 'users', String(currentUser.id), 'purchases', String(selectedProduct.id)), {
+            productId: selectedProduct.id,
+            title: selectedProduct.title,
+            quantity,
+            total: `₹${robustFinalPrice.toFixed(2)}`,
+            status: 'Completed',
+            unlockedAt: serverTimestamp(),
+          }, { merge: true }).catch(error => {
+            console.warn('Purchase database record failed; local unlock remains available.', error);
+          });
+        }
         const purchaseCoins = Math.max(0, Number(economySettings.coinPerPurchase));
         try {
           creditEduCoins(purchaseCoins, `✦ +${purchaseCoins} EduCoins Purchase Reward`, { source: 'Purchase reward', description: `Purchased ${selectedProduct.title}`, productId: selectedProduct.id });
@@ -2232,7 +2293,7 @@ const App: React.FC = () => {
     if (!currentUser) { setCurrentView('auth'); return; }
 
     const planPrice = Number(plan.price || 0);
-    const couponToApply = appliedCouponCode ? coupons.find(c => c.code.toUpperCase() === appliedCouponCode.toUpperCase()) : null;
+    const couponToApply = appliedCouponCode ? coupons.find(c => c.code.trim().toUpperCase() === appliedCouponCode.trim().toUpperCase()) : null;
     let couponDiscount = 0;
 
     if (appliedCouponCode) {
@@ -2535,12 +2596,12 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToAllProducts} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={currentUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
-      case 'coursePlayer': return selectedProduct && <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={handleNavigateToPurchases} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} />;
+      case 'coursePlayer': return currentUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) && <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={handleNavigateToPurchases} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} />;
       case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={currentUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={handleBackToHome} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
-      case 'myPurchases': return <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
-      case 'profile': return <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} />;
+      case 'myPurchases': return currentUser ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onOtpAuthenticate={handleOtpAuthenticate} onBack={handleBackFromAuth} />;
+      case 'profile': return currentUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onOtpAuthenticate={handleOtpAuthenticate} onBack={handleBackFromAuth} />;
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={handleBackToHome} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
       case 'home': default: return renderHomePageContent();

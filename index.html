@@ -694,7 +694,11 @@
       .cart-overlay, .common-modal-overlay, .coming-soon-overlay, .share-modal-overlay { background-color: rgba(8, 26, 69, 0.28) !important; }
       .common-modal-content, .coming-soon-content, .share-modal-content, .cart-sidebar { background: rgba(251,253,255,0.94) !important; border: 1px solid var(--border-soft) !important; }
       @media (max-width: 767px) {
-        .mobile-home-secondary, .mobile-app-chrome { display: none !important; }
+        /* Keep Home page sections visible on mobile; only hide the optional app chrome. */
+        .mobile-app-chrome { display: none !important; }
+        .mobile-home-secondary { display: block !important; }
+        .mobile-home-secondary :where(section) { scroll-margin-top: 1rem; }
+        .mobile-home-secondary :where(.container) { max-width: 100% !important; }
         .ai-mentor-output, [data-ai-output] { max-width: 100% !important; width: 100% !important; font-size: 1rem !important; line-height: 1.75rem !important; }
       }
 
