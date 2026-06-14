@@ -598,10 +598,10 @@ const initialReviews: { [productId: number]: Review[] } = {
 };
 
 const initialCoupons: Coupon[] = [
-    { id: 1, code: 'SUMMER25', type: 'percentage', value: 25, expiryDate: '2025-12-31', isActive: true, usageLimit: 100, timesUsed: 42 },
-    { id: 2, code: 'WELCOME500', type: 'fixed', value: 500, expiryDate: '2024-12-31', isActive: true, usageLimit: 500, timesUsed: 150 },
-    { id: 3, code: 'MONSOON10', type: 'percentage', value: 10, expiryDate: '2025-12-31', isActive: true, usageLimit: 200, timesUsed: 198 },
-    { id: 4, code: 'FLAT150', type: 'fixed', value: 150, expiryDate: '2025-01-01', isActive: true, usageLimit: 1000, timesUsed: 0 },
+    { id: 1, code: 'SUMMER25', type: 'percentage', value: 25, expiryDate: '2027-12-31', isActive: true, usageLimit: 100, timesUsed: 42 },
+    { id: 2, code: 'WELCOME500', type: 'fixed', value: 500, expiryDate: '2027-12-31', isActive: true, usageLimit: 500, timesUsed: 150 },
+    { id: 3, code: 'MONSOON10', type: 'percentage', value: 10, expiryDate: '2027-12-31', isActive: true, usageLimit: 200, timesUsed: 198 },
+    { id: 4, code: 'FLAT150', type: 'fixed', value: 150, expiryDate: '2027-12-31', isActive: true, usageLimit: 1000, timesUsed: 0 },
 ];
 
 const initialOrders: Order[] = [
@@ -1578,7 +1578,7 @@ const App: React.FC = () => {
 
   const calculateDiscount = (coupon: Coupon, price: number): number => {
     if (coupon.type === 'fixed') return Math.min(coupon.value, price);
-    if (coupon.type === 'percentage') return (price * coupon.value) / 100;
+    if (coupon.type === 'percentage') return Math.min(price, (price * coupon.value) / 100);
     return 0;
   };
   
@@ -2291,7 +2291,7 @@ const App: React.FC = () => {
     if (!currentUser) { setCurrentView('auth'); return; }
 
     const planPrice = Number(plan.price || 0);
-    const couponToApply = appliedCouponCode ? coupons.find(c => c.code.toUpperCase() === appliedCouponCode.toUpperCase()) : null;
+    const couponToApply = appliedCouponCode ? coupons.find(c => c.code.trim().toUpperCase() === appliedCouponCode.trim().toUpperCase()) : null;
     let couponDiscount = 0;
 
     if (appliedCouponCode) {
