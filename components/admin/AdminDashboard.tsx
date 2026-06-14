@@ -27,6 +27,7 @@ interface AdminDashboardProps {
     coupons: Coupon[];
     orders: Order[];
     tickets: SupportTicket[];
+    newsletterSubscribers: NewsletterSubscriber[];
     websiteSettings: WebsiteSettings;
     newsletterSubscribers: NewsletterSubscriber[];
     economySettings: EconomySettings;
@@ -37,6 +38,7 @@ interface AdminDashboardProps {
     onAdminUsersUpdate: (users: AdminUser[]) => void;
     onCouponsUpdate: (coupons: Coupon[]) => void;
     onTicketsUpdate: (tickets: SupportTicket[]) => void;
+    onSubscribersUpdate: (subscribers: NewsletterSubscriber[]) => void;
     onWebsiteSettingsChange: (settings: WebsiteSettings) => void;
     onLogout: () => void;
     onSwitchToHome: () => void;

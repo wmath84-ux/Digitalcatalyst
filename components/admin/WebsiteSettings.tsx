@@ -317,7 +317,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const redeemRewards = (((localSettings.content as any).redeemRewards || []) as EditableReward[]);
     const eduCoinRules = ((localSettings.content as any).eduCoinRules || { purchase: 25, redeemRate: 10 }) as { purchase: number; redeemRate: number };
     const dockItems = (((localSettings.content as any).dockItems || []) as string[]);
-    const dockStyle = { backgroundColor: '#020617', backgroundOpacity: 82, itemOpacity: 8, accentOpacity: 45, ...((localSettings.content as any).dockStyle || {}) };
+    const dockStyle = { backgroundColor: '#FBFDFF', backgroundOpacity: 92, itemOpacity: 96, accentOpacity: 22, height: 76, iconSize: 36, labelSize: 11, padding: 12, ...((localSettings.content as any).dockStyle || {}) };
     const readingStyle = { backgroundColor: '#f7f9fc', backgroundOpacity: 96, panelOpacity: 94, cardOpacity: 94, accentColor: '#c2e7ff', accentOpacity: 62, ...((localSettings.content as any).readingStyle || {}) };
     const profileStyle = { backgroundColor: '#e2e8f0', backgroundTint: '#e0e7ff', cardOpacity: 82, heroOverlayOpacity: 76, accentColor: '#f97316', ...((localSettings.content as any).profileStyle || {}) };
     const profileStreaks = (((localSettings.content as any).profileStreaks || []) as ProfileStreakConfig[]);
@@ -771,15 +771,33 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                 <FormRow label={`Accent Saturation (${dockStyle.accentOpacity}%)`} description="Controls the colored gradient glow inside each dock item.">
                                     <input type="range" min="0" max="85" step="1" value={dockStyle.accentOpacity} onChange={e => updateDockStyle('accentOpacity', Number(e.target.value))} className="w-full" />
                                 </FormRow>
+                                <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
+                                    <h5 className="font-black text-slate-900">Dock Size Customization</h5>
+                                    <p className="text-xs text-slate-600">Preview and save responsive dock sizing without changing dock navigation behavior.</p>
+                                    <div className="mt-3 space-y-4">
+                                        <FormRow label={`Dock Height (${dockStyle.height}px)`} description="Controls the minimum glass dock height.">
+                                            <input type="range" min="58" max="112" step="1" value={dockStyle.height} onChange={e => updateDockStyle('height', Number(e.target.value))} className="w-full" />
+                                        </FormRow>
+                                        <FormRow label={`Icon Size (${dockStyle.iconSize}px)`} description="Controls each dock icon bubble size.">
+                                            <input type="range" min="28" max="52" step="1" value={dockStyle.iconSize} onChange={e => updateDockStyle('iconSize', Number(e.target.value))} className="w-full" />
+                                        </FormRow>
+                                        <FormRow label={`Label Size (${dockStyle.labelSize}px)`} description="Controls dock label typography size.">
+                                            <input type="range" min="9" max="14" step="1" value={dockStyle.labelSize} onChange={e => updateDockStyle('labelSize', Number(e.target.value))} className="w-full" />
+                                        </FormRow>
+                                        <FormRow label={`Dock Padding (${dockStyle.padding}px)`} description="Controls the dock inner padding rhythm.">
+                                            <input type="range" min="8" max="22" step="1" value={dockStyle.padding} onChange={e => updateDockStyle('padding', Number(e.target.value))} className="w-full" />
+                                        </FormRow>
+                                    </div>
+                                </div>
                             </div>
                             <div className="rounded-2xl border border-slate-200 bg-slate-100 p-4">
                                 <p className="text-sm font-bold text-slate-700">Live Preview</p>
-                                <div className="mt-4 rounded-[2rem] border border-white/20 p-3 shadow-xl" style={{ backgroundColor: `${dockStyle.backgroundColor}${Math.round((Number(dockStyle.backgroundOpacity) / 100) * 255).toString(16).padStart(2, '0')}` }}>
+                                <div className="mt-4 rounded-[2rem] border border-blue-100 shadow-xl" style={{ backgroundColor: `${dockStyle.backgroundColor}${Math.round((Number(dockStyle.backgroundOpacity) / 100) * 255).toString(16).padStart(2, '0')}`, minHeight: Number(dockStyle.height), padding: Number(dockStyle.padding) }}>
                                     <div className="flex gap-2 overflow-hidden">
                                         {defaultDockItems.slice(0, 4).map(label => (
                                             <div key={label} className="min-w-[4.25rem] rounded-2xl border border-white/10 px-3 py-2 text-center text-white" style={{ backgroundColor: `rgba(255,255,255,${Number(dockStyle.itemOpacity) / 100})` }}>
-                                                <div className="mx-auto h-8 w-8 rounded-xl bg-indigo-500" style={{ opacity: Number(dockStyle.accentOpacity) / 100 }} />
-                                                <p className="mt-1 text-[10px] font-black">{label}</p>
+                                                <div className="mx-auto rounded-xl bg-gradient-to-br from-blue-600 to-violet-500" style={{ opacity: Number(dockStyle.accentOpacity) / 100, width: Number(dockStyle.iconSize), height: Number(dockStyle.iconSize) }} />
+                                                <p className="mt-1 font-black" style={{ fontSize: Number(dockStyle.labelSize) }}>{label}</p>
                                             </div>
                                         ))}
                                     </div>

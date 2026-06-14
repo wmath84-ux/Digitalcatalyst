@@ -51,6 +51,7 @@ const SupportManagement: React.FC<{ tickets: SupportTicket[]; onUpdate: (updated
   const [categoryFilter, setCategoryFilter] = useState('All');
   const [query, setQuery] = useState('');
 
+  const masterTagCategories = useMemo(() => ['All', ...Array.from(new Set(tickets.filter(ticket => ticket.source === 'masterTag').map(ticket => ticket.category || 'General')))], [tickets]);
   const activeTicket = useMemo(() => tickets.find(ticket => ticket.id === activeTicketId) || null, [activeTicketId, tickets]);
   const stats = useMemo(() => ({ open: tickets.filter(t => t.status === 'Open').length, pending: tickets.filter(t => t.status === 'Pending').length, resolved: tickets.filter(t => t.status === 'Resolved').length }), [tickets]);
   const categoryOptions = useMemo(() => ['All', ...Array.from(new Set(tickets.map(ticket => ticket.category).filter(Boolean) as string[]))], [tickets]);

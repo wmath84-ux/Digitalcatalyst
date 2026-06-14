@@ -36,10 +36,14 @@ const dockToneClasses: Record<string, string> = {
 
 
 const defaultDockStyle = {
-  backgroundColor: '#FFFFFF',
-  backgroundOpacity: 95,
-  itemOpacity: 100,
-  accentOpacity: 100,
+  backgroundColor: '#FBFDFF',
+  backgroundOpacity: 92,
+  itemOpacity: 96,
+  accentOpacity: 22,
+  height: 76,
+  iconSize: 36,
+  labelSize: 11,
+  padding: 12,
 };
 
 const clampPercent = (value: unknown, fallback: number) => {
@@ -81,20 +85,24 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
   const dockBackground = hexToRgba(dockStyle.backgroundColor, dockStyle.backgroundOpacity);
   const itemBackground = `rgba(255, 255, 255, ${clampPercent(dockStyle.itemOpacity, defaultDockStyle.itemOpacity) / 100})`;
   const accentOpacity = clampPercent(dockStyle.accentOpacity, defaultDockStyle.accentOpacity) / 100;
+  const dockHeight = Math.min(112, Math.max(58, Number(dockStyle.height || defaultDockStyle.height)));
+  const iconSize = Math.min(52, Math.max(28, Number(dockStyle.iconSize || defaultDockStyle.iconSize)));
+  const labelSize = Math.min(14, Math.max(9, Number(dockStyle.labelSize || defaultDockStyle.labelSize)));
+  const dockPadding = Math.min(22, Math.max(8, Number(dockStyle.padding || defaultDockStyle.padding)));
 
   return (
     <div className="fixed inset-x-0 bottom-2 md:bottom-4 z-[65] flex justify-center pointer-events-none px-3">
-      <div className="pointer-events-auto group relative max-w-[95vw] overflow-hidden rounded-[2rem] border border-[#D2E3FC] px-3 py-3 shadow-[0_18px_60px_rgba(26,115,232,0.22)] ring-1 ring-[#C2E7FF] backdrop-blur-3xl transition-all duration-500 hover:-translate-y-0.5 hover:shadow-[0_24px_80px_rgba(26,115,232,0.24)] data-[hidden=true]:translate-y-24 md:px-4" id="main-bottom-dock" style={{ backgroundColor: dockBackground }}>
+      <div className="pointer-events-auto group relative max-w-[95vw] overflow-hidden rounded-[2rem] border border-[var(--border-soft)] shadow-[var(--shadow-blue)] ring-1 ring-[var(--border-active)] backdrop-blur-3xl transition-all duration-500 hover:-translate-y-0.5 data-[hidden=true]:translate-y-24" id="main-bottom-dock" style={{ backgroundColor: dockBackground, minHeight: dockHeight, padding: dockPadding }}>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(26,115,232,0.12),transparent_30%),radial-gradient(circle_at_82%_10%,rgba(194,231,255,0.40),transparent_30%),linear-gradient(180deg,rgba(232,240,254,0.42),rgba(255,255,255,0.16))]" />
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#C2E7FF] to-transparent" />
         <div className="relative flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
           {items.map((item) => {
             const tone = dockToneClasses[item.label] || 'from-[#F8FAFD] to-[#E8F0FE] hover:border-[#D2E3FC]';
             return (
-              <button key={item.label} onClick={item.action} className={`group/item relative flex min-w-[86px] flex-col items-center rounded-2xl border border-[#DADCE0] px-3 py-2.5 text-[#202124] shadow-[0_8px_24px_rgba(60,64,67,0.06)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_12px_34px_rgba(26,115,232,0.14)] md:min-w-[92px] ${tone}`} style={{ backgroundColor: itemBackground }}>
+              <button key={item.label} onClick={item.action} className={`group/item relative flex min-w-[86px] flex-col items-center rounded-2xl border border-[var(--border-soft)] text-[var(--text-body)] shadow-[var(--shadow-soft)] transition duration-300 hover:-translate-y-1 hover:border-[var(--border-active)] hover:text-[var(--primary)] md:min-w-[92px] ${tone}`} style={{ backgroundColor: itemBackground, padding: Math.max(8, dockPadding - 2) }}>
                 <span className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${tone.split(' hover:')[0]} transition duration-300 group-hover/item:opacity-75`} style={{ opacity: accentOpacity }} />
-                <span className="relative flex h-9 w-9 items-center justify-center rounded-2xl border border-[#D2E3FC] bg-[#E8F0FE] text-xl shadow-inner transition duration-300 group-hover/item:scale-110 group-hover/item:bg-[#D3E3FD]">{item.icon}</span>
-                <span className="relative mt-1.5 text-[11px] font-black tracking-wide text-[#202124] transition group-hover/item:text-[#174EA6]">{item.label}</span>
+                <span className="relative flex items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-[var(--tag-blue)] shadow-inner transition duration-300 group-hover/item:scale-110 group-hover/item:bg-[var(--bg-section)]" style={{ width: iconSize, height: iconSize, fontSize: Math.max(16, iconSize * 0.55) }}>{item.icon}</span>
+                <span className="relative mt-1.5 font-black tracking-wide text-[var(--text-body)] transition group-hover/item:text-[var(--primary)]" style={{ fontSize: labelSize }}>{item.label}</span>
                 {item.badge ? <span className="absolute -right-1 -top-1 rounded-full border border-[#D2E3FC] bg-gradient-to-r from-[#1A73E8] to-[#174EA6] px-1.5 py-0.5 text-[10px] font-black text-white shadow-[0_8px_20px_rgba(79,70,229,0.38)]">{item.badge}</span> : null}
               </button>
             );
