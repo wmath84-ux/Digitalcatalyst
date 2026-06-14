@@ -22,13 +22,13 @@ const defaultReadingStyle = {
 
 const chatPalette = {
   appCanvas: '#F8FAFD',
-  searchBlue: '#E8F0FE',
-  activeBlue: '#C2E7FF',
+  searchBlue: '#EAF2FF',
+  activeBlue: '#CFE1FF',
   bubbleGray: '#F8FAFD',
-  cardBorder: '#E0E3EB',
-  primaryText: '#202124',
-  secondaryText: '#5F6368',
-  linkText: '#1967D2',
+  cardBorder: '#DDE6F7',
+  primaryText: '#07133F',
+  secondaryText: '#4F5B76',
+  linkText: '#0057D8',
 };
 
 const clampPercent = (value: unknown, fallback: number) => {
@@ -45,7 +45,8 @@ const hexToRgba = (hex: string, opacityPercent: number, fallback = defaultReadin
   return `rgba(${red}, ${green}, ${blue}, ${clampPercent(opacityPercent, defaultReadingStyle.backgroundOpacity) / 100})`;
 };
 
-const getArticleCoverImage = (article: NewsArticle, size = '800/600') => article.coverImage || article.thumbnailImage || `https://picsum.photos/seed/${article.imageSeed}/${size}`;
+const buildPremiumArticleImage = (article: NewsArticle) => `https://image.pollinations.ai/prompt/${encodeURIComponent(`premium calm education editorial hero card, ${article.category || article.type} ${article.title}, soft white and ice blue background, deep navy typography space, blue to violet pastel gradient, minimal vector illustration, rounded glass card, subtle geometric lines and dots, student friendly reading mode, no realistic photo, no clutter, 16:9`)}?width=1200&height=675&nologo=true&enhance=true&model=flux`;
+const getArticleCoverImage = (article: NewsArticle, size = '800/600') => article.coverImage || article.thumbnailImage || buildPremiumArticleImage(article);
 
 const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, settings: WebsiteSettings, cardBackground?: string, onReadMoreClick: (article: NewsArticle) => void }> = ({ article, animationDelay, settings, cardBackground, onReadMoreClick }) => {
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${(animationDelay % 8) + 1}` : '';
@@ -107,7 +108,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
 
   const newsArticles = articles.filter(article => article.type === 'news');
   const readingStyle = { ...defaultReadingStyle, ...((settings.content as any).readingStyle || {}) };
-  const sectionBackground = `linear-gradient(135deg, ${hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity)}, rgba(237, 244, 255, 0.92), rgba(247, 249, 252, 0.98))`;
+  const sectionBackground = `radial-gradient(circle at 0% 12%, rgba(194, 231, 255, 0.50), transparent 30%), radial-gradient(circle at 100% 15%, rgba(178, 158, 255, 0.22), transparent 28%), linear-gradient(135deg, ${hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity)}, rgba(237, 244, 255, 0.92), rgba(248, 250, 253, 0.98))`;
   const cardBackground = `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;
 
   if (newsArticles.length === 0) return null;
