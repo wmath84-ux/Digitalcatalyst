@@ -36,9 +36,9 @@ const InlineMarkdown: React.FC<{ text: string }> = ({ text }) => {
     })}</>;
 };
 
-const MarkdownMessage: React.FC<{ text: string }> = ({ text }) => {
+const MarkdownMessage: React.FC<{ text: string; isAi?: boolean }> = ({ text, isAi = false }) => {
     const blocks = text.split(/\n{2,}/).filter(Boolean);
-    return <div className="space-y-3 text-sm leading-7 text-slate-900/95">
+    return <div className={`${isAi ? 'space-y-4 text-base leading-8 sm:space-y-3 sm:text-sm sm:leading-7' : 'space-y-3 text-sm leading-7'} text-slate-900/95`}>
         {blocks.map((block, blockIndex) => {
             const trimmed = block.trim();
             if (trimmed.startsWith('```')) {
@@ -217,8 +217,8 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, on
                 <div ref={chatContainerRef} className="flex-1 space-y-4 overflow-y-auto px-3 py-4 sm:space-y-5 sm:px-4 sm:py-5 md:px-8">
                     {messages.map((msg, index) => (
                         <div key={`${msg.createdAt}-${index}`} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[92%] overflow-hidden rounded-[1.25rem] border p-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:max-w-3xl sm:rounded-[1.5rem] sm:p-4 ${msg.sender === 'user' ? 'border-cyan-200/50 bg-cyan-100/80 text-slate-900' : 'border-white/50 bg-white/70 text-slate-900'}`}>
-                                <MarkdownMessage text={msg.text} />
+                            <div className={`${msg.sender === 'ai' ? 'max-w-[98%] p-4' : 'max-w-[92%] p-3'} overflow-hidden rounded-[1.25rem] border shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:max-w-3xl sm:rounded-[1.5rem] sm:p-4 ${msg.sender === 'user' ? 'border-cyan-200/50 bg-cyan-100/80 text-slate-900' : 'border-white/50 bg-white/70 text-slate-900'}`}>
+                                <MarkdownMessage text={msg.text} isAi={msg.sender === 'ai'} />
                             </div>
                         </div>
                     ))}
