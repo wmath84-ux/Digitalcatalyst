@@ -373,6 +373,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const [activeWatchSeconds, setActiveWatchSeconds] = useState(0);
@@ -523,35 +524,35 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const isAudioExperience = activeFile?.type === 'audio';
 
   return (
-    <div className={`course-player-mobile-scope relative flex h-screen min-h-[100dvh] w-screen flex-col overflow-hidden text-slate-900 ${isAudioExperience ? 'bg-[#d9fbff]' : 'bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-slate-100'}`}>
+    <div className={`course-player-mobile-scope relative flex h-screen min-h-[100dvh] w-screen flex-col overflow-hidden text-slate-900 bg-[var(--bg-main)]`}>
       <div className={`absolute inset-0 scale-110 bg-cover bg-center blur-2xl ${isAudioExperience ? 'opacity-10' : 'opacity-20'}`} style={{ backgroundImage: `url(${backgroundImage})` }} />
       <div className={isAudioExperience ? "absolute inset-0 bg-[linear-gradient(180deg,#d9fbff_0%,#d6fbff_46%,#caf5ff_100%)]" : "absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(99,102,241,0.28),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.16),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.82),rgba(238,242,255,0.72),rgba(248,250,252,0.94))]"} />
       <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: isAudioExperience ? '#7dd3fc' : accentGlow }} />
       <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-cyan-200/45' : 'bg-indigo-300/15'}`} />
 
-      <header className={`relative z-30 flex items-center gap-2 border-b p-2.5 shadow-sm backdrop-blur-xl sm:gap-3 sm:p-3 lg:hidden ${isAudioExperience ? 'border-cyan-100/70 bg-[#d9fbff]/88' : 'border-white/50 bg-white/70'}`}>
+      <header className={`relative z-30 flex items-center gap-2 border-b p-2.5 shadow-sm backdrop-blur-xl sm:gap-3 sm:p-3 lg:hidden ${'border-[var(--border-soft)] bg-[var(--bg-glass)]/90'}`}>
         <button onClick={() => setIsSidebarOpen(true)} className="shrink-0 rounded-lg border border-white/60 bg-white/40 p-2"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
         <h1 className="min-w-0 flex-1 truncate text-base font-black sm:text-lg">{activeFile?.name || product.title}</h1>
         <div className="ml-auto flex max-w-[48vw] shrink-0 items-center gap-2 overflow-x-auto sm:max-w-none">
           {liveEarningHud}
-          <button onClick={() => setIsMentorOpen(value => !value)} className="rounded-xl border border-cyan-200/30 bg-cyan-200/15 px-2.5 py-2 text-xs font-black shadow-sm sm:px-3 sm:text-sm">🧠 AI</button>
+          <button onClick={() => setIsMentorOpen(value => !value)} className="hidden rounded-xl border border-cyan-200/30 bg-cyan-200/15 px-2.5 py-2 text-xs font-black shadow-sm sm:px-3 sm:text-sm md:inline-flex">🧠 AI</button>
         </div>
       </header>
 
       <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
       <main className="relative flex min-h-0 flex-1 flex-col gap-2 p-2 sm:gap-3 sm:p-3 lg:p-3">
-        <div className={`hidden shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid ${isAudioExperience ? 'border-cyan-100/70 bg-[#d9fbff]/88' : 'border-white/50 bg-white/70'}`}>
+        <div className={`hidden shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid ${'border-[var(--border-soft)] bg-[var(--bg-glass)]/90'}`}>
           <span className="truncate">{activeFile?.name || product.title}</span>
           <div className="flex items-center justify-center gap-3">
-            <button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-cyan-200/30 bg-cyan-200/15 px-6 py-3 text-base font-black text-cyan-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:bg-cyan-200/25">🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}</button>
+            <button onClick={() => setIsDesktopSidebarCollapsed(value => !value)} className="rounded-2xl border border-[var(--border-soft)] bg-white px-5 py-3 text-base font-black text-[var(--text-heading)] shadow-[var(--shadow-soft)] transition hover:-translate-y-0.5">{isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize modules'}</button><button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-cyan-200/30 bg-cyan-200/15 px-6 py-3 text-base font-black text-cyan-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:bg-cyan-200/25">🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}</button>
             {liveEarningHud}
           </div>
           <span className="truncate text-right text-sm font-bold text-slate-900/60">Welcome to the Course</span>
         </div>
 
-        <section className="grid min-h-0 flex-1 grid-cols-1 gap-2 sm:gap-3 lg:grid-cols-[28rem_minmax(0,1fr)]">
-          <aside className={`fixed inset-y-0 left-0 z-40 w-[18rem] transform transition sm:w-80 lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+        <section className="grid min-h-0 flex-1 grid-cols-1 gap-2 sm:gap-3 lg:grid-cols-[var(--course-sidebar-width,28rem)_minmax(0,1fr)]" style={{ ['--course-sidebar-width' as any]: isDesktopSidebarCollapsed ? '0rem' : '28rem' }}>
+          <aside className={`fixed inset-y-0 left-0 z-40 w-[18rem] transform transition sm:w-80 lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} ${isDesktopSidebarCollapsed ? 'lg:pointer-events-none lg:opacity-0' : ''}`}>
             <div className="flex h-full flex-col border-r border-slate-200/70 bg-white/95 shadow-[4px_0_30px_rgba(0,0,0,0.06)] backdrop-blur-3xl lg:rounded-2xl lg:border lg:border-slate-200/50 lg:bg-slate-900/[0.04] lg:shadow-[4px_0_30px_rgba(0,0,0,0.02)]">
               <div className="shrink-0 border-b border-slate-200/70 px-4 py-4 lg:border-white/50 lg:py-5">
                 <button onClick={onBack} className="mb-3 flex items-center gap-2 text-lg font-medium text-slate-900 hover:opacity-70 sm:mb-4 sm:text-[22px]">← <span>Back</span></button>

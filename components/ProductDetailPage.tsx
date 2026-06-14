@@ -7,7 +7,6 @@ import PaymentModal from './PaymentModal';
 import RatingsAndReviews from './RatingsAndReviews';
 import FeaturedProducts from './FeaturedProducts';
 import ShareModal from './ShareModal';
-import AiMentor from './AiMentor';
 
 const PriceChart: React.FC<{ basePrice: number, priceHistory?: PriceHistoryEntry[] }> = ({ basePrice, priceHistory }) => {
     const data: { date: Date; price: number; }[] = (() => {
@@ -576,7 +575,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       <div className="fixed bottom-6 right-6 z-40">
         {isMentorOpen && (
           <div className="w-full max-w-sm h-[70vh] max-h-[600px] bg-white/70 backdrop-blur-xl rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex flex-col mb-4 animate-fade-in-up">
-              <AiMentor productTitle={product.title} activeContentName={"Product Overview"} />
           </div>
         )}
         <button

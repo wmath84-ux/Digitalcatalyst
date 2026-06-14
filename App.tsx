@@ -388,6 +388,12 @@ export interface SupportTicket {
     repliedAt?: string;
 }
 
+export interface NewsletterSubscriber {
+    id: string;
+    email: string;
+    subscribedAt: string;
+}
+
 
 // --- Theme Customization ---
 export interface ThemePalette {
@@ -505,6 +511,10 @@ export interface WebsiteSettings {
             backgroundOpacity: number;
             itemOpacity: number;
             accentOpacity: number;
+            height?: number;
+            iconSize?: number;
+            labelSize?: number;
+            padding?: number;
         };
         readingStyle?: {
             backgroundColor: string;
@@ -608,6 +618,13 @@ const initialOrders: Order[] = [
     },
 ];
 
+
+const initialMasterTagSupportTickets: SupportTicket[] = [
+  { id: 'MT-1', customerName: 'Nisha Verma', customerEmail: 'nisha.verma@eduvora.community', subject: '@Master Master, please add weekly live doubt room', message: 'Many students need one fixed slot for funnel review, offer doubts, and quick action feedback.', date: new Date().toISOString(), status: 'Open', source: 'masterTag', communityThreadId: 1, customerAvatar: '👩‍🎓', category: 'Feature request' },
+  { id: 'MT-2', customerName: 'Arjun Mehta', customerEmail: 'arjun.mehta@eduvora.community', subject: '@Master Video lesson notes are not opening on mobile', message: 'The PDF opens on desktop but keeps loading on my Android phone. Please check the download button.', date: new Date().toISOString(), status: 'Open', source: 'masterTag', communityThreadId: 2, customerAvatar: '🧑‍💼', category: 'Bug or issue' },
+  { id: 'MT-3', customerName: 'Riya Sharma', customerEmail: 'riya.sharma@eduvora.community', subject: '@Master Need an update on next automation template', message: 'Can master upload the promised WhatsApp automation template before the weekend sprint?', date: new Date().toISOString(), status: 'Open', source: 'masterTag', communityThreadId: 3, customerAvatar: '🧕', category: 'Update' },
+];
+
 const initialSupportTickets: SupportTicket[] = [
     { 
         id: 'TKT-780B', 
@@ -684,11 +701,11 @@ const initialAdminUsers: AdminUser[] = [
 
 const defaultWebsiteSettings: WebsiteSettings = {
     theme: {
-        primaryColor: '#172554',
-        accentColor: '#4338ca',
-        backgroundColor: '#eef4ff', // enhanced blue-tinted canvas
-        textColor: '#0f172a', // slate-900
-        textMutedColor: '#334155', // slate-700
+        primaryColor: '#1769FF',
+        accentColor: '#7B61FF',
+        backgroundColor: '#F8FBFF',
+        textColor: '#081A45',
+        textMutedColor: '#536178',
         fontPairing: 'inter-lato',
         cornerRadius: '0.75rem', // lg
         shadowIntensity: 'medium',
@@ -752,10 +769,14 @@ const defaultWebsiteSettings: WebsiteSettings = {
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
         dockItems: ['Store','Purchases','Wishlist','Cart','News','Community','Blog','Free','Profile','Subscriptions'],
         dockStyle: {
-            backgroundColor: '#020617',
-            backgroundOpacity: 82,
-            itemOpacity: 8,
-            accentOpacity: 45,
+            backgroundColor: '#FBFDFF',
+            backgroundOpacity: 92,
+            itemOpacity: 96,
+            accentOpacity: 22,
+            height: 76,
+            iconSize: 36,
+            labelSize: 11,
+            padding: 12,
         },
         readingStyle: {
             backgroundColor: '#f7f9fc',
@@ -858,6 +879,7 @@ const App: React.FC = () => {
   const [coupons, setCoupons] = useState<Coupon[]>(initialCoupons);
   const [orders, setOrders] = useState<Order[]>(initialOrders);
   const [tickets, setTickets] = useState<SupportTicket[]>(initialSupportTickets);
+  const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [currentView, setCurrentView] = useState('home'); 
   const currentViewRef = React.useRef(currentView);
   const historyNavigationRef = React.useRef(false);
@@ -1135,7 +1157,16 @@ const App: React.FC = () => {
     if (storedOrders) setOrders(JSON.parse(storedOrders)); else setOrders(initialOrders);
 
     const storedTickets = localStorage.getItem('siteSupportTickets');
-    if (storedTickets) setTickets(JSON.parse(storedTickets)); else setTickets(initialSupportTickets);
+    if (storedTickets) {
+      const parsedTickets: SupportTicket[] = JSON.parse(storedTickets);
+      const mergedTickets = [...parsedTickets];
+      initialMasterTagSupportTickets.forEach(ticket => { if (!mergedTickets.some(item => item.id === ticket.id)) mergedTickets.push(ticket); });
+      setTickets(mergedTickets);
+      safeSetItem('siteSupportTickets', mergedTickets);
+    } else setTickets([...initialMasterTagSupportTickets, ...initialSupportTickets]);
+
+    const storedSubscribers = localStorage.getItem('newsletterSubscribers');
+    if (storedSubscribers) setNewsletterSubscribers(JSON.parse(storedSubscribers));
 
     const storedCurrentUser = localStorage.getItem('currentUser');
     if (storedCurrentUser) {
@@ -1592,6 +1623,13 @@ const App: React.FC = () => {
       const sessionUser = { ...user, eduCoins: user.eduCoins ?? 120, studyMinutes: user.studyMinutes ?? 0, totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0, rewardedArticleIds: user.rewardedArticleIds || [], readArticles: user.readArticles || user.rewardedArticleIds || [], rewardedQuizIds: user.rewardedQuizIds || [], claimedRewardIds: user.claimedRewardIds || [], profileStreakClaims: user.profileStreakClaims || {}, totalLifetimeCoins: user.totalLifetimeCoins ?? user.eduCoins ?? 120, coinTransactions: user.coinTransactions || [], lastLoginAt: new Date().toISOString() };
       setCurrentUser(sessionUser);
       safeSetItem('currentUser', sessionUser);
+      const userPurchaseKey = `purchasedProducts:${sessionUser.id}`;
+      const storedUserPurchases = localStorage.getItem(userPurchaseKey);
+      const restoredPurchasedIds = Array.isArray((sessionUser as any).purchasedProductIds)
+          ? (sessionUser as any).purchasedProductIds
+          : storedUserPurchases ? JSON.parse(storedUserPurchases) : [];
+      setPurchasedProductIds(restoredPurchasedIds);
+      safeSetItem('purchasedProducts', restoredPurchasedIds);
 
       if (productToBuyAfterLogin) {
           setSelectedProduct(productToBuyAfterLogin);
@@ -1643,9 +1681,25 @@ const App: React.FC = () => {
       return handleSignup(profile.email, `otp-${profile.mobile}`, profile.name, profile.mobile);
   };
 
+  const persistUserPurchasedProducts = (nextPurchasedIds: number[]) => {
+      if (!currentUser) return;
+      safeSetItem(`purchasedProducts:${currentUser.id}`, nextPurchasedIds);
+      const updatedUsers = users.map(user => user.id === currentUser.id ? { ...(user as any), purchasedProductIds: nextPurchasedIds } : user);
+      setUsers(updatedUsers as User[]);
+      safeSetItem('siteUsers', updatedUsers);
+      setCurrentUser({ ...(currentUser as any), purchasedProductIds: nextPurchasedIds });
+      safeSetItem('currentUser', { ...(currentUser as any), purchasedProductIds: nextPurchasedIds });
+  };
+
   const handleLogout = () => {
       setCurrentUser(null);
+      setPurchasedProductIds([]);
+      setWishlist([]);
+      setCart([]);
       localStorage.removeItem('currentUser');
+      localStorage.removeItem('purchasedProducts');
+      localStorage.removeItem('productWishlist');
+      localStorage.removeItem('shoppingCart');
       setCurrentView('home');
   };
   
@@ -1827,6 +1881,7 @@ const App: React.FC = () => {
       const nextPurchasedIds = [...new Set([...purchasedProductIds, ...reward.unlockProductIds])];
       setPurchasedProductIds(nextPurchasedIds);
       safeSetItem('purchasedProducts', nextPurchasedIds);
+      persistUserPurchasedProducts(nextPurchasedIds);
     }
     setInfoModal({ title: 'Milestone unlocked', message: `${reward.title} is now available.${coinReward ? ` +${coinReward} EduCoins credited.` : ''}`, icon: '🏆' });
     return true;
@@ -2005,6 +2060,7 @@ const App: React.FC = () => {
     const newPurchasedIds = [...new Set([...purchasedProductIds, product.id])];
     setPurchasedProductIds(newPurchasedIds);
     safeSetItem('purchasedProducts', newPurchasedIds);
+    persistUserPurchasedProducts(newPurchasedIds);
     if (currentUser) {
       try {
         void setDoc(doc(db, 'users', String(currentUser.id)), { purchasedProductIds: newPurchasedIds }, { merge: true }).catch(error => {
@@ -2089,6 +2145,7 @@ const App: React.FC = () => {
     const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
     setPurchasedProductIds(newPurchasedIds);
     safeSetItem('purchasedProducts', newPurchasedIds);
+    persistUserPurchasedProducts(newPurchasedIds);
     addGlobalOrder({
       id: `DC-${Date.now()}`,
       customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
@@ -2167,6 +2224,7 @@ const App: React.FC = () => {
     const newPurchasedIds = [...new Set([...purchasedProductIds, ...plan.unlockProductIds])];
     setPurchasedProductIds(newPurchasedIds);
     safeSetItem('purchasedProducts', newPurchasedIds);
+    persistUserPurchasedProducts(newPurchasedIds);
     setInfoModal({ title: 'Subscription active', message: `${plan.name} activated successfully via ${paymentLabel}.`, icon: '✅' });
   };
 
@@ -2296,13 +2354,19 @@ const App: React.FC = () => {
   };
 
   const handleSubscribe = (email: string) => {
-    const key = `subscribed:${email.toLowerCase()}`;
-    if (localStorage.getItem(key)) return;
-    localStorage.setItem(key, '1');
-    console.log(`Subscribing ${email} to the newsletter.`);
-    setSubscribedEmail(email);
+    const normalizedEmail = email.trim().toLowerCase();
+    if (!normalizedEmail) return;
+    const key = `subscribed:${normalizedEmail}`;
+    if (!localStorage.getItem(key)) {
+      const nextSubscribers = newsletterSubscribers.some(item => item.email.toLowerCase() === normalizedEmail)
+        ? newsletterSubscribers
+        : [{ id: `SUB-${Date.now()}`, email: normalizedEmail, subscribedAt: new Date().toISOString() }, ...newsletterSubscribers];
+      setNewsletterSubscribers(nextSubscribers);
+      safeSetItem('newsletterSubscribers', nextSubscribers);
+      localStorage.setItem(key, '1');
+    }
+    setSubscribedEmail(normalizedEmail);
     setIsSubscriptionModalOpen(true);
-    // In a real app, you would make an API call here to your backend.
   };
 
   const openReadingHub = (type: ReadingListType = 'blog') => {
@@ -2452,16 +2516,16 @@ const App: React.FC = () => {
           {websiteSettings.layout.map(section => {
               if (!section.visible) return null;
               switch(section.id) {
-                  case 'hero': return <React.Fragment key={section.id}><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => openReadingHub('news')} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></React.Fragment>;
+                  case 'hero': return <React.Fragment key={section.id}><div className="mobile-home-secondary"><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => openReadingHub('news')} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></div></React.Fragment>;
                   case 'purchased': return purchasedProducts.length > 0 && <PurchasedProducts settings={websiteSettings} key={section.id} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
                   case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
                   case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
-                  case 'services': return <Services settings={websiteSettings} key={section.id} services={websiteSettings.content.services} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} />;
-                  case 'news': return <LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Daily Reading Hub'} articles={websiteSettings.content.newsArticles.filter(article => article.type === 'news')} onReadMoreClick={handleViewBlogArticle} onOpenHub={() => openReadingHub('news')} />;
-                  case 'about': return <AboutUs settings={websiteSettings} key={section.id} title={websiteSettings.content.aboutUsTitle} text={websiteSettings.content.aboutUsText} imageSeed={websiteSettings.content.aboutUsImageSeed} />;
-                  case 'trust': return <TrustBadges settings={websiteSettings} key={section.id} />;
-                  case 'upcoming': return <UpcomingFeatures settings={websiteSettings} key={section.id} title={section.title || "What's Next?"} features={websiteSettings.content.upcomingFeatures} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />;
-                  case 'faq': return <Faq settings={websiteSettings} key={section.id} faqs={websiteSettings.content.faqs} />;
+                  case 'services': return <div className="mobile-home-secondary"><Services settings={websiteSettings} key={section.id} services={websiteSettings.content.services} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} /></div>;
+                  case 'news': return <div className="mobile-home-secondary"><LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Daily Reading Hub'} articles={websiteSettings.content.newsArticles.filter(article => article.type === 'news')} onReadMoreClick={handleViewBlogArticle} onOpenHub={() => openReadingHub('news')} /></div>;
+                  case 'about': return <div className="mobile-home-secondary"><AboutUs settings={websiteSettings} key={section.id} title={websiteSettings.content.aboutUsTitle} text={websiteSettings.content.aboutUsText} imageSeed={websiteSettings.content.aboutUsImageSeed} /></div>;
+                  case 'trust': return <div className="mobile-home-secondary"><TrustBadges settings={websiteSettings} key={section.id} /></div>;
+                  case 'upcoming': return <div className="mobile-home-secondary"><UpcomingFeatures settings={websiteSettings} key={section.id} title={section.title || "What's Next?"} features={websiteSettings.content.upcomingFeatures} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} /></div>;
+                  case 'faq': return <div className="mobile-home-secondary"><Faq settings={websiteSettings} key={section.id} faqs={websiteSettings.content.faqs} /></div>;
                   default: return null;
               }
           })}
@@ -2488,7 +2552,7 @@ const App: React.FC = () => {
   const renderPage = () => {
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={handleBackToHome} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
     if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} onOtpAuthenticate={handleOtpAuthenticate} onBack={handleBackFromAuth} /></div>;
-    if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
+    if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={handleBackToHome} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent()}</div>;
     if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity onClose={handleBackToHome} isAuthenticated={Boolean(currentUser)} /></div>;
@@ -2497,7 +2561,7 @@ const App: React.FC = () => {
        <ErrorBoundary>
          <div className="font-sans">
             <WelcomeOverlay onAnimationComplete={playWelcomeVoice} />
-            <Header settings={websiteSettings} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} authButtonLabel={authButtonLabel} activeTheme={activeTheme} onThemeChange={setActiveTheme} />
+            <div className="mobile-app-chrome"><Header settings={websiteSettings} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} authButtonLabel={authButtonLabel} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={() => setIsFreeModalOpen(true)} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={currentUser?.eduCoins || 0} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
@@ -2508,7 +2572,7 @@ const App: React.FC = () => {
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={currentUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
             <main key={currentView} className={appleOpenClass}>{renderContent()}</main>
-            <InstallAppButton enabled={canShowInstallPrompt} />
+            <div className="mobile-app-chrome"><InstallAppButton enabled={canShowInstallPrompt} /></div>
             <Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} />
          </div>
        </ErrorBoundary>
