@@ -84,17 +84,23 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
   const swipeStartXRef = useRef<number | null>(null);
   const progressId = useId();
 
+  const trackListKey = useMemo(() => tracks.map(track => `${track.id}:${track.url}`).join('|'), [tracks]);
   const activeTrack = tracks[activeIndex];
   const isFull = variant === 'full';
   const hasMultipleTracks = tracks.length > 1;
 
   useEffect(() => {
+    if (tracks.length === 0) return;
+
     const requestedIndex = initialTrackId ? tracks.findIndex(track => track.id === initialTrackId) : -1;
-    setActiveIndex(requestedIndex >= 0 ? requestedIndex : 0);
-    setIsPlaying(false);
-    setCurrentTime(0);
-    setDuration(0);
-  }, [fallbackTitle, initialTrackId, tracks]);
+    const nextIndex = requestedIndex >= 0 ? requestedIndex : 0;
+
+    setActiveIndex(currentIndex => {
+      const currentTrack = tracks[currentIndex];
+      if (currentTrack && currentIndex === nextIndex) return currentIndex;
+      return nextIndex;
+    });
+  }, [initialTrackId, trackListKey]);
 
   useEffect(() => {
     const audio = audioRef.current;
@@ -108,10 +114,10 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
 
     if (isPlaying) {
       audio.play().catch(() => setIsPlaying(false));
-    } else {
+    } else if (!audio.paused) {
       audio.pause();
     }
-  }, [activeIndex, isPlaying]);
+  }, [activeTrack?.url, isPlaying]);
 
   useEffect(() => {
     setIsDownloadMenuOpen(false);
@@ -135,18 +141,22 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
 
     const syncProgress = () => {
       const audio = audioRef.current;
-      if (audio) setCurrentTime(audio.currentTime);
+      if (audio) {
+        setCurrentTime(audio.currentTime);
+        if (Number.isFinite(audio.duration)) setDuration(audio.duration);
+      }
       frameId = window.requestAnimationFrame(syncProgress);
     };
 
     frameId = window.requestAnimationFrame(syncProgress);
     return () => window.cancelAnimationFrame(frameId);
-  }, [activeIndex, isPlaying]);
+  }, [activeTrack?.url, isPlaying]);
 
   if (tracks.length === 0 || !activeTrack) return null;
 
   const goToTrack = (index: number) => {
     const nextIndex = (index + tracks.length) % tracks.length;
+    if (nextIndex === activeIndex) return;
     setActiveIndex(nextIndex);
     setCurrentTime(0);
   };
@@ -244,8 +254,13 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
         src={activeTrack.url}
         loop={isLooping}
         preload="metadata"
-        onLoadedMetadata={event => setDuration(event.currentTarget.duration || 0)}
+        onLoadedMetadata={event => {
+          setDuration(event.currentTarget.duration || 0);
+          setCurrentTime(event.currentTarget.currentTime || 0);
+        }}
         onTimeUpdate={event => setCurrentTime(event.currentTarget.currentTime)}
+        onPlay={() => setIsPlaying(true)}
+        onPause={() => setIsPlaying(false)}
         onEnded={() => (isLooping ? undefined : goToNext())}
         onError={onError}
       />

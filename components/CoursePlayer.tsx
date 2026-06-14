@@ -473,6 +473,18 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     return () => window.clearInterval(timer);
   }, [activeFile, economySettings.coinPerVideoMinute, isPlaybackWindowFocused, isVideoPlaying, onWatchTimeMinutes]);
 
+  const activeAudioTracks = useMemo<AudioTrack[]>(() => {
+    if (activeFile?.type !== 'audio') return [];
+
+    return [{
+      id: activeFile.id,
+      title: activeFile.name || 'Course audio',
+      subtitle: product.title,
+      url: activeFile.url,
+      cover: backgroundImage,
+    }];
+  }, [activeFile, backgroundImage, product.title]);
+
   const liveEarningHud = activeFile?.type === 'video' ? (
     <div className="bg-white/50 backdrop-blur-md border border-slate-200 shadow-sm rounded-full px-4 py-1.5 flex items-center gap-2 text-sm font-semibold text-slate-800 transition-all whitespace-nowrap max-sm:px-3 max-sm:text-xs" aria-live="polite">
       <span>⏱️ {formatActiveWatchTime(activeWatchSeconds)} Mins</span>
@@ -491,17 +503,10 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       }
       case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onPlay={() => setIsVideoPlaying(true)} onPause={() => setIsVideoPlaying(false)} onEnded={() => setIsVideoPlaying(false)} onError={() => { setIsVideoPlaying(false); setMediaHasError(true); }} />;
       case 'audio': {
-        const audioTracks: AudioTrack[] = [{
-          id: activeFile.id,
-          title: activeFile.name || 'Course audio',
-          subtitle: product.title,
-          url: activeFile.url,
-          cover: backgroundImage,
-        }];
         return (
           <div className="flex h-full w-full bg-[#d9fbff] p-2 text-slate-900 sm:p-5">
             <ProductMusicPlayer
-              tracks={audioTracks}
+              tracks={activeAudioTracks}
               title={activeFile.name || product.title}
               variant="full"
               className="h-full w-full"
