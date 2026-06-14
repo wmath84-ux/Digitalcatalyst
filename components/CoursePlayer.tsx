@@ -499,7 +499,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           cover: backgroundImage,
         }];
         return (
-          <div className="flex h-full w-full bg-[#d9fbff] p-2 text-slate-900 sm:p-5">
+          <div className="flex h-full w-full bg-white/40 p-2 text-slate-900 sm:p-5">
             <ProductMusicPlayer
               tracks={audioTracks}
               title={activeFile.name || product.title}
@@ -521,14 +521,12 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     }
   };
 
-  const isAudioExperience = activeFile?.type === 'audio';
-
   return (
     <div className={`course-player-mobile-scope relative flex h-screen min-h-[100dvh] w-screen flex-col overflow-hidden text-slate-900 bg-[var(--bg-main)]`}>
-      <div className={`absolute inset-0 scale-110 bg-cover bg-center blur-2xl ${isAudioExperience ? 'opacity-10' : 'opacity-20'}`} style={{ backgroundImage: `url(${backgroundImage})` }} />
-      <div className={isAudioExperience ? "absolute inset-0 bg-[linear-gradient(180deg,#d9fbff_0%,#d6fbff_46%,#caf5ff_100%)]" : "absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(99,102,241,0.28),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.16),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.82),rgba(238,242,255,0.72),rgba(248,250,252,0.94))]"} />
-      <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: isAudioExperience ? '#7dd3fc' : accentGlow }} />
-      <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-cyan-200/45' : 'bg-indigo-300/15'}`} />
+      <div className="absolute inset-0 scale-110 bg-cover bg-center opacity-20 blur-2xl" style={{ backgroundImage: `url(${backgroundImage})` }} />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(99,102,241,0.28),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.16),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.82),rgba(238,242,255,0.72),rgba(248,250,252,0.94))]" />
+      <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: accentGlow }} />
+      <div className="absolute -top-12 right-12 h-72 w-72 rounded-full bg-indigo-300/15 blur-3xl" />
 
       <header className={`relative z-30 flex items-center gap-2 border-b p-2.5 shadow-sm backdrop-blur-xl sm:gap-3 sm:p-3 lg:hidden ${'border-[var(--border-soft)] bg-[var(--bg-glass)]/90'}`}>
         <button onClick={() => setIsSidebarOpen(true)} className="shrink-0 rounded-lg border border-white/60 bg-white/40 p-2"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
@@ -564,7 +562,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
             </div>
           </aside>
 
-          <div className={`relative min-h-0 overflow-hidden rounded-2xl border shadow-[0_20px_60px_rgba(0,0,0,0.05)] backdrop-blur-2xl sm:rounded-3xl ${isAudioExperience ? 'border-cyan-100/60 bg-[#d9fbff]/72' : 'border-slate-200/60 bg-white/40'}`}>
+          <div className="relative min-h-0 overflow-hidden rounded-2xl border border-slate-200/60 bg-white/40 shadow-[0_20px_60px_rgba(0,0,0,0.05)] backdrop-blur-2xl sm:rounded-3xl">
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>
