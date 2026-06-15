@@ -19,9 +19,7 @@ interface ProfilePageProps {
   onExplore: () => void;
   activeTheme: ThemeName;
   onThemeChange: (themeName: ThemeName) => void;
-  users: User[];
-  setUsers: (users: User[]) => void;
-  setCurrentUser: (user: User | null) => void;
+  onSyncCurrentUser: (updater: (user: User) => User, transaction?: Omit<CoinTransaction, 'id' | 'createdAt'>) => User | null;
   onClaimMilestoneReward: (reward: { id: string; title: string; requirement: number; unlockProductIds?: number[]; coinReward?: number; currentValue?: number }) => boolean;
   onOpenVerifiedCourse?: (course: ProductWithRating) => void;
 }
@@ -125,9 +123,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   onExplore,
   activeTheme,
   onThemeChange,
-  users,
-  setUsers,
-  setCurrentUser,
+  onSyncCurrentUser,
   onClaimMilestoneReward,
   onOpenVerifiedCourse,
 }) => {
@@ -393,18 +389,13 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   ];
 
   const syncProfileUser = (updated: User, entry?: CoinTransaction) => {
-    const userWithLedger = entry ? { ...updated, coinTransactions: [entry, ...(updated.coinTransactions || [])].slice(0, 25) } : updated;
-    const updatedUsers = users.some(user => user.id === userWithLedger.id) ? users.map(user => (user.id === userWithLedger.id ? userWithLedger : user)) : [...users, userWithLedger];
-    setUsers(updatedUsers);
-    localStorage.setItem('siteUsers', JSON.stringify(updatedUsers));
-    localStorage.setItem('currentUser', JSON.stringify(userWithLedger));
-    setCurrentUser(userWithLedger);
-    if (entry) {
-      const storageKey = `coinTransactions-${userWithLedger.id}`;
-      const localLedger = JSON.parse(localStorage.getItem(storageKey) || '[]') as CoinTransaction[];
-      localStorage.setItem(storageKey, JSON.stringify([entry, ...(Array.isArray(localLedger) ? localLedger : [])].slice(0, 100)));
-      setCoinTransactions(prev => [entry, ...prev].slice(0, 12));
-    }
+    onSyncCurrentUser(() => updated, entry ? {
+      amount: entry.amount,
+      type: entry.type,
+      source: entry.source,
+      title: entry.title,
+      description: entry.description,
+    } : undefined);
   };
 
   const handleStreakClaim = (streak: typeof streakCards[number]) => {
