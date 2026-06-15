@@ -76,13 +76,10 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, onEmailLogin, onEmailSign
     const handleForgotPassword = async () => {
         setError('');
         setSuccess('');
-        if (!isValidEmail) {
-            setError('Enter your account email first, then tap Forgot password?.');
-            return;
-        }
+        setMode('login');
         setIsSubmitting(true);
         try {
-            const result = await onPasswordReset(email.trim().toLowerCase());
+            const result = await onPasswordReset(email);
             if (result.success) setSuccess(result.message);
             else setError(result.message);
         } finally {
@@ -159,7 +156,12 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, onEmailLogin, onEmailSign
                                 <button type="button" onClick={handleForgotPassword} disabled={isSubmitting} className="text-sm font-bold text-blue-800 hover:text-blue-950 disabled:cursor-not-allowed disabled:opacity-60">Forgot password?</button>
                             </div>
                         )}
-                        {success && <p className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3">{success}</p>}
+                        {success && (
+                            <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
+                                <p>{success}</p>
+                                {mode === 'login' && <p className="mt-1 font-semibold">Check your Inbox, Spam, or Promotions folder.</p>}
+                            </div>
+                        )}
                         {error && <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl p-3">{error}</p>}
                         <button type="submit" disabled={isSubmitting} className="w-full rounded-2xl bg-gradient-to-r from-slate-950 via-blue-900 to-indigo-800 px-6 py-3.5 font-black text-white shadow-[0_14px_34px_rgba(30,64,175,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-70 sm:px-8 sm:py-4">{isSubmitting ? 'Please wait...' : mode === 'login' ? 'Login to learning store' : 'Create account'}</button>
                     </form>
