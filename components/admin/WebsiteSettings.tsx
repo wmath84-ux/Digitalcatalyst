@@ -324,6 +324,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const profileStreaks = (((localSettings.content as any).profileStreaks || []) as ProfileStreakConfig[]);
     const profileMilestones = (((localSettings.content as any).profileMilestones || []) as ProfileMilestoneConfig[]);
     const defaultDockItems = dockCustomizationItems;
+    const selectedDockItems = dockItems.length ? dockItems : defaultDockItems;
 
     const updatePlan = (planIndex: number, updates: Partial<EditableSubscriptionPlan>) => {
         const nextPlans = subscriptionPlans.map((plan, index) => index === planIndex ? { ...plan, ...updates } : plan);
@@ -361,8 +362,9 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     };
 
     const toggleDockItem = (label: string) => {
-        const currentItems = dockItems.length ? dockItems : defaultDockItems;
-        const nextItems = currentItems.includes(label) ? currentItems.filter(item => item !== label) : [...currentItems, label];
+        const nextItems = selectedDockItems.includes(label)
+            ? selectedDockItems.filter(item => item !== label)
+            : [...selectedDockItems, label];
         updateContentValue('dockItems', nextItems);
     };
 

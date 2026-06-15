@@ -420,6 +420,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   }, []);
 
   const backgroundImage = useMemo(() => getCourseBackground(product, activeFile), [product, activeFile]);
+  const isAudioExperience = activeFile?.type === 'audio';
   const accentGlow = settings.theme?.accentColor || '#a5f3fc';
 
   const onSelectFile = (file: ProductFile) => {
