@@ -152,7 +152,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     }
 
     return (
-        <div className="admin-mobile-scope tagmaster-admin-theme flex min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_10%_10%,rgba(79,70,229,0.16),transparent_30%),radial-gradient(circle_at_90%_0%,rgba(14,165,233,0.13),transparent_28%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] font-sans">
+        <div className="admin-mobile-scope tagmaster-admin-theme flex h-[100dvh] min-h-[100dvh] w-full max-w-full overflow-hidden bg-[#d8e0ef] bg-[radial-gradient(circle_at_10%_10%,rgba(79,70,229,0.16),transparent_30%),radial-gradient(circle_at_90%_0%,rgba(14,165,233,0.13),transparent_28%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] font-sans">
             <Sidebar 
                 onNavigate={setCurrentView} 
                 onLogout={props.onLogout} 
@@ -162,25 +162,25 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 onClose={() => setIsMobileSidebarOpen(false)}
             />
             
-            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
                 {/* Mobile Header */}
-                <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-300/70 bg-white/80 p-3 shadow-sm backdrop-blur-xl md:hidden">
+                <header className="z-30 flex shrink-0 items-center justify-between border-b border-slate-300/70 bg-white/85 px-3 py-2.5 shadow-sm backdrop-blur-xl md:hidden">
                     <div className="flex items-center gap-3">
                         <button 
                             onClick={() => setIsMobileSidebarOpen(true)}
-                            className="p-2 -ml-2 text-slate-700 hover:bg-white/80 rounded-lg"
+                            className="-ml-1 rounded-xl p-2 text-slate-700 transition-colors hover:bg-white/80"
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                         </button>
-                        <span className="text-base font-bold text-slate-800">Admin Panel</span>
+                        <span className="text-sm font-bold text-slate-800">Admin Panel</span>
                     </div>
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-700 to-indigo-800 rounded-full flex items-center justify-center text-white text-xs font-bold">
                         {props.currentAdminUser.email.charAt(0).toUpperCase()}
                     </div>
                 </header>
 
-                <main className="flex-1 overflow-y-auto bg-white/20 p-3 backdrop-blur-sm custom-scrollbar sm:p-8 lg:p-10">
-                    <div className="max-w-7xl mx-auto">
+                <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-white/20 p-3 backdrop-blur-sm custom-scrollbar sm:p-6 lg:p-10">
+                    <div className="mx-auto w-full max-w-7xl">
                         {renderView()}
                     </div>
                 </main>
