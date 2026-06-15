@@ -1,0 +1,55 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function isOwner(uid) { return signedIn() && request.auth.uid == uid; }
+    function isAdmin() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+    }
+    function protectedUserFieldsUnchanged() {
+      return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'purchasedProductIds']);
+    }
+
+    match /users/{uid} {
+      allow read: if isOwner(uid) || isAdmin();
+      allow create: if isOwner(uid)
+        && request.resource.data.uid == uid
+        && request.resource.data.role == 'user'
+        && request.resource.data.status == 'active'
+        && (!('purchasedProductIds' in request.resource.data) || request.resource.data.purchasedProductIds == []);
+      allow update: if isOwner(uid) && protectedUserFieldsUnchanged();
+      allow write: if isAdmin();
+
+      match /purchases/{productId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create: if isOwner(uid)
+          && request.resource.data.productId == int(productId)
+          && request.resource.data.status in ['Completed', 'Verified', 'Active']
+          && request.resource.data.source in ['razorpay', 'educoin', 'manual_admin'];
+        allow update, delete: if isAdmin();
+      }
+
+      match /coinTransactions/{transactionId} {
+        allow read, create: if isOwner(uid) || isAdmin();
+        allow update, delete: if isAdmin();
+      }
+    }
+
+    match /siteProducts/{productId} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /siteOrders/{orderId} {
+      allow create: if signedIn() && request.resource.data.customerUid == request.auth.uid;
+      allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid);
+      allow update, delete: if isAdmin();
+    }
+
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}
