@@ -4,6 +4,7 @@ import { WebsiteSettings, HomepageSection, Announcement, ProductWithRating, Prof
 import { ServiceItem } from '../Services';
 import { FaqItem } from '../Faq';
 import { UpcomingFeatureItem } from '../UpcomingFeatures';
+import { defaultDockStyle, dockCustomizationItems } from '../BottomGlassDock';
 
 const sectionNames: Record<HomepageSection['id'], string> = {
     hero: 'Hero Section',
@@ -322,7 +323,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const profileStyle = { backgroundColor: '#e2e8f0', backgroundTint: '#e0e7ff', cardOpacity: 82, heroOverlayOpacity: 76, accentColor: '#f97316', ...((localSettings.content as any).profileStyle || {}) };
     const profileStreaks = (((localSettings.content as any).profileStreaks || []) as ProfileStreakConfig[]);
     const profileMilestones = (((localSettings.content as any).profileMilestones || []) as ProfileMilestoneConfig[]);
-    const defaultDockItems = ['Store', 'Purchases', 'Wishlist', 'Cart', 'News', 'Blog', 'Free', 'Profile', 'Subscriptions'];
+    const defaultDockItems = dockCustomizationItems;
 
     const updatePlan = (planIndex: number, updates: Partial<EditableSubscriptionPlan>) => {
         const nextPlans = subscriptionPlans.map((plan, index) => index === planIndex ? { ...plan, ...updates } : plan);
@@ -360,7 +361,8 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     };
 
     const toggleDockItem = (label: string) => {
-        const nextItems = dockItems.includes(label) ? dockItems.filter(item => item !== label) : [...dockItems, label];
+        const currentItems = dockItems.length ? dockItems : defaultDockItems;
+        const nextItems = currentItems.includes(label) ? currentItems.filter(item => item !== label) : [...currentItems, label];
         updateContentValue('dockItems', nextItems);
     };
 
@@ -749,7 +751,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                         <p className="text-sm text-slate-600">Choose which labels should appear in the bottom dock for every user.</p>
                         <div className="mt-3 flex flex-wrap gap-2">
                             {defaultDockItems.map(label => (
-                                <button type="button" key={label} onClick={() => toggleDockItem(label)} className={`rounded-full border px-4 py-2 text-sm font-bold ${dockItems.includes(label) ? 'border-blue-600 bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'border-slate-200/80 bg-slate-100/80 text-gray-700'}`}>{label}</button>
+                                <button type="button" key={label} onClick={() => toggleDockItem(label)} className={`rounded-full border px-4 py-2 text-sm font-bold ${selectedDockItems.includes(label) ? 'border-blue-600 bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'border-slate-200/80 bg-slate-100/80 text-gray-700'}`}>{label}</button>
                             ))}
                         </div>
                     </div>

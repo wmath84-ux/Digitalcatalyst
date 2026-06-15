@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import { ProductWithRating, User, WebsiteSettings } from '../App';
+import type { ProductWithRating, User, WebsiteSettings } from '../App';
 
 interface BottomGlassDockProps {
   currentUser: User | null;
@@ -35,7 +35,9 @@ const dockToneClasses: Record<string, string> = {
 };
 
 
-const defaultDockStyle = {
+export const dockCustomizationItems = ['Store', 'Purchases', 'Wishlist', 'Cart', 'News', 'Community', 'Blog', 'Free', 'Profile', 'Subscriptions'];
+
+export const defaultDockStyle = {
   backgroundColor: '#FBFDFF',
   backgroundOpacity: 92,
   itemOpacity: 96,
@@ -72,10 +74,8 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
     { label: 'Free', action: onOpenFreeModal, icon: '🎁', badge: null },
     { label: currentUser ? 'Profile' : authButtonLabel, action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null },
   ]), [onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenCommunity, onOpenBlogModal, onOpenFreeModal, currentUser, authButtonLabel, onProfileClick]);
-  const configuredBase = ((settings.content as any).dockItems || defaultItems.map(i => i.label)) as string[];
-  const configured = onOpenCommunity && !configuredBase.includes('Community')
-    ? [...configuredBase.slice(0, Math.max(configuredBase.indexOf('News') + 1, 0)), 'Community', ...configuredBase.slice(Math.max(configuredBase.indexOf('News') + 1, 0))]
-    : configuredBase;
+  const configuredBase = ((settings.content as any).dockItems || dockCustomizationItems) as string[];
+  const configured = configuredBase.filter((label, index, labels) => labels.indexOf(label) === index);
   const map: any = Object.fromEntries(defaultItems.map(i => [i.label, i]));
   map['EduCoins'] = map['Profile'] || { label: currentUser ? 'Profile' : authButtonLabel, action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null };
   map['Profile'] = map['Profile'] || { label: currentUser ? 'Profile' : authButtonLabel, action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null };
