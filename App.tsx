@@ -38,7 +38,7 @@ import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
 import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
+import { createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
 
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
@@ -1749,6 +1749,11 @@ const App: React.FC = () => {
   }, []);
 
   const getFirebaseAuthErrorMessage = (error: any) => {
+      if (error?.code === 'auth/email-already-in-use') return 'This email already has an account. Please login instead.';
+      if (error?.code === 'auth/invalid-credential') return 'Invalid email or password.';
+      if (error?.code === 'auth/weak-password') return 'Password should be at least 6 characters.';
+      if (error?.code === 'auth/invalid-email') return 'Please enter a valid email address.';
+      if (error?.code === 'auth/user-not-found') return 'No account found. Please sign up first.';
       if (error?.code === 'auth/configuration-not-found') {
           return 'Firebase Email/Password authentication is not enabled for this project. Please enable the Email/Password sign-in provider in Firebase Console, then try again.';
       }
@@ -1761,24 +1766,34 @@ const App: React.FC = () => {
       return error?.message || 'Unable to authenticate with Firebase.';
   };
 
-  const handleOtpAuthenticate = (profile: { name: string; email: string; mobile: string }): { success: boolean, message: string } => {
-      const password = `otp-${profile.mobile}`;
-      signInWithEmailAndPassword(auth, profile.email, password)
-        .then(credential => completeFirebaseUserSession(credential.user, { profile }))
-        .catch(async error => {
-            try {
-                if (error?.code === 'auth/user-not-found' || error?.code === 'auth/invalid-credential') {
-                    const credential = await createUserWithEmailAndPassword(auth, profile.email, password);
-                    await updateProfile(credential.user, { displayName: profile.name });
-                    await completeFirebaseUserSession(credential.user, { profile });
-                    return;
-                }
-                setInfoModal({ title: 'Login failed', message: getFirebaseAuthErrorMessage(error), icon: '⚠️' });
-            } catch (signupError) {
-                setInfoModal({ title: 'Login failed', message: getFirebaseAuthErrorMessage(signupError), icon: '⚠️' });
-            }
-        });
-      return { success: true, message: 'Authenticating with Firebase...' };
+  const handleEmailLogin = async (email: string, password: string): Promise<{ success: boolean, message: string }> => {
+      try {
+          const credential = await signInWithEmailAndPassword(auth, email, password);
+          await completeFirebaseUserSession(credential.user, { profile: { name: credential.user.displayName || undefined, mobile: credential.user.phoneNumber || undefined } });
+          return { success: true, message: 'Login successful.' };
+      } catch (error) {
+          return { success: false, message: getFirebaseAuthErrorMessage(error) };
+      }
+  };
+
+  const handleEmailSignup = async (profile: { name: string; email: string; mobile: string }, password: string): Promise<{ success: boolean, message: string }> => {
+      try {
+          const credential = await createUserWithEmailAndPassword(auth, profile.email, password);
+          await updateProfile(credential.user, { displayName: profile.name });
+          await completeFirebaseUserSession(credential.user, { profile });
+          return { success: true, message: 'Account created successfully.' };
+      } catch (error) {
+          return { success: false, message: getFirebaseAuthErrorMessage(error) };
+      }
+  };
+
+  const handlePasswordReset = async (email: string): Promise<{ success: boolean, message: string }> => {
+      try {
+          await sendPasswordResetEmail(auth, email);
+          return { success: true, message: 'Password reset email sent. Please check your inbox.' };
+      } catch (error) {
+          return { success: false, message: getFirebaseAuthErrorMessage(error) };
+      }
   };
 
   const persistPurchaseEntitlement = async (uid: string, product: ProductWithRating, orderData: { quantity: number; total: string; source: 'razorpay' | 'educoin' | 'manual_admin'; orderId: string; paymentId?: string; status?: 'Completed' | 'Verified' | 'Active' }) => {
@@ -2688,8 +2703,8 @@ const App: React.FC = () => {
       case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={currentUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={handleBackToHome} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
-      case 'myPurchases': return currentUser ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onOtpAuthenticate={handleOtpAuthenticate} onBack={handleBackFromAuth} />;
-      case 'profile': return currentUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onOtpAuthenticate={handleOtpAuthenticate} onBack={handleBackFromAuth} />;
+      case 'myPurchases': return currentUser ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+      case 'profile': return currentUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={handleBackToHome} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={handleBackToHome} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
@@ -2701,7 +2716,7 @@ const App: React.FC = () => {
 
   const renderPage = () => {
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={handleBackToHome} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
-    if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} onOtpAuthenticate={handleOtpAuthenticate} onBack={handleBackFromAuth} /></div>;
+    if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={handleBackToHome} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent()}</div>;
