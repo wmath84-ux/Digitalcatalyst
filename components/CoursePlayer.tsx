@@ -347,6 +347,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
   const [rewardCoins, setRewardCoins] = useState(0);
   const quizViewport = useViewportSize();
   const compactQuiz = quizViewport.isShortHeight || quizViewport.isTinyPlayer || quizViewport.isLandscapeCompact || quizViewport.width < 640;
+  const veryCompactQuiz = quizViewport.isTinyPlayer || quizViewport.height < 620;
   const score = questions.reduce((total, q, index) => total + (answers[index] === q.correctAnswer ? 1 : 0), 0);
   if (!questions.length) return <GlassDownloadCard file={file} headline="Quiz unavailable" />;
 
@@ -364,22 +365,22 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
   };
 
   return (
-    <div className={`flex h-full min-h-0 overflow-hidden text-slate-900 ${compactQuiz ? 'p-2' : 'p-3 sm:p-5 md:p-8'}`}>
-      <div className={`mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col rounded-[1.5rem] border border-white/50 bg-white/78 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl sm:rounded-[2rem] ${compactQuiz ? 'p-3' : 'p-4 sm:p-6 md:p-8'}`}>
-        <div className={`${compactQuiz ? 'mb-2 gap-2' : 'mb-5 gap-4 sm:mb-8'} flex shrink-0 flex-col sm:flex-row sm:items-center sm:justify-between`}>
-          <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-700 sm:tracking-[0.3em]">Interactive Quiz</p>
-            <h2 className="mt-2 truncate text-2xl font-black text-slate-900 sm:text-3xl">{file.name}</h2>
+    <div className={`flex h-full min-h-0 overflow-hidden text-slate-900 ${compactQuiz ? 'p-1.5' : 'p-3 sm:p-5 md:p-8'}`}>
+      <div className={`mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col rounded-[1.25rem] border border-white/50 bg-white/78 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl sm:rounded-[2rem] ${compactQuiz ? 'p-2' : 'p-4 sm:p-6 md:p-8'}`}>
+        <div className={`${compactQuiz ? 'mb-1.5 flex-row items-center gap-2' : 'mb-5 gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between'} flex shrink-0 justify-between`}>
+          <div className="min-w-0 flex-1">
+            <p className={`${veryCompactQuiz ? 'hidden' : 'block'} text-[10px] font-black uppercase tracking-[0.22em] text-cyan-700 sm:text-xs sm:tracking-[0.3em]`}>Interactive Quiz</p>
+            <h2 className={`${compactQuiz ? 'mt-0 text-lg' : 'mt-2 text-2xl sm:text-3xl'} truncate font-black text-slate-900`}>{file.name}</h2>
           </div>
-          <div className="w-fit rounded-2xl border border-white/50 bg-white/70 px-4 py-2 text-base font-black text-slate-900 sm:px-5 sm:py-3 sm:text-lg">Score: {score}/{questions.length}</div>
+          <div className={`${compactQuiz ? 'rounded-xl px-3 py-1.5 text-sm' : 'rounded-2xl px-4 py-2 text-base sm:px-5 sm:py-3 sm:text-lg'} shrink-0 border border-white/50 bg-white/70 font-black text-slate-900`}>Score: {score}/{questions.length}</div>
         </div>
 
-        <div className={`${compactQuiz ? 'mb-2' : 'mb-6'} h-2 shrink-0 overflow-hidden rounded-full bg-white/70`}>
+        <div className={`${compactQuiz ? 'mb-1.5 h-1.5' : 'mb-6 h-2'} shrink-0 overflow-hidden rounded-full bg-white/70`}>
           <div className="h-full rounded-full bg-cyan-200 transition-all" style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }} />
         </div>
 
         {questions.length > 1 && (
-          <div className={`${compactQuiz ? 'mb-2 max-h-16 p-2' : 'mb-5 max-h-28 p-3 sm:mb-6'} flex shrink-0 flex-wrap gap-2 overflow-y-auto rounded-3xl border border-white/50 bg-white/70 custom-scrollbar`}>
+          <div className={`${compactQuiz ? 'mb-1.5 flex-nowrap gap-1.5 overflow-x-auto p-1.5' : 'mb-5 max-h-28 flex-wrap gap-2 overflow-y-auto p-3 sm:mb-6'} flex shrink-0 rounded-2xl border border-white/50 bg-white/70 custom-scrollbar`}>
             {questions.map((_, index) => {
               const isActive = currentQuestion === index;
               const isAnswered = answers[index] !== undefined;
@@ -388,7 +389,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
                   key={index}
                   type="button"
                   onClick={() => setCurrentQuestion(index)}
-                  className={`rounded-2xl px-4 py-2 text-sm font-black transition ${isActive ? 'bg-cyan-200 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5' : isAnswered ? 'border border-emerald-300/40 bg-emerald-400/10 text-emerald-700 hover:bg-emerald-400/20' : 'border border-white/50 bg-white/70 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}
+                  className={`${compactQuiz ? 'rounded-xl px-3 py-1.5 text-xs' : 'rounded-2xl px-4 py-2 text-sm'} shrink-0 font-black transition ${isActive ? 'bg-cyan-200 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5' : isAnswered ? 'border border-emerald-300/40 bg-emerald-400/10 text-emerald-700 hover:bg-emerald-400/20' : 'border border-white/50 bg-white/70 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}
                   aria-current={isActive ? 'step' : undefined}
                 >
                   Q{index + 1}
@@ -398,9 +399,9 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
           </div>
         )}
 
-        <div className="min-h-0 flex-1 overflow-y-auto rounded-[1.5rem] border border-white/50 bg-white/70 p-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:rounded-3xl sm:p-5 md:p-7 custom-scrollbar">
-          <p className="mb-3 text-sm font-black uppercase tracking-[0.24em] text-slate-600">Question {currentQuestion + 1} of {questions.length}</p>
-          <h3 className={`${compactQuiz ? 'text-lg' : 'text-xl sm:text-2xl'} font-black leading-tight text-slate-900`}>{question.prompt}</h3>
+        <div className={`${compactQuiz ? 'rounded-2xl p-3' : 'rounded-[1.5rem] p-3 sm:rounded-3xl sm:p-5 md:p-7'} min-h-0 flex-1 overflow-y-auto border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] custom-scrollbar`}>
+          <p className={`${compactQuiz ? 'mb-1.5 text-[10px]' : 'mb-3 text-sm'} font-black uppercase tracking-[0.24em] text-slate-600`}>Question {currentQuestion + 1} of {questions.length}</p>
+          <h3 className={`${compactQuiz ? 'text-base' : 'text-xl sm:text-2xl'} font-black leading-tight text-slate-900`}>{question.prompt}</h3>
           <div className={`${compactQuiz ? 'mt-3 gap-2' : 'mt-5 gap-3'} grid md:grid-cols-2`}>
             {(question.options || []).map((option, oIndex) => {
               const isCorrect = oIndex === question.correctAnswer;
@@ -412,24 +413,24 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
                   : isSelected
                     ? 'border-rose-300/80 bg-rose-400/25 text-rose-700 shadow-sm'
                     : 'border-white/50 bg-white/70 text-slate-600/70';
-              return <button key={`${option}-${oIndex}`} type="button" onClick={() => !answered && setAnswers(prev => ({ ...prev, [currentQuestion]: oIndex }))} className={`rounded-2xl border px-4 text-left font-bold transition ${compactQuiz ? 'py-2.5' : 'py-4 sm:px-5'} ${stateClass}`}>{option}</button>;
+              return <button key={`${option}-${oIndex}`} type="button" onClick={() => !answered && setAnswers(prev => ({ ...prev, [currentQuestion]: oIndex }))} className={`${compactQuiz ? 'rounded-xl px-3 py-2 text-sm' : 'rounded-2xl px-4 py-4 sm:px-5'} border text-left font-bold transition ${stateClass}`}>{option}</button>;
             })}
           </div>
-          {answered && <div className={`mt-6 rounded-2xl border p-4 font-black ${selected === question.correctAnswer ? 'border-emerald-300/50 bg-emerald-400/15 text-emerald-700' : 'border-rose-300/50 bg-rose-400/15 text-rose-100'}`}>{selected === question.correctAnswer ? 'Correct! Great work.' : `Incorrect. Correct answer: ${question.options[question.correctAnswer]}`}</div>}
+          {answered && <div className={`${compactQuiz ? 'mt-3 rounded-xl p-3 text-sm' : 'mt-6 rounded-2xl p-4'} border font-black ${selected === question.correctAnswer ? 'border-emerald-300/50 bg-emerald-400/15 text-emerald-700' : 'border-rose-300/50 bg-rose-400/15 text-rose-100'}`}>{selected === question.correctAnswer ? 'Correct! Great work.' : `Incorrect. Correct answer: ${question.options[question.correctAnswer]}`}</div>}
         </div>
 
         {submitted && (
-          <div className="mt-6 rounded-3xl border border-emerald-200/70 bg-emerald-50/80 p-5 shadow-sm backdrop-blur-xl">
-            <p className="text-xl font-black text-emerald-800">Quiz submitted: {score}/{questions.length}</p>
-            <p className="mt-2 text-sm font-bold text-emerald-700">{rewardClaimed ? `✦ +${rewardCoins} EduCoins credited to your wallet.` : rewardCoins > 0 ? 'Reward already claimed for this quiz.' : 'No coin reward this time — revise and try another quiz.'}</p>
+          <div className={`${compactQuiz ? 'mt-2 rounded-2xl p-3' : 'mt-6 rounded-3xl p-5'} shrink-0 border border-emerald-200/70 bg-emerald-50/80 shadow-sm backdrop-blur-xl`}>
+            <p className={`${compactQuiz ? 'text-base' : 'text-xl'} font-black text-emerald-800`}>Quiz submitted: {score}/{questions.length}</p>
+            <p className={`${compactQuiz ? 'mt-1 text-xs' : 'mt-2 text-sm'} font-bold text-emerald-700`}>{rewardClaimed ? `✦ +${rewardCoins} EduCoins credited to your wallet.` : rewardCoins > 0 ? 'Reward already claimed for this quiz.' : 'No coin reward this time — revise and try another quiz.'}</p>
           </div>
         )}
 
-        <div className={`${compactQuiz ? 'mt-2 gap-2' : 'mt-6 gap-3 sm:gap-4'} flex shrink-0 flex-col sm:flex-row sm:items-center sm:justify-between`}>
-          <button type="button" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(index => Math.max(0, index - 1))} className={`${compactQuiz ? 'py-2' : 'py-3'} rounded-2xl border border-white/50 bg-white/70 px-5 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40`}>Previous</button>
-          <div className={`${compactQuiz ? 'grid grid-cols-1 gap-2 sm:grid-cols-2' : 'grid gap-3 sm:flex'}`}>
-            <button type="button" onClick={() => isLastQuestion ? setCurrentQuestion(0) : setCurrentQuestion(index => Math.min(questions.length - 1, index + 1))} className={`${compactQuiz ? 'py-2' : 'py-3'} rounded-2xl bg-cyan-200 px-6 font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50`}>{isLastQuestion ? 'Review Quiz' : 'Next Question'}</button>
-            <button type="button" disabled={!allAnswered || submitted} onClick={submitQuiz} className={`${compactQuiz ? 'py-2' : 'py-3'} rounded-2xl bg-gradient-to-r from-indigo-500 to-amber-400 px-6 font-black text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50`}>Submit & Claim Coins</button>
+        <div className={`${compactQuiz ? 'mt-1.5 grid grid-cols-3 gap-1.5' : 'mt-6 flex gap-3 sm:items-center sm:justify-between sm:gap-4'} shrink-0`}>
+          <button type="button" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(index => Math.max(0, index - 1))} className={`${compactQuiz ? 'rounded-xl px-2 py-2 text-xs' : 'rounded-2xl px-5 py-3'} border border-white/50 bg-white/70 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40`}>Previous</button>
+          <div className={`${compactQuiz ? 'contents' : 'grid gap-3 sm:flex'}`}>
+            <button type="button" onClick={() => isLastQuestion ? setCurrentQuestion(0) : setCurrentQuestion(index => Math.min(questions.length - 1, index + 1))} className={`${compactQuiz ? 'rounded-xl px-2 py-2 text-xs' : 'rounded-2xl px-6 py-3'} bg-cyan-200 font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50`}>{isLastQuestion ? 'Review' : 'Next'}</button>
+            <button type="button" disabled={!allAnswered || submitted} onClick={submitQuiz} className={`${compactQuiz ? 'rounded-xl px-2 py-2 text-xs' : 'rounded-2xl px-6 py-3'} bg-gradient-to-r from-indigo-500 to-amber-400 font-black text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50`}>Submit</button>
           </div>
         </div>
       </div>
@@ -577,7 +578,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onPlay={() => setIsVideoPlaying(true)} onPause={() => setIsVideoPlaying(false)} onEnded={() => setIsVideoPlaying(false)} onError={() => { setIsVideoPlaying(false); setMediaHasError(true); }} />;
       case 'audio': {
         return (
-          <div className={`flex h-full min-h-0 w-full bg-[#d5fbff]/70 text-slate-900 ${compactPlayerChrome ? 'p-1.5' : 'p-2 sm:p-4'}`}>
+          <div className="flex h-full min-h-0 w-full bg-[#d5fbff]/70 text-slate-900">
             <ProductMusicPlayer
               tracks={activeAudioTracks}
               title={activeFile.name || product.title}
@@ -585,7 +586,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
               className="h-full w-full"
               initialTrackId={activeFile.id}
               onError={() => setMediaHasError(true)}
-              density={compactPlayerChrome ? 'compact' : 'comfortable'}
+              density={viewport.width < 760 || viewport.height < 720 ? 'compact' : 'comfortable'}
             />
           </div>
         );
@@ -645,7 +646,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
             </div>
           </aside>
 
-          <div className={`relative min-h-0 min-w-0 overflow-hidden rounded-2xl border shadow-[0_20px_60px_rgba(0,0,0,0.05)] backdrop-blur-2xl sm:rounded-3xl ${isAudioExperience ? 'border-[#b8f4ff] bg-[#d5fbff]/72' : 'border-[#ded8ff] bg-white/72'}`}>
+          <div className={`relative min-h-0 min-w-0 overflow-hidden backdrop-blur-2xl ${isAudioExperience ? 'rounded-none border-0 bg-transparent shadow-none' : 'rounded-2xl border border-[#ded8ff] bg-white/72 shadow-[0_20px_60px_rgba(0,0,0,0.05)] sm:rounded-3xl'}`}>
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>

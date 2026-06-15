@@ -243,11 +243,11 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
   const controlButtonClass = `${isCompactDensity ? 'h-9 w-9 text-sm' : 'h-11 w-11'} grid shrink-0 place-items-center rounded-full bg-[#071a32] text-[#d7fbff] shadow-[0_12px_30px_rgba(0,229,255,0.08)] transition hover:bg-[#0b2548]`;
   const cardSizeClass = isFull
     ? isCompactDensity
-      ? 'h-24 w-24 sm:h-28 sm:w-28'
+      ? 'h-[clamp(4.75rem,22dvh,7rem)] w-[clamp(4.75rem,22dvh,7rem)]'
       : 'h-40 w-40 sm:h-52 sm:w-52 lg:h-56 lg:w-56 xl:h-64 xl:w-64'
     : 'h-32 w-32';
   const shellClass = isFull
-    ? `${isCompactDensity ? 'flex flex-col justify-between gap-2 rounded-[1.5rem] p-3' : 'flex flex-col justify-between overflow-y-auto rounded-[2rem] p-5 sm:p-7 lg:p-8 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] xl:items-center xl:gap-8 custom-scrollbar'} h-full min-h-0`
+    ? `${isCompactDensity ? 'flex flex-col justify-between gap-1.5 rounded-[1.25rem] p-2.5' : 'flex flex-col justify-between rounded-[2rem] p-5 sm:p-7 lg:p-8 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] xl:items-center xl:gap-8'} h-full min-h-0 max-h-full`
     : 'rounded-3xl p-4';
 
   return (
@@ -307,7 +307,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
           </div>
         </div>
 
-        <div className={`${isFull ? isCompactDensity ? 'flex min-h-0 items-center justify-center gap-3 py-1' : 'flex flex-1 items-center justify-center gap-4 py-5 sm:gap-6 lg:min-h-[14rem] xl:min-h-[18rem]' : 'flex items-center justify-center gap-3 py-1'} overflow-hidden`} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} title="Swipe left or right to switch audio">
+        <div className={`${isFull ? isCompactDensity ? 'flex min-h-0 flex-1 items-center justify-center gap-2 py-0.5' : 'flex flex-1 items-center justify-center gap-4 py-5 sm:gap-6 lg:min-h-[14rem] xl:min-h-[18rem]' : 'flex items-center justify-center gap-3 py-1'} overflow-hidden`} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} title="Swipe left or right to switch audio">
           {tracks.map((track, index) => {
             const distance = Math.abs(index - activeIndex);
             const circularDistance = Math.min(distance, tracks.length - distance);
@@ -348,8 +348,8 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
         )}
       </div>
 
-      <div className={`relative z-10 min-w-0 ${isCompactDensity ? 'mt-0' : 'mt-5 lg:mt-0'}`}>
-        <div className={`overflow-hidden border border-[#163052] bg-[#020713]/72 shadow-[inset_0_1px_0_rgba(215,251,255,0.16)] backdrop-blur-2xl ${isCompactDensity ? 'rounded-[1.25rem] p-3' : 'rounded-[1.75rem] p-5 sm:p-6'}`}>
+      <div className={`relative z-10 min-h-0 min-w-0 ${isCompactDensity ? 'mt-0 shrink-0' : 'mt-5 lg:mt-0'}`}>
+        <div className={`overflow-hidden border border-[#163052] bg-[#020713]/72 shadow-[inset_0_1px_0_rgba(215,251,255,0.16)] backdrop-blur-2xl ${isCompactDensity ? 'rounded-[1.1rem] p-2.5' : 'rounded-[1.75rem] p-5 sm:p-6'}`}>
           <div className={`${isCompactDensity ? 'mb-2' : 'mb-3'} min-w-0`}>
             <p className={`${isCompactDensity ? 'text-sm' : 'text-lg'} truncate font-black uppercase tracking-wide`}>{activeTrack.title}</p>
             <p className="truncate text-[10px] font-semibold uppercase tracking-[0.2em] text-cyan-100/80 sm:text-xs">{activeTrack.subtitle}</p>
@@ -358,7 +358,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
           <label className="sr-only" htmlFor={progressId}>Audio progress</label>
           <div className="relative overflow-hidden rounded-2xl border border-[#081a31] bg-[#050710]/85 px-3 py-3 shadow-[inset_0_1px_10px_rgba(0,229,255,0.08)]">
             <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_var(--wave-progress)_50%,rgba(0,197,255,0.38),transparent_26%),linear-gradient(90deg,rgba(0,123,255,0.20),rgba(79,20,159,0.16),rgba(2,6,18,0.12))]" style={{ ['--wave-progress' as string]: `${progress * 100}%` }} />
-            <div className={`relative flex items-center gap-1 ${isCompactDensity ? 'h-10' : 'h-16 sm:h-20'}`} aria-hidden="true">
+            <div className={`relative flex items-center gap-1 ${isCompactDensity ? 'h-[clamp(2rem,10dvh,2.75rem)]' : 'h-16 sm:h-20'}`} aria-hidden="true">
               {waveformBars.map((height, index) => {
                 const barProgress = waveformBars.length <= 1 ? 1 : index / (waveformBars.length - 1);
                 const isFilled = barProgress <= progress;
@@ -387,7 +387,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
             <span>{formatTime(duration)}</span>
           </div>
 
-          <div className={`${isCompactDensity ? 'mt-2' : 'mt-4'} flex flex-wrap items-center justify-center gap-2`}>
+          <div className={`${isCompactDensity ? 'mt-1.5' : 'mt-4'} flex flex-wrap items-center justify-center gap-1.5`}>
             <button type="button" onClick={() => setIsLooping(value => !value)} className={`${controlButtonClass} ${isLooping ? 'bg-white text-slate-950 hover:bg-white' : ''}`} aria-label="Toggle repeat">↻</button>
             {hasMultipleTracks && (
               <>
@@ -400,7 +400,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
             <button type="button" onClick={() => setIsMuted(value => !value)} className={controlButtonClass} aria-label="Toggle mute">{isMuted ? '🔇' : '🔊'}</button>
             <label className={`${isFull ? 'flex basis-full justify-center pt-1' : 'hidden sm:flex'} items-center gap-2 text-xs font-bold text-white/75`}>
               <span>Vol</span>
-              <input type="range" min="0" max="1" step="0.05" value={volume} onChange={event => setVolume(Number(event.target.value))} className={`${isFull ? 'w-36' : 'w-16'} accent-[#d7fbff]`} aria-label="Volume" />
+              <input type="range" min="0" max="1" step="0.05" value={volume} onChange={event => setVolume(Number(event.target.value))} className={`${isFull ? isCompactDensity ? 'w-28' : 'w-36' : 'w-16'} accent-[#d7fbff]`} aria-label="Volume" />
             </label>
           </div>
         </div>
