@@ -31,23 +31,23 @@ interface ReadingDrawerProps {
 
 
 const defaultReadingStyle = {
-  backgroundColor: '#f7f9fc',
-  backgroundOpacity: 96,
-  panelOpacity: 94,
+  backgroundColor: '#F8FAFD',
+  backgroundOpacity: 98,
+  panelOpacity: 96,
   cardOpacity: 94,
-  accentColor: '#c2e7ff',
-  accentOpacity: 62,
+  accentColor: '#C2E7FF',
+  accentOpacity: 66,
 };
 
 const chatPalette = {
-  appCanvas: '#f7f9fc',
-  searchBlue: '#edf4ff',
-  activeBlue: '#c2e7ff',
-  bubbleGray: '#f1f3f4',
-  cardBorder: '#e0e3eb',
-  primaryText: '#202124',
-  secondaryText: '#5f6368',
-  linkText: '#0b57d0',
+  appCanvas: '#F8FAFD',
+  searchBlue: '#EAF2FF',
+  activeBlue: '#CFE1FF',
+  bubbleGray: '#F8FAFD',
+  cardBorder: '#DDE6F7',
+  primaryText: '#07133F',
+  secondaryText: '#4F5B76',
+  linkText: '#0057D8',
   green: '#1e8e3e',
 };
 
@@ -73,7 +73,8 @@ const isExternalArticle = (article: NewsArticle | null) => {
   return /^https?:\/\//i.test(possibleUrl.trim());
 };
 const getArticleUrl = (article: NewsArticle) => ((article as NewsArticle & { externalUrl?: string }).externalUrl || article.content).trim();
-const getArticleImage = (article: NewsArticle, size = '900/540') => article.coverImage || article.thumbnailImage || `https://picsum.photos/seed/${article.imageSeed}/${size}`;
+const buildPremiumArticleImage = (article: NewsArticle) => `https://image.pollinations.ai/prompt/${encodeURIComponent(`premium calm education editorial hero card, ${article.category || article.type} ${article.title}, soft white and ice blue background, deep navy typography space, blue to violet pastel gradient, minimal vector illustration, rounded glass card, subtle geometric lines and dots, student friendly reading mode, no realistic photo, no clutter, 16:9`)}?width=1200&height=675&nologo=true&enhance=true&model=flux`;
+const getArticleImage = (article: NewsArticle, size = '900/540') => article.coverImage || article.thumbnailImage || buildPremiumArticleImage(article);
 const getArticleType = (article: NewsArticle): ReadingListType => article.type === 'news' ? 'news' : 'blog';
 const shouldShowPremiumLearningCta = (article: NewsArticle | null) => Boolean((article as (NewsArticle & { showPremiumLearningCta?: boolean }) | null)?.showPremiumLearningCta);
 const stripMarkdown = (value = '') => value.replace(/[#*_`>-]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -166,7 +167,7 @@ const SponsoredPartnerCard: React.FC<{
   promoCtaLabel = 'Explore Feature',
   onExploreFeature,
 }) => (
-  <aside className="my-12 overflow-hidden rounded-[2rem] border bg-gradient-to-r from-[#edf4ff] via-[#f7f9fc] to-[#e6f4ea] p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+  <aside className="my-12 overflow-hidden rounded-[2rem] border bg-gradient-to-r from-[#EAF2FF] via-[#F8FAFD] to-[#CFE1FF] p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
     <div className="rounded-[1.75rem] p-6 backdrop-blur-2xl sm:p-8" style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -320,7 +321,16 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
 
   const rewardMinutes = Math.floor(rewardSecondsLeft / 60);
   const rewardSeconds = String(rewardSecondsLeft % 60).padStart(2, '0');
-  const readingStyle = { ...defaultReadingStyle, ...((settings.content as any).readingStyle || {}) };
+  const storedReadingStyle = ((settings.content as any).readingStyle || {}) as Partial<typeof defaultReadingStyle>;
+  const readingStyle = {
+    ...defaultReadingStyle,
+    cardOpacity: storedReadingStyle.cardOpacity ?? defaultReadingStyle.cardOpacity,
+    backgroundColor: defaultReadingStyle.backgroundColor,
+    backgroundOpacity: defaultReadingStyle.backgroundOpacity,
+    panelOpacity: defaultReadingStyle.panelOpacity,
+    accentColor: defaultReadingStyle.accentColor,
+    accentOpacity: defaultReadingStyle.accentOpacity,
+  };
   const readingBackground = hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity);
   const panelBackground = hexToRgba(readingStyle.backgroundColor, readingStyle.panelOpacity);
   const cardBackground = `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;
@@ -337,7 +347,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
             <div className="h-full rounded-r-full shadow-sm transition-all duration-150" style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${accentStrongBackground}, rgba(194, 231, 255, 0.92), rgba(11, 87, 208, 0.72))` }} />
           </div>
 
-          <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(circle at top left, ${accentSoftBackground}, transparent 32%), radial-gradient(circle at bottom right, rgba(194, 231, 255, 0.34), transparent 28%)` }} />
+          <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(circle at top left, ${accentSoftBackground}, transparent 30%), radial-gradient(circle at 82% 12%, rgba(178, 158, 255, 0.20), transparent 28%), radial-gradient(circle at bottom right, rgba(194, 231, 255, 0.38), transparent 30%)` }} />
 
           <header className="relative z-20 flex items-center justify-between gap-4 border-b px-4 py-4 backdrop-blur-2xl sm:px-8" style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }}>
             <div className="flex min-w-0 items-center gap-4">

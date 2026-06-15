@@ -495,7 +495,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   ];
 
   return (
-    <div className="min-h-screen overflow-hidden text-[#202124]" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}, ${profileStyle.backgroundTint}, #C2E7FF)`, '--profile-card-opacity': String(Number(profileStyle.cardOpacity) / 100) } as React.CSSProperties}>
+    <div className="min-h-screen w-full overflow-x-hidden text-[#202124]" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}, ${profileStyle.backgroundTint}, #C2E7FF)`, '--profile-card-opacity': String(Number(profileStyle.cardOpacity) / 100) } as React.CSSProperties}>
       <style>{`
         @keyframes hubFadeUp {
           from { opacity: 0; transform: translateY(28px); }
@@ -512,7 +512,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <div className="absolute bottom-[-10%] left-1/3 h-80 w-80 rounded-full bg-[#1A73E8]/12 blur-3xl" />
       </div>
 
-      <main className="relative mx-auto max-w-7xl px-3 py-4 sm:px-6 sm:py-5 lg:px-8">
+      <main className="relative mx-auto w-full max-w-none px-3 py-4 pb-32 sm:px-6 sm:py-5 sm:pb-36 lg:px-12 2xl:px-16">
         <button
           onClick={onBack}
           className="hub-animate mb-4 rounded-2xl border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-xs font-black uppercase tracking-[0.16em] text-[#202124] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-[#E8F0FE] hover:shadow-sm hover:shadow-sm hover:shadow-black/5 sm:mb-5 sm:px-5 sm:py-3 sm:text-sm sm:tracking-[0.2em]"
