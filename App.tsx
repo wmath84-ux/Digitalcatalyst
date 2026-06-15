@@ -896,6 +896,8 @@ const App: React.FC = () => {
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
   const [wishlist, setWishlist] = useState<number[]>([]);
   const [purchasedProductIds, setPurchasedProductIds] = useState<number[]>([]);
+  const [isAuthRestoring, setIsAuthRestoring] = useState(false);
+  const [authRestoreError, setAuthRestoreError] = useState<string | null>(null);
   const [scrollToSection, setScrollToSection] = useState<string | null>(null);
   const [scrollToPolicySection, setScrollToPolicySection] = useState<string | null>(null);
   const [scrollToProductSection, setScrollToProductSection] = useState<string | null>(null);
@@ -1765,8 +1767,8 @@ const App: React.FC = () => {
 
   const completeFirebaseUserSession = async (firebaseUser: FirebaseUser, options: { redirect?: boolean; profile?: { name?: string; mobile?: string } } = {}) => {
       const { redirect = true, profile } = options;
-      setPurchasedProductIds([]);
-      localStorage.removeItem('purchasedProducts');
+      setIsAuthRestoring(true);
+      setAuthRestoreError(null);
       const sessionUser = await ensureUserProfile(firebaseUser, profile);
       if (sessionUser.status === 'blocked') {
           await signOut(auth);
@@ -1780,14 +1782,21 @@ const App: React.FC = () => {
       await writeCurrentSession(firebaseUser.uid, sessionId);
       subscribeToCurrentSession(firebaseUser.uid, sessionId);
       try {
+          setPurchasedProductIds([]);
+          localStorage.removeItem('purchasedProducts');
+          localStorage.removeItem(`purchasedProducts:${firebaseUser.uid}`);
           const backendPurchasedIds = await restoreUserEntitlements(firebaseUser.uid);
           setPurchasedProductIds(backendPurchasedIds);
           safeSetItem(`purchasedProducts:${firebaseUser.uid}`, backendPurchasedIds);
           setCurrentUser({ ...(sessionUser as any), purchasedProductIds: backendPurchasedIds });
+          setAuthRestoreError(null);
       } catch (error) {
           setPurchasedProductIds([]);
+          setAuthRestoreError('Could not restore purchases. Please retry.');
           setInfoModal({ title: 'Could not restore purchases', message: 'Could not restore purchases. Please retry.', icon: '⚠️' });
           console.warn('Purchase access restore failed; keeping this session locked until backend data is available.', error);
+      } finally {
+          setIsAuthRestoring(false);
       }
       if (!redirect) return;
       if (productToBuyAfterLogin) {
@@ -1810,14 +1819,29 @@ const App: React.FC = () => {
       localStorage.removeItem('currentUser');
       localStorage.removeItem('purchasedProducts');
       const unsubscribe = onAuthStateChanged(auth, user => {
-          if (user) void completeFirebaseUserSession(user, { redirect: false });
-          else handleLogout(false);
+          if (user) {
+              setIsAuthRestoring(true);
+              setAuthRestoreError(null);
+              void completeFirebaseUserSession(user, { redirect: false });
+          } else handleLogout(false);
       });
       return () => {
           unsubscribe();
           stopSessionWatchers();
       };
   }, []);
+
+
+
+  const handleRetryAuthRestore = () => {
+      const firebaseUser = auth.currentUser;
+      if (!firebaseUser) {
+          setAuthRestoreError('Please log in again to restore purchases.');
+          setCurrentView('auth');
+          return;
+      }
+      void completeFirebaseUserSession(firebaseUser, { redirect: false });
+  };
 
   const getFirebaseAuthErrorMessage = (error: any) => {
       if (error?.code === 'auth/email-already-in-use') return 'This email already has an account. Please login instead.';
@@ -1858,12 +1882,24 @@ const App: React.FC = () => {
       }
   };
 
+  const getPasswordResetErrorMessage = (error: any) => {
+      if (error?.code === 'auth/invalid-email') return 'Please enter a valid email address.';
+      if (error?.code === 'auth/user-not-found') return 'No account found with this email.';
+      if (error?.code === 'auth/too-many-requests') return 'Too many reset attempts. Please try again later.';
+      if (error?.code === 'auth/network-request-failed') return 'Network error. Please check your internet connection.';
+      return 'Could not send reset email. Please try again.';
+  };
+
   const handlePasswordReset = async (email: string): Promise<{ success: boolean, message: string }> => {
+      const trimmedEmail = email.trim().toLowerCase();
+      if (!trimmedEmail) {
+          return { success: false, message: 'Please enter a valid email address.' };
+      }
       try {
-          await sendPasswordResetEmail(auth, email);
-          return { success: true, message: 'Password reset email sent. Please check your inbox.' };
+          await sendPasswordResetEmail(auth, trimmedEmail);
+          return { success: true, message: 'Password reset email sent. Please check your inbox/spam folder.' };
       } catch (error) {
-          return { success: false, message: getFirebaseAuthErrorMessage(error) };
+          return { success: false, message: getPasswordResetErrorMessage(error) };
       }
   };
 
@@ -1911,6 +1947,8 @@ const App: React.FC = () => {
       if (remoteSignOut) void signOut(auth).catch(error => console.warn('Firebase sign out failed.', error));
       setCurrentUser(null);
       setPurchasedProductIds([]);
+      setIsAuthRestoring(false);
+      setAuthRestoreError(null);
       setWishlist([]);
       setCart([]);
       setSelectedProduct(null);
@@ -2752,6 +2790,22 @@ const App: React.FC = () => {
   };
 
   // --- RENDER LOGIC ---
+
+  const renderAuthRestoreStatus = () => (
+      <div className="min-h-[60vh] flex items-center justify-center px-4 py-16">
+          <div className="max-w-md w-full bg-white/75 backdrop-blur-xl border border-slate-200 rounded-3xl shadow-[0_20px_70px_rgba(15,23,42,0.08)] p-8 text-center">
+              <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-indigo-50 flex items-center justify-center text-3xl">{isAuthRestoring ? '⏳' : '🔒'}</div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-3">{isAuthRestoring ? 'Restoring your account and purchases…' : 'Purchases are locked'}</h2>
+              <p className="text-slate-600 mb-6">{isAuthRestoring ? 'Please wait while we securely restore your account and verified purchases.' : authRestoreError || 'Could not restore purchases. Please retry.'}</p>
+              {!isAuthRestoring && authRestoreError && (
+                  <button onClick={handleRetryAuthRestore} className="w-full bg-slate-900 text-white px-5 py-3 rounded-2xl font-semibold hover:bg-slate-800 transition-colors">
+                      Retry restore
+                  </button>
+              )}
+          </div>
+      </div>
+  );
+
   const renderHomePageContent = () => (
       <>
           {websiteSettings.layout.map(section => {
@@ -2776,7 +2830,9 @@ const App: React.FC = () => {
   const renderContent = () => {
     switch (currentView) {
       case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToAllProducts} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={currentUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
-      case 'coursePlayer': return currentUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) && <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={handleNavigateToPurchases} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} />;
+      case 'coursePlayer':
+        if (isAuthRestoring || authRestoreError) return renderAuthRestoreStatus();
+        return currentUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={handleNavigateToPurchases} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} /> : renderAuthRestoreStatus();
       case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={currentUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={handleBackToHome} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
