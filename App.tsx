@@ -1779,8 +1779,6 @@ const App: React.FC = () => {
       activeSessionUidRef.current = firebaseUser.uid;
       await writeCurrentSession(firebaseUser.uid, sessionId);
       subscribeToCurrentSession(firebaseUser.uid, sessionId);
-      setCurrentUser(sessionUser);
-      safeSetItem('currentUser', sessionUser);
       try {
           const backendPurchasedIds = await restoreUserEntitlements(firebaseUser.uid);
           setPurchasedProductIds(backendPurchasedIds);
@@ -1893,13 +1891,12 @@ const App: React.FC = () => {
   };
 
   const persistUserPurchasedProducts = (nextPurchasedIds: number[]) => {
-      if (!currentUser) return;
+      if (!currentUser || !auth.currentUser || auth.currentUser.uid !== String(currentUser.id)) return;
       safeSetItem(`purchasedProducts:${currentUser.id}`, nextPurchasedIds);
       const updatedUsers = users.map(user => user.id === currentUser.id ? { ...(user as any), purchasedProductIds: nextPurchasedIds } : user);
       setUsers(updatedUsers as User[]);
       safeSetItem('siteUsers', updatedUsers);
       setCurrentUser({ ...(currentUser as any), purchasedProductIds: nextPurchasedIds });
-      safeSetItem('currentUser', { ...(currentUser as any), purchasedProductIds: nextPurchasedIds });
   };
 
   const handleLogout = (remoteSignOut = true, options: { preserveSessionDocument?: boolean } = {}) => {
@@ -2006,12 +2003,11 @@ const App: React.FC = () => {
   };
 
   const syncCurrentUser = (updater: (user: User) => User, transaction?: Omit<CoinTransaction, 'id' | 'createdAt'>) => {
-    if (!currentUser) return null;
+    if (!currentUser || !auth.currentUser || auth.currentUser.uid !== String(currentUser.id)) return null;
     const updatedUser = updater(currentUser);
     const entry = transaction ? recordCoinTransaction(updatedUser, transaction) : null;
     const userWithLedger = entry ? { ...updatedUser, coinTransactions: [entry, ...(updatedUser.coinTransactions || [])].slice(0, 25) } : updatedUser;
     setCurrentUser(userWithLedger);
-    safeSetItem('currentUser', userWithLedger);
     const nextUsers = users.some(user => user.id === userWithLedger.id)
       ? users.map(user => user.id === userWithLedger.id ? userWithLedger : user)
       : [...users, userWithLedger];
@@ -2785,7 +2781,7 @@ const App: React.FC = () => {
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={handleBackToHome} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
       case 'myPurchases': return currentUser ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
-      case 'profile': return currentUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} users={users} setUsers={setUsers} setCurrentUser={setCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+      case 'profile': return currentUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={handleBackToHome} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={handleBackToHome} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
