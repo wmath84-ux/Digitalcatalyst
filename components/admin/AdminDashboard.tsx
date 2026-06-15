@@ -164,22 +164,22 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
                 {/* Mobile Header */}
-                <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-300/70 bg-white/80 p-3 shadow-sm backdrop-blur-xl md:hidden">
+                <header className="z-30 flex shrink-0 items-center justify-between border-b border-slate-300/70 bg-white/85 px-3 py-2.5 shadow-sm backdrop-blur-xl md:hidden">
                     <div className="flex items-center gap-3">
                         <button 
                             onClick={() => setIsMobileSidebarOpen(true)}
-                            className="p-2 -ml-2 text-slate-700 hover:bg-white/80 rounded-lg"
+                            className="-ml-1 rounded-xl p-2 text-slate-700 transition-colors hover:bg-white/80"
                         >
                             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
                         </button>
-                        <span className="text-base font-bold text-slate-800">Admin Panel</span>
+                        <span className="text-sm font-bold text-slate-800">Admin Panel</span>
                     </div>
                     <div className="w-8 h-8 bg-gradient-to-br from-blue-700 to-indigo-800 rounded-full flex items-center justify-center text-white text-xs font-bold">
                         {props.currentAdminUser.email.charAt(0).toUpperCase()}
                     </div>
                 </header>
 
-                <main className="min-h-0 flex-1 overflow-y-auto bg-white/20 p-3 backdrop-blur-sm custom-scrollbar sm:p-8 lg:p-10">
+                <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-white/20 p-3 backdrop-blur-sm custom-scrollbar sm:p-6 lg:p-10">
                     <div className="mx-auto w-full max-w-7xl">
                         {renderView()}
                     </div>
