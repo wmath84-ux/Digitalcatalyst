@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { addDoc, collection, doc, increment, limit, onSnapshot, orderBy, query, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, doc, increment, limit, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
 import { db } from '../firebase';
 
@@ -18,10 +18,11 @@ type Creator = { id: string; username: string; name: string; avatar: string; rol
 type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; docId?: string; createdAt?: number };
 type SharedStory = { id: number; statusId: number; recipientId: string; senderId: 'me'; senderName: string; time: string };
 type MasterTagRequest = { id: number; author: string; avatar: string; category: string; title: string; detail: string; time: string; likes: number; reactions: Record<string, number> };
-type CommunitySupportTicket = { id: string; customerName: string; customerEmail: string; subject: string; message: string; date: string; status: 'Open' | 'Resolved' | 'Pending'; source?: 'contact' | 'masterTag'; communityThreadId?: number; customerAvatar?: string; category?: string; adminReply?: string; repliedAt?: string };
+type CommunitySupportTicket = { id: string; customerName: string; customerEmail: string; subject: string; message: string; date: string; status: 'Open' | 'Resolved' | 'Pending'; source?: 'contact' | 'masterTag'; communityThreadId?: number; customerAvatar?: string; category?: string; adminReply?: string; repliedAt?: string; inboxMessage?: string; inboxRead?: boolean };
 
 const MASTER_TAG_STORAGE_KEY = 'eduvoraMasterTagRequests';
 const SUPPORT_TICKETS_STORAGE_KEY = 'siteSupportTickets';
+const SUPPORT_TICKETS_COLLECTION = 'siteSupportTickets';
 
 const readJsonArray = <T,>(key: string, fallback: T[]): T[] => {
   if (typeof window === 'undefined') return fallback;
@@ -293,15 +294,30 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [masterTagRequests]);
 
   useEffect(() => {
-    const syncSupportTickets = () => setSupportTickets(readJsonArray(SUPPORT_TICKETS_STORAGE_KEY, []));
+    const mergeSeedTickets = (tickets: CommunitySupportTicket[]) => {
+      const seededTickets = initialMasterTagRequests.map(buildMasterTagTicket);
+      const mergedTickets = [...tickets];
+      seededTickets.forEach(ticket => { if (!mergedTickets.some(item => item.id === ticket.id)) mergedTickets.push(ticket); });
+      return mergedTickets.sort((a, b) => String(b.repliedAt || b.date).localeCompare(String(a.repliedAt || a.date)));
+    };
+
+    const syncSupportTickets = () => setSupportTickets(mergeSeedTickets(readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, [])));
     const handleStorage = (event: StorageEvent) => {
       if (event.key === SUPPORT_TICKETS_STORAGE_KEY) syncSupportTickets();
     };
+
+    const unsubscribeTickets = onSnapshot(collection(db, SUPPORT_TICKETS_COLLECTION), (snapshot) => {
+      if (snapshot.empty) return;
+      const remoteTickets = mergeSeedTickets(snapshot.docs.map((item) => item.data() as CommunitySupportTicket));
+      localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(remoteTickets));
+      setSupportTickets(remoteTickets);
+    }, (error) => console.warn('Community support ticket sync failed; using local fallback', error));
 
     window.addEventListener('siteSupportTicketsUpdated', syncSupportTickets);
     window.addEventListener('storage', handleStorage);
 
     return () => {
+      unsubscribeTickets();
       window.removeEventListener('siteSupportTicketsUpdated', syncSupportTickets);
       window.removeEventListener('storage', handleStorage);
     };
@@ -651,6 +667,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const supportTicket: CommunitySupportTicket = buildMasterTagTicket(request);
     const updatedTickets = [supportTicket, ...readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []).filter((ticket) => ticket.id !== supportTicket.id)];
     localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(updatedTickets));
+    setDoc(doc(db, SUPPORT_TICKETS_COLLECTION, supportTicket.id), supportTicket).catch((error) => console.warn('Master tag ticket Firebase write failed', error));
     window.dispatchEvent(new Event('siteSupportTicketsUpdated'));
     setSupportTickets(updatedTickets);
     setMasterTagRequests((current) => [request, ...current]);
