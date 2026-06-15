@@ -1822,21 +1822,27 @@ const App: React.FC = () => {
   }, []);
 
   const getFirebaseAuthErrorMessage = (error: any) => {
-      if (error?.code === 'auth/email-already-in-use') return 'This email already has an account. Please login instead.';
-      if (error?.code === 'auth/invalid-credential') return 'Invalid email or password.';
-      if (error?.code === 'auth/weak-password') return 'Password should be at least 6 characters.';
-      if (error?.code === 'auth/invalid-email') return 'Please enter a valid email address.';
-      if (error?.code === 'auth/user-not-found') return 'No account found. Please sign up first.';
-      if (error?.code === 'auth/configuration-not-found') {
-          return 'Firebase Email/Password authentication is not enabled for this project. Please enable the Email/Password sign-in provider in Firebase Console, then try again.';
-      }
-      if (error?.code === 'auth/network-request-failed') {
-          return 'Network connection failed while contacting Firebase. Please check your internet connection and try again.';
-      }
-      if (error?.code === 'auth/too-many-requests') {
-          return 'Too many login attempts. Please wait a few minutes and try again.';
-      }
-      return error?.message || 'Unable to authenticate with Firebase.';
+      const firebaseAuthErrorMessages: Record<string, string> = {
+          'auth/email-already-in-use': 'This email already has an account. Please login instead or use password reset.',
+          'auth/invalid-credential': 'Invalid email or password. Please check your details.',
+          'auth/user-not-found': 'No account found with this email. Please sign up first.',
+          'auth/wrong-password': 'Incorrect password.',
+          'auth/weak-password': 'Password should be at least 6 characters.',
+          'auth/invalid-email': 'Please enter a valid email address.',
+          'auth/configuration-not-found': 'Firebase Email/Password authentication is not enabled for this project. Please enable the Email/Password sign-in provider in Firebase Console, then try again.',
+          'auth/network-request-failed': 'Network connection failed while contacting Firebase. Please check your internet connection and try again.',
+          'auth/too-many-requests': 'Too many login attempts. Please wait a few minutes and try again.',
+      };
+
+      const code = typeof error?.code === 'string'
+          ? error.code
+          : typeof error?.message === 'string'
+              ? error.message.match(/\((auth\/[^)]+)\)/)?.[1]
+              : undefined;
+
+      if (code && firebaseAuthErrorMessages[code]) return firebaseAuthErrorMessages[code];
+
+      return 'Unable to authenticate right now. Please try again.';
   };
 
   const handleEmailLogin = async (email: string, password: string): Promise<{ success: boolean, message: string }> => {
