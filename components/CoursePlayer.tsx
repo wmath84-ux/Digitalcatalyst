@@ -33,7 +33,7 @@ const VideoUnavailablePlaceholder: React.FC = () => (
       <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-slate-900/70" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
     </div>
     <h3 className="text-xl font-semibold">Video unavailable</h3>
-    <p className="mt-1 text-slate-900/60">This video is unavailable in this environment.</p>
+    <p className="mt-1 text-[#50527a]/70">This video is unavailable in this environment.</p>
   </div>
 );
 
@@ -95,14 +95,14 @@ const ModuleItem: React.FC<{ module: CourseModule; activeFile: ProductFile | nul
   const [isExpanded, setIsExpanded] = useState(true);
   return (
     <div className={`${level > 0 ? "ml-4 border-l border-white/50 pl-3" : ""}`}>
-      <button onClick={() => setIsExpanded(!isExpanded)} className="module-item-button flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-slate-900 transition hover:bg-cyan-50/30 sm:py-4" aria-expanded={isExpanded}>
+      <button onClick={() => setIsExpanded(!isExpanded)} className="module-item-button flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-slate-900 transition hover:bg-[#f7f5ff] sm:py-4" aria-expanded={isExpanded}>
         <ModuleIcon className="h-5 w-5 shrink-0" />
         <span className="text-[15px] font-black leading-tight">{module.title}</span>
       </button>
       {isExpanded && (
         <div className="space-y-1 pb-2">
           {(module.files || []).map((file) => (
-            <button key={file.id} onClick={() => onSelectFile(file)} className={`module-item-button flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition sm:py-3 ${activeFile?.id === file.id ? "bg-white border border-slate-200 font-black text-slate-900 shadow-sm shadow-slate-200/50" : "font-medium text-slate-900/90 hover:bg-cyan-50/25"}`}>
+            <button key={file.id} onClick={() => onSelectFile(file)} className={`module-item-button flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition sm:py-3 ${activeFile?.id === file.id ? "bg-white border border-[#ded8ff] font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)]" : "font-medium text-slate-900/90 hover:bg-[#f7f5ff]"}`}>
               <span className="min-w-0 flex-1 truncate">{file.name}</span>
               {file.type === 'quiz' ? <QuizIcon className="h-5 w-5 shrink-0" /> : <FileIcon className="h-5 w-5 shrink-0" />}
             </button>
@@ -524,47 +524,51 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const isAudioExperience = activeFile?.type === 'audio';
 
   return (
-    <div className={`course-player-mobile-scope relative flex h-screen min-h-[100dvh] w-screen flex-col overflow-hidden text-slate-900 bg-[var(--bg-main)]`}>
-      <div className={`absolute inset-0 scale-110 bg-cover bg-center blur-2xl ${isAudioExperience ? 'opacity-10' : 'opacity-20'}`} style={{ backgroundImage: `url(${backgroundImage})` }} />
-      <div className={isAudioExperience ? "absolute inset-0 bg-[linear-gradient(180deg,#d9fbff_0%,#d6fbff_46%,#caf5ff_100%)]" : "absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(99,102,241,0.28),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(34,211,238,0.16),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.82),rgba(238,242,255,0.72),rgba(248,250,252,0.94))]"} />
-      <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: isAudioExperience ? '#7dd3fc' : accentGlow }} />
-      <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-cyan-200/45' : 'bg-indigo-300/15'}`} />
+    <div className={`course-player-mobile-scope relative flex h-screen min-h-[100dvh] w-screen flex-col overflow-hidden text-slate-900 bg-[#f3f0ff]`}>
+      <div className={`absolute inset-0 scale-110 bg-cover bg-center blur-2xl ${isAudioExperience ? 'opacity-[0.08]' : 'opacity-10'}`} style={{ backgroundImage: `url(${backgroundImage})` }} />
+      <div className={isAudioExperience ? "absolute inset-0 bg-[linear-gradient(180deg,#f7f5ff_0%,#f1edff_46%,#ece7ff_100%)]" : "absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(111,82,255,0.16),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(199,190,255,0.32),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.9),rgba(246,243,255,0.86),rgba(238,233,255,0.94))]"} />
+      <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: isAudioExperience ? '#c7beff' : '#8b75ff' }} />
+      <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-[#d9d2ff]/60' : 'bg-[#d9d2ff]/45'}`} />
 
-      <header className={`relative z-30 flex items-center gap-2 border-b p-2.5 shadow-sm backdrop-blur-xl sm:gap-3 sm:p-3 lg:hidden ${'border-[var(--border-soft)] bg-[var(--bg-glass)]/90'}`}>
-        <button onClick={() => setIsSidebarOpen(true)} className="shrink-0 rounded-lg border border-white/60 bg-white/40 p-2"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
+      <header className={`relative z-30 flex items-center gap-2 border-b p-2.5 shadow-sm backdrop-blur-xl sm:gap-3 sm:p-3 lg:hidden ${'border-[#ded8ff] bg-white/85'}`}>
+        <button onClick={onBack} className="shrink-0 rounded-lg border border-[#ded8ff] bg-white px-3 py-2 text-sm font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]" aria-label="Back to course details">← Back</button>
+        <button onClick={() => setIsSidebarOpen(true)} className="shrink-0 rounded-lg border border-[#ded8ff] bg-[#ece7ff] p-2" aria-label="Open modules"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
         <h1 className="min-w-0 flex-1 truncate text-base font-black sm:text-lg">{activeFile?.name || product.title}</h1>
         <div className="ml-auto flex max-w-[48vw] shrink-0 items-center gap-2 overflow-x-auto sm:max-w-none">
           {liveEarningHud}
-          <button onClick={() => setIsMentorOpen(value => !value)} className="hidden rounded-xl border border-cyan-200/30 bg-cyan-200/15 px-2.5 py-2 text-xs font-black shadow-sm sm:px-3 sm:text-sm md:inline-flex">🧠 AI</button>
+          <button onClick={() => setIsMentorOpen(value => !value)} className="hidden rounded-xl border border-[#ded8ff] bg-white/80 px-2.5 py-2 text-xs font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)] sm:px-3 sm:text-sm md:inline-flex">🧠 AI</button>
         </div>
       </header>
 
       <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
       <main className="relative flex min-h-0 flex-1 flex-col gap-2 p-2 sm:gap-3 sm:p-3 lg:p-3">
-        <div className={`hidden shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid ${'border-[var(--border-soft)] bg-[var(--bg-glass)]/90'}`}>
-          <span className="truncate">{activeFile?.name || product.title}</span>
+        <div className={`hidden shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid ${'border-[#ded8ff] bg-white/85'}`}>
+          <div className="flex min-w-0 items-center gap-3">
+            <button onClick={onBack} className="shrink-0 rounded-2xl border border-[#ded8ff] bg-white px-5 py-3 text-base font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]" aria-label="Back to course details">← Back</button>
+            <span className="truncate">{activeFile?.name || product.title}</span>
+          </div>
           <div className="flex items-center justify-center gap-3">
-            <button onClick={() => setIsDesktopSidebarCollapsed(value => !value)} className="rounded-2xl border border-[var(--border-soft)] bg-white px-5 py-3 text-base font-black text-[var(--text-heading)] shadow-[var(--shadow-soft)] transition hover:-translate-y-0.5">{isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize modules'}</button><button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-cyan-200/30 bg-cyan-200/15 px-6 py-3 text-base font-black text-cyan-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:bg-cyan-200/25">🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}</button>
+            <button onClick={() => setIsDesktopSidebarCollapsed(value => !value)} className="rounded-2xl border border-[#ded8ff] bg-white px-5 py-3 text-base font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5">{isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize modules'}</button><button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-[#ded8ff] bg-white/85 px-6 py-3 text-base font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.12)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]">🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}</button>
             {liveEarningHud}
           </div>
-          <span className="truncate text-right text-sm font-bold text-slate-900/60">Welcome to the Course</span>
+          <span className="truncate text-right text-sm font-bold text-[#50527a]/70">Welcome to the Course</span>
         </div>
 
         <section className="grid min-h-0 flex-1 grid-cols-1 gap-2 sm:gap-3 lg:grid-cols-[var(--course-sidebar-width,28rem)_minmax(0,1fr)]" style={{ ['--course-sidebar-width' as any]: isDesktopSidebarCollapsed ? '0rem' : '28rem' }}>
           <aside className={`fixed inset-y-0 left-0 z-40 w-[18rem] transform transition sm:w-80 lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} ${isDesktopSidebarCollapsed ? 'lg:pointer-events-none lg:opacity-0' : ''}`}>
-            <div className="flex h-full flex-col border-r border-slate-200/70 bg-white/95 shadow-[4px_0_30px_rgba(0,0,0,0.06)] backdrop-blur-3xl lg:rounded-2xl lg:border lg:border-slate-200/50 lg:bg-slate-900/[0.04] lg:shadow-[4px_0_30px_rgba(0,0,0,0.02)]">
-              <div className="shrink-0 border-b border-slate-200/70 px-4 py-4 lg:border-white/50 lg:py-5">
+            <div className="flex h-full flex-col border-r border-[#ded8ff] bg-white/85 shadow-sm backdrop-blur-xl lg:rounded-2xl lg:border lg:border-[#ded8ff] lg:bg-white/85 lg:shadow-sm">
+              <div className="shrink-0 border-b border-[#ded8ff] bg-white/85 px-4 py-4 shadow-sm lg:border-[#ded8ff] lg:py-5">
                 <button onClick={onBack} className="mb-3 flex items-center gap-2 text-lg font-medium text-slate-900 hover:opacity-70 sm:mb-4 sm:text-[22px]">← <span>Back</span></button>
                 <h2 className="text-xl font-black leading-tight text-slate-900 sm:text-[25px]">{product.title}</h2>
               </div>
               <nav className="flex-1 overflow-y-auto p-2 sm:p-3">
-                {(product.courseContent || []).length > 0 ? (product.courseContent || []).map(m => <ModuleItem key={m.id} module={m} activeFile={activeFile} onSelectFile={onSelectFile} />) : <p className="p-4 text-center font-semibold text-slate-900/60">No content added yet.</p>}
+                {(product.courseContent || []).length > 0 ? (product.courseContent || []).map(m => <ModuleItem key={m.id} module={m} activeFile={activeFile} onSelectFile={onSelectFile} />) : <p className="p-4 text-center font-semibold text-[#50527a]/70">No content added yet.</p>}
               </nav>
             </div>
           </aside>
 
-          <div className={`relative min-h-0 overflow-hidden rounded-2xl border shadow-[0_20px_60px_rgba(0,0,0,0.05)] backdrop-blur-2xl sm:rounded-3xl ${isAudioExperience ? 'border-cyan-100/60 bg-[#d9fbff]/72' : 'border-slate-200/60 bg-white/40'}`}>
+          <div className={`relative min-h-0 overflow-hidden rounded-2xl border shadow-[0_20px_60px_rgba(0,0,0,0.05)] backdrop-blur-2xl sm:rounded-3xl ${isAudioExperience ? 'border-[#ded8ff] bg-white/72' : 'border-[#ded8ff] bg-white/72'}`}>
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>
