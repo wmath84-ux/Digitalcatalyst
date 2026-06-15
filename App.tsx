@@ -1860,12 +1860,24 @@ const App: React.FC = () => {
       }
   };
 
+  const getPasswordResetErrorMessage = (error: any) => {
+      if (error?.code === 'auth/invalid-email') return 'Please enter a valid email address.';
+      if (error?.code === 'auth/user-not-found') return 'No account found with this email.';
+      if (error?.code === 'auth/too-many-requests') return 'Too many reset attempts. Please try again later.';
+      if (error?.code === 'auth/network-request-failed') return 'Network error. Please check your internet connection.';
+      return 'Could not send reset email. Please try again.';
+  };
+
   const handlePasswordReset = async (email: string): Promise<{ success: boolean, message: string }> => {
+      const trimmedEmail = email.trim().toLowerCase();
+      if (!trimmedEmail) {
+          return { success: false, message: 'Please enter a valid email address.' };
+      }
       try {
-          await sendPasswordResetEmail(auth, email);
-          return { success: true, message: 'Password reset email sent. Please check your inbox.' };
+          await sendPasswordResetEmail(auth, trimmedEmail);
+          return { success: true, message: 'Password reset email sent. Please check your inbox/spam folder.' };
       } catch (error) {
-          return { success: false, message: getFirebaseAuthErrorMessage(error) };
+          return { success: false, message: getPasswordResetErrorMessage(error) };
       }
   };
 
