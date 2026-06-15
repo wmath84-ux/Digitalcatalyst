@@ -557,7 +557,6 @@ const ProductForm: React.FC<{
                                 <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">{mode === 'add' ? 'New digital product' : formData.title || 'Product editor'}</h1>
                             </div>
                         </div>
-                        <button type="submit" className="rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-400 px-7 py-3 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition hover:-translate-y-0.5 hover:shadow-sm">{mode === 'add' ? 'Save Product' : 'Update Product'}</button>
                     </div>
                 </header>
 
@@ -686,6 +685,16 @@ const ProductForm: React.FC<{
                         </aside>
                     </div>
                 </main>
+
+                <footer className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
+                    <div className="rounded-[1.75rem] border border-white/50 bg-white/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:flex sm:items-center sm:justify-between sm:gap-4 sm:p-5">
+                        <div className="mb-4 sm:mb-0">
+                            <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-400">Ready to publish</p>
+                            <p className="mt-1 text-sm font-semibold text-slate-600">Review all product details above, then save your changes.</p>
+                        </div>
+                        <button type="submit" className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-400 px-7 py-4 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition hover:-translate-y-0.5 hover:shadow-sm sm:w-auto sm:min-w-48">{mode === 'add' ? 'Save Product' : 'Update Product'}</button>
+                    </div>
+                </footer>
             </form>
         </div>
     );
