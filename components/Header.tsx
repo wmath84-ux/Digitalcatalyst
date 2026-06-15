@@ -74,12 +74,21 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
       }
     };
 
+    const handleScroll = () => setIsUserMenuOpen(false);
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsUserMenuOpen(false);
+    };
+
     document.addEventListener('mousedown', handleOutsideClick);
     document.addEventListener('touchstart', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+    window.addEventListener('scroll', handleScroll, { passive: true });
 
     return () => {
       document.removeEventListener('mousedown', handleOutsideClick);
       document.removeEventListener('touchstart', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+      window.removeEventListener('scroll', handleScroll);
     };
   }, [isUserMenuOpen]);
 
@@ -112,7 +121,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
     <>
       <header className="w-full max-w-full border-b border-indigo-100/70 bg-background/90 shadow-[0_12px_34px_rgba(79,70,229,0.08)] backdrop-blur-md sticky top-0 z-50">
         <div className="container mx-auto w-full max-w-full px-4 py-3 sm:px-6 sm:py-4">
-          <div className="flex min-w-0 items-center justify-between gap-3 overflow-hidden">
+          <div className="flex min-w-0 items-center justify-between gap-3">
             <button onClick={onHomeClick} className="flex min-w-0 items-center space-x-3 cursor-pointer overflow-hidden" aria-label="Back to Homepage">
               <LogoIcon />
               <span className="truncate text-base font-bold text-primary sm:text-xl">{(settings.content as any).siteName || "Digital Catalyst"}</span>
@@ -153,7 +162,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                                 <span className="max-w-[9rem] truncate text-sm">{currentUser.name || currentUser.email.split('@')[0]}</span>
                             </button>
                             {isUserMenuOpen && (
-                                <div className="absolute right-0 mt-2 w-48 bg-white/70 backdrop-blur-xl rounded-md shadow-[0_8px_30px_rgb(0,0,0,0.04)] py-1 z-20">
+                                <div className="absolute right-0 top-full mt-2 w-52 overflow-hidden rounded-2xl border border-slate-100 bg-white/95 py-1 shadow-[0_18px_48px_rgba(15,23,42,0.18)] backdrop-blur-xl z-[1000]">
                                     <button onClick={handleProfileClick} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
                                             Profile & EduCoins
                                         </button>
@@ -194,7 +203,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                                 <UserIcon />
                             </button>
                             {isUserMenuOpen && (
-                                <div className="absolute right-0 mt-3 w-48 overflow-hidden rounded-2xl border border-slate-100 bg-white/90 py-1 shadow-[0_16px_40px_rgba(15,23,42,0.12)] backdrop-blur-xl z-20">
+                                <div className="absolute right-0 top-full mt-3 w-52 overflow-hidden rounded-2xl border border-slate-100 bg-white/95 py-1 shadow-[0_18px_48px_rgba(15,23,42,0.18)] backdrop-blur-xl z-[1000]">
                                     <div className="px-4 py-2 text-xs font-bold text-slate-500">{currentUser.name || currentUser.email.split('@')[0]}</div>
                                     <button onClick={handleProfileClick} className="block w-full text-left px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100">
                                         Profile & EduCoins

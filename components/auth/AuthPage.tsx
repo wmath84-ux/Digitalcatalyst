@@ -105,7 +105,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, onOtpAuthenticate, onBack
                         {error && <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl p-3">{error}</p>}
                         <button type="submit" className="w-full rounded-2xl bg-gradient-to-r from-slate-950 via-blue-900 to-indigo-800 px-6 py-3.5 font-black text-white shadow-[0_14px_34px_rgba(30,64,175,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-sm sm:px-8 sm:py-4">Continue to learning store</button>
                     </form>
-                    <p className="mt-5 text-xs text-slate-700 text-center">Prototype note: OTP is simulated locally; connect Firebase/Auth provider for production SMS delivery.</p>
+                    <p className="mt-5 text-xs text-slate-700 text-center">Firebase Auth secures this session; purchases restore from your account after login.</p>
                 </section>
             </div>
         </div>
