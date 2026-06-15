@@ -1748,18 +1748,35 @@ const App: React.FC = () => {
       return unsubscribe;
   }, []);
 
+  const getFirebaseAuthErrorMessage = (error: any) => {
+      if (error?.code === 'auth/configuration-not-found') {
+          return 'Firebase Email/Password authentication is not enabled for this project. Please enable the Email/Password sign-in provider in Firebase Console, then try again.';
+      }
+      if (error?.code === 'auth/network-request-failed') {
+          return 'Network connection failed while contacting Firebase. Please check your internet connection and try again.';
+      }
+      if (error?.code === 'auth/too-many-requests') {
+          return 'Too many login attempts. Please wait a few minutes and try again.';
+      }
+      return error?.message || 'Unable to authenticate with Firebase.';
+  };
+
   const handleOtpAuthenticate = (profile: { name: string; email: string; mobile: string }): { success: boolean, message: string } => {
       const password = `otp-${profile.mobile}`;
       signInWithEmailAndPassword(auth, profile.email, password)
         .then(credential => completeFirebaseUserSession(credential.user, { profile }))
         .catch(async error => {
-            if (error?.code === 'auth/user-not-found' || error?.code === 'auth/invalid-credential') {
-                const credential = await createUserWithEmailAndPassword(auth, profile.email, password);
-                await updateProfile(credential.user, { displayName: profile.name });
-                await completeFirebaseUserSession(credential.user, { profile });
-                return;
+            try {
+                if (error?.code === 'auth/user-not-found' || error?.code === 'auth/invalid-credential') {
+                    const credential = await createUserWithEmailAndPassword(auth, profile.email, password);
+                    await updateProfile(credential.user, { displayName: profile.name });
+                    await completeFirebaseUserSession(credential.user, { profile });
+                    return;
+                }
+                setInfoModal({ title: 'Login failed', message: getFirebaseAuthErrorMessage(error), icon: '⚠️' });
+            } catch (signupError) {
+                setInfoModal({ title: 'Login failed', message: getFirebaseAuthErrorMessage(signupError), icon: '⚠️' });
             }
-            setInfoModal({ title: 'Login failed', message: error?.message || 'Unable to authenticate with Firebase.', icon: '⚠️' });
         });
       return { success: true, message: 'Authenticating with Firebase...' };
   };
@@ -2700,7 +2717,6 @@ const App: React.FC = () => {
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
             {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins)} currentUser={currentUser} coinPrice={cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={handleConfirmCartCoinPurchase} onInsufficientCoins={handleInsufficientEduCoins} />}
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
-            <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={currentUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
@@ -2715,6 +2731,7 @@ const App: React.FC = () => {
   return (
       <ErrorBoundary>
         {renderPage()}
+        <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
       </ErrorBoundary>
   );
 };
