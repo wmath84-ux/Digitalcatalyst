@@ -37,6 +37,47 @@ const VideoUnavailablePlaceholder: React.FC = () => (
   </div>
 );
 
+const getViewportMetrics = () => {
+  if (typeof window === 'undefined') {
+    return { width: 1024, height: 768 };
+  }
+  const viewport = window.visualViewport;
+  return {
+    width: Math.floor(viewport?.width || window.innerWidth || 1024),
+    height: Math.floor(viewport?.height || window.innerHeight || 768),
+  };
+};
+
+const useViewportSize = () => {
+  const [size, setSize] = useState(getViewportMetrics);
+
+  useEffect(() => {
+    const update = () => setSize(getViewportMetrics());
+    update();
+    window.addEventListener('resize', update);
+    window.addEventListener('orientationchange', update);
+    window.visualViewport?.addEventListener('resize', update);
+    window.visualViewport?.addEventListener('scroll', update);
+    return () => {
+      window.removeEventListener('resize', update);
+      window.removeEventListener('orientationchange', update);
+      window.visualViewport?.removeEventListener('resize', update);
+      window.visualViewport?.removeEventListener('scroll', update);
+    };
+  }, []);
+
+  const width = size.width;
+  const height = size.height;
+  return {
+    width,
+    height,
+    isCompactWidth: width < 640,
+    isShortHeight: height < 560,
+    isTinyPlayer: width < 430 || height < 460,
+    isLandscapeCompact: width > height && height < 520,
+  };
+};
+
 
 const formatActiveWatchTime = (totalSeconds: number) => {
   const minutes = Math.floor(totalSeconds / 60);
@@ -45,14 +86,14 @@ const formatActiveWatchTime = (totalSeconds: number) => {
 };
 
 const GlassDownloadCard: React.FC<{ file: ProductFile; headline?: string; onDownloadRequest?: (file: ProductFile) => void; }> = ({ file, headline = 'Your download is ready', onDownloadRequest }) => (
-  <div className="flex h-full w-full items-center justify-center overflow-hidden bg-white/70 p-6 text-slate-900">
+  <div className="flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-white/70 p-3 text-slate-900 sm:p-6 custom-scrollbar">
     <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.32),transparent_26%),radial-gradient(circle_at_75%_70%,rgba(125,211,252,0.28),transparent_24%)]" />
-    <div className="relative w-full max-w-lg rounded-[2rem] border border-white/50 bg-white/70 p-8 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl">
-      <div className="mx-auto mb-5 flex h-24 w-24 items-center justify-center rounded-3xl border border-white/50 bg-white/15 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+    <div className="relative w-full max-w-lg rounded-[1.5rem] border border-white/50 bg-white/70 p-5 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:rounded-[2rem] sm:p-8">
+      <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-3xl border border-white/50 bg-white/15 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:mb-5 sm:h-24 sm:w-24">
         <FileIcon className="h-12 w-12 text-slate-900" />
       </div>
       <p className="text-sm font-black uppercase tracking-[0.3em] text-cyan-700/90">PDF / Document</p>
-      <h2 className="mt-3 text-3xl font-black leading-tight text-slate-900">{headline}</h2>
+      <h2 className="mt-3 text-2xl font-black leading-tight text-slate-900 sm:text-3xl">{headline}</h2>
       <p className="mx-auto mt-3 max-w-sm truncate text-base font-semibold text-slate-900/80" title={file.name}>{file.name}</p>
       {onDownloadRequest ? (
         <button type="button" onClick={() => onDownloadRequest(file)} className="group mt-8 inline-flex items-center justify-center rounded-2xl bg-cyan-100 px-7 py-4 text-base font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition duration-300 hover:-translate-y-1 hover:scale-[1.03] hover:bg-cyan-50 hover:shadow-sm">
@@ -179,6 +220,7 @@ const RichTextButton: React.FC<{ active?: boolean; children: React.ReactNode; on
 
 const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = ({ file, productId }) => {
   const editorRef = useRef<HTMLDivElement>(null);
+  const selectionRef = useRef<Range | null>(null);
   const storageKey = `smart-docs-workspace-${productId}-${file.id}`;
   const defaultContent = useMemo(() => htmlFromPlainText(file.content || '<h1>Smart Docs Workspace</h1><p>Start writing here.</p>'), [file.content]);
   const [html, setHtml] = useState(defaultContent);
@@ -197,14 +239,34 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
     setSavedAt(saved ? 'Restored from local autosave' : 'Loaded admin version');
   }, [storageKey, defaultContent]);
 
+  const saveSelection = () => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+    const range = selection.getRangeAt(0);
+    if (editorRef.current?.contains(range.commonAncestorContainer)) {
+      selectionRef.current = range.cloneRange();
+    }
+  };
+
+  const restoreSelection = () => {
+    const selection = window.getSelection();
+    const range = selectionRef.current;
+    if (!selection || !range || !editorRef.current?.contains(range.commonAncestorContainer)) return;
+    selection.removeAllRanges();
+    selection.addRange(range);
+  };
+
   const persist = () => {
+    saveSelection();
     localStorage.setItem(storageKey, editorRef.current?.innerHTML || '');
     setSavedAt(`Saved ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
   };
 
   const runCommand = (command: string, value?: string) => {
     editorRef.current?.focus();
+    restoreSelection();
     document.execCommand(command, false, value);
+    saveSelection();
     persist();
   };
 
@@ -215,42 +277,46 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   }[theme];
 
   return (
-    <div className="relative flex h-full flex-col overflow-hidden bg-white/70 text-slate-900 backdrop-blur-xl">
-      <div className="flex flex-wrap items-center gap-2 border-b border-white/50 bg-white/70 p-3 shadow-sm backdrop-blur-xl">
-        <span className="mr-2 rounded-full border border-white/50 bg-white/70 px-3 py-2 text-xs font-black uppercase tracking-widest text-cyan-700">Smart Docs Workspace</span>
-        {(smartDocToolbarCommands || []).map(([cmd, label]) => <button key={cmd} type="button" onClick={() => runCommand(cmd)} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 shadow-sm hover:bg-white/80 hover:shadow-sm">{label}</button>)}
-        <button type="button" onClick={() => runCommand('formatBlock', 'H1')} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 hover:bg-white/80 hover:shadow-sm">H1</button>
-        <button type="button" onClick={() => runCommand('formatBlock', 'H2')} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 hover:bg-white/80 hover:shadow-sm">H2</button>
-        <button type="button" onClick={() => runCommand('insertUnorderedList')} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 hover:bg-white/80 hover:shadow-sm">• List</button>
-        <button type="button" onClick={() => runCommand('justifyLeft')} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 hover:bg-white/80 hover:shadow-sm">Left</button>
-        <button type="button" onClick={() => runCommand('justifyCenter')} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 hover:bg-white/80 hover:shadow-sm">Center</button>
-        <button type="button" onClick={() => runCommand('justifyRight')} className="rounded-xl border border-white/50 bg-white/70 px-3 py-2 font-black text-slate-900 hover:bg-white/80 hover:shadow-sm">Right</button>
+    <div className="relative flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-white/70 text-slate-900 backdrop-blur-xl">
+      <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-b border-white/50 bg-white/70 p-2 shadow-sm backdrop-blur-xl sm:gap-2 sm:p-3 custom-scrollbar">
+        <span className="mr-1 shrink-0 rounded-full border border-white/50 bg-white/70 px-2.5 py-2 text-[10px] font-black uppercase tracking-widest text-cyan-700 sm:mr-2 sm:px-3 sm:text-xs">Smart Docs</span>
+        {(smartDocToolbarCommands || []).map(([cmd, label]) => <button key={cmd} type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand(cmd)} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 shadow-sm transition active:scale-95 hover:bg-white/90 hover:shadow-sm">{label}</button>)}
+        <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('formatBlock', 'H1')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">H1</button>
+        <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('formatBlock', 'H2')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">H2</button>
+        <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('insertUnorderedList')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">• List</button>
+        <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('justifyLeft')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">Left</button>
+        <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('justifyCenter')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">Center</button>
+        <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('justifyRight')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">Right</button>
         <span className="ml-auto text-xs font-bold text-slate-600/80">{savedAt}</span>
         <button type="button" onClick={() => setIsReadingMode(true)} className="rounded-2xl border border-cyan-200/30 bg-cyan-200/15 px-4 py-2 font-black text-cyan-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:bg-cyan-200/25">Reading Mode</button>
       </div>
-      <div className="flex-1 overflow-y-auto p-5 md:p-10">
+      <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
         <div
           ref={editorRef}
           contentEditable
           suppressContentEditableWarning
           onInput={persist}
           onBlur={persist}
+          onKeyUp={saveSelection}
+          onMouseUp={saveSelection}
+          onTouchEnd={saveSelection}
+          onFocus={saveSelection}
           className="smart-docs-page mx-auto min-h-full max-w-4xl rounded-[1.25rem] border border-white/50 bg-white/70 px-4 py-6 text-base leading-7 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl sm:rounded-[1.5rem] sm:px-8 sm:py-10 sm:text-lg sm:leading-8 md:px-14 [&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6"
         />
       </div>
       {isReadingMode && (
-        <div className="absolute inset-4 z-20 flex flex-col overflow-hidden rounded-[2rem] border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl">
-          <div className="smart-docs-toolbar flex flex-wrap items-center gap-2 border-b border-white/50 bg-white/70 p-2 sm:p-3">
-            <span className="mr-auto font-black text-slate-900">Reading Mode</span>
-            <button type="button" onClick={() => setFontSize(value => Math.max(14, value - 2))} className="rounded-xl bg-white/70 px-3 py-2 font-black hover:bg-white/80 hover:shadow-sm">A-</button>
-            <button type="button" onClick={() => setFontSize(value => Math.min(28, value + 2))} className="rounded-xl bg-white/70 px-3 py-2 font-black hover:bg-white/80 hover:shadow-sm">A+</button>
-            <button type="button" onClick={() => setLineSpacing(value => Math.max(1.25, Number((value - 0.15).toFixed(2))))} className="rounded-xl bg-white/70 px-3 py-2 font-black hover:bg-white/80 hover:shadow-sm">Line -</button>
-            <button type="button" onClick={() => setLineSpacing(value => Math.min(2.4, Number((value + 0.15).toFixed(2))))} className="rounded-xl bg-white/70 px-3 py-2 font-black hover:bg-white/80 hover:shadow-sm">Line +</button>
-            <button type="button" onClick={() => setFontStyle(value => value === 'sans' ? 'serif' : 'sans')} className="rounded-xl bg-white/70 px-3 py-2 font-black hover:bg-white/80 hover:shadow-sm">{fontStyle === 'sans' ? 'Serif' : 'Sans'}</button>
-            {(readingThemeOptions || []).map(option => <button key={option} type="button" onClick={() => setTheme(option)} className={`rounded-xl px-3 py-2 font-black capitalize ${theme === option ? 'bg-cyan-200 text-slate-900' : 'bg-white/70 hover:bg-white/80 hover:shadow-sm'}`}>{option}</button>)}
-            <button type="button" onClick={() => setIsReadingMode(false)} className="rounded-xl border border-white/50 bg-white/70 px-4 py-2 font-black hover:bg-white/80 hover:shadow-sm">Close</button>
+        <div className="absolute inset-2 z-20 flex min-h-0 flex-col overflow-hidden rounded-[1.5rem] border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl sm:inset-4 sm:rounded-[2rem]">
+          <div className="smart-docs-toolbar flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-b border-white/50 bg-white/70 p-2 sm:gap-2 sm:p-3 custom-scrollbar">
+            <span className="mr-auto shrink-0 text-sm font-black text-slate-900 sm:text-base">Reading Mode</span>
+            <button type="button" onClick={() => setFontSize(value => Math.max(14, value - 2))} className="min-h-9 shrink-0 rounded-xl bg-white/75 px-3 py-2 text-sm font-black hover:bg-white/90 hover:shadow-sm">A-</button>
+            <button type="button" onClick={() => setFontSize(value => Math.min(28, value + 2))} className="min-h-9 shrink-0 rounded-xl bg-white/75 px-3 py-2 text-sm font-black hover:bg-white/90 hover:shadow-sm">A+</button>
+            <button type="button" onClick={() => setLineSpacing(value => Math.max(1.25, Number((value - 0.15).toFixed(2))))} className="min-h-9 shrink-0 rounded-xl bg-white/75 px-3 py-2 text-sm font-black hover:bg-white/90 hover:shadow-sm">Line -</button>
+            <button type="button" onClick={() => setLineSpacing(value => Math.min(2.4, Number((value + 0.15).toFixed(2))))} className="min-h-9 shrink-0 rounded-xl bg-white/75 px-3 py-2 text-sm font-black hover:bg-white/90 hover:shadow-sm">Line +</button>
+            <button type="button" onClick={() => setFontStyle(value => value === 'sans' ? 'serif' : 'sans')} className="min-h-9 shrink-0 rounded-xl bg-white/75 px-3 py-2 text-sm font-black hover:bg-white/90 hover:shadow-sm">{fontStyle === 'sans' ? 'Serif' : 'Sans'}</button>
+            {(readingThemeOptions || []).map(option => <button key={option} type="button" onClick={() => setTheme(option)} className={`min-h-9 shrink-0 rounded-xl px-3 py-2 text-sm font-black capitalize ${theme === option ? 'bg-cyan-200 text-slate-900' : 'bg-white/75 hover:bg-white/90 hover:shadow-sm'}`}>{option}</button>)}
+            <button type="button" onClick={() => setIsReadingMode(false)} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-4 py-2 text-sm font-black hover:bg-white/90 hover:shadow-sm">Close</button>
           </div>
-          <div className={`flex-1 overflow-y-auto p-6 md:p-10 ${readingTheme}`}>
+          <div className={`min-h-0 flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar ${readingTheme}`}>
             <style>{`.reader-content, .reader-content * { line-height: ${lineSpacing} !important; } .reader-content p, .reader-content li, .reader-content div, .reader-content span, .reader-content blockquote { font-size: ${fontSize}px !important; } .reader-content h1 { font-size: ${Math.round(fontSize * 2)}px !important; } .reader-content h2 { font-size: ${Math.round(fontSize * 1.65)}px !important; } .reader-content h3 { font-size: ${Math.round(fontSize * 1.35)}px !important; }`}</style>
             <article className={`reader-content mx-auto max-w-3xl ${fontStyle === 'serif' ? 'font-serif' : 'font-sans'} [&_h1]:mb-5 [&_h1]:font-black [&_h2]:mb-4 [&_h2]:font-black [&_p]:mb-4 [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6`} dangerouslySetInnerHTML={{ __html: editorRef.current?.innerHTML || defaultContent }} />
           </div>
@@ -261,8 +327,8 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
 };
 
 const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
-  <div className="flex h-full items-center justify-center p-6 text-slate-900">
-    <div className="w-full max-w-2xl rounded-[2rem] border border-white/50 bg-white/70 p-8 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl">
+  <div className="flex h-full min-h-0 items-center justify-center overflow-auto p-3 text-slate-900 sm:p-6 custom-scrollbar">
+    <div className="w-full max-w-2xl rounded-[1.5rem] border border-white/50 bg-white/70 p-5 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:rounded-[2rem] sm:p-8">
       <div className="mx-auto mb-5 flex h-20 w-20 items-center justify-center rounded-3xl bg-white/15 text-4xl">↗</div>
       <p className="font-black uppercase tracking-[0.25em] text-cyan-700">External Resource</p>
       <h2 className="mt-3 text-3xl font-black">{file.name}</h2>
@@ -279,6 +345,9 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
   const [submitted, setSubmitted] = useState(false);
   const [rewardClaimed, setRewardClaimed] = useState(false);
   const [rewardCoins, setRewardCoins] = useState(0);
+  const quizViewport = useViewportSize();
+  const compactQuiz = quizViewport.isShortHeight || quizViewport.isTinyPlayer || quizViewport.isLandscapeCompact || quizViewport.width < 640;
+  const veryCompactQuiz = quizViewport.isTinyPlayer || quizViewport.height < 620;
   const score = questions.reduce((total, q, index) => total + (answers[index] === q.correctAnswer ? 1 : 0), 0);
   if (!questions.length) return <GlassDownloadCard file={file} headline="Quiz unavailable" />;
 
@@ -296,22 +365,22 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
   };
 
   return (
-    <div className="h-full overflow-y-auto p-4 text-slate-900 md:p-8 custom-scrollbar">
-      <div className="mx-auto w-full max-w-4xl rounded-[2rem] border border-white/50 bg-white/70 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl md:p-8">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="font-black uppercase tracking-[0.3em] text-cyan-700">Interactive Quiz</p>
-            <h2 className="mt-2 text-3xl font-black text-slate-900">{file.name}</h2>
+    <div className={`flex h-full min-h-0 overflow-hidden text-slate-900 ${compactQuiz ? 'p-1.5' : 'p-3 sm:p-5 md:p-8'}`}>
+      <div className={`mx-auto flex h-full min-h-0 w-full max-w-5xl flex-col rounded-[1.25rem] border border-white/50 bg-white/78 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl sm:rounded-[2rem] ${compactQuiz ? 'p-2' : 'p-4 sm:p-6 md:p-8'}`}>
+        <div className={`${compactQuiz ? 'mb-1.5 flex-row items-center gap-2' : 'mb-5 gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between'} flex shrink-0 justify-between`}>
+          <div className="min-w-0 flex-1">
+            <p className={`${veryCompactQuiz ? 'hidden' : 'block'} text-[10px] font-black uppercase tracking-[0.22em] text-cyan-700 sm:text-xs sm:tracking-[0.3em]`}>Interactive Quiz</p>
+            <h2 className={`${compactQuiz ? 'mt-0 text-lg' : 'mt-2 text-2xl sm:text-3xl'} truncate font-black text-slate-900`}>{file.name}</h2>
           </div>
-          <div className="rounded-2xl border border-white/50 bg-white/70 px-5 py-3 text-lg font-black text-slate-900">Score: {score}/{questions.length}</div>
+          <div className={`${compactQuiz ? 'rounded-xl px-3 py-1.5 text-sm' : 'rounded-2xl px-4 py-2 text-base sm:px-5 sm:py-3 sm:text-lg'} shrink-0 border border-white/50 bg-white/70 font-black text-slate-900`}>Score: {score}/{questions.length}</div>
         </div>
 
-        <div className="mb-6 h-2 overflow-hidden rounded-full bg-white/70">
+        <div className={`${compactQuiz ? 'mb-1.5 h-1.5' : 'mb-6 h-2'} shrink-0 overflow-hidden rounded-full bg-white/70`}>
           <div className="h-full rounded-full bg-cyan-200 transition-all" style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }} />
         </div>
 
         {questions.length > 1 && (
-          <div className="mb-6 flex flex-wrap gap-2 rounded-3xl border border-white/50 bg-white/70 p-3">
+          <div className={`${compactQuiz ? 'mb-1.5 flex-nowrap gap-1.5 overflow-x-auto p-1.5' : 'mb-5 max-h-28 flex-wrap gap-2 overflow-y-auto p-3 sm:mb-6'} flex shrink-0 rounded-2xl border border-white/50 bg-white/70 custom-scrollbar`}>
             {questions.map((_, index) => {
               const isActive = currentQuestion === index;
               const isAnswered = answers[index] !== undefined;
@@ -320,7 +389,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
                   key={index}
                   type="button"
                   onClick={() => setCurrentQuestion(index)}
-                  className={`rounded-2xl px-4 py-2 text-sm font-black transition ${isActive ? 'bg-cyan-200 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5' : isAnswered ? 'border border-emerald-300/40 bg-emerald-400/10 text-emerald-700 hover:bg-emerald-400/20' : 'border border-white/50 bg-white/70 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}
+                  className={`${compactQuiz ? 'rounded-xl px-3 py-1.5 text-xs' : 'rounded-2xl px-4 py-2 text-sm'} shrink-0 font-black transition ${isActive ? 'bg-cyan-200 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5' : isAnswered ? 'border border-emerald-300/40 bg-emerald-400/10 text-emerald-700 hover:bg-emerald-400/20' : 'border border-white/50 bg-white/70 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}
                   aria-current={isActive ? 'step' : undefined}
                 >
                   Q{index + 1}
@@ -330,10 +399,10 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
           </div>
         )}
 
-        <div className="rounded-3xl border border-white/50 bg-white/70 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] md:p-7">
-          <p className="mb-3 text-sm font-black uppercase tracking-[0.24em] text-slate-600">Question {currentQuestion + 1} of {questions.length}</p>
-          <h3 className="text-2xl font-black leading-tight text-slate-900">{question.prompt}</h3>
-          <div className="mt-6 grid gap-3 md:grid-cols-2">
+        <div className={`${compactQuiz ? 'rounded-2xl p-3' : 'rounded-[1.5rem] p-3 sm:rounded-3xl sm:p-5 md:p-7'} min-h-0 flex-1 overflow-y-auto border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] custom-scrollbar`}>
+          <p className={`${compactQuiz ? 'mb-1.5 text-[10px]' : 'mb-3 text-sm'} font-black uppercase tracking-[0.24em] text-slate-600`}>Question {currentQuestion + 1} of {questions.length}</p>
+          <h3 className={`${compactQuiz ? 'text-base' : 'text-xl sm:text-2xl'} font-black leading-tight text-slate-900`}>{question.prompt}</h3>
+          <div className={`${compactQuiz ? 'mt-3 gap-2' : 'mt-5 gap-3'} grid md:grid-cols-2`}>
             {(question.options || []).map((option, oIndex) => {
               const isCorrect = oIndex === question.correctAnswer;
               const isSelected = selected === oIndex;
@@ -344,24 +413,24 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
                   : isSelected
                     ? 'border-rose-300/80 bg-rose-400/25 text-rose-700 shadow-sm'
                     : 'border-white/50 bg-white/70 text-slate-600/70';
-              return <button key={`${option}-${oIndex}`} type="button" onClick={() => !answered && setAnswers(prev => ({ ...prev, [currentQuestion]: oIndex }))} className={`rounded-2xl border px-5 py-4 text-left font-bold transition ${stateClass}`}>{option}</button>;
+              return <button key={`${option}-${oIndex}`} type="button" onClick={() => !answered && setAnswers(prev => ({ ...prev, [currentQuestion]: oIndex }))} className={`${compactQuiz ? 'rounded-xl px-3 py-2 text-sm' : 'rounded-2xl px-4 py-4 sm:px-5'} border text-left font-bold transition ${stateClass}`}>{option}</button>;
             })}
           </div>
-          {answered && <div className={`mt-6 rounded-2xl border p-4 font-black ${selected === question.correctAnswer ? 'border-emerald-300/50 bg-emerald-400/15 text-emerald-700' : 'border-rose-300/50 bg-rose-400/15 text-rose-100'}`}>{selected === question.correctAnswer ? 'Correct! Great work.' : `Incorrect. Correct answer: ${question.options[question.correctAnswer]}`}</div>}
+          {answered && <div className={`${compactQuiz ? 'mt-3 rounded-xl p-3 text-sm' : 'mt-6 rounded-2xl p-4'} border font-black ${selected === question.correctAnswer ? 'border-emerald-300/50 bg-emerald-400/15 text-emerald-700' : 'border-rose-300/50 bg-rose-400/15 text-rose-100'}`}>{selected === question.correctAnswer ? 'Correct! Great work.' : `Incorrect. Correct answer: ${question.options[question.correctAnswer]}`}</div>}
         </div>
 
         {submitted && (
-          <div className="mt-6 rounded-3xl border border-emerald-200/70 bg-emerald-50/80 p-5 shadow-sm backdrop-blur-xl">
-            <p className="text-xl font-black text-emerald-800">Quiz submitted: {score}/{questions.length}</p>
-            <p className="mt-2 text-sm font-bold text-emerald-700">{rewardClaimed ? `✦ +${rewardCoins} EduCoins credited to your wallet.` : rewardCoins > 0 ? 'Reward already claimed for this quiz.' : 'No coin reward this time — revise and try another quiz.'}</p>
+          <div className={`${compactQuiz ? 'mt-2 rounded-2xl p-3' : 'mt-6 rounded-3xl p-5'} shrink-0 border border-emerald-200/70 bg-emerald-50/80 shadow-sm backdrop-blur-xl`}>
+            <p className={`${compactQuiz ? 'text-base' : 'text-xl'} font-black text-emerald-800`}>Quiz submitted: {score}/{questions.length}</p>
+            <p className={`${compactQuiz ? 'mt-1 text-xs' : 'mt-2 text-sm'} font-bold text-emerald-700`}>{rewardClaimed ? `✦ +${rewardCoins} EduCoins credited to your wallet.` : rewardCoins > 0 ? 'Reward already claimed for this quiz.' : 'No coin reward this time — revise and try another quiz.'}</p>
           </div>
         )}
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
-          <button type="button" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(index => Math.max(0, index - 1))} className="rounded-2xl border border-white/50 bg-white/70 px-5 py-3 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-          <div className="flex gap-3">
-            <button type="button" onClick={() => isLastQuestion ? setCurrentQuestion(0) : setCurrentQuestion(index => Math.min(questions.length - 1, index + 1))} className="rounded-2xl bg-cyan-200 px-6 py-3 font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50">{isLastQuestion ? 'Review Quiz' : 'Next Question'}</button>
-            <button type="button" disabled={!allAnswered || submitted} onClick={submitQuiz} className="rounded-2xl bg-gradient-to-r from-indigo-500 to-amber-400 px-6 py-3 font-black text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50">Submit & Claim Coins</button>
+        <div className={`${compactQuiz ? 'mt-1.5 grid grid-cols-3 gap-1.5' : 'mt-6 flex gap-3 sm:items-center sm:justify-between sm:gap-4'} shrink-0`}>
+          <button type="button" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(index => Math.max(0, index - 1))} className={`${compactQuiz ? 'rounded-xl px-2 py-2 text-xs' : 'rounded-2xl px-5 py-3'} border border-white/50 bg-white/70 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40`}>Previous</button>
+          <div className={`${compactQuiz ? 'contents' : 'grid gap-3 sm:flex'}`}>
+            <button type="button" onClick={() => isLastQuestion ? setCurrentQuestion(0) : setCurrentQuestion(index => Math.min(questions.length - 1, index + 1))} className={`${compactQuiz ? 'rounded-xl px-2 py-2 text-xs' : 'rounded-2xl px-6 py-3'} bg-cyan-200 font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50`}>{isLastQuestion ? 'Review' : 'Next'}</button>
+            <button type="button" disabled={!allAnswered || submitted} onClick={submitQuiz} className={`${compactQuiz ? 'rounded-xl px-2 py-2 text-xs' : 'rounded-2xl px-6 py-3'} bg-gradient-to-r from-indigo-500 to-amber-400 font-black text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50`}>Submit</button>
           </div>
         </div>
       </div>
@@ -370,6 +439,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
 };
 
 const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: EconomySettings; product: ProductWithRating; onBack: () => void; onWatchTimeMinutes?: (minutes: number, lessonTitle?: string) => void; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ settings, economySettings, product, onBack, onWatchTimeMinutes, onQuizReward }) => {
+  const viewport = useViewportSize();
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
@@ -422,6 +492,9 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const backgroundImage = useMemo(() => getCourseBackground(product, activeFile), [product, activeFile]);
   const isAudioExperience = activeFile?.type === 'audio';
   const accentGlow = settings.theme?.accentColor || '#a5f3fc';
+  const forceOverlaySidebar = viewport.width < 900 || viewport.height < 560 || viewport.isTinyPlayer || viewport.isLandscapeCompact;
+  const useDesktopSidebar = !forceOverlaySidebar && !isDesktopSidebarCollapsed;
+  const compactPlayerChrome = viewport.isShortHeight || viewport.isTinyPlayer || viewport.isLandscapeCompact;
 
   const onSelectFile = (file: ProductFile) => {
     setActiveFile(file);
@@ -505,7 +578,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onPlay={() => setIsVideoPlaying(true)} onPause={() => setIsVideoPlaying(false)} onEnded={() => setIsVideoPlaying(false)} onError={() => { setIsVideoPlaying(false); setMediaHasError(true); }} />;
       case 'audio': {
         return (
-          <div className="flex h-full w-full bg-white/40 p-2 text-slate-900 sm:p-5">
+          <div className="flex h-full min-h-0 w-full bg-[#d5fbff]/70 text-slate-900">
             <ProductMusicPlayer
               tracks={activeAudioTracks}
               title={activeFile.name || product.title}
@@ -513,6 +586,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
               className="h-full w-full"
               initialTrackId={activeFile.id}
               onError={() => setMediaHasError(true)}
+              density={viewport.width < 760 || viewport.height < 720 ? 'compact' : 'comfortable'}
             />
           </div>
         );
@@ -528,26 +602,26 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   };
 
   return (
-    <div className={`course-player-mobile-scope relative flex h-screen min-h-[100dvh] w-screen flex-col overflow-hidden text-slate-900 bg-[#f3f0ff]`}>
+    <div className="course-player-mobile-scope relative flex h-[100dvh] min-h-[100dvh] w-full max-w-full min-w-0 flex-col overflow-hidden text-slate-900 bg-[#f3f0ff]">
       <div className={`absolute inset-0 scale-110 bg-cover bg-center blur-2xl ${isAudioExperience ? 'opacity-[0.08]' : 'opacity-10'}`} style={{ backgroundImage: `url(${backgroundImage})` }} />
-      <div className={isAudioExperience ? "absolute inset-0 bg-[linear-gradient(180deg,#f7f5ff_0%,#f1edff_46%,#ece7ff_100%)]" : "absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(111,82,255,0.16),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(199,190,255,0.32),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.9),rgba(246,243,255,0.86),rgba(238,233,255,0.94))]"} />
-      <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: isAudioExperience ? '#c7beff' : '#8b75ff' }} />
-      <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-[#d9d2ff]/60' : 'bg-[#d9d2ff]/45'}`} />
+      <div className={isAudioExperience ? "absolute inset-0 bg-[linear-gradient(180deg,#d5fbff_0%,#c9f8ff_48%,#d8fbff_100%)]" : "absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(111,82,255,0.16),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(199,190,255,0.32),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.9),rgba(246,243,255,0.86),rgba(238,233,255,0.94))]"} />
+      <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: isAudioExperience ? '#bdf7ff' : '#8b75ff' }} />
+      <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-[#c9f8ff]/70' : 'bg-[#d9d2ff]/45'}`} />
 
-      <header className={`relative z-30 flex items-center gap-2 border-b p-2.5 shadow-sm backdrop-blur-xl sm:gap-3 sm:p-3 lg:hidden ${'border-[#ded8ff] bg-white/85'}`}>
-        <button onClick={onBack} className="shrink-0 rounded-lg border border-[#ded8ff] bg-white px-3 py-2 text-sm font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]" aria-label="Back to course details">← Back</button>
-        <button onClick={() => setIsSidebarOpen(true)} className="shrink-0 rounded-lg border border-[#ded8ff] bg-[#ece7ff] p-2" aria-label="Open modules"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
+      <header className={`relative z-30 min-w-0 items-center gap-2 border-b shadow-sm backdrop-blur-xl ${forceOverlaySidebar ? 'flex' : 'flex lg:hidden'} ${compactPlayerChrome ? 'p-1.5' : 'p-2.5 sm:gap-3 sm:p-3'} ${'border-[#ded8ff] bg-white/85'}`} style={{ paddingLeft: 'max(0.375rem, env(safe-area-inset-left))', paddingRight: 'max(0.375rem, env(safe-area-inset-right))' }}>
+        <button onClick={onBack} className={`${compactPlayerChrome ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} shrink-0 rounded-lg border border-[#ded8ff] bg-white font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]`} aria-label="Back to course details">← {viewport.isTinyPlayer ? '' : 'Back'}</button>
+        <button onClick={() => setIsSidebarOpen(true)} className={`${compactPlayerChrome ? 'p-1.5' : 'p-2'} shrink-0 rounded-lg border border-[#ded8ff] bg-[#ece7ff]`} aria-label="Open modules"><svg className={`${compactPlayerChrome ? 'h-5 w-5' : 'h-6 w-6'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
         <h1 className="min-w-0 flex-1 truncate text-base font-black sm:text-lg">{activeFile?.name || product.title}</h1>
         <div className="ml-auto flex max-w-[48vw] shrink-0 items-center gap-2 overflow-x-auto sm:max-w-none">
           {liveEarningHud}
-          <button onClick={() => setIsMentorOpen(value => !value)} className="hidden rounded-xl border border-[#ded8ff] bg-white/80 px-2.5 py-2 text-xs font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)] sm:px-3 sm:text-sm md:inline-flex">🧠 AI</button>
+          <button onClick={() => setIsMentorOpen(value => !value)} className={`${viewport.isTinyPlayer ? 'px-2 py-1.5 text-xs' : 'px-2.5 py-2 text-xs sm:px-3 sm:text-sm'} rounded-xl border border-[#ded8ff] bg-white/80 font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)]`}>🧠 AI</button>
         </div>
       </header>
 
-      <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition lg:hidden ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
+      <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition ${useDesktopSidebar ? 'lg:hidden' : ''} ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
-      <main className="relative flex min-h-0 flex-1 flex-col gap-2 p-2 sm:gap-3 sm:p-3 lg:p-3">
-        <div className={`hidden shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid ${'border-[#ded8ff] bg-white/85'}`}>
+      <main className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${compactPlayerChrome ? 'gap-1 p-1.5' : 'gap-2 p-2 sm:gap-3 sm:p-3 lg:p-3'}`} style={{ paddingLeft: 'max(0.375rem, env(safe-area-inset-left))', paddingRight: 'max(0.375rem, env(safe-area-inset-right))', paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}>
+        <div className={`${forceOverlaySidebar ? 'hidden' : 'hidden lg:grid'} shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl ${'border-[#ded8ff] bg-white/85'}`}>
           <div className="flex min-w-0 items-center gap-3">
             <button onClick={onBack} className="shrink-0 rounded-2xl border border-[#ded8ff] bg-white px-5 py-3 text-base font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]" aria-label="Back to course details">← Back</button>
             <span className="truncate">{activeFile?.name || product.title}</span>
@@ -559,8 +633,8 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           <span className="truncate text-right text-sm font-bold text-[#50527a]/70">Welcome to the Course</span>
         </div>
 
-        <section className="grid min-h-0 flex-1 grid-cols-1 gap-2 sm:gap-3 lg:grid-cols-[var(--course-sidebar-width,28rem)_minmax(0,1fr)]" style={{ ['--course-sidebar-width' as any]: isDesktopSidebarCollapsed ? '0rem' : '28rem' }}>
-          <aside className={`fixed inset-y-0 left-0 z-40 w-[18rem] transform transition sm:w-80 lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} ${isDesktopSidebarCollapsed ? 'lg:pointer-events-none lg:opacity-0' : ''}`}>
+        <section className={`${useDesktopSidebar ? 'lg:grid-cols-[var(--course-sidebar-width)_minmax(0,1fr)]' : 'grid-cols-1'} grid min-h-0 min-w-0 flex-1 overflow-hidden gap-2 sm:gap-3`} style={{ ['--course-sidebar-width' as any]: 'clamp(18rem, 28vw, 28rem)' }}>
+          <aside className={`${useDesktopSidebar ? 'lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl' : ''} fixed inset-y-0 left-0 z-40 w-[min(88svw,20rem)] max-w-full transform transition sm:w-80 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col border-r border-[#ded8ff] bg-white/85 shadow-sm backdrop-blur-xl lg:rounded-2xl lg:border lg:border-[#ded8ff] lg:bg-white/85 lg:shadow-sm">
               <div className="shrink-0 border-b border-[#ded8ff] bg-white/85 px-4 py-4 shadow-sm lg:border-[#ded8ff] lg:py-5">
                 <button onClick={onBack} className="mb-3 flex items-center gap-2 text-lg font-medium text-slate-900 hover:opacity-70 sm:mb-4 sm:text-[22px]">← <span>Back</span></button>
@@ -572,7 +646,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
             </div>
           </aside>
 
-          <div className={`relative min-h-0 overflow-hidden rounded-2xl border shadow-[0_20px_60px_rgba(0,0,0,0.05)] backdrop-blur-2xl sm:rounded-3xl ${isAudioExperience ? 'border-[#ded8ff] bg-white/72' : 'border-[#ded8ff] bg-white/72'}`}>
+          <div className={`relative min-h-0 min-w-0 overflow-hidden backdrop-blur-2xl ${isAudioExperience ? 'rounded-none border-0 bg-transparent shadow-none' : 'rounded-2xl border border-[#ded8ff] bg-white/72 shadow-[0_20px_60px_rgba(0,0,0,0.05)] sm:rounded-3xl'}`}>
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>

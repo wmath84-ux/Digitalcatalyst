@@ -495,7 +495,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   ];
 
   return (
-    <div className="min-h-screen w-full overflow-x-hidden text-[#202124]" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}, ${profileStyle.backgroundTint}, #C2E7FF)`, '--profile-card-opacity': String(Number(profileStyle.cardOpacity) / 100) } as React.CSSProperties}>
+    <div className="min-h-[100dvh] w-full max-w-full overflow-x-clip text-[#202124]" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}, ${profileStyle.backgroundTint}, #C2E7FF)`, '--profile-card-opacity': String(Number(profileStyle.cardOpacity) / 100) } as React.CSSProperties}>
       <style>{`
         @keyframes hubFadeUp {
           from { opacity: 0; transform: translateY(28px); }
@@ -505,14 +505,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         .profile-glass-card { background-color: rgba(255,255,255,var(--profile-card-opacity,0.95)); }
       `}</style>
 
-      <div className="pointer-events-none fixed inset-0 opacity-80">
+      <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-80">
         <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}d9, ${profileStyle.backgroundTint}b8, rgba(194,231,255,0.42))` }} />
         <div className="absolute left-[-10%] top-10 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: `${profileStyle.accentColor}26` }} />
         <div className="absolute right-[-5%] top-1/3 h-96 w-96 rounded-full bg-[#C2E7FF]/45 blur-3xl" />
         <div className="absolute bottom-[-10%] left-1/3 h-80 w-80 rounded-full bg-[#1A73E8]/12 blur-3xl" />
       </div>
 
-      <main className="relative mx-auto w-full max-w-none px-3 py-4 pb-32 sm:px-6 sm:py-5 sm:pb-36 lg:px-12 2xl:px-16">
+      <main className="relative mx-auto min-w-0 w-full max-w-[1600px] px-3 py-4 pb-32 sm:px-6 sm:py-5 sm:pb-36 lg:px-8 xl:px-10">
         <button
           onClick={onBack}
           className="hub-animate mb-4 rounded-2xl border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-xs font-black uppercase tracking-[0.16em] text-[#202124] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-[#E8F0FE] hover:shadow-sm hover:shadow-sm hover:shadow-black/5 sm:mb-5 sm:px-5 sm:py-3 sm:text-sm sm:tracking-[0.2em]"
@@ -520,18 +520,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           ← Back
         </button>
 
-        <section className={`hub-animate overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] ${glassCard}`} style={{ animationDelay: '80ms' }}>
-          <div className="relative min-h-[430px] w-full sm:aspect-video sm:min-h-[420px]">
+        <section className={`hub-animate w-full max-w-full overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] ${glassCard}`} style={{ animationDelay: '80ms' }}>
+          <div className="relative min-h-[min(430px,calc(100dvh-9rem))] w-full max-w-full sm:aspect-video sm:min-h-[420px]">
             <img src={coverImage} alt="Student achievement cover" className="h-full w-full object-cover" />
             <div className="absolute inset-0 bg-gradient-to-t from-[#202124] via-[#202124]/35 to-[#174EA6]/18" style={{ opacity: Number(profileStyle.heroOverlayOpacity) / 100 }} />
-            <div className="absolute inset-x-0 top-0 flex items-start justify-between gap-2 p-3 sm:items-center sm:p-6">
-              <div className="max-w-[9.5rem] rounded-full border border-[#D2E3FC] bg-white/95 px-3 py-1.5 text-[9px] font-black uppercase leading-4 tracking-[0.18em] text-[#1967D2] backdrop-blur-xl sm:max-w-none sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.28em]">
+            <div className="absolute inset-x-0 top-0 flex min-w-0 flex-wrap items-start justify-between gap-2 p-3 sm:items-center sm:p-6">
+              <div className="max-w-[min(100%,9.5rem)] shrink rounded-full border border-[#D2E3FC] bg-white/95 px-3 py-1.5 text-[9px] font-black uppercase leading-4 tracking-[0.18em] text-[#1967D2] backdrop-blur-xl sm:max-w-none sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.28em]">
                 Student Achievement Hub
               </div>
               <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
               <button
                 onClick={() => coverInputRef.current?.click()}
-                className="rounded-full border border-[#D2E3FC] bg-white/95 px-3 py-1.5 text-xs font-bold text-[#202124] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-[#E8F0FE] hover:shadow-sm hover:shadow-sm sm:px-4 sm:py-2 sm:text-sm"
+                className="shrink-0 rounded-full border border-[#D2E3FC] bg-white/95 px-3 py-1.5 text-xs font-bold text-[#202124] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-[#E8F0FE] hover:shadow-sm hover:shadow-sm sm:px-4 sm:py-2 sm:text-sm"
               >
                 📷 Upload Cover
               </button>

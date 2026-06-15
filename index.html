@@ -103,6 +103,21 @@
         scroll-behavior: smooth;
       }
 
+      html, body, #root {
+        width: 100%;
+        max-width: 100%;
+        min-height: 100%;
+        margin: 0;
+        overflow-x: clip;
+        box-sizing: border-box;
+      }
+
+      @supports not (overflow: clip) {
+        html, body, #root { overflow-x: hidden; }
+      }
+
+      *, *::before, *::after { box-sizing: inherit; }
+
       :root {
         --apple-fluid-curve: cubic-bezier(0.16, 1, 0.3, 1);
       }
