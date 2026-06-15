@@ -167,7 +167,7 @@ const SponsoredPartnerCard: React.FC<{
   promoCtaLabel = 'Explore Feature',
   onExploreFeature,
 }) => (
-  <aside className="my-12 overflow-hidden rounded-[2rem] border bg-gradient-to-r from-[#edf4ff] via-[#f7f9fc] to-[#e6f4ea] p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
+  <aside className="my-12 overflow-hidden rounded-[2rem] border bg-gradient-to-r from-[#EAF2FF] via-[#F8FAFD] to-[#CFE1FF] p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
     <div className="rounded-[1.75rem] p-6 backdrop-blur-2xl sm:p-8" style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
@@ -321,7 +321,16 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
 
   const rewardMinutes = Math.floor(rewardSecondsLeft / 60);
   const rewardSeconds = String(rewardSecondsLeft % 60).padStart(2, '0');
-  const readingStyle = { ...defaultReadingStyle, ...((settings.content as any).readingStyle || {}) };
+  const storedReadingStyle = ((settings.content as any).readingStyle || {}) as Partial<typeof defaultReadingStyle>;
+  const readingStyle = {
+    ...defaultReadingStyle,
+    cardOpacity: storedReadingStyle.cardOpacity ?? defaultReadingStyle.cardOpacity,
+    backgroundColor: defaultReadingStyle.backgroundColor,
+    backgroundOpacity: defaultReadingStyle.backgroundOpacity,
+    panelOpacity: defaultReadingStyle.panelOpacity,
+    accentColor: defaultReadingStyle.accentColor,
+    accentOpacity: defaultReadingStyle.accentOpacity,
+  };
   const readingBackground = hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity);
   const panelBackground = hexToRgba(readingStyle.backgroundColor, readingStyle.panelOpacity);
   const cardBackground = `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;

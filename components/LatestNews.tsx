@@ -14,10 +14,10 @@ interface LatestNewsProps {
 
 const defaultReadingStyle = {
   backgroundColor: '#F8FAFD',
-  backgroundOpacity: 96,
+  backgroundOpacity: 98,
   cardOpacity: 94,
-  accentColor: '#c2e7ff',
-  accentOpacity: 62,
+  accentColor: '#C2E7FF',
+  accentOpacity: 66,
 };
 
 const chatPalette = {
@@ -107,7 +107,15 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
   }, []);
 
   const newsArticles = articles.filter(article => article.type === 'news');
-  const readingStyle = { ...defaultReadingStyle, ...((settings.content as any).readingStyle || {}) };
+  const storedReadingStyle = ((settings.content as any).readingStyle || {}) as Partial<typeof defaultReadingStyle>;
+  const readingStyle = {
+    ...defaultReadingStyle,
+    cardOpacity: storedReadingStyle.cardOpacity ?? defaultReadingStyle.cardOpacity,
+    backgroundColor: defaultReadingStyle.backgroundColor,
+    backgroundOpacity: defaultReadingStyle.backgroundOpacity,
+    accentColor: defaultReadingStyle.accentColor,
+    accentOpacity: defaultReadingStyle.accentOpacity,
+  };
   const sectionBackground = `radial-gradient(circle at 0% 12%, rgba(194, 231, 255, 0.50), transparent 30%), radial-gradient(circle at 100% 15%, rgba(178, 158, 255, 0.22), transparent 28%), linear-gradient(135deg, ${hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity)}, rgba(237, 244, 255, 0.92), rgba(248, 250, 253, 0.98))`;
   const cardBackground = `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;
 
