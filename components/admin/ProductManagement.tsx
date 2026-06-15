@@ -548,19 +548,17 @@ const ProductForm: React.FC<{
     return (
         <div className="min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_12%_8%,rgba(79,70,229,0.14),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(14,165,233,0.12),transparent_26%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] text-slate-900">
             <form onSubmit={handleSubmit}>
-                <header className="sticky top-0 z-30 border-b border-white/50 bg-white/80 px-4 py-4 backdrop-blur-2xl sm:px-6 lg:px-8">
-                    <div className="mx-auto flex max-w-7xl flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                        <div className="flex items-center gap-4">
-                            <button type="button" onClick={onCancel} className="rounded-2xl border border-white/50 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm">← Back to List</button>
-                            <div>
-                                <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-300">{mode === 'add' ? 'Create Product' : 'Edit Product'}</p>
-                                <h1 className="text-2xl font-black text-slate-900 sm:text-3xl">{mode === 'add' ? 'New digital product' : formData.title || 'Product editor'}</h1>
+                <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
+                    <div className="mb-8 rounded-[1.75rem] border border-white/50 bg-white/70 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-6">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                            <button type="button" onClick={onCancel} className="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-white/90 hover:shadow-sm sm:w-auto">← Back to List</button>
+                            <div className="min-w-0">
+                                <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-400">{mode === 'add' ? 'Create Product' : 'Edit Product'}</p>
+                                <h1 className="mt-1 break-words text-2xl font-black text-slate-900 sm:text-3xl">{mode === 'add' ? 'New digital product' : formData.title || 'Product editor'}</h1>
                             </div>
                         </div>
                     </div>
-                </header>
 
-                <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
                     <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
                         <section className="space-y-8 lg:col-span-2">
                             <div className={glassCard}>
