@@ -1821,14 +1821,18 @@ const App: React.FC = () => {
       };
   }, []);
 
+  const firebaseEmailPasswordDisabledMessage = 'Firebase Email/Password provider is disabled. Enable it in Firebase Console → Authentication → Sign-in method.';
+  const firebaseEmailPasswordDisabledCodes = new Set(['auth/configuration-not-found', 'auth/operation-not-allowed']);
+  const isFirebaseEmailPasswordDisabledError = (error: any) => firebaseEmailPasswordDisabledCodes.has(error?.code);
+
   const getFirebaseAuthErrorMessage = (error: any) => {
       if (error?.code === 'auth/email-already-in-use') return 'This email already has an account. Please login instead.';
       if (error?.code === 'auth/invalid-credential') return 'Invalid email or password.';
       if (error?.code === 'auth/weak-password') return 'Password should be at least 6 characters.';
       if (error?.code === 'auth/invalid-email') return 'Please enter a valid email address.';
       if (error?.code === 'auth/user-not-found') return 'No account found. Please sign up first.';
-      if (error?.code === 'auth/configuration-not-found') {
-          return 'Firebase Email/Password authentication is not enabled for this project. Please enable the Email/Password sign-in provider in Firebase Console, then try again.';
+      if (isFirebaseEmailPasswordDisabledError(error)) {
+          return firebaseEmailPasswordDisabledMessage;
       }
       if (error?.code === 'auth/network-request-failed') {
           return 'Network connection failed while contacting Firebase. Please check your internet connection and try again.';
