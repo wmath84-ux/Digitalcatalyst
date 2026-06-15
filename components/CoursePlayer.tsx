@@ -534,7 +534,8 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-[#d9d2ff]/60' : 'bg-[#d9d2ff]/45'}`} />
 
       <header className={`relative z-30 flex items-center gap-2 border-b p-2.5 shadow-sm backdrop-blur-xl sm:gap-3 sm:p-3 lg:hidden ${'border-[#ded8ff] bg-white/85'}`}>
-        <button onClick={() => setIsSidebarOpen(true)} className="shrink-0 rounded-lg border border-[#ded8ff] bg-[#ece7ff] p-2"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
+        <button onClick={onBack} className="shrink-0 rounded-lg border border-[#ded8ff] bg-white px-3 py-2 text-sm font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]" aria-label="Back to course details">← Back</button>
+        <button onClick={() => setIsSidebarOpen(true)} className="shrink-0 rounded-lg border border-[#ded8ff] bg-[#ece7ff] p-2" aria-label="Open modules"><svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
         <h1 className="min-w-0 flex-1 truncate text-base font-black sm:text-lg">{activeFile?.name || product.title}</h1>
         <div className="ml-auto flex max-w-[48vw] shrink-0 items-center gap-2 overflow-x-auto sm:max-w-none">
           {liveEarningHud}
@@ -546,7 +547,10 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
 
       <main className="relative flex min-h-0 flex-1 flex-col gap-2 p-2 sm:gap-3 sm:p-3 lg:p-3">
         <div className={`hidden shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl lg:grid ${'border-[#ded8ff] bg-white/85'}`}>
-          <span className="truncate">{activeFile?.name || product.title}</span>
+          <div className="flex min-w-0 items-center gap-3">
+            <button onClick={onBack} className="shrink-0 rounded-2xl border border-[#ded8ff] bg-white px-5 py-3 text-base font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]" aria-label="Back to course details">← Back</button>
+            <span className="truncate">{activeFile?.name || product.title}</span>
+          </div>
           <div className="flex items-center justify-center gap-3">
             <button onClick={() => setIsDesktopSidebarCollapsed(value => !value)} className="rounded-2xl border border-[#ded8ff] bg-white px-5 py-3 text-base font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5">{isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize modules'}</button><button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-[#ded8ff] bg-white/85 px-6 py-3 text-base font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.12)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]">🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}</button>
             {liveEarningHud}
@@ -556,8 +560,8 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
 
         <section className="grid min-h-0 flex-1 grid-cols-1 gap-2 sm:gap-3 lg:grid-cols-[var(--course-sidebar-width,28rem)_minmax(0,1fr)]" style={{ ['--course-sidebar-width' as any]: isDesktopSidebarCollapsed ? '0rem' : '28rem' }}>
           <aside className={`fixed inset-y-0 left-0 z-40 w-[18rem] transform transition sm:w-80 lg:relative lg:inset-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"} ${isDesktopSidebarCollapsed ? 'lg:pointer-events-none lg:opacity-0' : ''}`}>
-            <div className="flex h-full flex-col border-r border-[#ded8ff] bg-white/86 shadow-[4px_0_30px_rgba(89,71,242,0.08)] backdrop-blur-3xl lg:rounded-2xl lg:border lg:border-[#ded8ff] lg:bg-white/70 lg:shadow-[0_20px_60px_rgba(89,71,242,0.08)]">
-              <div className="shrink-0 border-b border-[#ded8ff] px-4 py-4 lg:border-[#ded8ff] lg:py-5">
+            <div className="flex h-full flex-col border-r border-[#ded8ff] bg-white/85 shadow-sm backdrop-blur-xl lg:rounded-2xl lg:border lg:border-[#ded8ff] lg:bg-white/85 lg:shadow-sm">
+              <div className="shrink-0 border-b border-[#ded8ff] bg-white/85 px-4 py-4 shadow-sm lg:border-[#ded8ff] lg:py-5">
                 <button onClick={onBack} className="mb-3 flex items-center gap-2 text-lg font-medium text-slate-900 hover:opacity-70 sm:mb-4 sm:text-[22px]">← <span>Back</span></button>
                 <h2 className="text-xl font-black leading-tight text-slate-900 sm:text-[25px]">{product.title}</h2>
               </div>
