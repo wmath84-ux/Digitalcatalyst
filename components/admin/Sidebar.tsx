@@ -68,7 +68,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
     // Mobile overlay classes vs Desktop static classes
     const containerClasses = isOpen 
         ? "fixed inset-y-0 left-0 z-50 w-[17rem] bg-gradient-to-b from-[#cbd5e8] via-[#dbe3f1] to-[#c8d3e6] shadow-[0_18px_55px_rgba(51,65,85,0.18)] transition-transform transform translate-x-0"
-        : "hidden md:flex md:w-72 bg-gradient-to-b from-[#cbd5e8] via-[#dbe3f1] to-[#c8d3e6] shadow-[0_18px_55px_rgba(51,65,85,0.16)] flex-col md:fixed md:left-0 md:top-0 md:bottom-0 md:z-40 md:translate-x-[-248px] md:hover:translate-x-0 md:transition-transform md:duration-300";
+        : "hidden md:flex md:h-full md:w-72 md:shrink-0 md:flex-col md:overflow-hidden bg-gradient-to-b from-[#cbd5e8] via-[#dbe3f1] to-[#c8d3e6] shadow-[0_18px_55px_rgba(51,65,85,0.16)]";
 
     return (
         <>
@@ -80,26 +80,28 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
                 ></div>
             )}
 
-            <aside className={`${containerClasses} flex flex-col h-full text-slate-900`}>
-                <div className="mb-2 flex items-center justify-between border-b border-white/60 px-4 py-4 sm:py-6">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-700 to-indigo-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:h-10 sm:w-10">
-                            <span className="text-xl font-bold text-white">DC</span>
+            <aside className={`${containerClasses} flex h-full max-h-[100dvh] flex-col overflow-hidden text-slate-900`}>
+                <div className="shrink-0 border-b border-white/60 px-4 py-4 sm:py-6">
+                    <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-700 to-indigo-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:h-10 sm:w-10">
+                                <span className="text-xl font-bold text-white">DC</span>
+                            </div>
+                            <div>
+                                <div className="text-base font-bold tracking-tight sm:text-lg">Digital Catalyst</div>
+                                <div className="text-xs text-slate-700 font-medium uppercase tracking-widest">Admin Panel</div>
+                            </div>
                         </div>
-                        <div>
-                            <div className="text-base font-bold tracking-tight sm:text-lg">Digital Catalyst</div>
-                            <div className="text-xs text-slate-700 font-medium uppercase tracking-widest">Admin Panel</div>
-                        </div>
+                        {/* Mobile Close Button */}
+                        <button onClick={onClose} className="md:hidden text-slate-700 hover:text-slate-900 p-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
                     </div>
-                    {/* Mobile Close Button */}
-                    <button onClick={onClose} className="md:hidden text-slate-700 hover:text-slate-900 p-2">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                    </button>
                 </div>
                 
-                <div className="flex-1 space-y-1 overflow-y-auto py-2 custom-scrollbar sm:py-4">
+                <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-0 py-2 custom-scrollbar sm:py-4">
                     {navItems.map(item => (
                         <NavLink
                             key={item.view}
@@ -113,7 +115,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
                     ))}
                 </div>
                 
-                <div className="mt-2 space-y-2 border-t border-white/60 p-3 pt-3 sm:p-4 sm:pt-4">
+                <div className="shrink-0 space-y-2 border-t border-white/60 p-3 pt-3 sm:p-4 sm:pt-4">
                     <button
                         onClick={onSwitchToHome}
                         className="group flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left text-blue-800 transition-colors hover:bg-white/80 hover:text-slate-950 sm:px-4 sm:py-3"
