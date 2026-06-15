@@ -13,10 +13,9 @@ interface ProductShowcaseProps {
   onBuyNow: (product: ProductWithRating) => void;
   onQuickView: (product: ProductWithRating) => void;
   coupons: Coupon[];
-  onBack?: () => void;
 }
 
-const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, onQuickView, coupons, onBack }) => {
+const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, onQuickView, coupons }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('default');
   const [activeFilter, setActiveFilter] = useState<string>('All');
@@ -90,16 +89,6 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
       className={`py-14 sm:py-24 bg-gradient-to-br from-white via-sky-50/80 to-indigo-100/50 backdrop-blur-xl ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
     >
       <div className="container mx-auto px-4 sm:px-6">
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white/90 px-4 py-2 text-sm font-bold text-primary shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition active:scale-95 md:hidden"
-            aria-label="Go back"
-          >
-            <span aria-hidden="true">←</span> Back
-          </button>
-        )}
         <div className="mx-auto mb-8 max-w-3xl text-center sm:mb-12 animate-child animate-delay-1">
           <h2 className="text-3xl font-extrabold tracking-tight text-primary sm:text-4xl">All Products</h2>
           <p className="mt-3 text-base text-text-muted sm:mt-4 sm:text-lg">

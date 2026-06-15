@@ -39,10 +39,9 @@ interface PurchasedProductsProps {
   settings: WebsiteSettings;
   products: ProductWithRating[];
   onViewPurchasedProduct: (product: ProductWithRating) => void;
-  onBack?: () => void;
 }
 
-const PurchasedProducts: React.FC<PurchasedProductsProps> = ({ settings, products, onViewPurchasedProduct, onBack }) => {
+const PurchasedProducts: React.FC<PurchasedProductsProps> = ({ settings, products, onViewPurchasedProduct }) => {
   const sectionRef = useRef<HTMLElement>(null);
 
   useEffect(() => {
@@ -75,16 +74,6 @@ const PurchasedProducts: React.FC<PurchasedProductsProps> = ({ settings, product
       className={`py-20 bg-blue-50 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
     >
       <div className="container mx-auto px-6">
-        {onBack && (
-          <button
-            type="button"
-            onClick={onBack}
-            className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white/90 px-4 py-2 text-sm font-bold text-primary shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition active:scale-95 md:hidden"
-            aria-label="Go back"
-          >
-            <span aria-hidden="true">←</span> Back
-          </button>
-        )}
         <div className="flex flex-col md:flex-row justify-between items-end mb-12 animate-child animate-delay-1">
             <div className="max-w-2xl">
                 <h2 className="text-3xl font-bold text-primary">My Purchases</h2>

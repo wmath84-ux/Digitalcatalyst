@@ -111,11 +111,11 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
   return (
     <>
       <header className="border-b border-indigo-100/70 bg-background/90 shadow-[0_12px_34px_rgba(79,70,229,0.08)] backdrop-blur-md sticky top-0 z-50">
-        <div className="container mx-auto px-6 py-4">
+        <div className="container mx-auto px-4 py-3 sm:px-6 sm:py-4">
           <div className="flex items-center justify-between">
             <button onClick={onHomeClick} className="flex items-center space-x-3 cursor-pointer" aria-label="Back to Homepage">
               <LogoIcon />
-              <span className="text-xl font-bold text-primary">{(settings.content as any).siteName || "Digital Catalyst"}</span>
+              <span className="text-base font-bold text-primary sm:text-xl">{(settings.content as any).siteName || "Digital Catalyst"}</span>
             </button>
             
             <nav className="hidden md:flex items-center justify-center gap-x-7 lg:gap-x-9">
@@ -170,6 +170,16 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                     )}
                 </div>
                 <div className="flex items-center space-x-3 md:hidden">
+                    {settings.features.showFavourites && (
+                        <button onClick={onNavigateToWishlist} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your wishlist with ${wishlistCount} items`}>
+                            <HeartIcon />
+                            {wishlistCount > 0 && (
+                                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
+                                    {wishlistCount}
+                                </span>
+                            )}
+                        </button>
+                    )}
                     <button onClick={onCartClick} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your cart with ${cartItemCount} items`}>
                         <CartIcon />
                         {cartItemCount > 0 && (
@@ -203,6 +213,23 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                 </div>
             </div>
           </div>
+          <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 md:hidden" aria-label="Mobile primary navigation">
+            {navItems.map((item) => (
+              <button
+                key={item.name}
+                onClick={item.action}
+                className="shrink-0 rounded-full border border-indigo-100 bg-white/80 px-4 py-2 text-sm font-bold text-text-muted shadow-[0_8px_24px_rgba(79,70,229,0.08)] backdrop-blur-xl transition active:scale-95"
+              >
+                {item.name}
+              </button>
+            ))}
+            <button
+              onClick={onNavigateToPurchases}
+              className="shrink-0 rounded-full border border-indigo-100 bg-white/80 px-4 py-2 text-sm font-bold text-text-muted shadow-[0_8px_24px_rgba(79,70,229,0.08)] backdrop-blur-xl transition active:scale-95"
+            >
+              Purchases
+            </button>
+          </nav>
         </div>
       </header>
 
