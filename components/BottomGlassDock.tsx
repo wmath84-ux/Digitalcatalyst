@@ -91,11 +91,11 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
   const dockPadding = Math.min(22, Math.max(8, Number(dockStyle.padding || defaultDockStyle.padding)));
 
   return (
-    <div className="fixed inset-x-0 bottom-2 md:bottom-4 z-[65] flex justify-center pointer-events-none px-3">
-      <div className="pointer-events-auto group relative max-w-[95vw] overflow-hidden rounded-[2rem] border border-[var(--border-soft)] shadow-[var(--shadow-blue)] ring-1 ring-[var(--border-active)] backdrop-blur-3xl transition-all duration-500 hover:-translate-y-0.5 data-[hidden=true]:translate-y-24" id="main-bottom-dock" style={{ backgroundColor: dockBackground, minHeight: dockHeight, padding: dockPadding }}>
+    <div className="fixed left-0 right-0 bottom-[max(0.5rem,env(safe-area-inset-bottom))] z-[65] flex w-full max-w-full justify-center pointer-events-none px-2 sm:px-3">
+      <div className="pointer-events-auto group relative w-full max-w-[min(1180px,calc(100svw-1rem))] overflow-hidden rounded-[2rem] border border-[var(--border-soft)] shadow-[var(--shadow-blue)] ring-1 ring-[var(--border-active)] backdrop-blur-3xl transition-all duration-500 hover:-translate-y-0.5 data-[hidden=true]:translate-y-24" id="main-bottom-dock" style={{ backgroundColor: dockBackground, minHeight: dockHeight, padding: dockPadding }}>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(26,115,232,0.12),transparent_30%),radial-gradient(circle_at_82%_10%,rgba(194,231,255,0.40),transparent_30%),linear-gradient(180deg,rgba(232,240,254,0.42),rgba(255,255,255,0.16))]" />
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#C2E7FF] to-transparent" />
-        <div className="relative flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
+        <div className="relative flex min-w-0 items-center gap-2 overflow-x-auto overscroll-x-contain pb-1 custom-scrollbar">
           {items.map((item) => {
             const tone = dockToneClasses[item.label] || 'from-[#F8FAFD] to-[#E8F0FE] hover:border-[#D2E3FC]';
             return (

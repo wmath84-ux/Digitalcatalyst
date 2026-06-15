@@ -110,12 +110,12 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
 
   return (
     <>
-      <header className="border-b border-indigo-100/70 bg-background/90 shadow-[0_12px_34px_rgba(79,70,229,0.08)] backdrop-blur-md sticky top-0 z-50">
-        <div className="container mx-auto px-4 py-3 sm:px-6 sm:py-4">
-          <div className="flex items-center justify-between">
-            <button onClick={onHomeClick} className="flex items-center space-x-3 cursor-pointer" aria-label="Back to Homepage">
+      <header className="w-full max-w-full border-b border-indigo-100/70 bg-background/90 shadow-[0_12px_34px_rgba(79,70,229,0.08)] backdrop-blur-md sticky top-0 z-50">
+        <div className="container mx-auto w-full max-w-full px-4 py-3 sm:px-6 sm:py-4">
+          <div className="flex min-w-0 items-center justify-between gap-3 overflow-hidden">
+            <button onClick={onHomeClick} className="flex min-w-0 items-center space-x-3 cursor-pointer overflow-hidden" aria-label="Back to Homepage">
               <LogoIcon />
-              <span className="text-base font-bold text-primary sm:text-xl">{(settings.content as any).siteName || "Digital Catalyst"}</span>
+              <span className="truncate text-base font-bold text-primary sm:text-xl">{(settings.content as any).siteName || "Digital Catalyst"}</span>
             </button>
             
             <nav className="hidden md:flex items-center justify-center gap-x-7 lg:gap-x-9">
@@ -126,7 +126,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
               ))}
             </nav>
 
-            <div ref={accountMenuAreaRef} className="flex items-center justify-end">
+            <div ref={accountMenuAreaRef} className="flex min-w-0 shrink-0 items-center justify-end">
                 <div className="hidden md:flex items-center gap-x-4 lg:gap-x-5">
                     {settings.features.showFavourites && (
                         <button onClick={onNavigateToWishlist} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your wishlist with ${wishlistCount} items`}>
