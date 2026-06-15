@@ -15,9 +15,10 @@ interface FeaturedProductsProps {
   onQuickView: (product: ProductWithRating) => void;
   bgColor?: string;
   coupons: Coupon[];
+  onBack?: () => void;
 }
 
-const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, onQuickView, bgColor = 'bg-background', coupons }) => {
+const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, onQuickView, bgColor = 'bg-background', coupons, onBack }) => {
   const sectionRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -63,6 +64,16 @@ const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, pr
       className={`py-14 sm:py-24 ${bgColor}`}
     >
       <div className="container mx-auto px-4 sm:px-6">
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="mb-5 inline-flex items-center gap-2 rounded-full border border-indigo-100 bg-white/90 px-4 py-2 text-sm font-bold text-primary shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition active:scale-95 md:hidden"
+            aria-label="Go back"
+          >
+            <span aria-hidden="true">←</span> Back
+          </button>
+        )}
         <div className={`text-center max-w-3xl mx-auto mb-10 sm:mb-16 ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
           <h2 className="mb-3 text-3xl font-extrabold tracking-tight text-primary sm:mb-4 sm:text-4xl">{title}</h2>
           <div className="w-24 h-1 bg-accent mx-auto rounded-full"></div>
