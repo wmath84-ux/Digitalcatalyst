@@ -152,7 +152,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     }
 
     return (
-        <div className="admin-mobile-scope tagmaster-admin-theme flex min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_10%_10%,rgba(79,70,229,0.16),transparent_30%),radial-gradient(circle_at_90%_0%,rgba(14,165,233,0.13),transparent_28%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] font-sans">
+        <div className="admin-mobile-scope tagmaster-admin-theme flex h-[100dvh] min-h-[100dvh] w-full max-w-full overflow-hidden bg-[#d8e0ef] bg-[radial-gradient(circle_at_10%_10%,rgba(79,70,229,0.16),transparent_30%),radial-gradient(circle_at_90%_0%,rgba(14,165,233,0.13),transparent_28%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] font-sans">
             <Sidebar 
                 onNavigate={setCurrentView} 
                 onLogout={props.onLogout} 
@@ -162,7 +162,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 onClose={() => setIsMobileSidebarOpen(false)}
             />
             
-            <div className="flex-1 flex flex-col min-h-0 overflow-hidden">
+            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
                 {/* Mobile Header */}
                 <header className="sticky top-0 z-30 flex items-center justify-between border-b border-slate-300/70 bg-white/80 p-3 shadow-sm backdrop-blur-xl md:hidden">
                     <div className="flex items-center gap-3">
@@ -179,8 +179,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                     </div>
                 </header>
 
-                <main className="flex-1 overflow-y-auto bg-white/20 p-3 backdrop-blur-sm custom-scrollbar sm:p-8 lg:p-10">
-                    <div className="max-w-7xl mx-auto">
+                <main className="min-h-0 flex-1 overflow-y-auto bg-white/20 p-3 backdrop-blur-sm custom-scrollbar sm:p-8 lg:p-10">
+                    <div className="mx-auto w-full max-w-7xl">
                         {renderView()}
                     </div>
                 </main>
