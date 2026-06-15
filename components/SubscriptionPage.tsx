@@ -63,7 +63,7 @@ const SubscriptionPage: React.FC<{
       if (expiry < new Date()) return 'This coupon has expired.';
     }
 
-    if (coupon.timesUsed >= coupon.usageLimit) return 'Coupon usage limit reached.';
+    if (Number(coupon.usageLimit) > 0 && Number(coupon.timesUsed || 0) >= Number(coupon.usageLimit)) return 'Coupon usage limit reached.';
     return '';
   }, []);
 
@@ -188,9 +188,12 @@ const SubscriptionPage: React.FC<{
                   
                   <p className="mx-auto mt-4 min-h-10 max-w-[12rem] text-[11px] leading-5 text-[#5F6368]">{plan.description}</p>
 
-                  <div className="mt-4 rounded-3xl border border-[#E0E3EB] bg-[#F8FAFD] p-3 text-left shadow-inner sm:p-4">
-                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1967D2]">Have a coupon?</p>
-                    <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+                  <div className="mt-4 rounded-[1.5rem] border border-[#D2E3FC] bg-[#F8FAFD]/95 p-3 text-left shadow-inner sm:p-4">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1967D2]">Have a coupon?</p>
+                      <span className="rounded-full bg-[#E6F4EA] px-2.5 py-1 text-[10px] font-black text-[#137333]">Live coupons</span>
+                    </div>
+                    <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
                       <input
                         type="text"
                         value={couponInputs[planId] || ''}
@@ -198,14 +201,14 @@ const SubscriptionPage: React.FC<{
                         onKeyDown={event => { if (event.key === 'Enter' && !validAppliedCoupon) handleApplyCoupon(planId, couponInputs[planId] || ''); }}
                         placeholder="Coupon code"
                         disabled={allUnlocked}
-                        className="min-h-11 w-full min-w-0 flex-1 rounded-2xl border border-[#DADCE0] bg-white px-4 py-3 text-sm font-bold outline-none transition placeholder:text-[#9AA0A6] focus:border-[#1A73E8] focus:ring-2 focus:ring-[#D2E3FC] disabled:cursor-not-allowed disabled:bg-[#F8FAFD] sm:min-h-0 sm:py-2 sm:text-xs"
+                        className="h-12 w-full min-w-0 rounded-2xl border border-[#DADCE0] bg-white px-4 text-sm font-black uppercase tracking-[0.08em] outline-none transition placeholder:normal-case placeholder:tracking-normal placeholder:text-[#9AA0A6] focus:border-[#1A73E8] focus:ring-2 focus:ring-[#D2E3FC] disabled:cursor-not-allowed disabled:bg-[#F8FAFD] sm:h-11"
                         aria-label={`Coupon code for ${plan.name}`}
                       />
                       <button
                         type="button"
                         disabled={allUnlocked}
                         onClick={() => validAppliedCoupon ? handleRemoveCoupon(planId) : handleApplyCoupon(planId, couponInputs[planId] || '')}
-                        className={`min-h-11 rounded-2xl px-4 py-3 text-sm font-black transition active:scale-95 sm:min-h-0 sm:px-3 sm:py-2 sm:text-xs disabled:cursor-not-allowed disabled:bg-[#DADCE0] disabled:text-[#5F6368] ${validAppliedCoupon ? 'bg-[#FCE8E6] text-[#C5221F] hover:bg-[#FAD2CF]' : 'bg-[#1A73E8] text-white hover:-translate-y-0.5'}`}
+                        className={`h-12 rounded-2xl px-5 text-sm font-black transition active:scale-95 sm:h-11 disabled:cursor-not-allowed disabled:bg-[#DADCE0] disabled:text-[#5F6368] ${validAppliedCoupon ? 'bg-[#FCE8E6] text-[#C5221F] hover:bg-[#FAD2CF]' : 'bg-[#1A73E8] text-white hover:-translate-y-0.5'}`}
                       >
                         {validAppliedCoupon ? 'Remove' : 'Apply'}
                       </button>

@@ -296,14 +296,14 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
   };
 
   return (
-    <div className="h-full overflow-y-auto p-4 text-slate-900 md:p-8 custom-scrollbar">
-      <div className="mx-auto w-full max-w-4xl rounded-[2rem] border border-white/50 bg-white/70 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl md:p-8">
-        <div className="mb-8 flex flex-wrap items-center justify-between gap-4">
-          <div>
-            <p className="font-black uppercase tracking-[0.3em] text-cyan-700">Interactive Quiz</p>
-            <h2 className="mt-2 text-3xl font-black text-slate-900">{file.name}</h2>
+    <div className="flex h-full min-h-0 overflow-y-auto p-3 text-slate-900 sm:p-5 md:p-8 custom-scrollbar">
+      <div className="mx-auto my-auto w-full max-w-5xl rounded-[1.5rem] border border-white/50 bg-white/78 p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl sm:rounded-[2rem] sm:p-6 md:p-8">
+        <div className="mb-5 flex flex-col gap-4 sm:mb-8 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-cyan-700 sm:tracking-[0.3em]">Interactive Quiz</p>
+            <h2 className="mt-2 truncate text-2xl font-black text-slate-900 sm:text-3xl">{file.name}</h2>
           </div>
-          <div className="rounded-2xl border border-white/50 bg-white/70 px-5 py-3 text-lg font-black text-slate-900">Score: {score}/{questions.length}</div>
+          <div className="w-fit rounded-2xl border border-white/50 bg-white/70 px-4 py-2 text-base font-black text-slate-900 sm:px-5 sm:py-3 sm:text-lg">Score: {score}/{questions.length}</div>
         </div>
 
         <div className="mb-6 h-2 overflow-hidden rounded-full bg-white/70">
@@ -311,7 +311,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
         </div>
 
         {questions.length > 1 && (
-          <div className="mb-6 flex flex-wrap gap-2 rounded-3xl border border-white/50 bg-white/70 p-3">
+          <div className="mb-5 flex max-h-28 flex-wrap gap-2 overflow-y-auto rounded-3xl border border-white/50 bg-white/70 p-3 sm:mb-6 custom-scrollbar">
             {questions.map((_, index) => {
               const isActive = currentQuestion === index;
               const isAnswered = answers[index] !== undefined;
@@ -330,10 +330,10 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
           </div>
         )}
 
-        <div className="rounded-3xl border border-white/50 bg-white/70 p-5 shadow-[0_8px_30px_rgb(0,0,0,0.04)] md:p-7">
+        <div className="rounded-[1.5rem] border border-white/50 bg-white/70 p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:rounded-3xl sm:p-5 md:p-7">
           <p className="mb-3 text-sm font-black uppercase tracking-[0.24em] text-slate-600">Question {currentQuestion + 1} of {questions.length}</p>
-          <h3 className="text-2xl font-black leading-tight text-slate-900">{question.prompt}</h3>
-          <div className="mt-6 grid gap-3 md:grid-cols-2">
+          <h3 className="text-xl font-black leading-tight text-slate-900 sm:text-2xl">{question.prompt}</h3>
+          <div className="mt-5 grid gap-3 md:grid-cols-2">
             {(question.options || []).map((option, oIndex) => {
               const isCorrect = oIndex === question.correctAnswer;
               const isSelected = selected === oIndex;
@@ -357,9 +357,9 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
           </div>
         )}
 
-        <div className="mt-6 flex flex-wrap items-center justify-between gap-4">
+        <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <button type="button" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(index => Math.max(0, index - 1))} className="rounded-2xl border border-white/50 bg-white/70 px-5 py-3 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40">Previous</button>
-          <div className="flex gap-3">
+          <div className="grid gap-3 sm:flex">
             <button type="button" onClick={() => isLastQuestion ? setCurrentQuestion(0) : setCurrentQuestion(index => Math.min(questions.length - 1, index + 1))} className="rounded-2xl bg-cyan-200 px-6 py-3 font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50">{isLastQuestion ? 'Review Quiz' : 'Next Question'}</button>
             <button type="button" disabled={!allAnswered || submitted} onClick={submitQuiz} className="rounded-2xl bg-gradient-to-r from-indigo-500 to-amber-400 px-6 py-3 font-black text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50">Submit & Claim Coins</button>
           </div>
@@ -505,7 +505,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onPlay={() => setIsVideoPlaying(true)} onPause={() => setIsVideoPlaying(false)} onEnded={() => setIsVideoPlaying(false)} onError={() => { setIsVideoPlaying(false); setMediaHasError(true); }} />;
       case 'audio': {
         return (
-          <div className="flex h-full w-full bg-white/40 p-2 text-slate-900 sm:p-5">
+          <div className="flex h-full min-h-0 w-full bg-[#d5fbff]/70 p-2 text-slate-900 sm:p-4">
             <ProductMusicPlayer
               tracks={activeAudioTracks}
               title={activeFile.name || product.title}
@@ -530,9 +530,9 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   return (
     <div className={`course-player-mobile-scope relative flex h-screen min-h-[100dvh] w-screen flex-col overflow-hidden text-slate-900 bg-[#f3f0ff]`}>
       <div className={`absolute inset-0 scale-110 bg-cover bg-center blur-2xl ${isAudioExperience ? 'opacity-[0.08]' : 'opacity-10'}`} style={{ backgroundImage: `url(${backgroundImage})` }} />
-      <div className={isAudioExperience ? "absolute inset-0 bg-[linear-gradient(180deg,#f7f5ff_0%,#f1edff_46%,#ece7ff_100%)]" : "absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(111,82,255,0.16),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(199,190,255,0.32),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.9),rgba(246,243,255,0.86),rgba(238,233,255,0.94))]"} />
-      <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: isAudioExperience ? '#c7beff' : '#8b75ff' }} />
-      <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-[#d9d2ff]/60' : 'bg-[#d9d2ff]/45'}`} />
+      <div className={isAudioExperience ? "absolute inset-0 bg-[linear-gradient(180deg,#d5fbff_0%,#c9f8ff_48%,#d8fbff_100%)]" : "absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(111,82,255,0.16),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(199,190,255,0.32),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.9),rgba(246,243,255,0.86),rgba(238,233,255,0.94))]"} />
+      <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: isAudioExperience ? '#bdf7ff' : '#8b75ff' }} />
+      <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-[#c9f8ff]/70' : 'bg-[#d9d2ff]/45'}`} />
 
       <header className={`relative z-30 flex items-center gap-2 border-b p-2.5 shadow-sm backdrop-blur-xl sm:gap-3 sm:p-3 lg:hidden ${'border-[#ded8ff] bg-white/85'}`}>
         <button onClick={onBack} className="shrink-0 rounded-lg border border-[#ded8ff] bg-white px-3 py-2 text-sm font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]" aria-label="Back to course details">← Back</button>
@@ -572,7 +572,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
             </div>
           </aside>
 
-          <div className={`relative min-h-0 overflow-hidden rounded-2xl border shadow-[0_20px_60px_rgba(0,0,0,0.05)] backdrop-blur-2xl sm:rounded-3xl ${isAudioExperience ? 'border-[#ded8ff] bg-white/72' : 'border-[#ded8ff] bg-white/72'}`}>
+          <div className={`relative min-h-0 overflow-hidden rounded-2xl border shadow-[0_20px_60px_rgba(0,0,0,0.05)] backdrop-blur-2xl sm:rounded-3xl ${isAudioExperience ? 'border-[#b8f4ff] bg-[#d5fbff]/72' : 'border-[#ded8ff] bg-white/72'}`}>
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
         </section>
