@@ -35,6 +35,15 @@ service cloud.firestore {
         allow read, create: if isOwner(uid) || isAdmin();
         allow update, delete: if isAdmin();
       }
+
+      match /session/{sessionId} {
+        allow read: if sessionId == 'current' && isOwner(uid);
+        allow create, update: if sessionId == 'current'
+          && isOwner(uid)
+          && request.resource.data.uid == uid
+          && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds']);
+        allow delete: if sessionId == 'current' && isOwner(uid);
+      }
     }
 
     match /siteProducts/{productId} {

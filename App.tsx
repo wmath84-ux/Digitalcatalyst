@@ -1,6 +1,6 @@
 
 // FIX: Corrected the React import statement by removing the erroneous 'a' and fixing the destructuring syntax.
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
 import ProductShowcase from './components/ProductShowcase';
@@ -36,7 +36,7 @@ import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
 import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
-import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
@@ -919,6 +919,11 @@ const App: React.FC = () => {
   const [quickViewProduct, setQuickViewProduct] = useState<ProductWithRating | null>(null);
   const [cartToastMessage, setCartToastMessage] = useState('');
   const [isCartPaymentModalOpen, setIsCartPaymentModalOpen] = useState(false);
+  const activeSessionIdRef = useRef<string | null>(null);
+  const activeSessionUidRef = useRef<string | null>(null);
+  const sessionUnsubscribeRef = useRef<(() => void) | null>(null);
+  const sessionHeartbeatRef = useRef<ReturnType<typeof window.setInterval> | null>(null);
+
 
   const normalizeCourseModules = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
     ...module,
@@ -1698,6 +1703,66 @@ const App: React.FC = () => {
       return [...new Set([...idsFromUserDoc, ...idsFromPurchaseDocs])];
   };
 
+  // Frontend-only session locking improves UX, but is not fully tamper-proof.
+  // Stronger enforcement should use Cloud Functions/Admin SDK to revoke old refresh tokens when a new session starts.
+  const stopSessionWatchers = () => {
+      sessionUnsubscribeRef.current?.();
+      sessionUnsubscribeRef.current = null;
+      if (sessionHeartbeatRef.current) window.clearInterval(sessionHeartbeatRef.current);
+      sessionHeartbeatRef.current = null;
+  };
+
+  const getOrCreateDeviceSessionId = () => {
+      const storedSessionId = sessionStorage.getItem('firebaseDeviceSessionId');
+      if (storedSessionId) return storedSessionId;
+      const sessionId = crypto.randomUUID();
+      sessionStorage.setItem('firebaseDeviceSessionId', sessionId);
+      return sessionId;
+  };
+
+  const writeCurrentSession = async (uid: string, sessionId: string) => {
+      const sessionRef = doc(db, 'users', uid, 'session', 'current');
+      const now = serverTimestamp();
+      await setDoc(sessionRef, {
+          uid,
+          sessionId,
+          deviceLabel: navigator.platform || 'Unknown device',
+          userAgent: navigator.userAgent,
+          startedAt: now,
+          lastSeenAt: now,
+      }, { merge: false });
+  };
+
+  const clearCurrentSessionDocument = async () => {
+      const uid = activeSessionUidRef.current;
+      const sessionId = activeSessionIdRef.current;
+      if (!uid || !sessionId) return;
+      const sessionRef = doc(db, 'users', uid, 'session', 'current');
+      try {
+          const snapshot = await getDoc(sessionRef);
+          if (snapshot.exists() && snapshot.data()?.sessionId === sessionId) await deleteDoc(sessionRef);
+      } catch (error) {
+          console.warn('Session cleanup failed.', error);
+      }
+  };
+
+  const subscribeToCurrentSession = (uid: string, sessionId: string) => {
+      stopSessionWatchers();
+      const sessionRef = doc(db, 'users', uid, 'session', 'current');
+      sessionUnsubscribeRef.current = onSnapshot(sessionRef, snapshot => {
+          const remoteSessionId = snapshot.data()?.sessionId;
+          if (remoteSessionId && remoteSessionId !== sessionId) {
+              stopSessionWatchers();
+              void signOut(auth).catch(error => console.warn('Firebase sign out failed after session takeover.', error));
+              handleLogout(false, { preserveSessionDocument: true });
+              setInfoModal({ title: 'Logged out', message: 'You were logged out because this account was opened on another device.', icon: '🔒' });
+          }
+      }, error => console.warn('Session listener failed.', error));
+      sessionHeartbeatRef.current = window.setInterval(() => {
+          updateDoc(sessionRef, { lastSeenAt: serverTimestamp() }).catch(error => console.warn('Session heartbeat failed.', error));
+      }, 45000);
+  };
+
   const completeFirebaseUserSession = async (firebaseUser: FirebaseUser, options: { redirect?: boolean; profile?: { name?: string; mobile?: string } } = {}) => {
       const { redirect = true, profile } = options;
       setPurchasedProductIds([]);
@@ -1709,6 +1774,11 @@ const App: React.FC = () => {
           setInfoModal({ title: 'Account blocked', message: 'Your account is blocked. Please contact support.', icon: '🔒' });
           return;
       }
+      const sessionId = getOrCreateDeviceSessionId();
+      activeSessionIdRef.current = sessionId;
+      activeSessionUidRef.current = firebaseUser.uid;
+      await writeCurrentSession(firebaseUser.uid, sessionId);
+      subscribeToCurrentSession(firebaseUser.uid, sessionId);
       setCurrentUser(sessionUser);
       safeSetItem('currentUser', sessionUser);
       try {
@@ -1745,7 +1815,10 @@ const App: React.FC = () => {
           if (user) void completeFirebaseUserSession(user, { redirect: false });
           else handleLogout(false);
       });
-      return unsubscribe;
+      return () => {
+          unsubscribe();
+          stopSessionWatchers();
+      };
   }, []);
 
   const getFirebaseAuthErrorMessage = (error: any) => {
@@ -1829,7 +1902,15 @@ const App: React.FC = () => {
       safeSetItem('currentUser', { ...(currentUser as any), purchasedProductIds: nextPurchasedIds });
   };
 
-  const handleLogout = (remoteSignOut = true) => {
+  const handleLogout = (remoteSignOut = true, options: { preserveSessionDocument?: boolean } = {}) => {
+      const cleanup = async () => {
+          stopSessionWatchers();
+          if (!options.preserveSessionDocument) await clearCurrentSessionDocument();
+          activeSessionUidRef.current = null;
+          activeSessionIdRef.current = null;
+          sessionStorage.removeItem('firebaseDeviceSessionId');
+      };
+      void cleanup();
       if (remoteSignOut) void signOut(auth).catch(error => console.warn('Firebase sign out failed.', error));
       setCurrentUser(null);
       setPurchasedProductIds([]);
