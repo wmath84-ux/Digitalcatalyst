@@ -36,8 +36,9 @@ import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
 import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
-import { addDoc, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
-import { db } from './firebase';
+import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
+import { auth, db } from './firebase';
+import { createUserWithEmailAndPassword, onAuthStateChanged, signInWithEmailAndPassword, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
 
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
@@ -214,11 +215,15 @@ export interface CoinTransaction {
 }
 
 export interface User {
-    id: number;
+    id: string;
+    uid?: string;
     name: string;
     email: string;
     mobile: string;
-    password: string; // Legacy local-mode fallback; production should use secure OTP auth.
+    photoURL?: string;
+    role?: 'user' | 'admin';
+    status?: 'active' | 'blocked';
+    password?: string; // Legacy local-mode fallback only.
     createdAt: string;
     lastLoginAt?: string;
     eduCoins?: number;
@@ -1119,9 +1124,9 @@ const App: React.FC = () => {
     const storedReviews = localStorage.getItem('productReviews');
     if (storedReviews) setReviews(JSON.parse(storedReviews)); else setReviews(initialReviews);
     
-    // Purchases are authenticated state. Do not hydrate them globally because a
-    // previous user's cached unlocks must never leak into a logged-out or newly
-    // logged-in session. Per-user access is restored in completeUserSession().
+    // Purchases are authenticated state. Never hydrate global cached unlocks;
+    // Firestore entitlements are restored from Firebase Auth sessions only.
+    localStorage.removeItem('purchasedProducts');
 
     const storedCart = localStorage.getItem('shoppingCart');
     if (storedCart) setCart(JSON.parse(storedCart));
@@ -1171,19 +1176,9 @@ const App: React.FC = () => {
     const storedSubscribers = localStorage.getItem('newsletterSubscribers');
     if (storedSubscribers) setNewsletterSubscribers(JSON.parse(storedSubscribers));
 
-    const storedCurrentUser = localStorage.getItem('currentUser');
-    if (storedCurrentUser) {
-        try {
-            const currentUserData: User = JSON.parse(storedCurrentUser);
-            const userIsValid = loadedUsers.some(user => user.id === currentUserData.id);
-            if (userIsValid) void completeUserSession(currentUserData, { redirect: false });
-            else localStorage.removeItem('currentUser');
-        } catch (error) {
-            console.error("Error parsing current user:", error);
-            localStorage.removeItem('currentUser');
-        }
-    }
-    
+    localStorage.removeItem('currentUser');
+    localStorage.removeItem('purchasedProducts');
+
     const storedCurrentAdmin = localStorage.getItem('currentAdminUser');
     if (storedCurrentAdmin) {
       try {
@@ -1418,7 +1413,7 @@ const App: React.FC = () => {
 
   const addGlobalOrder = (order: Order) => {
     setOrders(prevOrders => [order, ...prevOrders.filter(existingOrder => existingOrder.id !== order.id)]);
-    void setDoc(doc(db, GLOBAL_ORDERS_COLLECTION, String(order.id)), stripUndefinedDeep(order), { merge: false })
+    void setDoc(doc(db, GLOBAL_ORDERS_COLLECTION, String(order.id)), stripUndefinedDeep({ ...order, customerUid: auth.currentUser?.uid || currentUser?.id || null }), { merge: false })
       .catch(error => logGlobalSyncWarning('Order create', error));
   };
 
@@ -1488,7 +1483,7 @@ const App: React.FC = () => {
     setIsCartPaymentModalOpen(true);
   };
 
-  const handleConfirmCartPurchase = (appliedCouponCode: string | null, appliedCoins = 0) => {
+  const handleConfirmCartPurchase = async (appliedCouponCode: string | null, appliedCoins = 0) => {
       if (cart.length === 0) return;
 
       // --- Recalculate price at the moment of confirmation for robustness ---
@@ -1513,9 +1508,17 @@ const App: React.FC = () => {
       })) return;
       // --- End of recalculation ---
 
+      if (!currentUser || !auth.currentUser) { setCurrentView('auth'); return; }
+      const orderId = `DC-${Date.now()}`;
+      try {
+        await Promise.all(cartDetails.map(item => persistPurchaseEntitlement(auth.currentUser!.uid, item.product, { quantity: item.quantity, total: `₹${finalPrice.toFixed(2)}`, source: 'razorpay', orderId })));
+      } catch (error) {
+        setInfoModal({ title: 'Purchase sync failed', message: 'Payment was confirmed, but cart access could not be saved. Please retry sync before opening products.', icon: '⚠️' });
+        console.warn('Cart entitlement write failed.', error);
+        return;
+      }
       const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
       setPurchasedProductIds(newPurchasedIds);
-      safeSetItem('purchasedProducts', newPurchasedIds);
       persistUserPurchasedProducts(newPurchasedIds);
 
       if (appliedCouponCode) {
@@ -1621,7 +1624,7 @@ const App: React.FC = () => {
   };
 
   const cartItemCount = cart.reduce((total, item) => total + item.quantity, 0);
-  const authButtonLabel = users.length > 0 ? 'Login' : 'Sign up';
+  const authButtonLabel = currentUser ? 'Profile' : 'Login';
 
   // --- Auth Handlers ---
   const normalizePurchaseIds = (ids: unknown): number[] => {
@@ -1629,36 +1632,95 @@ const App: React.FC = () => {
       return [...new Set(ids.map(id => Number(id)).filter(id => Number.isFinite(id)))];
   };
 
-  const fetchUserPurchaseIdsFromBackend = async (userId: number | string): Promise<number[]> => {
-      const userDoc = await getDoc(doc(db, 'users', String(userId)));
+  const toUserProfile = (firebaseUser: FirebaseUser, data: any = {}): User => ({
+      id: firebaseUser.uid,
+      uid: firebaseUser.uid,
+      name: data.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
+      email: data.email || firebaseUser.email || '',
+      mobile: data.mobile || firebaseUser.phoneNumber || '',
+      photoURL: data.photoURL || firebaseUser.photoURL || '',
+      role: data.role === 'admin' ? 'admin' : 'user',
+      status: data.status === 'blocked' ? 'blocked' : 'active',
+      createdAt: data.createdAt || new Date().toISOString(),
+      lastLoginAt: new Date().toISOString(),
+      eduCoins: data.eduCoins ?? 120,
+      studyMinutes: data.studyMinutes ?? 0,
+      totalWatchTimeMinutes: data.totalWatchTimeMinutes ?? data.studyMinutes ?? 0,
+      totalLifetimeCoins: data.totalLifetimeCoins ?? data.eduCoins ?? 120,
+      rewardedArticleIds: data.rewardedArticleIds || [],
+      readArticles: data.readArticles || data.rewardedArticleIds || [],
+      rewardedQuizIds: data.rewardedQuizIds || [],
+      claimedRewardIds: data.claimedRewardIds || [],
+      profileStreakClaims: data.profileStreakClaims || {},
+      coinTransactions: data.coinTransactions || [],
+  });
+
+  const ensureUserProfile = async (firebaseUser: FirebaseUser, profile?: { name?: string; mobile?: string }): Promise<User> => {
+      const userRef = doc(db, 'users', firebaseUser.uid);
+      const userSnap = await getDoc(userRef);
+      const nowFields = { updatedAt: serverTimestamp(), lastLoginAt: serverTimestamp() };
+      if (!userSnap.exists()) {
+          await setDoc(userRef, {
+              uid: firebaseUser.uid,
+              name: profile?.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
+              email: firebaseUser.email || '',
+              mobile: profile?.mobile || firebaseUser.phoneNumber || '',
+              photoURL: firebaseUser.photoURL || '',
+              role: 'user',
+              status: 'active',
+              purchasedProductIds: [],
+              createdAt: serverTimestamp(),
+              ...nowFields,
+          }, { merge: true });
+          const createdSnap = await getDoc(userRef);
+          return toUserProfile(firebaseUser, createdSnap.data());
+      }
+      const existing = userSnap.data();
+      await setDoc(userRef, {
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || existing.email || '',
+          name: profile?.name || existing.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
+          mobile: profile?.mobile || existing.mobile || firebaseUser.phoneNumber || '',
+          photoURL: firebaseUser.photoURL || existing.photoURL || '',
+          ...nowFields,
+      }, { merge: true });
+      return toUserProfile(firebaseUser, { ...existing, name: profile?.name || existing.name, mobile: profile?.mobile || existing.mobile });
+  };
+
+  const restoreUserEntitlements = async (uid: string): Promise<number[]> => {
+      const userDoc = await getDoc(doc(db, 'users', uid));
       const idsFromUserDoc = normalizePurchaseIds(userDoc.exists() ? userDoc.data()?.purchasedProductIds : []);
-      const purchasesSnapshot = await getDocs(collection(db, 'users', String(userId), 'purchases'));
-      const idsFromPurchaseDocs = normalizePurchaseIds(purchasesSnapshot.docs.map(item => item.data()?.productId ?? item.id));
+      const purchasesSnapshot = await getDocs(collection(db, 'users', uid, 'purchases'));
+      const validStatuses = new Set(['Completed', 'Verified', 'Active']);
+      const idsFromPurchaseDocs = normalizePurchaseIds(purchasesSnapshot.docs
+        .filter(item => validStatuses.has(String(item.data()?.status || '')))
+        .map(item => item.data()?.productId ?? item.id));
       return [...new Set([...idsFromUserDoc, ...idsFromPurchaseDocs])];
   };
 
-  const completeUserSession = async (user: User, options: { redirect?: boolean } = {}) => {
-      const { redirect = true } = options;
-      const sessionUser = { ...user, eduCoins: user.eduCoins ?? 120, studyMinutes: user.studyMinutes ?? 0, totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0, rewardedArticleIds: user.rewardedArticleIds || [], readArticles: user.readArticles || user.rewardedArticleIds || [], rewardedQuizIds: user.rewardedQuizIds || [], claimedRewardIds: user.claimedRewardIds || [], profileStreakClaims: user.profileStreakClaims || {}, totalLifetimeCoins: user.totalLifetimeCoins ?? user.eduCoins ?? 120, coinTransactions: user.coinTransactions || [], lastLoginAt: new Date().toISOString() };
-      setCurrentUser(sessionUser);
-      safeSetItem('currentUser', sessionUser);
+  const completeFirebaseUserSession = async (firebaseUser: FirebaseUser, options: { redirect?: boolean; profile?: { name?: string; mobile?: string } } = {}) => {
+      const { redirect = true, profile } = options;
       setPurchasedProductIds([]);
       localStorage.removeItem('purchasedProducts');
-
+      const sessionUser = await ensureUserProfile(firebaseUser, profile);
+      if (sessionUser.status === 'blocked') {
+          await signOut(auth);
+          handleLogout(false);
+          setInfoModal({ title: 'Account blocked', message: 'Your account is blocked. Please contact support.', icon: '🔒' });
+          return;
+      }
+      setCurrentUser(sessionUser);
+      safeSetItem('currentUser', sessionUser);
       try {
-          const backendPurchasedIds = await fetchUserPurchaseIdsFromBackend(sessionUser.id);
+          const backendPurchasedIds = await restoreUserEntitlements(firebaseUser.uid);
           setPurchasedProductIds(backendPurchasedIds);
-          safeSetItem(`purchasedProducts:${sessionUser.id}`, backendPurchasedIds);
-          safeSetItem('purchasedProducts', backendPurchasedIds);
-          if (backendPurchasedIds.length) {
-              const updatedSessionUser = { ...(sessionUser as any), purchasedProductIds: backendPurchasedIds };
-              setCurrentUser(updatedSessionUser);
-              safeSetItem('currentUser', updatedSessionUser);
-          }
+          safeSetItem(`purchasedProducts:${firebaseUser.uid}`, backendPurchasedIds);
+          setCurrentUser({ ...(sessionUser as any), purchasedProductIds: backendPurchasedIds });
       } catch (error) {
+          setPurchasedProductIds([]);
+          setInfoModal({ title: 'Could not restore purchases', message: 'Could not restore purchases. Please retry.', icon: '⚠️' });
           console.warn('Purchase access restore failed; keeping this session locked until backend data is available.', error);
       }
-
       if (!redirect) return;
       if (productToBuyAfterLogin) {
           setSelectedProduct(productToBuyAfterLogin);
@@ -1676,38 +1738,53 @@ const App: React.FC = () => {
       }
   };
 
-  const handleLogin = (email: string, password: string): boolean => {
-      const user = users.find(u => (u.email === email || u.mobile === email) && u.password === password);
-      if (user) {
-          void completeUserSession(user);
-          return true;
-      }
-      return false;
-  };
-
-  const handleSignup = (email: string, password: string, name = email.split('@')[0], mobile = ''): { success: boolean, message: string } => {
-      if (users.some(u => u.email === email)) {
-          return { success: false, message: 'An account with this email already exists.' };
-      }
-      const newUser: User = { id: Date.now(), name, email, mobile, password, createdAt: new Date().toISOString(), eduCoins: 120, totalLifetimeCoins: 120, studyMinutes: 0, totalWatchTimeMinutes: 0, rewardedArticleIds: [], readArticles: [], rewardedQuizIds: [], claimedRewardIds: [], coinTransactions: [] };
-      const updatedUsers = [...users, newUser];
-      setUsers(updatedUsers);
-      safeSetItem('siteUsers', updatedUsers);
-      void completeUserSession(newUser);
-      return { success: true, message: 'Account created successfully!' };
-  };
+  useEffect(() => {
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('purchasedProducts');
+      const unsubscribe = onAuthStateChanged(auth, user => {
+          if (user) void completeFirebaseUserSession(user, { redirect: false });
+          else handleLogout(false);
+      });
+      return unsubscribe;
+  }, []);
 
   const handleOtpAuthenticate = (profile: { name: string; email: string; mobile: string }): { success: boolean, message: string } => {
-      const existingUser = users.find(u => u.email === profile.email || u.mobile === profile.mobile);
-      if (existingUser) {
-          const updatedUser = { ...existingUser, name: profile.name || existingUser.name, email: profile.email || existingUser.email, mobile: profile.mobile || existingUser.mobile };
-          const updatedUsers = users.map(u => u.id === existingUser.id ? updatedUser : u);
-          setUsers(updatedUsers);
-          safeSetItem('siteUsers', updatedUsers);
-          void completeUserSession(updatedUser);
-          return { success: true, message: 'Logged in successfully.' };
-      }
-      return handleSignup(profile.email, `otp-${profile.mobile}`, profile.name, profile.mobile);
+      const password = `otp-${profile.mobile}`;
+      signInWithEmailAndPassword(auth, profile.email, password)
+        .then(credential => completeFirebaseUserSession(credential.user, { profile }))
+        .catch(async error => {
+            if (error?.code === 'auth/user-not-found' || error?.code === 'auth/invalid-credential') {
+                const credential = await createUserWithEmailAndPassword(auth, profile.email, password);
+                await updateProfile(credential.user, { displayName: profile.name });
+                await completeFirebaseUserSession(credential.user, { profile });
+                return;
+            }
+            setInfoModal({ title: 'Login failed', message: error?.message || 'Unable to authenticate with Firebase.', icon: '⚠️' });
+        });
+      return { success: true, message: 'Authenticating with Firebase...' };
+  };
+
+  const persistPurchaseEntitlement = async (uid: string, product: ProductWithRating, orderData: { quantity: number; total: string; source: 'razorpay' | 'educoin' | 'manual_admin'; orderId: string; paymentId?: string; status?: 'Completed' | 'Verified' | 'Active' }) => {
+      if (!auth.currentUser || auth.currentUser.uid !== uid) throw new Error('Login is required to unlock purchases.');
+      const status = orderData.status || 'Completed';
+      await setDoc(doc(db, 'users', uid, 'purchases', String(product.id)), {
+          productId: product.id,
+          title: product.title,
+          quantity: orderData.quantity,
+          total: orderData.total,
+          status,
+          unlockedAt: serverTimestamp(),
+          source: orderData.source,
+          orderId: orderData.orderId,
+          ...(orderData.paymentId ? { paymentId: orderData.paymentId } : {}),
+      }, { merge: true });
+      await setDoc(doc(db, 'users', uid), {
+          uid,
+          purchasedProductIds: arrayUnion(product.id),
+          updatedAt: serverTimestamp(),
+      }, { merge: true }).catch(error => {
+          console.warn('User purchase id mirror was not updated; purchase subcollection remains the source of truth.', error);
+      });
   };
 
   const persistUserPurchasedProducts = (nextPurchasedIds: number[]) => {
@@ -1720,7 +1797,8 @@ const App: React.FC = () => {
       safeSetItem('currentUser', { ...(currentUser as any), purchasedProductIds: nextPurchasedIds });
   };
 
-  const handleLogout = () => {
+  const handleLogout = (remoteSignOut = true) => {
+      if (remoteSignOut) void signOut(auth).catch(error => console.warn('Firebase sign out failed.', error));
       setCurrentUser(null);
       setPurchasedProductIds([]);
       setWishlist([]);
@@ -1920,7 +1998,6 @@ const App: React.FC = () => {
     if (reward.unlockProductIds?.length) {
       const nextPurchasedIds = [...new Set([...purchasedProductIds, ...reward.unlockProductIds])];
       setPurchasedProductIds(nextPurchasedIds);
-      safeSetItem('purchasedProducts', nextPurchasedIds);
       persistUserPurchasedProducts(nextPurchasedIds);
     }
     setInfoModal({ title: 'Milestone unlocked', message: `${reward.title} is now available.${coinReward ? ` +${coinReward} EduCoins credited.` : ''}`, icon: '🏆' });
@@ -2033,7 +2110,7 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
-  const handlePurchaseComplete = (appliedCouponCode: string | null, quantity: number) => {
+  const handlePurchaseComplete = async (appliedCouponCode: string | null, quantity: number) => {
     if (selectedProduct) {
         // Recalculate price robustly at the moment of confirmation
         const originalPriceNum = parseFloat(selectedProduct.price.replace('₹', ''));
@@ -2053,25 +2130,18 @@ const App: React.FC = () => {
           setActiveCoinDiscount(null);
         }
 
+        if (!currentUser || !auth.currentUser) { setCurrentView('auth'); return; }
+        const orderId = `DC-${Date.now()}`;
+        try {
+          await persistPurchaseEntitlement(auth.currentUser.uid, selectedProduct, { quantity, total: `₹${robustFinalPrice.toFixed(2)}`, source: 'razorpay', orderId });
+        } catch (error) {
+          setInfoModal({ title: 'Purchase sync failed', message: 'Payment was confirmed, but access could not be saved. Please retry sync before opening this product.', icon: '⚠️' });
+          console.warn('Purchase entitlement write failed.', error);
+          return;
+        }
         const newPurchasedIds = [...new Set([...purchasedProductIds, selectedProduct.id])];
         setPurchasedProductIds(newPurchasedIds);
-        safeSetItem('purchasedProducts', newPurchasedIds);
         persistUserPurchasedProducts(newPurchasedIds);
-        if (currentUser) {
-          void setDoc(doc(db, 'users', String(currentUser.id)), { purchasedProductIds: newPurchasedIds }, { merge: true }).catch(error => {
-            console.warn('Purchased product database sync failed; local unlock remains available.', error);
-          });
-          void setDoc(doc(db, 'users', String(currentUser.id), 'purchases', String(selectedProduct.id)), {
-            productId: selectedProduct.id,
-            title: selectedProduct.title,
-            quantity,
-            total: `₹${robustFinalPrice.toFixed(2)}`,
-            status: 'Completed',
-            unlockedAt: serverTimestamp(),
-          }, { merge: true }).catch(error => {
-            console.warn('Purchase database record failed; local unlock remains available.', error);
-          });
-        }
         const purchaseCoins = Math.max(0, Number(economySettings.coinPerPurchase));
         try {
           creditEduCoins(purchaseCoins, `✦ +${purchaseCoins} EduCoins Purchase Reward`, { source: 'Purchase reward', description: `Purchased ${selectedProduct.title}`, productId: selectedProduct.id });
@@ -2118,30 +2188,19 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
   
-  const completeProductUnlock = (product: ProductWithRating, quantity: number, totalLabel: string, status: Order['status'] = 'Completed') => {
+  const completeProductUnlock = async (product: ProductWithRating, quantity: number, totalLabel: string, status: Order['status'] = 'Completed') => {
+    if (!currentUser || !auth.currentUser) { setCurrentView('auth'); return false; }
+    const orderId = `DC-${Date.now()}`;
+    try {
+      await persistPurchaseEntitlement(auth.currentUser.uid, product, { quantity, total: totalLabel, source: 'educoin', orderId, status: status as 'Completed' | 'Verified' | 'Active' });
+    } catch (error) {
+      setInfoModal({ title: 'Purchase sync failed', message: 'Your payment/coin checkout was confirmed, but backend access could not be saved. Please retry.', icon: '⚠️' });
+      console.warn('Purchase entitlement write failed.', error);
+      return false;
+    }
     const newPurchasedIds = [...new Set([...purchasedProductIds, product.id])];
     setPurchasedProductIds(newPurchasedIds);
-    safeSetItem('purchasedProducts', newPurchasedIds);
     persistUserPurchasedProducts(newPurchasedIds);
-    if (currentUser) {
-      try {
-        void setDoc(doc(db, 'users', String(currentUser.id)), { purchasedProductIds: newPurchasedIds }, { merge: true }).catch(error => {
-          console.warn('Purchased product database sync failed; local unlock remains available.', error);
-        });
-        void setDoc(doc(db, 'users', String(currentUser.id), 'purchases', String(product.id)), {
-          productId: product.id,
-          title: product.title,
-          quantity,
-          total: totalLabel,
-          status,
-          unlockedAt: serverTimestamp(),
-        }, { merge: true }).catch(error => {
-          console.warn('Purchase database record failed; local unlock remains available.', error);
-        });
-      } catch (error) {
-        console.warn('Purchase database sync failed before request; local unlock remains available.', error);
-      }
-    }
     addGlobalOrder({
       id: `DC-${Date.now()}`,
       customerName: currentUser?.name || currentUser?.email.split('@')[0] || 'Valued Customer',
@@ -2185,11 +2244,10 @@ const App: React.FC = () => {
       console.warn('EduCoin deduction ledger failed; using local wallet fallback for product unlock.', error);
       syncCurrentUser(user => ({ ...user, eduCoins: Math.max(0, (user.eduCoins || 0) - totalCoinPrice) }));
     }
-    completeProductUnlock(product, quantity, `🪙 ${totalCoinPrice}`);
-    return true;
+    return await completeProductUnlock(product, quantity, `🪙 ${totalCoinPrice}`) !== false;
   };
 
-  const handleConfirmCartCoinPurchase = () => {
+  const handleConfirmCartCoinPurchase = async () => {
     if (!currentUser || cartDetails.length === 0) return false;
     const totalCoinPrice = cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0);
     const allCoinEnabled = cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0);
@@ -2204,9 +2262,16 @@ const App: React.FC = () => {
       console.warn('EduCoin deduction ledger failed; using local wallet fallback for cart unlock.', error);
       syncCurrentUser(user => ({ ...user, eduCoins: Math.max(0, (user.eduCoins || 0) - totalCoinPrice) }));
     }
+    const orderId = `DC-${Date.now()}`;
+    try {
+      await Promise.all(cartDetails.map(item => persistPurchaseEntitlement(auth.currentUser!.uid, item.product, { quantity: item.quantity, total: `🪙 ${resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity}`, source: 'educoin', orderId })));
+    } catch (error) {
+      setInfoModal({ title: 'Purchase sync failed', message: 'Coin checkout was confirmed, but cart access could not be saved. Please retry.', icon: '⚠️' });
+      console.warn('Cart entitlement write failed.', error);
+      return false;
+    }
     const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
     setPurchasedProductIds(newPurchasedIds);
-    safeSetItem('purchasedProducts', newPurchasedIds);
     persistUserPurchasedProducts(newPurchasedIds);
     addGlobalOrder({
       id: `DC-${Date.now()}`,
@@ -2285,7 +2350,6 @@ const App: React.FC = () => {
   const unlockSubscriptionPlan = (plan: any, paymentLabel = 'Fiat checkout') => {
     const newPurchasedIds = [...new Set([...purchasedProductIds, ...plan.unlockProductIds])];
     setPurchasedProductIds(newPurchasedIds);
-    safeSetItem('purchasedProducts', newPurchasedIds);
     persistUserPurchasedProducts(newPurchasedIds);
     setInfoModal({ title: 'Subscription active', message: `${plan.name} activated successfully via ${paymentLabel}.`, icon: '✅' });
   };

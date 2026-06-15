@@ -273,8 +273,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const verifyCoursePurchase = (courseId: number | string) => {
     if (!currentUser?.id) return false;
     const courseIdKey = String(courseId);
-    const localPurchasedIds = JSON.parse(localStorage.getItem('purchasedProducts') || '[]') as Array<number | string>;
-    return purchasedProductIdSet.has(courseIdKey) || localPurchasedIds.some(id => String(id) === courseIdKey);
+    return purchasedProductIdSet.has(courseIdKey);
   };
 
   const handleContinueLearning = (course: LearningProgress) => {
