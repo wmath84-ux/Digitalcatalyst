@@ -172,6 +172,19 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
     goToTrack(activeIndex + 1);
   };
 
+  const handleAudioEnded = () => {
+    if (!isLooping) {
+      goToNext();
+      return;
+    }
+
+    const audio = audioRef.current;
+    if (!audio) return;
+    audio.currentTime = 0;
+    setCurrentTime(0);
+    if (isPlaying) audio.play().catch(() => setIsPlaying(false));
+  };
+
   const handleScrub = (event: React.ChangeEvent<HTMLInputElement>) => {
     const nextTime = Number(event.target.value);
     setCurrentTime(nextTime);
@@ -232,7 +245,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
   };
 
   const progress = duration > 0 ? clamp(currentTime / duration, 0, 1) : 0;
-  const beatLevel = isPlaying ? 0.45 + Math.abs(Math.sin(currentTime * 5.2)) * 0.38 + Math.abs(Math.sin(currentTime * 12.8)) * 0.36 : 0;
+  const beatLevel = isPlaying ? 0.52 + Math.abs(Math.sin(currentTime * 5.2)) * 0.44 + Math.abs(Math.sin(currentTime * 12.8)) * 0.42 : 0;
   const waveformBars = Array.from({ length: isFull ? 52 : 32 }, (_, index) => {
     const seed = activeTrack.id.charCodeAt(index % activeTrack.id.length) || 7;
     const base = 34 + Math.abs(Math.sin(index * 0.82 + seed)) * 42;
@@ -243,11 +256,11 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
   const controlButtonClass = `${isCompactDensity ? 'h-9 w-9 text-sm' : 'h-11 w-11'} grid shrink-0 place-items-center rounded-full bg-[#071a32] text-[#d7fbff] shadow-[0_12px_30px_rgba(0,229,255,0.08)] transition hover:bg-[#0b2548]`;
   const cardSizeClass = isFull
     ? isCompactDensity
-      ? 'h-[clamp(4.75rem,22dvh,7rem)] w-[clamp(4.75rem,22dvh,7rem)]'
+      ? 'h-[clamp(7.25rem,min(44dvw,30dvh),11.25rem)] max-h-[42dvh] w-[clamp(7.25rem,min(44dvw,30dvh),11.25rem)] max-w-[62vw]'
       : 'h-40 w-40 sm:h-52 sm:w-52 lg:h-56 lg:w-56 xl:h-64 xl:w-64'
     : 'h-32 w-32';
   const shellClass = isFull
-    ? `${isCompactDensity ? 'flex flex-col justify-between gap-1.5 rounded-[1.25rem] p-2.5' : 'flex flex-col justify-between rounded-[2rem] p-5 sm:p-7 lg:p-8 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] xl:items-center xl:gap-8'} h-full min-h-0 max-h-full`
+    ? `${isCompactDensity ? 'flex flex-col justify-between gap-1 rounded-[1.25rem] p-2' : 'flex flex-col justify-between rounded-[2rem] p-5 sm:p-7 lg:p-8 xl:grid xl:grid-cols-[minmax(0,1fr)_minmax(20rem,26rem)] xl:items-center xl:gap-8'} h-full min-h-0 max-h-full`
     : 'rounded-3xl p-4';
 
   return (
@@ -267,7 +280,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
         onTimeUpdate={event => setCurrentTime(event.currentTarget.currentTime)}
         onPlay={() => setIsPlaying(true)}
         onPause={() => setIsPlaying(false)}
-        onEnded={() => (isLooping ? undefined : goToNext())}
+        onEnded={handleAudioEnded}
         onError={onError}
       />
 
@@ -307,7 +320,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
           </div>
         </div>
 
-        <div className={`${isFull ? isCompactDensity ? 'flex min-h-0 flex-1 items-center justify-center gap-2 py-0.5' : 'flex flex-1 items-center justify-center gap-4 py-5 sm:gap-6 lg:min-h-[14rem] xl:min-h-[18rem]' : 'flex items-center justify-center gap-3 py-1'} overflow-hidden`} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} title="Swipe left or right to switch audio">
+        <div className={`${isFull ? isCompactDensity ? 'flex min-h-0 flex-1 items-center justify-center gap-1.5 overflow-hidden py-0' : 'flex flex-1 items-center justify-center gap-4 py-5 sm:gap-6 lg:min-h-[14rem] xl:min-h-[18rem]' : 'flex items-center justify-center gap-3 py-1'} overflow-hidden`} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} title="Swipe left or right to switch audio">
           {tracks.map((track, index) => {
             const distance = Math.abs(index - activeIndex);
             const circularDistance = Math.min(distance, tracks.length - distance);
@@ -320,15 +333,15 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
                 key={track.id}
                 type="button"
                 onClick={() => goToTrack(index)}
-                className={`${isActive ? `${cardSizeClass} opacity-100` : 'h-28 w-28 opacity-55 blur-[0.5px]'} relative shrink-0 overflow-hidden rounded-[1.8rem] border transition-all duration-300 ${isActive ? 'border-cyan-50/90 shadow-[0_0_46px_rgba(56,189,248,0.82),0_0_64px_rgba(109,40,217,0.48)]' : 'border-white/30'} bg-white/10`}
-                style={isActive && isPlaying ? { transform: `scale(${1 + beatLevel * 0.065})`, boxShadow: `0 0 ${48 + beatLevel * 42}px rgba(56,189,248,0.86), 0 0 ${62 + beatLevel * 48}px rgba(109,40,217,0.55)` } : undefined}
+                className={`${isActive ? `${cardSizeClass} opacity-100` : isCompactDensity ? 'h-16 w-16 opacity-45 blur-[0.5px]' : 'h-28 w-28 opacity-55 blur-[0.5px]'} relative shrink-0 overflow-hidden rounded-[1.8rem] border transition-all duration-300 ${isActive ? 'border-cyan-50/90 shadow-[0_0_58px_rgba(56,189,248,0.9),0_0_78px_rgba(109,40,217,0.56)]' : 'border-white/30'} bg-white/10`}
+                style={isActive && isPlaying ? { transform: `scale(${1 + beatLevel * 0.09})`, boxShadow: `0 0 ${58 + beatLevel * 54}px rgba(56,189,248,0.94), 0 0 ${74 + beatLevel * 62}px rgba(109,40,217,0.64)` } : undefined}
                 aria-label={`Play ${track.title}`}
               >
                 <img src={track.cover} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
                 {isActive && isPlaying && (
                   <>
-                    <span className="absolute inset-0 bg-cyan-300/10 mix-blend-screen" style={{ opacity: beatLevel * 0.45 }} />
-                    <span className="absolute inset-3 rounded-[1.35rem] border border-white/50" style={{ transform: `scale(${1 + beatLevel * 0.14})`, opacity: 0.28 + beatLevel * 0.42 }} />
+                    <span className="absolute inset-0 bg-cyan-300/10 mix-blend-screen" style={{ opacity: Math.min(0.72, beatLevel * 0.58) }} />
+                    <span className="absolute inset-3 rounded-[1.35rem] border border-white/50" style={{ transform: `scale(${1 + beatLevel * 0.2})`, opacity: Math.min(0.9, 0.36 + beatLevel * 0.5) }} />
                   </>
                 )}
                 <span className="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-900/10 to-transparent" />
