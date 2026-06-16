@@ -367,22 +367,22 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
   };
 
   return (
-    <div className={`flex h-full min-h-0 overflow-hidden text-slate-900 ${compactQuiz ? 'p-1.5' : 'p-3 sm:p-5 md:p-6'}`}>
-      <div className={`mx-auto grid h-full min-h-0 w-full rounded-[1.25rem] border border-white/50 bg-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl sm:rounded-[2rem] ${compactQuiz ? 'grid-rows-[auto_auto_minmax(0,1fr)_auto_auto] gap-1.5 p-2' : desktopQuizLayout ? 'max-w-none grid-cols-[minmax(180px,0.45fr)_minmax(0,2.1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto_auto] gap-3 p-3 md:p-4 xl:p-5' : 'max-w-5xl grid-rows-[auto_auto_auto_minmax(0,1fr)_auto_auto] gap-4 p-4 sm:p-6 md:p-8'}`}>
-        <div className={`${compactQuiz ? 'flex-row items-center gap-2' : desktopQuizLayout ? 'col-start-1 row-start-1 flex-col gap-2 rounded-[1.25rem] border border-white/50 bg-white/70 p-3 shadow-sm xl:p-4' : 'gap-4 sm:flex-row sm:items-center sm:justify-between'} flex shrink-0 justify-between`}>
+    <div className={`flex h-full min-h-0 overflow-hidden text-slate-900 ${compactQuiz ? 'p-0.5 sm:p-1.5' : 'p-3 sm:p-5 md:p-6'}`}>
+      <div className={`mx-auto grid h-full min-h-0 w-full rounded-[1.25rem] border border-white/50 bg-white/60 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-3xl sm:rounded-[2rem] ${compactQuiz ? 'grid-rows-[auto_auto_auto_minmax(0,1fr)_auto] gap-1 p-1.5' : desktopQuizLayout ? 'max-w-none grid-cols-[minmax(180px,0.45fr)_minmax(0,2.1fr)] grid-rows-[auto_auto_minmax(0,1fr)_auto_auto] gap-3 p-3 md:p-4 xl:p-5' : 'max-w-5xl grid-rows-[auto_auto_auto_minmax(0,1fr)_auto_auto] gap-4 p-4 sm:p-6 md:p-8'}`}>
+        <div className={`${compactQuiz ? 'flex-row items-center gap-1.5' : desktopQuizLayout ? 'col-start-1 row-start-1 flex-col gap-2 rounded-[1.25rem] border border-white/50 bg-white/70 p-3 shadow-sm xl:p-4' : 'gap-4 sm:flex-row sm:items-center sm:justify-between'} flex shrink-0 justify-between`}>
           <div className="min-w-0 flex-1">
             <p className={`${veryCompactQuiz ? 'hidden' : 'block'} text-[10px] font-black uppercase tracking-[0.22em] text-cyan-700 sm:text-xs sm:tracking-[0.3em]`}>Interactive Quiz</p>
-            <h2 className={`${compactQuiz ? 'mt-0 text-lg' : desktopQuizLayout ? 'mt-1 text-xl xl:text-2xl' : 'mt-2 text-2xl sm:text-3xl'} truncate font-black text-slate-900`}>{file.name}</h2>
+            <h2 className={`${compactQuiz ? 'mt-0 text-base' : desktopQuizLayout ? 'mt-1 text-xl xl:text-2xl' : 'mt-2 text-2xl sm:text-3xl'} truncate font-black text-slate-900`}>{file.name}</h2>
           </div>
-          <div className={`${compactQuiz ? 'rounded-xl px-3 py-1.5 text-sm' : desktopQuizLayout ? 'rounded-2xl px-3 py-2 text-sm xl:text-base' : 'rounded-2xl px-4 py-2 text-base sm:px-5 sm:py-3 sm:text-lg'} shrink-0 border border-white/50 bg-white/70 font-black text-slate-900`}>Score: {score}/{questions.length}</div>
+          <div className={`${compactQuiz ? 'rounded-lg px-2 py-1 text-xs' : desktopQuizLayout ? 'rounded-2xl px-3 py-2 text-sm xl:text-base' : 'rounded-2xl px-4 py-2 text-base sm:px-5 sm:py-3 sm:text-lg'} shrink-0 border border-white/50 bg-white/70 font-black text-slate-900`}>Score: {score}/{questions.length}</div>
         </div>
 
-        <div className={`${compactQuiz ? 'h-1.5' : desktopQuizLayout ? 'col-start-1 row-start-2 h-2' : 'h-2'} shrink-0 overflow-hidden rounded-full bg-white/70`}>
+        <div className={`${compactQuiz ? 'h-1' : desktopQuizLayout ? 'col-start-1 row-start-2 h-2' : 'h-2'} shrink-0 overflow-hidden rounded-full bg-white/70`}>
           <div className="h-full rounded-full bg-cyan-200 transition-all" style={{ width: `${((currentQuestion + 1) / questions.length) * 100}%` }} />
         </div>
 
         {questions.length > 1 && (
-          <div className={`${compactQuiz ? 'flex-nowrap gap-1.5 overflow-x-auto p-1.5' : desktopQuizLayout ? 'col-start-1 row-start-3 content-start gap-1.5 overflow-y-auto p-2' : 'max-h-28 flex-wrap gap-2 overflow-y-auto p-3'} flex shrink-0 rounded-2xl border border-white/50 bg-white/70 custom-scrollbar`}>
+          <div className={`${compactQuiz ? 'flex-nowrap gap-1 overflow-x-auto rounded-xl p-1' : desktopQuizLayout ? 'col-start-1 row-start-3 content-start gap-1.5 overflow-y-auto p-2' : 'max-h-28 flex-wrap gap-2 overflow-y-auto p-3'} flex shrink-0 rounded-2xl border border-white/50 bg-white/70 custom-scrollbar`}>
             {questions.map((_, index) => {
               const isActive = currentQuestion === index;
               const isAnswered = answers[index] !== undefined;
@@ -391,7 +391,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
                   key={index}
                   type="button"
                   onClick={() => setCurrentQuestion(index)}
-                  className={`${compactQuiz ? 'rounded-xl px-3 py-1.5 text-xs' : 'rounded-2xl px-4 py-2 text-sm'} shrink-0 font-black transition ${isActive ? 'bg-cyan-200 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5' : isAnswered ? 'border border-emerald-300/40 bg-emerald-400/10 text-emerald-700 hover:bg-emerald-400/20' : 'border border-white/50 bg-white/70 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}
+                  className={`${compactQuiz ? 'h-6 min-w-7 rounded-lg px-1.5 py-0 text-[10px] leading-none' : 'rounded-2xl px-4 py-2 text-sm'} shrink-0 font-black transition ${isActive ? 'bg-cyan-200 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5' : isAnswered ? 'border border-emerald-300/40 bg-emerald-400/10 text-emerald-700 hover:bg-emerald-400/20' : 'border border-white/50 bg-white/70 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}
                   aria-current={isActive ? 'step' : undefined}
                 >
                   Q{index + 1}
@@ -401,10 +401,10 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
           </div>
         )}
 
-        <div className={`${compactQuiz ? 'rounded-2xl p-3' : desktopQuizLayout ? 'col-start-2 row-span-5 row-start-1 rounded-[1.75rem] p-6 xl:p-8 2xl:p-10' : 'rounded-[1.5rem] p-3 sm:rounded-3xl sm:p-5 md:p-7'} min-h-0 overflow-y-auto border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] custom-scrollbar`}>
-          <p className={`${compactQuiz ? 'mb-1.5 text-[10px]' : 'mb-3 text-sm'} font-black uppercase tracking-[0.24em] text-slate-600`}>Question {currentQuestion + 1} of {questions.length}</p>
-          <h3 className={`${compactQuiz ? 'text-base' : 'text-xl sm:text-2xl'} font-black leading-tight text-slate-900`}>{question.prompt}</h3>
-          <div className={`${compactQuiz ? 'mt-3 gap-2' : 'mt-5 gap-3'} grid md:grid-cols-2`}>
+        <div className={`${compactQuiz ? 'rounded-xl p-2' : desktopQuizLayout ? 'col-start-2 row-span-5 row-start-1 rounded-[1.75rem] p-6 xl:p-8 2xl:p-10' : 'rounded-[1.5rem] p-3 sm:rounded-3xl sm:p-5 md:p-7'} min-h-0 overflow-y-auto border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] custom-scrollbar`}>
+          <p className={`${compactQuiz ? 'mb-1 text-[9px]' : 'mb-3 text-sm'} font-black uppercase tracking-[0.24em] text-slate-600`}>Question {currentQuestion + 1} of {questions.length}</p>
+          <h3 className={`${compactQuiz ? 'text-[15px]' : 'text-xl sm:text-2xl'} font-black leading-tight text-slate-900`}>{question.prompt}</h3>
+          <div className={`${compactQuiz ? 'mt-2 gap-1.5' : 'mt-5 gap-3'} grid md:grid-cols-2`}>
             {(question.options || []).map((option, oIndex) => {
               const isCorrect = oIndex === question.correctAnswer;
               const isSelected = selected === oIndex;
@@ -415,24 +415,24 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
                   : isSelected
                     ? 'border-rose-300/80 bg-rose-400/25 text-rose-700 shadow-sm'
                     : 'border-white/50 bg-white/70 text-slate-600/70';
-              return <button key={`${option}-${oIndex}`} type="button" onClick={() => !answered && setAnswers(prev => ({ ...prev, [currentQuestion]: oIndex }))} className={`${compactQuiz ? 'rounded-xl px-3 py-2 text-sm' : 'rounded-2xl px-4 py-4 sm:px-5'} border text-left font-bold transition ${stateClass}`}>{option}</button>;
+              return <button key={`${option}-${oIndex}`} type="button" onClick={() => !answered && setAnswers(prev => ({ ...prev, [currentQuestion]: oIndex }))} className={`${compactQuiz ? 'rounded-lg px-2.5 py-1.5 text-xs' : 'rounded-2xl px-4 py-4 sm:px-5'} border text-left font-bold transition ${stateClass}`}>{option}</button>;
             })}
           </div>
-          {answered && <div className={`${compactQuiz ? 'mt-3 rounded-xl p-3 text-sm' : 'mt-6 rounded-2xl p-4'} border font-black ${selected === question.correctAnswer ? 'border-emerald-300/50 bg-emerald-400/15 text-emerald-700' : 'border-rose-300/50 bg-rose-400/15 text-rose-100'}`}>{selected === question.correctAnswer ? 'Correct! Great work.' : `Incorrect. Correct answer: ${question.options[question.correctAnswer]}`}</div>}
+          {answered && <div className={`${compactQuiz ? 'mt-2 rounded-lg p-2 text-xs' : 'mt-6 rounded-2xl p-4'} border font-black ${selected === question.correctAnswer ? 'border-emerald-300/50 bg-emerald-400/15 text-emerald-700' : 'border-rose-300/50 bg-rose-400/15 text-rose-100'}`}>{selected === question.correctAnswer ? 'Correct! Great work.' : `Incorrect. Correct answer: ${question.options[question.correctAnswer]}`}</div>}
         </div>
 
         {submitted && (
-          <div className={`${compactQuiz ? 'rounded-2xl p-3' : desktopQuizLayout ? 'col-start-1 row-start-4 rounded-3xl p-4' : 'rounded-3xl p-5'} shrink-0 border border-emerald-200/70 bg-emerald-50/80 shadow-sm backdrop-blur-xl`}>
-            <p className={`${compactQuiz ? 'text-base' : 'text-xl'} font-black text-emerald-800`}>Quiz submitted: {score}/{questions.length}</p>
+          <div className={`${compactQuiz ? 'rounded-xl p-2' : desktopQuizLayout ? 'col-start-1 row-start-4 rounded-3xl p-4' : 'rounded-3xl p-5'} shrink-0 border border-emerald-200/70 bg-emerald-50/80 shadow-sm backdrop-blur-xl`}>
+            <p className={`${compactQuiz ? 'text-[15px]' : 'text-xl'} font-black text-emerald-800`}>Quiz submitted: {score}/{questions.length}</p>
             <p className={`${compactQuiz ? 'mt-1 text-xs' : 'mt-2 text-sm'} font-bold text-emerald-700`}>{rewardClaimed ? `✦ +${rewardCoins} EduCoins credited to your wallet.` : rewardCoins > 0 ? 'Reward already claimed for this quiz.' : 'No coin reward this time — revise and try another quiz.'}</p>
           </div>
         )}
 
-        <div className={`${compactQuiz ? 'grid grid-cols-3 gap-1.5' : desktopQuizLayout ? 'col-start-1 row-start-5 grid gap-2 self-end' : 'flex gap-3 sm:items-center sm:justify-between sm:gap-4'} shrink-0`}>
-          <button type="button" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(index => Math.max(0, index - 1))} className={`${compactQuiz ? 'rounded-xl px-2 py-2 text-xs' : desktopQuizLayout ? 'rounded-2xl px-4 py-2.5 text-sm' : 'rounded-2xl px-5 py-3'} border border-white/50 bg-white/70 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40`}>Previous</button>
+        <div className={`${compactQuiz ? 'grid grid-cols-3 gap-1' : desktopQuizLayout ? 'col-start-1 row-start-5 grid gap-2 self-end' : 'flex gap-3 sm:items-center sm:justify-between sm:gap-4'} shrink-0`}>
+          <button type="button" disabled={currentQuestion === 0} onClick={() => setCurrentQuestion(index => Math.max(0, index - 1))} className={`${compactQuiz ? 'rounded-lg px-1.5 py-1.5 text-[11px]' : desktopQuizLayout ? 'rounded-2xl px-4 py-2.5 text-sm' : 'rounded-2xl px-5 py-3'} border border-white/50 bg-white/70 font-black text-slate-900 transition hover:bg-white/80 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-40`}>Previous</button>
           <div className={`${compactQuiz ? 'contents' : desktopQuizLayout ? 'grid gap-3' : 'grid gap-3 sm:flex'}`}>
-            <button type="button" onClick={() => isLastQuestion ? setCurrentQuestion(0) : setCurrentQuestion(index => Math.min(questions.length - 1, index + 1))} className={`${compactQuiz ? 'rounded-xl px-2 py-2 text-xs' : desktopQuizLayout ? 'rounded-2xl px-4 py-2.5 text-sm' : 'rounded-2xl px-6 py-3'} bg-cyan-200 font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50`}>{isLastQuestion ? 'Review' : 'Next'}</button>
-            <button type="button" disabled={!allAnswered || submitted} onClick={submitQuiz} className={`${compactQuiz ? 'rounded-xl px-2 py-2 text-xs' : desktopQuizLayout ? 'rounded-2xl px-4 py-2.5 text-sm' : 'rounded-2xl px-6 py-3'} bg-gradient-to-r from-indigo-500 to-amber-400 font-black text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50`}>Submit</button>
+            <button type="button" onClick={() => isLastQuestion ? setCurrentQuestion(0) : setCurrentQuestion(index => Math.min(questions.length - 1, index + 1))} className={`${compactQuiz ? 'rounded-lg px-1.5 py-1.5 text-[11px]' : desktopQuizLayout ? 'rounded-2xl px-4 py-2.5 text-sm' : 'rounded-2xl px-6 py-3'} bg-cyan-200 font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50`}>{isLastQuestion ? 'Review' : 'Next'}</button>
+            <button type="button" disabled={!allAnswered || submitted} onClick={submitQuiz} className={`${compactQuiz ? 'rounded-lg px-1.5 py-1.5 text-[11px]' : desktopQuizLayout ? 'rounded-2xl px-4 py-2.5 text-sm' : 'rounded-2xl px-6 py-3'} bg-gradient-to-r from-indigo-500 to-amber-400 font-black text-white shadow-sm transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-50`}>Submit</button>
           </div>
         </div>
       </div>
