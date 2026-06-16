@@ -2868,12 +2868,10 @@ const App: React.FC = () => {
               purchasedProductIds={purchasedProductIds}
               wishlist={wishlist}
               coupons={coupons}
+              cartCount={cartItemCount}
               onViewPurchasedProduct={handleViewPurchasedProduct}
               onViewProduct={handleViewProduct}
               onToggleWishlist={handleToggleWishlist}
-              onAddToCart={handleAddToCart}
-              onBuyNow={handleBuyNowProduct}
-              onQuickView={setQuickViewProduct}
               onNavigateToAllProducts={handleNavigateToAllProducts}
               onNavigateToPurchases={handleNavigateToPurchases}
               onNavigateToFreeProducts={handleNavigateToFreeProducts}
