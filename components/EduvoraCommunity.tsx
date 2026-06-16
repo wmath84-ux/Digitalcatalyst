@@ -1078,12 +1078,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     </div>
   );
 
-  const renderMasterTagsPage = () => (
-    <div className="mx-auto max-w-7xl space-y-5">
-      <div className="rounded-[2.4rem] border border-[#D2E3FC] bg-gradient-to-br from-[#E8F0FE] via-white to-[#C2E7FF] p-6 shadow-[0_26px_80px_rgba(26,115,232,0.14)] sm:p-8">
+  const renderMasterTagFilters = (compact = false) => (
+    <div className={compact ? 'space-y-4' : ''}>
+      <div className={compact ? '' : 'rounded-[2.4rem] border border-[#D2E3FC] bg-gradient-to-br from-[#E8F0FE] via-white to-[#C2E7FF] p-6 shadow-[0_26px_80px_rgba(26,115,232,0.14)] sm:p-8'}>
         <p className="text-sm font-black uppercase tracking-[0.28em] text-[#1967D2]">Master Tags</p>
-        <h2 className="mt-3 text-4xl font-black tracking-tight text-[#202124] sm:text-5xl">Category-wise student queries and demands.</h2>
-        <p className="mt-3 max-w-3xl text-base font-semibold leading-7 text-[#5F6368]">Switch between your submitted tags and other students' tags, then use category filters below. Open any row for full reading, and react only with likes or emojis.</p>
+        <h2 className={compact ? 'mt-2 text-2xl font-black tracking-tight text-[#202124] lg:text-3xl' : 'mt-3 text-4xl font-black tracking-tight text-[#202124] sm:text-5xl'}>Category-wise student queries and demands.</h2>
+        <p className={compact ? 'mt-2 text-sm font-semibold leading-6 text-[#5F6368]' : 'mt-3 max-w-3xl text-base font-semibold leading-7 text-[#5F6368]'}>Switch between your submitted tags and other students' tags, then use category filters below. Open any row for full reading, and react only with likes or emojis.</p>
         <div className="mt-5 grid gap-2 sm:inline-grid sm:grid-cols-2" aria-label="Master tag audience filter">
           {([{ key: 'mine', label: 'Your tags', helper: 'Only tags submitted by you' }, { key: 'students', label: 'Students tags', helper: 'Tags submitted by other students' }] as const).map((option) => <button key={option.key} type="button" onClick={() => setMasterTagsAudienceFilter(option.key)} className={`rounded-2xl border px-5 py-3 text-left transition ${masterTagsAudienceFilter === option.key ? 'border-[#1A73E8] bg-[#1A73E8] text-white shadow-[0_14px_34px_rgba(26,115,232,0.24)]' : 'border-[#D2E3FC] bg-white/85 text-[#1967D2] hover:bg-[#E8F0FE]'}`}><span className="block text-sm font-black">{option.label}</span><span className={`mt-1 block text-[11px] font-bold ${masterTagsAudienceFilter === option.key ? 'text-white/80' : 'text-[#5F6368]'}`}>{option.helper}</span></button>)}
         </div>
@@ -1091,13 +1091,46 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           {(['All', ...masterTagCategories] as Array<'All' | (typeof masterTagCategories)[number]>).map((category) => <button key={category} type="button" onClick={() => setMasterTagFilter(category)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black transition ${masterTagFilter === category ? 'border-[#1A73E8] bg-[#1A73E8] text-white shadow-[0_10px_28px_rgba(26,115,232,0.24)]' : 'border-[#D2E3FC] bg-white/85 text-[#1967D2] hover:bg-[#E8F0FE]'}`}>{category === 'All' ? 'All tags' : category}</button>)}
         </div>
       </div>
-      <div className="grid gap-5 md:grid-cols-[minmax(0,0.92fr)_minmax(380px,1.08fr)] md:items-start">
+    </div>
+  );
+
+  const renderMasterTagListHeader = () => (
+    <div className="flex flex-wrap items-center justify-between gap-3 px-1">
+      <div>
+        <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1967D2]">{masterTagsAudienceFilter === 'mine' ? 'Your tags' : 'Students tags'} · {masterTagFilter === 'All' ? 'All categories' : masterTagFilter}</p>
+        <h3 className="mt-1 text-2xl font-black text-[#202124]">{filteredMasterTagRequests.length} visible student {filteredMasterTagRequests.length === 1 ? 'tag' : 'tags'}</h3>
+      </div>
+      <span className="rounded-full bg-[#E8F0FE] px-4 py-2 text-xs font-black text-[#174EA6]">Click row to read</span>
+    </div>
+  );
+
+  const renderMasterTagRows = () => filteredMasterTagRequests.length ? filteredMasterTagRequests.map(renderMasterTagStrip) : <div className="rounded-2xl border border-dashed border-[#C2E7FF] bg-[#F8FAFD] p-8 text-center text-sm font-black text-[#5F6368]">{masterTagsAudienceFilter === 'mine' ? 'No tags submitted by you yet. Use Tag your master to create your first request.' : 'No student tags found for this filter yet.'}</div>;
+
+  const renderMasterTagsPage = () => (
+    <div className="mx-auto max-w-7xl md:max-w-none">
+      <div className="space-y-5 md:hidden">
+        {renderMasterTagFilters()}
         <div className="rounded-[2rem] border border-[#E0E3EB] bg-white p-3 shadow-[0_18px_54px_rgba(60,64,67,0.08)] sm:p-4">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-1"><div><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1967D2]">{masterTagsAudienceFilter === 'mine' ? 'Your tags' : 'Students tags'} · {masterTagFilter === 'All' ? 'All categories' : masterTagFilter}</p><h3 className="mt-1 text-2xl font-black text-[#202124]">{filteredMasterTagRequests.length} visible student {filteredMasterTagRequests.length === 1 ? 'tag' : 'tags'}</h3></div><span className="rounded-full bg-[#E8F0FE] px-4 py-2 text-xs font-black text-[#174EA6]">Click row to read</span></div>
-          <div className="space-y-2">{filteredMasterTagRequests.length ? filteredMasterTagRequests.map(renderMasterTagStrip) : <div className="rounded-2xl border border-dashed border-[#C2E7FF] bg-[#F8FAFD] p-8 text-center text-sm font-black text-[#5F6368]">{masterTagsAudienceFilter === 'mine' ? 'No tags submitted by you yet. Use Tag your master to create your first request.' : 'No student tags found for this filter yet.'}</div>}</div>
+          <div className="mb-3">{renderMasterTagListHeader()}</div>
+          <div className="space-y-2">{renderMasterTagRows()}</div>
         </div>
-        <aside className="hidden md:sticky md:top-6 md:block">
-          {selectedMasterTag ? renderMasterTagDetailPage(false) : <div className="rounded-[2rem] border border-dashed border-[#C2E7FF] bg-[#F8FAFD] p-8 text-center text-sm font-black text-[#5F6368]">Select a Master Tag to read the full detail.</div>}
+      </div>
+
+      <div className="hidden h-[calc(100dvh-9.5rem)] min-h-0 grid-cols-[minmax(320px,0.92fr)_minmax(420px,1.08fr)] gap-5 overflow-hidden md:grid xl:h-[calc(100dvh-10rem)]">
+        <section className="flex min-h-0 flex-col overflow-hidden rounded-[2.35rem] border border-[#D2E3FC] bg-white/90 shadow-[0_24px_80px_rgba(26,115,232,0.12)] ring-1 ring-white/70">
+          <div className="shrink-0 border-b border-[#E0E3EB] bg-gradient-to-br from-[#E8F0FE] via-white to-[#C2E7FF] p-5 lg:p-6">
+            {renderMasterTagFilters(true)}
+          </div>
+          <div className="shrink-0 bg-white/95 p-4 pb-3">
+            {renderMasterTagListHeader()}
+          </div>
+          <div className="min-h-0 flex-1 space-y-2 overflow-y-auto px-4 pb-5 custom-scrollbar lg:px-5">
+            {renderMasterTagRows()}
+          </div>
+        </section>
+
+        <aside className="min-h-0 overflow-y-auto rounded-[2.35rem] border border-[#D2E3FC] bg-white/88 p-4 shadow-[0_24px_80px_rgba(26,115,232,0.12)] ring-1 ring-white/70 custom-scrollbar lg:p-5">
+          {selectedMasterTag ? renderMasterTagDetailPage(false) : <div className="flex h-full items-center justify-center rounded-[2rem] border border-dashed border-[#C2E7FF] bg-[#F8FAFD] p-8 text-center text-sm font-black text-[#5F6368]">Select a Master Tag to read the full detail.</div>}
         </aside>
       </div>
     </div>
