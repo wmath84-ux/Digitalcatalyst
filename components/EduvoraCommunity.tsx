@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, doc, increment, limit, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged } from 'firebase/auth';
@@ -257,6 +258,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const replyInputRef = useRef<HTMLInputElement>(null);
   const replyComposerRef = useRef<HTMLDivElement>(null);
   const notificationPanelRef = useRef<HTMLDivElement>(null);
+  const notificationDropdownRef = useRef<HTMLDivElement>(null);
   const selectedMessage = messages.find((message) => message.id === selectedMessageId) || messages[0];
   const selectedStatus = statusCards.find((status) => status.id === selectedStatusId) || statusCards[0];
   const allCreators = useMemo(() => creators.map((creator) => creator.id === 'me' ? { ...creator, name: profile.name, username: profile.username, avatar: profile.avatar } : creator), [profile]);
@@ -510,7 +512,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   useEffect(() => {
     if (!isNotificationPanelOpen) return undefined;
     const handlePointerDown = (event: PointerEvent) => {
-      if (notificationPanelRef.current && !notificationPanelRef.current.contains(event.target as Node)) setIsNotificationPanelOpen(false);
+      const target = event.target as Node;
+      const clickedBellWrapper = notificationPanelRef.current?.contains(target);
+      const clickedDropdown = notificationDropdownRef.current?.contains(target);
+      if (!clickedBellWrapper && !clickedDropdown) setIsNotificationPanelOpen(false);
     };
     document.addEventListener('pointerdown', handlePointerDown);
     return () => document.removeEventListener('pointerdown', handlePointerDown);
@@ -1076,6 +1081,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return textMatches && tabMatches;
   });
 
+
+  const NotificationDropdown = () => (
+    <div ref={notificationDropdownRef} className="fixed right-[clamp(0.75rem,3vw,2.5rem)] top-[calc(env(safe-area-inset-top)+5.75rem)] z-[2147483647] w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-[1.75rem] border border-[#E3ECF8] bg-white/95 shadow-[0_28px_90px_rgba(8,27,92,0.22)] backdrop-blur-2xl isolate">
+      <div className="flex items-center justify-between gap-3 border-b border-[#E3ECF8] bg-gradient-to-br from-[#EEF2FF] to-white p-4"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Notifications</p><h2 className="text-lg font-black text-[#081B5C]">Community updates</h2></div><button type="button" onClick={markAllNotificationsRead} disabled={!unreadNotificationCount} className="rounded-full bg-white px-3 py-2 text-[11px] font-black text-[#4F46E5] shadow-sm disabled:opacity-45">Mark all as read</button></div>
+      <div className="max-h-[min(54dvh,28rem)] overflow-y-auto p-2 custom-scrollbar">{notifications.length ? notifications.map((notification) => <button key={notification.id} type="button" onClick={() => openNotification(notification)} className={`flex w-full gap-3 rounded-[1.35rem] p-3 text-left transition hover:bg-[#F8FBFF] ${notification.read ? 'opacity-70' : 'bg-[#EEF2FF]'}`}><span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${notification.read ? 'bg-[#DADCE0]' : 'bg-[#4F7BFF]'}`} /><span className="min-w-0 flex-1"><span className="block text-sm font-black text-[#081B5C]">{notification.title}</span><span className="mt-1 line-clamp-2 block text-xs font-bold leading-5 text-[#64748B]">{notification.body}</span><span className="mt-2 block text-[11px] font-black uppercase tracking-[0.16em] text-[#4F7BFF]">{notification.time}</span></span></button>) : <div className="p-8 text-center"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF2FF] text-2xl">🔕</div><p className="mt-3 text-sm font-black text-[#081B5C]">No notifications yet</p><p className="mt-1 text-xs font-bold text-[#64748B]">Replies, status interactions, and master tag updates will appear here.</p></div>}</div>
+    </div>
+  );
+
+  const notificationDropdownPortal = isNotificationPanelOpen && typeof document !== 'undefined' ? createPortal(<NotificationDropdown />, document.body) : null;
+
   const navItems = [
     { label: 'Feed', icon: '📢', active: activeView === 'feed' && page === 'chat', action: () => switchView('feed') },
     { label: 'Status', icon: '⭕', active: activeView === 'status' && page === 'chat', action: () => { setActiveView('status'); setPage('chat'); setPageStack([]); setShowStatusActions((value) => !value); } },
@@ -1090,7 +1105,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const CommunityHeader = () => (
     <header className="flex h-[72px] min-w-0 shrink-0 items-center justify-between gap-3 border-b border-[#E3ECF8] bg-white/70 px-3 backdrop-blur-2xl sm:px-5 lg:h-[82px] lg:px-7">
       <div className="flex min-w-0 items-center gap-3"><button type="button" onClick={goBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#E3ECF8] bg-white text-xl font-black text-[#081B5C] shadow-[0_12px_30px_rgba(79,123,255,0.10)]">←</button><h1 className="truncate text-xl font-black tracking-tight text-[#081B5C] sm:text-3xl">EDUVORA BOND</h1></div>
-      <div className="flex shrink-0 items-center gap-2"><button type="button" onClick={() => pushPage('profile')} className="flex items-center gap-2 rounded-full border border-[#E3ECF8] bg-white px-2.5 py-2 text-xs font-black text-[#081B5C] shadow-sm sm:px-4"><Avatar value={profile.avatar} size="h-8 w-8" /><span className="hidden sm:inline">{profile.name}</span></button><span className="rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400]">🪙 {eduCoins}</span><div ref={notificationPanelRef} className="relative"><button type="button" onClick={() => setIsNotificationPanelOpen((open) => !open)} aria-expanded={isNotificationPanelOpen} aria-label="Community notifications" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#E3ECF8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><span>🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button>{isNotificationPanelOpen ? <div className="fixed right-[clamp(0.75rem,3vw,2.5rem)] top-[calc(env(safe-area-inset-top)+5.75rem)] z-[1700] w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-[1.75rem] border border-[#E3ECF8] bg-white/95 shadow-[0_28px_90px_rgba(8,27,92,0.22)] backdrop-blur-2xl"><div className="flex items-center justify-between gap-3 border-b border-[#E3ECF8] bg-gradient-to-br from-[#EEF2FF] to-white p-4"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Notifications</p><h2 className="text-lg font-black text-[#081B5C]">Community updates</h2></div><button type="button" onClick={markAllNotificationsRead} disabled={!unreadNotificationCount} className="rounded-full bg-white px-3 py-2 text-[11px] font-black text-[#4F46E5] shadow-sm disabled:opacity-45">Mark all as read</button></div><div className="max-h-[min(54dvh,28rem)] overflow-y-auto p-2 custom-scrollbar">{notifications.length ? notifications.map((notification) => <button key={notification.id} type="button" onClick={() => openNotification(notification)} className={`flex w-full gap-3 rounded-[1.35rem] p-3 text-left transition hover:bg-[#F8FBFF] ${notification.read ? 'opacity-70' : 'bg-[#EEF2FF]'}`}><span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${notification.read ? 'bg-[#DADCE0]' : 'bg-[#4F7BFF]'}`} /><span className="min-w-0 flex-1"><span className="block text-sm font-black text-[#081B5C]">{notification.title}</span><span className="mt-1 line-clamp-2 block text-xs font-bold leading-5 text-[#64748B]">{notification.body}</span><span className="mt-2 block text-[11px] font-black uppercase tracking-[0.16em] text-[#4F7BFF]">{notification.time}</span></span></button>) : <div className="p-8 text-center"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF2FF] text-2xl">🔕</div><p className="mt-3 text-sm font-black text-[#081B5C]">No notifications yet</p><p className="mt-1 text-xs font-bold text-[#64748B]">Replies, status interactions, and master tag updates will appear here.</p></div>}</div></div> : null}</div></div>
+      <div className="flex shrink-0 items-center gap-2"><button type="button" onClick={() => pushPage('profile')} className="flex items-center gap-2 rounded-full border border-[#E3ECF8] bg-white px-2.5 py-2 text-xs font-black text-[#081B5C] shadow-sm sm:px-4"><Avatar value={profile.avatar} size="h-8 w-8" /><span className="hidden sm:inline">{profile.name}</span></button><span className="rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400]">🪙 {eduCoins}</span><div ref={notificationPanelRef} className="relative"><button type="button" onClick={() => setIsNotificationPanelOpen((open) => !open)} aria-expanded={isNotificationPanelOpen} aria-label="Community notifications" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#E3ECF8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><span>🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button></div></div>
     </header>
   );
 
@@ -1134,6 +1149,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   return (
     <section className="relative h-[100dvh] overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-0 text-[#081B5C] sm:p-4 lg:p-6">
+      {notificationDropdownPortal}
       {imageLightbox ? <div className="fixed inset-0 z-[1800] flex items-center justify-center bg-[#081B5C]/80 p-4 backdrop-blur-xl"><button type="button" onClick={() => setImageLightbox(null)} className="absolute right-4 top-4 rounded-full bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Close</button><div className="flex max-h-[90dvh] max-w-[94vw] items-center justify-center overflow-hidden rounded-[2rem] bg-white p-3 shadow-2xl">{renderUploadedImage(imageLightbox.src, imageLightbox.alt, 'original')}</div></div> : null}
       {page === 'statusReel' ? renderStatusReel() : null}
       <div className="mx-auto flex h-full min-w-0 max-w-[1720px] overflow-hidden border border-[#E3ECF8] bg-white/55 shadow-[0_30px_100px_rgba(79,123,255,0.18)] backdrop-blur-2xl sm:rounded-[2rem] lg:rounded-[2.5rem]">
