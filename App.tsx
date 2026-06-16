@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/Header';
 import Hero from './components/Hero';
+import MobileAppHome, { MobileQuickAction } from './components/MobileAppHome';
 import ProductShowcase from './components/ProductShowcase';
 import Services, { ServiceItem } from './components/Services';
 import AboutUs from './components/AboutUs';
@@ -1081,6 +1082,8 @@ const App: React.FC = () => {
   const [isReadingDrawerOpen, setIsReadingDrawerOpen] = useState(false);
   const [readingDrawerView, setReadingDrawerView] = useState<ReadingView>('blog');
   const [readingListType, setReadingListType] = useState<ReadingListType>('blog');
+  const [mobileSearchQuery, setMobileSearchQuery] = useState('');
+  const [activeMobileQuickAction, setActiveMobileQuickAction] = useState<MobileQuickAction | null>(null);
   const [isFreeModalOpen, setIsFreeModalOpen] = useState(false);
   
   // User Theme State
@@ -1402,6 +1405,27 @@ const App: React.FC = () => {
   const purchasedProducts = productsWithRatings.filter(p => purchasedProductIds.includes(p.id));
   const wishlistProducts = visibleProducts.filter(p => wishlist.includes(p.id));
   const freeProducts = visibleProducts.filter(p => p.isFree);
+  const normalizedMobileSearchQuery = mobileSearchQuery.trim().toLowerCase();
+  const mobileFilteredAllProducts = visibleProducts
+    .filter(p => !purchasedProductIds.includes(p.id))
+    .filter(product => {
+      const matchesQuickAction = activeMobileQuickAction !== 'coupons' || Boolean(product.couponCode);
+      if (!matchesQuickAction) return false;
+      if (!normalizedMobileSearchQuery) return true;
+      return [
+        product.title,
+        product.description,
+        product.longDescription,
+        product.category,
+        product.sku,
+        product.fileFormat,
+        product.couponCode,
+        ...(product.tags || []),
+        ...(product.features || []),
+      ]
+        .filter(Boolean)
+        .some(value => String(value).toLowerCase().includes(normalizedMobileSearchQuery));
+    });
 
   // --- Real-time Metrics for Hero ---
   // Calculate total revenue from orders that are not cancelled
@@ -2628,6 +2652,31 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
+  const handleMobileQuickAction = (action: MobileQuickAction) => {
+    setActiveMobileQuickAction(action);
+    if (action !== 'coupons') setMobileSearchQuery('');
+
+    switch (action) {
+      case 'purchases':
+        handleNavigateToPurchases();
+        return;
+      case 'free':
+        handleNavigateToFreeProducts();
+        return;
+      case 'news':
+        openReadingHub('news');
+        return;
+      case 'topRated':
+        handleNavigateToHomeAndScroll('top-rated-products');
+        return;
+      case 'coupons':
+        handleNavigateToHomeAndScroll('products');
+        return;
+      default:
+        return;
+    }
+  };
+
   const handleNavigateToHomeAndScroll = (sectionId: string) => {
     if (currentView === 'home') {
         const element = document.getElementById(sectionId);
@@ -2817,10 +2866,10 @@ const App: React.FC = () => {
           {websiteSettings.layout.map(section => {
               if (!section.visible) return null;
               switch(section.id) {
-                  case 'hero': return <React.Fragment key={section.id}><div className="mobile-home-secondary"><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></div></React.Fragment>;
-                  case 'purchased': return purchasedProducts.length > 0 && <PurchasedProducts settings={websiteSettings} key={section.id} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
-                  case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
-                  case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
+                  case 'hero': return <React.Fragment key={section.id}><div className="mobile-home-secondary"><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} realMetrics={realMetrics} /><MobileAppHome searchQuery={mobileSearchQuery} activeAction={activeMobileQuickAction} onSearchChange={(query) => { setMobileSearchQuery(query); if (activeMobileQuickAction === 'coupons') setActiveMobileQuickAction(null); }} onQuickAction={handleMobileQuickAction} /><PlatformExperience settings={websiteSettings} /></div></React.Fragment>;
+                  case 'purchased': return purchasedProducts.length > 0 && <div id="my-purchases"><PurchasedProducts settings={websiteSettings} key={section.id} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /></div>;
+                  case 'topRated': return <div id="top-rated-products" key={section.id}><FeaturedProducts settings={websiteSettings} title={section.title || "Top Rated Products"} products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} /></div>;
+                  case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={mobileFilteredAllProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
                   case 'services': return <div className="mobile-home-secondary"><Services settings={websiteSettings} key={section.id} services={websiteSettings.content.services} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} /></div>;
                   case 'news': return <div className="mobile-home-secondary"><LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Daily Reading Hub'} articles={websiteSettings.content.newsArticles.filter(article => article.type === 'news')} onReadMoreClick={handleViewBlogArticle} onOpenHub={() => openReadingHub('news')} /></div>;
                   case 'about': return <div className="mobile-home-secondary"><AboutUs settings={websiteSettings} key={section.id} title={websiteSettings.content.aboutUsTitle} text={websiteSettings.content.aboutUsText} imageSeed={websiteSettings.content.aboutUsImageSeed} /></div>;
