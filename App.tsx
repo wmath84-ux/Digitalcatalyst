@@ -2,7 +2,7 @@
 // FIX: Corrected the React import statement by removing the erroneous 'a' and fixing the destructuring syntax.
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/Header';
-import Hero from './components/Hero';
+import MobileAppHome from './components/MobileAppHome';
 import ProductShowcase from './components/ProductShowcase';
 import Services, { ServiceItem } from './components/Services';
 import AboutUs from './components/AboutUs';
@@ -30,7 +30,6 @@ import { FreeProductsModal, FreeProductsPage } from './components/ContentModals'
 import ReadingDrawer, { ReadingListType, ReadingView } from './components/ReadingDrawer';
 import BottomGlassDock from './components/BottomGlassDock';
 import ProfilePage from './components/ProfilePage';
-import PlatformExperience from './components/PlatformExperience';
 import WelcomeOverlay from './components/WelcomeOverlay';
 import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
@@ -2499,6 +2498,16 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
+  const handleMobileHomePurchases = () => {
+    const purchasedSection = document.getElementById('mobile-purchased-section');
+    if (currentView === 'home' && purchasedSection) {
+      purchasedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return;
+    }
+
+    handleNavigateToPurchases();
+  };
+
 
   const unlockSubscriptionPlan = (plan: any, paymentLabel = 'Fiat checkout') => {
     const newPurchasedIds = [...new Set([...purchasedProductIds, ...plan.unlockProductIds])];
@@ -2817,8 +2826,8 @@ const App: React.FC = () => {
           {websiteSettings.layout.map(section => {
               if (!section.visible) return null;
               switch(section.id) {
-                  case 'hero': return <React.Fragment key={section.id}><div className="mobile-home-secondary"><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></div></React.Fragment>;
-                  case 'purchased': return purchasedProducts.length > 0 && <PurchasedProducts settings={websiteSettings} key={section.id} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
+                  case 'hero': return <MobileAppHome key={section.id} settings={websiteSettings} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleMobileHomePurchases} />;
+                  case 'purchased': return purchasedProducts.length > 0 && <div id="mobile-purchased-section" key={section.id} className="scroll-mt-24"><PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /></div>;
                   case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
                   case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
                   case 'services': return <div className="mobile-home-secondary"><Services settings={websiteSettings} key={section.id} services={websiteSettings.content.services} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} /></div>;
