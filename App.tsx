@@ -513,7 +513,7 @@ export interface WebsiteSettings {
         ],
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
-        dockItems: ['Store','Purchases','Wishlist','Cart','News','Community','Blog','Free','Profile','Subscriptions'],
+        dockItems: ['Home','Store','Purchases','Wishlist','Cart','News','Community','Blog','Free','Profile','Subscriptions'],
         dockStyle?: {
             backgroundColor: string;
             backgroundOpacity: number;
@@ -775,7 +775,7 @@ const defaultWebsiteSettings: WebsiteSettings = {
         ],
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
-        dockItems: ['Store','Purchases','Wishlist','Cart','News','Community','Blog','Free','Profile','Subscriptions'],
+        dockItems: ['Home','Store','Purchases','Wishlist','Cart','News','Community','Blog','Free','Profile','Subscriptions'],
         dockStyle: {
             backgroundColor: '#FBFDFF',
             backgroundOpacity: 92,
@@ -2868,12 +2868,10 @@ const App: React.FC = () => {
               purchasedProductIds={purchasedProductIds}
               wishlist={wishlist}
               coupons={coupons}
+              cartCount={cartItemCount}
               onViewPurchasedProduct={handleViewPurchasedProduct}
               onViewProduct={handleViewProduct}
               onToggleWishlist={handleToggleWishlist}
-              onAddToCart={handleAddToCart}
-              onBuyNow={handleBuyNowProduct}
-              onQuickView={setQuickViewProduct}
               onNavigateToAllProducts={handleNavigateToAllProducts}
               onNavigateToPurchases={handleNavigateToPurchases}
               onNavigateToFreeProducts={handleNavigateToFreeProducts}
