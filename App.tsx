@@ -36,6 +36,7 @@ import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
 import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
+import MobileAppHome from './components/MobileAppHome';
 import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
@@ -2847,7 +2848,35 @@ const App: React.FC = () => {
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={handleBackToHome} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={handleBackToHome} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
-      case 'home': default: return renderHomePageContent();
+      case 'home': default: return (
+        <>
+          <div className="md:hidden">
+            <MobileAppHome
+              settings={websiteSettings}
+              currentUser={currentUser}
+              purchasedProducts={purchasedProducts}
+              topRatedProducts={topRatedProducts}
+              visibleProducts={visibleProducts}
+              purchasedProductIds={purchasedProductIds}
+              wishlist={wishlist}
+              coupons={coupons}
+              onViewPurchasedProduct={handleViewPurchasedProduct}
+              onViewProduct={handleViewProduct}
+              onToggleWishlist={handleToggleWishlist}
+              onAddToCart={handleAddToCart}
+              onBuyNow={handleBuyNowProduct}
+              onQuickView={setQuickViewProduct}
+              onNavigateToAllProducts={handleNavigateToAllProducts}
+              onNavigateToPurchases={handleNavigateToPurchases}
+              onNavigateToFreeProducts={handleNavigateToFreeProducts}
+              onOpenNews={() => openReadingHub('news')}
+              onCartClick={() => setIsCartOpen(true)}
+              onProfileClick={handleNavigateToProfile}
+            />
+          </div>
+          <div className="hidden md:block">{renderHomePageContent()}</div>
+        </>
+      );
     }
   };
 
