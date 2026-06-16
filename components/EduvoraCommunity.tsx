@@ -19,10 +19,12 @@ type StatusCard = { id: number; title: string; body: string; gradient: string; l
 type SharedStory = { id: number; statusId: number; recipientId: string; senderId: 'me'; senderName: string; time: string };
 type MasterTagRequest = { id: number; author: string; avatar: string; category: string; title: string; detail: string; time: string; likes: number; reactions: Record<string, number> };
 type CommunitySupportTicket = { id: string; customerName: string; customerEmail: string; subject: string; message: string; date: string; status: 'Open' | 'Resolved' | 'Pending'; source?: 'contact' | 'masterTag'; communityThreadId?: number; customerAvatar?: string; category?: string; adminReply?: string; repliedAt?: string; inboxMessage?: string; inboxRead?: boolean };
+type CommunityNotification = { id: string; title: string; body: string; time: string; read: boolean; type: 'reply' | 'masterTag' | 'status' | 'creator'; targetPage?: CommunityPage; targetId?: number | string };
 
 const MASTER_TAG_STORAGE_KEY = 'eduvoraMasterTagRequests';
 const SUPPORT_TICKETS_STORAGE_KEY = 'siteSupportTickets';
 const SUPPORT_TICKETS_COLLECTION = 'siteSupportTickets';
+const COMMUNITY_NOTIFICATION_READ_KEY = 'eduvoraCommunityNotificationReads';
 
 const readJsonArray = <T,>(key: string, fallback: T[]): T[] => {
   if (typeof window === 'undefined') return fallback;
@@ -248,9 +250,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [likedMasterTagIds, setLikedMasterTagIds] = useState<number[]>([]);
   const [profile, setProfile] = useState({ name: 'Eduvora Member', username: 'eduvora_member', avatar: '🧑‍🎓', bio: 'Building digital skills daily.' });
   const [showStatusActions, setShowStatusActions] = useState(false);
+  const [notificationReads, setNotificationReads] = useState<Record<string, boolean>>(() => readJsonArray<string>(COMMUNITY_NOTIFICATION_READ_KEY, []).reduce<Record<string, boolean>>((reads, id) => ({ ...reads, [id]: true }), {}));
+  const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const scrollContainerRef = useRef<HTMLElement>(null);
   const replyInputRef = useRef<HTMLInputElement>(null);
   const replyComposerRef = useRef<HTMLDivElement>(null);
+  const notificationPanelRef = useRef<HTMLDivElement>(null);
   const selectedMessage = messages.find((message) => message.id === selectedMessageId) || messages[0];
   const selectedStatus = statusCards.find((status) => status.id === selectedStatusId) || statusCards[0];
   const allCreators = useMemo(() => creators.map((creator) => creator.id === 'me' ? { ...creator, name: profile.name, username: profile.username, avatar: profile.avatar } : creator), [profile]);
@@ -261,8 +266,53 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const activeChatCreator = allCreators.find((creator) => creator.id === selectedChatId) || chatCreators[0] || allCreators[0];
   const activeChatStories = sharedStories.filter((story) => story.recipientId === activeChatCreator?.id);
   const shouldShowStatusDetail = (card: StatusCard) => card.body.length > 140 || Boolean(card.imagePreview && card.body.trim().length > 0);
+  const notifications = useMemo<CommunityNotification[]>(() => {
+    const feedReplyAlerts = messages.flatMap((message) => message.replies.slice(-2).map((reply) => ({
+      id: `reply-${message.id}-${reply.id}`,
+      title: `${reply.author} replied in ${message.title}`,
+      body: reply.text,
+      time: reply.time,
+      read: Boolean(notificationReads[`reply-${message.id}-${reply.id}`]),
+      type: 'reply' as const,
+      targetPage: 'thread' as CommunityPage,
+      targetId: message.id,
+    })));
+    const masterTagAlerts = supportTickets.filter((ticket) => ticket.source === 'masterTag' && (ticket.adminReply || ticket.inboxMessage)).slice(0, 6).map((ticket) => ({
+      id: `master-${ticket.id}-${ticket.repliedAt || ticket.date}`,
+      title: ticket.adminReply ? 'Master replied to your tag' : 'Master tag inbox update',
+      body: ticket.adminReply || ticket.inboxMessage || ticket.subject,
+      time: formatCommunityReplyTime(ticket.repliedAt || ticket.date),
+      read: Boolean(notificationReads[`master-${ticket.id}-${ticket.repliedAt || ticket.date}`]),
+      type: 'masterTag' as const,
+      targetPage: 'masterTagDetail' as CommunityPage,
+      targetId: ticket.communityThreadId,
+    }));
+    const statusAlerts = statusCards.filter((status) => status.likedBy > 0 || (status.views > 0 && status.ownerId === 'me')).slice(0, 5).map((status) => ({
+      id: `status-${status.id}-${status.likedBy}-${status.views}`,
+      title: status.likedBy > 0 ? 'Your status is getting love' : 'Your status has new views',
+      body: `${status.title} · ❤️ ${status.likedBy} · 👁️ ${status.views}`,
+      time: status.slots.split('·').pop()?.trim() || 'Just now',
+      read: Boolean(notificationReads[`status-${status.id}-${status.likedBy}-${status.views}`]),
+      type: 'status' as const,
+      targetPage: 'statusReel' as CommunityPage,
+      targetId: status.id,
+    }));
+    const creatorAlerts = messages.filter((message) => message.creatorId && message.creatorId !== 'me').slice(0, 4).map((message) => ({
+      id: `creator-${message.id}`,
+      title: `${message.admin} posted in community`,
+      body: message.title,
+      time: message.time,
+      read: Boolean(notificationReads[`creator-${message.id}`]),
+      type: 'creator' as const,
+      targetPage: 'thread' as CommunityPage,
+      targetId: message.id,
+    }));
+    return [...feedReplyAlerts, ...masterTagAlerts, ...statusAlerts, ...creatorAlerts].slice(0, 20);
+  }, [messages, notificationReads, statusCards, supportTickets]);
+  const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
 
   const pushPage = (nextPage: CommunityPage) => {
+    setIsNotificationPanelOpen(false);
     setShowStatusActions(false);
     setShareStatusId(null);
     setExpandedReplyId(null);
@@ -272,6 +322,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const goBack = () => {
+    setIsNotificationPanelOpen(false);
     setExpandedReplyId(null);
     if (pageStack.length) {
       const previous = pageStack[pageStack.length - 1];
@@ -449,7 +500,50 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return () => window.removeEventListener('pointerdown', onOutsidePointer);
   }, [expandedReplyId]);
 
+
+
+  useEffect(() => {
+    localStorage.setItem(COMMUNITY_NOTIFICATION_READ_KEY, JSON.stringify(Object.keys(notificationReads).filter((id) => notificationReads[id])));
+  }, [notificationReads]);
+
+  useEffect(() => {
+    if (!isNotificationPanelOpen) return undefined;
+    const handlePointerDown = (event: PointerEvent) => {
+      if (notificationPanelRef.current && !notificationPanelRef.current.contains(event.target as Node)) setIsNotificationPanelOpen(false);
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [isNotificationPanelOpen]);
+
+  const markAllNotificationsRead = () => setNotificationReads((current) => ({ ...current, ...Object.fromEntries(notifications.map((notification) => [notification.id, true])) }));
+
+  const openNotification = (notification: CommunityNotification) => {
+    setNotificationReads((current) => ({ ...current, [notification.id]: true }));
+    setIsNotificationPanelOpen(false);
+    if (!notification.targetPage) return;
+    if ((notification.targetPage === 'thread' || notification.type === 'reply' || notification.type === 'creator') && typeof notification.targetId === 'number') {
+      setSelectedMessageId(notification.targetId);
+      setActiveView('feed');
+      setPage(window.matchMedia('(max-width: 767px)').matches ? 'thread' : 'chat');
+      setPageStack([]);
+      return;
+    }
+    if (notification.targetPage === 'statusReel' && typeof notification.targetId === 'number') {
+      setSelectedStatusId(notification.targetId);
+      setActiveView('status');
+      setPage('statusReel');
+      setPageStack(['chat']);
+      return;
+    }
+    if (notification.targetPage === 'masterTagDetail' && typeof notification.targetId === 'number') {
+      setSelectedMasterTagId(notification.targetId);
+      setPage('masterTagDetail');
+      setPageStack(['tagMaster']);
+    }
+  };
+
   const switchView = (view: CommunityView) => {
+    setIsNotificationPanelOpen(false);
     setExpandedReplyId(null);
     setShowStatusActions(false);
     setActiveView(view);
@@ -857,7 +951,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const heroEyebrow = isFollowingFeed ? 'Following pulse' : 'Chat feed live';
     const heroIcon = isFollowingFeed ? '👥' : '💬';
     if (!feedMessages.length) return <div className="mx-auto max-w-5xl rounded-[2rem] border border-dashed border-[#C2E7FF] bg-gradient-to-br from-[#F8FAFD] via-white to-[#E8F0FE] p-8 text-center font-bold text-[#5F6368] shadow-[0_18px_54px_rgba(37,99,235,0.10)]"><div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white text-3xl shadow-inner">👀</div>Follow creators to build this feed.</div>;
-    return <div className="mx-auto grid h-[calc(100dvh-10.5rem)] w-full max-w-[1800px] gap-5 overflow-hidden md:grid-cols-[minmax(300px,440px)_1fr]"><aside className="hidden h-full min-h-0 overflow-y-auto rounded-[2rem] border border-[#E0E3EB] bg-white p-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] ring-1 ring-[#D2E3FC] backdrop-blur-xl custom-scrollbar md:block"><div className={`relative mb-4 overflow-hidden rounded-[1.6rem] bg-gradient-to-br ${heroGradient} p-5 text-[#202124] shadow-[0_18px_50px_rgba(37,99,235,0.18)]`}><div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/20 blur-2xl" /><p className="relative text-xs font-black uppercase tracking-[0.28em] text-[#202124]/80">{heroEyebrow}</p><h2 className="relative mt-2 text-3xl font-black tracking-tight">{heroIcon} {title}</h2><p className="relative mt-2 text-sm font-semibold leading-6 text-[#202124]/78">{subtitle}</p></div><div className="space-y-3">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} isActive={activeMessage?.id === message.id} />)}</div></aside><section className="hidden min-h-0 overflow-hidden md:block">{activeMessage ? renderMessageDetails(activeMessage) : null}</section><div className="h-full space-y-3 overflow-y-auto pb-4 custom-scrollbar md:hidden">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)}</div></div>;
+    return <div className="mx-auto grid h-[clamp(32rem,calc(100dvh-10.5rem),76rem)] min-h-0 w-full min-w-0 max-w-[1800px] gap-4 overflow-hidden lg:gap-5 md:grid-cols-[minmax(0,clamp(17rem,30vw,27.5rem))_minmax(0,1fr)]"><aside className="hidden h-full min-h-0 min-w-0 overflow-y-auto rounded-[2rem] border border-[#E0E3EB] bg-white p-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] ring-1 ring-[#D2E3FC] backdrop-blur-xl custom-scrollbar md:block"><div className={`relative mb-4 overflow-hidden rounded-[1.6rem] bg-gradient-to-br ${heroGradient} p-5 text-[#202124] shadow-[0_18px_50px_rgba(37,99,235,0.18)]`}><div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/20 blur-2xl" /><p className="relative text-xs font-black uppercase tracking-[0.28em] text-[#202124]/80">{heroEyebrow}</p><h2 className="relative mt-2 text-3xl font-black tracking-tight">{heroIcon} {title}</h2><p className="relative mt-2 text-sm font-semibold leading-6 text-[#202124]/78">{subtitle}</p></div><div className="space-y-3">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} isActive={activeMessage?.id === message.id} />)}</div></aside><section className="hidden min-h-0 min-w-0 overflow-hidden md:block">{activeMessage ? renderMessageDetails(activeMessage) : null}</section><div className="h-full space-y-3 overflow-y-auto pb-4 custom-scrollbar md:hidden">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)}</div></div>;
   };
 
   const renderTypeComposer = (activeType: PostType, setActiveType: (type: PostType) => void, accent: 'sky' | 'orange' = 'sky') => {
@@ -976,17 +1070,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   ];
 
   const CommunityHeader = () => (
-    <header className="flex h-[72px] shrink-0 items-center justify-between gap-3 border-b border-[#E3ECF8] bg-white/70 px-3 backdrop-blur-2xl sm:px-5 lg:h-[82px] lg:px-7">
-      <div className="flex min-w-0 items-center gap-3"><button type="button" onClick={goBack} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#E3ECF8] bg-white text-xl font-black text-[#081B5C] shadow-[0_12px_30px_rgba(79,123,255,0.10)]">←</button><h1 className="truncate text-xl font-black tracking-tight text-[#081B5C] sm:text-3xl">EDUVORA BOND</h1></div>
-      <div className="flex shrink-0 items-center gap-2"><button type="button" onClick={() => pushPage('profile')} className="flex items-center gap-2 rounded-full border border-[#E3ECF8] bg-white px-2.5 py-2 text-xs font-black text-[#081B5C] shadow-sm sm:px-4"><Avatar value={profile.avatar} size="h-8 w-8" /><span className="hidden sm:inline">{profile.name}</span></button><span className="rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400]">🪙 {eduCoins}</span><button type="button" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#E3ECF8] bg-white text-lg shadow-sm"><span>🔔</span><span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[#FF3B5C] ring-2 ring-white" /></button></div>
+    <header className="flex h-[72px] min-w-0 shrink-0 items-center justify-between gap-3 border-b border-[#E3ECF8] bg-white/70 px-3 backdrop-blur-2xl sm:px-5 lg:h-[82px] lg:px-7">
+      <div className="flex min-w-0 items-center gap-3"><button type="button" onClick={goBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#E3ECF8] bg-white text-xl font-black text-[#081B5C] shadow-[0_12px_30px_rgba(79,123,255,0.10)]">←</button><h1 className="truncate text-xl font-black tracking-tight text-[#081B5C] sm:text-3xl">EDUVORA BOND</h1></div>
+      <div className="flex shrink-0 items-center gap-2"><button type="button" onClick={() => pushPage('profile')} className="flex items-center gap-2 rounded-full border border-[#E3ECF8] bg-white px-2.5 py-2 text-xs font-black text-[#081B5C] shadow-sm sm:px-4"><Avatar value={profile.avatar} size="h-8 w-8" /><span className="hidden sm:inline">{profile.name}</span></button><span className="rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400]">🪙 {eduCoins}</span><div ref={notificationPanelRef} className="relative"><button type="button" onClick={() => setIsNotificationPanelOpen((open) => !open)} aria-expanded={isNotificationPanelOpen} aria-label="Community notifications" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#E3ECF8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><span>🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button>{isNotificationPanelOpen ? <div className="absolute right-0 top-14 z-[1700] w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-[1.75rem] border border-[#E3ECF8] bg-white/95 shadow-[0_28px_90px_rgba(8,27,92,0.22)] backdrop-blur-2xl"><div className="flex items-center justify-between gap-3 border-b border-[#E3ECF8] bg-gradient-to-br from-[#EEF2FF] to-white p-4"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Notifications</p><h2 className="text-lg font-black text-[#081B5C]">Community updates</h2></div><button type="button" onClick={markAllNotificationsRead} disabled={!unreadNotificationCount} className="rounded-full bg-white px-3 py-2 text-[11px] font-black text-[#4F46E5] shadow-sm disabled:opacity-45">Mark all as read</button></div><div className="max-h-[min(62dvh,30rem)] overflow-y-auto p-2 custom-scrollbar">{notifications.length ? notifications.map((notification) => <button key={notification.id} type="button" onClick={() => openNotification(notification)} className={`flex w-full gap-3 rounded-[1.35rem] p-3 text-left transition hover:bg-[#F8FBFF] ${notification.read ? 'opacity-70' : 'bg-[#EEF2FF]'}`}><span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${notification.read ? 'bg-[#DADCE0]' : 'bg-[#4F7BFF]'}`} /><span className="min-w-0 flex-1"><span className="block text-sm font-black text-[#081B5C]">{notification.title}</span><span className="mt-1 line-clamp-2 block text-xs font-bold leading-5 text-[#64748B]">{notification.body}</span><span className="mt-2 block text-[11px] font-black uppercase tracking-[0.16em] text-[#4F7BFF]">{notification.time}</span></span></button>) : <div className="p-8 text-center"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF2FF] text-2xl">🔕</div><p className="mt-3 text-sm font-black text-[#081B5C]">No notifications yet</p><p className="mt-1 text-xs font-bold text-[#64748B]">Replies, status interactions, and master tag updates will appear here.</p></div>}</div></div> : null}</div></div>
     </header>
   );
 
   const CommunitySidebar = () => (
-    <aside className="hidden w-[248px] shrink-0 flex-col border-r border-[#E3ECF8] bg-white/58 p-4 lg:flex">
-      <div className="mb-5 rounded-[2rem] bg-gradient-to-br from-[#6C4CF6] to-[#4F7BFF] p-4 text-white shadow-[0_18px_42px_rgba(79,123,255,0.25)]"><p className="text-xs font-black uppercase tracking-[0.22em] text-white/75">Community</p><h2 className="mt-2 text-2xl font-black">Bond Hub</h2></div>
-      <nav className="space-y-2">{navItems.map((item) => <button key={item.label} type="button" onClick={item.action} className={`flex w-full items-center gap-3 rounded-[1.35rem] px-4 py-3 text-left text-sm font-black transition ${item.active ? 'bg-[#EEF2FF] text-[#4F46E5] shadow-[0_12px_34px_rgba(79,70,229,0.12)]' : 'text-[#64748B] hover:bg-white hover:text-[#081B5C]'}`}><span className={`flex h-10 w-10 items-center justify-center rounded-2xl ${item.active ? 'bg-gradient-to-br from-[#6C4CF6] to-[#4F7BFF] text-white' : 'bg-[#F3F7FF]'}`}>{item.icon}</span>{item.label}</button>)}</nav>
-      <div className="mt-auto space-y-4"><div className="rounded-[2rem] bg-gradient-to-br from-[#081B5C] to-[#4F7BFF] p-5 text-white shadow-[0_18px_48px_rgba(8,27,92,0.18)]"><p className="text-lg font-black">Go Premium</p><p className="mt-1 text-xs font-bold text-white/75">Unlock creator boosts and deep insights.</p><button type="button" className="mt-4 rounded-full bg-white px-4 py-2 text-xs font-black text-[#4F46E5]">Upgrade Now</button></div><button type="button" onClick={() => pushPage('profile')} className="flex w-full items-center gap-3 rounded-[1.6rem] border border-[#E3ECF8] bg-white p-3 text-left"><Avatar value={profile.avatar} size="h-11 w-11" /><span className="min-w-0"><span className="block truncate text-sm font-black text-[#081B5C]">{profile.name}</span><span className="block truncate text-xs font-bold text-[#64748B]">@{profile.username}</span></span></button></div>
+    <aside className="hidden w-[clamp(12.5rem,16vw,15.5rem)] min-h-0 shrink-0 flex-col overflow-y-auto border-r border-[#E3ECF8] bg-white/58 p-3 custom-scrollbar lg:flex xl:p-4">
+      <div className="mb-3 rounded-[1.6rem] bg-gradient-to-br from-[#6C4CF6] to-[#4F7BFF] p-3 xl:mb-5 xl:rounded-[2rem] xl:p-4 text-white shadow-[0_18px_42px_rgba(79,123,255,0.25)]"><p className="text-xs font-black uppercase tracking-[0.22em] text-white/75">Community</p><h2 className="mt-2 text-2xl font-black">Bond Hub</h2></div>
+      <nav className="space-y-1.5 xl:space-y-2">{navItems.map((item) => <button key={item.label} type="button" onClick={item.action} className={`flex w-full items-center gap-2 rounded-[1.15rem] px-3 py-2.5 xl:gap-3 xl:rounded-[1.35rem] xl:px-4 xl:py-3 text-left text-sm font-black transition ${item.active ? 'bg-[#EEF2FF] text-[#4F46E5] shadow-[0_12px_34px_rgba(79,70,229,0.12)]' : 'text-[#64748B] hover:bg-white hover:text-[#081B5C]'}`}><span className={`flex h-9 w-9 items-center justify-center rounded-xl xl:h-10 xl:w-10 xl:rounded-2xl ${item.active ? 'bg-gradient-to-br from-[#6C4CF6] to-[#4F7BFF] text-white' : 'bg-[#F3F7FF]'}`}>{item.icon}</span>{item.label}</button>)}</nav>
+      <div className="mt-auto space-y-3 pt-3 xl:space-y-4"><div className="rounded-[1.6rem] bg-gradient-to-br from-[#081B5C] to-[#4F7BFF] p-3 xl:rounded-[2rem] xl:p-5 text-white shadow-[0_18px_48px_rgba(8,27,92,0.18)]"><p className="text-lg font-black">Go Premium</p><p className="mt-1 text-xs font-bold text-white/75">Unlock creator boosts and deep insights.</p><button type="button" className="mt-3 rounded-full bg-white px-3 py-2 xl:mt-4 xl:px-4 text-xs font-black text-[#4F46E5]">Upgrade Now</button></div><button type="button" onClick={() => pushPage('profile')} className="flex w-full items-center gap-3 rounded-[1.6rem] border border-[#E3ECF8] bg-white p-3 text-left"><Avatar value={profile.avatar} size="h-11 w-11" /><span className="min-w-0"><span className="block truncate text-sm font-black text-[#081B5C]">{profile.name}</span><span className="block truncate text-xs font-bold text-[#64748B]">@{profile.username}</span></span></button></div>
     </aside>
   );
 
@@ -1024,11 +1118,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     <section className="relative h-[100dvh] overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-0 text-[#081B5C] sm:p-4 lg:p-6">
       {imageLightbox ? <div className="fixed inset-0 z-[1800] flex items-center justify-center bg-[#081B5C]/80 p-4 backdrop-blur-xl"><button type="button" onClick={() => setImageLightbox(null)} className="absolute right-4 top-4 rounded-full bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Close</button><div className="flex max-h-[90dvh] max-w-[94vw] items-center justify-center overflow-hidden rounded-[2rem] bg-white p-3 shadow-2xl">{renderUploadedImage(imageLightbox.src, imageLightbox.alt, 'original')}</div></div> : null}
       {page === 'statusReel' ? renderStatusReel() : null}
-      <div className="mx-auto flex h-full max-w-[1720px] overflow-hidden border border-[#E3ECF8] bg-white/55 shadow-[0_30px_100px_rgba(79,123,255,0.18)] backdrop-blur-2xl sm:rounded-[2rem] lg:rounded-[2.5rem]">
+      <div className="mx-auto flex h-full min-w-0 max-w-[1720px] overflow-hidden border border-[#E3ECF8] bg-white/55 shadow-[0_30px_100px_rgba(79,123,255,0.18)] backdrop-blur-2xl sm:rounded-[2rem] lg:rounded-[2.5rem]">
         <CommunitySidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <CommunityHeader />
-          <main ref={scrollContainerRef} className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-32 pt-4 custom-scrollbar sm:px-5 lg:px-7 lg:pb-7">
+          <main ref={scrollContainerRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-32 pt-4 custom-scrollbar sm:px-5 lg:px-7 lg:pb-7">
             {renderMainContent()}
           </main>
         </div>
