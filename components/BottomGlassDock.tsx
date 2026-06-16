@@ -77,7 +77,8 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
     { label: currentUser ? 'Profile' : authButtonLabel, action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null },
   ]), [onHomeClick, onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenCommunity, onOpenBlogModal, onOpenFreeModal, currentUser, authButtonLabel, onProfileClick]);
   const configuredBase = ((settings.content as any).dockItems || dockCustomizationItems) as string[];
-  const configured = configuredBase.filter((label, index, labels) => labels.indexOf(label) === index);
+  const configuredWithHome = configuredBase.includes('Home') ? configuredBase : ['Home', ...configuredBase];
+  const configured = configuredWithHome.filter((label, index, labels) => labels.indexOf(label) === index);
   const map: any = Object.fromEntries(defaultItems.map(i => [i.label, i]));
   map['Home'] = map['Home'] || { label: 'Home', action: onHomeClick, icon: '🏠', badge: null };
   map['EduCoins'] = map['Profile'] || { label: currentUser ? 'Profile' : authButtonLabel, action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null };
