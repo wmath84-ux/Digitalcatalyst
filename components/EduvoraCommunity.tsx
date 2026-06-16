@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { addDoc, collection, doc, increment, limit, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, deleteField, doc, increment, limit, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { db } from '../firebase';
 
@@ -14,11 +14,11 @@ type CommunityView = 'feed' | 'status';
 type CommunityPage = 'chat' | 'thread' | 'profile' | 'creators' | 'network' | 'following' | 'tagMaster' | 'masterTags' | 'masterTagDetail' | 'statusUpload' | 'statusMine' | 'statusReel' | 'directChat' | 'directChatThread' | 'statusDetail';
 type PostType = 'text' | 'image' | 'poll';
 type Reply = { id: number; author: string; text: string; time: string; avatar?: string; docId?: string; createdAt?: number; ownerId?: string };
-type FeedMessage = { id: number; admin: string; badge: string; avatar: string; title: string; body: string; time: string; reactions: string[]; replies: Reply[]; creatorId?: string; postType?: PostType; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; likeCount?: number; docId?: string; createdAt?: number; reactionCounts?: Record<string, number>; replyCount?: number };
+type FeedMessage = { id: number; admin: string; badge: string; avatar: string; title: string; body: string; time: string; reactions: string[]; replies: Reply[]; creatorId?: string; postType?: PostType; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; likeCount?: number; docId?: string; createdAt?: number; reactionCounts?: Record<string, number>; replyCount?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; reactionUsers?: Record<string, string> };
 type Creator = { id: string; username: string; name: string; avatar: string; role: string; followers: number; mutual: boolean; verified?: boolean };
-type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; docId?: string; createdAt?: number };
+type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number> };
 type SharedStory = { id: number; statusId: number; recipientId: string; senderId: 'me'; senderName: string; time: string };
-type MasterTagRequest = { id: number; author: string; avatar: string; category: string; title: string; detail: string; time: string; likes: number; reactions: Record<string, number>; ownerId?: string };
+type MasterTagRequest = { id: number; author: string; avatar: string; category: string; title: string; detail: string; time: string; likes: number; reactions: Record<string, number>; ownerId?: string; docId?: string; likedByUsers?: Record<string, boolean>; reactionUsers?: Record<string, string> };
 type CommunitySupportTicket = { id: string; customerName: string; customerEmail: string; subject: string; message: string; date: string; status: 'Open' | 'Resolved' | 'Pending'; source?: 'contact' | 'masterTag'; communityThreadId?: number; customerAvatar?: string; category?: string; adminReply?: string; repliedAt?: string; inboxMessage?: string; inboxRead?: boolean };
 type CommunityNotification = { id: string; title: string; body: string; time: string; read: boolean; type: 'reply' | 'masterTag' | 'status' | 'creator'; targetPage?: CommunityPage; targetId?: number | string };
 type CommunityProfile = { name: string; username: string; avatar: string; bio: string };
@@ -132,6 +132,7 @@ const STATUS_IMAGE_FALLBACK = '🖼️';
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 const COMMUNITY_FEED = 'community_feed';
 const COMMUNITY_STATUS = 'community_status';
+const COMMUNITY_MASTER_TAGS = 'community_master_tags';
 const MAX_STATUS_FILE_BYTES = 1048576;
 const isImageAvatar = (value: string) => value.startsWith('data:') || value.startsWith('http://') || value.startsWith('https://');
 
@@ -198,9 +199,32 @@ const mapFeedDoc = (snapshotDoc: { id: string; data: () => Record<string, any> }
     reactions: [],
     reactionCounts: data.reactions || data.reactionCounts || {},
     likeCount: data.likeCount || 0,
+    likedByUsers: data.likedByUsers || {},
+    pollVoters: data.pollVoters || {},
+    reactionUsers: data.reactionUsers || {},
     replyCount: data.replyCount || 0,
     replies: [],
     createdAt: asMillis(data.createdAt),
+  };
+};
+
+
+const mapMasterTagDoc = (snapshotDoc: { id: string; data: () => Record<string, any> }): MasterTagRequest => {
+  const data = snapshotDoc.data();
+  return {
+    id: typeof data.id === 'number' ? data.id : Number.parseInt(snapshotDoc.id.replace(/\D/g, '').slice(-9), 10) || Date.now(),
+    docId: snapshotDoc.id,
+    author: data.author || data.authorName || 'Eduvora Member',
+    avatar: data.avatar || '🧑‍🎓',
+    category: (masterTagCategories as readonly string[]).includes(data.category) ? data.category : 'Query',
+    title: data.title || 'Community request',
+    detail: data.detail || data.body || '',
+    time: data.time || formatCommunityTime(data.createdAt),
+    likes: data.likes || 0,
+    reactions: data.reactions || {},
+    ownerId: data.ownerId,
+    likedByUsers: data.likedByUsers || {},
+    reactionUsers: data.reactionUsers || {},
   };
 };
 
@@ -222,6 +246,8 @@ const mapStatusDoc = (snapshotDoc: { id: string; data: () => Record<string, any>
     pollOptions: Array.isArray(data.pollOptions) ? data.pollOptions : undefined,
     pollVotes: Array.isArray(data.pollVotes) ? data.pollVotes : undefined,
     selectedPollOption: data.selectedPollOption,
+    likedByUsers: data.likedByUsers || {},
+    pollVoters: data.pollVoters || {},
     createdAt: asMillis(data.createdAt),
   };
 };
@@ -239,6 +265,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [statusCards, setStatusCards] = useState<StatusCard[]>(initialStatusCards);
   const [likedStatuses, setLikedStatuses] = useState<number[]>([]);
   const [likedMessages, setLikedMessages] = useState<number[]>([]);
+  const [viewedStatusIds, setViewedStatusIds] = useState<number[]>([]);
   const [imageLightbox, setImageLightbox] = useState<{ src: string; alt: string; mode: 'thumbnail' | 'original' } | null>(null);
   const [sharedStories, setSharedStories] = useState<SharedStory[]>([]);
   const [shareStatusId, setShareStatusId] = useState<number | null>(null);
@@ -360,6 +387,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     ].slice(0, 20);
   }, [messages, notificationPreferences, notificationReads, statusCards, supportTickets]);
   const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
+  const currentUserKey = guardedAuth.currentUser?.uid || authEmail || `profile-${normalizeUsername(profile.username || profile.name) || 'local'}`;
 
   const pushPage = (nextPage: CommunityPage) => {
     setIsNotificationPanelOpen(false);
@@ -466,6 +494,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       const firebaseStatuses = snapshot.docs.map((item) => mapStatusDoc(item));
       setStatusCards(firebaseStatuses.length ? firebaseStatuses : initialStatusCards);
     }, (error) => console.warn('community_status snapshot failed; using local fallback', error));
+  }, [isCommunityAllowed]);
+
+  useEffect(() => {
+    if (!isCommunityAllowed) return undefined;
+    const masterTagsQuery = query(collection(db, COMMUNITY_MASTER_TAGS), orderBy('createdAt', 'desc'), limit(150));
+    return onSnapshot(masterTagsQuery, (snapshot) => {
+      const firebaseMasterTags = snapshot.docs.map((item) => mapMasterTagDoc(item));
+      setMasterTagRequests(firebaseMasterTags.length ? firebaseMasterTags : readJsonArray(MASTER_TAG_STORAGE_KEY, initialMasterTagRequests));
+    }, (error) => console.warn('community_master_tags snapshot failed; using local fallback', error));
   }, [isCommunityAllowed]);
 
   useEffect(() => {
@@ -644,8 +681,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (window.matchMedia('(max-width: 767px)').matches) pushPage('thread');
   };
 
+  const recordStatusView = (statusId: number) => {
+    if (viewedStatusIds.includes(statusId)) return;
+    const targetStatus = statusCards.find((status) => status.id === statusId);
+    setViewedStatusIds((current) => [...current, statusId]);
+    setStatusCards((current) => current.map((status) => status.id === statusId ? { ...status, views: status.views + 1 } : status));
+    if (targetStatus?.docId) updateDoc(doc(db, COMMUNITY_STATUS, targetStatus.docId), { views: increment(1) }).catch((error) => console.warn('Status view update failed', error));
+  };
+
   const openStatusReel = (statusId: number) => {
     setSelectedStatusId(statusId);
+    recordStatusView(statusId);
     setActiveView('status');
     pushPage('statusReel');
   };
@@ -799,41 +845,57 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const toggleStatusLike = (statusId: number) => {
-    const alreadyLiked = likedStatuses.includes(statusId);
+    const targetStatus = statusCards.find((status) => status.id === statusId);
+    const alreadyLiked = Boolean(targetStatus?.likedByUsers?.[currentUserKey]) || likedStatuses.includes(statusId);
     setLikedStatuses((current) => alreadyLiked ? current.filter((id) => id !== statusId) : [...current, statusId]);
-    setStatusCards((current) => current.map((status) => status.id === statusId ? { ...status, likedBy: Math.max(0, status.likedBy + (alreadyLiked ? -1 : 1)) } : status));
+    setStatusCards((current) => current.map((status) => status.id === statusId ? { ...status, likedBy: Math.max(0, status.likedBy + (alreadyLiked ? -1 : 1)), likedByUsers: { ...(status.likedByUsers || {}), [currentUserKey]: !alreadyLiked } } : status));
+    if (targetStatus?.docId) updateDoc(doc(db, COMMUNITY_STATUS, targetStatus.docId), { likedBy: increment(alreadyLiked ? -1 : 1), [`likedByUsers.${currentUserKey}`]: alreadyLiked ? deleteField() : true }).catch((error) => console.warn('Status like update failed', error));
   };
 
   const toggleMessageLike = (messageId: number) => {
-    const alreadyLiked = likedMessages.includes(messageId);
+    const targetMessage = messages.find((message) => message.id === messageId);
+    const alreadyLiked = Boolean(targetMessage?.likedByUsers?.[currentUserKey]) || likedMessages.includes(messageId);
     setLikedMessages((current) => alreadyLiked ? current.filter((id) => id !== messageId) : [...current, messageId]);
-    setMessages((current) => current.map((message) => message.id === messageId ? { ...message, likeCount: Math.max(0, (message.likeCount || 0) + (alreadyLiked ? -1 : 1)) } : message));
+    setMessages((current) => current.map((message) => message.id === messageId ? { ...message, likeCount: Math.max(0, (message.likeCount || 0) + (alreadyLiked ? -1 : 1)), likedByUsers: { ...(message.likedByUsers || {}), [currentUserKey]: !alreadyLiked } } : message));
+    if (targetMessage?.docId) updateDoc(doc(db, COMMUNITY_FEED, targetMessage.docId), { likeCount: increment(alreadyLiked ? -1 : 1), [`likedByUsers.${currentUserKey}`]: alreadyLiked ? deleteField() : true }).catch((error) => console.warn('Message like update failed', error));
   };
 
   const reactToMessage = (message: FeedMessage, emoji: string) => {
-    setMessages((current) => current.map((item) => item.id === message.id ? { ...item, reactionCounts: { ...(item.reactionCounts || {}), [emoji]: ((item.reactionCounts || {})[emoji] || 0) + 1 } } : item));
-    if (message.docId) updateDoc(doc(db, COMMUNITY_FEED, message.docId), { [`reactions.${emoji}`]: increment(1) }).catch((error) => console.warn('Reaction update failed', error));
+    const previousEmoji = message.reactionUsers?.[currentUserKey];
+    if (previousEmoji === emoji) return;
+    setMessages((current) => current.map((item) => item.id === message.id ? { ...item, reactionCounts: { ...(item.reactionCounts || {}), ...(previousEmoji ? { [previousEmoji]: Math.max(0, ((item.reactionCounts || {})[previousEmoji] || 0) - 1) } : {}), [emoji]: ((item.reactionCounts || {})[emoji] || 0) + 1 }, reactionUsers: { ...(item.reactionUsers || {}), [currentUserKey]: emoji } } : item));
+    if (message.docId) updateDoc(doc(db, COMMUNITY_FEED, message.docId), { ...(previousEmoji ? { [`reactions.${previousEmoji}`]: increment(-1) } : {}), [`reactions.${emoji}`]: increment(1), [`reactionUsers.${currentUserKey}`]: emoji }).catch((error) => console.warn('Reaction update failed', error));
   };
 
   const renderReactionStrip = (message: FeedMessage) => <div className="mt-3 flex flex-wrap gap-2">{REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMessage(message, emoji)} title={`${emoji} reactions`} className="rounded-full border border-[#DADCE0] bg-white px-3 py-1.5 text-xs font-black text-[#202124] shadow-[0_1px_2px_rgba(60,64,67,0.16)] transition hover:border-[#1A73E8] hover:text-[#1967D2] hover:shadow-[0_2px_6px_rgba(60,64,67,0.18)]"><span>{emoji}</span> <span>{(message.reactionCounts || {})[emoji] || 0}</span></button>)}</div>;
 
 
   const voteOnStatusPoll = (statusId: number, optionIndex: number) => {
+    const targetStatus = statusCards.find((status) => status.id === statusId);
+    if (!targetStatus?.pollOptions || targetStatus.pollVoters?.[currentUserKey] !== undefined || targetStatus.selectedPollOption !== undefined) return;
     setStatusCards((current) => current.map((status) => {
       if (status.id !== statusId || !status.pollOptions) return status;
-      if (status.selectedPollOption !== undefined) return status;
       const votes = status.pollVotes || status.pollOptions.map(() => 0);
-      return { ...status, selectedPollOption: optionIndex, pollVotes: votes.map((count, index) => index === optionIndex ? count + 1 : count) };
+      return { ...status, selectedPollOption: optionIndex, pollVoters: { ...(status.pollVoters || {}), [currentUserKey]: optionIndex }, pollVotes: votes.map((count, index) => index === optionIndex ? count + 1 : count) };
     }));
+    if (targetStatus.docId) {
+      const votes = targetStatus.pollVotes || targetStatus.pollOptions.map(() => 0);
+      updateDoc(doc(db, COMMUNITY_STATUS, targetStatus.docId), { pollVotes: votes.map((count, index) => index === optionIndex ? count + 1 : count), [`pollVoters.${currentUserKey}`]: optionIndex }).catch((error) => console.warn('Status poll vote update failed', error));
+    }
   };
 
   const voteOnMessagePoll = (messageId: number, optionIndex: number) => {
+    const targetMessage = messages.find((message) => message.id === messageId);
+    if (!targetMessage?.pollOptions || targetMessage.pollVoters?.[currentUserKey] !== undefined || targetMessage.selectedPollOption !== undefined) return;
     setMessages((current) => current.map((message) => {
       if (message.id !== messageId || !message.pollOptions) return message;
-      if (message.selectedPollOption !== undefined) return message;
       const votes = message.pollVotes || message.pollOptions.map(() => 0);
-      return { ...message, selectedPollOption: optionIndex, pollVotes: votes.map((count, index) => index === optionIndex ? count + 1 : count) };
+      return { ...message, selectedPollOption: optionIndex, pollVoters: { ...(message.pollVoters || {}), [currentUserKey]: optionIndex }, pollVotes: votes.map((count, index) => index === optionIndex ? count + 1 : count) };
     }));
+    if (targetMessage.docId) {
+      const votes = targetMessage.pollVotes || targetMessage.pollOptions.map(() => 0);
+      updateDoc(doc(db, COMMUNITY_FEED, targetMessage.docId), { pollVotes: votes.map((count, index) => index === optionIndex ? count + 1 : count), [`pollVoters.${currentUserKey}`]: optionIndex }).catch((error) => console.warn('Message poll vote update failed', error));
+    }
   };
 
   const shareStatusWithCreator = (statusId: number, recipientId: string) => {
@@ -865,6 +927,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setDoc(doc(db, SUPPORT_TICKETS_COLLECTION, supportTicket.id), supportTicket).catch((error) => console.warn('Master tag ticket Firebase write failed', error));
     window.dispatchEvent(new Event('siteSupportTicketsUpdated'));
     setSupportTickets(updatedTickets);
+    addDoc(collection(db, COMMUNITY_MASTER_TAGS), { ...request, createdAt: Date.now(), likedByUsers: {}, reactionUsers: {} }).catch((error) => console.warn('Master tag Firebase write failed; using local fallback', error));
     setMasterTagRequests((current) => [request, ...current]);
     setMasterTagFilter('All');
     setMasterTagsAudienceFilter('mine');
@@ -877,13 +940,19 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const likeMasterTag = (requestId: number) => {
-    const alreadyLiked = likedMasterTagIds.includes(requestId);
+    const targetRequest = masterTagRequests.find((request) => request.id === requestId);
+    const alreadyLiked = Boolean(targetRequest?.likedByUsers?.[currentUserKey]) || likedMasterTagIds.includes(requestId);
     setLikedMasterTagIds((current) => alreadyLiked ? current.filter((id) => id !== requestId) : [...current, requestId]);
-    setMasterTagRequests((current) => current.map((request) => request.id === requestId ? { ...request, likes: Math.max(0, request.likes + (alreadyLiked ? -1 : 1)) } : request));
+    setMasterTagRequests((current) => current.map((request) => request.id === requestId ? { ...request, likes: Math.max(0, request.likes + (alreadyLiked ? -1 : 1)), likedByUsers: { ...(request.likedByUsers || {}), [currentUserKey]: !alreadyLiked } } : request));
+    if (targetRequest?.docId) updateDoc(doc(db, COMMUNITY_MASTER_TAGS, targetRequest.docId), { likes: increment(alreadyLiked ? -1 : 1), [`likedByUsers.${currentUserKey}`]: alreadyLiked ? deleteField() : true }).catch((error) => console.warn('Master tag like update failed', error));
   };
 
   const reactToMasterTag = (requestId: number, emoji: string) => {
-    setMasterTagRequests((current) => current.map((request) => request.id === requestId ? { ...request, reactions: { ...request.reactions, [emoji]: (request.reactions[emoji] || 0) + 1 } } : request));
+    const targetRequest = masterTagRequests.find((request) => request.id === requestId);
+    const previousEmoji = targetRequest?.reactionUsers?.[currentUserKey];
+    if (previousEmoji === emoji) return;
+    setMasterTagRequests((current) => current.map((request) => request.id === requestId ? { ...request, reactions: { ...request.reactions, ...(previousEmoji ? { [previousEmoji]: Math.max(0, (request.reactions[previousEmoji] || 0) - 1) } : {}), [emoji]: (request.reactions[emoji] || 0) + 1 }, reactionUsers: { ...(request.reactionUsers || {}), [currentUserKey]: emoji } } : request));
+    if (targetRequest?.docId) updateDoc(doc(db, COMMUNITY_MASTER_TAGS, targetRequest.docId), { ...(previousEmoji ? { [`reactions.${previousEmoji}`]: increment(-1) } : {}), [`reactions.${emoji}`]: increment(1), [`reactionUsers.${currentUserKey}`]: emoji }).catch((error) => console.warn('Master tag reaction update failed', error));
   };
 
   const currentMasterTagAuthor = profile.name.trim().toLowerCase();
@@ -913,7 +982,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <h3 className="mt-2 text-xl font-black tracking-tight text-[#202124] sm:text-2xl">@Master {request.title}</h3>{masterTagAdminReplies[request.id] && <span className="mt-2 inline-flex rounded-full bg-[#E6F4EA] px-3 py-1 text-[11px] font-black text-[#137333]">Master replied</span>}
             <p className={`mt-2 whitespace-pre-wrap text-sm font-semibold leading-7 text-[#5F6368] ${compact ? 'line-clamp-3' : ''}`}>{request.detail}</p>
             <div className="mt-4 flex flex-wrap items-center gap-2">
-              <button type="button" onClick={() => likeMasterTag(request.id)} className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${likedMasterTagIds.includes(request.id) ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#DADCE0] bg-white text-[#202124] hover:border-[#1A73E8] hover:text-[#1967D2]'}`}>❤️ {request.likes}</button>
+              <button type="button" onClick={() => likeMasterTag(request.id)} className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${(request.likedByUsers?.[currentUserKey] || likedMasterTagIds.includes(request.id)) ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#DADCE0] bg-white text-[#202124] hover:border-[#1A73E8] hover:text-[#1967D2]'}`}>❤️ {request.likes}</button>
               {REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMasterTag(request.id, emoji)} className="rounded-full border border-[#DADCE0] bg-white px-3 py-1.5 text-xs font-black text-[#202124] transition hover:border-[#1A73E8] hover:text-[#1967D2]">{emoji} {request.reactions[emoji] || 0}</button>)}
             </div>
           </div>
@@ -924,7 +993,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const openMasterTagDetail = (requestId: number) => {
     setSelectedMasterTagId(requestId);
-    pushPage('masterTagDetail');
+    if (window.matchMedia('(max-width: 767px)').matches) pushPage('masterTagDetail');
   };
 
   const renderMasterTagStrip = (request: MasterTagRequest) => (
@@ -935,16 +1004,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <p className="mt-1 line-clamp-1 text-xs font-semibold text-[#5F6368]">{request.detail}</p>
       </div>
       <div className="flex shrink-0 items-center gap-1.5" onClick={(event) => event.stopPropagation()}>
-        <button type="button" onClick={() => likeMasterTag(request.id)} className={`rounded-full px-2.5 py-1 text-[11px] font-black transition ${likedMasterTagIds.includes(request.id) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#F8FAFD] text-[#202124] hover:bg-[#E8F0FE]'}`}>❤️ {request.likes}</button>
+        <button type="button" onClick={() => likeMasterTag(request.id)} className={`rounded-full px-2.5 py-1 text-[11px] font-black transition ${(request.likedByUsers?.[currentUserKey] || likedMasterTagIds.includes(request.id)) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#F8FAFD] text-[#202124] hover:bg-[#E8F0FE]'}`}>❤️ {request.likes}</button>
         {REACTION_EMOJIS.slice(0, 3).map((emoji) => <button key={emoji} type="button" onClick={() => reactToMasterTag(request.id, emoji)} className="rounded-full bg-[#F8FAFD] px-2 py-1 text-[11px] font-black text-[#202124] transition hover:bg-[#E8F0FE] hover:text-[#1967D2]">{emoji} {request.reactions[emoji] || 0}</button>)}
       </div>
       <span className="hidden rounded-full bg-[#D3E3FD] px-3 py-1 text-[10px] font-black text-[#174EA6] transition group-hover:bg-[#1A73E8] group-hover:text-white sm:inline">Read</span>
     </article>
   );
 
-  const renderMasterTagDetailPage = () => selectedMasterTag ? (
+  const renderMasterTagDetailPage = (showBackButton = true) => selectedMasterTag ? (
     <div className="mx-auto max-w-4xl space-y-4">
-      <button type="button" onClick={() => setPage('masterTags')} className="rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-sm font-black text-[#5F6368] shadow-sm transition hover:bg-[#E8F0FE]">← Back to Master Tags</button>
+      {showBackButton ? <button type="button" onClick={() => setPage('masterTags')} className="rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-sm font-black text-[#5F6368] shadow-sm transition hover:bg-[#E8F0FE]">← Back to Master Tags</button> : null}
       <section className="overflow-hidden rounded-[2.4rem] border border-[#D2E3FC] bg-white shadow-[0_28px_86px_rgba(26,115,232,0.14)]">
         <div className="bg-gradient-to-br from-[#E8F0FE] via-[#D3E3FD] to-[#C2E7FF] p-6 sm:p-8">
           <div className="flex items-start gap-4"><Avatar value={selectedMasterTag.avatar} size="h-14 w-14" /><div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1967D2]">{selectedMasterTag.category}</p><h2 className="mt-2 text-3xl font-black tracking-tight text-[#202124] sm:text-5xl">@Master {selectedMasterTag.title}</h2><p className="mt-2 text-sm font-bold text-[#5F6368]">{selectedMasterTag.author} • {selectedMasterTag.time}</p></div></div>
@@ -954,7 +1023,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <section className={`rounded-[2rem] border p-5 shadow-[0_12px_34px_rgba(52,168,83,0.10)] ${selectedMasterTagReply?.adminReply ? 'border-[#CEEAD6] bg-[#E6F4EA]' : 'border-[#E0E3EB] bg-[#F8FAFD]'}`}>
             <div className="flex items-start gap-3"><Avatar value="🧑‍💻" size="h-11 w-11" /><div className="min-w-0 flex-1"><div className="flex flex-wrap items-center gap-2"><p className="text-sm font-black text-[#137333]">Master replied</p>{selectedMasterTagReply?.adminReply ? <span className="text-xs font-bold text-[#5F6368]">{formatCommunityReplyTime(selectedMasterTagReply.repliedAt)}</span> : null}</div><p className="mt-2 whitespace-pre-wrap text-sm font-semibold leading-7 text-[#202124] sm:text-base">{selectedMasterTagReply?.adminReply || 'No reply yet'}</p></div></div>
           </section>
-          <div className="rounded-[2rem] border border-[#E0E3EB] bg-white p-4"><p className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-[#1967D2]">React only</p><div className="flex flex-wrap gap-2"><button type="button" onClick={() => likeMasterTag(selectedMasterTag.id)} className={`rounded-full border px-4 py-2 text-sm font-black transition ${likedMasterTagIds.includes(selectedMasterTag.id) ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#DADCE0] bg-white text-[#202124] hover:border-[#1A73E8] hover:text-[#1967D2]'}`}>❤️ {selectedMasterTag.likes}</button>{REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMasterTag(selectedMasterTag.id, emoji)} className="rounded-full border border-[#DADCE0] bg-white px-4 py-2 text-sm font-black text-[#202124] transition hover:border-[#1A73E8] hover:text-[#1967D2]">{emoji} {selectedMasterTag.reactions[emoji] || 0}</button>)}</div></div>
+          <div className="rounded-[2rem] border border-[#E0E3EB] bg-white p-4"><p className="mb-3 text-xs font-black uppercase tracking-[0.24em] text-[#1967D2]">React only</p><div className="flex flex-wrap gap-2"><button type="button" onClick={() => likeMasterTag(selectedMasterTag.id)} className={`rounded-full border px-4 py-2 text-sm font-black transition ${(selectedMasterTag.likedByUsers?.[currentUserKey] || likedMasterTagIds.includes(selectedMasterTag.id)) ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#DADCE0] bg-white text-[#202124] hover:border-[#1A73E8] hover:text-[#1967D2]'}`}>❤️ {selectedMasterTag.likes}</button>{REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMasterTag(selectedMasterTag.id, emoji)} className="rounded-full border border-[#DADCE0] bg-white px-4 py-2 text-sm font-black text-[#202124] transition hover:border-[#1A73E8] hover:text-[#1967D2]">{emoji} {selectedMasterTag.reactions[emoji] || 0}</button>)}</div></div>
         </div>
       </section>
     </div>
@@ -1022,9 +1091,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           {(['All', ...masterTagCategories] as Array<'All' | (typeof masterTagCategories)[number]>).map((category) => <button key={category} type="button" onClick={() => setMasterTagFilter(category)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black transition ${masterTagFilter === category ? 'border-[#1A73E8] bg-[#1A73E8] text-white shadow-[0_10px_28px_rgba(26,115,232,0.24)]' : 'border-[#D2E3FC] bg-white/85 text-[#1967D2] hover:bg-[#E8F0FE]'}`}>{category === 'All' ? 'All tags' : category}</button>)}
         </div>
       </div>
-      <div className="rounded-[2rem] border border-[#E0E3EB] bg-white p-3 shadow-[0_18px_54px_rgba(60,64,67,0.08)] sm:p-4">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-1"><div><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1967D2]">{masterTagsAudienceFilter === 'mine' ? 'Your tags' : 'Students tags'} · {masterTagFilter === 'All' ? 'All categories' : masterTagFilter}</p><h3 className="mt-1 text-2xl font-black text-[#202124]">{filteredMasterTagRequests.length} visible student {filteredMasterTagRequests.length === 1 ? 'tag' : 'tags'}</h3></div><span className="rounded-full bg-[#E8F0FE] px-4 py-2 text-xs font-black text-[#174EA6]">Click row to read</span></div>
-        <div className="space-y-2">{filteredMasterTagRequests.length ? filteredMasterTagRequests.map(renderMasterTagStrip) : <div className="rounded-2xl border border-dashed border-[#C2E7FF] bg-[#F8FAFD] p-8 text-center text-sm font-black text-[#5F6368]">{masterTagsAudienceFilter === 'mine' ? 'No tags submitted by you yet. Use Tag your master to create your first request.' : 'No student tags found for this filter yet.'}</div>}</div>
+      <div className="grid gap-5 md:grid-cols-[minmax(0,0.92fr)_minmax(380px,1.08fr)] md:items-start">
+        <div className="rounded-[2rem] border border-[#E0E3EB] bg-white p-3 shadow-[0_18px_54px_rgba(60,64,67,0.08)] sm:p-4">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 px-1"><div><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1967D2]">{masterTagsAudienceFilter === 'mine' ? 'Your tags' : 'Students tags'} · {masterTagFilter === 'All' ? 'All categories' : masterTagFilter}</p><h3 className="mt-1 text-2xl font-black text-[#202124]">{filteredMasterTagRequests.length} visible student {filteredMasterTagRequests.length === 1 ? 'tag' : 'tags'}</h3></div><span className="rounded-full bg-[#E8F0FE] px-4 py-2 text-xs font-black text-[#174EA6]">Click row to read</span></div>
+          <div className="space-y-2">{filteredMasterTagRequests.length ? filteredMasterTagRequests.map(renderMasterTagStrip) : <div className="rounded-2xl border border-dashed border-[#C2E7FF] bg-[#F8FAFD] p-8 text-center text-sm font-black text-[#5F6368]">{masterTagsAudienceFilter === 'mine' ? 'No tags submitted by you yet. Use Tag your master to create your first request.' : 'No student tags found for this filter yet.'}</div>}</div>
+        </div>
+        <aside className="hidden md:sticky md:top-6 md:block">
+          {selectedMasterTag ? renderMasterTagDetailPage(false) : <div className="rounded-[2rem] border border-dashed border-[#C2E7FF] bg-[#F8FAFD] p-8 text-center text-sm font-black text-[#5F6368]">Select a Master Tag to read the full detail.</div>}
+        </aside>
       </div>
     </div>
   );
@@ -1051,8 +1125,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-black text-[#202124] sm:text-xl">{resolveName(message)}</h2><span className="rounded-full border border-[#D2E3FC] bg-white px-2.5 py-1 text-[11px] font-black text-[#1967D2]">{message.badge}</span><span className="text-xs font-bold text-[#5F6368]">{message.time}</span></div>
             <h3 className="mt-3 text-2xl font-black tracking-tight text-[#202124] lg:text-4xl">{message.title}</h3>
-            <p className="mt-3 whitespace-pre-wrap text-base font-semibold leading-8 text-[#5F6368] sm:text-lg">{message.body}</p>{message.imagePreview ? <div className="mt-5 aspect-square max-w-md overflow-hidden rounded-[2rem] border border-[#C2E7FF] bg-gradient-to-br from-[#E8F0FE] via-[#EDF2FA] to-[#C2E7FF] shadow-inner">{renderUploadedImage(message.imagePreview, message.title, message.imageLayout || 'thumbnail')}</div> : null}{message.pollOptions ? <div className="mt-5 space-y-3 rounded-[1.6rem] border border-[#CEEAD6] bg-[#E6F4EA] p-4">{message.pollOptions.map((option, index) => { const votes = message.pollVotes || message.pollOptions!.map(() => 0); const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0)); const percent = Math.round((votes[index] / total) * 100); const selected = message.selectedPollOption === index; return <button key={option} type="button" onClick={() => voteOnMessagePoll(message.id, index)} className={`relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left font-black transition ${selected ? 'border-[#34A853] bg-white text-[#137333]' : 'border-[#CEEAD6] bg-white text-[#202124] hover:border-[#34A853]'}`}><span className="absolute inset-y-0 left-0 bg-[#CEEAD6]" style={{ width: message.selectedPollOption !== undefined ? `${percent}%` : '0%' }} /><span className="relative flex items-center justify-between"><span>{option}</span>{message.selectedPollOption !== undefined ? <span>{percent}% · {votes[index]}</span> : <span>Vote</span>}</span></button>; })}</div> : null}
-            {renderReactionStrip(message)}<div className="mt-5 flex flex-wrap gap-2"><button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-3 py-1.5 text-sm font-black transition ${likedMessages.includes(message.id) ? 'border-[#F8D7DA] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D2E3FC] bg-[#E8F0FE] text-[#1967D2]'}`}>❤️ {message.likeCount || 0}</button><span className="rounded-full border border-[#D2E3FC] bg-[#E8F0FE] px-3 py-1.5 text-sm font-black text-[#1967D2]">💬 {message.replyCount || message.replies.length}</span></div>
+            <p className="mt-3 whitespace-pre-wrap text-base font-semibold leading-8 text-[#5F6368] sm:text-lg">{message.body}</p>{message.imagePreview ? <div className="mt-5 aspect-square max-w-md overflow-hidden rounded-[2rem] border border-[#C2E7FF] bg-gradient-to-br from-[#E8F0FE] via-[#EDF2FA] to-[#C2E7FF] shadow-inner">{renderUploadedImage(message.imagePreview, message.title, message.imageLayout || 'thumbnail')}</div> : null}{message.pollOptions ? <div className="mt-5 space-y-3 rounded-[1.6rem] border border-[#CEEAD6] bg-[#E6F4EA] p-4">{message.pollOptions.map((option, index) => { const votes = message.pollVotes || message.pollOptions!.map(() => 0); const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0)); const percent = Math.round((votes[index] / total) * 100); const selectedOption = message.pollVoters?.[currentUserKey] ?? message.selectedPollOption; const selected = selectedOption === index; return <button key={option} type="button" onClick={() => voteOnMessagePoll(message.id, index)} className={`relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left font-black transition ${selected ? 'border-[#34A853] bg-white text-[#137333]' : 'border-[#CEEAD6] bg-white text-[#202124] hover:border-[#34A853]'}`}><span className="absolute inset-y-0 left-0 bg-[#CEEAD6]" style={{ width: selectedOption !== undefined ? `${percent}%` : '0%' }} /><span className="relative flex items-center justify-between"><span>{option}</span>{selectedOption !== undefined ? <span>{percent}% · {votes[index]}</span> : <span>Vote</span>}</span></button>; })}</div> : null}
+            {renderReactionStrip(message)}<div className="mt-5 flex flex-wrap gap-2"><button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-3 py-1.5 text-sm font-black transition ${(message.likedByUsers?.[currentUserKey] || likedMessages.includes(message.id)) ? 'border-[#F8D7DA] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D2E3FC] bg-[#E8F0FE] text-[#1967D2]'}`}>❤️ {message.likeCount || 0}</button><span className="rounded-full border border-[#D2E3FC] bg-[#E8F0FE] px-3 py-1.5 text-sm font-black text-[#1967D2]">💬 {message.replyCount || message.replies.length}</span></div>
           </div>
         </div>
         <div className="mt-5 space-y-3 pb-4">{message.replies.map((reply) => <div key={reply.id} className="flex items-start gap-3"><Avatar value={reply.ownerId === 'me' || reply.author === profile.name ? profile.avatar : (reply.avatar || '👤')} size="h-9 w-9" className="mt-1 text-base shadow-[0_8px_24px_rgba(37,99,235,0.12)]" /><div className="max-w-[92%] flex-1 rounded-[1.35rem] rounded-bl-md border border-[#D2E3FC] border-l-4 border-l-[#1A73E8] bg-gradient-to-br from-white via-[#F8FAFD] to-[#EDF2FA] px-4 py-3 shadow-[0_10px_32px_rgba(15,23,42,0.06)]"><div className="flex flex-wrap items-center gap-2"><span className="font-black text-[#202124]">{reply.ownerId === 'me' || reply.author === profile.name ? profile.name : reply.author}</span><span className="text-xs font-bold text-[#5F6368]">{reply.time}</span></div><p className="mt-1 text-sm font-semibold leading-6 text-[#5F6368] sm:text-base">{reply.text}</p></div></div>)}</div>
@@ -1106,7 +1180,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return <textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 1000))} maxLength={1000} placeholder={isStatus ? 'Write your daily text status...' : 'Write your daily creator post...'} className="min-h-[190px] w-full rounded-[1.75rem] border border-[#E0E3EB] bg-white px-5 py-4 text-[#202124] text-base font-semibold leading-7 outline-none transition focus:border-[#1A73E8] focus:bg-white" />;
   };
 
-  const renderStatusPoll = (card: StatusCard) => card.pollOptions ? <div className="mt-4 space-y-2">{card.pollOptions.map((option, index) => { const votes = card.pollVotes || card.pollOptions!.map(() => 0); const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0)); const percent = Math.round((votes[index] / total) * 100); const selected = card.selectedPollOption === index; return <button key={option} type="button" onClick={() => voteOnStatusPoll(card.id, index)} className={`relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left text-sm font-black shadow-inner transition sm:text-base ${selected ? 'border-white bg-white text-[#137333]' : 'border-white/30 bg-white/18 text-white hover:bg-white/25'}`}><span className="absolute inset-y-0 left-0 bg-white/30" style={{ width: card.selectedPollOption !== undefined ? `${percent}%` : '0%' }} /><span className="relative flex items-center justify-between gap-3"><span className="min-w-0 flex-1 truncate"><span className="mr-2 opacity-70">{index + 1}.</span>{option}</span>{card.selectedPollOption !== undefined ? <span className="shrink-0">{percent}% · {votes[index]}</span> : <span className="shrink-0">Vote</span>}</span></button>; })}</div> : null;
+  const renderStatusPoll = (card: StatusCard) => card.pollOptions ? <div className="mt-4 space-y-2">{card.pollOptions.map((option, index) => { const votes = card.pollVotes || card.pollOptions!.map(() => 0); const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0)); const percent = Math.round((votes[index] / total) * 100); const selectedOption = card.pollVoters?.[currentUserKey] ?? card.selectedPollOption; const selected = selectedOption === index; return <button key={option} type="button" onClick={() => voteOnStatusPoll(card.id, index)} className={`relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left text-sm font-black shadow-inner transition sm:text-base ${selected ? 'border-white bg-white text-[#137333]' : 'border-white/30 bg-white/18 text-white hover:bg-white/25'}`}><span className="absolute inset-y-0 left-0 bg-white/30" style={{ width: selectedOption !== undefined ? `${percent}%` : '0%' }} /><span className="relative flex items-center justify-between gap-3"><span className="min-w-0 flex-1 truncate"><span className="mr-2 opacity-70">{index + 1}.</span>{option}</span>{selectedOption !== undefined ? <span className="shrink-0">{percent}% · {votes[index]}</span> : <span className="shrink-0">Vote</span>}</span></button>; })}</div> : null;
 
   const renderStatusReelContent = (card: StatusCard) => {
     const hasDetail = shouldShowStatusDetail(card);
@@ -1145,7 +1219,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 {renderStatusReelContent(card)}
                 <div className="flex items-center justify-between text-sm font-black text-white/80"><span>Swipe for next status</span><span>👁️ {card.views} views</span></div>
               </article>
-              <div className="mx-auto flex flex-row justify-center gap-3 md:flex-col"><button type="button" onClick={() => toggleStatusLike(card.id)} className={`flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 ${likedStatuses.includes(card.id) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#202124]/20 text-white'} shadow-2xl backdrop-blur-xl transition hover:scale-105`}><span>❤️</span><span className="text-[11px] font-black">{card.likedBy}</span></button><button type="button" onClick={() => setShareStatusId(card.id)} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#202124]/20 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>↗️</span><span className="text-[11px] font-black">Share</span></button></div>
+              <div className="mx-auto flex flex-row justify-center gap-3 md:flex-col"><button type="button" onClick={() => toggleStatusLike(card.id)} className={`flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 ${(card.likedByUsers?.[currentUserKey] || likedStatuses.includes(card.id)) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#202124]/20 text-white'} shadow-2xl backdrop-blur-xl transition hover:scale-105`}><span>❤️</span><span className="text-[11px] font-black">{card.likedBy}</span></button><button type="button" onClick={() => setShareStatusId(card.id)} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#202124]/20 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>↗️</span><span className="text-[11px] font-black">Share</span></button></div>
             </div>
           </section>
         ))}
