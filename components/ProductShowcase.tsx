@@ -13,14 +13,18 @@ interface ProductShowcaseProps {
   onBuyNow: (product: ProductWithRating) => void;
   onQuickView: (product: ProductWithRating) => void;
   coupons: Coupon[];
+  variant?: 'default' | 'mobileHome';
+  externalSearchQuery?: string;
+  hideInternalSearch?: boolean;
 }
 
-const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, onQuickView, coupons }) => {
+const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, onQuickView, coupons, variant = 'default', externalSearchQuery = '', hideInternalSearch = false }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('default');
   const [activeFilter, setActiveFilter] = useState<string>('All');
   const sectionRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const isMobileHome = variant === 'mobileHome';
 
   useEffect(() => {
     const observer = new IntersectionObserver(
@@ -57,19 +61,25 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
 
   const displayProducts = products
     .filter(product => {
-        const query = searchQuery.toLowerCase();
+        const queries = [searchQuery, externalSearchQuery]
+            .map(query => query.trim().toLowerCase())
+            .filter(Boolean);
         const filterMatch = activeFilter === 'All'
             || product.category === activeFilter
             || (product.tags && product.tags.includes(activeFilter));
 
-        if (!query) return filterMatch;
+        if (queries.length === 0) return filterMatch;
 
-        return filterMatch && (
-            product.title.toLowerCase().includes(query) ||
-            product.description.toLowerCase().includes(query) ||
-            (product.category && product.category.toLowerCase().includes(query)) ||
-            (product.sku && product.sku.toLowerCase().includes(query)) ||
-            (product.tags && product.tags.some(tag => tag.toLowerCase().includes(query)))
+        const searchableFields = [
+            product.title,
+            product.description,
+            product.category,
+            product.sku,
+            ...(product.tags || []),
+        ].filter((field): field is string => !!field).map(field => field.toLowerCase());
+
+        return filterMatch && queries.every(query =>
+            searchableFields.some(field => field.includes(query))
         );
     })
     .sort((a, b) => {
@@ -86,29 +96,31 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
     <section 
       id="products" 
       ref={sectionRef}
-      className={`py-14 sm:py-24 bg-gradient-to-br from-white via-sky-50/80 to-indigo-100/50 backdrop-blur-xl ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+      className={`${isMobileHome ? 'pb-36 pt-8 sm:py-14' : 'py-14 sm:py-24'} bg-gradient-to-br from-white via-sky-50/80 to-indigo-100/50 backdrop-blur-xl ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
     >
       <div className="container mx-auto px-4 sm:px-6">
-        <div className="mx-auto mb-8 max-w-3xl text-center sm:mb-12 animate-child animate-delay-1">
+        <div className={`${isMobileHome ? 'mb-5 sm:mb-8' : 'mb-8 sm:mb-12'} mx-auto max-w-3xl text-center animate-child animate-delay-1`}>
           <h2 className="text-3xl font-extrabold tracking-tight text-primary sm:text-4xl">All Products</h2>
           <p className="mt-3 text-base text-text-muted sm:mt-4 sm:text-lg">
-            Browse our full catalog or use the search bar to find exactly what you need.
+            {isMobileHome ? 'Browse all premium learning products.' : 'Browse our full catalog or use the search bar to find exactly what you need.'}
           </p>
         </div>
 
         <div className="max-w-4xl mx-auto animate-child animate-delay-2">
           <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-indigo-100/80 bg-white/80 p-3 shadow-sm sm:p-4 md:flex-row md:gap-4">
               {/* Search */}
-              <div className="relative w-full md:w-1/2">
-                <input 
-                  type="text"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  placeholder="Search..."
-                  className="w-full pl-12 pr-4 py-3 border border-indigo-200/80 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition bg-white/70 backdrop-blur-xl"
-                />
-                <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-              </div>
+              {!hideInternalSearch && (
+                <div className="relative w-full md:w-1/2">
+                  <input 
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Search..."
+                    className="w-full pl-12 pr-4 py-3 border border-indigo-200/80 rounded-lg focus:ring-2 focus:ring-primary focus:border-transparent transition bg-white/70 backdrop-blur-xl"
+                  />
+                  <svg className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </div>
+              )}
 
               {/* Sort */}
               <div className="w-full md:w-auto">
@@ -146,7 +158,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
 
         <div 
             ref={gridRef} 
-            className={`mt-10 grid grid-cols-1 gap-5 sm:mt-16 sm:gap-8 md:grid-cols-2 lg:grid-cols-3 lg:gap-10 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+            className={`${isMobileHome ? 'mt-6 gap-4 sm:mt-10 sm:gap-6' : 'mt-10 gap-5 sm:mt-16 sm:gap-8 lg:gap-10'} grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
         >
           {displayProducts.length > 0 ? (
             displayProducts.map((product, index) => (
