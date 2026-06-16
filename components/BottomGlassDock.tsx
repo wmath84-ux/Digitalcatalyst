@@ -6,6 +6,7 @@ interface BottomGlassDockProps {
   purchasedProducts: ProductWithRating[];
   cartCount: number;
   wishlistCount: number;
+  onHomeClick: () => void;
   onOpenBlogModal: () => void;
   onOpenFreeModal: () => void;
   onOpenAnnouncementsModal: () => void;
@@ -21,6 +22,7 @@ interface BottomGlassDockProps {
 }
 
 const dockToneClasses: Record<string, string> = {
+  Home: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
   Store: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
   Purchases: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
   Wishlist: 'from-[#E8F0FE] to-[#D3E3FD] hover:border-[#D2E3FC]',
@@ -35,7 +37,7 @@ const dockToneClasses: Record<string, string> = {
 };
 
 
-export const dockCustomizationItems = ['Store', 'Purchases', 'Wishlist', 'Cart', 'News', 'Community', 'Blog', 'Free', 'Profile', 'Subscriptions'];
+export const dockCustomizationItems = ['Home', 'Store', 'Purchases', 'Wishlist', 'Cart', 'News', 'Community', 'Blog', 'Free', 'Profile', 'Subscriptions'];
 
 export const defaultDockStyle = {
   backgroundColor: '#FBFDFF',
@@ -62,8 +64,9 @@ const hexToRgba = (hex: string, opacityPercent: number) => {
   return `rgba(${red}, ${green}, ${blue}, ${clampPercent(opacityPercent, defaultDockStyle.backgroundOpacity) / 100})`;
 };
 
-const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser, purchasedProducts, cartCount, wishlistCount, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity, authButtonLabel }) => {
+const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser, purchasedProducts, cartCount, wishlistCount, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity, authButtonLabel }) => {
   const defaultItems = useMemo(() => ([
+    { label: 'Home', action: onHomeClick, icon: '🏠', badge: null },
     { label: 'Store', action: onNavigateToAllProducts, icon: '🛍️', badge: null },
     { label: 'Purchases', action: onNavigateToPurchases, icon: '📚', badge: purchasedProducts.length || null },
     { label: 'Wishlist', action: onNavigateToWishlist, icon: '❤️', badge: wishlistCount || null },
@@ -73,10 +76,11 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
     { label: 'Blog', action: onOpenBlogModal, icon: '📝', badge: null },
     { label: 'Free', action: onOpenFreeModal, icon: '🎁', badge: null },
     { label: currentUser ? 'Profile' : authButtonLabel, action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null },
-  ]), [onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenCommunity, onOpenBlogModal, onOpenFreeModal, currentUser, authButtonLabel, onProfileClick]);
+  ]), [onHomeClick, onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenCommunity, onOpenBlogModal, onOpenFreeModal, currentUser, authButtonLabel, onProfileClick]);
   const configuredBase = ((settings.content as any).dockItems || dockCustomizationItems) as string[];
   const configured = configuredBase.filter((label, index, labels) => labels.indexOf(label) === index);
   const map: any = Object.fromEntries(defaultItems.map(i => [i.label, i]));
+  map['Home'] = map['Home'] || { label: 'Home', action: onHomeClick, icon: '🏠', badge: null };
   map['EduCoins'] = map['Profile'] || { label: currentUser ? 'Profile' : authButtonLabel, action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null };
   map['Profile'] = map['Profile'] || { label: currentUser ? 'Profile' : authButtonLabel, action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null };
   map['Subscriptions'] = { label: 'Subscriptions', action: onSubscriptionClick, icon: '💎', badge: null };
