@@ -36,6 +36,7 @@ import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
 import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
+import MobileAppHome from './components/MobileAppHome';
 import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
@@ -888,6 +889,7 @@ const App: React.FC = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>(initialSupportTickets);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [currentView, setCurrentView] = useState('home'); 
+  const [isMobileViewport, setIsMobileViewport] = useState(false);
   const currentViewRef = React.useRef(currentView);
   const historyNavigationRef = React.useRef(false);
   const lastHistoryViewRef = React.useRef(currentView);
@@ -1086,6 +1088,15 @@ const App: React.FC = () => {
   // User Theme State
   const [activeTheme, setActiveTheme] = useState<ThemeName>('default');
 
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const mobileMediaQuery = window.matchMedia('(max-width: 767px)');
+    const handleViewportChange = () => setIsMobileViewport(mobileMediaQuery.matches);
+    handleViewportChange();
+    mobileMediaQuery.addEventListener('change', handleViewportChange);
+    return () => mobileMediaQuery.removeEventListener('change', handleViewportChange);
+  }, []);
 
   useEffect(() => {
     return subscribeEconomySettings(setEconomySettings, (error) => {
@@ -2847,13 +2858,37 @@ const App: React.FC = () => {
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={handleBackToHome} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={handleBackToHome} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
-      case 'home': default: return renderHomePageContent();
+      case 'home': default:
+        return isMobileViewport ? (
+          <MobileAppHome
+            settings={websiteSettings}
+            currentUser={currentUser}
+            featuredProducts={topRatedProducts}
+            purchasedCount={purchasedProducts.length}
+            wishlistCount={wishlist.length}
+            cartCount={cartItemCount}
+            authButtonLabel={authButtonLabel}
+            onNavigateToAllProducts={handleNavigateToAllProducts}
+            onNavigateToPurchases={handleNavigateToPurchases}
+            onNavigateToWishlist={handleNavigateToWishlist}
+            onOpenCart={() => setIsCartOpen(true)}
+            onOpenProfile={handleNavigateToProfile}
+            onOpenBlog={() => openReadingHub('blog')}
+            onOpenAnnouncements={() => openReadingHub('news')}
+            onOpenFreeProducts={handleNavigateToFreeProducts}
+            onOpenSubscription={handleNavigateToSubscription}
+            onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }}
+            onViewProduct={handleViewProduct}
+          />
+        ) : renderHomePageContent();
     }
   };
 
   const appleOpenClass = "animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]";
 
   const renderPage = () => {
+    const isMobileAppHomeActive = currentView === 'home' && isMobileViewport;
+
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={handleBackToHome} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
     if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
@@ -2876,7 +2911,7 @@ const App: React.FC = () => {
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
             <main key={currentView} className={appleOpenClass}>{renderContent()}</main>
             <div className="mobile-app-chrome"><InstallAppButton enabled={canShowInstallPrompt} /></div>
-            <Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} />
+            {!isMobileAppHomeActive && <Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} />}
          </div>
        </ErrorBoundary>
     );
