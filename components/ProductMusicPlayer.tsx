@@ -172,6 +172,19 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
     goToTrack(activeIndex + 1);
   };
 
+  const replayCurrentTrack = () => {
+    const audio = audioRef.current;
+    if (!audio) {
+      setCurrentTime(0);
+      setIsPlaying(true);
+      return;
+    }
+    audio.currentTime = 0;
+    setCurrentTime(0);
+    setIsPlaying(true);
+    audio.play().catch(() => setIsPlaying(false));
+  };
+
   const handleAudioEnded = () => {
     if (!isLooping) {
       goToNext();
@@ -401,7 +414,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
           </div>
 
           <div className={`${isCompactDensity ? 'mt-1.5' : 'mt-4'} flex flex-wrap items-center justify-center gap-1.5`}>
-            <button type="button" onClick={() => setIsLooping(value => !value)} className={`${controlButtonClass} ${isLooping ? 'bg-white text-slate-950 hover:bg-white' : ''}`} aria-label="Toggle repeat">↻</button>
+            <button type="button" onClick={replayCurrentTrack} onDoubleClick={() => setIsLooping(value => !value)} className={`${controlButtonClass} ${isLooping ? 'bg-white text-slate-950 hover:bg-white' : ''}`} aria-label="Replay current track" title="Replay current track · double-click to toggle loop">↻</button>
             {hasMultipleTracks && (
               <>
                 <button type="button" onClick={() => setIsShuffling(value => !value)} className={`${controlButtonClass} ${isShuffling ? 'bg-white text-slate-950 hover:bg-white' : ''}`} aria-label="Toggle shuffle">⌘</button>

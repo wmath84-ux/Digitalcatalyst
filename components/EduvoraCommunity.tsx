@@ -136,6 +136,30 @@ const COMMUNITY_MASTER_TAGS = 'community_master_tags';
 const MAX_STATUS_FILE_BYTES = 1048576;
 const isImageAvatar = (value: string) => value.startsWith('data:') || value.startsWith('http://') || value.startsWith('https://');
 
+const countTruthyValues = (value: unknown): number => {
+  if (!value || typeof value !== 'object') return 0;
+  return Object.values(value as Record<string, unknown>).filter(Boolean).length;
+};
+
+const countEmojiUsers = (value: unknown): Record<string, number> => {
+  if (!value || typeof value !== 'object') return {};
+  return Object.values(value as Record<string, unknown>).reduce<Record<string, number>>((counts, emoji) => {
+    if (typeof emoji === 'string' && emoji) counts[emoji] = (counts[emoji] || 0) + 1;
+    return counts;
+  }, {});
+};
+
+const resolveAccountBackedCount = (storedCount: unknown, accountMap: unknown): number => Math.max(Number(storedCount) || 0, countTruthyValues(accountMap));
+
+const resolveAccountBackedReactions = (storedReactions: unknown, reactionUsers: unknown): Record<string, number> => {
+  const base = storedReactions && typeof storedReactions === 'object' ? { ...(storedReactions as Record<string, number>) } : {};
+  const accountCounts = countEmojiUsers(reactionUsers);
+  Object.entries(accountCounts).forEach(([emoji, count]) => {
+    base[emoji] = Math.max(Number(base[emoji]) || 0, count);
+  });
+  return base;
+};
+
 const createStatusStory = ({
   id,
   type,
@@ -220,8 +244,8 @@ const mapMasterTagDoc = (snapshotDoc: { id: string; data: () => Record<string, a
     title: data.title || 'Community request',
     detail: data.detail || data.body || '',
     time: data.time || formatCommunityTime(data.createdAt),
-    likes: data.likes || 0,
-    reactions: data.reactions || {},
+    likes: resolveAccountBackedCount(data.likes, data.likedByUsers),
+    reactions: resolveAccountBackedReactions(data.reactions, data.reactionUsers),
     ownerId: data.ownerId,
     likedByUsers: data.likedByUsers || {},
     reactionUsers: data.reactionUsers || {},
@@ -943,7 +967,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const targetRequest = masterTagRequests.find((request) => request.id === requestId);
     const alreadyLiked = Boolean(targetRequest?.likedByUsers?.[currentUserKey]) || likedMasterTagIds.includes(requestId);
     setLikedMasterTagIds((current) => alreadyLiked ? current.filter((id) => id !== requestId) : [...current, requestId]);
-    setMasterTagRequests((current) => current.map((request) => request.id === requestId ? { ...request, likes: Math.max(0, request.likes + (alreadyLiked ? -1 : 1)), likedByUsers: { ...(request.likedByUsers || {}), [currentUserKey]: !alreadyLiked } } : request));
+    setMasterTagRequests((current) => current.map((request) => request.id === requestId ? { ...request, likes: Math.max(0, request.likes + (alreadyLiked ? -1 : 1)), likedByUsers: alreadyLiked ? Object.fromEntries(Object.entries(request.likedByUsers || {}).filter(([key]) => key !== currentUserKey)) : { ...(request.likedByUsers || {}), [currentUserKey]: true } } : request));
     if (targetRequest?.docId) updateDoc(doc(db, COMMUNITY_MASTER_TAGS, targetRequest.docId), { likes: increment(alreadyLiked ? -1 : 1), [`likedByUsers.${currentUserKey}`]: alreadyLiked ? deleteField() : true }).catch((error) => console.warn('Master tag like update failed', error));
   };
 
@@ -951,7 +975,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const targetRequest = masterTagRequests.find((request) => request.id === requestId);
     const previousEmoji = targetRequest?.reactionUsers?.[currentUserKey];
     if (previousEmoji === emoji) return;
-    setMasterTagRequests((current) => current.map((request) => request.id === requestId ? { ...request, reactions: { ...request.reactions, ...(previousEmoji ? { [previousEmoji]: Math.max(0, (request.reactions[previousEmoji] || 0) - 1) } : {}), [emoji]: (request.reactions[emoji] || 0) + 1 }, reactionUsers: { ...(request.reactionUsers || {}), [currentUserKey]: emoji } } : request));
+    setMasterTagRequests((current) => current.map((request) => request.id === requestId ? { ...request, reactions: resolveAccountBackedReactions({ ...request.reactions, ...(previousEmoji ? { [previousEmoji]: Math.max(0, (request.reactions[previousEmoji] || 0) - 1) } : {}), [emoji]: (request.reactions[emoji] || 0) + 1 }, { ...(request.reactionUsers || {}), [currentUserKey]: emoji }), reactionUsers: { ...(request.reactionUsers || {}), [currentUserKey]: emoji } } : request));
     if (targetRequest?.docId) updateDoc(doc(db, COMMUNITY_MASTER_TAGS, targetRequest.docId), { ...(previousEmoji ? { [`reactions.${previousEmoji}`]: increment(-1) } : {}), [`reactions.${emoji}`]: increment(1), [`reactionUsers.${currentUserKey}`]: emoji }).catch((error) => console.warn('Master tag reaction update failed', error));
   };
 
