@@ -5,7 +5,7 @@ const LogoIcon = () => (
     <img
         src="/icons/icon-192x192.svg"
         alt="Digital Catalyst logo"
-        className="h-11 w-11 rounded-2xl shadow-[0_10px_28px_rgba(37,99,235,0.22)] ring-1 ring-white/70 sm:h-12 sm:w-12"
+        className="h-9 w-9 rounded-xl shadow-[0_8px_18px_rgba(37,99,235,0.16)] ring-1 ring-white/70 md:h-12 md:w-12 md:rounded-2xl md:shadow-[0_10px_28px_rgba(37,99,235,0.22)]"
     />
 );
 
@@ -115,16 +115,14 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
   };
 
   const authButtonClass = "rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-6 py-2 font-semibold text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90";
-  const mobileAuthButtonClass = "rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-4 py-2 text-sm font-bold text-white shadow-[0_8px_24px_rgba(79,70,229,0.18)] transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90";
-
   return (
     <>
-      <header className="w-full max-w-full border-b border-indigo-100/70 bg-background/90 shadow-[0_12px_34px_rgba(79,70,229,0.08)] backdrop-blur-md sticky top-0 z-50">
-        <div className="container mx-auto w-full max-w-full px-4 py-3 sm:px-6 sm:py-4">
-          <div className="flex min-w-0 items-center justify-between gap-3">
-            <button onClick={onHomeClick} className="flex min-w-0 items-center space-x-3 cursor-pointer overflow-hidden" aria-label="Back to Homepage">
+      <header className="sticky top-0 z-50 w-full max-w-full border-b border-[#D9E7F8] bg-[rgba(248,251,255,0.92)] shadow-none backdrop-blur-[18px] md:border-indigo-100/70 md:bg-background/90 md:shadow-[0_12px_34px_rgba(79,70,229,0.08)] md:backdrop-blur-md">
+        <div className="container mx-auto flex h-16 w-full max-w-full items-center px-3 py-0 md:block md:h-auto md:px-6 md:py-4">
+          <div className="flex min-w-0 flex-1 items-center justify-between gap-2 md:gap-3">
+            <button onClick={onHomeClick} className="flex min-w-0 cursor-pointer items-center space-x-2 overflow-hidden md:space-x-3" aria-label="Back to Homepage">
               <LogoIcon />
-              <span className="truncate text-base font-bold text-primary sm:text-xl">{(settings.content as any).siteName || "Digital Catalyst"}</span>
+              <span className="truncate text-base font-bold text-[#081A45] md:text-xl md:text-primary">{(settings.content as any).siteName || "Digital Catalyst"}</span>
             </button>
             
             <nav className="hidden md:flex items-center justify-center gap-x-7 lg:gap-x-9">
@@ -178,18 +176,8 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                         </button>
                     )}
                 </div>
-                <div className="flex items-center space-x-3 md:hidden">
-                    {settings.features.showFavourites && (
-                        <button onClick={onNavigateToWishlist} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your wishlist with ${wishlistCount} items`}>
-                            <HeartIcon />
-                            {wishlistCount > 0 && (
-                                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                    {wishlistCount}
-                                </span>
-                            )}
-                        </button>
-                    )}
-                    <button onClick={onCartClick} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your cart with ${cartItemCount} items`}>
+                <div className="flex items-center gap-2 md:hidden">
+                    <button onClick={onCartClick} className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#D9E7F8] bg-white/55 text-[#081A45] transition-colors duration-300 hover:bg-white/80" aria-label={`View your cart with ${cartItemCount} items`}>
                         <CartIcon />
                         {cartItemCount > 0 && (
                             <span className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
@@ -199,7 +187,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                     </button>
                     {currentUser ? (
                         <div className="relative">
-                            <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white shadow-[0_8px_24px_rgba(79,70,229,0.18)]" aria-label="Open account menu">
+                            <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex h-10 w-10 items-center justify-center rounded-full border border-[#D9E7F8] bg-white/55 text-[#081A45] transition-colors duration-300 hover:bg-white/80" aria-label="Open account menu">
                                 <UserIcon />
                             </button>
                             {isUserMenuOpen && (
@@ -215,30 +203,13 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                             )}
                         </div>
                     ) : (
-                        <button onClick={onLoginClick} className={mobileAuthButtonClass}>
-                            {authButtonLabel}
+                        <button onClick={onLoginClick} className="flex h-10 w-10 items-center justify-center rounded-full border border-[#D9E7F8] bg-white/55 text-[#081A45] transition-colors duration-300 hover:bg-white/80" aria-label={authButtonLabel}>
+                            <UserIcon />
                         </button>
                     )}
                 </div>
             </div>
           </div>
-          <nav className="mt-3 flex gap-2 overflow-x-auto pb-1 md:hidden" aria-label="Mobile primary navigation">
-            {navItems.map((item) => (
-              <button
-                key={item.name}
-                onClick={item.action}
-                className="shrink-0 rounded-full border border-indigo-100 bg-white/80 px-4 py-2 text-sm font-bold text-text-muted shadow-[0_8px_24px_rgba(79,70,229,0.08)] backdrop-blur-xl transition active:scale-95"
-              >
-                {item.name}
-              </button>
-            ))}
-            <button
-              onClick={onNavigateToPurchases}
-              className="shrink-0 rounded-full border border-indigo-100 bg-white/80 px-4 py-2 text-sm font-bold text-text-muted shadow-[0_8px_24px_rgba(79,70,229,0.08)] backdrop-blur-xl transition active:scale-95"
-            >
-              Purchases
-            </button>
-          </nav>
         </div>
       </header>
 
