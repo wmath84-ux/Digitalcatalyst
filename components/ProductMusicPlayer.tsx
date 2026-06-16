@@ -256,7 +256,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
   const controlButtonClass = `${isCompactDensity ? 'h-9 w-9 text-sm' : 'h-11 w-11'} grid shrink-0 place-items-center rounded-full bg-[#071a32] text-[#d7fbff] shadow-[0_12px_30px_rgba(0,229,255,0.08)] transition hover:bg-[#0b2548]`;
   const cardSizeClass = isFull
     ? isCompactDensity
-      ? 'h-[clamp(7.25rem,min(44dvw,30dvh),11.25rem)] max-h-[42dvh] w-[clamp(7.25rem,min(44dvw,30dvh),11.25rem)] max-w-[62vw]'
+      ? 'h-[clamp(12.5rem,min(78dvw,39dvh),18rem)] max-h-[42dvh] w-[clamp(12.5rem,min(78dvw,39dvh),18rem)] max-w-[86vw]'
       : 'h-40 w-40 sm:h-52 sm:w-52 lg:h-56 lg:w-56 xl:h-64 xl:w-64'
     : 'h-32 w-32';
   const shellClass = isFull
@@ -320,7 +320,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
           </div>
         </div>
 
-        <div className={`${isFull ? isCompactDensity ? 'flex min-h-0 flex-1 items-center justify-center gap-1.5 overflow-hidden py-0' : 'flex flex-1 items-center justify-center gap-4 py-5 sm:gap-6 lg:min-h-[14rem] xl:min-h-[18rem]' : 'flex items-center justify-center gap-3 py-1'} overflow-hidden`} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} title="Swipe left or right to switch audio">
+        <div className={`${isFull ? isCompactDensity ? 'flex min-h-0 flex-1 items-start justify-center gap-1.5 overflow-hidden pt-1 pb-0' : 'flex flex-1 items-center justify-center gap-4 py-5 sm:gap-6 lg:min-h-[14rem] xl:min-h-[18rem]' : 'flex items-center justify-center gap-3 py-1'} overflow-hidden`} onPointerDown={handlePointerDown} onPointerUp={handlePointerUp} title="Swipe left or right to switch audio">
           {tracks.map((track, index) => {
             const distance = Math.abs(index - activeIndex);
             const circularDistance = Math.min(distance, tracks.length - distance);
