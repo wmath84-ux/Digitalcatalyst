@@ -2812,14 +2812,21 @@ const App: React.FC = () => {
       </div>
   );
 
-  const renderHomePageContent = () => (
+  const renderHomePageContent = () => {
+      const visibleHomeSections = websiteSettings.layout.filter(section => section.visible);
+      const topRatedSection = visibleHomeSections.find(section => section.id === 'topRated');
+      const hasPurchasedSection = visibleHomeSections.some(section => section.id === 'purchased');
+      const orderedHomeSections = topRatedSection && hasPurchasedSection
+          ? visibleHomeSections.filter(section => section.id !== 'topRated').flatMap(section => section.id === 'purchased' ? [section, topRatedSection] : [section])
+          : visibleHomeSections;
+
+      return (
       <>
-          {websiteSettings.layout.map(section => {
-              if (!section.visible) return null;
+          {orderedHomeSections.map(section => {
               switch(section.id) {
                   case 'hero': return <React.Fragment key={section.id}><div className="mobile-home-secondary"><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></div></React.Fragment>;
                   case 'purchased': return purchasedProducts.length > 0 && <PurchasedProducts settings={websiteSettings} key={section.id} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
-                  case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
+                  case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} subtitle="A quick look at the courses learners rate highest right now." products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} variant="mobileHome" />;
                   case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
                   case 'services': return <div className="mobile-home-secondary"><Services settings={websiteSettings} key={section.id} services={websiteSettings.content.services} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} /></div>;
                   case 'news': return <div className="mobile-home-secondary"><LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Daily Reading Hub'} articles={websiteSettings.content.newsArticles.filter(article => article.type === 'news')} onReadMoreClick={handleViewBlogArticle} onOpenHub={() => openReadingHub('news')} /></div>;
@@ -2831,7 +2838,8 @@ const App: React.FC = () => {
               }
           })}
       </>
-  );
+      );
+  };
 
   const renderContent = () => {
     switch (currentView) {
