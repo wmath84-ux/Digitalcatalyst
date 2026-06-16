@@ -2,6 +2,7 @@
 // FIX: Corrected the React import statement by removing the erroneous 'a' and fixing the destructuring syntax.
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import Header from './components/Header';
+import MobileAppHome from './components/MobileAppHome';
 import Hero from './components/Hero';
 import ProductShowcase from './components/ProductShowcase';
 import Services, { ServiceItem } from './components/Services';
@@ -36,7 +37,6 @@ import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
 import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
-import MobileAppHome from './components/MobileAppHome';
 import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
