@@ -22,25 +22,24 @@ interface BottomGlassDockProps {
 }
 
 const dockToneClasses: Record<string, string> = {
-  Home: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
-  Store: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
-  Purchases: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
-  Wishlist: 'from-[#E8F0FE] to-[#D3E3FD] hover:border-[#D2E3FC]',
-  Cart: 'from-[#FEF7E0] to-[#E8F0FE] hover:border-[#D2E3FC]',
-  News: 'from-[#E8F0FE] to-[#D3E3FD] hover:border-[#D2E3FC]',
-  Blog: 'from-[#E8F0FE] to-[#D3E3FD] hover:border-[#D2E3FC]',
-  Free: 'from-[#E6F4EA] to-[#E8F0FE] hover:border-[#CEEAD6]',
-  Profile: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
-  Login: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
-  Subscriptions: 'from-[#E8F0FE] to-[#D3E3FD] hover:border-[#D2E3FC]',
-  Community: 'from-[#E8F0FE] to-[#C2E7FF] hover:border-[#C2E7FF]',
+  Store: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
+  Purchases: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
+  Wishlist: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border)] hover:border-[var(--mobile-border-active)]',
+  Cart: 'from-[#FEF7E0] to-[var(--mobile-bg-soft)] hover:border-[var(--mobile-border-active)]',
+  News: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border)] hover:border-[var(--mobile-border-active)]',
+  Blog: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border)] hover:border-[var(--mobile-border-active)]',
+  Free: 'from-[#E6F4EA] to-[var(--mobile-bg-soft)] hover:border-[#CEEAD6]',
+  Profile: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
+  Login: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
+  Subscriptions: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border)] hover:border-[var(--mobile-border-active)]',
+  Community: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
 };
 
 
 export const dockCustomizationItems = ['Home', 'Store', 'Purchases', 'Wishlist', 'Cart', 'News', 'Community', 'Blog', 'Free', 'Profile', 'Subscriptions'];
 
 export const defaultDockStyle = {
-  backgroundColor: '#FBFDFF',
+  backgroundColor: '#FFFFFF',
   backgroundOpacity: 92,
   itemOpacity: 96,
   accentOpacity: 22,
@@ -96,18 +95,18 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
 
   return (
     <div className="fixed inset-x-0 bottom-2 md:bottom-4 z-[65] flex justify-center pointer-events-none px-3">
-      <div className="pointer-events-auto group relative max-w-[95vw] overflow-hidden rounded-[2rem] border border-[var(--border-soft)] shadow-[var(--shadow-blue)] ring-1 ring-[var(--border-active)] backdrop-blur-3xl transition-all duration-500 hover:-translate-y-0.5 data-[hidden=true]:translate-y-24" id="main-bottom-dock" style={{ backgroundColor: dockBackground, minHeight: dockHeight, padding: dockPadding }}>
-        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(26,115,232,0.12),transparent_30%),radial-gradient(circle_at_82%_10%,rgba(194,231,255,0.40),transparent_30%),linear-gradient(180deg,rgba(232,240,254,0.42),rgba(255,255,255,0.16))]" />
-        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[#C2E7FF] to-transparent" />
+      <div className="pointer-events-auto group relative max-w-[95vw] overflow-hidden rounded-[2rem] border border-[var(--mobile-border)] shadow-[var(--shadow-blue)] ring-1 ring-[var(--mobile-border-active)] backdrop-blur-3xl transition-all duration-500 hover:-translate-y-0.5 data-[hidden=true]:translate-y-24" id="main-bottom-dock" style={{ backgroundColor: dockBackground, minHeight: dockHeight, padding: dockPadding }}>
+        <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(23,105,255,0.12),transparent_30%),radial-gradient(circle_at_82%_10%,rgba(191,215,255,0.46),transparent_30%),linear-gradient(180deg,rgba(238,246,255,0.52),rgba(255,255,255,0.18))]" />
+        <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--mobile-border-active)] to-transparent" />
         <div className="relative flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
           {items.map((item) => {
-            const tone = dockToneClasses[item.label] || 'from-[#F8FAFD] to-[#E8F0FE] hover:border-[#D2E3FC]';
+            const tone = dockToneClasses[item.label] || 'from-[var(--mobile-bg)] to-[var(--mobile-bg-soft)] hover:border-[var(--mobile-border-active)]';
             return (
-              <button key={item.label} onClick={item.action} className={`group/item relative flex min-w-[86px] flex-col items-center rounded-2xl border border-[var(--border-soft)] text-[var(--text-body)] shadow-[var(--shadow-soft)] transition duration-300 hover:-translate-y-1 hover:border-[var(--border-active)] hover:text-[var(--primary)] md:min-w-[92px] ${tone}`} style={{ backgroundColor: itemBackground, padding: Math.max(8, dockPadding - 2) }}>
+              <button key={item.label} onClick={item.action} className={`group/item relative flex min-w-[86px] flex-col items-center rounded-2xl border border-[var(--mobile-border)] text-[var(--mobile-body)] shadow-[var(--shadow-soft)] transition duration-300 hover:-translate-y-1 hover:border-[var(--mobile-border-active)] hover:text-[var(--mobile-primary)] md:min-w-[92px] ${tone}`} style={{ backgroundColor: itemBackground, padding: Math.max(8, dockPadding - 2) }}>
                 <span className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${tone.split(' hover:')[0]} transition duration-300 group-hover/item:opacity-75`} style={{ opacity: accentOpacity }} />
-                <span className="relative flex items-center justify-center rounded-2xl border border-[var(--border-soft)] bg-[var(--tag-blue)] shadow-inner transition duration-300 group-hover/item:scale-110 group-hover/item:bg-[var(--bg-section)]" style={{ width: iconSize, height: iconSize, fontSize: Math.max(16, iconSize * 0.55) }}>{item.icon}</span>
-                <span className="relative mt-1.5 font-black tracking-wide text-[var(--text-body)] transition group-hover/item:text-[var(--primary)]" style={{ fontSize: labelSize }}>{item.label}</span>
-                {item.badge ? <span className="absolute -right-1 -top-1 rounded-full border border-[#D2E3FC] bg-gradient-to-r from-[#1A73E8] to-[#174EA6] px-1.5 py-0.5 text-[10px] font-black text-white shadow-[0_8px_20px_rgba(79,70,229,0.38)]">{item.badge}</span> : null}
+                <span className="relative flex items-center justify-center rounded-2xl border border-[var(--mobile-border)] bg-[var(--mobile-bg-soft)] shadow-inner transition duration-300 group-hover/item:scale-110 group-hover/item:bg-[var(--mobile-card)]" style={{ width: iconSize, height: iconSize, fontSize: Math.max(16, iconSize * 0.55) }}>{item.icon}</span>
+                <span className="relative mt-1.5 font-black tracking-wide text-[var(--mobile-body)] transition group-hover/item:text-[var(--mobile-primary)]" style={{ fontSize: labelSize }}>{item.label}</span>
+                {item.badge ? <span className="absolute -right-1 -top-1 rounded-full border border-[var(--mobile-border-active)] bg-gradient-to-r from-[var(--mobile-primary)] to-[var(--mobile-violet)] px-1.5 py-0.5 text-[10px] font-black text-white shadow-[0_8px_20px_rgba(79,70,229,0.38)]">{item.badge}</span> : null}
               </button>
             );
           })}

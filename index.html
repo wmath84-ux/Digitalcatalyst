@@ -120,6 +120,17 @@
 
       :root {
         --apple-fluid-curve: cubic-bezier(0.16, 1, 0.3, 1);
+        --mobile-bg: #F8FBFF;
+        --mobile-bg-soft: #EEF6FF;
+        --mobile-card: #FFFFFF;
+        --mobile-heading: #081A45;
+        --mobile-body: #536178;
+        --mobile-muted: #7C879A;
+        --mobile-primary: #1769FF;
+        --mobile-violet: #7B61FF;
+        --mobile-border: #D9E7F8;
+        --mobile-border-active: #BFD7FF;
+        --mobile-page-gradient: radial-gradient(circle at 12% 8%, rgba(191, 215, 255, 0.72), transparent 32%), radial-gradient(circle at 88% 10%, rgba(123, 97, 255, 0.18), transparent 28%), linear-gradient(180deg, var(--mobile-bg) 0%, var(--mobile-bg-soft) 100%);
       }
 
       @keyframes apple-app-open {
@@ -710,6 +721,21 @@
       .common-modal-content, .coming-soon-content, .share-modal-content, .cart-sidebar { background: rgba(251,253,255,0.94) !important; border: 1px solid var(--border-soft) !important; }
       @media (max-width: 767px) {
         /* Keep Home page sections visible on mobile; only hide the optional app chrome. */
+        .mobile-app-home {
+          background: var(--mobile-page-gradient) fixed !important;
+          color: var(--mobile-body) !important;
+          min-height: 100dvh;
+        }
+        .mobile-app-home :where(h1, h2) { color: var(--mobile-heading) !important; }
+        .mobile-app-home :where(h3, h4, h5, h6) { color: var(--mobile-heading) !important; }
+        .mobile-app-home :where(p, li, dd, small) { color: var(--mobile-body) !important; }
+        .mobile-app-home :where(article, form, dialog, [class*="rounded-2xl"], [class*="rounded-3xl"], [class*="rounded-[2"]):not(.no-premium-card) {
+          background-color: var(--mobile-card);
+          border-color: var(--mobile-border) !important;
+        }
+        .mobile-app-home :where([class*="text-slate-500"], [class*="text-gray-500"], [class*="text-slate-400"], [class*="text-gray-400"]) { color: var(--mobile-muted) !important; }
+        .mobile-app-home :where([class*="text-blue"], [class*="text-indigo"], [class*="text-cyan"], [class*="text-purple"]) { color: var(--mobile-primary) !important; }
+        .mobile-app-home :where([class*="border-slate"], [class*="border-gray"], [class*="border-blue"], [class*="border-indigo"], [class*="border-cyan"], [class*="border-purple"]) { border-color: var(--mobile-border) !important; }
         .mobile-app-chrome { display: none !important; }
         .mobile-home-secondary { display: block !important; }
         .mobile-home-secondary :where(section) { scroll-margin-top: 1rem; }
