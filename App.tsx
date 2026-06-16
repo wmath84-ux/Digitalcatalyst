@@ -2813,36 +2813,21 @@ const App: React.FC = () => {
       </div>
   );
 
-  const renderMobileHomePurchaseEmptyCard = () => (
-      <section className="bg-blue-50 py-8">
-          <div className="container mx-auto px-4">
-              <div className="rounded-2xl border border-dashed border-indigo-200 bg-white/80 p-5 text-center shadow-[0_8px_30px_rgba(79,70,229,0.08)]">
-                  <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-full bg-indigo-50 text-2xl">📚</div>
-                  <h2 className="text-lg font-bold text-primary">Start your learning library</h2>
-                  <p className="mt-1 text-sm text-text-muted">Log in to restore purchases, or explore products to unlock your first course.</p>
-                  <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
-                      {!currentUser && (
-                          <button onClick={handleNavigateToAuth} className="w-full rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition-opacity hover:opacity-90">
-                              Log in
-                          </button>
-                      )}
-                      <button onClick={handleNavigateToAllProducts} className="w-full rounded-xl border border-indigo-100 bg-white px-4 py-2.5 text-sm font-bold text-indigo-700 transition-colors hover:bg-indigo-50">
-                          Explore products
-                      </button>
-                  </div>
-              </div>
-          </div>
-      </section>
-  );
+  const renderHomePageContent = () => {
+      const visibleHomeSections = websiteSettings.layout.filter(section => section.visible);
+      const topRatedSection = visibleHomeSections.find(section => section.id === 'topRated');
+      const hasPurchasedSection = visibleHomeSections.some(section => section.id === 'purchased');
+      const orderedHomeSections = topRatedSection && hasPurchasedSection
+          ? visibleHomeSections.filter(section => section.id !== 'topRated').flatMap(section => section.id === 'purchased' ? [section, topRatedSection] : [section])
+          : visibleHomeSections;
 
-  const renderHomePageContent = () => (
+      return (
       <>
-          {websiteSettings.layout.map(section => {
-              if (!section.visible) return null;
+          {orderedHomeSections.map(section => {
               switch(section.id) {
                   case 'hero': return <React.Fragment key={section.id}><div className="mobile-home-secondary"><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></div></React.Fragment>;
-                  case 'purchased': return purchasedProducts.length > 0 ? <PurchasedProducts settings={websiteSettings} key={section.id} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} variant="mobileHome" /> : <React.Fragment key={section.id}>{renderMobileHomePurchaseEmptyCard()}</React.Fragment>;
-                  case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
+                  case 'purchased': return purchasedProducts.length > 0 && <PurchasedProducts settings={websiteSettings} key={section.id} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
+                  case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} subtitle="A quick look at the courses learners rate highest right now." products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} variant="mobileHome" />;
                   case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
                   case 'services': return <div className="mobile-home-secondary"><Services settings={websiteSettings} key={section.id} services={websiteSettings.content.services} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} /></div>;
                   case 'news': return <div className="mobile-home-secondary"><LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Daily Reading Hub'} articles={websiteSettings.content.newsArticles.filter(article => article.type === 'news')} onReadMoreClick={handleViewBlogArticle} onOpenHub={() => openReadingHub('news')} /></div>;
@@ -2854,7 +2839,8 @@ const App: React.FC = () => {
               }
           })}
       </>
-  );
+      );
+  };
 
   const renderContent = () => {
     switch (currentView) {
