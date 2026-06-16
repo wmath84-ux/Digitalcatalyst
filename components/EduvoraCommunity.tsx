@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
-import { addDoc, collection, deleteField, doc, increment, limit, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
+import { addDoc, collection, deleteDoc, deleteField, doc, increment, limit, onSnapshot, orderBy, query, setDoc, updateDoc, where } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { db } from '../firebase';
 
@@ -34,6 +34,9 @@ const COMMUNITY_NOTIFICATION_READ_KEY = 'eduvoraCommunityNotificationReads';
 const COMMUNITY_PROFILE_STORAGE_KEY = 'eduvoraCommunityProfile';
 const COMMUNITY_PRIVACY_STORAGE_KEY = 'eduvoraCommunityPrivacySettings';
 const COMMUNITY_NOTIFICATION_PREFS_KEY = 'eduvoraCommunityNotificationPreferences';
+const COMMUNITY_CREATOR_QUOTA_KEY = 'eduvoraCommunityCreatorQuota';
+const COMMUNITY_STATUS_QUOTA_KEY = 'eduvoraCommunityStatusQuota';
+const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 const PROFILE_BIO_MAX_LENGTH = 180;
 
 
@@ -308,7 +311,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [eduCoins, setEduCoins] = useState(0);
   const [postType, setPostType] = useState<PostType>('text');
   const [statusType, setStatusType] = useState<PostType>('text');
-  const [creatorQuota, setCreatorQuota] = useState<Record<string, string[]>>({ [todayKey()]: [] });
+  const [creatorQuota, setCreatorQuota] = useState<Record<string, string[]>>(() => readJsonObject<Record<string, string[]>>(COMMUNITY_CREATOR_QUOTA_KEY, { [todayKey()]: [] }));
+  const [statusQuota, setStatusQuota] = useState<Record<string, string[]>>(() => readJsonObject<Record<string, string[]>>(COMMUNITY_STATUS_QUOTA_KEY, { [todayKey()]: [] }));
   const [followedIds, setFollowedIds] = useState<string[]>(['riya', 'meera']);
   const [networkTab, setNetworkTab] = useState<'mutual' | 'followers' | 'following' | 'forYou'>('following');
   const [networkSearch, setNetworkSearch] = useState('');
@@ -343,12 +347,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const replyComposerRef = useRef<HTMLDivElement>(null);
   const notificationPanelRef = useRef<HTMLDivElement>(null);
   const notificationDropdownRef = useRef<HTMLDivElement>(null);
+  const currentUserKey = guardedAuth.currentUser?.uid || authEmail || `profile-${normalizeUsername(profile.username || profile.name) || 'local'}`;
+  const isOwnCommunityId = (id?: string) => id === currentUserKey || id === 'me';
   const selectedMessage = messages.find((message) => message.id === selectedMessageId) || messages[0];
   const selectedStatus = statusCards.find((status) => status.id === selectedStatusId) || statusCards[0];
   const allCreators = useMemo(() => creators.map((creator) => creator.id === 'me' ? { ...creator, name: profile.name, username: profile.username, avatar: profile.avatar } : creator), [profile]);
-  const followingMessages = messages.filter((message) => message.creatorId && (followedIds.includes(message.creatorId) || message.creatorId === 'me'));
-  const isPostUsedToday = (creatorQuota[todayKey()] || []).length > 0;
-  const myStatuses = statusCards.filter((status) => status.ownerId === 'me');
+  const followingMessages = messages.filter((message) => message.creatorId && (followedIds.includes(message.creatorId) || isOwnCommunityId(message.creatorId)));
+  const usedCreatorTypesToday = creatorQuota[todayKey()] || [];
+  const usedStatusTypesToday = statusQuota[todayKey()] || [];
+  const isCreatorTypeUsedToday = usedCreatorTypesToday.includes(postType);
+  const isStatusTypeUsedToday = usedStatusTypesToday.includes(statusType);
+  const myStatuses = statusCards.filter((status) => isOwnCommunityId(status.ownerId));
   const chatCreators = allCreators.filter((creator) => sharedStories.some((story) => story.recipientId === creator.id));
   const activeChatCreator = allCreators.find((creator) => creator.id === selectedChatId) || chatCreators[0] || allCreators[0];
   const activeChatStories = sharedStories.filter((story) => story.recipientId === activeChatCreator?.id);
@@ -356,10 +365,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const profileStats = useMemo(() => ({
     coinBalance: eduCoins,
     following: followedIds.length,
-    creatorPosts: messages.filter((message) => message.creatorId === 'me').length,
+    creatorPosts: messages.filter((message) => isOwnCommunityId(message.creatorId)).length,
     myStatuses: myStatuses.length,
-    masterTags: masterTagRequests.filter((request) => request.ownerId === 'me' || request.author === profile.name).length,
-    repliesGiven: messages.reduce((count, message) => count + message.replies.filter((reply) => reply.ownerId === 'me' || reply.author === profile.name).length, 0),
+    masterTags: masterTagRequests.filter((request) => isOwnCommunityId(request.ownerId) || request.author === profile.name).length,
+    repliesGiven: messages.reduce((count, message) => count + message.replies.filter((reply) => isOwnCommunityId(reply.ownerId) || reply.author === profile.name).length, 0),
   }), [eduCoins, followedIds.length, masterTagRequests, messages, myStatuses.length, profile.name]);
 
   const notifications = useMemo<CommunityNotification[]>(() => {
@@ -383,7 +392,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       targetPage: 'masterTagDetail' as CommunityPage,
       targetId: ticket.communityThreadId,
     }));
-    const statusAlerts = statusCards.filter((status) => status.likedBy > 0 || (status.views > 0 && status.ownerId === 'me')).slice(0, 5).map((status) => ({
+    const statusAlerts = statusCards.filter((status) => status.likedBy > 0 || (status.views > 0 && isOwnCommunityId(status.ownerId))).slice(0, 5).map((status) => ({
       id: `status-${status.id}-${status.likedBy}-${status.views}`,
       title: status.likedBy > 0 ? 'Your status is getting love' : 'Your status has new views',
       body: `${status.title} · ❤️ ${status.likedBy} · 👁️ ${status.views}`,
@@ -393,7 +402,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       targetPage: 'statusReel' as CommunityPage,
       targetId: status.id,
     }));
-    const creatorAlerts = messages.filter((message) => message.creatorId && message.creatorId !== 'me').slice(0, 4).map((message) => ({
+    const creatorAlerts = messages.filter((message) => message.creatorId && !isOwnCommunityId(message.creatorId)).slice(0, 4).map((message) => ({
       id: `creator-${message.id}`,
       title: `${message.admin} posted in community`,
       body: message.title,
@@ -411,7 +420,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     ].slice(0, 20);
   }, [messages, notificationPreferences, notificationReads, statusCards, supportTickets]);
   const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
-  const currentUserKey = guardedAuth.currentUser?.uid || authEmail || `profile-${normalizeUsername(profile.username || profile.name) || 'local'}`;
 
   const pushPage = (nextPage: CommunityPage) => {
     setIsNotificationPanelOpen(false);
@@ -504,7 +512,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   useEffect(() => {
     if (!isCommunityAllowed) return undefined;
-    const feedQuery = query(collection(db, COMMUNITY_FEED), orderBy('createdAt', 'desc'), limit(15));
+    const feedQuery = query(collection(db, COMMUNITY_FEED), orderBy('createdAt', 'desc'), limit(150));
     return onSnapshot(feedQuery, (snapshot) => {
       const firebaseMessages = snapshot.docs.map((item) => mapFeedDoc(item));
       setMessages(firebaseMessages.length ? firebaseMessages : initialMessages);
@@ -515,7 +523,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (!isCommunityAllowed) return undefined;
     const statusQuery = query(collection(db, COMMUNITY_STATUS), where('createdAt', '>', Date.now() - 86400000), orderBy('createdAt', 'desc'), limit(150));
     return onSnapshot(statusQuery, (snapshot) => {
-      const firebaseStatuses = snapshot.docs.map((item) => mapStatusDoc(item));
+      snapshot.docs.forEach((item) => {
+        const createdAt = asMillis(item.data().createdAt);
+        if (createdAt < Date.now() - STORY_TTL_MS) deleteDoc(doc(db, COMMUNITY_STATUS, item.id)).catch((error) => console.warn('Expired status cleanup failed', error));
+      });
+      const firebaseStatuses = snapshot.docs.map((item) => mapStatusDoc(item)).filter((status) => (status.createdAt || Date.now()) > Date.now() - STORY_TTL_MS);
       setStatusCards(firebaseStatuses.length ? firebaseStatuses : initialStatusCards);
     }, (error) => console.warn('community_status snapshot failed; using local fallback', error));
   }, [isCommunityAllowed]);
@@ -679,8 +691,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const resolveAvatar = (message: FeedMessage) => message.creatorId === 'me' ? profile.avatar : message.avatar;
-  const resolveName = (message: FeedMessage) => message.creatorId === 'me' ? profile.name : message.admin;
+  const resolveAvatar = (message: FeedMessage) => isOwnCommunityId(message.creatorId) ? profile.avatar : message.avatar;
+  const resolveName = (message: FeedMessage) => isOwnCommunityId(message.creatorId) ? profile.name : message.admin;
 
   const Avatar: React.FC<{ value: string; size?: string; className?: string }> = ({ value, size = 'h-12 w-12', className = '' }) => (
     <div className={`${size} shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-[#E8F0FE] via-[#D3E3FD] to-[#C2E7FF] text-xl shadow-inner ring-1 ring-[#D2E3FC] text-[#202124] ${className}`}>{isImageAvatar(value) ? <img src={value} alt="Profile avatar" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center">{value}</span>}</div>
@@ -739,7 +751,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const submitCreatorPost = () => {
     const draft = postDraft.trim();
     const cleanedOptions = postPollOptions.map((option) => option.trim()).filter(Boolean);
-    if (!draft || isPostUsedToday) return;
+    if (!draft || isCreatorTypeUsedToday) return;
     if (postType === 'poll' && cleanedOptions.length < 2) return;
     const labels: Record<PostType, { badge: string; title: string; avatar: string }> = {
       text: { badge: 'Creator text · +1 EduCoin', title: `${profile.name} shared a note`, avatar: profile.avatar },
@@ -755,7 +767,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       title: meta.title,
       body: draft,
       time: 'Just now',
-      creatorId: 'me',
+      creatorId: currentUserKey,
       postType,
       imagePreview: postType === 'image' ? (postImagePreview || '🖼️') : undefined,
       imageLayout: postType === 'image' ? 'thumbnail' : undefined,
@@ -766,8 +778,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       replies: [],
     };
     setMessages((current) => [newMessage, ...current]);
-    addDoc(collection(db, COMMUNITY_FEED), { ...newMessage, createdAt: Date.now(), reactionCounts: {}, replyCount: 0 }).catch((error) => console.warn('Creator post write failed', error));
-    setCreatorQuota((current) => ({ ...current, [todayKey()]: [postType] }));
+    addDoc(collection(db, COMMUNITY_FEED), { ...newMessage, ownerId: currentUserKey, createdAt: Date.now(), expiresAt: null, reactionCounts: {}, replyCount: 0 }).catch((error) => console.warn('Creator post write failed', error));
+    setCreatorQuota((current) => ({ ...current, [todayKey()]: Array.from(new Set([...(current[todayKey()] || []), postType])) }));
     setEduCoins((coins) => coins + 1);
     setPostDraft('');
     setPostImageName('');
@@ -782,7 +794,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const submitStatus = () => {
     const draft = statusDraft.trim();
     const cleanedOptions = statusPollOptions.map((option) => option.trim()).filter(Boolean);
-    if (!draft && statusType !== 'image') return;
+    if ((!draft && statusType !== 'image') || isStatusTypeUsedToday) return;
     if (statusType === 'poll' && cleanedOptions.length < 2) return;
     const title = statusType === 'image' ? (statusImageName || 'Image story') : draft.slice(0, 54) || 'Fresh status';
     const statusStoryId = Date.now();
@@ -795,7 +807,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       pollOptions: cleanedOptions,
     });
     setStatusCards((current) => [statusStory, ...current]);
-    addDoc(collection(db, COMMUNITY_STATUS), { ...statusStory, createdAt: Date.now() }).catch((error) => console.warn('Status write failed', error));
+    const now = Date.now();
+    addDoc(collection(db, COMMUNITY_STATUS), { ...statusStory, ownerId: currentUserKey, createdAt: now, expiresAt: now + STORY_TTL_MS }).catch((error) => console.warn('Status write failed', error));
+    setStatusQuota((current) => ({ ...current, [todayKey()]: Array.from(new Set([...(current[todayKey()] || []), statusType])) }));
     setSelectedStatusId(statusStoryId);
     setStatusDraft('');
     setStatusImageName('');
@@ -979,6 +993,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (targetRequest?.docId) updateDoc(doc(db, COMMUNITY_MASTER_TAGS, targetRequest.docId), { ...(previousEmoji ? { [`reactions.${previousEmoji}`]: increment(-1) } : {}), [`reactions.${emoji}`]: increment(1), [`reactionUsers.${currentUserKey}`]: emoji }).catch((error) => console.warn('Master tag reaction update failed', error));
   };
 
+  useEffect(() => { localStorage.setItem(COMMUNITY_CREATOR_QUOTA_KEY, JSON.stringify({ [todayKey()]: creatorQuota[todayKey()] || [] })); }, [creatorQuota]);
+  useEffect(() => { localStorage.setItem(COMMUNITY_STATUS_QUOTA_KEY, JSON.stringify({ [todayKey()]: statusQuota[todayKey()] || [] })); }, [statusQuota]);
+
   const currentMasterTagAuthor = profile.name.trim().toLowerCase();
   const audienceFilteredMasterTagRequests = masterTagRequests.filter((request) => {
     const isCurrentUserRequest = request.author.trim().toLowerCase() === currentMasterTagAuthor;
@@ -1000,9 +1017,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     <article key={request.id} className="overflow-hidden rounded-[1.75rem] border border-[#E0E3EB] bg-white shadow-[0_16px_42px_rgba(60,64,67,0.08)] transition duration-300 hover:-translate-y-0.5 hover:border-[#C2E7FF]">
       <div className="border-l-4 border-[#1A73E8] p-4 sm:p-5">
         <div className="flex items-start gap-3">
-          <Avatar value={request.ownerId === 'me' ? profile.avatar : request.avatar} size="h-11 w-11" />
+          <Avatar value={isOwnCommunityId(request.ownerId) ? profile.avatar : request.avatar} size="h-11 w-11" />
           <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2 text-xs font-black text-[#5F6368]"><span className="text-[#202124]">{request.ownerId === 'me' ? profile.name : request.author}</span><span>•</span><span>{request.time}</span><span className="rounded-full border border-[#D2E3FC] bg-[#E8F0FE] px-2 py-1 text-[#1967D2]">{request.category}</span></div>
+            <div className="flex flex-wrap items-center gap-2 text-xs font-black text-[#5F6368]"><span className="text-[#202124]">{isOwnCommunityId(request.ownerId) ? profile.name : request.author}</span><span>•</span><span>{request.time}</span><span className="rounded-full border border-[#D2E3FC] bg-[#E8F0FE] px-2 py-1 text-[#1967D2]">{request.category}</span></div>
             <h3 className="mt-2 text-xl font-black tracking-tight text-[#202124] sm:text-2xl">@Master {request.title}</h3>{masterTagAdminReplies[request.id] && <span className="mt-2 inline-flex rounded-full bg-[#E6F4EA] px-3 py-1 text-[11px] font-black text-[#137333]">Master replied</span>}
             <p className={`mt-2 whitespace-pre-wrap text-sm font-semibold leading-7 text-[#5F6368] ${compact ? 'line-clamp-3' : ''}`}>{request.detail}</p>
             <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -1022,7 +1039,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const renderMasterTagStrip = (request: MasterTagRequest) => (
     <article key={request.id} role="button" tabIndex={0} onClick={() => openMasterTagDetail(request.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openMasterTagDetail(request.id); }} className="group flex w-full cursor-pointer items-center gap-3 rounded-2xl border border-[#E0E3EB] bg-white px-3 py-2.5 text-left shadow-[0_8px_24px_rgba(60,64,67,0.06)] transition duration-300 hover:-translate-y-0.5 hover:border-[#C2E7FF] hover:bg-[#F8FAFD] sm:px-4">
-      <Avatar value={request.ownerId === 'me' ? profile.avatar : request.avatar} size="h-10 w-10" />
+      <Avatar value={isOwnCommunityId(request.ownerId) ? profile.avatar : request.avatar} size="h-10 w-10" />
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2"><span className="truncate text-sm font-black text-[#202124]">@Master {request.title}</span><span className="rounded-full bg-[#E8F0FE] px-2 py-0.5 text-[10px] font-black text-[#1967D2]">{request.category}</span>{masterTagAdminReplies[request.id] && <span className="rounded-full bg-[#E6F4EA] px-2 py-0.5 text-[10px] font-black text-[#137333]">Master replied</span>}</div>
         <p className="mt-1 line-clamp-1 text-xs font-semibold text-[#5F6368]">{request.detail}</p>
@@ -1186,7 +1203,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             {renderReactionStrip(message)}<div className="mt-5 flex flex-wrap gap-2"><button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-3 py-1.5 text-sm font-black transition ${(message.likedByUsers?.[currentUserKey] || likedMessages.includes(message.id)) ? 'border-[#F8D7DA] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D2E3FC] bg-[#E8F0FE] text-[#1967D2]'}`}>❤️ {message.likeCount || 0}</button><span className="rounded-full border border-[#D2E3FC] bg-[#E8F0FE] px-3 py-1.5 text-sm font-black text-[#1967D2]">💬 {message.replyCount || message.replies.length}</span></div>
           </div>
         </div>
-        <div className="mt-5 space-y-3 pb-4">{message.replies.map((reply) => <div key={reply.id} className="flex items-start gap-3"><Avatar value={reply.ownerId === 'me' || reply.author === profile.name ? profile.avatar : (reply.avatar || '👤')} size="h-9 w-9" className="mt-1 text-base shadow-[0_8px_24px_rgba(37,99,235,0.12)]" /><div className="max-w-[92%] flex-1 rounded-[1.35rem] rounded-bl-md border border-[#D2E3FC] border-l-4 border-l-[#1A73E8] bg-gradient-to-br from-white via-[#F8FAFD] to-[#EDF2FA] px-4 py-3 shadow-[0_10px_32px_rgba(15,23,42,0.06)]"><div className="flex flex-wrap items-center gap-2"><span className="font-black text-[#202124]">{reply.ownerId === 'me' || reply.author === profile.name ? profile.name : reply.author}</span><span className="text-xs font-bold text-[#5F6368]">{reply.time}</span></div><p className="mt-1 text-sm font-semibold leading-6 text-[#5F6368] sm:text-base">{reply.text}</p></div></div>)}</div>
+        <div className="mt-5 space-y-3 pb-4">{message.replies.map((reply) => <div key={reply.id} className="flex items-start gap-3"><Avatar value={isOwnCommunityId(reply.ownerId) || reply.author === profile.name ? profile.avatar : (reply.avatar || '👤')} size="h-9 w-9" className="mt-1 text-base shadow-[0_8px_24px_rgba(37,99,235,0.12)]" /><div className="max-w-[92%] flex-1 rounded-[1.35rem] rounded-bl-md border border-[#D2E3FC] border-l-4 border-l-[#1A73E8] bg-gradient-to-br from-white via-[#F8FAFD] to-[#EDF2FA] px-4 py-3 shadow-[0_10px_32px_rgba(15,23,42,0.06)]"><div className="flex flex-wrap items-center gap-2"><span className="font-black text-[#202124]">{isOwnCommunityId(reply.ownerId) || reply.author === profile.name ? profile.name : reply.author}</span><span className="text-xs font-bold text-[#5F6368]">{reply.time}</span></div><p className="mt-1 text-sm font-semibold leading-6 text-[#5F6368] sm:text-base">{reply.text}</p></div></div>)}</div>
       </div>
       {expandedReplyId === message.id ? <div ref={replyComposerRef} data-community-replybar="true" className="fixed bottom-[calc(env(safe-area-inset-bottom)+7.75rem)] left-3 right-3 z-[1600] rounded-[1.65rem] border border-[#D2E3FC] bg-white/95 p-3 shadow-[0_24px_80px_rgba(15,23,42,0.20)] backdrop-blur-2xl transition-all duration-500 data-[hidden=true]:translate-y-8 data-[hidden=true]:opacity-0 md:bottom-28 md:left-auto md:right-8 md:w-[min(760px,calc(100vw-4rem))]"><div className="flex items-center gap-2"><input ref={replyInputRef} value={replyDrafts[message.id] || ''} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value }))} placeholder="Write a quick reply..." maxLength={1000} className="min-w-0 flex-1 rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-sm font-bold text-[#202124] outline-none transition focus:border-[#1A73E8] focus:bg-white" /><button type="button" onClick={() => submitReply(message.id)} className="rounded-2xl bg-[#1A73E8] px-5 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5">Send</button></div></div> : <div className="shrink-0 border-t border-[#E0E3EB] bg-white/95 p-3 backdrop-blur-xl lg:p-4"><button type="button" onClick={() => { loadRepliesForMessage(message); setExpandedReplyId(message.id); }} className="w-full rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-left text-sm font-black text-[#5F6368] transition hover:bg-[#E8F0FE]">💬 Reply to this thread</button></div>}
     </div>
@@ -1374,13 +1391,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {page === 'chat' && activeView === 'feed' && renderFeedLayout(messages, 'Chat Feed', 'Fresh community prompts, replies, and streak ideas are shown here.')}
       {page === 'thread' && <div className="space-y-3"><button type="button" onClick={goBack} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-sm font-black text-[#64748B] shadow-sm">← Back to posts</button>{renderMessageDetails(selectedMessage, true)}</div>}
       {page === 'profile' && renderProfilePage()}
-      {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_28px_90px_rgba(79,123,255,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.28em] text-[#4F7BFF]">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">One powerful post per day. Make it count.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">Choose text, image, or poll. The composer below changes instantly so creators get only the upload tools they need.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EAF5FF] p-5 sm:p-7"><div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={!postDraft.trim() || isPostUsedToday || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.28)] disabled:opacity-45">{isPostUsedToday ? 'Daily post already shared' : 'Publish creator post'}</button></div></div>}
+      {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_28px_90px_rgba(79,123,255,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.28em] text-[#4F7BFF]">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">One text, one image, one poll per day.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">Each upload type can be used once per day. Creator posts go to the main chat feed and followers feed.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EAF5FF] p-5 sm:p-7"><div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={!postDraft.trim() || isCreatorTypeUsedToday || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.28)] disabled:opacity-45">{isCreatorTypeUsedToday ? 'This option already used today' : 'Publish creator post'}</button></div></div>}
       {page === 'network' && <div className="mx-auto max-w-5xl rounded-[2rem] bg-white p-4 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="sticky top-0 z-10 bg-white pb-3"><h2 className="text-4xl font-black text-[#081B5C]">{profile.username}</h2><div className="mt-6 grid grid-cols-4 border-b border-[#E3ECF8] text-center text-sm font-black sm:text-lg">{(['mutual', 'followers', 'following', 'forYou'] as const).map((tab) => <button key={tab} type="button" onClick={() => setNetworkTab(tab)} className={`pb-3 capitalize ${networkTab === tab ? 'border-b-4 border-[#4F7BFF] text-[#4F46E5]' : 'text-[#64748B]'}`}>{tab === 'forYou' ? 'For you' : tab}</button>)}</div><input value={networkSearch} onChange={(event) => setNetworkSearch(event.target.value)} placeholder="Search creators..." className="mt-4 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></div><div className="space-y-3 pt-3">{filteredCreators.map((creator) => { const followed = followedIds.includes(creator.id); return <article key={creator.id} className="flex items-center gap-3 rounded-3xl border border-[#E3ECF8] bg-white p-4 shadow-sm"><Avatar value={creator.avatar} /><div className="min-w-0 flex-1"><h3 className="truncate text-xl font-black text-[#081B5C]">{creator.name} {creator.verified ? '✅' : ''}</h3><p className="text-sm font-bold text-[#64748B]">@{creator.username} · {creator.role}</p><p className="text-sm font-black text-[#64748B]">{creator.followers.toLocaleString()} followers</p></div><button type="button" onClick={() => setFollowedIds((current) => followed ? current.filter((id) => id !== creator.id) : [...current, creator.id])} className={`rounded-full px-4 py-2 text-sm font-black transition ${followed ? 'bg-[#EEF2FF] text-[#4F46E5]' : 'bg-[#4F7BFF] text-white'}`}>{followed ? 'Following' : 'Follow'}</button></article>; })}</div></div>}
       {page === 'following' && renderFeedLayout(followingMessages, 'Your followers feed', 'Only posts from creators you follow are shown here.')}
       {page === 'tagMaster' && renderTagMasterPage()}{page === 'masterTags' && renderMasterTagsPage()}{page === 'masterTagDetail' && renderMasterTagDetailPage()}
       {page === 'directChat' && renderChatPage()}{page === 'directChatThread' && renderChatThreadPage()}{page === 'statusDetail' && renderStatusDetailPage()}
       {page === 'chat' && activeView === 'status' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[1.8rem] border border-[#E3ECF8] bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-5 text-center text-[#081B5C] shadow-[0_22px_70px_rgba(79,123,255,0.16)]"><p className="text-lg font-black sm:text-2xl">1MB Limit &amp; 150 Slots Left</p><p className="mt-2 text-sm font-bold text-[#64748B]">Tap any status to open a scroll-snap reel.</p><div className="mt-4 flex justify-center gap-2"><button type="button" onClick={() => pushPage('statusUpload')} className="rounded-2xl bg-[#4F7BFF] px-4 py-3 text-xs font-black text-white">Upload your status</button><button type="button" onClick={() => pushPage('statusMine')} className="rounded-2xl bg-white px-4 py-3 text-xs font-black text-[#081B5C]">View your status</button></div></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
-      {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_30px_90px_rgba(79,123,255,0.16)]"><div className="bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.3em] text-[#4F7BFF]">Story studio</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2></div><div className="p-5 sm:p-7"><div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange')}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={(statusType === 'image' && !statusImagePreview) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white disabled:opacity-45">Publish status story</button></div></div>}
+      {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_30px_90px_rgba(79,123,255,0.16)]"><div className="bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.3em] text-[#4F7BFF]">Story studio</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2></div><div className="p-5 sm:p-7"><div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange')}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={isStatusTypeUsedToday || (statusType === 'image' && !statusImagePreview) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white disabled:opacity-45">{isStatusTypeUsedToday ? 'This status option already used today' : 'Publish status story'}</button></div></div>}
       {page === 'statusMine' && <div className="mx-auto max-w-6xl space-y-5"><div className="rounded-[2rem] border border-[#E3ECF8] bg-white p-6"><h2 className="text-4xl font-black tracking-tight text-[#081B5C]">View your status</h2></div>{myStatuses.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{myStatuses.map((status) => <article key={status.id} className="overflow-hidden rounded-[2rem] border border-[#E3ECF8] bg-white p-4"><div className={`rounded-[1.5rem] bg-gradient-to-br ${status.gradient} p-5 text-white`}><h3 className="line-clamp-3 text-2xl font-black">{status.title}</h3></div><button type="button" onClick={() => openStatusReel(status.id)} className="mt-4 w-full rounded-2xl bg-[#4F7BFF] px-4 py-3 text-sm font-black text-white">Open reel view</button></article>)}</div> : <div className="rounded-[2rem] border border-dashed border-[#E3ECF8] bg-white p-10 text-center font-black text-[#64748B]">No status uploaded yet.</div>}</div>}
     </div>
   );
