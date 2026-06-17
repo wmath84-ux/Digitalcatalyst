@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Coupon, CourseModule, Product, ProductFile, ProductFileType, ProductWithRating, QuizQuestion, User } from '../../App';
 import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
+import { PRODUCT_IMAGE_SLOTS, ProductImageSlot } from '../../utils/productImages';
 
 type ProductViewState = 'list' | 'add' | 'edit';
 
@@ -36,6 +37,7 @@ type ProductFormData = {
 const initialProductState: ProductAdminInitialState = {
     imageSeed: '',
     images: [],
+    productImages: {},
     title: '',
     description: '',
     longDescription: '',
@@ -455,6 +457,8 @@ const ProductForm: React.FC<{
     const [formData, setFormData] = useState<ProductFormData>(() => createEmptyProductForm(product));
     const [modules, setModules] = useState<CourseModule[]>(() => normaliseModules(product?.courseContent || initialProductState.courseContent || []));
     const [images, setImages] = useState<string[]>(() => product?.images || initialProductState.images || []);
+    const [productImages, setProductImages] = useState<Partial<Record<ProductImageSlot, string>>>(() => product?.productImages || {});
+    const slotInputRefs = useRef<Partial<Record<ProductImageSlot, HTMLInputElement | null>>>({});
     const [imageMode, setImageMode] = useState<'upload' | 'ai'>('upload');
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [discountPercent, setDiscountPercent] = useState(0);
@@ -480,6 +484,30 @@ const ProductForm: React.FC<{
             reader.readAsDataURL(file);
         });
         event.target.value = '';
+    };
+
+
+    const handleSlotImageUpload = (slot: ProductImageSlot, file?: File) => {
+        if (!file) return;
+        const config = PRODUCT_IMAGE_SLOTS[slot];
+        const objectUrl = URL.createObjectURL(file);
+        const image = new Image();
+        image.onload = () => {
+            URL.revokeObjectURL(objectUrl);
+            const uploadedRatio = image.naturalWidth / image.naturalHeight;
+            if (Math.abs(uploadedRatio - config.ratioValue) / config.ratioValue > 0.01) {
+                alert(`This image is not the required ${config.ratio} ratio. Upload ${config.recommendedSize} for best result.`);
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = () => setProductImages(prev => ({ ...prev, [slot]: reader.result as string }));
+            reader.readAsDataURL(file);
+        };
+        image.onerror = () => {
+            URL.revokeObjectURL(objectUrl);
+            alert('Could not read this image. Please upload a valid image file.');
+        };
+        image.src = objectUrl;
     };
 
     const handleGenerateAiImage = async () => {
@@ -518,6 +546,7 @@ const ProductForm: React.FC<{
         onSave({
             imageSeed: formData.imageSeed || formData.title || `product-${Date.now()}`,
             images: images || [],
+            productImages,
             title: formData.title,
             description: formData.description,
             longDescription: formData.longDescription,
@@ -673,12 +702,30 @@ const ProductForm: React.FC<{
                                 <div className="mt-4 grid grid-cols-2 gap-3">
                                     {((images || []).filter(Boolean) || []).map((image, index) => (
                                         <div key={`${image}-${index}`} className="group relative aspect-square overflow-hidden rounded-2xl border border-white/50 bg-white/80">
-                                            <img src={image} alt={`Product ${index + 1}`} className="h-full w-full object-cover" />
+                                            <img src={image} alt={`Product ${index + 1}`} className="h-full w-full object-contain" />
                                             <button type="button" onClick={() => setImages(prev => (prev || []).filter((_, currentIndex) => currentIndex !== index))} className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-sm font-black text-white opacity-90">×</button>
                                         </div>
                                     ))}
                                 </div>
                                 <div className="mt-4"><label className={labelClass}>Image Seed</label><input value={formData.imageSeed} onChange={event => setFormData(prev => ({ ...prev, imageSeed: event.target.value }))} className={fieldClass} placeholder="Fallback image seed" /></div>
+                                <div className="mt-6 border-t border-slate-200 pt-5">
+                                    <h3 className="text-lg font-black text-slate-900">Display-specific thumbnails</h3>
+                                    <p className="mt-1 text-xs font-bold text-slate-500">Upload one exact-ratio image for each storefront placement. Wrong ratios are rejected instead of cropped.</p>
+                                    <div className="mt-4 space-y-4">
+                                        {(Object.keys(PRODUCT_IMAGE_SLOTS) as ProductImageSlot[]).map(slot => {
+                                            const config = PRODUCT_IMAGE_SLOTS[slot];
+                                            return <div key={slot} className="rounded-2xl border border-slate-200 bg-white/80 p-3">
+                                                <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-black text-slate-900">{config.label}</p><p className="text-xs font-bold text-slate-500">Required {config.ratio} · Recommended {config.recommendedSize}</p></div>{productImages[slot] ? <button type="button" onClick={() => setProductImages(prev => ({ ...prev, [slot]: undefined }))} className="rounded-full bg-red-500 px-2 py-1 text-xs font-black text-white">Remove</button> : null}</div>
+                                                <div className={`mt-3 ${config.aspectClass} overflow-hidden rounded-xl bg-slate-100`}>
+                                                    {productImages[slot] ? <img src={productImages[slot]} alt={config.label} className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-xs font-black text-slate-400">No {config.ratio} image</div>}
+                                                </div>
+                                                <button type="button" onClick={() => slotInputRefs.current[slot]?.click()} className="mt-3 w-full rounded-xl border border-dashed border-cyan-300 px-3 py-2 text-xs font-black text-cyan-700">Upload / Replace {config.ratio}</button>
+                                                <input ref={node => { slotInputRefs.current[slot] = node; }} type="file" accept="image/*" className="hidden" onChange={event => { handleSlotImageUpload(slot, event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />
+                                            </div>;
+                                        })}
+                                    </div>
+                                </div>
+
                             </div>
                         </aside>
                     </div>
@@ -720,6 +767,7 @@ const ProductManagement: React.FC<{
         setEditingProduct({
             ...product,
             images: product.images || [],
+            productImages: product.productImages || {},
             features: product.features || [],
             tags: product.tags || [],
             courseContent: normaliseModules(product.courseContent || []),
@@ -734,6 +782,7 @@ const ProductManagement: React.FC<{
             ...emptyArrays,
             ...productData,
             images: productData.images || [],
+            productImages: productData.productImages || {},
             features: productData.features || [],
             tags: productData.tags || [],
             courseContent: normaliseModules(productData.courseContent || []),
@@ -799,7 +848,7 @@ const ProductManagement: React.FC<{
                                             <td className="p-5">
                                                 <div className="flex items-center gap-4">
                                                     <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-2xl border border-white/50 bg-white/80">
-                                                        <img src={thumbnail} alt="" className="h-full w-full object-cover" />
+                                                        <img src={thumbnail} alt="" className="h-full w-full object-contain" />
                                                     </div>
                                                     <div className="min-w-0">
                                                         <p className="truncate font-black text-slate-900 group-hover:text-cyan-700">{product.title}</p>

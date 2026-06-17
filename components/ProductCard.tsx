@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { ProductWithRating, WebsiteSettings, Coupon } from '../App';
+import { getProductImage } from '../utils/productImages';
 
 interface ProductCardProps {
   settings: WebsiteSettings;
@@ -23,7 +24,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
         ? `animate-child animate-delay-${(animationDelay % 12) + 1}` 
         : '';
     
-    const displayImage = product.images && product.images.length > 0 ? product.images[0] : `https://picsum.photos/seed/${product.imageSeed}/600/400`;
+    const displayImage = getProductImage(product, 'card');
     const handleQuickViewClick = (event: React.MouseEvent<HTMLButtonElement>) => {
         event.preventDefault();
         event.stopPropagation();
@@ -57,7 +58,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                 <img 
                     src={displayImage} 
                     alt={product.title} 
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" 
+                    className="absolute inset-0 w-full h-full object-contain" 
                     loading="lazy"
                 />
                 
