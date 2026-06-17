@@ -778,7 +778,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       replies: [],
     };
     setMessages((current) => [newMessage, ...current]);
-    addDoc(collection(db, COMMUNITY_FEED), { ...newMessage, ownerId: currentUserKey, createdAt: Date.now(), expiresAt: null, reactionCounts: {}, replyCount: 0 }).catch((error) => console.warn('Creator post write failed', error));
+    addDoc(collection(db, COMMUNITY_FEED), { ...newMessage, ownerId: currentUserKey, createdAt: Date.now(), expiresAt: null, reactionCounts: {}, replyCount: 0 })
+      .then((docRef) => {
+        const firebasePostId = Number.parseInt(docRef.id.replace(/\D/g, '').slice(-9), 10) || newMessage.id;
+        setMessages((current) => current.map((message) => message.id === newMessage.id ? { ...message, docId: docRef.id } : message));
+        setSelectedMessageId(newMessage.id || firebasePostId);
+      })
+      .catch((error) => {
+        console.warn('Creator post write failed; showing local post fallback', error);
+        setProfileFeedback({ type: 'error', message: 'Creator post is visible locally, but cloud sync failed. Check your connection before closing.' });
+      });
     setCreatorQuota((current) => ({ ...current, [todayKey()]: Array.from(new Set([...(current[todayKey()] || []), postType])) }));
     setEduCoins((coins) => coins + 1);
     setPostDraft('');
@@ -787,7 +796,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setPostPollOptions(['', '', '']);
     setSelectedMessageId(newMessage.id);
     setActiveView('feed');
-    setPage('chat');
+    setPage(window.matchMedia('(max-width: 767px)').matches ? 'thread' : 'chat');
     setPageStack([]);
   };
 
@@ -808,7 +817,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     });
     setStatusCards((current) => [statusStory, ...current]);
     const now = Date.now();
-    addDoc(collection(db, COMMUNITY_STATUS), { ...statusStory, ownerId: currentUserKey, createdAt: now, expiresAt: now + STORY_TTL_MS }).catch((error) => console.warn('Status write failed', error));
+    addDoc(collection(db, COMMUNITY_STATUS), { ...statusStory, ownerId: currentUserKey, createdAt: now, expiresAt: now + STORY_TTL_MS })
+      .then((docRef) => {
+        setStatusCards((current) => current.map((status) => status.id === statusStoryId ? { ...status, docId: docRef.id } : status));
+        setSelectedStatusId(statusStoryId);
+        recordStatusView(statusStoryId);
+      })
+      .catch((error) => {
+        console.warn('Status write failed; showing local story fallback', error);
+        setProfileFeedback({ type: 'error', message: 'Status is visible locally, but cloud sync failed. It may not appear on other devices.' });
+      });
     setStatusQuota((current) => ({ ...current, [todayKey()]: Array.from(new Set([...(current[todayKey()] || []), statusType])) }));
     setSelectedStatusId(statusStoryId);
     setStatusDraft('');
@@ -1398,7 +1416,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {page === 'directChat' && renderChatPage()}{page === 'directChatThread' && renderChatThreadPage()}{page === 'statusDetail' && renderStatusDetailPage()}
       {page === 'chat' && activeView === 'status' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[1.8rem] border border-[#E3ECF8] bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-5 text-center text-[#081B5C] shadow-[0_22px_70px_rgba(79,123,255,0.16)]"><p className="text-lg font-black sm:text-2xl">1MB Limit &amp; 150 Slots Left</p><p className="mt-2 text-sm font-bold text-[#64748B]">Tap any status to open a scroll-snap reel.</p><div className="mt-4 flex justify-center gap-2"><button type="button" onClick={() => pushPage('statusUpload')} className="rounded-2xl bg-[#4F7BFF] px-4 py-3 text-xs font-black text-white">Upload your status</button><button type="button" onClick={() => pushPage('statusMine')} className="rounded-2xl bg-white px-4 py-3 text-xs font-black text-[#081B5C]">View your status</button></div></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
       {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_30px_90px_rgba(79,123,255,0.16)]"><div className="bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.3em] text-[#4F7BFF]">Story studio</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2></div><div className="p-5 sm:p-7"><div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange')}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={isStatusTypeUsedToday || (statusType === 'image' && !statusImagePreview) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white disabled:opacity-45">{isStatusTypeUsedToday ? 'This status option already used today' : 'Publish status story'}</button></div></div>}
-      {page === 'statusMine' && <div className="mx-auto max-w-6xl space-y-5"><div className="rounded-[2rem] border border-[#E3ECF8] bg-white p-6"><h2 className="text-4xl font-black tracking-tight text-[#081B5C]">View your status</h2></div>{myStatuses.length ? <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">{myStatuses.map((status) => <article key={status.id} className="overflow-hidden rounded-[2rem] border border-[#E3ECF8] bg-white p-4"><div className={`rounded-[1.5rem] bg-gradient-to-br ${status.gradient} p-5 text-white`}><h3 className="line-clamp-3 text-2xl font-black">{status.title}</h3></div><button type="button" onClick={() => openStatusReel(status.id)} className="mt-4 w-full rounded-2xl bg-[#4F7BFF] px-4 py-3 text-sm font-black text-white">Open reel view</button></article>)}</div> : <div className="rounded-[2rem] border border-dashed border-[#E3ECF8] bg-white p-10 text-center font-black text-[#64748B]">No status uploaded yet.</div>}</div>}
+      {page === 'statusMine' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[2rem] border border-[#E3ECF8] bg-white p-6"><h2 className="text-4xl font-black tracking-tight text-[#081B5C]">View your status</h2><p className="mt-2 text-sm font-bold text-[#64748B]">Tap a card to open reel view.</p></div>{myStatuses.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{myStatuses.map(renderStatusTile)}</div> : <div className="rounded-[2rem] border border-dashed border-[#E3ECF8] bg-white p-10 text-center font-black text-[#64748B]">No status uploaded yet.</div>}</div>}
     </div>
   );
 

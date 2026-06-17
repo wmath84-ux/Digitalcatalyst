@@ -486,6 +486,9 @@ export interface WebsiteSettings {
         showReviews: boolean;
         showSaleBadges: boolean;
     };
+    mobile: {
+        hideFooter: boolean;
+    };
     content: {
         siteName?: string;
         heroTitle: string;
@@ -734,6 +737,9 @@ const defaultWebsiteSettings: WebsiteSettings = {
         showFavourites: true,
         showReviews: true,
         showSaleBadges: true,
+    },
+    mobile: {
+        hideFooter: false,
     },
     content: {
         siteName: 'Digital Catalyst',
@@ -1163,7 +1169,7 @@ const App: React.FC = () => {
     const storedSettings = localStorage.getItem('websiteSettings');
     if (storedSettings) {
         const parsedSettings = JSON.parse(storedSettings);
-        setWebsiteSettings({ ...defaultWebsiteSettings, ...parsedSettings, content: { ...defaultWebsiteSettings.content, ...(parsedSettings.content || {}) } });
+        setWebsiteSettings({ ...defaultWebsiteSettings, ...parsedSettings, mobile: { ...defaultWebsiteSettings.mobile, ...(parsedSettings.mobile || {}) }, content: { ...defaultWebsiteSettings.content, ...(parsedSettings.content || {}) } });
     }
     
     const storedCoupons = localStorage.getItem('siteCoupons');
@@ -1254,7 +1260,7 @@ const App: React.FC = () => {
     const unsubscribeWebsiteSettings = onSnapshot(doc(db, ...GLOBAL_WEBSITE_SETTINGS_DOC), (snapshot) => {
       if (!snapshot.exists()) return;
       const remoteSettings = snapshot.data() as WebsiteSettings;
-      const mergedSettings = { ...defaultWebsiteSettings, ...remoteSettings, content: { ...defaultWebsiteSettings.content, ...(remoteSettings.content || {}) } };
+      const mergedSettings = { ...defaultWebsiteSettings, ...remoteSettings, mobile: { ...defaultWebsiteSettings.mobile, ...(remoteSettings.mobile || {}) }, content: { ...defaultWebsiteSettings.content, ...(remoteSettings.content || {}) } };
       setWebsiteSettings(mergedSettings);
       safeSetItem('websiteSettings', mergedSettings);
     }, error => logGlobalSyncWarning('Website settings', error));
@@ -1360,6 +1366,10 @@ const App: React.FC = () => {
         theme: {
             ...newSettings.theme,
             ...themes.default.palette,
+        },
+        mobile: {
+            ...defaultWebsiteSettings.mobile,
+            ...(newSettings.mobile || {}),
         },
         content: {
             ...defaultWebsiteSettings.content,
@@ -1982,6 +1992,15 @@ const App: React.FC = () => {
       setCurrentView('home');
       window.scrollTo(0, 0);
     }
+  };
+
+  const handleNavigateBack = (fallbackView: string = 'home') => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back();
+      return;
+    }
+    setCurrentView(fallbackView);
+    window.scrollTo(0, 0);
   };
 
   const handleBackFromAuth = () => {
@@ -2844,17 +2863,17 @@ const App: React.FC = () => {
 
   const renderContent = () => {
     switch (currentView) {
-      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={handleNavigateToAllProducts} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={currentUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
+      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={currentUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
       case 'coursePlayer':
         if (isAuthRestoring || authRestoreError) return renderAuthRestoreStatus();
-        return currentUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={handleNavigateToPurchases} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} /> : renderAuthRestoreStatus();
+        return currentUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={() => handleNavigateBack('myPurchases')} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} /> : renderAuthRestoreStatus();
       case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={currentUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
-      case 'congratulations': return <Congratulations settings={websiteSettings} onBack={handleBackToHome} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
+      case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
       case 'myPurchases': return currentUser ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
-      case 'profile': return currentUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={handleBackToHome} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
-      case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={handleBackToHome} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
-      case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={handleBackToHome} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
+      case 'profile': return currentUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+      case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={() => handleNavigateBack('home')} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
+      case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={() => handleNavigateBack('home')} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
       case 'home': default: return (
         <>
@@ -2886,15 +2905,17 @@ const App: React.FC = () => {
     }
   };
 
+  const shouldHideFooterOnMobile = Boolean(websiteSettings.mobile?.hideFooter);
+
   const appleOpenClass = "animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]";
 
   const renderPage = () => {
-    if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={handleBackToHome} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
+    if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={() => handleNavigateBack('home')} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
     if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
-    if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={handleBackToHome} /></div>;
+    if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent()}</div>;
-    if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity onClose={handleBackToHome} isAuthenticated={Boolean(currentUser)} /></div>;
+    if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity onClose={() => handleNavigateBack('home')}  isAuthenticated={Boolean(currentUser)} /></div>;
 
     return (
        <ErrorBoundary>
@@ -2911,7 +2932,7 @@ const App: React.FC = () => {
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
             <main key={currentView} className={`${appleOpenClass} ${currentView === 'home' ? 'mobile-app-home' : ''}`}>{renderContent()}</main>
             <div className="mobile-app-chrome"><InstallAppButton enabled={canShowInstallPrompt} /></div>
-            <Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} />
+            <div className={shouldHideFooterOnMobile ? 'max-md:hidden' : ''}><Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} /></div>
          </div>
        </ErrorBoundary>
     );

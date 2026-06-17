@@ -17,5 +17,4 @@
   <path d="M42 61c0-8 6-14 14-14h27c9 0 17 5 21 13v76c-5-7-12-10-21-10H56c-8 0-14-6-14-14V61z" fill="url(#dc-page-192)"/>
   <path d="M150 47c8 0 14 6 14 14v51c0 8-6 14-14 14h-27c-9 0-16 3-21 10V60c4-8 12-13 21-13h27z" fill="#eff6ff"/>
   <path d="M70 78h20M70 94h20M122 78h25M122 94h25" stroke="#2563eb" stroke-width="6" stroke-linecap="round" opacity=".72"/>
-  <text x="96" y="157" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="30" font-weight="900" fill="#fff">DC</text>
 </svg>

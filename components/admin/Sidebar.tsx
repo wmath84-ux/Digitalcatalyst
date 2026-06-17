@@ -85,9 +85,7 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
                 <div className="shrink-0 border-b border-white/60 px-3 py-3 sm:px-4 sm:py-5">
                     <div className="flex items-center justify-center gap-3 md:group-hover/sidebar:justify-between">
                         <div className="flex min-w-0 items-center gap-3">
-                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-700 to-indigo-800 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:h-10 sm:w-10">
-                                <span className="text-xl font-bold text-white">DC</span>
-                            </div>
+                            <img src="/icons/icon-192x192.svg" alt="Digital Catalyst logo" className="h-9 w-9 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:h-10 sm:w-10" />
                             <div className="min-w-0 md:w-0 md:opacity-0 md:transition-all md:duration-200 md:group-hover/sidebar:w-auto md:group-hover/sidebar:opacity-100">
                                 <div className="truncate text-base font-bold tracking-tight sm:text-lg">Digital Catalyst</div>
                                 <div className="truncate text-xs text-slate-700 font-medium uppercase tracking-widest">Admin Panel</div>

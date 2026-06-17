@@ -12,5 +12,4 @@
   <path d="M112 166c0-22 18-40 40-40h78c28 0 52 16 64 40v202c-14-18-36-29-64-29h-78c-22 0-40-18-40-40V166z" fill="#ffffff"/>
   <path d="M400 126c22 0 40 18 40 40v133c0 22-18 40-40 40h-78c-28 0-50 11-64 29V166c12-24 36-40 64-40h78z" fill="#eff6ff"/>
   <path d="M184 210h58M184 254h58M322 210h68M322 254h68" stroke="#2563eb" stroke-width="17" stroke-linecap="round" opacity=".72"/>
-  <text x="256" y="438" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-size="88" font-weight="900" fill="#fff">DC</text>
 </svg>
