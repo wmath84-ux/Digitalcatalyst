@@ -60,12 +60,13 @@ service cloud.firestore {
 
     match /community_feed/{postId} {
       allow read: if signedIn();
-      allow create: if signedIn()
+      allow create: if (signedIn()
         && request.resource.data.creatorId == request.auth.uid
         && request.resource.data.ownerId == request.auth.uid
-        && request.resource.data.postType in ['text', 'image', 'poll'];
+        && request.resource.data.postType in ['text', 'image', 'poll'])
+        || (isAdmin() && request.resource.data.source == 'admin');
       allow update: if signedIn();
-      allow delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid);
+      allow delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid) || (signedIn() && resource.data.expiresAt < request.time.toMillis());
 
       match /replies/{replyId} {
         allow read: if signedIn();
@@ -81,6 +82,18 @@ service cloud.firestore {
         && request.resource.data.type in ['text', 'image', 'poll'];
       allow update: if signedIn();
       allow delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid) || (signedIn() && resource.data.expiresAt < request.time.toMillis());
+    }
+
+    match /community_upload_quotas/{quotaId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow delete: if isAdmin();
+    }
+
+    match /community_storage_meta/{metaId} {
+      allow read: if signedIn();
+      allow create, update: if signedIn();
+      allow delete: if isAdmin();
     }
 
     match /community_master_tags/{tagId} {
