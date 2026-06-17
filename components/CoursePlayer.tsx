@@ -454,6 +454,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const [isPlaybackWindowFocused, setIsPlaybackWindowFocused] = useState(() => typeof document === 'undefined' ? true : document.visibilityState === 'visible' && document.hasFocus());
   const [coinPulse, setCoinPulse] = useState(false);
   const [pendingPdfDownload, setPendingPdfDownload] = useState<ProductFile | null>(null);
+  const [showWelcome, setShowWelcome] = useState(true);
 
   useEffect(() => {
     const findFirst = (modules?: CourseModule[]): ProductFile | null => {
@@ -561,6 +562,12 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     }];
   }, [activeFile, backgroundImage, product.title]);
 
+  const ThreeDotMenuIcon = () => (
+    <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[#ded8ff] bg-[#ece7ff] text-slate-950 shadow-[0_10px_30px_rgba(89,71,242,0.10)]" aria-hidden="true">
+      <svg className="h-7 w-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg>
+    </span>
+  );
+
   const liveEarningHud = activeFile?.type === 'video' ? (
     <div className="bg-white/50 backdrop-blur-md border border-slate-200 shadow-sm rounded-full px-4 py-1.5 flex items-center gap-2 text-sm font-semibold text-slate-800 transition-all whitespace-nowrap max-sm:px-3 max-sm:text-xs" aria-live="polite">
       <span>⏱️ {formatActiveWatchTime(activeWatchSeconds)} Mins</span>
@@ -602,6 +609,25 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       default: return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
     }
   };
+
+  if (showWelcome) {
+    return (
+      <div className="course-player-mobile-scope relative flex min-h-[100dvh] w-full items-center justify-center overflow-hidden bg-[#f3f0ff] p-4 text-slate-950">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(89,71,242,0.18),transparent_30%),radial-gradient(circle_at_85%_20%,rgba(125,211,252,0.22),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.95),rgba(238,233,255,0.95))]" />
+        <div className="relative w-full max-w-3xl rounded-[2rem] border border-white/70 bg-white/80 p-6 text-center shadow-[0_30px_90px_rgba(15,23,42,0.16)] backdrop-blur-2xl sm:p-10">
+          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-[1.75rem] bg-white shadow-sm"><ThreeDotMenuIcon /></div>
+          <p className="text-sm font-black uppercase tracking-[0.32em] text-[#5947f2]">Welcome to {product.title}</p>
+          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">Now start your learning</h1>
+          <p className="mx-auto mt-5 max-w-2xl text-base font-semibold leading-8 text-slate-700 sm:text-lg">You are entering a focused learning space. Move step by step, take notes, and give every lesson your full attention so today’s session turns into practical progress.</p>
+          <div className="mx-auto mt-6 flex max-w-xl items-center gap-4 rounded-3xl border border-[#ded8ff] bg-[#f7f5ff] p-4 text-left">
+            <ThreeDotMenuIcon />
+            <p className="text-sm font-bold leading-6 text-slate-700 sm:text-base">Open the three-line menu in the course player header to choose modules and start studying your content in order.</p>
+          </div>
+          <button type="button" onClick={() => setShowWelcome(false)} className="mt-8 w-full rounded-2xl bg-[#5947f2] px-7 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(89,71,242,0.28)] transition hover:-translate-y-0.5 sm:w-auto">Start learning</button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="course-player-mobile-scope relative flex h-[100dvh] min-h-[100dvh] w-full max-w-full min-w-0 flex-col overflow-hidden text-slate-900 bg-[#f3f0ff]">

@@ -820,6 +820,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                     <FormRow label="Show Wishlist" description="Enable or disable the 'heart' icon and Wishlist page."><input type="checkbox" checked={localSettings.features.showFavourites} onChange={e => handleNestedChange('features', 'showFavourites', e.target.checked)} className="form-checkbox h-5 w-5" /></FormRow>
                     <FormRow label="Show Reviews" description="Enable or disable the entire customer review and rating system."><input type="checkbox" checked={localSettings.features.showReviews} onChange={e => handleNestedChange('features', 'showReviews', e.target.checked)} className="form-checkbox h-5 w-5" /></FormRow>
                     <FormRow label="Show Sale Badges" description="Show or hide the 'SALE' badge on product cards."><input type="checkbox" checked={localSettings.features.showSaleBadges} onChange={e => handleNestedChange('features', 'showSaleBadges', e.target.checked)} className="form-checkbox h-5 w-5" /></FormRow>
+                    <FormRow label="Hide footer on mobile for all users" description="When enabled, the global footer is hidden only on mobile viewports and remains visible on tablet/desktop. This is saved to Firebase website settings."><input type="checkbox" checked={Boolean(localSettings.mobile?.hideFooter)} onChange={e => handleNestedChange('mobile', 'hideFooter', e.target.checked)} className="form-checkbox h-5 w-5" /></FormRow>
                 </div>
             );
             case 'animations': return (
