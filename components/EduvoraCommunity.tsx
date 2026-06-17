@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { createPortal } from 'react-dom';
+import { createPortal, flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, deleteDoc, deleteField, doc, increment, limit, onSnapshot, orderBy, query, runTransaction, setDoc, updateDoc, where } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
@@ -15,9 +15,9 @@ type CommunityView = 'feed' | 'status';
 type CommunityPage = 'chat' | 'adminPosts' | 'thread' | 'profile' | 'creators' | 'network' | 'following' | 'tagMaster' | 'masterTags' | 'masterTagDetail' | 'statusUpload' | 'statusMine' | 'statusReel' | 'directChat' | 'directChatThread' | 'statusDetail';
 type PostType = 'text' | 'image' | 'poll';
 type Reply = { id: number; author: string; text: string; time: string; avatar?: string; docId?: string; createdAt?: number; ownerId?: string };
-type FeedMessage = { id: number; admin: string; badge: string; avatar: string; title: string; body: string; time: string; reactions: string[]; replies: Reply[]; creatorId?: string; postType?: PostType; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; likeCount?: number; docId?: string; createdAt?: number; reactionCounts?: Record<string, number>; replyCount?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; reactionUsers?: Record<string, string>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'creator' | 'admin' };
+type FeedMessage = { id: number; admin: string; badge: string; avatar: string; title: string; body: string; time: string; reactions: string[]; replies: Reply[]; creatorId?: string; ownerId?: string; postType?: PostType; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; likeCount?: number; docId?: string; createdAt?: number; reactionCounts?: Record<string, number>; replyCount?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; reactionUsers?: Record<string, string>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'creator' | 'admin' };
 type Creator = { id: string; username: string; name: string; avatar: string; role: string; followers: number; mutual: boolean; verified?: boolean };
-type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; storagePath?: string; uploadBytes?: number; expiresAt?: number };
+type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'status' };
 type SharedStory = { id: number; statusId: number; recipientId: string; senderId: 'me'; senderName: string; time: string };
 type MasterTagRequest = { id: number; author: string; avatar: string; category: string; title: string; detail: string; time: string; likes: number; reactions: Record<string, number>; ownerId?: string; docId?: string; likedByUsers?: Record<string, boolean>; reactionUsers?: Record<string, string>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'creator' | 'admin' };
 type CommunitySupportTicket = { id: string; customerName: string; customerEmail: string; subject: string; message: string; date: string; status: 'Open' | 'Resolved' | 'Pending'; source?: 'contact' | 'masterTag'; communityThreadId?: number; customerAvatar?: string; category?: string; adminReply?: string; repliedAt?: string; inboxMessage?: string; inboxRead?: boolean };
@@ -158,6 +158,40 @@ const countEmojiUsers = (value: unknown): Record<string, number> => {
   }, {});
 };
 
+
+const normalizeFeedMessage = (message: FeedMessage): FeedMessage => ({
+  ...message,
+  reactions: Array.isArray(message.reactions) ? message.reactions : [],
+  replies: Array.isArray(message.replies) ? message.replies : [],
+  reactionCounts: message.reactionCounts && typeof message.reactionCounts === 'object' ? message.reactionCounts : {},
+  likeCount: Number(message.likeCount) || 0,
+  replyCount: Number(message.replyCount) || (Array.isArray(message.replies) ? message.replies.length : 0),
+  pollOptions: Array.isArray(message.pollOptions) ? message.pollOptions : undefined,
+  pollVotes: Array.isArray(message.pollVotes) ? message.pollVotes : (Array.isArray(message.pollOptions) ? message.pollOptions.map(() => 0) : undefined),
+  imagePreview: message.imagePreview || undefined,
+  createdAt: message.createdAt || Date.now(),
+  expiresAt: message.expiresAt || Date.now() + POST_TTL_MS,
+  source: message.source || 'creator',
+});
+
+const isUnexpired = (item: { expiresAt?: number; createdAt?: number }, ttlMs: number) => {
+  const expiresAt = item.expiresAt || ((item.createdAt || Date.now()) + ttlMs);
+  return expiresAt > Date.now();
+};
+
+const mergeUnexpiredByIdentity = <T extends { id: number; docId?: string; createdAt?: number; expiresAt?: number }>(remoteItems: T[], currentItems: T[], seedItems: T[], ttlMs: number): T[] => {
+  const merged = new Map<string, T>();
+  const put = (item: T) => {
+    if (!isUnexpired(item, ttlMs)) return;
+    const key = item.docId ? `doc:${item.docId}` : `id:${item.id}`;
+    merged.set(key, { ...merged.get(key), ...item });
+  };
+  seedItems.forEach(put);
+  currentItems.forEach(put);
+  remoteItems.forEach(put);
+  return Array.from(merged.values()).sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
+};
+
 const resolveAccountBackedCount = (storedCount: unknown, accountMap: unknown): number => Math.max(Number(storedCount) || 0, countTruthyValues(accountMap));
 
 const resolveAccountBackedReactions = (storedReactions: unknown, reactionUsers: unknown): Record<string, number> => {
@@ -233,14 +267,14 @@ const mapFeedDoc = (snapshotDoc: { id: string; data: () => Record<string, any> }
     source: data.source || 'creator',
     pollOptions: Array.isArray(data.pollOptions) ? data.pollOptions : undefined,
     pollVotes: Array.isArray(data.pollVotes) ? data.pollVotes : undefined,
-    reactions: [],
-    reactionCounts: data.reactions || data.reactionCounts || {},
-    likeCount: data.likeCount || 0,
+    reactions: Array.isArray(data.reactions) ? data.reactions : [],
+    reactionCounts: data.reactionCounts || data.reactions || {},
+    likeCount: Number(data.likeCount) || 0,
     likedByUsers: data.likedByUsers || {},
     pollVoters: data.pollVoters || {},
     reactionUsers: data.reactionUsers || {},
-    replyCount: data.replyCount || 0,
-    replies: [],
+    replyCount: Number(data.replyCount) || (Array.isArray(data.replies) ? data.replies.length : 0),
+    replies: Array.isArray(data.replies) ? data.replies : [],
     createdAt: asMillis(data.createdAt),
   };
 };
@@ -289,6 +323,7 @@ const mapStatusDoc = (snapshotDoc: { id: string; data: () => Record<string, any>
     storagePath: data.storagePath,
     uploadBytes: Number(data.uploadBytes) || 0,
     expiresAt: asMillis(data.expiresAt),
+    source: data.source || 'status',
   };
 };
 
@@ -573,25 +608,28 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   useEffect(() => {
     if (!isCommunityAllowed) return undefined;
-    const feedQuery = query(collection(db, COMMUNITY_FEED), orderBy('createdAt', 'desc'), limit(150));
+    const feedQuery = query(collection(db, COMMUNITY_FEED), where('expiresAt', '>', Date.now()), orderBy('expiresAt', 'desc'), limit(150));
     return onSnapshot(feedQuery, (snapshot) => {
-      snapshot.docs.forEach((item) => { const expiresAt = asMillis(item.data().expiresAt); if (expiresAt && expiresAt < Date.now()) deleteExpiredCommunityItem(COMMUNITY_FEED, item.id, item.data().storagePath, Number(item.data().uploadBytes) || 0); });
-      const firebaseMessages = snapshot.docs.map((item) => mapFeedDoc(item)).filter((message) => !message.expiresAt || message.expiresAt > Date.now());
-      setMessages(firebaseMessages.length ? firebaseMessages : initialMessages);
-      setAdminPosts(firebaseMessages.filter((message) => message.source === 'admin'));
+      snapshot.docs.forEach((item) => { const expiresAt = asMillis(item.data().expiresAt); if (expiresAt <= Date.now()) deleteExpiredCommunityItem(COMMUNITY_FEED, item.id, item.data().storagePath, Number(item.data().uploadBytes) || 0); });
+      const firebaseMessages = snapshot.docs.map((item) => normalizeFeedMessage(mapFeedDoc(item))).filter((message) => isUnexpired(message, POST_TTL_MS));
+      setMessages((current) => {
+        const mergedMessages = mergeUnexpiredByIdentity(firebaseMessages, current.map(normalizeFeedMessage), initialMessages.map(normalizeFeedMessage), POST_TTL_MS);
+        setAdminPosts(mergedMessages.filter((message) => message.source === 'admin'));
+        return mergedMessages;
+      });
     }, (error) => console.warn('community_feed snapshot failed; using local fallback', error));
   }, [isCommunityAllowed]);
 
   useEffect(() => {
     if (!isCommunityAllowed) return undefined;
-    const statusQuery = query(collection(db, COMMUNITY_STATUS), where('createdAt', '>', Date.now() - 86400000), orderBy('createdAt', 'desc'), limit(150));
+    const statusQuery = query(collection(db, COMMUNITY_STATUS), where('expiresAt', '>', Date.now()), orderBy('expiresAt', 'desc'), limit(150));
     return onSnapshot(statusQuery, (snapshot) => {
       snapshot.docs.forEach((item) => {
-        const createdAt = asMillis(item.data().createdAt);
-        if (createdAt < Date.now() - STORY_TTL_MS) deleteExpiredCommunityItem(COMMUNITY_STATUS, item.id, item.data().storagePath, Number(item.data().uploadBytes) || 0);
+        const expiresAt = asMillis(item.data().expiresAt);
+        if (expiresAt <= Date.now()) deleteExpiredCommunityItem(COMMUNITY_STATUS, item.id, item.data().storagePath, Number(item.data().uploadBytes) || 0);
       });
-      const firebaseStatuses = snapshot.docs.map((item) => mapStatusDoc(item)).filter((status) => (status.createdAt || Date.now()) > Date.now() - STORY_TTL_MS);
-      setStatusCards(firebaseStatuses.length ? firebaseStatuses : initialStatusCards);
+      const firebaseStatuses = snapshot.docs.map((item) => mapStatusDoc(item)).filter((status) => isUnexpired(status, STORY_TTL_MS));
+      setStatusCards((current) => mergeUnexpiredByIdentity(firebaseStatuses, current, initialStatusCards, STORY_TTL_MS));
     }, (error) => console.warn('community_status snapshot failed; using local fallback', error));
   }, [isCommunityAllowed]);
 
@@ -888,15 +926,26 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       reactions: [],
       likeCount: 0,
       replies: [],
+      createdAt: Date.now(),
+      expiresAt: Date.now() + POST_TTL_MS,
+      ownerId: currentUserKey,
+      source: 'creator',
+      reactionCounts: {},
+      likedByUsers: {},
+      pollVoters: {},
+      reactionUsers: {},
+      replyCount: 0,
     };
     const upload = postType === 'image' && postImagePreview ? await uploadCommunityImage('creator-posts', newMessage.id, postImagePreview) : { imageUrl: newMessage.imagePreview, storagePath: undefined, uploadBytes: 0 };
-    const cloudMessage = { ...newMessage, imagePreview: upload.imageUrl, storagePath: upload.storagePath, uploadBytes: upload.uploadBytes, expiresAt: Date.now() + POST_TTL_MS };
-    setMessages((current) => [cloudMessage, ...current]);
-    addDoc(collection(db, COMMUNITY_FEED), { ...cloudMessage, ownerId: currentUserKey, createdAt: Date.now(), expiresAt: Date.now() + POST_TTL_MS, source: 'creator', reactionCounts: {}, replyCount: 0 })
+    const now = Date.now();
+    const cloudMessage = normalizeFeedMessage({ ...newMessage, imagePreview: upload.imageUrl, storagePath: upload.storagePath, uploadBytes: upload.uploadBytes, ownerId: currentUserKey, createdAt: now, expiresAt: now + POST_TTL_MS, source: 'creator' });
+    flushSync(() => setMessages((current) => [cloudMessage, ...current.filter((message) => message.id !== cloudMessage.id)]));
+    openPublishedCreatorPost(cloudMessage.id);
+    addDoc(collection(db, COMMUNITY_FEED), { ...cloudMessage, ownerId: currentUserKey, creatorId: currentUserKey, createdAt: now, expiresAt: now + POST_TTL_MS, source: 'creator', reactionCounts: {}, replyCount: 0 })
       .then((docRef) => {
         const firebasePostId = Number.parseInt(docRef.id.replace(/\D/g, '').slice(-9), 10) || newMessage.id;
         setMessages((current) => current.map((message) => message.id === newMessage.id ? { ...message, docId: docRef.id } : message));
-        openPublishedCreatorPost(newMessage.id || firebasePostId);
+        setSelectedMessageId(newMessage.id || firebasePostId);
         setProfileFeedback({ type: 'success', message: 'Creator post published and opened.' });
       })
       .catch((error) => {
@@ -911,7 +960,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setPostImageName('');
     setPostImagePreview('');
     setPostPollOptions(['', '', '']);
-    openPublishedCreatorPost(newMessage.id);
   };
 
   const submitStatus = async () => {
@@ -933,10 +981,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       pollOptions: cleanedOptions,
     });
     const upload = statusType === 'image' && statusImagePreview ? await uploadCommunityImage('stories', statusStoryId, statusImagePreview) : { imageUrl: statusStory.imagePreview, storagePath: undefined, uploadBytes: 0 };
-    const cloudStory = { ...statusStory, imagePreview: upload.imageUrl, storagePath: upload.storagePath, uploadBytes: upload.uploadBytes };
-    setStatusCards((current) => [cloudStory, ...current]);
     const now = Date.now();
-    addDoc(collection(db, COMMUNITY_STATUS), { ...cloudStory, ownerId: currentUserKey, createdAt: now, expiresAt: now + STORY_TTL_MS })
+    const cloudStory = { ...statusStory, imagePreview: upload.imageUrl, storagePath: upload.storagePath, uploadBytes: upload.uploadBytes, ownerId: currentUserKey, createdAt: now, expiresAt: now + STORY_TTL_MS, source: 'status' as const };
+    flushSync(() => setStatusCards((current) => [cloudStory, ...current.filter((status) => status.id !== cloudStory.id)]));
+    openPublishedStatusStory(statusStoryId);
+    addDoc(collection(db, COMMUNITY_STATUS), { ...cloudStory, ownerId: currentUserKey, createdAt: now, expiresAt: now + STORY_TTL_MS, source: 'status' })
       .then((docRef) => {
         setStatusCards((current) => current.map((status) => status.id === statusStoryId ? { ...status, docId: docRef.id } : status));
         openPublishedStatusStory(statusStoryId);
@@ -949,7 +998,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         setProfileFeedback({ type: 'error', message: 'Status story failed to publish. Nothing was locked; please try again.' });
       })
       .finally(() => setIsPublishingStatus(false));
-    openPublishedStatusStory(statusStoryId);
     setStatusDraft('');
     setStatusImageName('');
     setStatusImagePreview('');
@@ -1350,9 +1398,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const activeMessage = feedMessages.find((message) => message.id === selectedMessageId) || feedMessages[0];
     const isFollowingFeed = title.toLowerCase().includes('followers');
     const heroGradient = isFollowingFeed ? 'from-[#E8F0FE] via-[#D3E3FD] to-[#C2E7FF]' : 'from-[#EDF2FA] via-[#D3E3FD] to-[#C2E7FF]';
-    const heroEyebrow = isFollowingFeed ? 'Following pulse' : 'Chat feed live';
-    const heroIcon = isFollowingFeed ? '👥' : '💬';
-    if (!feedMessages.length) return <div className="mx-auto max-w-5xl rounded-[2rem] border border-dashed border-[#C2E7FF] bg-gradient-to-br from-[#F8FAFD] via-white to-[#E8F0FE] p-8 text-center font-bold text-[#5F6368] shadow-[0_18px_54px_rgba(37,99,235,0.10)]"><div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white text-3xl shadow-inner">👀</div>Follow creators to build this feed.</div>;
+    const isAdminFeed = title.toLowerCase().includes('admin');
+    const heroEyebrow = isAdminFeed ? 'Admin broadcast' : isFollowingFeed ? 'Following pulse' : 'Chat feed live';
+    const heroIcon = isAdminFeed ? '📣' : isFollowingFeed ? '👥' : '💬';
+    if (!feedMessages.length) return <div className="mx-auto max-w-5xl rounded-[2rem] border border-dashed border-[#C2E7FF] bg-gradient-to-br from-[#F8FAFD] via-white to-[#E8F0FE] p-8 text-center font-bold text-[#5F6368] shadow-[0_18px_54px_rgba(37,99,235,0.10)]"><div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white text-3xl shadow-inner">{isAdminFeed ? '📣' : '👀'}</div>{isAdminFeed ? 'No unexpired admin posts are available right now.' : 'Follow creators to build this feed.'}</div>;
     return <div className="mx-auto grid h-[clamp(32rem,calc(100dvh-10.5rem),76rem)] min-h-0 w-full min-w-0 max-w-[1800px] gap-4 overflow-hidden lg:gap-5 md:grid-cols-[minmax(0,clamp(17rem,30vw,27.5rem))_minmax(0,1fr)]"><aside className="hidden h-full min-h-0 min-w-0 overflow-y-auto rounded-[2rem] border border-[#E0E3EB] bg-white p-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] ring-1 ring-[#D2E3FC] backdrop-blur-xl custom-scrollbar md:block"><div className={`relative mb-4 overflow-hidden rounded-[1.6rem] bg-gradient-to-br ${heroGradient} p-5 text-[#202124] shadow-[0_18px_50px_rgba(37,99,235,0.18)]`}><div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/20 blur-2xl" /><p className="relative text-xs font-black uppercase tracking-[0.28em] text-[#202124]/80">{heroEyebrow}</p><h2 className="relative mt-2 text-3xl font-black tracking-tight">{heroIcon} {title}</h2><p className="relative mt-2 text-sm font-semibold leading-6 text-[#202124]/78">{subtitle}</p></div><div className="space-y-3">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} isActive={activeMessage?.id === message.id} />)}</div></aside><section className="hidden min-h-0 min-w-0 overflow-hidden md:block">{activeMessage ? renderMessageDetails(activeMessage) : null}</section><div className="h-full space-y-3 overflow-y-auto pb-4 custom-scrollbar md:hidden">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)}</div></div>;
   };
 
