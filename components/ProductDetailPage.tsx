@@ -424,8 +424,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           <div ref={gridRef} className={`grid grid-cols-1 gap-5 sm:gap-8 md:grid-cols-12 ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
             <div className="md:col-span-7">
               <div className="relative w-full overflow-hidden rounded-[1.5rem] border border-white/70 bg-white/80 shadow-[0_24px_70px_rgba(15,23,42,0.10)] sm:rounded-[2rem]">
-                <img src={mainImage || getProductImage(product, 'detailMobile')} alt={product.title} className="block aspect-[4/3] h-auto w-full object-cover lg:hidden" />
-                <img src={mainImage || getProductImage(product, 'detailDesktop')} alt={product.title} className="hidden aspect-video h-auto w-full object-cover lg:block" />
+                <img src={mainImage || getProductImage(product, 'detailMobile')} alt={product.title} className="block aspect-[4/3] h-auto w-full object-contain lg:hidden" />
+                <img src={mainImage || getProductImage(product, 'detailDesktop')} alt={product.title} className="hidden aspect-video h-auto w-full object-contain lg:block" />
                 {isWishlisted && <span className="absolute right-3 top-3 rounded-full bg-red-500 px-3 py-1.5 text-xs font-black text-white shadow-lg sm:right-5 sm:top-5 sm:px-4 sm:py-2 sm:text-sm">♥ Wishlisted</span>}
               </div>
 
@@ -439,7 +439,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <div className="mt-4 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:gap-3 sm:overflow-visible sm:pb-0">
                   {(product.images || []).map((img, i) => (
                     <button key={i} onClick={() => setMainImage(img)} className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-white/75 transition-all sm:h-20 sm:w-20 sm:rounded-2xl ${mainImage === img ? 'border-primary shadow-lg' : 'border-white/70 hover:border-indigo-300'}`} aria-label={`View thumbnail ${i + 1}`}>
-                      <img src={img} alt={`thumbnail ${i + 1}`} className="h-full w-full object-cover" />
+                      <img src={img} alt={`thumbnail ${i + 1}`} className="h-full w-full object-contain" />
                     </button>
                   ))}
                 </div>

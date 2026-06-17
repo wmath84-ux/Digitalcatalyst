@@ -4,7 +4,7 @@ import { getDownloadURL, ref, uploadString } from 'firebase/storage';
 import { db, storage } from '../../firebase';
 
 const COMMUNITY_FEED = 'community_feed';
-const POST_TTL_MS = 5 * 24 * 60 * 60 * 1000;
+const POST_TTL_MS = 24 * 60 * 60 * 1000;
 type PostType = 'text' | 'image' | 'poll';
 
 const AdminPostManagement: React.FC = () => {
@@ -70,7 +70,7 @@ const AdminPostManagement: React.FC = () => {
         expiresAt: Date.now() + POST_TTL_MS,
       });
       setText(''); setLink(''); setImage(''); setImageName(''); setPollOptions(['', '', '']);
-      setFeedback('Admin post published to the community ADMIN POST page and main feed. It will auto-delete after 5 days.');
+      setFeedback('Admin post published to the community ADMIN POST page and main feed. It will auto-delete after 24 hours.');
     } catch (error) {
       setFeedback(error instanceof Error ? error.message : 'Admin post publish failed.');
     } finally {

@@ -17,7 +17,7 @@ const PurchasedProductCard: React.FC<{
     return (
         <div className={`relative bg-white/70 backdrop-blur-xl ${isMobileHome ? 'rounded-lg' : 'rounded-xl'} shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden border border-gray-200 flex flex-col transform hover:-translate-y-2 transition-all duration-300 ease-in-out hover:shadow-sm product-card-shine ${animationClass}`}>
             <div className="aspect-[4/3] overflow-hidden relative bg-gray-100">
-                <img src={getProductImage(product, 'purchaseCard')} alt={product.title} className="w-full h-full object-cover transition-transform duration-500 hover:scale-110" />
+                <img src={getProductImage(product, 'purchaseCard')} alt={product.title} className="w-full h-full object-contain" />
                 <div className="absolute inset-0 bg-white/20"></div>
                 <div className="absolute top-3 right-3 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded shadow-sm">
                     PURCHASED

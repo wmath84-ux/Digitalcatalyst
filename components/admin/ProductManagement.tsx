@@ -702,7 +702,7 @@ const ProductForm: React.FC<{
                                 <div className="mt-4 grid grid-cols-2 gap-3">
                                     {((images || []).filter(Boolean) || []).map((image, index) => (
                                         <div key={`${image}-${index}`} className="group relative aspect-square overflow-hidden rounded-2xl border border-white/50 bg-white/80">
-                                            <img src={image} alt={`Product ${index + 1}`} className="h-full w-full object-cover" />
+                                            <img src={image} alt={`Product ${index + 1}`} className="h-full w-full object-contain" />
                                             <button type="button" onClick={() => setImages(prev => (prev || []).filter((_, currentIndex) => currentIndex !== index))} className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-sm font-black text-white opacity-90">×</button>
                                         </div>
                                     ))}
@@ -717,7 +717,7 @@ const ProductForm: React.FC<{
                                             return <div key={slot} className="rounded-2xl border border-slate-200 bg-white/80 p-3">
                                                 <div className="flex items-start justify-between gap-3"><div><p className="text-sm font-black text-slate-900">{config.label}</p><p className="text-xs font-bold text-slate-500">Required {config.ratio} · Recommended {config.recommendedSize}</p></div>{productImages[slot] ? <button type="button" onClick={() => setProductImages(prev => ({ ...prev, [slot]: undefined }))} className="rounded-full bg-red-500 px-2 py-1 text-xs font-black text-white">Remove</button> : null}</div>
                                                 <div className={`mt-3 ${config.aspectClass} overflow-hidden rounded-xl bg-slate-100`}>
-                                                    {productImages[slot] ? <img src={productImages[slot]} alt={config.label} className="h-full w-full object-cover" /> : <div className="flex h-full w-full items-center justify-center text-xs font-black text-slate-400">No {config.ratio} image</div>}
+                                                    {productImages[slot] ? <img src={productImages[slot]} alt={config.label} className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-xs font-black text-slate-400">No {config.ratio} image</div>}
                                                 </div>
                                                 <button type="button" onClick={() => slotInputRefs.current[slot]?.click()} className="mt-3 w-full rounded-xl border border-dashed border-cyan-300 px-3 py-2 text-xs font-black text-cyan-700">Upload / Replace {config.ratio}</button>
                                                 <input ref={node => { slotInputRefs.current[slot] = node; }} type="file" accept="image/*" className="hidden" onChange={event => { handleSlotImageUpload(slot, event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />
@@ -848,7 +848,7 @@ const ProductManagement: React.FC<{
                                             <td className="p-5">
                                                 <div className="flex items-center gap-4">
                                                     <div className="h-14 w-14 flex-shrink-0 overflow-hidden rounded-2xl border border-white/50 bg-white/80">
-                                                        <img src={thumbnail} alt="" className="h-full w-full object-cover" />
+                                                        <img src={thumbnail} alt="" className="h-full w-full object-contain" />
                                                     </div>
                                                     <div className="min-w-0">
                                                         <p className="truncate font-black text-slate-900 group-hover:text-cyan-700">{product.title}</p>

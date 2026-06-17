@@ -58,7 +58,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                 <img 
                     src={displayImage} 
                     alt={product.title} 
-                    className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 ease-out group-hover:scale-110" 
+                    className="absolute inset-0 w-full h-full object-contain" 
                     loading="lazy"
                 />
                 

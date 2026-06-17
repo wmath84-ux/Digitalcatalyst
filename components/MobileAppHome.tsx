@@ -27,7 +27,7 @@ const currency = (product: ProductWithRating) => product.salePrice || product.pr
 const progressFor = (product: ProductWithRating, index = 0) => Math.min(92, Math.max(18, ((product.id * 17) + (index * 11)) % 100));
 const ProductCover: React.FC<{ product: ProductWithRating; compact?: boolean; slot: ProductImageSlot }> = ({ product, compact, slot }) => {
   const image = getProductImage(product, slot);
-  if (image) return <img src={image} alt={product.title} className="h-full w-full object-cover" />;
+  if (image) return <img src={image} alt={product.title} className="h-full w-full object-contain" />;
   return (
     <div className="flex h-full w-full flex-col justify-between overflow-hidden bg-[radial-gradient(circle_at_20%_15%,#7C4DFF_0,transparent_34%),linear-gradient(135deg,#071742,#0B63FF_58%,#DCCBFF)] p-3 text-white">
       <span className="w-fit rounded-full bg-white/18 px-2 py-1 text-[9px] font-black uppercase tracking-wider">{product.category || 'Course'}</span>
