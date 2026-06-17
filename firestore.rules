@@ -57,6 +57,45 @@ service cloud.firestore {
       allow update, delete: if isAdmin();
     }
 
+
+    match /community_feed/{postId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.creatorId == request.auth.uid
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.postType in ['text', 'image', 'poll'];
+      allow update: if signedIn();
+      allow delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid);
+
+      match /replies/{replyId} {
+        allow read: if signedIn();
+        allow create: if signedIn();
+        allow update, delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid);
+      }
+    }
+
+    match /community_status/{statusId} {
+      allow read: if signedIn();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.type in ['text', 'image', 'poll'];
+      allow update: if signedIn();
+      allow delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid) || (signedIn() && resource.data.expiresAt < request.time.toMillis());
+    }
+
+    match /community_master_tags/{tagId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update: if signedIn();
+      allow delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid);
+    }
+
+    match /siteSupportTickets/{ticketId} {
+      allow read: if signedIn();
+      allow create: if signedIn();
+      allow update, delete: if isAdmin();
+    }
+
     match /{document=**} {
       allow read, write: if isAdmin();
     }
