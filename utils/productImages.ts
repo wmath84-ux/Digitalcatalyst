@@ -18,7 +18,20 @@ export const getProductImageFallback = (product: Pick<Product, 'images' | 'image
   return firstImage || `https://picsum.photos/seed/${product.imageSeed || 'product'}/800/600`;
 };
 
+const PRODUCT_IMAGE_SLOT_FALLBACKS: Record<ProductImageSlot, ProductImageSlot[]> = {
+  card: ['card', 'detailMobile', 'purchaseCard', 'galleryThumb', 'homeTopRated'],
+  detailMobile: ['detailMobile', 'card', 'purchaseCard', 'detailDesktop'],
+  detailDesktop: ['detailDesktop', 'detailMobile', 'card', 'purchaseCard'],
+  homeTopRated: ['homeTopRated', 'purchaseSquare', 'galleryThumb', 'card'],
+  homeList: ['homeList', 'card', 'detailMobile', 'purchaseCard'],
+  purchaseSquare: ['purchaseSquare', 'homeTopRated', 'galleryThumb', 'card'],
+  purchaseCard: ['purchaseCard', 'card', 'detailMobile', 'detailDesktop'],
+  galleryThumb: ['galleryThumb', 'homeTopRated', 'purchaseSquare', 'card'],
+};
+
 export const getProductImage = (product: Product, slot: ProductImageSlot): string => {
-  const slotImage = product.productImages?.[slot];
+  const slotImage = PRODUCT_IMAGE_SLOT_FALLBACKS[slot]
+    .map((fallbackSlot) => product.productImages?.[fallbackSlot])
+    .find(Boolean);
   return slotImage || getProductImageFallback(product);
 };
