@@ -839,6 +839,24 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setExpandedReplyId(null);
   };
 
+
+  const openPublishedCreatorPost = (messageId: number) => {
+    setSelectedMessageId(messageId);
+    setActiveView('feed');
+    setPage(window.matchMedia('(max-width: 767px)').matches ? 'thread' : 'chat');
+    setPageStack([]);
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const openPublishedStatusStory = (statusId: number) => {
+    setSelectedStatusId(statusId);
+    setActiveView('status');
+    setPage('statusReel');
+    setPageStack([]);
+    recordStatusView(statusId);
+    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
   const submitCreatorPost = async () => {
     const draft = postDraft.trim();
     const cleanedOptions = postPollOptions.map((option) => option.trim()).filter(Boolean);
@@ -878,7 +896,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       .then((docRef) => {
         const firebasePostId = Number.parseInt(docRef.id.replace(/\D/g, '').slice(-9), 10) || newMessage.id;
         setMessages((current) => current.map((message) => message.id === newMessage.id ? { ...message, docId: docRef.id } : message));
-        setSelectedMessageId(newMessage.id || firebasePostId);
+        openPublishedCreatorPost(newMessage.id || firebasePostId);
         setProfileFeedback({ type: 'success', message: 'Creator post published and opened.' });
       })
       .catch((error) => {
@@ -893,10 +911,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setPostImageName('');
     setPostImagePreview('');
     setPostPollOptions(['', '', '']);
-    setSelectedMessageId(newMessage.id);
-    setActiveView('feed');
-    setPage(window.matchMedia('(max-width: 767px)').matches ? 'thread' : 'chat');
-    setPageStack([]);
+    openPublishedCreatorPost(newMessage.id);
   };
 
   const submitStatus = async () => {
@@ -924,8 +939,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     addDoc(collection(db, COMMUNITY_STATUS), { ...cloudStory, ownerId: currentUserKey, createdAt: now, expiresAt: now + STORY_TTL_MS })
       .then((docRef) => {
         setStatusCards((current) => current.map((status) => status.id === statusStoryId ? { ...status, docId: docRef.id } : status));
-        setSelectedStatusId(statusStoryId);
-        recordStatusView(statusStoryId);
+        openPublishedStatusStory(statusStoryId);
         setProfileFeedback({ type: 'success', message: 'Status story published and opened.' });
       })
       .catch((error) => {
@@ -935,13 +949,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         setProfileFeedback({ type: 'error', message: 'Status story failed to publish. Nothing was locked; please try again.' });
       })
       .finally(() => setIsPublishingStatus(false));
-    setSelectedStatusId(statusStoryId);
+    openPublishedStatusStory(statusStoryId);
     setStatusDraft('');
     setStatusImageName('');
     setStatusImagePreview('');
     setStatusPollOptions(['', '', '']);
-    setActiveView('status');
-    setPage('statusReel');
   };
 
   const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {

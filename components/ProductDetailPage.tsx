@@ -7,7 +7,7 @@ import PaymentModal from './PaymentModal';
 import RatingsAndReviews from './RatingsAndReviews';
 import FeaturedProducts from './FeaturedProducts';
 import ShareModal from './ShareModal';
-import { getProductImage } from '../utils/productImages';
+import { PRODUCT_IMAGE_SLOTS, ProductImageSlot, getProductImage } from '../utils/productImages';
 
 const PriceChart: React.FC<{ basePrice: number, priceHistory?: PriceHistoryEntry[] }> = ({ basePrice, priceHistory }) => {
     const data: { date: Date; price: number; }[] = (() => {
@@ -137,6 +137,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [openAccordion, setOpenAccordion] = useState<number | null>(0);
 
   const [mainImage, setMainImage] = useState<string | null>(null);
+
+  const detailGallerySlots: ProductImageSlot[] = ['galleryThumb', 'detailMobile', 'detailDesktop', 'card'];
+  const detailGalleryImages = detailGallerySlots
+    .map((slot) => ({ slot, image: product.productImages?.[slot], config: PRODUCT_IMAGE_SLOTS[slot] }))
+    .filter((item): item is { slot: ProductImageSlot; image: string; config: typeof PRODUCT_IMAGE_SLOTS[ProductImageSlot] } => Boolean(item.image));
   const quantity = 1;
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
@@ -435,11 +440,16 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <div className="rounded-2xl border border-white/70 bg-white/70 p-3 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl sm:rounded-3xl sm:p-4"><p className="text-xl sm:text-2xl">⭐</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Rating</p><p className="text-sm font-black text-slate-900">{product.rating.toFixed(1)} / 5</p></div>
               </div>
 
-              {(product.images || []).length > 1 && (
+              {(detailGalleryImages.length > 0 || (product.images || []).length > 1) && (
                 <div className="mt-4 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:gap-3 sm:overflow-visible sm:pb-0">
+                  {detailGalleryImages.map(({ slot, image, config }) => (
+                    <button key={slot} onClick={() => setMainImage(image)} className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-white/75 transition-all sm:h-20 sm:w-20 sm:rounded-2xl ${mainImage === image ? 'border-primary shadow-lg' : 'border-white/70 hover:border-indigo-300'}`} aria-label={`View ${config.label}`}>
+                      <img src={image} alt={`${product.title} ${config.label}`} className="h-full w-full object-contain" />
+                    </button>
+                  ))}
                   {(product.images || []).map((img, i) => (
-                    <button key={i} onClick={() => setMainImage(img)} className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-white/75 transition-all sm:h-20 sm:w-20 sm:rounded-2xl ${mainImage === img ? 'border-primary shadow-lg' : 'border-white/70 hover:border-indigo-300'}`} aria-label={`View thumbnail ${i + 1}`}>
-                      <img src={img} alt={`thumbnail ${i + 1}`} className="h-full w-full object-contain" />
+                    <button key={`legacy-${i}`} onClick={() => setMainImage(img)} className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-white/75 transition-all sm:h-20 sm:w-20 sm:rounded-2xl ${mainImage === img ? 'border-primary shadow-lg' : 'border-white/70 hover:border-indigo-300'}`} aria-label={`View fallback thumbnail ${i + 1}`}>
+                      <img src={img} alt={`${product.title} fallback thumbnail ${i + 1}`} className="h-full w-full object-contain" />
                     </button>
                   ))}
                 </div>
