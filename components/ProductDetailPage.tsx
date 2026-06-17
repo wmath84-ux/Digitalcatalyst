@@ -7,6 +7,7 @@ import PaymentModal from './PaymentModal';
 import RatingsAndReviews from './RatingsAndReviews';
 import FeaturedProducts from './FeaturedProducts';
 import ShareModal from './ShareModal';
+import { getProductImage } from '../utils/productImages';
 
 const PriceChart: React.FC<{ basePrice: number, priceHistory?: PriceHistoryEntry[] }> = ({ basePrice, priceHistory }) => {
     const data: { date: Date; price: number; }[] = (() => {
@@ -135,7 +136,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const gridRef = useRef<HTMLDivElement>(null);
   const [openAccordion, setOpenAccordion] = useState<number | null>(0);
 
-  const [mainImage, setMainImage] = useState((product.images || [])[0] || `https://picsum.photos/seed/${product.imageSeed}/800/600`);
+  const [mainImage, setMainImage] = useState<string | null>(null);
   const quantity = 1;
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
@@ -146,7 +147,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const productUrl = `https://digitalcatalyst.example.com/product/${product.id}`;
 
   useEffect(() => {
-    setMainImage((product.images || [])[0] || `https://picsum.photos/seed/${product.imageSeed}/800/600`);
+    setMainImage(null);
     setAppliedCoupon(null);
     setCouponInput('');
     setCouponError(null);
@@ -423,7 +424,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           <div ref={gridRef} className={`grid grid-cols-1 gap-5 sm:gap-8 md:grid-cols-12 ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
             <div className="md:col-span-7">
               <div className="relative w-full overflow-hidden rounded-[1.5rem] border border-white/70 bg-white/80 shadow-[0_24px_70px_rgba(15,23,42,0.10)] sm:rounded-[2rem]">
-                <img src={mainImage} alt={product.title} className="aspect-[4/3] h-auto w-full object-cover sm:aspect-video" />
+                <img src={mainImage || getProductImage(product, 'detailMobile')} alt={product.title} className="block aspect-[4/3] h-auto w-full object-cover lg:hidden" />
+                <img src={mainImage || getProductImage(product, 'detailDesktop')} alt={product.title} className="hidden aspect-video h-auto w-full object-cover lg:block" />
                 {isWishlisted && <span className="absolute right-3 top-3 rounded-full bg-red-500 px-3 py-1.5 text-xs font-black text-white shadow-lg sm:right-5 sm:top-5 sm:px-4 sm:py-2 sm:text-sm">♥ Wishlisted</span>}
               </div>
 

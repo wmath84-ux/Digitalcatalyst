@@ -160,6 +160,16 @@ export interface Product {
   id: number;
   imageSeed: string;
   images: string[]; // First image is the primary thumbnail.
+  productImages?: {
+    card?: string;
+    detailMobile?: string;
+    detailDesktop?: string;
+    homeTopRated?: string;
+    homeList?: string;
+    purchaseSquare?: string;
+    purchaseCard?: string;
+    galleryThumb?: string;
+  };
   title: string;
   description: string;
   longDescription: string;
