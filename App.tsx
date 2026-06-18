@@ -1220,9 +1220,8 @@ const App: React.FC = () => {
     const storedReviews = localStorage.getItem('productReviews');
     if (storedReviews) setReviews(JSON.parse(storedReviews)); else setReviews(initialReviews);
     
-    // Purchases are authenticated state. Never hydrate global cached unlocks;
+    // Purchases are authenticated state. Never hydrate or clear global cached unlocks on startup;
     // Firestore entitlements are restored from Firebase Auth sessions only.
-    localStorage.removeItem('purchasedProducts');
 
     const storedCart = localStorage.getItem('shoppingCart');
     if (storedCart) setCart(JSON.parse(storedCart));
@@ -1271,8 +1270,6 @@ const App: React.FC = () => {
 
     const storedSubscribers = localStorage.getItem('newsletterSubscribers');
     if (storedSubscribers) setNewsletterSubscribers(JSON.parse(storedSubscribers));
-
-    localStorage.removeItem('purchasedProducts');
 
     const storedCurrentAdmin = localStorage.getItem('currentAdminUser');
     if (storedCurrentAdmin) {
@@ -1858,7 +1855,7 @@ const App: React.FC = () => {
           lastLoginAt: serverTimestamp(),
       };
       await setDoc(userRef, safeProfileFields, { merge: true });
-      console.info(`profile ${userSnap.exists() ? 'loaded' : 'created'}`);
+      console.info('PROFILE_LOADED_OR_CREATED', { uid: firebaseUser.uid });
       const savedSnap = await getDoc(userRef);
       return toUserProfile(firebaseUser, savedSnap.exists() ? savedSnap.data() : safeProfileFields);
   };
@@ -1873,8 +1870,8 @@ const App: React.FC = () => {
       return mergePurchasedProductIds(idsFromUserDoc, idsFromPurchaseDocs);
   };
 
-  // Frontend-only session locking improves UX, but is not fully tamper-proof.
-  // Stronger enforcement should use Cloud Functions/Admin SDK to revoke old refresh tokens when a new session starts.
+  // Frontend session locking is disabled. Firebase Auth is the source of truth on the client.
+  // Any single-device enforcement must happen on a secure backend/Admin SDK, not from Firestore snapshots.
   const stopSessionWatchers = () => {
       sessionUnsubscribeRef.current?.();
       sessionUnsubscribeRef.current = null;
@@ -1922,12 +1919,14 @@ const App: React.FC = () => {
       sessionUnsubscribeRef.current = onSnapshot(sessionRef, snapshot => {
           const remoteSessionId = snapshot.data()?.sessionId;
           if (remoteSessionId && remoteSessionId !== sessionId) {
-              stopSessionWatchers();
-              void signOut(auth).catch(error => console.warn('Firebase sign out failed after session takeover.', error));
-              handleLogout(false, { preserveSessionDocument: true });
-              setInfoModal({ title: 'Logged out', message: 'You were logged out because this account was opened on another device.', icon: '🔒' });
+              console.warn('IGNORED_STALE_SESSION_MISMATCH', {
+                  uid,
+                  localSessionId: sessionId,
+                  remoteSessionId,
+              });
+              return;
           }
-      }, error => console.warn('Session listener failed.', error));
+      }, error => console.warn('Session listener failed; keeping Firebase Auth session active.', error));
       sessionHeartbeatRef.current = window.setInterval(() => {
           updateDoc(sessionRef, { lastSeenAt: serverTimestamp() }).catch(error => console.warn('Session heartbeat failed.', error));
       }, 45000);
@@ -2026,6 +2025,7 @@ const App: React.FC = () => {
               try {
                   const ensuredUser = await ensureUserProfile(firebaseUser, profile);
                   if (isBlockedUserStatus(ensuredUser.status)) {
+                      console.warn('AUTO_SIGNOUT_BLOCKED_REASON', { uid: firebaseUser.uid, status: ensuredUser.status });
                       await signOut(auth);
                       handleLogout(false);
                       if (getIsMobileViewport()) setMobileAuthFlowState('logged-out');
@@ -2065,19 +2065,8 @@ const App: React.FC = () => {
                   currentView: currentViewRef.current,
               });
 
-              const sessionId = getOrCreateDeviceSessionId();
-              activeSessionIdRef.current = sessionId;
-              activeSessionUidRef.current = firebaseUser.uid;
-              try {
-                  await writeCurrentSession(firebaseUser.uid, sessionId);
-              } catch (error) {
-                  console.warn('Current session write failed; continuing login.', error);
-              }
-              try {
-                  subscribeToCurrentSession(firebaseUser.uid, sessionId);
-              } catch (error) {
-                  console.warn('Current session watcher failed; continuing login.', error);
-              }
+              // Disabled: do not write or subscribe to users/{uid}/session/current during login.
+              // Firestore session/current can be stale/cached on mobile and must not block Firebase Auth.
 
               return hydratedUser;
           } catch (error) {
@@ -2100,8 +2089,7 @@ const App: React.FC = () => {
   const ensureAuthPersistence = () => setPersistence(auth, browserLocalPersistence);
 
   useEffect(() => {
-      console.info('auth init started');
-      localStorage.removeItem('purchasedProducts');
+      console.info('AUTH_INIT_START');
       void ensureAuthPersistence().catch(error => {
           console.warn('Firebase auth persistence setup failed.', error);
           setAuthError(getFirebaseAuthErrorMessage(error));
@@ -2129,7 +2117,7 @@ const App: React.FC = () => {
           setFirebaseAuthUser(user);
           setIsAuthStateReady(true);
           setAuthError(null);
-          console.info(`auth state resolved: ${user?.uid || 'null'}`);
+          console.info('AUTH_STATE_RESOLVED', { uid: user?.uid || null });
           console.info('[mobile-auth]', { step: 'firebase-user-detected', hasFirebaseUser: Boolean(user) });
           console.info('[mobile-auth]', {
               step: 'auth-state-changed',
@@ -2209,7 +2197,7 @@ const App: React.FC = () => {
           }
           const credential = await signInWithPopup(auth, googleProvider);
           await credential.user.getIdToken(true);
-          console.info(`login success: ${credential.user.uid}`);
+          console.info('LOGIN_SUCCESS', { uid: credential.user.uid });
           const hydratedUser = await completeFirebaseUserSession(credential.user, { redirect: false });
           if (hydratedUser) {
               finishMobileAuthSuccess(hydratedUser);
@@ -2238,7 +2226,7 @@ const App: React.FC = () => {
           await ensureAuthPersistence();
           const credential = await signInWithEmailAndPassword(auth, email, password);
           await credential.user.getIdToken(true);
-          console.info(`login success: ${credential.user.uid}`);
+          console.info('LOGIN_SUCCESS', { uid: credential.user.uid });
           const hydratedUser = await completeFirebaseUserSession(credential.user, { redirect: false, profile: { name: credential.user.displayName || undefined, mobile: credential.user.phoneNumber || undefined } });
           if (hydratedUser) {
               finishMobileAuthSuccess(hydratedUser);
@@ -2256,7 +2244,7 @@ const App: React.FC = () => {
           await ensureAuthPersistence();
           const credential = await createUserWithEmailAndPassword(auth, profile.email, password);
           await credential.user.getIdToken(true);
-          console.info(`login success: ${credential.user.uid}`);
+          console.info('LOGIN_SUCCESS', { uid: credential.user.uid });
           await updateProfile(credential.user, { displayName: profile.name });
           const hydratedUser = await completeFirebaseUserSession(credential.user, { redirect: false, profile });
           if (hydratedUser) {
@@ -3316,7 +3304,7 @@ const App: React.FC = () => {
 
   const renderPage = () => {
     const hasFirebaseUser = Boolean(firebaseAuthUser);
-    console.info('route guard decision: authReady, userExists, path', isAuthStateReady, Boolean(currentUser || firebaseAuthUser), currentView);
+    console.info('ROUTE_GUARD_DECISION', { authReady: isAuthStateReady, userExists: Boolean(firebaseAuthUser), path: currentView });
     if (isMobileViewport && !isAuthStateReady) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
     if (isMobileViewport && hasFirebaseUser && !currentUser) return renderMobileSessionStatus('Restoring account…', 'Your login succeeded. We are finishing your account setup now.');
     if (isMobileViewport && isAuthStateReady && !hasFirebaseUser && !currentUser) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : 'signup'} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
