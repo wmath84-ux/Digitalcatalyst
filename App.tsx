@@ -39,10 +39,18 @@ import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
 import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import { createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
+import { createUserWithEmailAndPassword, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
+import { clearRememberedAuthAccount, getRememberedAuthAccount, RememberedAuthAccount, saveRememberedAuthAccount } from './utils/rememberedAuth';
+import { isMobileViewport as getIsMobileViewport } from './utils/device';
 
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
+const MOBILE_WELCOME_SESSION_KEY = 'digitalCatalyst.mobileWelcomeShown';
+
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
+});
 
 // --- SAFETY & UTILS ---
 
@@ -234,7 +242,10 @@ export interface User {
     photoURL?: string;
     role?: 'user' | 'admin';
     status?: 'active' | 'blocked';
-    password?: string; // Legacy local-mode fallback only.
+    password?: string; // Legacy local-mode fallback only. Never write Firebase passwords into this field.
+    authProvider?: 'google' | 'password';
+    providerIds?: string[];
+    emailVerified?: boolean;
     createdAt: string;
     lastLoginAt?: string;
     eduCoins?: number;
@@ -905,6 +916,10 @@ const App: React.FC = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>(initialSupportTickets);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [currentView, setCurrentView] = useState('home'); 
+  const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup'>('login');
+  const [isAuthStateReady, setIsAuthStateReady] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => getIsMobileViewport());
+  const [mobileWelcomeMessage, setMobileWelcomeMessage] = useState('');
   const currentViewRef = React.useRef(currentView);
   const historyNavigationRef = React.useRef(false);
   const lastHistoryViewRef = React.useRef(currentView);
@@ -921,6 +936,7 @@ const App: React.FC = () => {
 
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [rememberedAuthAccount, setRememberedAuthAccount] = useState<RememberedAuthAccount | null>(() => getRememberedAuthAccount());
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(initialAdminUsers);
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
   const [productToBuyAfterLogin, setProductToBuyAfterLogin] = useState<ProductWithRating | null>(null);
@@ -942,6 +958,56 @@ const App: React.FC = () => {
   const activeSessionUidRef = useRef<string | null>(null);
   const sessionUnsubscribeRef = useRef<(() => void) | null>(null);
   const sessionHeartbeatRef = useRef<ReturnType<typeof window.setInterval> | null>(null);
+  const sessionCompletionRef = useRef<{ uid: string; startedAt: number } | null>(null);
+  const sessionCompletionPromiseRef = useRef<Promise<void> | null>(null);
+  const authRedirectHandledRef = useRef<{ uid: string; source?: string; at: number } | null>(null);
+  const hasShownMobileWelcomeThisSessionRef = useRef(false);
+  const mobileWelcomeTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
+  const [mobileCompletionInput, setMobileCompletionInput] = useState('');
+  const [mobileCompletionError, setMobileCompletionError] = useState('');
+  const [isSavingMobileCompletion, setIsSavingMobileCompletion] = useState(false);
+  const [hasSkippedMobileCompletion, setHasSkippedMobileCompletion] = useState(false);
+
+
+  useEffect(() => {
+    const updateMobileViewport = () => setIsMobileViewport(getIsMobileViewport());
+    updateMobileViewport();
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 768px)');
+    media.addEventListener?.('change', updateMobileViewport);
+    window.addEventListener('resize', updateMobileViewport, { passive: true });
+    return () => {
+      media.removeEventListener?.('change', updateMobileViewport);
+      window.removeEventListener('resize', updateMobileViewport);
+    };
+  }, []);
+
+  const getHasShownMobileWelcomeThisSession = () => {
+    if (hasShownMobileWelcomeThisSessionRef.current) return true;
+    try {
+      return sessionStorage.getItem(MOBILE_WELCOME_SESSION_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  };
+
+  const markMobileWelcomeShownThisSession = () => {
+    hasShownMobileWelcomeThisSessionRef.current = true;
+    try {
+      sessionStorage.setItem(MOBILE_WELCOME_SESSION_KEY, 'true');
+    } catch {
+      // Session welcome is only a UI nicety; in-memory ref remains the fallback.
+    }
+  };
+
+  const showMobileWelcomeAfterAuth = (user?: Pick<User, 'name' | 'email'> | null) => {
+    if (!isMobileViewport || !user || getHasShownMobileWelcomeThisSession()) return;
+    const displayName = (user.name || '').trim() || (user.email ? user.email.split('@')[0] : '');
+    setMobileWelcomeMessage(displayName ? `Welcome back, ${displayName}!` : 'Welcome to Eduvora!');
+    markMobileWelcomeShownThisSession();
+    if (mobileWelcomeTimeoutRef.current) window.clearTimeout(mobileWelcomeTimeoutRef.current);
+    mobileWelcomeTimeoutRef.current = window.setTimeout(() => setMobileWelcomeMessage(''), 3500);
+  };
 
 
   const normalizeCourseModules = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
@@ -1461,7 +1527,7 @@ const App: React.FC = () => {
   const handleAddToCart = (productId: number, quantity: number = 1) => {
       if (!currentUser) {
           setInfoModal({ title: 'Login required', message: 'Please login before adding products to cart.', icon: '🔐' });
-          setCurrentView('auth');
+          openAuthPage('login');
           return;
       }
       setCart(prevCart => {
@@ -1497,16 +1563,24 @@ const App: React.FC = () => {
       setCart(prevCart => prevCart.filter(item => item.productId !== productId));
   };
 
+  const promptForMobileCompletion = () => {
+    setHasSkippedMobileCompletion(false);
+    setMobileCompletionError('Please add your 10 digit mobile number before purchases or profile-sensitive actions.');
+  };
+
+  const requiresMobileCompletion = () => Boolean(currentUser && !currentUser.mobile);
+
   const handleInitiateCheckout = () => {
     if (cart.length === 0) return;
     if (!currentUser) {
       setResumeCartCheckoutAfterLogin(true);
       setIsCartOpen(false);
       setIsCartPaymentModalOpen(false);
-      setCurrentView('auth');
+      openAuthPage('login');
       window.scrollTo(0, 0);
       return;
     }
+    if (requiresMobileCompletion()) { promptForMobileCompletion(); return; }
     setIsCartOpen(false);
     setIsCartPaymentModalOpen(true);
   };
@@ -1536,7 +1610,7 @@ const App: React.FC = () => {
       })) return;
       // --- End of recalculation ---
 
-      if (!currentUser || !auth.currentUser) { setCurrentView('auth'); return; }
+      if (!currentUser || !auth.currentUser) { openAuthPage('login'); return; }
       const orderId = `DC-${Date.now()}`;
       try {
         await Promise.all(cartDetails.map(item => persistPurchaseEntitlement(auth.currentUser!.uid, item.product, { quantity: item.quantity, total: `₹${finalPrice.toFixed(2)}`, source: 'razorpay', orderId })));
@@ -1652,12 +1726,28 @@ const App: React.FC = () => {
   };
 
   const cartItemCount = cart.reduce((total, item) => total + item.quantity, 0);
-  const authButtonLabel = currentUser ? 'Profile' : 'Login';
+  const authButtonLabel = currentUser ? 'Profile' : rememberedAuthAccount ? 'Login' : 'Sign Up';
 
   // --- Auth Handlers ---
   const normalizePurchaseIds = (ids: unknown): number[] => {
       if (!Array.isArray(ids)) return [];
       return [...new Set(ids.map(id => Number(id)).filter(id => Number.isFinite(id)))];
+  };
+
+  const getFirebaseAuthProvider = (firebaseUser: FirebaseUser): 'google' | 'password' =>
+      firebaseUser.providerData.some(provider => provider.providerId === GoogleAuthProvider.PROVIDER_ID) ? 'google' : 'password';
+
+  const getProviderIds = (firebaseUser: FirebaseUser): string[] =>
+      [...new Set(firebaseUser.providerData.map(provider => provider.providerId).filter(Boolean))];
+
+  const getFirebaseUserPhotoURL = (firebaseUser: FirebaseUser): string =>
+      firebaseUser.photoURL || firebaseUser.providerData.find(provider => Boolean(provider.photoURL))?.photoURL || '';
+
+  const shouldReplaceProfilePhoto = (existingPhotoURL: unknown, nextPhotoURL: string) => {
+      if (!nextPhotoURL) return false;
+      const existingPhoto = typeof existingPhotoURL === 'string' ? existingPhotoURL : '';
+      if (!existingPhoto) return true;
+      return existingPhoto.includes('googleusercontent.com') || existingPhoto === nextPhotoURL;
   };
 
   const toUserProfile = (firebaseUser: FirebaseUser, data: any = {}): User => ({
@@ -1666,7 +1756,10 @@ const App: React.FC = () => {
       name: data.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
       email: data.email || firebaseUser.email || '',
       mobile: data.mobile || firebaseUser.phoneNumber || '',
-      photoURL: data.photoURL || firebaseUser.photoURL || '',
+      photoURL: data.photoURL || getFirebaseUserPhotoURL(firebaseUser),
+      authProvider: data.authProvider || getFirebaseAuthProvider(firebaseUser),
+      providerIds: data.providerIds || getProviderIds(firebaseUser),
+      emailVerified: data.emailVerified ?? firebaseUser.emailVerified,
       role: data.role === 'admin' ? 'admin' : 'user',
       status: data.status === 'blocked' ? 'blocked' : 'active',
       createdAt: data.createdAt || new Date().toISOString(),
@@ -1686,33 +1779,45 @@ const App: React.FC = () => {
   const ensureUserProfile = async (firebaseUser: FirebaseUser, profile?: { name?: string; mobile?: string }): Promise<User> => {
       const userRef = doc(db, 'users', firebaseUser.uid);
       const userSnap = await getDoc(userRef);
-      const nowFields = { updatedAt: serverTimestamp(), lastLoginAt: serverTimestamp() };
-      if (!userSnap.exists()) {
-          await setDoc(userRef, {
-              uid: firebaseUser.uid,
-              name: profile?.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
-              email: firebaseUser.email || '',
-              mobile: profile?.mobile || firebaseUser.phoneNumber || '',
-              photoURL: firebaseUser.photoURL || '',
-              role: 'user',
-              status: 'active',
-              purchasedProductIds: [],
-              createdAt: serverTimestamp(),
-              ...nowFields,
-          }, { merge: true });
-          const createdSnap = await getDoc(userRef);
-          return toUserProfile(firebaseUser, createdSnap.data());
-      }
-      const existing = userSnap.data();
-      await setDoc(userRef, {
+      const existing = userSnap.exists() ? userSnap.data() : {};
+      const providerIds = getProviderIds(firebaseUser);
+      const authProvider = providerIds.includes(GoogleAuthProvider.PROVIDER_ID) ? 'google' : 'password';
+      const existingName = String(existing.name || '').trim();
+      const providerName = String(firebaseUser.displayName || '').trim();
+      const fallbackName = firebaseUser.email?.split('@')[0] || 'Learner';
+      const nextName = profile?.name || existingName || providerName || fallbackName;
+      const nextMobile = profile?.mobile || existing.mobile || firebaseUser.phoneNumber || '';
+      const firebasePhotoURL = getFirebaseUserPhotoURL(firebaseUser);
+      const nextPhotoURL = shouldReplaceProfilePhoto(existing.photoURL, firebasePhotoURL) ? firebasePhotoURL : existing.photoURL || '';
+      const safeProfileFields = {
           uid: firebaseUser.uid,
+          name: nextName,
           email: firebaseUser.email || existing.email || '',
-          name: profile?.name || existing.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
-          mobile: profile?.mobile || existing.mobile || firebaseUser.phoneNumber || '',
-          photoURL: firebaseUser.photoURL || existing.photoURL || '',
-          ...nowFields,
-      }, { merge: true });
-      return toUserProfile(firebaseUser, { ...existing, name: profile?.name || existing.name, mobile: profile?.mobile || existing.mobile });
+          mobile: nextMobile,
+          photoURL: nextPhotoURL,
+          role: existing.role === 'admin' ? 'admin' : 'user',
+          status: existing.status === 'blocked' ? 'blocked' : 'active',
+          authProvider,
+          providerIds,
+          emailVerified: firebaseUser.emailVerified,
+          purchasedProductIds: normalizePurchaseIds(existing.purchasedProductIds),
+          eduCoins: existing.eduCoins ?? 120,
+          studyMinutes: existing.studyMinutes ?? 0,
+          totalWatchTimeMinutes: existing.totalWatchTimeMinutes ?? existing.studyMinutes ?? 0,
+          totalLifetimeCoins: existing.totalLifetimeCoins ?? existing.eduCoins ?? 120,
+          rewardedArticleIds: existing.rewardedArticleIds || [],
+          readArticles: existing.readArticles || existing.rewardedArticleIds || [],
+          rewardedQuizIds: existing.rewardedQuizIds || [],
+          claimedRewardIds: existing.claimedRewardIds || [],
+          profileStreakClaims: existing.profileStreakClaims || {},
+          coinTransactions: existing.coinTransactions || [],
+          createdAt: existing.createdAt || serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
+      };
+      await setDoc(userRef, safeProfileFields, { merge: true });
+      const savedSnap = await getDoc(userRef);
+      return toUserProfile(firebaseUser, savedSnap.exists() ? savedSnap.data() : safeProfileFields);
   };
 
   const restoreUserEntitlements = async (uid: string): Promise<number[]> => {
@@ -1786,65 +1891,136 @@ const App: React.FC = () => {
       }, 45000);
   };
 
-  const completeFirebaseUserSession = async (firebaseUser: FirebaseUser, options: { redirect?: boolean; profile?: { name?: string; mobile?: string } } = {}) => {
-      const { redirect = true, profile } = options;
-      setIsAuthRestoring(true);
+
+
+  const handleMobileAuthSuccessRedirect = (user?: Pick<User, 'name' | 'email'> | null) => {
+      if (!isMobileViewport || !user) return false;
+      setIsAuthRestoring(false);
       setAuthRestoreError(null);
-      const sessionUser = await ensureUserProfile(firebaseUser, profile);
-      if (sessionUser.status === 'blocked') {
-          await signOut(auth);
-          handleLogout(false);
-          setInfoModal({ title: 'Account blocked', message: 'Your account is blocked. Please contact support.', icon: '🔒' });
-          return;
-      }
-      const sessionId = getOrCreateDeviceSessionId();
-      activeSessionIdRef.current = sessionId;
-      activeSessionUidRef.current = firebaseUser.uid;
-      await writeCurrentSession(firebaseUser.uid, sessionId);
-      subscribeToCurrentSession(firebaseUser.uid, sessionId);
-      try {
-          setPurchasedProductIds([]);
-          localStorage.removeItem('purchasedProducts');
-          localStorage.removeItem(`purchasedProducts:${firebaseUser.uid}`);
-          const backendPurchasedIds = await restoreUserEntitlements(firebaseUser.uid);
-          setPurchasedProductIds(backendPurchasedIds);
-          safeSetItem(`purchasedProducts:${firebaseUser.uid}`, backendPurchasedIds);
-          setCurrentUser({ ...(sessionUser as any), purchasedProductIds: backendPurchasedIds });
-          setAuthRestoreError(null);
-      } catch (error) {
-          setPurchasedProductIds([]);
-          setAuthRestoreError('Could not restore purchases. Please retry.');
-          setInfoModal({ title: 'Could not restore purchases', message: 'Could not restore purchases. Please retry.', icon: '⚠️' });
-          console.warn('Purchase access restore failed; keeping this session locked until backend data is available.', error);
-      } finally {
-          setIsAuthRestoring(false);
-      }
-      if (!redirect) return;
-      if (productToBuyAfterLogin) {
+      setCurrentView('home');
+      window.scrollTo(0, 0);
+      showMobileWelcomeAfterAuth(user);
+      return true;
+  };
+
+  const redirectAfterSuccessfulAuth = (options: { source?: 'google-popup' | 'google-redirect' | 'email-login' | 'email-signup' | 'session-restore'; preserveCheckoutIntent?: boolean } = {}) => {
+      const { source, preserveCheckoutIntent = true } = options;
+      const uid = auth.currentUser?.uid || currentUser?.id || '';
+      const lastRedirect = authRedirectHandledRef.current;
+      if (uid && lastRedirect?.uid === uid && Date.now() - lastRedirect.at < 1200) return;
+      if (uid) authRedirectHandledRef.current = { uid, source, at: Date.now() };
+      setIsAuthRestoring(false);
+      setAuthRestoreError(null);
+
+      if (isMobileViewport) showMobileWelcomeAfterAuth(currentUser || auth.currentUser ? { name: currentUser?.name || auth.currentUser?.displayName || '', email: currentUser?.email || auth.currentUser?.email || '' } : null);
+
+      if (preserveCheckoutIntent && productToBuyAfterLogin) {
           setSelectedProduct(productToBuyAfterLogin);
           setCurrentView('product');
           setAutoOpenPaymentModalFor(productToBuyAfterLogin.id);
           setProductToBuyAfterLogin(null);
-      } else if (resumeCartCheckoutAfterLogin && cart.length > 0) {
+          window.scrollTo(0, 0);
+          return;
+      }
+
+      if (preserveCheckoutIntent && resumeCartCheckoutAfterLogin && cart.length > 0) {
           setCurrentView('home');
           setIsCartOpen(false);
           setIsCartPaymentModalOpen(true);
           setResumeCartCheckoutAfterLogin(false);
-      } else {
-          setResumeCartCheckoutAfterLogin(false);
-          setCurrentView('home');
+          window.scrollTo(0, 0);
+          return;
       }
+
+      setProductToBuyAfterLogin(null);
+      setResumeCartCheckoutAfterLogin(false);
+      if (isMobileViewport && handleMobileAuthSuccessRedirect(currentUser || auth.currentUser ? { name: currentUser?.name || auth.currentUser?.displayName || '', email: currentUser?.email || auth.currentUser?.email || '' } : null)) return;
+      setCurrentView('home');
+      window.scrollTo(0, 0);
+  };
+
+  const completeFirebaseUserSession = async (firebaseUser: FirebaseUser, options: { redirect?: boolean; profile?: { name?: string; mobile?: string } } = {}) => {
+      const { redirect = true, profile } = options;
+      const existingCompletion = sessionCompletionRef.current;
+      if (existingCompletion?.uid === firebaseUser.uid && Date.now() - existingCompletion.startedAt < 2000) {
+          await sessionCompletionPromiseRef.current?.catch(error => console.warn('Existing auth completion failed.', error));
+          if (redirect || currentViewRef.current === 'auth') redirectAfterSuccessfulAuth({ source: 'session-restore' });
+          return;
+      }
+      sessionCompletionRef.current = { uid: firebaseUser.uid, startedAt: Date.now() };
+      let canRedirectAfterCompletion = true;
+      const completionPromise = (async () => {
+          setIsAuthRestoring(true);
+          setAuthRestoreError(null);
+          const sessionUser = await ensureUserProfile(firebaseUser, profile);
+          if (sessionUser.status === 'blocked') {
+              canRedirectAfterCompletion = false;
+              await signOut(auth);
+              handleLogout(false);
+              setInfoModal({ title: 'Account blocked', message: 'Your account is blocked. Please contact support.', icon: '🔒' });
+              return;
+          }
+          const sessionId = getOrCreateDeviceSessionId();
+          activeSessionIdRef.current = sessionId;
+          activeSessionUidRef.current = firebaseUser.uid;
+          await writeCurrentSession(firebaseUser.uid, sessionId);
+          subscribeToCurrentSession(firebaseUser.uid, sessionId);
+          try {
+              setPurchasedProductIds([]);
+              localStorage.removeItem('purchasedProducts');
+              localStorage.removeItem(`purchasedProducts:${firebaseUser.uid}`);
+              const backendPurchasedIds = await restoreUserEntitlements(firebaseUser.uid);
+              setPurchasedProductIds(backendPurchasedIds);
+              safeSetItem(`purchasedProducts:${firebaseUser.uid}`, backendPurchasedIds);
+              const hydratedUser = { ...(sessionUser as any), purchasedProductIds: backendPurchasedIds };
+              saveRememberedAuthAccount({ uid: hydratedUser.id, email: hydratedUser.email, name: hydratedUser.name, photoURL: hydratedUser.photoURL || getFirebaseUserPhotoURL(firebaseUser), providerIds: hydratedUser.providerIds, authProvider: hydratedUser.authProvider });
+              setRememberedAuthAccount(getRememberedAuthAccount());
+              setCurrentUser(hydratedUser);
+              setUsers(current => current.some(user => user.id === hydratedUser.id) ? current.map(user => user.id === hydratedUser.id ? hydratedUser : user) : [...current, hydratedUser]);
+              setAuthRestoreError(null);
+          } catch (error) {
+              setPurchasedProductIds([]);
+              setAuthRestoreError('Could not restore purchases. Please retry.');
+              setInfoModal({ title: 'Could not restore purchases', message: 'Could not restore purchases. Please retry.', icon: '⚠️' });
+              console.warn('Purchase access restore failed; keeping this session locked until backend data is available.', error);
+          } finally {
+              setIsAuthRestoring(false);
+          }
+      })();
+      sessionCompletionPromiseRef.current = completionPromise;
+      try {
+          await completionPromise;
+      } finally {
+          if (sessionCompletionPromiseRef.current === completionPromise) sessionCompletionPromiseRef.current = null;
+      }
+      if (redirect && canRedirectAfterCompletion) redirectAfterSuccessfulAuth({ source: 'session-restore' });
   };
 
   useEffect(() => {
       localStorage.removeItem('currentUser');
       localStorage.removeItem('purchasedProducts');
+      void getRedirectResult(auth).then(result => {
+          if (result?.user) void completeFirebaseUserSession(result.user, { redirect: false }).then(() => redirectAfterSuccessfulAuth({ source: 'google-redirect' }));
+      }).catch(error => {
+          console.warn('Google redirect result handling failed.', error);
+          setAuthRestoreError(getFirebaseAuthErrorMessage(error));
+      });
       const unsubscribe = onAuthStateChanged(auth, user => {
           if (user) {
               setIsAuthRestoring(true);
               setAuthRestoreError(null);
-              void completeFirebaseUserSession(user, { redirect: false });
-          } else handleLogout(false);
+              void completeFirebaseUserSession(user, { redirect: false }).then(() => {
+                  setIsAuthStateReady(true);
+                  if (currentViewRef.current === 'auth' || getIsMobileViewport()) redirectAfterSuccessfulAuth({ source: 'session-restore' });
+                  else if (getIsMobileViewport()) showMobileWelcomeAfterAuth({ name: user.displayName || '', email: user.email || '' });
+              }).catch(error => {
+                  setIsAuthStateReady(true);
+                  console.warn('Firebase session restore failed.', error);
+              });
+          } else {
+              handleLogout(false);
+              setIsAuthStateReady(true);
+          }
       });
       return () => {
           unsubscribe();
@@ -1873,8 +2049,15 @@ const App: React.FC = () => {
           'auth/weak-password': 'Password should be at least 6 characters.',
           'auth/invalid-email': 'Please enter a valid email address.',
           'auth/configuration-not-found': 'Firebase Email/Password authentication is not enabled for this project. Please enable the Email/Password sign-in provider in Firebase Console, then try again.',
-          'auth/network-request-failed': 'Network connection failed while contacting Firebase. Please check your internet connection and try again.',
-          'auth/too-many-requests': 'Too many login attempts. Please wait a few minutes and try again.',
+          'auth/network-request-failed': 'Network connection failed. Please check your internet and try again.',
+          'auth/too-many-requests': 'Too many attempts. Please wait and try again.',
+          'auth/popup-closed-by-user': 'Google login was cancelled.',
+          'auth/cancelled-popup-request': 'Another Google login window is already open.',
+          'auth/popup-blocked': 'Popup was blocked. Redirecting to Google login...',
+          'auth/account-exists-with-different-credential': 'An account already exists with this email. Login with the original method, then link Google from Profile.',
+          'auth/credential-already-in-use': 'This Google account is already linked to another user.',
+          'auth/unauthorized-domain': 'This domain is not authorized in Firebase Authentication settings.',
+          'auth/operation-not-allowed': 'Google login is not enabled. Enable Google provider in Firebase Console.',
       };
 
       const code = typeof error?.code === 'string'
@@ -1885,13 +2068,48 @@ const App: React.FC = () => {
 
       if (code && firebaseAuthErrorMessages[code]) return firebaseAuthErrorMessages[code];
 
-      return 'Unable to authenticate right now. Please try again.';
+      return 'Unable to continue with Google right now. Please try again.';
+  };
+
+
+  const shouldUseGoogleRedirect = () => {
+      const userAgent = navigator.userAgent || '';
+      const isSmallScreen = window.matchMedia?.('(max-width: 768px)').matches;
+      const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone;
+      const isWebView = /wv|FBAN|FBAV|Instagram|Line|Twitter/i.test(userAgent);
+      return Boolean(isSmallScreen || isStandalone || isWebView);
+  };
+
+  const handleGoogleLogin = async (): Promise<{ success: boolean, message: string }> => {
+      try {
+          if (shouldUseGoogleRedirect()) {
+              await signInWithRedirect(auth, googleProvider);
+              return { success: true, message: 'Opening Google login...' };
+          }
+          const credential = await signInWithPopup(auth, googleProvider);
+          await completeFirebaseUserSession(credential.user, { redirect: false });
+          redirectAfterSuccessfulAuth({ source: 'google-popup' });
+          return { success: true, message: 'Google login successful.' };
+      } catch (error: any) {
+          console.warn('Google login failed.', error);
+          if (error?.code === 'auth/popup-blocked') {
+              try {
+                  await signInWithRedirect(auth, googleProvider);
+                  return { success: true, message: getFirebaseAuthErrorMessage(error) };
+              } catch (redirectError) {
+                  console.warn('Google redirect fallback failed.', redirectError);
+                  return { success: false, message: getFirebaseAuthErrorMessage(redirectError) };
+              }
+          }
+          return { success: false, message: getFirebaseAuthErrorMessage(error) };
+      }
   };
 
   const handleEmailLogin = async (email: string, password: string): Promise<{ success: boolean, message: string }> => {
       try {
           const credential = await signInWithEmailAndPassword(auth, email, password);
-          await completeFirebaseUserSession(credential.user, { profile: { name: credential.user.displayName || undefined, mobile: credential.user.phoneNumber || undefined } });
+          await completeFirebaseUserSession(credential.user, { redirect: false, profile: { name: credential.user.displayName || undefined, mobile: credential.user.phoneNumber || undefined } });
+          redirectAfterSuccessfulAuth({ source: 'email-login' });
           return { success: true, message: 'Login successful.' };
       } catch (error) {
           return { success: false, message: getFirebaseAuthErrorMessage(error) };
@@ -1902,7 +2120,8 @@ const App: React.FC = () => {
       try {
           const credential = await createUserWithEmailAndPassword(auth, profile.email, password);
           await updateProfile(credential.user, { displayName: profile.name });
-          await completeFirebaseUserSession(credential.user, { profile });
+          await completeFirebaseUserSession(credential.user, { redirect: false, profile });
+          redirectAfterSuccessfulAuth({ source: 'email-signup' });
           return { success: true, message: 'Account created successfully.' };
       } catch (error) {
           return { success: false, message: getFirebaseAuthErrorMessage(error) };
@@ -1976,6 +2195,10 @@ const App: React.FC = () => {
       setPurchasedProductIds([]);
       setIsAuthRestoring(false);
       setAuthRestoreError(null);
+      setMobileWelcomeMessage('');
+      if (mobileWelcomeTimeoutRef.current) window.clearTimeout(mobileWelcomeTimeoutRef.current);
+      hasShownMobileWelcomeThisSessionRef.current = false;
+      try { sessionStorage.removeItem(MOBILE_WELCOME_SESSION_KEY); } catch {}
       setWishlist([]);
       setCart([]);
       setSelectedProduct(null);
@@ -2029,18 +2252,27 @@ const App: React.FC = () => {
   };
 
   const handleNavigateToProfile = () => {
-    setCurrentView(currentUser ? 'profile' : 'auth');
+    if (currentUser) setCurrentView('profile');
+    else {
+      setAuthInitialMode(rememberedAuthAccount ? 'login' : 'signup');
+      setCurrentView('auth');
+    }
     window.scrollTo(0, 0);
   };
 
-  const handleNavigateToAuth = () => setCurrentView('auth');
+  const openAuthPage = (mode: 'login' | 'signup' = rememberedAuthAccount ? 'login' : 'signup') => {
+    setAuthInitialMode(mode);
+    setCurrentView('auth');
+  };
+
+  const handleNavigateToAuth = () => openAuthPage(rememberedAuthAccount ? 'login' : 'signup');
 
   const handleLoginRequired = (product: ProductWithRating) => {
     setProductToBuyAfterLogin(product);
     setResumeCartCheckoutAfterLogin(false);
     setIsCartOpen(false);
     setIsCartPaymentModalOpen(false);
-    setCurrentView('auth');
+    openAuthPage('login');
     window.scrollTo(0,0);
   };
 
@@ -2246,6 +2478,8 @@ const App: React.FC = () => {
       return;
     }
 
+    if (requiresMobileCompletion()) { promptForMobileCompletion(); return; }
+
     const selected = { ...product, viewCount: (product.viewCount || 0) + 1 };
     setProducts(prev => prev.map(item => item.id === product.id ? { ...item, viewCount: (item.viewCount || 0) + 1 } : item));
     setSelectedProduct(selected);
@@ -2263,7 +2497,7 @@ const App: React.FC = () => {
   };
 
   const handleApplyCoinClaim = (claim: ActiveCoinDiscount) => {
-    if (!currentUser) { setCurrentView('auth'); return; }
+    if (!currentUser) { openAuthPage('login'); return; }
     setActiveCoinDiscount(claim);
     if (claim.targetType === 'product' && claim.productId) {
       const product = productsWithRatings.find(item => item.id === claim.productId);
@@ -2313,7 +2547,7 @@ const App: React.FC = () => {
           setActiveCoinDiscount(null);
         }
 
-        if (!currentUser || !auth.currentUser) { setCurrentView('auth'); return; }
+        if (!currentUser || !auth.currentUser) { openAuthPage('login'); return; }
         const orderId = `DC-${Date.now()}`;
         try {
           await persistPurchaseEntitlement(auth.currentUser.uid, selectedProduct, { quantity, total: `₹${robustFinalPrice.toFixed(2)}`, source: 'razorpay', orderId });
@@ -2372,7 +2606,7 @@ const App: React.FC = () => {
   };
   
   const completeProductUnlock = async (product: ProductWithRating, quantity: number, totalLabel: string, status: Order['status'] = 'Completed') => {
-    if (!currentUser || !auth.currentUser) { setCurrentView('auth'); return false; }
+    if (!currentUser || !auth.currentUser) { openAuthPage('login'); return false; }
     const orderId = `DC-${Date.now()}`;
     try {
       await persistPurchaseEntitlement(auth.currentUser.uid, product, { quantity, total: totalLabel, source: 'educoin', orderId, status: status as 'Completed' | 'Verified' | 'Active' });
@@ -2410,7 +2644,7 @@ const App: React.FC = () => {
   };
 
   const handleProductCoinPurchase = async (product: ProductWithRating, quantity: number): Promise<boolean> => {
-    if (!currentUser) { setCurrentView('auth'); window.scrollTo(0, 0); return false; }
+    if (!currentUser) { openAuthPage('login'); window.scrollTo(0, 0); return false; }
     const totalCoinPrice = resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity;
     if (!totalCoinPrice) {
       setInfoModal({ title: 'EduCoin checkout unavailable', message: 'This product does not have an EduCoin price configured yet.', icon: '🪙' });
@@ -2538,7 +2772,7 @@ const App: React.FC = () => {
   };
 
   const handleActivateSubscription = (plan: any, appliedCouponCode?: string | null) => {
-    if (!currentUser) { setCurrentView('auth'); return; }
+    if (!currentUser) { openAuthPage('login'); return; }
 
     const planPrice = Number(plan.price || 0);
     const couponToApply = appliedCouponCode ? coupons.find(c => c.code.trim().toUpperCase() === appliedCouponCode.trim().toUpperCase()) : null;
@@ -2617,7 +2851,7 @@ const App: React.FC = () => {
   };
 
   const handleActivateSubscriptionWithCoins = (plan: any) => {
-    if (!currentUser) { setCurrentView('auth'); return; }
+    if (!currentUser) { openAuthPage('login'); return; }
     const coinPrice = activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(plan.id) ? activeCoinDiscount.coins : resolveCoinPrice(plan.coinPrice, economySettings, 'subscription', plan.id);
     if (!coinPrice || !deductEduCoins(coinPrice, { source: 'Subscription EduCoin purchase', description: `Activated ${plan.name} with EduCoins` })) return;
     if (activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(plan.id)) setActiveCoinDiscount(null);
@@ -2880,8 +3114,8 @@ const App: React.FC = () => {
       case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={currentUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
-      case 'myPurchases': return currentUser ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
-      case 'profile': return currentUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+      case 'myPurchases': return currentUser ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+      case 'profile': return currentUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={() => handleNavigateBack('home')} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={() => handleNavigateBack('home')} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
@@ -2890,6 +3124,8 @@ const App: React.FC = () => {
           <div className="md:hidden">
             <MobileAppHome
               settings={websiteSettings}
+              authButtonLabel={authButtonLabel}
+              rememberedAccount={rememberedAuthAccount}
               currentUser={currentUser}
               purchasedProducts={purchasedProducts}
               topRatedProducts={topRatedProducts}
@@ -2920,8 +3156,10 @@ const App: React.FC = () => {
   const appleOpenClass = "animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]";
 
   const renderPage = () => {
+    if (isMobileViewport && !isAuthStateReady) return <div key="mobile-auth-check" className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.16),transparent_34%),linear-gradient(135deg,#ffffff,#eff6ff)] p-6 text-center"><div className="rounded-[2rem] border border-blue-100 bg-white/90 p-8 shadow-[0_24px_80px_rgba(37,99,235,0.12)]"><div className="mx-auto mb-4 h-3 w-3 animate-ping rounded-full bg-blue-600" /><h1 className="text-2xl font-black text-slate-950">Checking your session...</h1><p className="mt-2 text-sm font-semibold text-slate-600">Securing your mobile learning app.</p></div></div>;
+    if (isMobileViewport && isAuthStateReady && !currentUser) return <div key="mobile-auth-gate" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : 'signup'} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); setAuthInitialMode('signup'); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={() => {}} /></div>;
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={() => handleNavigateBack('home')} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
-    if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
+    if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent()}</div>;
@@ -2931,7 +3169,7 @@ const App: React.FC = () => {
        <ErrorBoundary>
          <div className="font-sans">
             <WelcomeOverlay onAnimationComplete={playWelcomeVoice} />
-            <div className="mobile-site-header"><Header settings={websiteSettings} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} authButtonLabel={authButtonLabel} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
+            <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} authButtonLabel={authButtonLabel} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={currentUser?.eduCoins || 0} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
@@ -2939,7 +3177,41 @@ const App: React.FC = () => {
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={currentUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
+            {mobileWelcomeMessage && <div className="fixed left-1/2 top-5 z-[1600] -translate-x-1/2 rounded-full border border-emerald-200/70 bg-white/95 px-5 py-3 text-sm font-black text-emerald-700 shadow-[0_18px_54px_rgba(16,185,129,0.20)] backdrop-blur-2xl md:hidden">{mobileWelcomeMessage}</div>}
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
+            {currentUser && !currentUser.mobile && !hasSkippedMobileCompletion && (
+              <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+                <div className="w-full max-w-md rounded-[2rem] border border-blue-100 bg-white p-6 shadow-2xl">
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Complete profile</p>
+                  <h2 className="mt-2 text-2xl font-black text-slate-950">Add your mobile number</h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">Google does not share your phone number. Add a 10 digit Indian mobile number for purchase support and profile-sensitive actions. No OTP or SMS verification is used.</p>
+                  <div className="mt-5 flex overflow-hidden rounded-2xl border border-slate-300 bg-white focus-within:border-blue-700 focus-within:ring-4 focus-within:ring-blue-100">
+                    <span className="bg-slate-100 px-4 py-3 font-bold text-slate-700">+91</span>
+                    <input value={mobileCompletionInput} onChange={e => setMobileCompletionInput(e.target.value.replace(/\D/g, '').slice(-10))} className="w-full bg-transparent px-4 py-3 outline-none" placeholder="10 digit mobile" inputMode="numeric" />
+                  </div>
+                  {mobileCompletionError && <p className="mt-3 rounded-xl border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{mobileCompletionError}</p>}
+                  <div className="mt-5 flex gap-3">
+                    <button type="button" onClick={() => { setHasSkippedMobileCompletion(true); setMobileCompletionError(''); }} className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-black text-slate-700">Skip for now</button>
+                    <button type="button" disabled={isSavingMobileCompletion} onClick={async () => {
+                      const normalizedMobile = mobileCompletionInput.replace(/\D/g, '').slice(-10);
+                      if (normalizedMobile.length !== 10) { setMobileCompletionError('Please enter a valid 10 digit mobile number.'); return; }
+                      if (!currentUser || !auth.currentUser) return;
+                      setIsSavingMobileCompletion(true); setMobileCompletionError('');
+                      try {
+                        await setDoc(doc(db, 'users', currentUser.id), { mobile: normalizedMobile, updatedAt: serverTimestamp() }, { merge: true });
+                        const updatedUser = { ...currentUser, mobile: normalizedMobile };
+                        setCurrentUser(updatedUser);
+                        setHasSkippedMobileCompletion(false);
+                        setUsers(current => current.map(user => user.id === updatedUser.id ? updatedUser : user));
+                      } catch (error) {
+                        console.warn('Mobile profile completion failed.', error);
+                        setMobileCompletionError('Could not save mobile number. Please try again.');
+                      } finally { setIsSavingMobileCompletion(false); }
+                    }} className="flex-1 rounded-2xl bg-gradient-to-r from-slate-950 to-blue-800 px-4 py-3 font-black text-white disabled:opacity-60">{isSavingMobileCompletion ? 'Saving...' : 'Save mobile'}</button>
+                  </div>
+                </div>
+              </div>
+            )}
             <main key={currentView} className={`${appleOpenClass} ${currentView === 'home' ? 'mobile-app-home' : ''}`}>{renderContent()}</main>
             <div className="mobile-app-chrome"><InstallAppButton enabled={canShowInstallPrompt} /></div>
             <div className={shouldHideFooterOnMobile ? 'max-md:hidden' : ''}><Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} /></div>

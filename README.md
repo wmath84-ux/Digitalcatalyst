@@ -65,3 +65,14 @@ Digital Catalyst is configured as an installable PWA. To test installability aft
 - If the install prompt does not appear immediately, wait a moment and tap/click the page once, then use the visible **Install App** / **Add to Home Screen** button or Chrome's menu.
 - In Chrome DevTools, check **Application > Manifest** for the Digital Catalyst manifest and icons, and **Application > Service Workers** for the registered service worker.
 - Run Lighthouse and review the PWA/installability checks if Lighthouse is available in your Chrome version.
+
+## Firebase Google login setup
+
+To use the in-app **Continue with Google** authentication flow:
+
+- Open **Firebase Console → Authentication → Sign-in method → Google** and enable the Google provider.
+- Add a support email for the Firebase project.
+- Add authorized domains for production and local development, such as your deployed domain and `localhost`.
+- Deploy after the Firebase environment/configuration is correct.
+
+The app stores only safe profile metadata in Firestore (`users/{uid}`); passwords and Google credentials/tokens are never written to Firestore or localStorage.
