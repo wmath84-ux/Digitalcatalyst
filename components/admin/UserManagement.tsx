@@ -25,6 +25,8 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onDeleteUser }) 
                                 <th className="p-3 sm:p-5 font-bold text-xs text-slate-600 uppercase tracking-wider">User ID</th>
                                 <th className="p-3 sm:p-5 font-bold text-xs text-slate-600 uppercase tracking-wider">Learner</th>
                                 <th className="p-3 sm:p-5 font-bold text-xs text-slate-600 uppercase tracking-wider">Mobile</th>
+                                <th className="p-3 sm:p-5 font-bold text-xs text-slate-600 uppercase tracking-wider">Provider</th>
+                                <th className="p-3 sm:p-5 font-bold text-xs text-slate-600 uppercase tracking-wider">Email Verified</th>
                                 <th className="p-3 sm:p-5 font-bold text-xs text-slate-600 uppercase tracking-wider">Joined Date</th>
                                 <th className="p-3 sm:p-5 font-bold text-xs text-slate-600 uppercase tracking-wider">Last Login</th>
                                 <th className="p-3 sm:p-5 font-bold text-xs text-slate-600 uppercase tracking-wider text-right">Actions</th>
@@ -37,16 +39,25 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onDeleteUser }) 
                                         <td className="p-3 sm:p-5 font-mono text-xs text-slate-600">{user.id}</td>
                                         <td className="p-3 sm:p-5">
                                             <div className="flex items-center gap-3">
-                                                <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-slate-900 font-bold text-xs shadow-sm">
-                                                    {(user.name || user.email).charAt(0).toUpperCase()}
-                                                </div>
+                                                {user.photoURL ? (
+                                                    <img src={user.photoURL} alt={user.name || user.email} className="w-8 h-8 rounded-full object-cover shadow-sm" />
+                                                ) : (
+                                                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-400 to-indigo-500 flex items-center justify-center text-slate-900 font-bold text-xs shadow-sm">
+                                                        {(user.name || user.email).charAt(0).toUpperCase()}
+                                                    </div>
+                                                )}
                                                 <div>
                                                     <span className="block font-bold text-slate-700">{user.name || 'Learner'}</span>
                                                     <span className="block text-xs text-slate-600">{user.email}</span>
                                                 </div>
                                             </div>
                                         </td>
-                                        <td className="p-3 sm:p-5 text-sm text-slate-600 font-medium">{user.mobile ? `+91 ${user.mobile}` : 'Not added'}</td>
+                                        <td className="p-3 sm:p-5 text-sm text-slate-600 font-medium">{user.mobile ? `+91 ${user.mobile}` : 'Mobile not added'}</td>
+                                        <td className="p-3 sm:p-5 text-sm text-slate-600 font-medium">
+                                            <span className="block font-bold text-slate-700">{user.authProvider === 'google' ? 'Google' : 'Email Password'}</span>
+                                            {user.providerIds?.length ? <span className="block text-xs text-slate-500">{user.providerIds.join(', ')}</span> : null}
+                                        </td>
+                                        <td className="p-3 sm:p-5 text-sm text-slate-600 font-medium">{user.emailVerified ? 'Yes' : 'No'}</td>
                                         <td className="p-3 sm:p-5 text-sm text-slate-600 font-medium">
                                             {new Date(user.createdAt).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
                                         </td>
@@ -65,7 +76,7 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onDeleteUser }) 
                                 ))
                             ) : (
                                 <tr>
-                                    <td colSpan={6} className="text-center p-12 text-slate-600">
+                                    <td colSpan={8} className="text-center p-12 text-slate-600">
                                         No users found.
                                     </td>
                                 </tr>
