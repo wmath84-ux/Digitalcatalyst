@@ -41,6 +41,7 @@ import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnap
 import { auth, db } from './firebase';
 import { createUserWithEmailAndPassword, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
+import { clearRememberedAuthAccount, getRememberedAuthAccount, RememberedAuthAccount, saveRememberedAuthAccount } from './utils/rememberedAuth';
 
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
 const googleProvider = new GoogleAuthProvider();
@@ -912,6 +913,7 @@ const App: React.FC = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>(initialSupportTickets);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [currentView, setCurrentView] = useState('home'); 
+  const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup'>('login');
   const currentViewRef = React.useRef(currentView);
   const historyNavigationRef = React.useRef(false);
   const lastHistoryViewRef = React.useRef(currentView);
@@ -928,6 +930,7 @@ const App: React.FC = () => {
 
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [rememberedAuthAccount, setRememberedAuthAccount] = useState<RememberedAuthAccount | null>(() => getRememberedAuthAccount());
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(initialAdminUsers);
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
   const [productToBuyAfterLogin, setProductToBuyAfterLogin] = useState<ProductWithRating | null>(null);
@@ -1473,7 +1476,7 @@ const App: React.FC = () => {
   const handleAddToCart = (productId: number, quantity: number = 1) => {
       if (!currentUser) {
           setInfoModal({ title: 'Login required', message: 'Please login before adding products to cart.', icon: '🔐' });
-          setCurrentView('auth');
+          openAuthPage('login');
           return;
       }
       setCart(prevCart => {
@@ -1522,7 +1525,7 @@ const App: React.FC = () => {
       setResumeCartCheckoutAfterLogin(true);
       setIsCartOpen(false);
       setIsCartPaymentModalOpen(false);
-      setCurrentView('auth');
+      openAuthPage('login');
       window.scrollTo(0, 0);
       return;
     }
@@ -1556,7 +1559,7 @@ const App: React.FC = () => {
       })) return;
       // --- End of recalculation ---
 
-      if (!currentUser || !auth.currentUser) { setCurrentView('auth'); return; }
+      if (!currentUser || !auth.currentUser) { openAuthPage('login'); return; }
       const orderId = `DC-${Date.now()}`;
       try {
         await Promise.all(cartDetails.map(item => persistPurchaseEntitlement(auth.currentUser!.uid, item.product, { quantity: item.quantity, total: `₹${finalPrice.toFixed(2)}`, source: 'razorpay', orderId })));
@@ -1672,7 +1675,7 @@ const App: React.FC = () => {
   };
 
   const cartItemCount = cart.reduce((total, item) => total + item.quantity, 0);
-  const authButtonLabel = currentUser ? 'Profile' : 'Login';
+  const authButtonLabel = currentUser ? 'Profile' : rememberedAuthAccount ? 'Login' : 'Sign Up';
 
   // --- Auth Handlers ---
   const normalizePurchaseIds = (ids: unknown): number[] => {
@@ -1686,13 +1689,23 @@ const App: React.FC = () => {
   const getProviderIds = (firebaseUser: FirebaseUser): string[] =>
       [...new Set(firebaseUser.providerData.map(provider => provider.providerId).filter(Boolean))];
 
+  const getFirebaseUserPhotoURL = (firebaseUser: FirebaseUser): string =>
+      firebaseUser.photoURL || firebaseUser.providerData.find(provider => Boolean(provider.photoURL))?.photoURL || '';
+
+  const shouldReplaceProfilePhoto = (existingPhotoURL: unknown, nextPhotoURL: string) => {
+      if (!nextPhotoURL) return false;
+      const existingPhoto = typeof existingPhotoURL === 'string' ? existingPhotoURL : '';
+      if (!existingPhoto) return true;
+      return existingPhoto.includes('googleusercontent.com') || existingPhoto === nextPhotoURL;
+  };
+
   const toUserProfile = (firebaseUser: FirebaseUser, data: any = {}): User => ({
       id: firebaseUser.uid,
       uid: firebaseUser.uid,
       name: data.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
       email: data.email || firebaseUser.email || '',
       mobile: data.mobile || firebaseUser.phoneNumber || '',
-      photoURL: data.photoURL || firebaseUser.photoURL || '',
+      photoURL: data.photoURL || getFirebaseUserPhotoURL(firebaseUser),
       authProvider: data.authProvider || getFirebaseAuthProvider(firebaseUser),
       providerIds: data.providerIds || getProviderIds(firebaseUser),
       emailVerified: data.emailVerified ?? firebaseUser.emailVerified,
@@ -1723,12 +1736,14 @@ const App: React.FC = () => {
       const fallbackName = firebaseUser.email?.split('@')[0] || 'Learner';
       const nextName = profile?.name || existingName || providerName || fallbackName;
       const nextMobile = profile?.mobile || existing.mobile || firebaseUser.phoneNumber || '';
+      const firebasePhotoURL = getFirebaseUserPhotoURL(firebaseUser);
+      const nextPhotoURL = shouldReplaceProfilePhoto(existing.photoURL, firebasePhotoURL) ? firebasePhotoURL : existing.photoURL || '';
       const safeProfileFields = {
           uid: firebaseUser.uid,
           name: nextName,
           email: firebaseUser.email || existing.email || '',
           mobile: nextMobile,
-          photoURL: firebaseUser.photoURL || existing.photoURL || '',
+          photoURL: nextPhotoURL,
           role: existing.role === 'admin' ? 'admin' : 'user',
           status: existing.status === 'blocked' ? 'blocked' : 'active',
           authProvider,
@@ -1852,6 +1867,8 @@ const App: React.FC = () => {
           setPurchasedProductIds(backendPurchasedIds);
           safeSetItem(`purchasedProducts:${firebaseUser.uid}`, backendPurchasedIds);
           const hydratedUser = { ...(sessionUser as any), purchasedProductIds: backendPurchasedIds };
+          saveRememberedAuthAccount({ uid: hydratedUser.id, email: hydratedUser.email, name: hydratedUser.name, photoURL: hydratedUser.photoURL || getFirebaseUserPhotoURL(firebaseUser), providerIds: hydratedUser.providerIds, authProvider: hydratedUser.authProvider });
+          setRememberedAuthAccount(getRememberedAuthAccount());
           setCurrentUser(hydratedUser);
           setUsers(current => current.some(user => user.id === hydratedUser.id) ? current.map(user => user.id === hydratedUser.id ? hydratedUser : user) : [...current, hydratedUser]);
           setAuthRestoreError(null);
@@ -2119,18 +2136,27 @@ const App: React.FC = () => {
   };
 
   const handleNavigateToProfile = () => {
-    setCurrentView(currentUser ? 'profile' : 'auth');
+    if (currentUser) setCurrentView('profile');
+    else {
+      setAuthInitialMode(rememberedAuthAccount ? 'login' : 'signup');
+      setCurrentView('auth');
+    }
     window.scrollTo(0, 0);
   };
 
-  const handleNavigateToAuth = () => setCurrentView('auth');
+  const openAuthPage = (mode: 'login' | 'signup' = rememberedAuthAccount ? 'login' : 'signup') => {
+    setAuthInitialMode(mode);
+    setCurrentView('auth');
+  };
+
+  const handleNavigateToAuth = () => openAuthPage(rememberedAuthAccount ? 'login' : 'signup');
 
   const handleLoginRequired = (product: ProductWithRating) => {
     setProductToBuyAfterLogin(product);
     setResumeCartCheckoutAfterLogin(false);
     setIsCartOpen(false);
     setIsCartPaymentModalOpen(false);
-    setCurrentView('auth');
+    openAuthPage('login');
     window.scrollTo(0,0);
   };
 
@@ -2355,7 +2381,7 @@ const App: React.FC = () => {
   };
 
   const handleApplyCoinClaim = (claim: ActiveCoinDiscount) => {
-    if (!currentUser) { setCurrentView('auth'); return; }
+    if (!currentUser) { openAuthPage('login'); return; }
     setActiveCoinDiscount(claim);
     if (claim.targetType === 'product' && claim.productId) {
       const product = productsWithRatings.find(item => item.id === claim.productId);
@@ -2405,7 +2431,7 @@ const App: React.FC = () => {
           setActiveCoinDiscount(null);
         }
 
-        if (!currentUser || !auth.currentUser) { setCurrentView('auth'); return; }
+        if (!currentUser || !auth.currentUser) { openAuthPage('login'); return; }
         const orderId = `DC-${Date.now()}`;
         try {
           await persistPurchaseEntitlement(auth.currentUser.uid, selectedProduct, { quantity, total: `₹${robustFinalPrice.toFixed(2)}`, source: 'razorpay', orderId });
@@ -2464,7 +2490,7 @@ const App: React.FC = () => {
   };
   
   const completeProductUnlock = async (product: ProductWithRating, quantity: number, totalLabel: string, status: Order['status'] = 'Completed') => {
-    if (!currentUser || !auth.currentUser) { setCurrentView('auth'); return false; }
+    if (!currentUser || !auth.currentUser) { openAuthPage('login'); return false; }
     const orderId = `DC-${Date.now()}`;
     try {
       await persistPurchaseEntitlement(auth.currentUser.uid, product, { quantity, total: totalLabel, source: 'educoin', orderId, status: status as 'Completed' | 'Verified' | 'Active' });
@@ -2502,7 +2528,7 @@ const App: React.FC = () => {
   };
 
   const handleProductCoinPurchase = async (product: ProductWithRating, quantity: number): Promise<boolean> => {
-    if (!currentUser) { setCurrentView('auth'); window.scrollTo(0, 0); return false; }
+    if (!currentUser) { openAuthPage('login'); window.scrollTo(0, 0); return false; }
     const totalCoinPrice = resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity;
     if (!totalCoinPrice) {
       setInfoModal({ title: 'EduCoin checkout unavailable', message: 'This product does not have an EduCoin price configured yet.', icon: '🪙' });
@@ -2630,7 +2656,7 @@ const App: React.FC = () => {
   };
 
   const handleActivateSubscription = (plan: any, appliedCouponCode?: string | null) => {
-    if (!currentUser) { setCurrentView('auth'); return; }
+    if (!currentUser) { openAuthPage('login'); return; }
 
     const planPrice = Number(plan.price || 0);
     const couponToApply = appliedCouponCode ? coupons.find(c => c.code.trim().toUpperCase() === appliedCouponCode.trim().toUpperCase()) : null;
@@ -2709,7 +2735,7 @@ const App: React.FC = () => {
   };
 
   const handleActivateSubscriptionWithCoins = (plan: any) => {
-    if (!currentUser) { setCurrentView('auth'); return; }
+    if (!currentUser) { openAuthPage('login'); return; }
     const coinPrice = activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(plan.id) ? activeCoinDiscount.coins : resolveCoinPrice(plan.coinPrice, economySettings, 'subscription', plan.id);
     if (!coinPrice || !deductEduCoins(coinPrice, { source: 'Subscription EduCoin purchase', description: `Activated ${plan.name} with EduCoins` })) return;
     if (activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(plan.id)) setActiveCoinDiscount(null);
@@ -2972,8 +2998,8 @@ const App: React.FC = () => {
       case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={currentUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
-      case 'myPurchases': return currentUser ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
-      case 'profile': return currentUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+      case 'myPurchases': return currentUser ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+      case 'profile': return currentUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={() => handleNavigateBack('home')} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={() => handleNavigateBack('home')} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
@@ -2982,6 +3008,8 @@ const App: React.FC = () => {
           <div className="md:hidden">
             <MobileAppHome
               settings={websiteSettings}
+              authButtonLabel={authButtonLabel}
+              rememberedAccount={rememberedAuthAccount}
               currentUser={currentUser}
               purchasedProducts={purchasedProducts}
               topRatedProducts={topRatedProducts}
@@ -3013,7 +3041,7 @@ const App: React.FC = () => {
 
   const renderPage = () => {
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={() => handleNavigateBack('home')} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
-    if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
+    if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent()}</div>;
@@ -3023,7 +3051,7 @@ const App: React.FC = () => {
        <ErrorBoundary>
          <div className="font-sans">
             <WelcomeOverlay onAnimationComplete={playWelcomeVoice} />
-            <div className="mobile-site-header"><Header settings={websiteSettings} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} authButtonLabel={authButtonLabel} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
+            <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} authButtonLabel={authButtonLabel} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={currentUser?.eduCoins || 0} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}

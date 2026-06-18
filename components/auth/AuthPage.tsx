@@ -1,5 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { WebsiteSettings } from '../../App';
+import UserAvatar from '../common/UserAvatar';
+import { RememberedAuthAccount } from '../../utils/rememberedAuth';
 
 type AuthMode = 'login' | 'signup';
 
@@ -13,6 +15,9 @@ interface SignupProfile {
 
 interface AuthPageProps {
     settings: WebsiteSettings;
+    initialMode?: AuthMode;
+    rememberedAccount?: RememberedAuthAccount | null;
+    onForgetRememberedAccount: () => void;
     onGoogleLogin: () => Promise<AuthResult> | AuthResult;
     onEmailLogin: (email: string, password: string) => Promise<AuthResult> | AuthResult;
     onEmailSignup: (profile: SignupProfile, password: string) => Promise<AuthResult> | AuthResult;
@@ -20,12 +25,13 @@ interface AuthPageProps {
     onBack: () => void;
 }
 
-const AuthPage: React.FC<AuthPageProps> = ({ settings, onGoogleLogin, onEmailLogin, onEmailSignup, onPasswordReset, onBack }) => {
-    const [mode, setMode] = useState<AuthMode>('login');
+const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', rememberedAccount, onForgetRememberedAccount, onGoogleLogin, onEmailLogin, onEmailSignup, onPasswordReset, onBack }) => {
+    const [mode, setMode] = useState<AuthMode>(initialMode);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
     const [mobile, setMobile] = useState('');
     const [password, setPassword] = useState('');
+    const passwordInputRef = useRef<HTMLInputElement>(null);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
@@ -33,6 +39,10 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, onGoogleLogin, onEmailLog
 
     const normalizedMobile = useMemo(() => mobile.replace(/\D/g, '').slice(-10), [mobile]);
     const isValidEmail = /\S+@\S+\.\S+/.test(email);
+
+    useEffect(() => {
+        setMode(initialMode);
+    }, [initialMode]);
 
     const handleModeChange = (nextMode: AuthMode) => {
         setMode(nextMode);
@@ -53,6 +63,30 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, onGoogleLogin, onEmailLog
         } finally {
             setIsGoogleLoading(false);
         }
+    };
+
+
+    const handleRememberedContinue = async () => {
+        if (!rememberedAccount) return;
+        setError('');
+        setSuccess('');
+        const isGoogleAccount = rememberedAccount.authProvider === 'google' || rememberedAccount.providerIds?.includes('google.com');
+        if (isGoogleAccount) {
+            await handleGoogleSubmit();
+            return;
+        }
+        setMode('login');
+        setEmail(rememberedAccount.email);
+        window.setTimeout(() => passwordInputRef.current?.focus(), 0);
+    };
+
+    const handleUseAnotherAccount = () => {
+        const rememberedEmail = rememberedAccount?.email;
+        onForgetRememberedAccount();
+        if (rememberedEmail && email.trim().toLowerCase() === rememberedEmail.toLowerCase()) setEmail('');
+        setPassword('');
+        setError('');
+        setSuccess('');
     };
 
     const handleSubmit = async (e: React.FormEvent) => {
@@ -143,6 +177,23 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, onGoogleLogin, onEmailLog
                         <button type="button" onClick={() => handleModeChange('signup')} className={`rounded-xl px-4 py-2.5 text-sm font-black transition-colors ${mode === 'signup' ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-600 hover:text-slate-950'}`}>Sign up</button>
                     </div>
 
+                    {rememberedAccount && (
+                        <div className="mb-5 rounded-[1.5rem] border border-blue-100 bg-gradient-to-br from-white via-blue-50/80 to-indigo-50/70 p-4 shadow-[0_18px_50px_rgba(37,99,235,0.10)]">
+                            <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">Continue as</p>
+                            <div className="mt-3 flex items-center gap-3">
+                                <UserAvatar name={rememberedAccount.name} email={rememberedAccount.email} photoURL={rememberedAccount.photoURL} size={48} />
+                                <div className="min-w-0 flex-1">
+                                    <p className="truncate text-base font-black text-slate-950">{rememberedAccount.name || rememberedAccount.email.split('@')[0]}</p>
+                                    <p className="truncate text-sm font-semibold text-slate-600">{rememberedAccount.email}</p>
+                                </div>
+                            </div>
+                            <button type="button" onClick={handleRememberedContinue} disabled={isSubmitting || isGoogleLoading} className="mt-4 w-full rounded-2xl bg-gradient-to-r from-slate-950 via-blue-900 to-indigo-800 px-5 py-3 font-black text-white shadow-[0_14px_34px_rgba(30,64,175,0.18)] disabled:cursor-not-allowed disabled:opacity-70">
+                                {rememberedAccount.authProvider === 'google' || rememberedAccount.providerIds?.includes('google.com') ? (isGoogleLoading ? 'Opening Google...' : 'Continue with this account') : 'Continue with email'}
+                            </button>
+                            <button type="button" onClick={handleUseAnotherAccount} className="mt-3 w-full text-sm font-black text-slate-500 hover:text-blue-800">Not you? Use another account</button>
+                        </div>
+                    )}
+
                     <button type="button" onClick={handleGoogleSubmit} disabled={isSubmitting || isGoogleLoading} className="mb-4 flex w-full items-center justify-center gap-3 rounded-2xl border border-slate-200 bg-white px-5 py-3.5 font-black text-slate-800 shadow-[0_12px_34px_rgba(15,23,42,0.08)] transition-all hover:-translate-y-0.5 hover:border-blue-200 hover:shadow-[0_18px_44px_rgba(37,99,235,0.14)] disabled:cursor-not-allowed disabled:opacity-70">
                         <svg aria-hidden="true" className="h-5 w-5" viewBox="0 0 24 24">
                             <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -180,7 +231,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, onGoogleLogin, onEmailLog
                         )}
                         <label className="block">
                             <span className="text-sm font-bold text-slate-700">Password</span>
-                            <input type="password" value={password} onChange={e => setPassword(e.target.value)} required className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-blue-700 focus:bg-white focus:ring-4 focus:ring-blue-100 sm:py-3" placeholder="Enter password" />
+                            <input ref={passwordInputRef} type="password" value={password} onChange={e => setPassword(e.target.value)} required className="mt-2 w-full rounded-2xl border border-slate-300 bg-white px-4 py-2.5 outline-none focus:border-blue-700 focus:bg-white focus:ring-4 focus:ring-blue-100 sm:py-3" placeholder="Enter password" />
                         </label>
                         {mode === 'login' && (
                             <div className="flex justify-end">
