@@ -4,6 +4,7 @@ import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { ActiveCoinDiscount, CoinTransaction, Coupon, ProductWithRating, ProfileMilestoneConfig, ProfileStreakConfig, ProfileStreakMetric, ProfileMilestoneMetric, ThemeName, themes, User, WebsiteSettings } from '../App';
 import { EconomySettings, resolveCoinPrice, resolveMaxDiscountPercentage } from '../utils/economy';
 import { db } from '../firebase';
+import UserAvatar from './common/UserAvatar';
 
 interface ProfilePageProps {
   settings: WebsiteSettings;
@@ -529,9 +530,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             <div className="absolute -bottom-1 left-0 right-0 p-4 sm:p-8 lg:p-10">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-5">
-                  <div className="flex h-20 w-20 items-center justify-center rounded-[1.5rem] border-4 border-[#D2E3FC] bg-gradient-to-br from-[#E8F0FE] via-[#D3E3FD] to-[#C2E7FF] text-3xl font-black shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 sm:h-36 sm:w-36 sm:rounded-[2rem] sm:text-5xl">
-                    {(currentUser?.name || 'S').slice(0, 1).toUpperCase()}
-                  </div>
+                  <UserAvatar name={currentUser?.name} email={currentUser?.email} photoURL={currentUser?.photoURL} size={144} className="!h-20 !w-20 rounded-[1.5rem] border-4 border-[#D2E3FC] text-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 sm:!h-36 sm:!w-36 sm:rounded-[2rem] sm:text-5xl" imageClassName="rounded-[1.5rem] sm:rounded-[2rem]" />
                   <div className="pb-2">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C2E7FF] sm:text-sm sm:tracking-[0.35em]">Level {level} Scholar</p>
                     <h1 className="mt-1 text-3xl font-black tracking-tight text-white drop-shadow sm:mt-2 sm:text-6xl">{currentUser?.name || 'Student'}</h1>
