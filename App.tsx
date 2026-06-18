@@ -43,6 +43,7 @@ import { createUserWithEmailAndPassword, getRedirectResult, GoogleAuthProvider, 
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
 import { clearRememberedAuthAccount, getRememberedAuthAccount, RememberedAuthAccount, saveRememberedAuthAccount } from './utils/rememberedAuth';
 import { isMobileViewport as getIsMobileViewport } from './utils/device';
+import { getFirebaseAuthErrorMessageFromCode, isBlockedUserStatus, mergePurchasedProductIds, normalizePurchaseIds as normalizeSharedPurchaseIds, shouldRestoreEntitlementStatus } from './utils/authParity';
 
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
 const MOBILE_WELCOME_SESSION_KEY = 'digitalCatalyst.mobileWelcomeShown';
@@ -1623,7 +1624,7 @@ const App: React.FC = () => {
         console.warn('Cart entitlement write failed.', error);
         return;
       }
-      const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
+      const newPurchasedIds = mergePurchasedProductIds(purchasedProductIds, cart.map(item => item.productId));
       setPurchasedProductIds(newPurchasedIds);
       persistUserPurchasedProducts(newPurchasedIds);
 
@@ -1733,10 +1734,7 @@ const App: React.FC = () => {
   const authButtonLabel = currentUser ? 'Profile' : rememberedAuthAccount ? 'Login' : 'Sign Up';
 
   // --- Auth Handlers ---
-  const normalizePurchaseIds = (ids: unknown): number[] => {
-      if (!Array.isArray(ids)) return [];
-      return [...new Set(ids.map(id => Number(id)).filter(id => Number.isFinite(id)))];
-  };
+  const normalizePurchaseIds = (ids: unknown): number[] => normalizeSharedPurchaseIds(ids);
 
   const getFirebaseAuthProvider = (firebaseUser: FirebaseUser): 'google' | 'password' =>
       firebaseUser.providerData.some(provider => provider.providerId === GoogleAuthProvider.PROVIDER_ID) ? 'google' : 'password';
@@ -1868,11 +1866,10 @@ const App: React.FC = () => {
       const userDoc = await getDoc(doc(db, 'users', uid));
       const idsFromUserDoc = normalizePurchaseIds(userDoc.exists() ? userDoc.data()?.purchasedProductIds : []);
       const purchasesSnapshot = await getDocs(collection(db, 'users', uid, 'purchases'));
-      const validStatuses = new Set(['Completed', 'Verified', 'Active']);
       const idsFromPurchaseDocs = normalizePurchaseIds(purchasesSnapshot.docs
-        .filter(item => validStatuses.has(String(item.data()?.status || '')))
+        .filter(item => shouldRestoreEntitlementStatus(item.data()?.status))
         .map(item => item.data()?.productId ?? item.id));
-      return [...new Set([...idsFromUserDoc, ...idsFromPurchaseDocs])];
+      return mergePurchasedProductIds(idsFromUserDoc, idsFromPurchaseDocs);
   };
 
   // Frontend-only session locking improves UX, but is not fully tamper-proof.
@@ -2020,15 +2017,13 @@ const App: React.FC = () => {
           const fallbackUser = createFallbackAppUser(firebaseUser, profile);
           hydratedSessionUser = fallbackUser;
           if (getIsMobileViewport()) {
-              setPurchasedProductIds([]);
-              safeSetItem(`purchasedProducts:${firebaseUser.uid}`, []);
-              unlockMobileAuthWithUser(firebaseUser, fallbackUser);
+              setMobileAuthFlowState('completing-session');
           }
           try {
               let sessionUser = fallbackUser;
               try {
                   const ensuredUser = await ensureUserProfile(firebaseUser, profile);
-                  if (ensuredUser.status === 'blocked') {
+                  if (isBlockedUserStatus(ensuredUser.status)) {
                       await signOut(auth);
                       handleLogout(false);
                       if (getIsMobileViewport()) setMobileAuthFlowState('logged-out');
@@ -2085,12 +2080,7 @@ const App: React.FC = () => {
 
               return hydratedSessionUser;
           } catch (error) {
-              if (getIsMobileViewport() && auth.currentUser?.uid === firebaseUser.uid && hydratedSessionUser) {
-                  unlockMobileAuthWithUser(firebaseUser, hydratedSessionUser);
-                  console.warn('Firebase session completion failed after auth; keeping mobile app unlocked.', error);
-                  return hydratedSessionUser;
-              }
-              if (getIsMobileViewport()) setMobileAuthFlowState(auth.currentUser ? 'authenticated' : 'logged-out');
+              if (getIsMobileViewport()) setMobileAuthFlowState(auth.currentUser ? 'completing-session' : 'logged-out');
               throw error;
           } finally {
               setIsAuthRestoring(false);
@@ -2113,8 +2103,7 @@ const App: React.FC = () => {
           if (result?.user) {
               setIsAuthStateReady(true);
               setFirebaseAuthUser(result.user);
-              const redirectFallbackUser = createFallbackAppUser(result.user);
-              if (getIsMobileViewport()) unlockMobileAuthWithUser(result.user, redirectFallbackUser);
+              if (getIsMobileViewport()) setMobileAuthFlowState('completing-session');
               void completeFirebaseUserSession(result.user, { redirect: false }).then(hydratedUser => {
                   if (hydratedUser) {
                       finishMobileAuthSuccess(hydratedUser);
@@ -2127,7 +2116,7 @@ const App: React.FC = () => {
           setAuthRestoreError(getFirebaseAuthErrorMessage(error));
           if (getIsMobileViewport() && auth.currentUser) {
               setIsAuthStateReady(true);
-              unlockMobileAuthWithUser(auth.currentUser, createFallbackAppUser(auth.currentUser));
+              setMobileAuthFlowState('completing-session');
               void completeFirebaseUserSession(auth.currentUser, { redirect: false });
           }
       });
@@ -2136,7 +2125,7 @@ const App: React.FC = () => {
           const firebaseUser = auth.currentUser;
           if (firebaseUser) {
               setIsAuthStateReady(true);
-              unlockMobileAuthWithUser(firebaseUser, createFallbackAppUser(firebaseUser));
+              setMobileAuthFlowState('completing-session');
               void completeFirebaseUserSession(firebaseUser, { redirect: false });
           } else {
               setIsAuthStateReady(true);
@@ -2204,36 +2193,7 @@ const App: React.FC = () => {
       void completeFirebaseUserSession(firebaseUser, { redirect: false });
   };
 
-  const getFirebaseAuthErrorMessage = (error: any) => {
-      const firebaseAuthErrorMessages: Record<string, string> = {
-          'auth/email-already-in-use': 'This email already has an account. Please login instead or use password reset.',
-          'auth/invalid-credential': 'Invalid email or password. Please check your details.',
-          'auth/user-not-found': 'No account found with this email. Please sign up first.',
-          'auth/wrong-password': 'Incorrect password.',
-          'auth/weak-password': 'Password should be at least 6 characters.',
-          'auth/invalid-email': 'Please enter a valid email address.',
-          'auth/configuration-not-found': 'Firebase Email/Password authentication is not enabled for this project. Please enable the Email/Password sign-in provider in Firebase Console, then try again.',
-          'auth/network-request-failed': 'Network connection failed. Please check your internet and try again.',
-          'auth/too-many-requests': 'Too many attempts. Please wait and try again.',
-          'auth/popup-closed-by-user': 'Google login was cancelled.',
-          'auth/cancelled-popup-request': 'Another Google login window is already open.',
-          'auth/popup-blocked': 'Popup was blocked. Redirecting to Google login...',
-          'auth/account-exists-with-different-credential': 'An account already exists with this email. Login with the original method, then link Google from Profile.',
-          'auth/credential-already-in-use': 'This Google account is already linked to another user.',
-          'auth/unauthorized-domain': 'This domain is not authorized in Firebase Authentication settings.',
-          'auth/operation-not-allowed': 'Google login is not enabled. Enable Google provider in Firebase Console.',
-      };
-
-      const code = typeof error?.code === 'string'
-          ? error.code
-          : typeof error?.message === 'string'
-              ? error.message.match(/\((auth\/[^)]+)\)/)?.[1]
-              : undefined;
-
-      if (code && firebaseAuthErrorMessages[code]) return firebaseAuthErrorMessages[code];
-
-      return 'Unable to continue with Google right now. Please try again.';
-  };
+  const getFirebaseAuthErrorMessage = (error: any) => getFirebaseAuthErrorMessageFromCode(error);
 
 
   const shouldUseGoogleRedirect = () => {
@@ -2589,7 +2549,7 @@ const App: React.FC = () => {
       { amount: coinReward, type: 'credit', source: 'Milestone unlocked', description: `Unlocked: ${reward.title}${coinReward ? ` (+${coinReward} EduCoins)` : ''}` },
     );
     if (reward.unlockProductIds?.length) {
-      const nextPurchasedIds = [...new Set([...purchasedProductIds, ...reward.unlockProductIds])];
+      const nextPurchasedIds = mergePurchasedProductIds(purchasedProductIds, reward.unlockProductIds);
       setPurchasedProductIds(nextPurchasedIds);
       persistUserPurchasedProducts(nextPurchasedIds);
     }
@@ -2734,7 +2694,7 @@ const App: React.FC = () => {
           console.warn('Purchase entitlement write failed.', error);
           return;
         }
-        const newPurchasedIds = [...new Set([...purchasedProductIds, selectedProduct.id])];
+        const newPurchasedIds = mergePurchasedProductIds(purchasedProductIds, [selectedProduct.id]);
         setPurchasedProductIds(newPurchasedIds);
         persistUserPurchasedProducts(newPurchasedIds);
         const purchaseCoins = Math.max(0, Number(economySettings.coinPerPurchase));
@@ -2793,7 +2753,7 @@ const App: React.FC = () => {
       console.warn('Purchase entitlement write failed.', error);
       return false;
     }
-    const newPurchasedIds = [...new Set([...purchasedProductIds, product.id])];
+    const newPurchasedIds = mergePurchasedProductIds(purchasedProductIds, [product.id]);
     setPurchasedProductIds(newPurchasedIds);
     persistUserPurchasedProducts(newPurchasedIds);
     addGlobalOrder({
@@ -2865,7 +2825,7 @@ const App: React.FC = () => {
       console.warn('Cart entitlement write failed.', error);
       return false;
     }
-    const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
+    const newPurchasedIds = mergePurchasedProductIds(purchasedProductIds, cart.map(item => item.productId));
     setPurchasedProductIds(newPurchasedIds);
     persistUserPurchasedProducts(newPurchasedIds);
     addGlobalOrder({
@@ -2943,7 +2903,7 @@ const App: React.FC = () => {
 
 
   const unlockSubscriptionPlan = (plan: any, paymentLabel = 'Fiat checkout') => {
-    const newPurchasedIds = [...new Set([...purchasedProductIds, ...plan.unlockProductIds])];
+    const newPurchasedIds = mergePurchasedProductIds(purchasedProductIds, plan.unlockProductIds || []);
     setPurchasedProductIds(newPurchasedIds);
     persistUserPurchasedProducts(newPurchasedIds);
     setInfoModal({ title: 'Subscription active', message: `${plan.name} activated successfully via ${paymentLabel}.`, icon: '✅' });
