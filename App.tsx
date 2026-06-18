@@ -39,10 +39,14 @@ import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
 import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from './firebase';
-import { createUserWithEmailAndPassword, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
+import { createUserWithEmailAndPassword, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
 
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
+const googleProvider = new GoogleAuthProvider();
+googleProvider.setCustomParameters({
+  prompt: 'select_account',
+});
 
 // --- SAFETY & UTILS ---
 
@@ -234,7 +238,10 @@ export interface User {
     photoURL?: string;
     role?: 'user' | 'admin';
     status?: 'active' | 'blocked';
-    password?: string; // Legacy local-mode fallback only.
+    password?: string; // Legacy local-mode fallback only. Never write Firebase passwords into this field.
+    authProvider?: 'google' | 'password';
+    providerIds?: string[];
+    emailVerified?: boolean;
     createdAt: string;
     lastLoginAt?: string;
     eduCoins?: number;
@@ -942,6 +949,11 @@ const App: React.FC = () => {
   const activeSessionUidRef = useRef<string | null>(null);
   const sessionUnsubscribeRef = useRef<(() => void) | null>(null);
   const sessionHeartbeatRef = useRef<ReturnType<typeof window.setInterval> | null>(null);
+  const sessionCompletionRef = useRef<{ uid: string; startedAt: number } | null>(null);
+  const [mobileCompletionInput, setMobileCompletionInput] = useState('');
+  const [mobileCompletionError, setMobileCompletionError] = useState('');
+  const [isSavingMobileCompletion, setIsSavingMobileCompletion] = useState(false);
+  const [hasSkippedMobileCompletion, setHasSkippedMobileCompletion] = useState(false);
 
 
   const normalizeCourseModules = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
@@ -1497,6 +1509,13 @@ const App: React.FC = () => {
       setCart(prevCart => prevCart.filter(item => item.productId !== productId));
   };
 
+  const promptForMobileCompletion = () => {
+    setHasSkippedMobileCompletion(false);
+    setMobileCompletionError('Please add your 10 digit mobile number before purchases or profile-sensitive actions.');
+  };
+
+  const requiresMobileCompletion = () => Boolean(currentUser && !currentUser.mobile);
+
   const handleInitiateCheckout = () => {
     if (cart.length === 0) return;
     if (!currentUser) {
@@ -1507,6 +1526,7 @@ const App: React.FC = () => {
       window.scrollTo(0, 0);
       return;
     }
+    if (requiresMobileCompletion()) { promptForMobileCompletion(); return; }
     setIsCartOpen(false);
     setIsCartPaymentModalOpen(true);
   };
@@ -1660,6 +1680,12 @@ const App: React.FC = () => {
       return [...new Set(ids.map(id => Number(id)).filter(id => Number.isFinite(id)))];
   };
 
+  const getFirebaseAuthProvider = (firebaseUser: FirebaseUser): 'google' | 'password' =>
+      firebaseUser.providerData.some(provider => provider.providerId === GoogleAuthProvider.PROVIDER_ID) ? 'google' : 'password';
+
+  const getProviderIds = (firebaseUser: FirebaseUser): string[] =>
+      [...new Set(firebaseUser.providerData.map(provider => provider.providerId).filter(Boolean))];
+
   const toUserProfile = (firebaseUser: FirebaseUser, data: any = {}): User => ({
       id: firebaseUser.uid,
       uid: firebaseUser.uid,
@@ -1667,6 +1693,9 @@ const App: React.FC = () => {
       email: data.email || firebaseUser.email || '',
       mobile: data.mobile || firebaseUser.phoneNumber || '',
       photoURL: data.photoURL || firebaseUser.photoURL || '',
+      authProvider: data.authProvider || getFirebaseAuthProvider(firebaseUser),
+      providerIds: data.providerIds || getProviderIds(firebaseUser),
+      emailVerified: data.emailVerified ?? firebaseUser.emailVerified,
       role: data.role === 'admin' ? 'admin' : 'user',
       status: data.status === 'blocked' ? 'blocked' : 'active',
       createdAt: data.createdAt || new Date().toISOString(),
@@ -1686,33 +1715,43 @@ const App: React.FC = () => {
   const ensureUserProfile = async (firebaseUser: FirebaseUser, profile?: { name?: string; mobile?: string }): Promise<User> => {
       const userRef = doc(db, 'users', firebaseUser.uid);
       const userSnap = await getDoc(userRef);
-      const nowFields = { updatedAt: serverTimestamp(), lastLoginAt: serverTimestamp() };
-      if (!userSnap.exists()) {
-          await setDoc(userRef, {
-              uid: firebaseUser.uid,
-              name: profile?.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
-              email: firebaseUser.email || '',
-              mobile: profile?.mobile || firebaseUser.phoneNumber || '',
-              photoURL: firebaseUser.photoURL || '',
-              role: 'user',
-              status: 'active',
-              purchasedProductIds: [],
-              createdAt: serverTimestamp(),
-              ...nowFields,
-          }, { merge: true });
-          const createdSnap = await getDoc(userRef);
-          return toUserProfile(firebaseUser, createdSnap.data());
-      }
-      const existing = userSnap.data();
-      await setDoc(userRef, {
+      const existing = userSnap.exists() ? userSnap.data() : {};
+      const providerIds = getProviderIds(firebaseUser);
+      const authProvider = providerIds.includes(GoogleAuthProvider.PROVIDER_ID) ? 'google' : 'password';
+      const existingName = String(existing.name || '').trim();
+      const providerName = String(firebaseUser.displayName || '').trim();
+      const fallbackName = firebaseUser.email?.split('@')[0] || 'Learner';
+      const nextName = profile?.name || existingName || providerName || fallbackName;
+      const nextMobile = profile?.mobile || existing.mobile || firebaseUser.phoneNumber || '';
+      const safeProfileFields = {
           uid: firebaseUser.uid,
+          name: nextName,
           email: firebaseUser.email || existing.email || '',
-          name: profile?.name || existing.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
-          mobile: profile?.mobile || existing.mobile || firebaseUser.phoneNumber || '',
+          mobile: nextMobile,
           photoURL: firebaseUser.photoURL || existing.photoURL || '',
-          ...nowFields,
-      }, { merge: true });
-      return toUserProfile(firebaseUser, { ...existing, name: profile?.name || existing.name, mobile: profile?.mobile || existing.mobile });
+          role: existing.role === 'admin' ? 'admin' : 'user',
+          status: existing.status === 'blocked' ? 'blocked' : 'active',
+          authProvider,
+          providerIds,
+          emailVerified: firebaseUser.emailVerified,
+          purchasedProductIds: normalizePurchaseIds(existing.purchasedProductIds),
+          eduCoins: existing.eduCoins ?? 120,
+          studyMinutes: existing.studyMinutes ?? 0,
+          totalWatchTimeMinutes: existing.totalWatchTimeMinutes ?? existing.studyMinutes ?? 0,
+          totalLifetimeCoins: existing.totalLifetimeCoins ?? existing.eduCoins ?? 120,
+          rewardedArticleIds: existing.rewardedArticleIds || [],
+          readArticles: existing.readArticles || existing.rewardedArticleIds || [],
+          rewardedQuizIds: existing.rewardedQuizIds || [],
+          claimedRewardIds: existing.claimedRewardIds || [],
+          profileStreakClaims: existing.profileStreakClaims || {},
+          coinTransactions: existing.coinTransactions || [],
+          createdAt: existing.createdAt || serverTimestamp(),
+          updatedAt: serverTimestamp(),
+          lastLoginAt: serverTimestamp(),
+      };
+      await setDoc(userRef, safeProfileFields, { merge: true });
+      const savedSnap = await getDoc(userRef);
+      return toUserProfile(firebaseUser, savedSnap.exists() ? savedSnap.data() : safeProfileFields);
   };
 
   const restoreUserEntitlements = async (uid: string): Promise<number[]> => {
@@ -1788,6 +1827,9 @@ const App: React.FC = () => {
 
   const completeFirebaseUserSession = async (firebaseUser: FirebaseUser, options: { redirect?: boolean; profile?: { name?: string; mobile?: string } } = {}) => {
       const { redirect = true, profile } = options;
+      const existingCompletion = sessionCompletionRef.current;
+      if (existingCompletion?.uid === firebaseUser.uid && Date.now() - existingCompletion.startedAt < 2000) return;
+      sessionCompletionRef.current = { uid: firebaseUser.uid, startedAt: Date.now() };
       setIsAuthRestoring(true);
       setAuthRestoreError(null);
       const sessionUser = await ensureUserProfile(firebaseUser, profile);
@@ -1809,7 +1851,9 @@ const App: React.FC = () => {
           const backendPurchasedIds = await restoreUserEntitlements(firebaseUser.uid);
           setPurchasedProductIds(backendPurchasedIds);
           safeSetItem(`purchasedProducts:${firebaseUser.uid}`, backendPurchasedIds);
-          setCurrentUser({ ...(sessionUser as any), purchasedProductIds: backendPurchasedIds });
+          const hydratedUser = { ...(sessionUser as any), purchasedProductIds: backendPurchasedIds };
+          setCurrentUser(hydratedUser);
+          setUsers(current => current.some(user => user.id === hydratedUser.id) ? current.map(user => user.id === hydratedUser.id ? hydratedUser : user) : [...current, hydratedUser]);
           setAuthRestoreError(null);
       } catch (error) {
           setPurchasedProductIds([]);
@@ -1839,6 +1883,12 @@ const App: React.FC = () => {
   useEffect(() => {
       localStorage.removeItem('currentUser');
       localStorage.removeItem('purchasedProducts');
+      void getRedirectResult(auth).then(result => {
+          if (result?.user) void completeFirebaseUserSession(result.user);
+      }).catch(error => {
+          console.warn('Google redirect result handling failed.', error);
+          setAuthRestoreError(getFirebaseAuthErrorMessage(error));
+      });
       const unsubscribe = onAuthStateChanged(auth, user => {
           if (user) {
               setIsAuthRestoring(true);
@@ -1873,8 +1923,15 @@ const App: React.FC = () => {
           'auth/weak-password': 'Password should be at least 6 characters.',
           'auth/invalid-email': 'Please enter a valid email address.',
           'auth/configuration-not-found': 'Firebase Email/Password authentication is not enabled for this project. Please enable the Email/Password sign-in provider in Firebase Console, then try again.',
-          'auth/network-request-failed': 'Network connection failed while contacting Firebase. Please check your internet connection and try again.',
-          'auth/too-many-requests': 'Too many login attempts. Please wait a few minutes and try again.',
+          'auth/network-request-failed': 'Network connection failed. Please check your internet and try again.',
+          'auth/too-many-requests': 'Too many attempts. Please wait and try again.',
+          'auth/popup-closed-by-user': 'Google login was cancelled.',
+          'auth/cancelled-popup-request': 'Another Google login window is already open.',
+          'auth/popup-blocked': 'Popup was blocked. Redirecting to Google login...',
+          'auth/account-exists-with-different-credential': 'An account already exists with this email. Login with the original method, then link Google from Profile.',
+          'auth/credential-already-in-use': 'This Google account is already linked to another user.',
+          'auth/unauthorized-domain': 'This domain is not authorized in Firebase Authentication settings.',
+          'auth/operation-not-allowed': 'Google login is not enabled. Enable Google provider in Firebase Console.',
       };
 
       const code = typeof error?.code === 'string'
@@ -1885,7 +1942,40 @@ const App: React.FC = () => {
 
       if (code && firebaseAuthErrorMessages[code]) return firebaseAuthErrorMessages[code];
 
-      return 'Unable to authenticate right now. Please try again.';
+      return 'Unable to continue with Google right now. Please try again.';
+  };
+
+
+  const shouldUseGoogleRedirect = () => {
+      const userAgent = navigator.userAgent || '';
+      const isSmallScreen = window.matchMedia?.('(max-width: 768px)').matches;
+      const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone;
+      const isWebView = /wv|FBAN|FBAV|Instagram|Line|Twitter/i.test(userAgent);
+      return Boolean(isSmallScreen || isStandalone || isWebView);
+  };
+
+  const handleGoogleLogin = async (): Promise<{ success: boolean, message: string }> => {
+      try {
+          if (shouldUseGoogleRedirect()) {
+              await signInWithRedirect(auth, googleProvider);
+              return { success: true, message: 'Opening Google login...' };
+          }
+          const credential = await signInWithPopup(auth, googleProvider);
+          await completeFirebaseUserSession(credential.user);
+          return { success: true, message: 'Google login successful.' };
+      } catch (error: any) {
+          console.warn('Google login failed.', error);
+          if (error?.code === 'auth/popup-blocked') {
+              try {
+                  await signInWithRedirect(auth, googleProvider);
+                  return { success: true, message: getFirebaseAuthErrorMessage(error) };
+              } catch (redirectError) {
+                  console.warn('Google redirect fallback failed.', redirectError);
+                  return { success: false, message: getFirebaseAuthErrorMessage(redirectError) };
+              }
+          }
+          return { success: false, message: getFirebaseAuthErrorMessage(error) };
+      }
   };
 
   const handleEmailLogin = async (email: string, password: string): Promise<{ success: boolean, message: string }> => {
@@ -2245,6 +2335,8 @@ const App: React.FC = () => {
       handleLoginRequired(product);
       return;
     }
+
+    if (requiresMobileCompletion()) { promptForMobileCompletion(); return; }
 
     const selected = { ...product, viewCount: (product.viewCount || 0) + 1 };
     setProducts(prev => prev.map(item => item.id === product.id ? { ...item, viewCount: (item.viewCount || 0) + 1 } : item));
@@ -2880,8 +2972,8 @@ const App: React.FC = () => {
       case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={currentUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
-      case 'myPurchases': return currentUser ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
-      case 'profile': return currentUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+      case 'myPurchases': return currentUser ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+      case 'profile': return currentUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={() => handleNavigateBack('home')} onActivatePlan={handleActivateSubscription} currentUser={currentUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={() => handleNavigateBack('home')} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
@@ -2921,7 +3013,7 @@ const App: React.FC = () => {
 
   const renderPage = () => {
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={() => handleNavigateBack('home')} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
-    if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
+    if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent()}</div>;
@@ -2940,6 +3032,39 @@ const App: React.FC = () => {
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={currentUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
+            {currentUser && !currentUser.mobile && !hasSkippedMobileCompletion && (
+              <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+                <div className="w-full max-w-md rounded-[2rem] border border-blue-100 bg-white p-6 shadow-2xl">
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Complete profile</p>
+                  <h2 className="mt-2 text-2xl font-black text-slate-950">Add your mobile number</h2>
+                  <p className="mt-2 text-sm leading-6 text-slate-600">Google does not share your phone number. Add a 10 digit Indian mobile number for purchase support and profile-sensitive actions. No OTP or SMS verification is used.</p>
+                  <div className="mt-5 flex overflow-hidden rounded-2xl border border-slate-300 bg-white focus-within:border-blue-700 focus-within:ring-4 focus-within:ring-blue-100">
+                    <span className="bg-slate-100 px-4 py-3 font-bold text-slate-700">+91</span>
+                    <input value={mobileCompletionInput} onChange={e => setMobileCompletionInput(e.target.value.replace(/\D/g, '').slice(-10))} className="w-full bg-transparent px-4 py-3 outline-none" placeholder="10 digit mobile" inputMode="numeric" />
+                  </div>
+                  {mobileCompletionError && <p className="mt-3 rounded-xl border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{mobileCompletionError}</p>}
+                  <div className="mt-5 flex gap-3">
+                    <button type="button" onClick={() => { setHasSkippedMobileCompletion(true); setMobileCompletionError(''); }} className="flex-1 rounded-2xl border border-slate-200 bg-white px-4 py-3 font-black text-slate-700">Skip for now</button>
+                    <button type="button" disabled={isSavingMobileCompletion} onClick={async () => {
+                      const normalizedMobile = mobileCompletionInput.replace(/\D/g, '').slice(-10);
+                      if (normalizedMobile.length !== 10) { setMobileCompletionError('Please enter a valid 10 digit mobile number.'); return; }
+                      if (!currentUser || !auth.currentUser) return;
+                      setIsSavingMobileCompletion(true); setMobileCompletionError('');
+                      try {
+                        await setDoc(doc(db, 'users', currentUser.id), { mobile: normalizedMobile, updatedAt: serverTimestamp() }, { merge: true });
+                        const updatedUser = { ...currentUser, mobile: normalizedMobile };
+                        setCurrentUser(updatedUser);
+                        setHasSkippedMobileCompletion(false);
+                        setUsers(current => current.map(user => user.id === updatedUser.id ? updatedUser : user));
+                      } catch (error) {
+                        console.warn('Mobile profile completion failed.', error);
+                        setMobileCompletionError('Could not save mobile number. Please try again.');
+                      } finally { setIsSavingMobileCompletion(false); }
+                    }} className="flex-1 rounded-2xl bg-gradient-to-r from-slate-950 to-blue-800 px-4 py-3 font-black text-white disabled:opacity-60">{isSavingMobileCompletion ? 'Saving...' : 'Save mobile'}</button>
+                  </div>
+                </div>
+              </div>
+            )}
             <main key={currentView} className={`${appleOpenClass} ${currentView === 'home' ? 'mobile-app-home' : ''}`}>{renderContent()}</main>
             <div className="mobile-app-chrome"><InstallAppButton enabled={canShowInstallPrompt} /></div>
             <div className={shouldHideFooterOnMobile ? 'max-md:hidden' : ''}><Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} /></div>
