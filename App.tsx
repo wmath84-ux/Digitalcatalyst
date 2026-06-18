@@ -2022,6 +2022,7 @@ const App: React.FC = () => {
           }
           try {
               let sessionUser: User;
+              let usedFallbackProfile = false;
               try {
                   const ensuredUser = await ensureUserProfile(firebaseUser, profile);
                   if (isBlockedUserStatus(ensuredUser.status)) {
@@ -2033,13 +2034,22 @@ const App: React.FC = () => {
                   }
                   sessionUser = ensuredUser;
               } catch (error) {
-                  console.warn('User profile hydration failed; login cannot be completed.', error);
-                  setAuthRestoreError('Login could not be completed. Please try again.');
-                  if (getIsMobileViewport()) setMobileAuthFlowState('logged-out');
-                  return null;
+                  console.warn('User profile hydration failed; continuing with Firebase Auth fallback profile.', error);
+                  usedFallbackProfile = true;
+                  sessionUser = fallbackUser;
+                  setAuthRestoreError('Login restored. Profile sync will retry when the database is reachable.');
               }
 
-              const initialPurchasedIds = normalizePurchaseIds((sessionUser as any).purchasedProductIds);
+              const profilePurchasedIds = normalizePurchaseIds((sessionUser as any).purchasedProductIds);
+              let restoredPurchasedIds = profilePurchasedIds;
+              try {
+                  restoredPurchasedIds = await restoreUserEntitlements(firebaseUser.uid);
+              } catch (error) {
+                  setAuthRestoreError('Login restored, but purchases could not be refreshed. Showing saved purchases if available.');
+                  setInfoModal({ title: 'Purchases not refreshed', message: 'Login restored, but purchases could not be refreshed. Please retry from Purchases if something is missing.', icon: '⚠️' });
+                  console.warn('Purchase access restore failed before unlock; continuing login.', error);
+              }
+              const initialPurchasedIds = mergePurchasedProductIds(profilePurchasedIds, restoredPurchasedIds);
               const hydratedUser = { ...(sessionUser as any), purchasedProductIds: initialPurchasedIds } as User;
               hydratedSessionUser = hydratedUser;
               setFirebaseAuthUser(firebaseUser);
@@ -2051,7 +2061,7 @@ const App: React.FC = () => {
               if (getIsMobileViewport()) finishMobileAuthSuccess(hydratedUser);
               console.info('[mobile-auth]', {
                   step: 'session-unlocked',
-                  hasHydratedUser: sessionUser !== fallbackUser,
+                  hasHydratedUser: !usedFallbackProfile,
                   currentView: currentViewRef.current,
               });
 
@@ -2068,18 +2078,6 @@ const App: React.FC = () => {
               } catch (error) {
                   console.warn('Current session watcher failed; continuing login.', error);
               }
-
-              void restoreUserEntitlements(firebaseUser.uid).then(backendPurchasedIds => {
-                  setPurchasedProductIds(backendPurchasedIds);
-                  safeSetItem(`purchasedProducts:${firebaseUser.uid}`, backendPurchasedIds);
-                  const userWithRestoredPurchases = { ...(hydratedUser as any), purchasedProductIds: backendPurchasedIds } as User;
-                  setCurrentUser(current => current?.id === userWithRestoredPurchases.id ? { ...current, purchasedProductIds: backendPurchasedIds } as User : userWithRestoredPurchases);
-                  setUsers(current => current.some(user => user.id === userWithRestoredPurchases.id) ? current.map(user => user.id === userWithRestoredPurchases.id ? { ...user, purchasedProductIds: backendPurchasedIds } as User : user) : [...current, userWithRestoredPurchases]);
-              }).catch(error => {
-                  setAuthRestoreError('Login successful, but purchases could not be restored. Please retry from Purchases.');
-                  setInfoModal({ title: 'Purchases not restored', message: 'Login successful, but purchases could not be restored. Please retry from Purchases.', icon: '⚠️' });
-                  console.warn('Purchase access restore failed; login will continue.', error);
-              });
 
               return hydratedUser;
           } catch (error) {
@@ -3320,7 +3318,7 @@ const App: React.FC = () => {
     const hasFirebaseUser = Boolean(firebaseAuthUser);
     console.info('route guard decision: authReady, userExists, path', isAuthStateReady, Boolean(currentUser || firebaseAuthUser), currentView);
     if (isMobileViewport && !isAuthStateReady) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
-    if (isMobileViewport && isAuthRestoring && hasFirebaseUser && !currentUser) return renderMobileSessionStatus('Restoring account…', 'Your login succeeded. We are finishing your account setup now.');
+    if (isMobileViewport && hasFirebaseUser && !currentUser) return renderMobileSessionStatus('Restoring account…', 'Your login succeeded. We are finishing your account setup now.');
     if (isMobileViewport && isAuthStateReady && !hasFirebaseUser && !currentUser) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : 'signup'} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={() => handleNavigateBack('home')} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
     if (currentView === 'auth' && !(isMobileViewport && hasFirebaseUser && currentUser)) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
