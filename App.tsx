@@ -953,6 +953,8 @@ const App: React.FC = () => {
   const sessionUnsubscribeRef = useRef<(() => void) | null>(null);
   const sessionHeartbeatRef = useRef<ReturnType<typeof window.setInterval> | null>(null);
   const sessionCompletionRef = useRef<{ uid: string; startedAt: number } | null>(null);
+  const sessionCompletionPromiseRef = useRef<Promise<void> | null>(null);
+  const authRedirectHandledRef = useRef<{ uid: string; source?: string; at: number } | null>(null);
   const [mobileCompletionInput, setMobileCompletionInput] = useState('');
   const [mobileCompletionError, setMobileCompletionError] = useState('');
   const [isSavingMobileCompletion, setIsSavingMobileCompletion] = useState(false);
@@ -1840,68 +1842,102 @@ const App: React.FC = () => {
       }, 45000);
   };
 
-  const completeFirebaseUserSession = async (firebaseUser: FirebaseUser, options: { redirect?: boolean; profile?: { name?: string; mobile?: string } } = {}) => {
-      const { redirect = true, profile } = options;
-      const existingCompletion = sessionCompletionRef.current;
-      if (existingCompletion?.uid === firebaseUser.uid && Date.now() - existingCompletion.startedAt < 2000) return;
-      sessionCompletionRef.current = { uid: firebaseUser.uid, startedAt: Date.now() };
-      setIsAuthRestoring(true);
+
+  const redirectAfterSuccessfulAuth = (options: { source?: 'google-popup' | 'google-redirect' | 'email-login' | 'email-signup' | 'session-restore'; preserveCheckoutIntent?: boolean } = {}) => {
+      const { source, preserveCheckoutIntent = true } = options;
+      const uid = auth.currentUser?.uid || currentUser?.id || '';
+      const lastRedirect = authRedirectHandledRef.current;
+      if (uid && lastRedirect?.uid === uid && Date.now() - lastRedirect.at < 1200) return;
+      if (uid) authRedirectHandledRef.current = { uid, source, at: Date.now() };
+      setIsAuthRestoring(false);
       setAuthRestoreError(null);
-      const sessionUser = await ensureUserProfile(firebaseUser, profile);
-      if (sessionUser.status === 'blocked') {
-          await signOut(auth);
-          handleLogout(false);
-          setInfoModal({ title: 'Account blocked', message: 'Your account is blocked. Please contact support.', icon: '🔒' });
-          return;
-      }
-      const sessionId = getOrCreateDeviceSessionId();
-      activeSessionIdRef.current = sessionId;
-      activeSessionUidRef.current = firebaseUser.uid;
-      await writeCurrentSession(firebaseUser.uid, sessionId);
-      subscribeToCurrentSession(firebaseUser.uid, sessionId);
-      try {
-          setPurchasedProductIds([]);
-          localStorage.removeItem('purchasedProducts');
-          localStorage.removeItem(`purchasedProducts:${firebaseUser.uid}`);
-          const backendPurchasedIds = await restoreUserEntitlements(firebaseUser.uid);
-          setPurchasedProductIds(backendPurchasedIds);
-          safeSetItem(`purchasedProducts:${firebaseUser.uid}`, backendPurchasedIds);
-          const hydratedUser = { ...(sessionUser as any), purchasedProductIds: backendPurchasedIds };
-          saveRememberedAuthAccount({ uid: hydratedUser.id, email: hydratedUser.email, name: hydratedUser.name, photoURL: hydratedUser.photoURL || getFirebaseUserPhotoURL(firebaseUser), providerIds: hydratedUser.providerIds, authProvider: hydratedUser.authProvider });
-          setRememberedAuthAccount(getRememberedAuthAccount());
-          setCurrentUser(hydratedUser);
-          setUsers(current => current.some(user => user.id === hydratedUser.id) ? current.map(user => user.id === hydratedUser.id ? hydratedUser : user) : [...current, hydratedUser]);
-          setAuthRestoreError(null);
-      } catch (error) {
-          setPurchasedProductIds([]);
-          setAuthRestoreError('Could not restore purchases. Please retry.');
-          setInfoModal({ title: 'Could not restore purchases', message: 'Could not restore purchases. Please retry.', icon: '⚠️' });
-          console.warn('Purchase access restore failed; keeping this session locked until backend data is available.', error);
-      } finally {
-          setIsAuthRestoring(false);
-      }
-      if (!redirect) return;
-      if (productToBuyAfterLogin) {
+
+      if (preserveCheckoutIntent && productToBuyAfterLogin) {
           setSelectedProduct(productToBuyAfterLogin);
           setCurrentView('product');
           setAutoOpenPaymentModalFor(productToBuyAfterLogin.id);
           setProductToBuyAfterLogin(null);
-      } else if (resumeCartCheckoutAfterLogin && cart.length > 0) {
+          window.scrollTo(0, 0);
+          return;
+      }
+
+      if (preserveCheckoutIntent && resumeCartCheckoutAfterLogin && cart.length > 0) {
           setCurrentView('home');
           setIsCartOpen(false);
           setIsCartPaymentModalOpen(true);
           setResumeCartCheckoutAfterLogin(false);
-      } else {
-          setResumeCartCheckoutAfterLogin(false);
-          setCurrentView('home');
+          window.scrollTo(0, 0);
+          return;
       }
+
+      setProductToBuyAfterLogin(null);
+      setResumeCartCheckoutAfterLogin(false);
+      setCurrentView('home');
+      window.scrollTo(0, 0);
+  };
+
+  const completeFirebaseUserSession = async (firebaseUser: FirebaseUser, options: { redirect?: boolean; profile?: { name?: string; mobile?: string } } = {}) => {
+      const { redirect = true, profile } = options;
+      const existingCompletion = sessionCompletionRef.current;
+      if (existingCompletion?.uid === firebaseUser.uid && Date.now() - existingCompletion.startedAt < 2000) {
+          await sessionCompletionPromiseRef.current?.catch(error => console.warn('Existing auth completion failed.', error));
+          if (redirect || currentViewRef.current === 'auth') redirectAfterSuccessfulAuth({ source: 'session-restore' });
+          return;
+      }
+      sessionCompletionRef.current = { uid: firebaseUser.uid, startedAt: Date.now() };
+      let canRedirectAfterCompletion = true;
+      const completionPromise = (async () => {
+          setIsAuthRestoring(true);
+          setAuthRestoreError(null);
+          const sessionUser = await ensureUserProfile(firebaseUser, profile);
+          if (sessionUser.status === 'blocked') {
+              canRedirectAfterCompletion = false;
+              await signOut(auth);
+              handleLogout(false);
+              setInfoModal({ title: 'Account blocked', message: 'Your account is blocked. Please contact support.', icon: '🔒' });
+              return;
+          }
+          const sessionId = getOrCreateDeviceSessionId();
+          activeSessionIdRef.current = sessionId;
+          activeSessionUidRef.current = firebaseUser.uid;
+          await writeCurrentSession(firebaseUser.uid, sessionId);
+          subscribeToCurrentSession(firebaseUser.uid, sessionId);
+          try {
+              setPurchasedProductIds([]);
+              localStorage.removeItem('purchasedProducts');
+              localStorage.removeItem(`purchasedProducts:${firebaseUser.uid}`);
+              const backendPurchasedIds = await restoreUserEntitlements(firebaseUser.uid);
+              setPurchasedProductIds(backendPurchasedIds);
+              safeSetItem(`purchasedProducts:${firebaseUser.uid}`, backendPurchasedIds);
+              const hydratedUser = { ...(sessionUser as any), purchasedProductIds: backendPurchasedIds };
+              saveRememberedAuthAccount({ uid: hydratedUser.id, email: hydratedUser.email, name: hydratedUser.name, photoURL: hydratedUser.photoURL || getFirebaseUserPhotoURL(firebaseUser), providerIds: hydratedUser.providerIds, authProvider: hydratedUser.authProvider });
+              setRememberedAuthAccount(getRememberedAuthAccount());
+              setCurrentUser(hydratedUser);
+              setUsers(current => current.some(user => user.id === hydratedUser.id) ? current.map(user => user.id === hydratedUser.id ? hydratedUser : user) : [...current, hydratedUser]);
+              setAuthRestoreError(null);
+          } catch (error) {
+              setPurchasedProductIds([]);
+              setAuthRestoreError('Could not restore purchases. Please retry.');
+              setInfoModal({ title: 'Could not restore purchases', message: 'Could not restore purchases. Please retry.', icon: '⚠️' });
+              console.warn('Purchase access restore failed; keeping this session locked until backend data is available.', error);
+          } finally {
+              setIsAuthRestoring(false);
+          }
+      })();
+      sessionCompletionPromiseRef.current = completionPromise;
+      try {
+          await completionPromise;
+      } finally {
+          if (sessionCompletionPromiseRef.current === completionPromise) sessionCompletionPromiseRef.current = null;
+      }
+      if (redirect && canRedirectAfterCompletion) redirectAfterSuccessfulAuth({ source: 'session-restore' });
   };
 
   useEffect(() => {
       localStorage.removeItem('currentUser');
       localStorage.removeItem('purchasedProducts');
       void getRedirectResult(auth).then(result => {
-          if (result?.user) void completeFirebaseUserSession(result.user);
+          if (result?.user) void completeFirebaseUserSession(result.user, { redirect: false }).then(() => redirectAfterSuccessfulAuth({ source: 'google-redirect' }));
       }).catch(error => {
           console.warn('Google redirect result handling failed.', error);
           setAuthRestoreError(getFirebaseAuthErrorMessage(error));
@@ -1910,7 +1946,9 @@ const App: React.FC = () => {
           if (user) {
               setIsAuthRestoring(true);
               setAuthRestoreError(null);
-              void completeFirebaseUserSession(user, { redirect: false });
+              void completeFirebaseUserSession(user, { redirect: false }).then(() => {
+                  if (currentViewRef.current === 'auth') redirectAfterSuccessfulAuth({ source: 'session-restore' });
+              });
           } else handleLogout(false);
       });
       return () => {
@@ -1978,7 +2016,8 @@ const App: React.FC = () => {
               return { success: true, message: 'Opening Google login...' };
           }
           const credential = await signInWithPopup(auth, googleProvider);
-          await completeFirebaseUserSession(credential.user);
+          await completeFirebaseUserSession(credential.user, { redirect: false });
+          redirectAfterSuccessfulAuth({ source: 'google-popup' });
           return { success: true, message: 'Google login successful.' };
       } catch (error: any) {
           console.warn('Google login failed.', error);
@@ -1998,7 +2037,8 @@ const App: React.FC = () => {
   const handleEmailLogin = async (email: string, password: string): Promise<{ success: boolean, message: string }> => {
       try {
           const credential = await signInWithEmailAndPassword(auth, email, password);
-          await completeFirebaseUserSession(credential.user, { profile: { name: credential.user.displayName || undefined, mobile: credential.user.phoneNumber || undefined } });
+          await completeFirebaseUserSession(credential.user, { redirect: false, profile: { name: credential.user.displayName || undefined, mobile: credential.user.phoneNumber || undefined } });
+          redirectAfterSuccessfulAuth({ source: 'email-login' });
           return { success: true, message: 'Login successful.' };
       } catch (error) {
           return { success: false, message: getFirebaseAuthErrorMessage(error) };
@@ -2009,7 +2049,8 @@ const App: React.FC = () => {
       try {
           const credential = await createUserWithEmailAndPassword(auth, profile.email, password);
           await updateProfile(credential.user, { displayName: profile.name });
-          await completeFirebaseUserSession(credential.user, { profile });
+          await completeFirebaseUserSession(credential.user, { redirect: false, profile });
+          redirectAfterSuccessfulAuth({ source: 'email-signup' });
           return { success: true, message: 'Account created successfully.' };
       } catch (error) {
           return { success: false, message: getFirebaseAuthErrorMessage(error) };
