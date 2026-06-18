@@ -47,6 +47,8 @@ import { isMobileViewport as getIsMobileViewport } from './utils/device';
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
 const MOBILE_WELCOME_SESSION_KEY = 'digitalCatalyst.mobileWelcomeShown';
 
+type MobileAuthFlowState = 'checking' | 'logged-out' | 'completing-session' | 'authenticated';
+
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: 'select_account',
@@ -919,6 +921,8 @@ const App: React.FC = () => {
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup'>('login');
   const [isAuthStateReady, setIsAuthStateReady] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() => getIsMobileViewport());
+  const [mobileAuthFlowState, setMobileAuthFlowState] = useState<MobileAuthFlowState>('checking');
+  const [firebaseAuthUser, setFirebaseAuthUser] = useState<FirebaseUser | null>(null);
   const [mobileWelcomeMessage, setMobileWelcomeMessage] = useState('');
   const currentViewRef = React.useRef(currentView);
   const historyNavigationRef = React.useRef(false);
@@ -1893,14 +1897,18 @@ const App: React.FC = () => {
 
 
 
-  const handleMobileAuthSuccessRedirect = (user?: Pick<User, 'name' | 'email'> | null) => {
-      if (!isMobileViewport || !user) return false;
+  const finishMobileAuthSuccess = (user: User | Pick<User, 'name' | 'email'>) => {
+      if (!getIsMobileViewport()) return;
+      console.info('[mobile-auth]', {
+          step: 'finish-mobile-success',
+          userId: 'id' in user ? user.id : user.email,
+      });
       setIsAuthRestoring(false);
       setAuthRestoreError(null);
+      setMobileAuthFlowState('authenticated');
       setCurrentView('home');
       window.scrollTo(0, 0);
-      showMobileWelcomeAfterAuth(user);
-      return true;
+      window.setTimeout(() => showMobileWelcomeAfterAuth(user), 0);
   };
 
   const redirectAfterSuccessfulAuth = (options: { source?: 'google-popup' | 'google-redirect' | 'email-login' | 'email-signup' | 'session-restore'; user?: User | Pick<User, 'name' | 'email'> | null; preserveCheckoutIntent?: boolean; force?: boolean } = {}) => {
@@ -1939,7 +1947,8 @@ const App: React.FC = () => {
 
       setProductToBuyAfterLogin(null);
       setResumeCartCheckoutAfterLogin(false);
-      if (isMobileViewport && handleMobileAuthSuccessRedirect(welcomeUser)) {
+      if (isMobileViewport && welcomeUser) {
+          finishMobileAuthSuccess(welcomeUser);
           console.info('[mobile-auth] redirect home', { source, hasUser: Boolean(welcomeUser) });
           return;
       }
@@ -1963,40 +1972,66 @@ const App: React.FC = () => {
       const completionPromise = (async (): Promise<User | null> => {
           setIsAuthRestoring(true);
           setAuthRestoreError(null);
-          const sessionUser = await ensureUserProfile(firebaseUser, profile);
-          if (sessionUser.status === 'blocked') {
-              await signOut(auth);
-              handleLogout(false);
-              setInfoModal({ title: 'Account blocked', message: 'Your account is blocked. Please contact support.', icon: '🔒' });
-              return null;
-          }
-          const sessionId = getOrCreateDeviceSessionId();
-          activeSessionIdRef.current = sessionId;
-          activeSessionUidRef.current = firebaseUser.uid;
-          await writeCurrentSession(firebaseUser.uid, sessionId);
-          subscribeToCurrentSession(firebaseUser.uid, sessionId);
+          if (getIsMobileViewport()) setMobileAuthFlowState('completing-session');
           try {
-              setPurchasedProductIds([]);
-              localStorage.removeItem('purchasedProducts');
-              localStorage.removeItem(`purchasedProducts:${firebaseUser.uid}`);
-              const backendPurchasedIds = await restoreUserEntitlements(firebaseUser.uid);
-              setPurchasedProductIds(backendPurchasedIds);
-              safeSetItem(`purchasedProducts:${firebaseUser.uid}`, backendPurchasedIds);
-              const hydratedUser = { ...(sessionUser as any), purchasedProductIds: backendPurchasedIds } as User;
+              const sessionUser = await ensureUserProfile(firebaseUser, profile);
+              if (sessionUser.status === 'blocked') {
+                  await signOut(auth);
+                  handleLogout(false);
+                  setInfoModal({ title: 'Account blocked', message: 'Your account is blocked. Please contact support.', icon: '🔒' });
+                  return null;
+              }
+
+              const sessionId = getOrCreateDeviceSessionId();
+              activeSessionIdRef.current = sessionId;
+              activeSessionUidRef.current = firebaseUser.uid;
+              try {
+                  await writeCurrentSession(firebaseUser.uid, sessionId);
+              } catch (error) {
+                  console.warn('Current session write failed; continuing login.', error);
+                  setInfoModal({ title: 'Session warning', message: 'Login successful, but device session sync could not be saved. You can continue using the app.', icon: '⚠️' });
+              }
+              try {
+                  subscribeToCurrentSession(firebaseUser.uid, sessionId);
+              } catch (error) {
+                  console.warn('Current session watcher failed; continuing login.', error);
+              }
+
+              const initialPurchasedIds = normalizePurchaseIds((sessionUser as any).purchasedProductIds);
+              const hydratedUser = { ...(sessionUser as any), purchasedProductIds: initialPurchasedIds } as User;
               hydratedSessionUser = hydratedUser;
+              setPurchasedProductIds(initialPurchasedIds);
+              safeSetItem(`purchasedProducts:${firebaseUser.uid}`, initialPurchasedIds);
               saveRememberedAuthAccount({ uid: hydratedUser.id, email: hydratedUser.email, name: hydratedUser.name, photoURL: hydratedUser.photoURL || getFirebaseUserPhotoURL(firebaseUser), providerIds: hydratedUser.providerIds, authProvider: hydratedUser.authProvider });
               setRememberedAuthAccount(getRememberedAuthAccount());
               setCurrentUser(hydratedUser);
               setUsers(current => current.some(user => user.id === hydratedUser.id) ? current.map(user => user.id === hydratedUser.id ? hydratedUser : user) : [...current, hydratedUser]);
               setAuthRestoreError(null);
-              console.info('[mobile-auth] session completed', { uid: hydratedUser.id, source: 'complete-session', currentView: currentViewRef.current, isMobileViewport });
-              return hydratedUser;
+              if (getIsMobileViewport()) setMobileAuthFlowState('authenticated');
+              console.info('[mobile-auth]', {
+                  step: 'session-completed',
+                  hasHydratedUser: Boolean(hydratedUser),
+                  currentView: currentViewRef.current,
+              });
+
+              try {
+                  const backendPurchasedIds = await restoreUserEntitlements(firebaseUser.uid);
+                  setPurchasedProductIds(backendPurchasedIds);
+                  safeSetItem(`purchasedProducts:${firebaseUser.uid}`, backendPurchasedIds);
+                  const userWithRestoredPurchases = { ...(hydratedUser as any), purchasedProductIds: backendPurchasedIds } as User;
+                  hydratedSessionUser = userWithRestoredPurchases;
+                  setCurrentUser(userWithRestoredPurchases);
+                  setUsers(current => current.some(user => user.id === userWithRestoredPurchases.id) ? current.map(user => user.id === userWithRestoredPurchases.id ? userWithRestoredPurchases : user) : [...current, userWithRestoredPurchases]);
+              } catch (error) {
+                  setAuthRestoreError('Login successful, but purchases could not be restored. Please retry from Purchases.');
+                  setInfoModal({ title: 'Purchases not restored', message: 'Login successful, but purchases could not be restored. Please retry from Purchases.', icon: '⚠️' });
+                  console.warn('Purchase access restore failed; login will continue.', error);
+              }
+
+              return hydratedSessionUser;
           } catch (error) {
-              setPurchasedProductIds([]);
-              setAuthRestoreError('Could not restore purchases. Please retry.');
-              setInfoModal({ title: 'Could not restore purchases', message: 'Could not restore purchases. Please retry.', icon: '⚠️' });
-              console.warn('Purchase access restore failed; keeping this session locked until backend data is available.', error);
-              return null;
+              if (getIsMobileViewport()) setMobileAuthFlowState(auth.currentUser ? 'completing-session' : 'logged-out');
+              throw error;
           } finally {
               setIsAuthRestoring(false);
           }
@@ -2015,27 +2050,45 @@ const App: React.FC = () => {
       localStorage.removeItem('currentUser');
       localStorage.removeItem('purchasedProducts');
       void getRedirectResult(auth).then(result => {
-          if (result?.user) void completeFirebaseUserSession(result.user, { redirect: false }).then(hydratedUser => {
-              if (hydratedUser) redirectAfterSuccessfulAuth({ source: 'google-redirect', user: hydratedUser, force: true });
-          });
+          if (result?.user) {
+              setFirebaseAuthUser(result.user);
+              if (getIsMobileViewport()) setMobileAuthFlowState('completing-session');
+              void completeFirebaseUserSession(result.user, { redirect: false }).then(hydratedUser => {
+                  if (hydratedUser) {
+                      finishMobileAuthSuccess(hydratedUser);
+                      redirectAfterSuccessfulAuth({ source: 'google-redirect', user: hydratedUser, force: true });
+                  }
+              });
+          }
       }).catch(error => {
           console.warn('Google redirect result handling failed.', error);
           setAuthRestoreError(getFirebaseAuthErrorMessage(error));
       });
       const unsubscribe = onAuthStateChanged(auth, user => {
+          setFirebaseAuthUser(user);
+          setIsAuthStateReady(true);
+          console.info('[mobile-auth]', {
+              step: 'auth-state-changed',
+              hasFirebaseUser: Boolean(user),
+              isMobileViewport: getIsMobileViewport(),
+          });
           if (user) {
               setIsAuthRestoring(true);
               setAuthRestoreError(null);
+              if (getIsMobileViewport()) setMobileAuthFlowState('completing-session');
               void completeFirebaseUserSession(user, { redirect: false }).then(hydratedUser => {
-                  setIsAuthStateReady(true);
-                  if (hydratedUser && (currentViewRef.current === 'auth' || getIsMobileViewport())) redirectAfterSuccessfulAuth({ source: 'session-restore', user: hydratedUser, force: currentViewRef.current === 'auth' || getIsMobileViewport() });
+                  if (hydratedUser && (currentViewRef.current === 'auth' || getIsMobileViewport())) {
+                      finishMobileAuthSuccess(hydratedUser);
+                      redirectAfterSuccessfulAuth({ source: 'session-restore', user: hydratedUser, force: currentViewRef.current === 'auth' || getIsMobileViewport() });
+                  }
               }).catch(error => {
-                  setIsAuthStateReady(true);
                   console.warn('Firebase session restore failed.', error);
               });
           } else {
+              setCurrentUser(null);
+              setFirebaseAuthUser(null);
+              if (getIsMobileViewport()) setMobileAuthFlowState('logged-out');
               handleLogout(false);
-              setIsAuthStateReady(true);
           }
       });
       return () => {
@@ -2046,11 +2099,19 @@ const App: React.FC = () => {
 
 
   useEffect(() => {
-      if (!isMobileViewport || !isAuthStateReady || !currentUser) return;
-      if (currentView === 'auth' || currentViewRef.current === 'auth') {
-          redirectAfterSuccessfulAuth({ source: 'session-restore', user: currentUser, force: true, preserveCheckoutIntent: true });
+      if (!isMobileViewport) return;
+      if (!isAuthStateReady) return;
+      if (!currentUser) return;
+
+      setMobileAuthFlowState('authenticated');
+
+      if (currentView === 'auth') {
+          setCurrentView('home');
+          window.scrollTo(0, 0);
       }
-  }, [isMobileViewport, isAuthStateReady, currentUser, currentView]);
+
+      showMobileWelcomeAfterAuth(currentUser);
+  }, [isMobileViewport, isAuthStateReady, currentUser?.id, currentView]);
 
 
   const handleRetryAuthRestore = () => {
@@ -2111,8 +2172,12 @@ const App: React.FC = () => {
           }
           const credential = await signInWithPopup(auth, googleProvider);
           const hydratedUser = await completeFirebaseUserSession(credential.user, { redirect: false });
-          if (hydratedUser) redirectAfterSuccessfulAuth({ source: 'google-popup', user: hydratedUser, force: true });
-          return { success: true, message: 'Google login successful.' };
+          if (hydratedUser) {
+              finishMobileAuthSuccess(hydratedUser);
+              redirectAfterSuccessfulAuth({ source: 'google-popup', user: hydratedUser, force: true });
+              return { success: true, message: 'Google login successful.' };
+          }
+          return { success: false, message: 'Login could not be completed. Please try again.' };
       } catch (error: any) {
           console.warn('Google login failed.', error);
           if (error?.code === 'auth/popup-blocked') {
@@ -2132,8 +2197,12 @@ const App: React.FC = () => {
       try {
           const credential = await signInWithEmailAndPassword(auth, email, password);
           const hydratedUser = await completeFirebaseUserSession(credential.user, { redirect: false, profile: { name: credential.user.displayName || undefined, mobile: credential.user.phoneNumber || undefined } });
-          if (hydratedUser) redirectAfterSuccessfulAuth({ source: 'email-login', user: hydratedUser, force: true });
-          return { success: true, message: 'Login successful.' };
+          if (hydratedUser) {
+              finishMobileAuthSuccess(hydratedUser);
+              redirectAfterSuccessfulAuth({ source: 'email-login', user: hydratedUser, force: true });
+              return { success: true, message: 'Login successful.' };
+          }
+          return { success: false, message: 'Login could not be completed. Please try again.' };
       } catch (error) {
           return { success: false, message: getFirebaseAuthErrorMessage(error) };
       }
@@ -2144,8 +2213,12 @@ const App: React.FC = () => {
           const credential = await createUserWithEmailAndPassword(auth, profile.email, password);
           await updateProfile(credential.user, { displayName: profile.name });
           const hydratedUser = await completeFirebaseUserSession(credential.user, { redirect: false, profile });
-          if (hydratedUser) redirectAfterSuccessfulAuth({ source: 'email-signup', user: hydratedUser, force: true });
-          return { success: true, message: 'Account created successfully.' };
+          if (hydratedUser) {
+              finishMobileAuthSuccess(hydratedUser);
+              redirectAfterSuccessfulAuth({ source: 'email-signup', user: hydratedUser, force: true });
+              return { success: true, message: 'Account created successfully.' };
+          }
+          return { success: false, message: 'Account could not be completed. Please try again.' };
       } catch (error) {
           return { success: false, message: getFirebaseAuthErrorMessage(error) };
       }
@@ -2214,7 +2287,9 @@ const App: React.FC = () => {
       };
       void cleanup();
       if (remoteSignOut) void signOut(auth).catch(error => console.warn('Firebase sign out failed.', error));
+      setFirebaseAuthUser(null);
       setCurrentUser(null);
+      setMobileAuthFlowState('logged-out');
       setPurchasedProductIds([]);
       setIsAuthRestoring(false);
       setAuthRestoreError(null);
@@ -3180,8 +3255,8 @@ const App: React.FC = () => {
 
   const renderPage = () => {
     if (isMobileViewport && !isAuthStateReady) return <div key="mobile-auth-check" className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.16),transparent_34%),linear-gradient(135deg,#ffffff,#eff6ff)] p-6 text-center"><div className="rounded-[2rem] border border-blue-100 bg-white/90 p-8 shadow-[0_24px_80px_rgba(37,99,235,0.12)]"><div className="mx-auto mb-4 h-3 w-3 animate-ping rounded-full bg-blue-600" /><h1 className="text-2xl font-black text-slate-950">Checking your session...</h1><p className="mt-2 text-sm font-semibold text-slate-600">Securing your mobile learning app.</p></div></div>;
-    if (isMobileViewport && isAuthStateReady && !currentUser && isAuthRestoring) return <div key="mobile-auth-restoring" className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.16),transparent_34%),linear-gradient(135deg,#ffffff,#eff6ff)] p-6 text-center"><div className="rounded-[2rem] border border-blue-100 bg-white/90 p-8 shadow-[0_24px_80px_rgba(37,99,235,0.12)]"><div className="mx-auto mb-4 h-3 w-3 animate-ping rounded-full bg-emerald-500" /><h1 className="text-2xl font-black text-slate-950">Restoring your account...</h1><p className="mt-2 text-sm font-semibold text-slate-600">Please wait while we unlock your mobile learning app.</p></div></div>;
-    if (isMobileViewport && isAuthStateReady && !currentUser) return <div key="mobile-auth-gate" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : 'signup'} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); setAuthInitialMode('signup'); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={() => {}} /></div>;
+    if (isMobileViewport && mobileAuthFlowState === 'completing-session') return <div key="mobile-auth-restoring" className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.16),transparent_34%),linear-gradient(135deg,#ffffff,#eff6ff)] p-6 text-center"><div className="rounded-[2rem] border border-blue-100 bg-white/90 p-8 shadow-[0_24px_80px_rgba(37,99,235,0.12)]"><div className="mx-auto mb-4 h-3 w-3 animate-ping rounded-full bg-emerald-500" /><h1 className="text-2xl font-black text-slate-950">Restoring your account...</h1><p className="mt-2 text-sm font-semibold text-slate-600">Please wait while we unlock your mobile learning app.</p></div></div>;
+    if (isMobileViewport && isAuthStateReady && !firebaseAuthUser && !currentUser) return <div key="mobile-auth-gate" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : 'signup'} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); setAuthInitialMode('signup'); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={() => {}} /></div>;
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={() => handleNavigateBack('home')} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
     if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
