@@ -42,8 +42,11 @@ import { auth, db } from './firebase';
 import { createUserWithEmailAndPassword, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
 import { clearRememberedAuthAccount, getRememberedAuthAccount, RememberedAuthAccount, saveRememberedAuthAccount } from './utils/rememberedAuth';
+import { isMobileViewport as getIsMobileViewport } from './utils/device';
 
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
+const MOBILE_WELCOME_SESSION_KEY = 'digitalCatalyst.mobileWelcomeShown';
+
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({
   prompt: 'select_account',
@@ -914,6 +917,9 @@ const App: React.FC = () => {
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [currentView, setCurrentView] = useState('home'); 
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup'>('login');
+  const [isAuthStateReady, setIsAuthStateReady] = useState(false);
+  const [isMobileViewport, setIsMobileViewport] = useState(() => getIsMobileViewport());
+  const [mobileWelcomeMessage, setMobileWelcomeMessage] = useState('');
   const currentViewRef = React.useRef(currentView);
   const historyNavigationRef = React.useRef(false);
   const lastHistoryViewRef = React.useRef(currentView);
@@ -955,10 +961,53 @@ const App: React.FC = () => {
   const sessionCompletionRef = useRef<{ uid: string; startedAt: number } | null>(null);
   const sessionCompletionPromiseRef = useRef<Promise<void> | null>(null);
   const authRedirectHandledRef = useRef<{ uid: string; source?: string; at: number } | null>(null);
+  const hasShownMobileWelcomeThisSessionRef = useRef(false);
+  const mobileWelcomeTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [mobileCompletionInput, setMobileCompletionInput] = useState('');
   const [mobileCompletionError, setMobileCompletionError] = useState('');
   const [isSavingMobileCompletion, setIsSavingMobileCompletion] = useState(false);
   const [hasSkippedMobileCompletion, setHasSkippedMobileCompletion] = useState(false);
+
+
+  useEffect(() => {
+    const updateMobileViewport = () => setIsMobileViewport(getIsMobileViewport());
+    updateMobileViewport();
+    if (typeof window === 'undefined') return;
+    const media = window.matchMedia('(max-width: 768px)');
+    media.addEventListener?.('change', updateMobileViewport);
+    window.addEventListener('resize', updateMobileViewport, { passive: true });
+    return () => {
+      media.removeEventListener?.('change', updateMobileViewport);
+      window.removeEventListener('resize', updateMobileViewport);
+    };
+  }, []);
+
+  const getHasShownMobileWelcomeThisSession = () => {
+    if (hasShownMobileWelcomeThisSessionRef.current) return true;
+    try {
+      return sessionStorage.getItem(MOBILE_WELCOME_SESSION_KEY) === 'true';
+    } catch {
+      return false;
+    }
+  };
+
+  const markMobileWelcomeShownThisSession = () => {
+    hasShownMobileWelcomeThisSessionRef.current = true;
+    try {
+      sessionStorage.setItem(MOBILE_WELCOME_SESSION_KEY, 'true');
+    } catch {
+      // Session welcome is only a UI nicety; in-memory ref remains the fallback.
+    }
+  };
+
+  const showMobileWelcomeAfterAuth = (user?: Pick<User, 'name' | 'email'> | null) => {
+    if (!isMobileViewport || !user || getHasShownMobileWelcomeThisSession()) return;
+    const displayName = (user.name || '').trim() || (user.email ? user.email.split('@')[0] : '');
+    setMobileWelcomeMessage(displayName ? `Welcome back, ${displayName}!` : 'Welcome to Eduvora!');
+    markMobileWelcomeShownThisSession();
+    if (mobileWelcomeTimeoutRef.current) window.clearTimeout(mobileWelcomeTimeoutRef.current);
+    mobileWelcomeTimeoutRef.current = window.setTimeout(() => setMobileWelcomeMessage(''), 3500);
+  };
 
 
   const normalizeCourseModules = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
@@ -1843,6 +1892,17 @@ const App: React.FC = () => {
   };
 
 
+
+  const handleMobileAuthSuccessRedirect = (user?: Pick<User, 'name' | 'email'> | null) => {
+      if (!isMobileViewport || !user) return false;
+      setIsAuthRestoring(false);
+      setAuthRestoreError(null);
+      setCurrentView('home');
+      window.scrollTo(0, 0);
+      showMobileWelcomeAfterAuth(user);
+      return true;
+  };
+
   const redirectAfterSuccessfulAuth = (options: { source?: 'google-popup' | 'google-redirect' | 'email-login' | 'email-signup' | 'session-restore'; preserveCheckoutIntent?: boolean } = {}) => {
       const { source, preserveCheckoutIntent = true } = options;
       const uid = auth.currentUser?.uid || currentUser?.id || '';
@@ -1851,6 +1911,8 @@ const App: React.FC = () => {
       if (uid) authRedirectHandledRef.current = { uid, source, at: Date.now() };
       setIsAuthRestoring(false);
       setAuthRestoreError(null);
+
+      if (isMobileViewport) showMobileWelcomeAfterAuth(currentUser || auth.currentUser ? { name: currentUser?.name || auth.currentUser?.displayName || '', email: currentUser?.email || auth.currentUser?.email || '' } : null);
 
       if (preserveCheckoutIntent && productToBuyAfterLogin) {
           setSelectedProduct(productToBuyAfterLogin);
@@ -1872,6 +1934,7 @@ const App: React.FC = () => {
 
       setProductToBuyAfterLogin(null);
       setResumeCartCheckoutAfterLogin(false);
+      if (isMobileViewport && handleMobileAuthSuccessRedirect(currentUser || auth.currentUser ? { name: currentUser?.name || auth.currentUser?.displayName || '', email: currentUser?.email || auth.currentUser?.email || '' } : null)) return;
       setCurrentView('home');
       window.scrollTo(0, 0);
   };
@@ -1947,9 +2010,17 @@ const App: React.FC = () => {
               setIsAuthRestoring(true);
               setAuthRestoreError(null);
               void completeFirebaseUserSession(user, { redirect: false }).then(() => {
-                  if (currentViewRef.current === 'auth') redirectAfterSuccessfulAuth({ source: 'session-restore' });
+                  setIsAuthStateReady(true);
+                  if (currentViewRef.current === 'auth' || getIsMobileViewport()) redirectAfterSuccessfulAuth({ source: 'session-restore' });
+                  else if (getIsMobileViewport()) showMobileWelcomeAfterAuth({ name: user.displayName || '', email: user.email || '' });
+              }).catch(error => {
+                  setIsAuthStateReady(true);
+                  console.warn('Firebase session restore failed.', error);
               });
-          } else handleLogout(false);
+          } else {
+              handleLogout(false);
+              setIsAuthStateReady(true);
+          }
       });
       return () => {
           unsubscribe();
@@ -2124,6 +2195,10 @@ const App: React.FC = () => {
       setPurchasedProductIds([]);
       setIsAuthRestoring(false);
       setAuthRestoreError(null);
+      setMobileWelcomeMessage('');
+      if (mobileWelcomeTimeoutRef.current) window.clearTimeout(mobileWelcomeTimeoutRef.current);
+      hasShownMobileWelcomeThisSessionRef.current = false;
+      try { sessionStorage.removeItem(MOBILE_WELCOME_SESSION_KEY); } catch {}
       setWishlist([]);
       setCart([]);
       setSelectedProduct(null);
@@ -3081,6 +3156,8 @@ const App: React.FC = () => {
   const appleOpenClass = "animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]";
 
   const renderPage = () => {
+    if (isMobileViewport && !isAuthStateReady) return <div key="mobile-auth-check" className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.16),transparent_34%),linear-gradient(135deg,#ffffff,#eff6ff)] p-6 text-center"><div className="rounded-[2rem] border border-blue-100 bg-white/90 p-8 shadow-[0_24px_80px_rgba(37,99,235,0.12)]"><div className="mx-auto mb-4 h-3 w-3 animate-ping rounded-full bg-blue-600" /><h1 className="text-2xl font-black text-slate-950">Checking your session...</h1><p className="mt-2 text-sm font-semibold text-slate-600">Securing your mobile learning app.</p></div></div>;
+    if (isMobileViewport && isAuthStateReady && !currentUser) return <div key="mobile-auth-gate" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : 'signup'} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); setAuthInitialMode('signup'); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={() => {}} /></div>;
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={() => handleNavigateBack('home')} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
     if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
@@ -3100,6 +3177,7 @@ const App: React.FC = () => {
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={currentUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
+            {mobileWelcomeMessage && <div className="fixed left-1/2 top-5 z-[1600] -translate-x-1/2 rounded-full border border-emerald-200/70 bg-white/95 px-5 py-3 text-sm font-black text-emerald-700 shadow-[0_18px_54px_rgba(16,185,129,0.20)] backdrop-blur-2xl md:hidden">{mobileWelcomeMessage}</div>}
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
             {currentUser && !currentUser.mobile && !hasSkippedMobileCompletion && (
               <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
