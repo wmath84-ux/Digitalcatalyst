@@ -2111,8 +2111,10 @@ const App: React.FC = () => {
       localStorage.removeItem('purchasedProducts');
       void getRedirectResult(auth).then(result => {
           if (result?.user) {
+              setIsAuthStateReady(true);
               setFirebaseAuthUser(result.user);
-              if (getIsMobileViewport()) setMobileAuthFlowState('completing-session');
+              const redirectFallbackUser = createFallbackAppUser(result.user);
+              if (getIsMobileViewport()) unlockMobileAuthWithUser(result.user, redirectFallbackUser);
               void completeFirebaseUserSession(result.user, { redirect: false }).then(hydratedUser => {
                   if (hydratedUser) {
                       finishMobileAuthSuccess(hydratedUser);
@@ -2123,7 +2125,24 @@ const App: React.FC = () => {
       }).catch(error => {
           console.warn('Google redirect result handling failed.', error);
           setAuthRestoreError(getFirebaseAuthErrorMessage(error));
+          if (getIsMobileViewport() && auth.currentUser) {
+              setIsAuthStateReady(true);
+              unlockMobileAuthWithUser(auth.currentUser, createFallbackAppUser(auth.currentUser));
+              void completeFirebaseUserSession(auth.currentUser, { redirect: false });
+          }
       });
+      const mobileAuthReadyFallbackTimer = window.setTimeout(() => {
+          if (!getIsMobileViewport()) return;
+          const firebaseUser = auth.currentUser;
+          if (firebaseUser) {
+              setIsAuthStateReady(true);
+              unlockMobileAuthWithUser(firebaseUser, createFallbackAppUser(firebaseUser));
+              void completeFirebaseUserSession(firebaseUser, { redirect: false });
+          } else {
+              setIsAuthStateReady(true);
+              setMobileAuthFlowState('logged-out');
+          }
+      }, 2500);
       const unsubscribe = onAuthStateChanged(auth, user => {
           setFirebaseAuthUser(user);
           setIsAuthStateReady(true);
@@ -2152,6 +2171,7 @@ const App: React.FC = () => {
           }
       });
       return () => {
+          window.clearTimeout(mobileAuthReadyFallbackTimer);
           unsubscribe();
           stopSessionWatchers();
       };
@@ -3314,7 +3334,7 @@ const App: React.FC = () => {
   const appleOpenClass = "animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]";
 
   const renderPage = () => {
-    if (isMobileViewport && !isAuthStateReady) return <div key="mobile-auth-check" className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.16),transparent_34%),linear-gradient(135deg,#ffffff,#eff6ff)] p-6 text-center"><div className="rounded-[2rem] border border-blue-100 bg-white/90 p-8 shadow-[0_24px_80px_rgba(37,99,235,0.12)]"><div className="mx-auto mb-4 h-3 w-3 animate-ping rounded-full bg-blue-600" /><h1 className="text-2xl font-black text-slate-950">Checking your session...</h1><p className="mt-2 text-sm font-semibold text-slate-600">Securing your mobile learning app.</p></div></div>;
+    if (isMobileViewport && !isAuthStateReady && !firebaseAuthUser && !currentUser) return <div key="mobile-auth-check" className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.16),transparent_34%),linear-gradient(135deg,#ffffff,#eff6ff)] p-6 text-center"><div className="rounded-[2rem] border border-blue-100 bg-white/90 p-8 shadow-[0_24px_80px_rgba(37,99,235,0.12)]"><div className="mx-auto mb-4 h-3 w-3 animate-ping rounded-full bg-blue-600" /><h1 className="text-2xl font-black text-slate-950">Checking your session...</h1><p className="mt-2 text-sm font-semibold text-slate-600">Securing your mobile learning app.</p></div></div>;
     if (isMobileViewport && mobileAuthFlowState === 'completing-session' && !currentUser) return <div key="mobile-auth-restoring" className="flex min-h-screen items-center justify-center bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.16),transparent_34%),linear-gradient(135deg,#ffffff,#eff6ff)] p-6 text-center"><div className="rounded-[2rem] border border-blue-100 bg-white/90 p-8 shadow-[0_24px_80px_rgba(37,99,235,0.12)]"><div className="mx-auto mb-4 h-3 w-3 animate-ping rounded-full bg-emerald-500" /><h1 className="text-2xl font-black text-slate-950">Restoring your account...</h1><p className="mt-2 text-sm font-semibold text-slate-600">Please wait while we unlock your mobile learning app.</p></div></div>;
     if (isMobileViewport && isAuthStateReady && !firebaseAuthUser && !currentUser) return <div key="mobile-auth-gate" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : 'signup'} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); setAuthInitialMode('signup'); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={() => {}} /></div>;
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={() => handleNavigateBack('home')} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
