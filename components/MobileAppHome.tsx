@@ -1,10 +1,14 @@
 import React, { useMemo, useState } from 'react';
 import { Coupon, ProductWithRating, User, WebsiteSettings } from '../App';
+import UserAvatar from './common/UserAvatar';
+import { RememberedAuthAccount } from '../utils/rememberedAuth';
 import { ProductImageSlot, getProductImage } from '../utils/productImages';
 
 interface MobileAppHomeProps {
   settings: WebsiteSettings;
   currentUser: User | null;
+  rememberedAccount?: RememberedAuthAccount | null;
+  authButtonLabel: string;
   purchasedProducts: ProductWithRating[];
   topRatedProducts: ProductWithRating[];
   visibleProducts: ProductWithRating[];
@@ -52,6 +56,8 @@ const SectionHead: React.FC<{ title: string; subtitle?: string; onViewAll?: () =
 const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   settings,
   currentUser,
+  rememberedAccount,
+  authButtonLabel,
   purchasedProducts,
   topRatedProducts,
   visibleProducts,
@@ -79,6 +85,7 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   }).slice(0, 6), [visibleProducts, purchasedProductIds, query]);
   const topPreview = topRatedProducts.slice(0, 4);
   const coins = currentUser?.eduCoins ?? 250;
+  const resolvedPhotoURL = currentUser?.photoURL || ((rememberedAccount?.uid && rememberedAccount.uid === currentUser?.id) || (rememberedAccount?.email && rememberedAccount.email === currentUser?.email) ? rememberedAccount.photoURL : '');
   const activeCoupons = coupons.filter(coupon => coupon.isActive).slice(0, 3);
   const scrollToMobileSection = (sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -95,14 +102,22 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   return (
     <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_12%_3%,rgba(191,215,255,0.78),transparent_30%),radial-gradient(circle_at_92%_12%,rgba(220,203,255,0.52),transparent_28%),linear-gradient(180deg,#F5F9FF_0%,#EEF6FF_44%,#FFFFFF_100%)] px-4 pb-44 pt-[max(14px,env(safe-area-inset-top))] text-[#64708F]">
       <header className="sticky top-2 z-30 mb-5 flex items-center gap-3 rounded-[28px] border border-[#D8E6FF]/90 bg-white/86 p-3 shadow-[0_18px_50px_rgba(11,99,255,0.12)] backdrop-blur-2xl">
-        <button type="button" onClick={onNavigateToAllProducts} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#0B63FF] to-[#7C4DFF] text-xl shadow-[0_10px_24px_rgba(11,99,255,0.28)]">⚡</button>
+        <button type="button" onClick={onNavigateToAllProducts} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#0B63FF] to-[#7C4DFF] text-xl shadow-[0_10px_24px_rgba(11,99,255,0.28)]" aria-label={currentUser ? 'Open learning home with your account avatar' : 'Explore products'}>
+          {currentUser ? <UserAvatar name={currentUser.name} email={currentUser.email} photoURL={resolvedPhotoURL} size={44} className="ring-2 ring-white/70" /> : '⚡'}
+        </button>
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-black text-[#081A44]">{siteName}</p>
           <p className="text-[11px] font-bold text-[#64708F]">Premium learning store</p>
         </div>
         <button type="button" onClick={onCartClick} className="relative grid h-10 w-10 place-items-center rounded-2xl border border-[#D8E6FF] bg-[#F5F9FF] text-lg text-[#081A44]">🛒{cartCount > 0 ? <span className="absolute -right-1 -top-1 rounded-full bg-[#0B63FF] px-1.5 text-[10px] font-black text-white">{cartCount}</span> : null}</button>
-        <button type="button" onClick={onProfileClick} className="grid h-10 w-10 place-items-center rounded-2xl border border-[#D8E6FF] bg-white text-lg">👤</button>
-        <button type="button" onClick={onProfileClick} className="flex h-10 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 text-xs font-black text-[#081A44]">🪙 {coins}</button>
+        {currentUser ? (
+          <>
+            <button type="button" onClick={onProfileClick} className="grid h-10 w-10 place-items-center rounded-2xl border border-[#D8E6FF] bg-white text-lg" aria-label="Open profile"><UserAvatar name={currentUser.name} email={currentUser.email} photoURL={resolvedPhotoURL} size={34} /></button>
+            <button type="button" onClick={onProfileClick} className="flex h-10 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 text-xs font-black text-[#081A44]">🪙 {coins}</button>
+          </>
+        ) : (
+          <button type="button" onClick={onProfileClick} className="flex h-10 items-center rounded-full border border-[#D8E6FF] bg-white px-3 text-xs font-black text-[#081A44]">{authButtonLabel}</button>
+        )}
       </header>
 
       <section className="relative overflow-hidden rounded-[28px] border border-[#D8E6FF] bg-[linear-gradient(135deg,#FFFFFF_0%,#EEF6FF_42%,#EDE7FF_100%)] p-5 shadow-[0_24px_70px_rgba(11,99,255,0.14)]">
