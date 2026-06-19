@@ -1782,33 +1782,20 @@ const App: React.FC = () => {
       coinTransactions: data.coinTransactions || [],
   });
 
-  const createFallbackAppUser = (firebaseUser: FirebaseUser, profile?: { name?: string; mobile?: string }): User => ({
-      id: firebaseUser.uid,
-      uid: firebaseUser.uid,
-      name: profile?.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
-      email: firebaseUser.email || '',
-      mobile: profile?.mobile || firebaseUser.phoneNumber || '',
-      photoURL: getFirebaseUserPhotoURL(firebaseUser),
-      authProvider: getFirebaseAuthProvider(firebaseUser),
-      providerIds: getProviderIds(firebaseUser),
-      emailVerified: firebaseUser.emailVerified,
-      displayName: profile?.name || firebaseUser.displayName || firebaseUser.email || 'Student',
-      role: 'student' as any,
-      status: 'active',
-      isFallbackProfile: true,
-      createdAt: new Date().toISOString(),
-      lastLoginAt: new Date().toISOString(),
-      eduCoins: 120,
-      studyMinutes: 0,
-      totalWatchTimeMinutes: 0,
-      totalLifetimeCoins: 120,
-      rewardedArticleIds: [],
-      readArticles: [],
-      rewardedQuizIds: [],
-      claimedRewardIds: [],
-      profileStreakClaims: {},
-      coinTransactions: [],
-  } as User);
+  const createFallbackUserFromFirebase = (firebaseUser: FirebaseUser): User => {
+      const fallbackDisplayName = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student';
+      return {
+          uid: firebaseUser.uid,
+          id: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          displayName: fallbackDisplayName,
+          name: fallbackDisplayName,
+          photoURL: getFirebaseUserPhotoURL(firebaseUser),
+          role: 'student',
+          isFallbackProfile: true,
+      } as unknown as User;
+  };
+
 
   const rememberAndStoreUser = (user: User, firebaseUser: FirebaseUser) => {
       saveRememberedAuthAccount({ uid: user.id, email: user.email, name: user.name, photoURL: user.photoURL || getFirebaseUserPhotoURL(firebaseUser), providerIds: user.providerIds, authProvider: user.authProvider });
@@ -2049,10 +2036,11 @@ const App: React.FC = () => {
 
   const completeFirebaseUserSession = async (firebaseUser: FirebaseUser, options: { redirect?: boolean; profile?: { name?: string; mobile?: string }; source?: string; explicit?: boolean } = {}): Promise<User | null> => {
       if (!firebaseUser) return null;
-      const { redirect = true, profile, source = 'unknown', explicit = false } = options;
+      const { redirect = true, profile, source = 'unknown' } = options;
       const uid = firebaseUser.uid;
-      const fallbackUser = createFallbackAppUser(firebaseUser, profile);
-      console.info('AUTH_COMPLETE_START', { uid, source });
+      const fallbackUser = createFallbackUserFromFirebase(firebaseUser);
+
+      console.info('AUTH_COMMIT_START', { uid, source });
       setFirebaseAuthUser(firebaseUser);
       rememberAndStoreUser(fallbackUser, firebaseUser);
       setIsAuthStateReady(true);
@@ -2060,23 +2048,20 @@ const App: React.FC = () => {
       setAuthRestoreError(null);
       setAuthError(null);
       setAuthStatus('authenticated');
-      if (profileStatus === 'idle') setProfileStatus('fallback');
+      setProfileStatus('fallback');
       if (purchaseStatus === 'idle') setPurchaseStatus('idle');
       if (getIsMobileViewport()) setMobileAuthFlowState('authenticated');
-      console.info('AUTH_MINIMAL_USER_SET', { uid });
+      console.info('AUTH_FALLBACK_USER_SET', { uid });
 
       const recentCompletion = lastCompletedSessionRef.current;
       if (recentCompletion?.uid === uid && Date.now() - recentCompletion.at < 2000) {
           if (redirect) redirectAfterSuccessfulAuth({ source, user: fallbackUser });
+          console.info('AUTH_COMMIT_DONE', { uid, source, dedupe: 'recent-completion' });
           return fallbackUser;
       }
       if (sessionCompletionRef.current?.uid === uid && sessionCompletionPromiseRef.current) {
-          const existingCompletion = sessionCompletionPromiseRef.current.catch(error => {
-              console.warn('Existing auth hydration failed; login remains active.', error);
-              return fallbackUser;
-          });
           if (redirect) redirectAfterSuccessfulAuth({ source, user: fallbackUser });
-          if (explicit) return existingCompletion;
+          console.info('AUTH_COMMIT_DONE', { uid, source, dedupe: 'in-flight' });
           return fallbackUser;
       }
 
@@ -2091,8 +2076,9 @@ const App: React.FC = () => {
       });
       sessionCompletionPromiseRef.current = hydrationPromise;
       void hydrationPromise;
+
       if (redirect) redirectAfterSuccessfulAuth({ source, user: fallbackUser });
-      if (explicit) return hydrationPromise;
+      console.info('AUTH_COMMIT_DONE', { uid, source });
       return fallbackUser;
   };
 
