@@ -3281,7 +3281,6 @@ const App: React.FC = () => {
           <div className="md:hidden">
             <MobileAppHome
               settings={websiteSettings}
-              authButtonLabel={authButtonLabel}
               rememberedAccount={rememberedAuthAccount}
               currentUser={currentUser}
               purchasedProducts={purchasedProducts}
@@ -3300,6 +3299,7 @@ const App: React.FC = () => {
               onOpenNews={() => openReadingHub('news')}
               onCartClick={() => setIsCartOpen(true)}
               onProfileClick={handleNavigateToProfile}
+              onAuthClick={openAuthPage}
             />
           </div>
           <div className="hidden md:block">{renderHomePageContent()}</div>
