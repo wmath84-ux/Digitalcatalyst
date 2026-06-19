@@ -1944,6 +1944,7 @@ const App: React.FC = () => {
       setIsAuthRestoring(false);
       setAuthRestoreError(null);
       setMobileAuthFlowState('authenticated');
+      currentViewRef.current = 'home';
       setCurrentView('home');
       window.scrollTo(0, 0);
       window.setTimeout(() => showMobileWelcomeAfterAuth(user), 0);
@@ -1959,12 +1960,14 @@ const App: React.FC = () => {
       if (uid) authRedirectHandledRef.current = { uid, source, at: Date.now() };
       setIsAuthRestoring(false);
       setAuthRestoreError(null);
+      setAuthError(null);
       console.info('[mobile-auth] session completed', { uid, source, currentView: currentViewRef.current, isMobileViewport });
 
       const welcomeUser = user || currentUser || (auth.currentUser ? { name: auth.currentUser.displayName || '', email: auth.currentUser.email || '' } : null);
 
       if (preserveCheckoutIntent && productToBuyAfterLogin) {
           if (isMobileViewport && welcomeUser) showMobileWelcomeAfterAuth(welcomeUser);
+          currentViewRef.current = 'product';
           setSelectedProduct(productToBuyAfterLogin);
           setCurrentView('product');
           setAutoOpenPaymentModalFor(productToBuyAfterLogin.id);
@@ -1975,6 +1978,7 @@ const App: React.FC = () => {
 
       if (preserveCheckoutIntent && resumeCartCheckoutAfterLogin && cart.length > 0) {
           if (isMobileViewport && welcomeUser) showMobileWelcomeAfterAuth(welcomeUser);
+          currentViewRef.current = 'home';
           setCurrentView('home');
           setIsCartOpen(false);
           setIsCartPaymentModalOpen(true);
@@ -1986,10 +1990,12 @@ const App: React.FC = () => {
       setProductToBuyAfterLogin(null);
       setResumeCartCheckoutAfterLogin(false);
       if (isMobileViewport && welcomeUser) {
+          currentViewRef.current = 'home';
           finishMobileAuthSuccess(welcomeUser);
           console.info('[mobile-auth]', { step: 'mobile-redirect-home', source });
           return;
       }
+      currentViewRef.current = 'home';
       setCurrentView('home');
       window.scrollTo(0, 0);
   };
@@ -2043,7 +2049,7 @@ const App: React.FC = () => {
 
   const completeFirebaseUserSession = async (firebaseUser: FirebaseUser, options: { redirect?: boolean; profile?: { name?: string; mobile?: string }; source?: string; explicit?: boolean } = {}): Promise<User | null> => {
       if (!firebaseUser) return null;
-      const { redirect = true, profile, source = 'unknown' } = options;
+      const { redirect = true, profile, source = 'unknown', explicit = false } = options;
       const uid = firebaseUser.uid;
       const fallbackUser = createFallbackAppUser(firebaseUser, profile);
       console.info('AUTH_COMPLETE_START', { uid, source });
@@ -2061,12 +2067,16 @@ const App: React.FC = () => {
 
       const recentCompletion = lastCompletedSessionRef.current;
       if (recentCompletion?.uid === uid && Date.now() - recentCompletion.at < 2000) {
-          if (redirect || currentViewRef.current === 'auth') redirectAfterSuccessfulAuth({ source, user: fallbackUser, force: currentViewRef.current === 'auth' });
+          if (redirect) redirectAfterSuccessfulAuth({ source, user: fallbackUser });
           return fallbackUser;
       }
       if (sessionCompletionRef.current?.uid === uid && sessionCompletionPromiseRef.current) {
-          void sessionCompletionPromiseRef.current.catch(error => console.warn('Existing auth hydration failed; login remains active.', error));
-          if (redirect || currentViewRef.current === 'auth') redirectAfterSuccessfulAuth({ source, user: fallbackUser, force: currentViewRef.current === 'auth' });
+          const existingCompletion = sessionCompletionPromiseRef.current.catch(error => {
+              console.warn('Existing auth hydration failed; login remains active.', error);
+              return fallbackUser;
+          });
+          if (redirect) redirectAfterSuccessfulAuth({ source, user: fallbackUser });
+          if (explicit) return existingCompletion;
           return fallbackUser;
       }
 
@@ -2081,7 +2091,8 @@ const App: React.FC = () => {
       });
       sessionCompletionPromiseRef.current = hydrationPromise;
       void hydrationPromise;
-      if (redirect || currentViewRef.current === 'auth') redirectAfterSuccessfulAuth({ source, user: fallbackUser, force: currentViewRef.current === 'auth' });
+      if (redirect) redirectAfterSuccessfulAuth({ source, user: fallbackUser });
+      if (explicit) return hydrationPromise;
       return fallbackUser;
   };
 
@@ -2129,10 +2140,10 @@ const App: React.FC = () => {
               setIsAuthRestoring(true);
               setAuthRestoreError(null);
               if (getIsMobileViewport()) setMobileAuthFlowState('completing-session');
-              void completeFirebaseUserSession(user, { redirect: false, source: 'auth-listener' }).then(hydratedUser => {
-                  if (hydratedUser && (currentViewRef.current === 'auth' || getIsMobileViewport())) {
-                      finishMobileAuthSuccess(hydratedUser);
-                      redirectAfterSuccessfulAuth({ source: 'session-restore', user: hydratedUser, force: currentViewRef.current === 'auth' || getIsMobileViewport() });
+              const shouldCloseAuthViewAfterRestore = currentViewRef.current === 'auth';
+              void completeFirebaseUserSession(user, { redirect: false, source: 'auth-listener', explicit: shouldCloseAuthViewAfterRestore }).then(hydratedUser => {
+                  if (hydratedUser && currentViewRef.current === 'auth') {
+                      redirectAfterSuccessfulAuth({ source: 'session-restore', user: hydratedUser, force: true });
                   }
               }).catch(error => {
                   console.warn('Firebase session restore failed.', error);
@@ -2171,6 +2182,12 @@ const App: React.FC = () => {
   }, [isMobileViewport, isAuthStateReady, currentUser?.id, currentView]);
 
 
+  useEffect(() => {
+      if (!isAuthStateReady || isRedirectResultPending || !firebaseAuthUser || currentView !== 'auth') return;
+      redirectAfterSuccessfulAuth({ source: 'auth-page-existing-user', user: currentUser, force: true });
+  }, [isAuthStateReady, isRedirectResultPending, firebaseAuthUser?.uid, currentUser?.id, currentView]);
+
+
   const handleRetryAuthRestore = () => {
       const firebaseUser = auth.currentUser;
       if (!firebaseUser) {
@@ -2193,6 +2210,8 @@ const App: React.FC = () => {
   };
 
   const handleGoogleLogin = async (): Promise<{ success: boolean, message: string }> => {
+      setAuthError(null);
+      setAuthRestoreError(null);
       try {
           await ensureAuthPersistence();
           if (shouldUseGoogleRedirect()) {
@@ -3279,7 +3298,6 @@ const App: React.FC = () => {
           <div className="md:hidden">
             <MobileAppHome
               settings={websiteSettings}
-              authButtonLabel={authButtonLabel}
               rememberedAccount={rememberedAuthAccount}
               currentUser={currentUser}
               purchasedProducts={purchasedProducts}
@@ -3298,6 +3316,7 @@ const App: React.FC = () => {
               onOpenNews={() => openReadingHub('news')}
               onCartClick={() => setIsCartOpen(true)}
               onProfileClick={handleNavigateToProfile}
+              onAuthClick={openAuthPage}
             />
           </div>
           <div className="hidden md:block">{renderHomePageContent()}</div>
@@ -3315,7 +3334,6 @@ const App: React.FC = () => {
 console.info('ROUTE_GUARD_DECISION', { authReady: isAuthStateReady && !isRedirectResultPending, hasFirebaseUser, hasAppUser: Boolean(currentUser), authStatus, path: currentView });
     if (!isAuthStateReady || isRedirectResultPending || authStatus === 'checking-session') return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
     if (!hasFirebaseUser && (isMobileViewport || currentView === 'auth' || currentView === 'profile' || currentView === 'myPurchases' || currentView === 'coursePlayer')) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
-    if (currentView === 'auth' && hasFirebaseUser) { console.info('AUTH_PAGE_REDIRECT_EXISTING_USER', { uid: firebaseAuthUser?.uid }); setTimeout(() => redirectAfterSuccessfulAuth({ source: 'auth-page-existing-user', user: currentUser, force: true }), 0); return renderContent(); }
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={() => handleNavigateBack('home')} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
     if (currentView === 'auth' && !hasFirebaseUser) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
@@ -3327,7 +3345,7 @@ console.info('ROUTE_GUARD_DECISION', { authReady: isAuthStateReady && !isRedirec
        <ErrorBoundary>
          <div className="font-sans">
             <WelcomeOverlay onAnimationComplete={playWelcomeVoice} />
-            <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onLoginClick={handleNavigateToAuth} authButtonLabel={authButtonLabel} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
+            <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={currentUser} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={currentUser?.eduCoins || 0} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}

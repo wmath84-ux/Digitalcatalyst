@@ -8,7 +8,6 @@ interface MobileAppHomeProps {
   settings: WebsiteSettings;
   currentUser: User | null;
   rememberedAccount?: RememberedAuthAccount | null;
-  authButtonLabel: string;
   purchasedProducts: ProductWithRating[];
   topRatedProducts: ProductWithRating[];
   visibleProducts: ProductWithRating[];
@@ -25,6 +24,7 @@ interface MobileAppHomeProps {
   onOpenNews: () => void;
   onCartClick: () => void;
   onProfileClick: () => void;
+  onAuthClick: (mode: 'login' | 'signup') => void;
 }
 
 const currency = (product: ProductWithRating) => product.salePrice || product.price || '₹0';
@@ -57,7 +57,6 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   settings,
   currentUser,
   rememberedAccount,
-  authButtonLabel,
   purchasedProducts,
   topRatedProducts,
   visibleProducts,
@@ -74,6 +73,7 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   onOpenNews,
   onCartClick,
   onProfileClick,
+  onAuthClick,
 }) => {
   const [query, setQuery] = useState('');
   const siteName = settings.content.siteName || 'Digital Catalyst';
@@ -86,6 +86,8 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   const topPreview = topRatedProducts.slice(0, 4);
   const coins = currentUser?.eduCoins ?? 250;
   const resolvedPhotoURL = currentUser?.photoURL || ((rememberedAccount?.uid && rememberedAccount.uid === currentUser?.id) || (rememberedAccount?.email && rememberedAccount.email === currentUser?.email) ? rememberedAccount.photoURL : '');
+  const loggedOutAuthMode: 'login' | 'signup' = rememberedAccount ? 'login' : 'signup';
+  const loggedOutAuthLabel = rememberedAccount ? 'Login' : 'Sign Up';
   const activeCoupons = coupons.filter(coupon => coupon.isActive).slice(0, 3);
   const scrollToMobileSection = (sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -114,7 +116,9 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
             <button type="button" onClick={onProfileClick} className="flex h-10 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 text-xs font-black text-[#081A44]">🪙 {coins}</button>
           </>
         ) : (
-          <button type="button" onClick={onProfileClick} className="flex h-10 items-center rounded-full border border-[#D8E6FF] bg-white px-3 text-xs font-black text-[#081A44]">{authButtonLabel}</button>
+          <button type="button" onClick={() => onAuthClick(loggedOutAuthMode)} className="flex h-10 shrink-0 items-center rounded-full border border-[#BFD7FF] bg-white/95 px-3 text-xs font-black text-[#081A44] shadow-[0_10px_24px_rgba(11,99,255,0.10)] transition hover:-translate-y-0.5 hover:border-[#0B63FF] hover:text-[#0B63FF]" aria-label={loggedOutAuthLabel}>
+            {loggedOutAuthLabel}
+          </button>
         )}
       </header>
 

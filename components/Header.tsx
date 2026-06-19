@@ -39,13 +39,12 @@ interface HeaderProps {
     currentUser: User | null;
     rememberedAccount?: RememberedAuthAccount | null;
     onLogout: () => void;
-    onLoginClick: () => void;
-    authButtonLabel: string;
+    onAuthClick: (mode: 'login' | 'signup') => void;
     activeTheme: ThemeName;
     onThemeChange: (themeName: ThemeName) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount, cartToastMessage, onHomeClick, onCartClick, onNavigateToAllProducts, onNavigateToPurchases, onNavigateToWishlist, onNavigateToProfile, onNavigateToHomeAndScroll, currentUser, rememberedAccount, onLogout, onLoginClick, authButtonLabel, activeTheme, onThemeChange }) => {
+const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount, cartToastMessage, onHomeClick, onCartClick, onNavigateToAllProducts, onNavigateToPurchases, onNavigateToWishlist, onNavigateToProfile, onNavigateToHomeAndScroll, currentUser, rememberedAccount, onLogout, onAuthClick, activeTheme, onThemeChange }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isToastVisible, setIsToastVisible] = useState(false);
   const accountMenuAreaRef = useRef<HTMLDivElement>(null);
@@ -112,6 +111,8 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
   };
 
   const resolvedPhotoURL = currentUser?.photoURL || ((rememberedAccount?.uid && rememberedAccount.uid === currentUser?.id) || (rememberedAccount?.email && rememberedAccount.email === currentUser?.email) ? rememberedAccount.photoURL : '');
+  const loggedOutAuthMode: 'login' | 'signup' = rememberedAccount ? 'login' : 'signup';
+  const loggedOutAuthLabel = rememberedAccount ? 'Login' : 'Sign Up';
   const authButtonClass = "rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-5 py-2 text-sm font-black text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90";
   return (
     <>
@@ -169,8 +170,8 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                             )}
                         </div>
                     ) : (
-                         <button onClick={onLoginClick} className={authButtonClass}>
-                            {authButtonLabel}
+                         <button onClick={() => onAuthClick(loggedOutAuthMode)} className={authButtonClass}>
+                            {loggedOutAuthLabel}
                         </button>
                     )}
                 </div>
@@ -201,8 +202,8 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                             )}
                         </div>
                     ) : (
-                        <button onClick={onLoginClick} className="flex h-10 items-center justify-center rounded-full border border-[#D9E7F8] bg-white/75 px-3 text-xs font-black text-[#081A45] transition-colors duration-300 hover:bg-white" aria-label={authButtonLabel}>
-                            {authButtonLabel}
+                        <button onClick={() => onAuthClick(loggedOutAuthMode)} className="flex h-10 items-center justify-center rounded-full border border-[#D9E7F8] bg-white/75 px-3 text-xs font-black text-[#081A45] transition-colors duration-300 hover:bg-white" aria-label={loggedOutAuthLabel}>
+                            {loggedOutAuthLabel}
                         </button>
                     )}
                 </div>
