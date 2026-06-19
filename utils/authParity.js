@@ -2,7 +2,7 @@ export const VALID_ENTITLEMENT_STATUSES = Object.freeze(['Completed', 'Verified'
 
 export const normalizePurchaseIds = (ids) => {
   if (!Array.isArray(ids)) return [];
-  return [...new Set(ids.map(id => Number(id)).filter(id => Number.isFinite(id)))];
+  return [...new Set(ids.filter(id => id !== null && id !== undefined && id !== '').map(id => Number(id)).filter(id => Number.isFinite(id)))];
 };
 
 export const mergePurchasedProductIds = (...idGroups) => normalizePurchaseIds(idGroups.flat());
