@@ -7,6 +7,17 @@ const COMMUNITY_FEED = 'community_feed';
 const POST_TTL_MS = 24 * 60 * 60 * 1000;
 type PostType = 'text' | 'image' | 'poll';
 
+const stripUndefinedDeep = <T,>(value: T): T => {
+  if (Array.isArray(value)) return value.map(item => stripUndefinedDeep(item)) as T;
+  if (value && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).reduce((acc, [key, entry]) => {
+      if (entry !== undefined) (acc as Record<string, unknown>)[key] = stripUndefinedDeep(entry);
+      return acc;
+    }, {} as Record<string, unknown>) as T;
+  }
+  return value;
+};
+
 const AdminPostManagement: React.FC = () => {
   const [type, setType] = useState<PostType>('text');
   const [text, setText] = useState('');
@@ -41,7 +52,7 @@ const AdminPostManagement: React.FC = () => {
         await uploadString(ref(storage, storagePath), image, 'data_url');
         imagePreview = await getDownloadURL(ref(storage, storagePath));
       }
-      await addDoc(collection(db, COMMUNITY_FEED), {
+      const payload: Record<string, unknown> = {
         id,
         admin: 'Digital Catalyst Admin',
         avatar: '🛡️',
@@ -68,11 +79,14 @@ const AdminPostManagement: React.FC = () => {
         replies: [],
         createdAt: Date.now(),
         expiresAt: Date.now() + POST_TTL_MS,
-      });
+      };
+      if (type === 'image') Object.assign(payload, { imagePreview, imageLayout: 'thumbnail', storagePath });
+      if (type === 'poll') Object.assign(payload, { pollOptions: options, pollVotes: options.map(() => 0) });
+      await addDoc(collection(db, COMMUNITY_FEED), stripUndefinedDeep(payload));
       setText(''); setLink(''); setImage(''); setImageName(''); setPollOptions(['', '', '']);
       setFeedback('Admin post published to the community ADMIN POST page and main feed. It will auto-delete after 24 hours.');
     } catch (error) {
-      setFeedback(error instanceof Error ? error.message : 'Admin post publish failed.');
+      setFeedback(`Admin post publish failed. Please check the image/poll fields and try again. ${error instanceof Error ? error.message : ''}`.trim());
     } finally {
       setIsSaving(false);
     }

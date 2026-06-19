@@ -28,6 +28,17 @@ type ProfilePanel = 'privacy' | 'notifications' | 'connected' | 'logout';
 type PrivacySettings = { profileVisible: boolean; showActivity: boolean; allowMessages: boolean; allowFollowRequests: boolean };
 type NotificationPreferences = { replies: boolean; masterTags: boolean; statuses: boolean; creatorPosts: boolean };
 
+const stripUndefinedDeep = <T,>(value: T): T => {
+  if (Array.isArray(value)) return value.map(item => stripUndefinedDeep(item)) as T;
+  if (value && typeof value === 'object') {
+    return Object.entries(value as Record<string, unknown>).reduce((acc, [key, entry]) => {
+      if (entry !== undefined) (acc as Record<string, unknown>)[key] = stripUndefinedDeep(entry);
+      return acc;
+    }, {} as Record<string, unknown>) as T;
+  }
+  return value;
+};
+
 const MASTER_TAG_STORAGE_KEY = 'eduvoraMasterTagRequests';
 const SUPPORT_TICKETS_STORAGE_KEY = 'siteSupportTickets';
 const SUPPORT_TICKETS_COLLECTION = 'siteSupportTickets';
@@ -499,7 +510,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       const usedTypes = quotaSnap.exists() ? (quotaSnap.data().usedTypes || {}) : {};
       const usedBytes = Number(usageSnap.exists() ? usageSnap.data().usedBytes : 0) || 0;
       if (usedBytes + uploadBytes >= STORAGE_LOCK_BYTES) throw new Error('Community uploads are paused because Firebase Storage reached the 4GB safety limit.');
-      transaction.set(quotaRef, { userId: currentUserKey, kind, usedTypes, updatedAt: Date.now() }, { merge: true });
+      const lastUsed = Number(usedTypes[type] || 0);
+      if (lastUsed && Date.now() - lastUsed < POST_TTL_MS) throw new Error(`Daily ${type} ${kind} slot already used. Try again after the 24-hour window resets.`);
+      transaction.set(quotaRef, { userId: currentUserKey, kind, usedTypes: { ...usedTypes, [type]: Date.now() }, updatedAt: Date.now() }, { merge: true });
       transaction.set(usageRef, { usedBytes: usedBytes + uploadBytes, limitBytes: STORAGE_LOCK_BYTES, bucketBytes: STORAGE_TOTAL_BYTES, updatedAt: Date.now() }, { merge: true });
     });
   };
@@ -614,7 +627,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       const firebaseMessages = snapshot.docs.map((item) => normalizeFeedMessage(mapFeedDoc(item))).filter((message) => isUnexpired(message, POST_TTL_MS));
       setMessages((current) => {
         const mergedMessages = mergeUnexpiredByIdentity(firebaseMessages, current.map(normalizeFeedMessage), initialMessages.map(normalizeFeedMessage), POST_TTL_MS);
-        setAdminPosts(mergedMessages.filter((message) => message.source === 'admin'));
+        setAdminPosts(mergedMessages.filter((message) => message.source === 'admin' || message.badge === 'ADMIN POST' || message.creatorId === 'admin'));
         return mergedMessages;
       });
     }, (error) => console.warn('community_feed snapshot failed; using local fallback', error));
@@ -941,12 +954,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const cloudMessage = normalizeFeedMessage({ ...newMessage, imagePreview: upload.imageUrl, storagePath: upload.storagePath, uploadBytes: upload.uploadBytes, ownerId: currentUserKey, createdAt: now, expiresAt: now + POST_TTL_MS, source: 'creator' });
     flushSync(() => setMessages((current) => [cloudMessage, ...current.filter((message) => message.id !== cloudMessage.id)]));
     openPublishedCreatorPost(cloudMessage.id);
-    addDoc(collection(db, COMMUNITY_FEED), { ...cloudMessage, ownerId: currentUserKey, creatorId: currentUserKey, createdAt: now, expiresAt: now + POST_TTL_MS, source: 'creator', reactionCounts: {}, replyCount: 0 })
+    addDoc(collection(db, COMMUNITY_FEED), stripUndefinedDeep({ ...cloudMessage, ownerId: currentUserKey, creatorId: currentUserKey, createdAt: now, expiresAt: now + POST_TTL_MS, source: 'creator', reactionCounts: {}, replyCount: 0 }))
       .then((docRef) => {
         const firebasePostId = Number.parseInt(docRef.id.replace(/\D/g, '').slice(-9), 10) || newMessage.id;
         setMessages((current) => current.map((message) => message.id === newMessage.id ? { ...message, docId: docRef.id } : message));
         setSelectedMessageId(newMessage.id || firebasePostId);
         setProfileFeedback({ type: 'success', message: 'Creator post published and opened.' });
+        setEduCoins((coins) => coins + 1);
+        setPostDraft('');
+        setPostImageName('');
+        setPostImagePreview('');
+        setPostPollOptions(['', '', '']);
       })
       .catch((error) => {
         console.warn('Creator post write failed; showing local post fallback', error);
@@ -955,11 +973,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         setProfileFeedback({ type: 'error', message: 'Creator post failed to publish. Nothing was locked; please try again.' });
       })
       .finally(() => setIsPublishingCreator(false));
-    setEduCoins((coins) => coins + 1);
-    setPostDraft('');
-    setPostImageName('');
-    setPostImagePreview('');
-    setPostPollOptions(['', '', '']);
+
   };
 
   const submitStatus = async () => {
@@ -985,11 +999,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const cloudStory = { ...statusStory, imagePreview: upload.imageUrl, storagePath: upload.storagePath, uploadBytes: upload.uploadBytes, ownerId: currentUserKey, createdAt: now, expiresAt: now + STORY_TTL_MS, source: 'status' as const };
     flushSync(() => setStatusCards((current) => [cloudStory, ...current.filter((status) => status.id !== cloudStory.id)]));
     openPublishedStatusStory(statusStoryId);
-    addDoc(collection(db, COMMUNITY_STATUS), { ...cloudStory, ownerId: currentUserKey, createdAt: now, expiresAt: now + STORY_TTL_MS, source: 'status' })
+    addDoc(collection(db, COMMUNITY_STATUS), stripUndefinedDeep({ ...cloudStory, ownerId: currentUserKey, createdAt: now, expiresAt: now + STORY_TTL_MS, source: 'status' }))
       .then((docRef) => {
         setStatusCards((current) => current.map((status) => status.id === statusStoryId ? { ...status, docId: docRef.id } : status));
         openPublishedStatusStory(statusStoryId);
         setProfileFeedback({ type: 'success', message: 'Status story published and opened.' });
+        setStatusDraft('');
+        setStatusImageName('');
+        setStatusImagePreview('');
+        setStatusPollOptions(['', '', '']);
       })
       .catch((error) => {
         console.warn('Status write failed; showing local story fallback', error);
@@ -998,10 +1016,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         setProfileFeedback({ type: 'error', message: 'Status story failed to publish. Nothing was locked; please try again.' });
       })
       .finally(() => setIsPublishingStatus(false));
-    setStatusDraft('');
-    setStatusImageName('');
-    setStatusImagePreview('');
-    setStatusPollOptions(['', '', '']);
   };
 
   const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1087,7 +1101,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const previousEmoji = message.reactionUsers?.[currentUserKey];
     if (previousEmoji === emoji) return;
     setMessages((current) => current.map((item) => item.id === message.id ? { ...item, reactionCounts: { ...(item.reactionCounts || {}), ...(previousEmoji ? { [previousEmoji]: Math.max(0, ((item.reactionCounts || {})[previousEmoji] || 0) - 1) } : {}), [emoji]: ((item.reactionCounts || {})[emoji] || 0) + 1 }, reactionUsers: { ...(item.reactionUsers || {}), [currentUserKey]: emoji } } : item));
-    if (message.docId) updateDoc(doc(db, COMMUNITY_FEED, message.docId), { ...(previousEmoji ? { [`reactions.${previousEmoji}`]: increment(-1) } : {}), [`reactions.${emoji}`]: increment(1), [`reactionUsers.${currentUserKey}`]: emoji }).catch((error) => console.warn('Reaction update failed', error));
+    if (message.docId) updateDoc(doc(db, COMMUNITY_FEED, message.docId), { ...(previousEmoji ? { [`reactionCounts.${previousEmoji}`]: increment(-1) } : {}), [`reactionCounts.${emoji}`]: increment(1), [`reactionUsers.${currentUserKey}`]: emoji }).catch((error) => console.warn('Reaction update failed', error));
   };
 
   const renderReactionStrip = (message: FeedMessage) => <div className="mt-3 flex flex-wrap gap-2">{REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMessage(message, emoji)} title={`${emoji} reactions`} className="rounded-full border border-[#DADCE0] bg-white px-3 py-1.5 text-xs font-black text-[#202124] shadow-[0_1px_2px_rgba(60,64,67,0.16)] transition hover:border-[#1A73E8] hover:text-[#1967D2] hover:shadow-[0_2px_6px_rgba(60,64,67,0.18)]"><span>{emoji}</span> <span>{(message.reactionCounts || {})[emoji] || 0}</span></button>)}</div>;
@@ -1095,11 +1109,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const voteOnStatusPoll = (statusId: number, optionIndex: number) => {
     const targetStatus = statusCards.find((status) => status.id === statusId);
-    if (!targetStatus?.pollOptions || targetStatus.pollVoters?.[currentUserKey] !== undefined || targetStatus.selectedPollOption !== undefined) return;
+    if (!targetStatus?.pollOptions || targetStatus.pollVoters?.[currentUserKey] !== undefined) return;
     setStatusCards((current) => current.map((status) => {
       if (status.id !== statusId || !status.pollOptions) return status;
       const votes = status.pollVotes || status.pollOptions.map(() => 0);
-      return { ...status, selectedPollOption: optionIndex, pollVoters: { ...(status.pollVoters || {}), [currentUserKey]: optionIndex }, pollVotes: votes.map((count, index) => index === optionIndex ? count + 1 : count) };
+      return { ...status, pollVoters: { ...(status.pollVoters || {}), [currentUserKey]: optionIndex }, pollVotes: votes.map((count, index) => index === optionIndex ? count + 1 : count) };
     }));
     if (targetStatus.docId) {
       const votes = targetStatus.pollVotes || targetStatus.pollOptions.map(() => 0);
@@ -1109,11 +1123,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const voteOnMessagePoll = (messageId: number, optionIndex: number) => {
     const targetMessage = messages.find((message) => message.id === messageId);
-    if (!targetMessage?.pollOptions || targetMessage.pollVoters?.[currentUserKey] !== undefined || targetMessage.selectedPollOption !== undefined) return;
+    if (!targetMessage?.pollOptions || targetMessage.pollVoters?.[currentUserKey] !== undefined) return;
     setMessages((current) => current.map((message) => {
       if (message.id !== messageId || !message.pollOptions) return message;
       const votes = message.pollVotes || message.pollOptions.map(() => 0);
-      return { ...message, selectedPollOption: optionIndex, pollVoters: { ...(message.pollVoters || {}), [currentUserKey]: optionIndex }, pollVotes: votes.map((count, index) => index === optionIndex ? count + 1 : count) };
+      return { ...message, pollVoters: { ...(message.pollVoters || {}), [currentUserKey]: optionIndex }, pollVotes: votes.map((count, index) => index === optionIndex ? count + 1 : count) };
     }));
     if (targetMessage.docId) {
       const votes = targetMessage.pollVotes || targetMessage.pollOptions.map(() => 0);
@@ -1147,10 +1161,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const supportTicket: CommunitySupportTicket = buildMasterTagTicket(request);
     const updatedTickets = [supportTicket, ...readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []).filter((ticket) => ticket.id !== supportTicket.id)];
     localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(updatedTickets));
-    setDoc(doc(db, SUPPORT_TICKETS_COLLECTION, supportTicket.id), supportTicket).catch((error) => console.warn('Master tag ticket Firebase write failed', error));
+    setDoc(doc(db, SUPPORT_TICKETS_COLLECTION, supportTicket.id), stripUndefinedDeep(supportTicket)).catch((error) => console.warn('Master tag ticket Firebase write failed', error));
     window.dispatchEvent(new Event('siteSupportTicketsUpdated'));
     setSupportTickets(updatedTickets);
-    addDoc(collection(db, COMMUNITY_MASTER_TAGS), { ...request, createdAt: Date.now(), likedByUsers: {}, reactionUsers: {} }).catch((error) => console.warn('Master tag Firebase write failed; using local fallback', error));
+    addDoc(collection(db, COMMUNITY_MASTER_TAGS), stripUndefinedDeep({ ...request, createdAt: Date.now(), likedByUsers: {}, reactionUsers: {} })).catch((error) => console.warn('Master tag Firebase write failed; using local fallback', error));
     setMasterTagRequests((current) => [request, ...current]);
     setMasterTagFilter('All');
     setMasterTagsAudienceFilter('mine');

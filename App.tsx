@@ -145,13 +145,21 @@ export interface QuizQuestion {
 export interface ProductQuiz {
   questions: QuizQuestion[];
 }
+export interface ProductDocPage {
+  id: string;
+  title: string;
+  content: string;
+  createdAt?: number;
+  updatedAt?: number;
+}
 export type QuizAnswerState = Record<number, number>;
 export interface ProductFile {
   id: string;
   name: string;
   type: ProductFileType;
   url: string; // For uploads, this is a Base64 data URL. For links, it's the URL.
-  content?: string; // For Smart Docs Workspace / e-book HTML content
+  content?: string; // Backward-compatible first page for Open Docs / e-book HTML content
+  docPages?: ProductDocPage[];
   quiz?: ProductQuiz;
 }
 
@@ -1454,7 +1462,7 @@ const App: React.FC = () => {
 
   }, [websiteSettings.theme, activeTheme]);
 
-  const handleWebsiteSettingsUpdate = (newSettings: WebsiteSettings) => {
+  const handleWebsiteSettingsUpdate = async (newSettings: WebsiteSettings): Promise<boolean> => {
     // When admin saves, we don't want to override user's theme choice,
     // so we merge admin settings with the default theme palette.
     const mergedSettings = {
@@ -1474,8 +1482,9 @@ const App: React.FC = () => {
     };
     setWebsiteSettings(mergedSettings);
     safeSetItem('websiteSettings', mergedSettings);
-    void setDoc(doc(db, ...GLOBAL_WEBSITE_SETTINGS_DOC), stripUndefinedDeep(mergedSettings), { merge: true })
-      .catch(error => logGlobalSyncWarning('Website settings', error));
+    return setDoc(doc(db, ...GLOBAL_WEBSITE_SETTINGS_DOC), stripUndefinedDeep(mergedSettings), { merge: true })
+      .then(() => true)
+      .catch(error => { logGlobalSyncWarning('Website settings', error); return false; });
   };
   
   useEffect(() => {
@@ -3402,7 +3411,7 @@ const App: React.FC = () => {
 
     return (
        <ErrorBoundary>
-         <div className="font-sans">
+         <div className={`font-sans ${websiteSettings.animations.enabled ? '' : 'animations-off'}`}>
             <WelcomeOverlay onAnimationComplete={playWelcomeVoice} />
             <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />}
@@ -3447,7 +3456,7 @@ const App: React.FC = () => {
                 </div>
               </div>
             )}
-            <main key={currentView} className={`${appleOpenClass} ${currentView === 'home' ? 'mobile-app-home' : ''}`}>{renderContent(effectiveAppUser)}</main>
+            <main key={currentView} className={`${websiteSettings.animations.enabled ? appleOpenClass : ''} ${currentView === 'home' ? 'mobile-app-home' : ''}`}>{renderContent(effectiveAppUser)}</main>
             <div className="mobile-app-chrome"><InstallAppButton enabled={canShowInstallPrompt} /></div>
             <div className={shouldHideFooterOnMobile ? 'max-md:hidden' : ''}><Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} /></div>
          </div>
@@ -3457,6 +3466,7 @@ const App: React.FC = () => {
 
   return (
       <ErrorBoundary>
+        <style>{`.animations-off *, .animations-off *::before, .animations-off *::after { animation: none !important; scroll-behavior: auto !important; } .animations-off .animate-child, .animations-off .scroll-animate { opacity: 1 !important; transform: none !important; } .animations-off * { transition-duration: 0.01ms !important; }`}</style>
         {renderPage()}
         <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
       </ErrorBoundary>

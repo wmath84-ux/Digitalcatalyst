@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Coupon, CourseModule, Product, ProductFile, ProductFileType, ProductWithRating, QuizQuestion, User } from '../../App';
+import { Coupon, CourseModule, Product, ProductFile, ProductFileType, ProductWithRating, ProductDocPage, QuizQuestion, User } from '../../App';
 import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
 import { PRODUCT_IMAGE_SLOTS, ProductImageSlot } from '../../utils/productImages';
 
@@ -164,6 +164,7 @@ const editorCommands: Array<[string, string, string?]> = [
 
 const AdminDocsEditor: React.FC<{ value: string; onChange: (value: string) => void; }> = ({ value, onChange }) => {
     const editorRef = useRef<HTMLDivElement>(null);
+    const [warning, setWarning] = useState('');
 
     useEffect(() => {
         if (editorRef.current && editorRef.current.innerHTML !== value) editorRef.current.innerHTML = value;
@@ -171,8 +172,13 @@ const AdminDocsEditor: React.FC<{ value: string; onChange: (value: string) => vo
 
     const runCommand = (command: string, commandValue?: string) => {
         editorRef.current?.focus();
-        document.execCommand(command, false, commandValue);
-        onChange(editorRef.current?.innerHTML || '');
+        try {
+            document.execCommand(command, false, commandValue);
+            setWarning('');
+            onChange(editorRef.current?.innerHTML || '');
+        } catch {
+            setWarning('Formatting failed. Click inside the editor and try again.');
+        }
     };
 
     return (
@@ -189,6 +195,7 @@ const AdminDocsEditor: React.FC<{ value: string; onChange: (value: string) => vo
                     </button>
                 ))}
             </div>
+            {warning && <p className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700">{warning}</p>}
             <div
                 ref={editorRef}
                 contentEditable
@@ -204,6 +211,9 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [uploadConfig, setUploadConfig] = useState<{ type: ProductFileType; accept: string } | null>(null);
     const [formState, setFormState] = useState<{ type: ProductFileType; url: string; name: string; content: string } | null>(null);
+    const [docPages, setDocPages] = useState<ProductDocPage[]>([]);
+    const [activeDocPageId, setActiveDocPageId] = useState('');
+    const [docError, setDocError] = useState('');
     const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
     const [isUploading, setIsUploading] = useState(false);
     const quizListRef = useRef<HTMLDivElement>(null);
@@ -213,7 +223,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
         { type: 'video', title: 'Video Upload', description: 'Upload MP4/WebM lesson files.', icon: '🎬', accept: 'video/*' },
         { type: 'youtube', title: 'YouTube Video', description: 'Embed a hosted YouTube lesson.', icon: '▶️' },
         { type: 'pdf', title: 'PDF', description: 'Attach worksheets, notes, or guides.', icon: '📄', accept: 'application/pdf' },
-        { type: 'doc', title: 'Smart Docs', description: 'Build rich HTML lesson notes inline.', icon: '🧠' },
+        { type: 'doc', title: 'Open Docs', description: 'Build full-page multi-page HTML lesson notes.', icon: '🧠' },
         { type: 'quiz', title: 'Quiz', description: 'Create interactive assessment questions.', icon: '✅' },
         { type: 'link', title: 'External Link', description: 'Reference any hosted resource.', icon: '🔗' },
         { type: 'sheet', title: 'Spreadsheet', description: 'Upload CSV/XLS study material.', icon: '📊', accept: '.csv,.xls,.xlsx' },
@@ -232,8 +242,9 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
             type,
             url: '',
             name: selected?.title || 'Learning Resource',
-            content: type === 'doc' ? '<h1>Smart Docs Workspace</h1><p>Start building your lesson here.</p>' : '',
+            content: type === 'doc' ? '<h1>Open Docs Workspace</h1><p>Start building your lesson here.</p>' : '',
         });
+        if (type === 'doc') { const now = Date.now(); const firstPage = { id: `doc-page-${now}`, title: 'Page 1', content: '<h1>Open Docs Workspace</h1><p>Start building your lesson here.</p>', createdAt: now, updatedAt: now }; setDocPages([firstPage]); setActiveDocPageId(firstPage.id); setDocError(''); }
         if (type === 'quiz') setQuizQuestions([{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
     };
 
@@ -292,6 +303,14 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                 content: '',
                 quiz: { questions: quizQuestions || [] },
             });
+        } else if (formState.type === 'doc') {
+            const meaningfulText = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
+            const ids = new Set(docPages.map(page => page.id));
+            if (!trimmedName || docPages.length === 0 || ids.size !== docPages.length || docPages.some(page => !page.title.trim() || !meaningfulText(page.content))) {
+                setDocError('Resource name, unique page IDs, page titles, and meaningful content on every page are required.');
+                return;
+            }
+            onAdd({ name: trimmedName, type: 'doc', url: '', content: docPages[0].content, docPages, quiz: { questions: [] } });
         } else {
             onAdd({
                 name: trimmedName,
@@ -341,7 +360,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
 
                     <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5 custom-scrollbar">
                         {formState.type === 'doc' ? (
-                            <AdminDocsEditor value={formState.content} onChange={content => setFormState(prev => prev ? { ...prev, content } : prev)} />
+                            <div className="fixed inset-0 z-50 flex bg-slate-950/60 p-4 backdrop-blur"><div className="flex min-h-0 flex-1 overflow-hidden rounded-3xl bg-white"><aside className="w-72 shrink-0 overflow-y-auto border-r p-4"><button type="button" onClick={() => setFormState(null)} className="mb-4 rounded-xl border px-3 py-2 text-sm font-bold">Back</button><input value={formState.name} onChange={event => setFormState(prev => prev ? { ...prev, name: event.target.value } : prev)} className={fieldClass} placeholder="Resource name" />{docError && <p className="my-3 rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-700">{docError}</p>}<div className="mt-4 space-y-2">{docPages.map(page => <button key={page.id} type="button" onClick={() => setActiveDocPageId(page.id)} className={`w-full rounded-xl px-3 py-2 text-left text-sm font-bold ${page.id === activeDocPageId ? 'bg-cyan-100 text-cyan-800' : 'bg-slate-100 text-slate-700'}`}>{page.title}</button>)}</div><button type="button" onClick={() => { const now = Date.now(); const page = { id: `doc-page-${now}`, title: `Page ${docPages.length + 1}`, content: '<h1>New page</h1><p>Write here.</p>', createdAt: now, updatedAt: now }; setDocPages(prev => [...prev, page]); setActiveDocPageId(page.id); }} className="mt-4 w-full rounded-xl bg-cyan-600 px-3 py-2 font-black text-white">+ Add page</button><button type="button" onClick={() => { const title = prompt('Page title', docPages.find(page => page.id === activeDocPageId)?.title || '')?.trim(); if (title) setDocPages(prev => prev.map(page => page.id === activeDocPageId ? { ...page, title, updatedAt: Date.now() } : page)); }} className="mt-2 w-full rounded-xl bg-slate-100 px-3 py-2 font-black text-slate-700">Rename page</button>{docPages.length > 1 && <button type="button" onClick={() => { if (!confirm('Delete this page?')) return; setDocPages(prev => { const next = prev.filter(page => page.id !== activeDocPageId); setActiveDocPageId(next[0].id); return next; }); }} className="mt-2 w-full rounded-xl bg-rose-100 px-3 py-2 font-black text-rose-700">Delete page</button>}</aside><main className="min-w-0 flex-1 overflow-y-auto p-5"><h3 className="mb-4 text-2xl font-black text-slate-900">Open Docs Builder</h3><AdminDocsEditor value={docPages.find(page => page.id === activeDocPageId)?.content || ''} onChange={content => setDocPages(prev => prev.map(page => page.id === activeDocPageId ? { ...page, content, updatedAt: Date.now() } : page))} /></main></div></div>
                         ) : formState.type === 'quiz' ? (
                             <div className="space-y-4">
                                 <div ref={quizListRef} className="space-y-4">
@@ -431,7 +450,7 @@ const ModuleEditor: React.FC<{
                         </div>
                         <button type="button" onClick={() => onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles => (currentFiles || []).filter(item => item.id !== file.id)))} className="self-start rounded-xl border border-red-400/30 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-500/10 sm:self-auto">Remove</button>
                     </div>
-                )) : <p className="rounded-2xl border border-dashed border-white/50 p-4 text-sm text-slate-600">No content yet. Add videos, PDFs, Smart Docs, quizzes, and resource links here.</p>}
+                )) : <p className="rounded-2xl border border-dashed border-white/50 p-4 text-sm text-slate-600">No content yet. Add videos, PDFs, Open Docs, quizzes, and resource links here.</p>}
             </div>
 
             {isAddingContent && <ContentComposer onAdd={handleAddContent} onClose={() => setIsAddingContent(false)} />}
@@ -624,7 +643,7 @@ const ProductForm: React.FC<{
                                     <div>
                                         <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-300">Curriculum Builder</p>
                                         <h2 className="mt-2 text-2xl font-black text-slate-900">Course content / files</h2>
-                                        <p className="mt-2 text-sm text-slate-600">Organize Video, PDF, Smart Docs, Quiz, audio, sheets, e-books, and links in spacious modules.</p>
+                                        <p className="mt-2 text-sm text-slate-600">Organize Video, PDF, Open Docs, Quiz, audio, sheets, e-books, and links in spacious modules.</p>
                                     </div>
                                     <button type="button" onClick={addRootModule} className="rounded-2xl bg-white px-5 py-3 font-black text-slate-900 hover:bg-cyan-100">+ Add Module</button>
                                 </div>
