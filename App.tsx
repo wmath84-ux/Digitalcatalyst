@@ -2193,6 +2193,8 @@ const App: React.FC = () => {
   };
 
   const handleGoogleLogin = async (): Promise<{ success: boolean, message: string }> => {
+      setAuthError(null);
+      setAuthRestoreError(null);
       try {
           await ensureAuthPersistence();
           if (shouldUseGoogleRedirect()) {
@@ -3279,7 +3281,6 @@ const App: React.FC = () => {
           <div className="md:hidden">
             <MobileAppHome
               settings={websiteSettings}
-              authButtonLabel={authButtonLabel}
               rememberedAccount={rememberedAuthAccount}
               currentUser={currentUser}
               purchasedProducts={purchasedProducts}
@@ -3298,6 +3299,7 @@ const App: React.FC = () => {
               onOpenNews={() => openReadingHub('news')}
               onCartClick={() => setIsCartOpen(true)}
               onProfileClick={handleNavigateToProfile}
+              onAuthClick={openAuthPage}
             />
           </div>
           <div className="hidden md:block">{renderHomePageContent()}</div>
