@@ -3,11 +3,11 @@ import { User, WebsiteSettings, ThemeName, themes } from '../App';
 import UserAvatar from './common/UserAvatar';
 import { RememberedAuthAccount } from '../utils/rememberedAuth';
 
-const LogoIcon = () => (
+const LogoIcon = ({ src, isAccountImage = false }: { src?: string; isAccountImage?: boolean }) => (
     <img
-        src="/icons/icon-192x192.svg"
-        alt="Digital Catalyst logo"
-        className="h-9 w-9 rounded-xl shadow-[0_8px_18px_rgba(37,99,235,0.16)] ring-1 ring-white/70 md:h-12 md:w-12 md:rounded-2xl md:shadow-[0_10px_28px_rgba(37,99,235,0.22)]"
+        src={src || "/icons/icon-192x192.svg"}
+        alt={isAccountImage ? "Signed-in account avatar" : "Digital Catalyst logo"}
+        className={`h-9 w-9 object-cover shadow-[0_8px_18px_rgba(37,99,235,0.16)] ring-1 ring-white/70 md:h-12 md:w-12 md:shadow-[0_10px_28px_rgba(37,99,235,0.22)] ${isAccountImage ? 'rounded-full' : 'rounded-xl md:rounded-2xl'}`}
     />
 );
 
@@ -111,9 +111,10 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
     onLogout();
   };
 
-  const resolvedPhotoURL = currentUser?.photoURL || ((rememberedAccount?.uid && rememberedAccount.uid === currentUser?.id) || (rememberedAccount?.email && rememberedAccount.email === currentUser?.email) ? rememberedAccount.photoURL : '');
+  const resolvedPhotoURL = currentUser?.photoURL || (currentUser as any)?.avatarUrl || ((rememberedAccount?.uid && rememberedAccount.uid === currentUser?.id) || (rememberedAccount?.email && rememberedAccount.email === currentUser?.email) ? rememberedAccount.photoURL : '');
+  const accountImage = isLoggedIn && currentUser ? (resolvedPhotoURL || '/icons/icon-192x192.svg') : '/icons/icon-192x192.svg';
   const loggedOutAuthMode: 'login' | 'signup' = rememberedAccount ? 'login' : 'signup';
-  const loggedOutAuthLabel = rememberedAccount ? 'Login' : 'Sign Up';
+  const loggedOutAuthLabel = rememberedAccount ? `Continue as ${rememberedAccount.name || rememberedAccount.email.split('@')[0]}` : 'Login';
   const authButtonClass = "rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-5 py-2 text-sm font-black text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90";
   return (
     <>
@@ -121,7 +122,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
         <div className="container mx-auto flex h-16 w-full max-w-full items-center px-3 py-0 md:block md:h-auto md:px-6 md:py-4">
           <div className="flex min-w-0 flex-1 items-center justify-between gap-2 md:gap-3">
             <button onClick={onHomeClick} className="flex min-w-0 cursor-pointer items-center space-x-2 overflow-hidden md:space-x-3" aria-label="Back to Homepage">
-              <LogoIcon />
+              <LogoIcon src={accountImage} isAccountImage={isLoggedIn && Boolean(currentUser)} />
               <span className="truncate text-base font-bold text-[#081A45] md:text-xl md:text-primary">{(settings.content as any).siteName || "Digital Catalyst"}</span>
             </button>
             
