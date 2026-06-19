@@ -1,6 +1,6 @@
 // components/CoursePlayer.tsx
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, QuizAnswerState } from '../App';
+import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, ProductDocPage, QuizAnswerState } from '../App';
 import { EconomySettings } from '../utils/economy';
 import AiMentor from './AiMentor';
 import ProductMusicPlayer, { type AudioTrack } from './ProductMusicPlayer';
@@ -218,11 +218,19 @@ const RichTextButton: React.FC<{ active?: boolean; children: React.ReactNode; on
   </button>
 );
 
+const normalizeDocPages = (file: ProductFile): ProductDocPage[] => (file.docPages && file.docPages.length ? file.docPages : [{ id: 'page-1', title: file.name || 'Page 1', content: file.content || '<h1>Open Docs Workspace</h1><p>Start writing here.</p>' }]);
+
 const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = ({ file, productId }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const selectionRef = useRef<Range | null>(null);
-  const storageKey = `smart-docs-workspace-${productId}-${file.id}`;
-  const defaultContent = useMemo(() => htmlFromPlainText(file.content || '<h1>Smart Docs Workspace</h1><p>Start writing here.</p>'), [file.content]);
+  const legacyStorageKey = `smart-docs-workspace-${productId}-${file.id}`;
+  const pagesStorageKey = `open-docs-pages-${productId}-${file.id}`;
+  const defaultPages = useMemo(() => normalizeDocPages(file).map(page => ({ ...page, content: htmlFromPlainText(page.content) })), [file]);
+  const [pages, setPages] = useState<ProductDocPage[]>(defaultPages);
+  const [activePageId, setActivePageId] = useState(defaultPages[0]?.id || 'page-1');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const activePage = pages.find(page => page.id === activePageId) || pages[0];
+  const defaultContent = activePage?.content || '<h1>Open Docs Workspace</h1><p>Start writing here.</p>';
   const [html, setHtml] = useState(defaultContent);
   const [savedAt, setSavedAt] = useState('Saved locally');
   const [isReadingMode, setIsReadingMode] = useState(false);
@@ -232,12 +240,19 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   const [theme, setTheme] = useState<'dark' | 'sepia' | 'light'>('dark');
 
   useEffect(() => {
-    const saved = localStorage.getItem(storageKey);
-    const nextHtml = saved || defaultContent;
+    const savedPages = localStorage.getItem(pagesStorageKey);
+    const legacy = localStorage.getItem(legacyStorageKey);
+    const nextPages = savedPages ? JSON.parse(savedPages) as ProductDocPage[] : defaultPages.map((page, index) => index === 0 && legacy ? { ...page, content: legacy } : page);
+    setPages(nextPages);
+    setActivePageId(nextPages[0]?.id || 'page-1');
+    setSavedAt(savedPages || legacy ? 'Restored from local autosave' : 'Loaded admin version');
+  }, [pagesStorageKey, legacyStorageKey, defaultPages]);
+
+  useEffect(() => {
+    const nextHtml = activePage?.content || defaultContent;
     setHtml(nextHtml);
     if (editorRef.current) editorRef.current.innerHTML = nextHtml;
-    setSavedAt(saved ? 'Restored from local autosave' : 'Loaded admin version');
-  }, [storageKey, defaultContent]);
+  }, [activePageId, activePage?.content, defaultContent]);
 
   const saveSelection = () => {
     const selection = window.getSelection();
@@ -258,16 +273,24 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
 
   const persist = () => {
     saveSelection();
-    localStorage.setItem(storageKey, editorRef.current?.innerHTML || '');
+    const nextContent = editorRef.current?.innerHTML || '';
+    setHtml(nextContent);
+    const nextPages = pages.map(page => page.id === activePageId ? { ...page, content: nextContent, updatedAt: Date.now() } : page);
+    setPages(nextPages);
+    localStorage.setItem(pagesStorageKey, JSON.stringify(nextPages));
     setSavedAt(`Saved ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
   };
 
   const runCommand = (command: string, value?: string) => {
     editorRef.current?.focus();
     restoreSelection();
-    document.execCommand(command, false, value);
-    saveSelection();
-    persist();
+    try {
+      document.execCommand(command, false, value);
+      saveSelection();
+      persist();
+    } catch {
+      setSavedAt('Formatting failed — click inside the page and try again');
+    }
   };
 
   const readingTheme = {
@@ -279,7 +302,8 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   return (
     <div className="relative flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-white/70 text-slate-900 backdrop-blur-xl">
       <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-b border-white/50 bg-white/70 p-2 shadow-sm backdrop-blur-xl sm:gap-2 sm:p-3 custom-scrollbar">
-        <span className="mr-1 shrink-0 rounded-full border border-white/50 bg-white/70 px-2.5 py-2 text-[10px] font-black uppercase tracking-widest text-cyan-700 sm:mr-2 sm:px-3 sm:text-xs">Smart Docs</span>
+        <button type="button" onClick={() => setIsSidebarOpen(value => !value)} className="mr-1 shrink-0 rounded-full border border-cyan-200 bg-white/80 px-2.5 py-2 text-[10px] font-black uppercase tracking-widest text-cyan-700 sm:mr-2 sm:px-3 sm:text-xs">Open Docs</button>
+        <button type="button" onClick={() => setIsReadingMode(true)} className="rounded-2xl border border-cyan-200/30 bg-cyan-200/15 px-4 py-2 font-black text-cyan-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:bg-cyan-200/25">Reading Mode</button>
         {(smartDocToolbarCommands || []).map(([cmd, label]) => <button key={cmd} type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand(cmd)} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 shadow-sm transition active:scale-95 hover:bg-white/90 hover:shadow-sm">{label}</button>)}
         <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('formatBlock', 'H1')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">H1</button>
         <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('formatBlock', 'H2')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">H2</button>
@@ -288,9 +312,8 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
         <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('justifyCenter')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">Center</button>
         <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('justifyRight')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">Right</button>
         <span className="ml-auto text-xs font-bold text-slate-600/80">{savedAt}</span>
-        <button type="button" onClick={() => setIsReadingMode(true)} className="rounded-2xl border border-cyan-200/30 bg-cyan-200/15 px-4 py-2 font-black text-cyan-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:bg-cyan-200/25">Reading Mode</button>
-      </div>
-      <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+        </div>
+      <div className="flex min-h-0 flex-1"><aside className={`${isSidebarOpen ? 'block' : 'hidden'} w-64 shrink-0 overflow-y-auto border-r border-white/50 bg-white/60 p-3 custom-scrollbar`}><p className="mb-2 text-xs font-black uppercase tracking-widest text-slate-500">Saved on this device</p>{pages.map(page => <button key={page.id} type="button" onClick={() => setActivePageId(page.id)} className={`mb-2 w-full rounded-xl px-3 py-2 text-left text-sm font-bold ${page.id === activePageId ? 'bg-cyan-100 text-cyan-800' : 'bg-white/70 text-slate-700'}`}>{page.title}</button>)}<button type="button" onClick={() => { const title = prompt('Page title', `Page ${pages.length + 1}`)?.trim(); if (!title) return; const now = Date.now(); const page = { id: `page-${now}`, title, content: '<h1>New page</h1><p>Start writing here.</p>', createdAt: now, updatedAt: now }; const next = [...pages, page]; setPages(next); localStorage.setItem(pagesStorageKey, JSON.stringify(next)); setActivePageId(page.id); }} className="mt-2 w-full rounded-xl bg-cyan-600 px-3 py-2 text-sm font-black text-white">+ New page</button><button type="button" onClick={() => { const title = prompt('Rename page', activePage?.title || 'Page')?.trim(); if (!title || !activePage) return; const next = pages.map(page => page.id === activePage.id ? { ...page, title, updatedAt: Date.now() } : page); setPages(next); localStorage.setItem(pagesStorageKey, JSON.stringify(next)); }} className="mt-2 w-full rounded-xl bg-white/80 px-3 py-2 text-sm font-black text-slate-700">Rename</button>{pages.length > 1 && <button type="button" onClick={() => { if (!activePage || !confirm('Delete this docs page?')) return; const next = pages.filter(page => page.id !== activePage.id); setPages(next); localStorage.setItem(pagesStorageKey, JSON.stringify(next)); setActivePageId(next[0].id); }} className="mt-2 w-full rounded-xl bg-rose-100 px-3 py-2 text-sm font-black text-rose-700">Delete</button>}</aside><div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
         <div
           ref={editorRef}
           contentEditable
@@ -301,12 +324,12 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
           onMouseUp={saveSelection}
           onTouchEnd={saveSelection}
           onFocus={saveSelection}
-          className="smart-docs-page mx-auto min-h-full max-w-4xl rounded-[1.25rem] border border-white/50 bg-white/70 px-4 py-6 text-base leading-7 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl sm:rounded-[1.5rem] sm:px-8 sm:py-10 sm:text-lg sm:leading-8 md:px-14 [&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6"
+          className="open-docs-page mx-auto min-h-full max-w-4xl rounded-[1.25rem] border border-white/50 bg-white/70 px-4 py-6 text-base leading-7 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl sm:rounded-[1.5rem] sm:px-8 sm:py-10 sm:text-lg sm:leading-8 md:px-14 [&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6"
         />
-      </div>
+      </div></div>
       {isReadingMode && (
         <div className="absolute inset-2 z-20 flex min-h-0 flex-col overflow-hidden rounded-[1.5rem] border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl sm:inset-4 sm:rounded-[2rem]">
-          <div className="smart-docs-toolbar flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-b border-white/50 bg-white/70 p-2 sm:gap-2 sm:p-3 custom-scrollbar">
+          <div className="open-docs-toolbar flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-b border-white/50 bg-white/70 p-2 sm:gap-2 sm:p-3 custom-scrollbar">
             <span className="mr-auto shrink-0 text-sm font-black text-slate-900 sm:text-base">Reading Mode</span>
             <button type="button" onClick={() => setFontSize(value => Math.max(14, value - 2))} className="min-h-9 shrink-0 rounded-xl bg-white/75 px-3 py-2 text-sm font-black hover:bg-white/90 hover:shadow-sm">A-</button>
             <button type="button" onClick={() => setFontSize(value => Math.min(28, value + 2))} className="min-h-9 shrink-0 rounded-xl bg-white/75 px-3 py-2 text-sm font-black hover:bg-white/90 hover:shadow-sm">A+</button>

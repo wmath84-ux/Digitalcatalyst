@@ -257,7 +257,7 @@ const AnnouncementFormModal: React.FC<{ announcement: Announcement, onSave: (a: 
 interface WebsiteSettingsProps {
     settings: WebsiteSettings;
     products?: ProductWithRating[];
-    onSettingsChange: (settings: WebsiteSettings) => void;
+    onSettingsChange: (settings: WebsiteSettings) => Promise<boolean>;
 }
 
 type EditableSubscriptionPlan = { id: string; name: string; price: number; coinPrice?: number; description: string; unlockProductIds: number[]; badge?: string; };
@@ -268,16 +268,21 @@ const milestoneMetricOptions: ProfileMilestoneMetric[] = ['lifetimeCoins', 'stud
 const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, products = [], onSettingsChange }) => {
     const [activeTab, setActiveTab] = useState<'theme' | 'layout' | 'content' | 'reading' | 'profile' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
     const [localSettings, setLocalSettings] = useState<WebsiteSettings>(settings);
-    const [showSuccess, setShowSuccess] = useState(false);
+    const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'failed'>('idle');
 
     useEffect(() => {
         setLocalSettings(settings);
+        setSaveStatus('idle');
     }, [settings]);
 
-    const handleSave = () => {
-        onSettingsChange(localSettings);
-        setShowSuccess(true);
-        setTimeout(() => setShowSuccess(false), 3000);
+    const isDirty = JSON.stringify(localSettings) !== JSON.stringify(settings);
+
+    const handleSave = async () => {
+        if (!isDirty || saveStatus === 'saving') return;
+        setSaveStatus('saving');
+        const synced = await onSettingsChange(localSettings);
+        setSaveStatus(synced ? 'success' : 'failed');
+        setTimeout(() => setSaveStatus('idle'), 4000);
     };
 
     const handleNestedChange = (area: keyof WebsiteSettings, field: string, value: any) => {
@@ -825,7 +830,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
             );
             case 'animations': return (
                 <div>
-                     <FormRow label="Enable Animations" description="Toggle all entrance animations across the site."><input type="checkbox" checked={localSettings.animations.enabled} onChange={e => handleNestedChange('animations', 'enabled', e.target.checked)} className="form-checkbox h-5 w-5" /></FormRow>
+                     <FormRow label="Turn off homepage animations" description="Switch this on to disable non-essential homepage motion, pulse/bounce effects, and heavy transitions for smoother scrolling on mobile."><input type="checkbox" checked={!localSettings.animations.enabled} onChange={e => handleNestedChange('animations', 'enabled', !e.target.checked)} className="form-checkbox h-5 w-5" /></FormRow>
                 </div>
             );
             default: return null;
@@ -837,11 +842,10 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
             <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 border-b pb-4">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800">Site Customizer</h1>
-                    <p className="text-slate-600 mt-1">Changes are live in this panel. Click "Save" to apply them to the website.</p>
+                    <p className="text-slate-600 mt-1">Section buttons and toggles update this local draft first. Click Save Changes to publish them to the website.</p>{isDirty && <p className="mt-2 rounded-xl bg-amber-100 px-3 py-2 text-sm font-black text-amber-800">Unsaved changes — click Save Changes to publish.</p>}{saveStatus === 'success' && <p className="mt-2 rounded-xl bg-emerald-100 px-3 py-2 text-sm font-black text-emerald-800">Settings saved and synced.</p>}{saveStatus === 'failed' && <p className="mt-2 rounded-xl bg-rose-100 px-3 py-2 text-sm font-black text-rose-800">Saved locally but cloud sync failed. Please retry when online.</p>}
                 </div>
-                <button onClick={handleSave} className="mt-4 md:mt-0 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold px-6 py-2.5 rounded-lg hover:bg-blue-700 transition-colors relative">
-                    Save Changes
-                    {showSuccess && <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs rounded-full p-1 animate-pop-in">✔</span>}
+                <button onClick={handleSave} disabled={!isDirty || saveStatus === 'saving'} className={`mt-4 md:mt-0 rounded-lg px-6 py-2.5 font-bold text-white transition-colors relative ${isDirty ? 'bg-gradient-to-r from-indigo-600 to-purple-600 hover:bg-blue-700' : 'bg-slate-400 opacity-60'}`}>
+                    {saveStatus === 'saving' ? 'Saving...' : 'Save Changes'}
                 </button>
             </div>
             

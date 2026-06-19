@@ -39,7 +39,7 @@ interface AdminDashboardProps {
     onCouponsUpdate: (coupons: Coupon[]) => void;
     onTicketsUpdate: (tickets: SupportTicket[]) => void;
     onSubscribersUpdate: (subscribers: NewsletterSubscriber[]) => void;
-    onWebsiteSettingsChange: (settings: WebsiteSettings) => void;
+    onWebsiteSettingsChange: (settings: WebsiteSettings) => Promise<boolean>;
     onLogout: () => void;
     onSwitchToHome: () => void;
 }
