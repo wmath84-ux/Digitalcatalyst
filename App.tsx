@@ -1939,7 +1939,7 @@ const App: React.FC = () => {
 
   const redirectAfterSuccessfulAuth = (options: { source?: string; user?: User | Pick<User, 'name' | 'email'> | null; preserveCheckoutIntent?: boolean; force?: boolean } = {}) => {
       const { source, user, preserveCheckoutIntent = true, force = false } = options;
-      const uid = auth.currentUser?.uid || currentUser?.id || '';
+      const uid = ('id' in (user || {}) ? (user as User).id : '') || auth.currentUser?.uid || currentUser?.id || '';
       const lastRedirect = authRedirectHandledRef.current;
       const hasExplicitUser = Boolean(user);
       const isClosingAuthView = currentViewRef.current === 'auth';
@@ -1953,6 +1953,7 @@ const App: React.FC = () => {
       const welcomeUser = user || currentUser || (auth.currentUser ? { name: auth.currentUser.displayName || '', email: auth.currentUser.email || '' } : null);
 
       if (preserveCheckoutIntent && productToBuyAfterLogin) {
+          console.info('AUTH_REDIRECT_AFTER_COMMIT', { uid, target: 'product' });
           if (isMobileViewport && welcomeUser) showMobileWelcomeAfterAuth(welcomeUser);
           currentViewRef.current = 'product';
           setSelectedProduct(productToBuyAfterLogin);
@@ -1964,6 +1965,7 @@ const App: React.FC = () => {
       }
 
       if (preserveCheckoutIntent && resumeCartCheckoutAfterLogin && cart.length > 0) {
+          console.info('AUTH_REDIRECT_AFTER_COMMIT', { uid, target: 'cart-checkout' });
           if (isMobileViewport && welcomeUser) showMobileWelcomeAfterAuth(welcomeUser);
           currentViewRef.current = 'home';
           setCurrentView('home');
@@ -1977,11 +1979,13 @@ const App: React.FC = () => {
       setProductToBuyAfterLogin(null);
       setResumeCartCheckoutAfterLogin(false);
       if (isMobileViewport && welcomeUser) {
+          console.info('AUTH_REDIRECT_AFTER_COMMIT', { uid, target: 'home' });
           currentViewRef.current = 'home';
           finishMobileAuthSuccess(welcomeUser);
           console.info('[mobile-auth]', { step: 'mobile-redirect-home', source });
           return;
       }
+      console.info('AUTH_REDIRECT_AFTER_COMMIT', { uid, target: 'home' });
       currentViewRef.current = 'home';
       setCurrentView('home');
       window.scrollTo(0, 0);
@@ -2087,20 +2091,20 @@ const App: React.FC = () => {
   useEffect(() => {
       console.info('AUTH_INIT_START');
       setAuthStatus('checking-session');
-      void ensureAuthPersistence().catch(error => {
-          console.warn('Firebase auth persistence setup failed.', error);
-          setAuthError(getFirebaseAuthErrorMessage(error));
-      });
-      void getRedirectResult(auth).then(result => {
+      console.info('LOGIN_START', { source: 'google-redirect' });
+      void ensureAuthPersistence().then(() => getRedirectResult(auth)).then(async result => {
           if (result?.user) {
               setFirebaseAuthUser(result.user);
               if (getIsMobileViewport()) setMobileAuthFlowState('completing-session');
-              void completeFirebaseUserSession(result.user, { redirect: false, source: 'google-redirect', explicit: true }).then(hydratedUser => {
-                  if (hydratedUser) {
-                      finishMobileAuthSuccess(hydratedUser);
-                      redirectAfterSuccessfulAuth({ source: 'google-redirect', user: hydratedUser, force: true });
-                  }
-              });
+              await result.user.getIdToken(true);
+              console.info('LOGIN_FIREBASE_SUCCESS', { uid: result.user.uid, source: 'google-redirect' });
+              const committedUser = await completeFirebaseUserSession(result.user, { redirect: false, source: 'google-redirect', explicit: true });
+              if (!committedUser) {
+                  setAuthRestoreError('Google login could not be completed. Please try again.');
+                  return;
+              }
+              finishMobileAuthSuccess(committedUser);
+              redirectAfterSuccessfulAuth({ source: 'google-redirect', user: committedUser, force: true });
           }
       }).catch(error => {
           console.warn('Google redirect result handling failed.', error);
@@ -2199,18 +2203,20 @@ const App: React.FC = () => {
       setAuthError(null);
       setAuthRestoreError(null);
       try {
+          const source = shouldUseGoogleRedirect() ? 'google-redirect' : 'google-popup';
+          console.info('LOGIN_START', { source });
           await ensureAuthPersistence();
-          if (shouldUseGoogleRedirect()) {
+          if (source === 'google-redirect') {
               await signInWithRedirect(auth, googleProvider);
               return { success: true, message: 'Opening Google login...' };
           }
           const credential = await signInWithPopup(auth, googleProvider);
           await credential.user.getIdToken(true);
-          console.info('LOGIN_SUCCESS', { uid: credential.user.uid });
-          const hydratedUser = await completeFirebaseUserSession(credential.user, { redirect: false, source: 'google-popup', explicit: true });
-          if (hydratedUser) {
-              finishMobileAuthSuccess(hydratedUser);
-              redirectAfterSuccessfulAuth({ source: 'google-popup', user: hydratedUser, force: true });
+          console.info('LOGIN_FIREBASE_SUCCESS', { uid: credential.user.uid, source: 'google-popup' });
+          const committedUser = await completeFirebaseUserSession(credential.user, { redirect: false, source: 'google-popup', explicit: true });
+          if (committedUser) {
+              finishMobileAuthSuccess(committedUser);
+              redirectAfterSuccessfulAuth({ source: 'google-popup', user: committedUser, force: true });
               return { success: true, message: 'Google login successful.' };
           }
           return { success: false, message: 'Login could not be completed. Please try again.' };
@@ -2218,6 +2224,7 @@ const App: React.FC = () => {
           console.warn('Google login failed.', error);
           if (error?.code === 'auth/popup-blocked') {
               try {
+                  console.info('LOGIN_START', { source: 'google-redirect' });
                   await ensureAuthPersistence();
                   await signInWithRedirect(auth, googleProvider);
                   return { success: true, message: getFirebaseAuthErrorMessage(error) };
@@ -2232,14 +2239,16 @@ const App: React.FC = () => {
 
   const handleEmailLogin = async (email: string, password: string): Promise<{ success: boolean, message: string }> => {
       try {
+          const source = 'email-login';
+          console.info('LOGIN_START', { source });
           await ensureAuthPersistence();
           const credential = await signInWithEmailAndPassword(auth, email, password);
           await credential.user.getIdToken(true);
-          console.info('LOGIN_SUCCESS', { uid: credential.user.uid });
-          const hydratedUser = await completeFirebaseUserSession(credential.user, { redirect: false, profile: { name: credential.user.displayName || undefined, mobile: credential.user.phoneNumber || undefined }, source: 'email-login', explicit: true });
-          if (hydratedUser) {
-              finishMobileAuthSuccess(hydratedUser);
-              redirectAfterSuccessfulAuth({ source: 'email-login', user: hydratedUser, force: true });
+          console.info('LOGIN_FIREBASE_SUCCESS', { uid: credential.user.uid, source });
+          const committedUser = await completeFirebaseUserSession(credential.user, { redirect: false, profile: { name: credential.user.displayName || undefined, mobile: credential.user.phoneNumber || undefined }, source, explicit: true });
+          if (committedUser) {
+              finishMobileAuthSuccess(committedUser);
+              redirectAfterSuccessfulAuth({ source, user: committedUser, force: true });
               return { success: true, message: 'Login successful.' };
           }
           return { success: false, message: 'Login could not be completed. Please try again.' };
@@ -2250,15 +2259,17 @@ const App: React.FC = () => {
 
   const handleEmailSignup = async (profile: { name: string; email: string; mobile: string }, password: string): Promise<{ success: boolean, message: string }> => {
       try {
+          const source = 'email-signup';
+          console.info('LOGIN_START', { source });
           await ensureAuthPersistence();
           const credential = await createUserWithEmailAndPassword(auth, profile.email, password);
           await credential.user.getIdToken(true);
-          console.info('LOGIN_SUCCESS', { uid: credential.user.uid });
+          console.info('LOGIN_FIREBASE_SUCCESS', { uid: credential.user.uid, source });
           await updateProfile(credential.user, { displayName: profile.name });
-          const hydratedUser = await completeFirebaseUserSession(credential.user, { redirect: false, profile, source: 'email-signup', explicit: true });
-          if (hydratedUser) {
-              finishMobileAuthSuccess(hydratedUser);
-              redirectAfterSuccessfulAuth({ source: 'email-signup', user: hydratedUser, force: true });
+          const committedUser = await completeFirebaseUserSession(credential.user, { redirect: false, profile, source, explicit: true });
+          if (committedUser) {
+              finishMobileAuthSuccess(committedUser);
+              redirectAfterSuccessfulAuth({ source, user: committedUser, force: true });
               return { success: true, message: 'Account created successfully.' };
           }
           return { success: false, message: 'Account could not be completed. Please try again.' };
