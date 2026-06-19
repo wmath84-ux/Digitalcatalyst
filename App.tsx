@@ -247,6 +247,8 @@ export interface User {
     photoURL?: string;
     role?: 'user' | 'admin';
     status?: 'active' | 'blocked';
+    blocked?: boolean;
+    suspended?: boolean;
     password?: string; // Legacy local-mode fallback only. Never write Firebase passwords into this field.
     authProvider?: 'google' | 'password';
     providerIds?: string[];
@@ -1775,6 +1777,8 @@ const App: React.FC = () => {
       emailVerified: data.emailVerified ?? firebaseUser.emailVerified,
       role: data.role === 'admin' ? 'admin' : 'user',
       status: data.status === 'blocked' ? 'blocked' : 'active',
+      blocked: data.blocked === true,
+      suspended: data.suspended === true,
       createdAt: data.createdAt || new Date().toISOString(),
       lastLoginAt: new Date().toISOString(),
       eduCoins: data.eduCoins ?? 120,
@@ -1839,6 +1843,8 @@ const App: React.FC = () => {
           photoURL: nextPhotoURL,
           role: existing.role === 'admin' ? 'admin' : 'user',
           status: existing.status === 'blocked' ? 'blocked' : 'active',
+          blocked: existing.blocked === true,
+          suspended: existing.suspended === true,
           authProvider,
           providerIds,
           emailVerified: firebaseUser.emailVerified,
@@ -1998,6 +2004,9 @@ const App: React.FC = () => {
       window.scrollTo(0, 0);
   };
 
+  const isBlockedUserProfile = (user: User): boolean =>
+      user.blocked === true || user.status === 'blocked' || user.suspended === true;
+
   const hydrateFirebaseUserSession = async (firebaseUser: FirebaseUser, fallbackUser: User, profile?: { name?: string; mobile?: string }) => {
       console.info('AUTH_HYDRATION_START', { uid: firebaseUser.uid });
       setAuthStatus('hydrating');
@@ -2005,7 +2014,7 @@ const App: React.FC = () => {
       try {
           setProfileStatus('loading');
           const ensuredUser = await ensureUserProfile(firebaseUser, profile);
-          if ((ensuredUser as any).blocked === true || ensuredUser.status === 'blocked' || (ensuredUser as any).suspended === true) {
+          if (isBlockedUserProfile(ensuredUser)) {
               console.warn('AUTO_SIGNOUT_BLOCKED_REASON', { uid: firebaseUser.uid, status: ensuredUser.status });
               await signOut(auth);
               handleLogout(false);
