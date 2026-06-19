@@ -37,6 +37,7 @@ interface HeaderProps {
     onNavigateToProfile: () => void;
     onNavigateToHomeAndScroll: (sectionId: string) => void;
     currentUser: User | null;
+    isLoggedIn: boolean;
     rememberedAccount?: RememberedAuthAccount | null;
     onLogout: () => void;
     onAuthClick: (mode: 'login' | 'signup') => void;
@@ -44,7 +45,7 @@ interface HeaderProps {
     onThemeChange: (themeName: ThemeName) => void;
 }
 
-const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount, cartToastMessage, onHomeClick, onCartClick, onNavigateToAllProducts, onNavigateToPurchases, onNavigateToWishlist, onNavigateToProfile, onNavigateToHomeAndScroll, currentUser, rememberedAccount, onLogout, onAuthClick, activeTheme, onThemeChange }) => {
+const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount, cartToastMessage, onHomeClick, onCartClick, onNavigateToAllProducts, onNavigateToPurchases, onNavigateToWishlist, onNavigateToProfile, onNavigateToHomeAndScroll, currentUser, isLoggedIn, rememberedAccount, onLogout, onAuthClick, activeTheme, onThemeChange }) => {
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [isToastVisible, setIsToastVisible] = useState(false);
   const accountMenuAreaRef = useRef<HTMLDivElement>(null);
@@ -89,8 +90,8 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
   }, [isUserMenuOpen]);
 
   useEffect(() => {
-    if (!currentUser) setIsUserMenuOpen(false);
-  }, [currentUser]);
+    if (!isLoggedIn) setIsUserMenuOpen(false);
+  }, [isLoggedIn]);
 
   const navItems = [
     { name: 'Home', action: onHomeClick },
@@ -152,7 +153,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                             </span>
                         )}
                     </button>
-                    {currentUser ? (
+                    {isLoggedIn && currentUser ? (
                          <div className="relative">
                             <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-4 py-2 font-bold text-white shadow-[0_10px_28px_rgba(23,105,255,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(23,105,255,0.26)]">
                                 <UserAvatar name={currentUser.name} email={currentUser.email} photoURL={resolvedPhotoURL} size={28} className="ring-2 ring-white/60" />
@@ -184,7 +185,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
                             </span>
                         )}
                     </button>
-                    {currentUser ? (
+                    {isLoggedIn && currentUser ? (
                         <div className="relative">
                             <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex h-10 w-10 items-center justify-center rounded-full border border-[#D9E7F8] bg-white/55 text-[#081A45] transition-colors duration-300 hover:bg-white/80" aria-label="Open account menu">
                                 <UserAvatar name={currentUser.name} email={currentUser.email} photoURL={resolvedPhotoURL} size={36} />
