@@ -140,7 +140,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
     return (
         <div className="relative flex min-h-screen items-start justify-center overflow-y-auto bg-white px-3 pb-6 pt-16 text-slate-950 sm:items-center sm:p-6">
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(59,130,246,0.14),transparent_34%),radial-gradient(circle_at_bottom_right,rgba(16,185,129,0.12),transparent_30%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(239,246,255,0.92),rgba(255,255,255,0.96))]" />
-            <button onClick={onBack} className="absolute left-3 top-3 z-10 rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-sm font-bold text-slate-800 shadow-sm backdrop-blur-xl hover:text-slate-950 sm:left-5 sm:top-5 sm:px-4">&larr; Back</button>
+            <button onClick={onBack} className="absolute left-3 top-3 z-10 hidden rounded-full border border-slate-200 bg-white/90 px-3 py-2 text-sm font-bold text-slate-800 shadow-sm backdrop-blur-xl hover:text-slate-950 sm:left-5 sm:top-5 sm:inline-flex sm:px-4">&larr; Back</button>
 
             <div className="relative z-10 w-full max-w-xl overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white/95 p-4 text-slate-950 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur-2xl sm:rounded-[2rem] sm:p-10 lg:p-12">
                     <div className="mb-5 sm:mb-8">
