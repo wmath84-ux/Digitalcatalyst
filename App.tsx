@@ -2193,6 +2193,8 @@ const App: React.FC = () => {
   };
 
   const handleGoogleLogin = async (): Promise<{ success: boolean, message: string }> => {
+      setAuthError(null);
+      setAuthRestoreError(null);
       try {
           await ensureAuthPersistence();
           if (shouldUseGoogleRedirect()) {
