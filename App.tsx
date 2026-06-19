@@ -47,6 +47,7 @@ import { getFirebaseAuthErrorMessageFromCode, mergePurchasedProductIds, normaliz
 
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
 const MOBILE_WELCOME_SESSION_KEY = 'digitalCatalyst.mobileWelcomeShown';
+const GOOGLE_REDIRECT_ATTEMPT_KEY = 'digitalCatalyst.googleRedirectAttempt';
 
 type MobileAuthFlowState = 'checking' | 'logged-out' | 'completing-session' | 'authenticated';
 type AuthStatus = 'booting' | 'checking-session' | 'unauthenticated' | 'authenticated' | 'hydrating' | 'logout' | 'error';
@@ -925,9 +926,10 @@ const App: React.FC = () => {
   const [currentView, setCurrentView] = useState('home'); 
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup'>('login');
   const [isAuthStateReady, setIsAuthStateReady] = useState(false);
-  const [isRedirectResultPending, setIsRedirectResultPending] = useState(true);
-  const isRedirectResultPendingRef = useRef(true);
+  const [isRedirectResultPending, setIsRedirectResultPending] = useState(false);
+  const isRedirectResultPendingRef = useRef(false);
   const authOperationInProgressRef = useRef(false);
+  const committedFirebaseUidRef = useRef<string | null>(null);
   const [isMobileViewport, setIsMobileViewport] = useState(() => getIsMobileViewport());
   const [mobileAuthFlowState, setMobileAuthFlowState] = useState<MobileAuthFlowState>('checking');
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<FirebaseUser | null>(null);
@@ -984,10 +986,11 @@ const App: React.FC = () => {
   const [isSavingMobileCompletion, setIsSavingMobileCompletion] = useState(false);
   const [hasSkippedMobileCompletion, setHasSkippedMobileCompletion] = useState(false);
 
-  const effectiveFirebaseUser = firebaseAuthUser || auth.currentUser;
+  const effectiveFirebaseUser = firebaseAuthUser || auth.currentUser || null;
   const hasFirebaseUser = Boolean(effectiveFirebaseUser);
   const effectiveAppUser = currentUser || (effectiveFirebaseUser ? createFallbackUserFromFirebase(effectiveFirebaseUser) : null);
-  const isLoggedIn = hasFirebaseUser;
+  const isLoggedIn = Boolean(effectiveFirebaseUser);
+  const isAuthBooting = authStatus === 'booting' || authStatus === 'checking-session' || isRedirectResultPending;
 
 
   useEffect(() => {
@@ -1738,7 +1741,7 @@ const App: React.FC = () => {
   };
 
   const cartItemCount = cart.reduce((total, item) => total + item.quantity, 0);
-  const authButtonLabel = isLoggedIn ? 'Profile' : rememberedAuthAccount ? 'Login' : 'Sign Up';
+  const authButtonLabel = isLoggedIn ? 'Profile' : rememberedAuthAccount ? `Continue as ${rememberedAuthAccount.name || rememberedAuthAccount.email.split('@')[0]}` : 'Login';
 
   // --- Auth Handlers ---
   const normalizePurchaseIds = (ids: unknown): number[] => normalizeSharedPurchaseIds(ids);
@@ -1788,14 +1791,16 @@ const App: React.FC = () => {
   });
 
   function createFallbackUserFromFirebase(firebaseUser: FirebaseUser): User {
-      const fallbackDisplayName = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student';
+      const fallbackDisplayName = firebaseUser.displayName || firebaseUser.email || 'Student';
+      const fallbackPhotoURL = getFirebaseUserPhotoURL(firebaseUser);
       return {
           uid: firebaseUser.uid,
           id: firebaseUser.uid,
           email: firebaseUser.email || '',
           displayName: fallbackDisplayName,
           name: fallbackDisplayName,
-          photoURL: getFirebaseUserPhotoURL(firebaseUser),
+          photoURL: fallbackPhotoURL,
+          avatarUrl: fallbackPhotoURL,
           role: 'student',
           isFallbackProfile: true,
       } as unknown as User;
@@ -2014,6 +2019,7 @@ const App: React.FC = () => {
       }
 
       try {
+          console.info('PURCHASE_RESTORE_START', { uid: firebaseUser.uid });
           setPurchaseStatus('loading');
           const profilePurchasedIds = normalizePurchaseIds((nextUser as any).purchasedProductIds);
           const restoredPurchasedIds = await restoreUserEntitlements(firebaseUser.uid);
@@ -2023,8 +2029,10 @@ const App: React.FC = () => {
           safeSetItem(`purchasedProducts:${firebaseUser.uid}`, initialPurchasedIds);
           rememberAndStoreUser(nextUser, firebaseUser);
           setPurchaseStatus('ready');
+          console.info('PURCHASE_RESTORE_DONE', { uid: firebaseUser.uid, count: initialPurchasedIds.length });
           console.info('AUTH_PURCHASES_READY', { uid: firebaseUser.uid, status: 'ready' });
       } catch (error) {
+          console.warn('PURCHASE_RESTORE_FAILED_NON_BLOCKING', error);
           console.warn('Purchase access restore failed; keeping login active.', error);
           setPurchaseStatus('error');
           setAuthRestoreError('Login restored, but purchases could not be refreshed. Showing saved purchases if available.');
@@ -2042,6 +2050,7 @@ const App: React.FC = () => {
       const fallbackUser = createFallbackUserFromFirebase(firebaseUser);
 
       console.info('AUTH_COMMIT_START', { uid, source });
+      committedFirebaseUidRef.current = firebaseUser.uid;
       setFirebaseAuthUser(firebaseUser);
       rememberAndStoreUser(fallbackUser, firebaseUser);
       setIsAuthStateReady(true);
@@ -2094,13 +2103,26 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-      console.info('AUTH_INIT_START');
-      setAuthStatus('checking-session');
-      console.info('LOGIN_START', { source: 'google-redirect' });
+      console.info('APP_START_PUBLIC_HOME');
+      const isReturningFromGoogleRedirect = consumeGoogleRedirectAttempt();
+      setAuthStatus(isReturningFromGoogleRedirect ? 'checking-session' : 'booting');
+      setIsAuthStateReady(false);
+      isRedirectResultPendingRef.current = isReturningFromGoogleRedirect;
+      setIsRedirectResultPending(isReturningFromGoogleRedirect);
+
+      const redirectTimeout = window.setTimeout(() => {
+          if (!isRedirectResultPendingRef.current) return;
+          console.info('GOOGLE_REDIRECT_TIMEOUT_PUBLIC_HOME');
+          isRedirectResultPendingRef.current = false;
+          setIsRedirectResultPending(false);
+          setAuthStatus(auth.currentUser ? 'authenticated' : 'unauthenticated');
+          setIsAuthStateReady(true);
+      }, 6000);
+
       void ensureAuthPersistence().then(() => getRedirectResult(auth)).then(async result => {
           if (result?.user) {
+              console.info('GOOGLE_REDIRECT_RESULT_USER', { uid: result.user.uid });
               setFirebaseAuthUser(result.user);
-              if (getIsMobileViewport()) setMobileAuthFlowState('completing-session');
               await result.user.getIdToken(true);
               console.info('LOGIN_FIREBASE_SUCCESS', { uid: result.user.uid, source: 'google-redirect' });
               const committedUser = await completeFirebaseUserSession(result.user, { redirect: false, source: 'google-redirect', explicit: true });
@@ -2108,49 +2130,39 @@ const App: React.FC = () => {
                   setAuthRestoreError('Google login could not be completed. Please try again.');
                   return;
               }
-              finishMobileAuthSuccess(committedUser);
               redirectAfterSuccessfulAuth({ source: 'google-redirect', user: committedUser, force: true });
+              return;
           }
+          console.info('GOOGLE_REDIRECT_RESULT_NULL_WAIT_FOR_LISTENER');
       }).catch(error => {
           console.warn('Google redirect result handling failed.', error);
           setAuthRestoreError(getFirebaseAuthErrorMessage(error));
-          if (getIsMobileViewport() && auth.currentUser) {
-              setMobileAuthFlowState('completing-session');
-              void completeFirebaseUserSession(auth.currentUser, { redirect: false, source: 'redirect-error-current-user' });
-          }
+          if (auth.currentUser) void completeFirebaseUserSession(auth.currentUser, { redirect: false, source: 'redirect-error-current-user' });
       }).finally(() => {
+          window.clearTimeout(redirectTimeout);
           isRedirectResultPendingRef.current = false;
           setIsRedirectResultPending(false);
+          setIsAuthStateReady(true);
+          if (!auth.currentUser && !committedFirebaseUidRef.current) setAuthStatus('unauthenticated');
       });
-      console.info('AUTH_OBSERVER_ATTACHED');
+
+      console.info('AUTH_LISTENER_ATTACHED');
       const unsubscribe = onAuthStateChanged(auth, user => {
           setAuthError(null);
-          console.info('AUTH_STATE_RESOLVED', { hasUser: Boolean(user), uid: user?.uid || null });
-          console.info('[mobile-auth]', { step: 'firebase-user-detected', hasFirebaseUser: Boolean(user) });
-          console.info('[mobile-auth]', {
-              step: 'auth-state-changed',
-              hasFirebaseUser: Boolean(user),
-              isMobileViewport: getIsMobileViewport(),
-          });
           if (user) {
               console.info('AUTH_LISTENER_USER', { uid: user.uid });
-              setIsAuthRestoring(true);
-              setAuthRestoreError(null);
-              if (getIsMobileViewport()) setMobileAuthFlowState('completing-session');
-              // No-gate startup: publish the Firebase user immediately so the homepage can
-              // render, then hydrate profile and entitlements in the background.
               void completeFirebaseUserSession(user, { source: 'auth-listener', explicit: false, redirect: false }).catch(error => {
                   console.warn('Firebase session restore failed.', error);
               });
               return;
           }
 
-          if (isRedirectResultPendingRef.current || authOperationInProgressRef.current) {
+          if (isRedirectResultPendingRef.current || authOperationInProgressRef.current || committedFirebaseUidRef.current) {
               console.info('AUTH_NULL_IGNORED_DURING_PENDING_OPERATION');
               return;
           }
 
-          console.info('AUTH_LISTENER_NULL_ACCEPTED');
+          console.info('AUTH_LISTENER_NULL_PUBLIC_HOME');
           setFirebaseAuthUser(null);
           setCurrentUser(null);
           setAuthStatus('unauthenticated');
@@ -2160,16 +2172,16 @@ const App: React.FC = () => {
           if (getIsMobileViewport()) setMobileAuthFlowState('logged-out');
       });
       return () => {
+          window.clearTimeout(redirectTimeout);
           unsubscribe();
           stopSessionWatchers();
       };
   }, []);
 
-
   useEffect(() => {
       if (!isMobileViewport) return;
       if (!isAuthStateReady) return;
-      if (!currentUser) return;
+      if (!isLoggedIn || !effectiveFirebaseUser || !currentUser) return;
 
       setMobileAuthFlowState('authenticated');
 
@@ -2179,7 +2191,7 @@ const App: React.FC = () => {
       }
 
       showMobileWelcomeAfterAuth(currentUser);
-  }, [isMobileViewport, isAuthStateReady, currentUser?.id, currentView]);
+  }, [isMobileViewport, isAuthStateReady, isLoggedIn, effectiveFirebaseUser?.uid, currentUser?.id, currentView]);
 
 
   useEffect(() => {
@@ -2203,6 +2215,25 @@ const App: React.FC = () => {
   const getFirebaseAuthErrorMessage = (error: any) => getFirebaseAuthErrorMessageFromCode(error);
 
 
+
+  const markGoogleRedirectAttempt = () => {
+      try {
+          sessionStorage.setItem(GOOGLE_REDIRECT_ATTEMPT_KEY, String(Date.now()));
+      } catch {
+          // Redirect marker is best-effort only.
+      }
+  };
+
+  const consumeGoogleRedirectAttempt = () => {
+      try {
+          const value = sessionStorage.getItem(GOOGLE_REDIRECT_ATTEMPT_KEY);
+          sessionStorage.removeItem(GOOGLE_REDIRECT_ATTEMPT_KEY);
+          return Boolean(value);
+      } catch {
+          return false;
+      }
+  };
+
   const shouldUseGoogleRedirect = () => {
       const userAgent = navigator.userAgent || '';
       const isSmallScreen = window.matchMedia?.('(max-width: 768px)').matches;
@@ -2216,13 +2247,9 @@ const App: React.FC = () => {
       setAuthRestoreError(null);
       beginAuthOperation();
       try {
-          const source = shouldUseGoogleRedirect() ? 'google-redirect' : 'google-popup';
-          console.info('LOGIN_START', { source });
+          const source = 'google-popup';
+          console.info('LOGIN_START', { source, mobileRedirectFallbackAvailable: shouldUseGoogleRedirect() });
           await ensureAuthPersistence();
-          if (source === 'google-redirect') {
-              await signInWithRedirect(auth, googleProvider);
-              return { success: true, message: 'Opening Google login...' };
-          }
           const credential = await signInWithPopup(auth, googleProvider);
           await credential.user.getIdToken(true);
           console.info('LOGIN_FIREBASE_SUCCESS', { uid: credential.user.uid, source: 'google-popup' });
@@ -2235,12 +2262,21 @@ const App: React.FC = () => {
           return { success: false, message: 'Login could not be completed. Please try again.' };
       } catch (error: any) {
           console.warn('Google login failed.', error);
-          if (error?.code === 'auth/popup-blocked') {
+          const shouldFallbackToRedirect = [
+              'auth/popup-blocked',
+              'auth/cancelled-popup-request',
+              'auth/operation-not-supported-in-this-environment',
+          ].includes(error?.code) || (shouldUseGoogleRedirect() && error?.code !== 'auth/popup-closed-by-user');
+          if (shouldFallbackToRedirect) {
               try {
                   console.info('LOGIN_START', { source: 'google-redirect' });
                   await ensureAuthPersistence();
+                  console.info('GOOGLE_REDIRECT_START');
+                  markGoogleRedirectAttempt();
+                  isRedirectResultPendingRef.current = true;
+                  setIsRedirectResultPending(true);
                   await signInWithRedirect(auth, googleProvider);
-                  return { success: true, message: getFirebaseAuthErrorMessage(error) };
+                  return { success: true, message: 'Opening Google login...' };
               } catch (redirectError) {
                   console.warn('Google redirect fallback failed.', redirectError);
                   return { success: false, message: getFirebaseAuthErrorMessage(redirectError) };
@@ -2363,6 +2399,7 @@ const App: React.FC = () => {
       };
       void cleanup();
       if (remoteSignOut) void signOut(auth).catch(error => console.warn('Firebase sign out failed.', error));
+      committedFirebaseUidRef.current = null;
       setFirebaseAuthUser(null);
       setCurrentUser(null);
       setMobileAuthFlowState('logged-out');
@@ -2430,14 +2467,12 @@ const App: React.FC = () => {
 
   const handleNavigateToProfile = () => {
     if (isLoggedIn) setCurrentView('profile');
-    else {
-      setAuthInitialMode(rememberedAuthAccount ? 'login' : 'signup');
-      setCurrentView('auth');
-    }
+    else openAuthPage(rememberedAuthAccount ? 'login' : 'signup');
     window.scrollTo(0, 0);
   };
 
   const openAuthPage = (mode: 'login' | 'signup' = rememberedAuthAccount ? 'login' : 'signup') => {
+    if (!auth.currentUser && !firebaseAuthUser && currentUser) setCurrentUser(null);
     setAuthInitialMode(mode);
     setCurrentView('auth');
   };
@@ -3350,14 +3385,13 @@ const App: React.FC = () => {
   const appleOpenClass = "animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]";
 
   const renderPage = () => {
-    const isAuthChecking = !isAuthStateReady || isRedirectResultPending || authStatus === 'checking-session';
+    const isAuthChecking = isAuthBooting && !isAuthStateReady;
     const isSignedIn = !isAuthChecking && hasFirebaseUser;
     const isSignedOut = !isAuthChecking && !hasFirebaseUser;
     const protectedViews = new Set(['profile', 'myPurchases', 'coursePlayer']);
     const requiresAuthForView = protectedViews.has(currentView);
-    console.info('ROUTE_GUARD_DECISION', { authReady: isAuthStateReady && !isRedirectResultPending, hasFirebaseUser, hasAppUser: Boolean(effectiveAppUser), authStatus, path: currentView });
-    console.info('AUTH_GATE_STATE', { authReady: isAuthStateReady && !isRedirectResultPending, hasFirebaseUser, hasAppUser: Boolean(effectiveAppUser), isAuthChecking, isSignedIn, isSignedOut, requiresAuthForView, path: currentView, authStatus });
-    if (isAuthChecking && currentView !== 'home') return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
+    console.info('AUTH_GATE_DECISION', { isLoggedIn, hasFirebaseUser, hasAppUser: Boolean(effectiveAppUser), currentView, isMobileViewport, authStatus, isRedirectResultPending });
+    if (isAuthChecking && requiresAuthForView) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
     if (currentView === 'auth' && !hasFirebaseUser) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (isSignedOut && requiresAuthForView) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={() => handleNavigateBack('home')} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
