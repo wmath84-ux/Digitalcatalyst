@@ -924,6 +924,8 @@ const App: React.FC = () => {
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup'>('login');
   const [isAuthStateReady, setIsAuthStateReady] = useState(false);
   const [isRedirectResultPending, setIsRedirectResultPending] = useState(true);
+  const isRedirectResultPendingRef = useRef(true);
+  const authOperationInProgressRef = useRef(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() => getIsMobileViewport());
   const [mobileAuthFlowState, setMobileAuthFlowState] = useState<MobileAuthFlowState>('checking');
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<FirebaseUser | null>(null);
@@ -2088,6 +2090,14 @@ const App: React.FC = () => {
 
   const ensureAuthPersistence = () => setPersistence(auth, browserLocalPersistence);
 
+  const beginAuthOperation = () => {
+      authOperationInProgressRef.current = true;
+  };
+
+  const endAuthOperation = () => {
+      authOperationInProgressRef.current = false;
+  };
+
   useEffect(() => {
       console.info('AUTH_INIT_START');
       setAuthStatus('checking-session');
@@ -2113,11 +2123,12 @@ const App: React.FC = () => {
               setMobileAuthFlowState('completing-session');
               void completeFirebaseUserSession(auth.currentUser, { redirect: false, source: 'redirect-error-current-user' });
           }
-      }).finally(() => setIsRedirectResultPending(false));
+      }).finally(() => {
+          isRedirectResultPendingRef.current = false;
+          setIsRedirectResultPending(false);
+      });
       console.info('AUTH_OBSERVER_ATTACHED');
       const unsubscribe = onAuthStateChanged(auth, user => {
-          setFirebaseAuthUser(user);
-          setIsAuthStateReady(true);
           setAuthError(null);
           console.info('AUTH_STATE_RESOLVED', { hasUser: Boolean(user), uid: user?.uid || null });
           console.info('[mobile-auth]', { step: 'firebase-user-detected', hasFirebaseUser: Boolean(user) });
@@ -2127,27 +2138,26 @@ const App: React.FC = () => {
               isMobileViewport: getIsMobileViewport(),
           });
           if (user) {
+              console.info('AUTH_LISTENER_USER', { uid: user.uid });
               setIsAuthRestoring(true);
               setAuthRestoreError(null);
               if (getIsMobileViewport()) setMobileAuthFlowState('completing-session');
-              const shouldCloseAuthViewAfterRestore = currentViewRef.current === 'auth';
-              void completeFirebaseUserSession(user, { redirect: false, source: 'auth-listener', explicit: shouldCloseAuthViewAfterRestore }).then(hydratedUser => {
-                  if (hydratedUser && currentViewRef.current === 'auth') {
-                      redirectAfterSuccessfulAuth({ source: 'session-restore', user: hydratedUser, force: true });
-                  }
-              }).catch(error => {
+              void completeFirebaseUserSession(user, { source: 'auth-listener', explicit: false, redirect: false }).catch(error => {
                   console.warn('Firebase session restore failed.', error);
               });
-          } else {
-              setCurrentUser(null);
-              setFirebaseAuthUser(null);
-              setPurchasedProductIds([]);
-              setProfileStatus('idle');
-              setPurchaseStatus('idle');
-              setAuthStatus('unauthenticated');
-              setIsAuthRestoring(false);
-              if (getIsMobileViewport()) setMobileAuthFlowState('logged-out');
+              return;
           }
+
+          if (isRedirectResultPendingRef.current || authOperationInProgressRef.current) {
+              console.info('AUTH_NULL_IGNORED_DURING_PENDING_OPERATION');
+              return;
+          }
+
+          console.info('AUTH_LISTENER_NULL_ACCEPTED');
+          setFirebaseAuthUser(null);
+          setCurrentUser(null);
+          setAuthStatus('unauthenticated');
+          setIsAuthStateReady(true);
       });
       return () => {
           unsubscribe();
@@ -2204,6 +2214,7 @@ const App: React.FC = () => {
   const handleGoogleLogin = async (): Promise<{ success: boolean, message: string }> => {
       setAuthError(null);
       setAuthRestoreError(null);
+      beginAuthOperation();
       try {
           const source = shouldUseGoogleRedirect() ? 'google-redirect' : 'google-popup';
           console.info('LOGIN_START', { source });
@@ -2236,10 +2247,13 @@ const App: React.FC = () => {
               }
           }
           return { success: false, message: getFirebaseAuthErrorMessage(error) };
+      } finally {
+          if (auth.currentUser || !isRedirectResultPendingRef.current) endAuthOperation();
       }
   };
 
   const handleEmailLogin = async (email: string, password: string): Promise<{ success: boolean, message: string }> => {
+      beginAuthOperation();
       try {
           const source = 'email-login';
           console.info('LOGIN_START', { source });
@@ -2256,10 +2270,13 @@ const App: React.FC = () => {
           return { success: false, message: 'Login could not be completed. Please try again.' };
       } catch (error) {
           return { success: false, message: getFirebaseAuthErrorMessage(error) };
+      } finally {
+          endAuthOperation();
       }
   };
 
   const handleEmailSignup = async (profile: { name: string; email: string; mobile: string }, password: string): Promise<{ success: boolean, message: string }> => {
+      beginAuthOperation();
       try {
           const source = 'email-signup';
           console.info('LOGIN_START', { source });
@@ -2277,6 +2294,8 @@ const App: React.FC = () => {
           return { success: false, message: 'Account could not be completed. Please try again.' };
       } catch (error) {
           return { success: false, message: getFirebaseAuthErrorMessage(error) };
+      } finally {
+          endAuthOperation();
       }
   };
 
