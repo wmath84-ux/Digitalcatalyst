@@ -47,6 +47,7 @@ import { getFirebaseAuthErrorMessageFromCode, mergePurchasedProductIds, normaliz
 
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
 const MOBILE_WELCOME_SESSION_KEY = 'digitalCatalyst.mobileWelcomeShown';
+const GOOGLE_REDIRECT_ATTEMPT_KEY = 'digitalCatalyst.googleRedirectAttempt';
 
 type MobileAuthFlowState = 'checking' | 'logged-out' | 'completing-session' | 'authenticated';
 type AuthStatus = 'booting' | 'checking-session' | 'unauthenticated' | 'authenticated' | 'hydrating' | 'logout' | 'error';
@@ -2101,8 +2102,11 @@ const App: React.FC = () => {
 
   useEffect(() => {
       console.info('APP_START_PUBLIC_HOME');
-      setAuthStatus('booting');
+      const isReturningFromGoogleRedirect = consumeGoogleRedirectAttempt();
+      setAuthStatus(isReturningFromGoogleRedirect ? 'checking-session' : 'booting');
       setIsAuthStateReady(false);
+      isRedirectResultPendingRef.current = isReturningFromGoogleRedirect;
+      setIsRedirectResultPending(isReturningFromGoogleRedirect);
 
       const redirectTimeout = window.setTimeout(() => {
           if (!isRedirectResultPendingRef.current) return;
@@ -2113,11 +2117,7 @@ const App: React.FC = () => {
           setIsAuthStateReady(true);
       }, 6000);
 
-      void ensureAuthPersistence().then(() => {
-          isRedirectResultPendingRef.current = true;
-          setIsRedirectResultPending(true);
-          return getRedirectResult(auth);
-      }).then(async result => {
+      void ensureAuthPersistence().then(() => getRedirectResult(auth)).then(async result => {
           if (result?.user) {
               console.info('GOOGLE_REDIRECT_RESULT_USER', { uid: result.user.uid });
               setFirebaseAuthUser(result.user);
@@ -2179,7 +2179,7 @@ const App: React.FC = () => {
   useEffect(() => {
       if (!isMobileViewport) return;
       if (!isAuthStateReady) return;
-      if (!currentUser) return;
+      if (!isLoggedIn || !effectiveFirebaseUser || !currentUser) return;
 
       setMobileAuthFlowState('authenticated');
 
@@ -2189,7 +2189,7 @@ const App: React.FC = () => {
       }
 
       showMobileWelcomeAfterAuth(currentUser);
-  }, [isMobileViewport, isAuthStateReady, currentUser?.id, currentView]);
+  }, [isMobileViewport, isAuthStateReady, isLoggedIn, effectiveFirebaseUser?.uid, currentUser?.id, currentView]);
 
 
   useEffect(() => {
@@ -2213,6 +2213,25 @@ const App: React.FC = () => {
   const getFirebaseAuthErrorMessage = (error: any) => getFirebaseAuthErrorMessageFromCode(error);
 
 
+
+  const markGoogleRedirectAttempt = () => {
+      try {
+          sessionStorage.setItem(GOOGLE_REDIRECT_ATTEMPT_KEY, String(Date.now()));
+      } catch {
+          // Redirect marker is best-effort only.
+      }
+  };
+
+  const consumeGoogleRedirectAttempt = () => {
+      try {
+          const value = sessionStorage.getItem(GOOGLE_REDIRECT_ATTEMPT_KEY);
+          sessionStorage.removeItem(GOOGLE_REDIRECT_ATTEMPT_KEY);
+          return Boolean(value);
+      } catch {
+          return false;
+      }
+  };
+
   const shouldUseGoogleRedirect = () => {
       const userAgent = navigator.userAgent || '';
       const isSmallScreen = window.matchMedia?.('(max-width: 768px)').matches;
@@ -2231,6 +2250,7 @@ const App: React.FC = () => {
           await ensureAuthPersistence();
           if (source === 'google-redirect') {
               console.info('GOOGLE_REDIRECT_START');
+              markGoogleRedirectAttempt();
               isRedirectResultPendingRef.current = true;
               setIsRedirectResultPending(true);
               await signInWithRedirect(auth, googleProvider);
@@ -2253,6 +2273,7 @@ const App: React.FC = () => {
                   console.info('LOGIN_START', { source: 'google-redirect' });
                   await ensureAuthPersistence();
                   console.info('GOOGLE_REDIRECT_START');
+                  markGoogleRedirectAttempt();
                   isRedirectResultPendingRef.current = true;
                   setIsRedirectResultPending(true);
                   await signInWithRedirect(auth, googleProvider);
@@ -2446,14 +2467,12 @@ const App: React.FC = () => {
 
   const handleNavigateToProfile = () => {
     if (isLoggedIn) setCurrentView('profile');
-    else {
-      setAuthInitialMode(rememberedAuthAccount ? 'login' : 'signup');
-      setCurrentView('auth');
-    }
+    else openAuthPage(rememberedAuthAccount ? 'login' : 'signup');
     window.scrollTo(0, 0);
   };
 
   const openAuthPage = (mode: 'login' | 'signup' = rememberedAuthAccount ? 'login' : 'signup') => {
+    if (!auth.currentUser && !firebaseAuthUser && currentUser) setCurrentUser(null);
     setAuthInitialMode(mode);
     setCurrentView('auth');
   };
