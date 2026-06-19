@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 
 interface UserAvatarProps {
   name?: string;
@@ -21,6 +21,10 @@ const getInitials = (name?: string, email?: string) => {
 const UserAvatar: React.FC<UserAvatarProps> = ({ name, email, photoURL, size = 40, className = '', imageClassName = '' }) => {
   const [hasImageError, setHasImageError] = useState(false);
   const initials = useMemo(() => getInitials(name, email), [name, email]);
+
+  useEffect(() => {
+    setHasImageError(false);
+  }, [photoURL]);
   const dimensionStyle = /(?:^|\s)!?[hw]-/.test(className) ? undefined : { width: size, height: size };
 
   if (photoURL && !hasImageError) {
