@@ -3,6 +3,7 @@ import type { ProductWithRating, User, WebsiteSettings } from '../App';
 
 interface BottomGlassDockProps {
   currentUser: User | null;
+  isLoggedIn: boolean;
   purchasedProducts: ProductWithRating[];
   cartCount: number;
   wishlistCount: number;
@@ -63,7 +64,7 @@ const hexToRgba = (hex: string, opacityPercent: number) => {
   return `rgba(${red}, ${green}, ${blue}, ${clampPercent(opacityPercent, defaultDockStyle.backgroundOpacity) / 100})`;
 };
 
-const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser, purchasedProducts, cartCount, wishlistCount, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity, authButtonLabel }) => {
+const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser, isLoggedIn, purchasedProducts, cartCount, wishlistCount, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity, authButtonLabel }) => {
   const defaultItems = useMemo(() => ([
     { label: 'Home', action: onHomeClick, icon: '🏠', badge: null },
     { label: 'Store', action: onNavigateToAllProducts, icon: '🛍️', badge: null },
@@ -74,15 +75,15 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
     ...(onOpenCommunity ? [{ label: 'Community', action: onOpenCommunity, icon: '💬', badge: null }] : []),
     { label: 'Blog', action: onOpenBlogModal, icon: '📝', badge: null },
     { label: 'Free', action: onOpenFreeModal, icon: '🎁', badge: null },
-    { label: currentUser ? 'Profile' : authButtonLabel, action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null },
-  ]), [onHomeClick, onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenCommunity, onOpenBlogModal, onOpenFreeModal, currentUser, authButtonLabel, onProfileClick]);
+    { label: isLoggedIn ? 'Profile' : authButtonLabel, action: onProfileClick, icon: isLoggedIn ? '🪙' : '🔐', badge: null },
+  ]), [onHomeClick, onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenCommunity, onOpenBlogModal, onOpenFreeModal, isLoggedIn, authButtonLabel, onProfileClick]);
   const configuredBase = ((settings.content as any).dockItems || dockCustomizationItems) as string[];
   const configuredWithHome = configuredBase.includes('Home') ? configuredBase : ['Home', ...configuredBase];
   const configured = configuredWithHome.filter((label, index, labels) => labels.indexOf(label) === index);
   const map: any = Object.fromEntries(defaultItems.map(i => [i.label, i]));
   map['Home'] = map['Home'] || { label: 'Home', action: onHomeClick, icon: '🏠', badge: null };
-  map['EduCoins'] = map['Profile'] || { label: currentUser ? 'Profile' : authButtonLabel, action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null };
-  map['Profile'] = map['Profile'] || { label: currentUser ? 'Profile' : authButtonLabel, action: onProfileClick, icon: currentUser ? '🪙' : '🔐', badge: null };
+  map['EduCoins'] = map['Profile'] || { label: isLoggedIn ? 'Profile' : authButtonLabel, action: onProfileClick, icon: isLoggedIn ? '🪙' : '🔐', badge: null };
+  map['Profile'] = map['Profile'] || { label: isLoggedIn ? 'Profile' : authButtonLabel, action: onProfileClick, icon: isLoggedIn ? '🪙' : '🔐', badge: null };
   map['Subscriptions'] = { label: 'Subscriptions', action: onSubscriptionClick, icon: '💎', badge: null };
   const items = configured.map((l) => map[l]).filter(Boolean);
   const dockStyle = { ...defaultDockStyle, ...((settings.content as any).dockStyle || {}) };

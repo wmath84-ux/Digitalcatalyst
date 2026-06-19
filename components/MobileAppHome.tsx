@@ -25,6 +25,7 @@ interface MobileAppHomeProps {
   onOpenNews: () => void;
   onCartClick: () => void;
   onProfileClick: () => void;
+  onAuthClick: (mode: 'login' | 'signup') => void;
 }
 
 const currency = (product: ProductWithRating) => product.salePrice || product.price || '₹0';
@@ -74,6 +75,7 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   onOpenNews,
   onCartClick,
   onProfileClick,
+  onAuthClick,
 }) => {
   const [query, setQuery] = useState('');
   const siteName = settings.content.siteName || 'Digital Catalyst';

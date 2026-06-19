@@ -37,7 +37,7 @@ import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
 import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
-import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { createUserWithEmailAndPassword, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
@@ -930,6 +930,10 @@ const App: React.FC = () => {
   const [purchasedProductIds, setPurchasedProductIds] = useState<number[]>([]);
   const [isAuthRestoring, setIsAuthRestoring] = useState(false);
   const [authRestoreError, setAuthRestoreError] = useState<string | null>(null);
+  const [authStatus, setAuthStatus] = useState<AuthStatus>('booting');
+  const [profileStatus, setProfileStatus] = useState<HydrationStatus>('idle');
+  const [purchaseStatus, setPurchaseStatus] = useState<HydrationStatus>('idle');
+  const [authError, setAuthError] = useState<string | null>(null);
   const [scrollToSection, setScrollToSection] = useState<string | null>(null);
   const [scrollToPolicySection, setScrollToPolicySection] = useState<string | null>(null);
   const [scrollToProductSection, setScrollToProductSection] = useState<string | null>(null);
@@ -1214,9 +1218,8 @@ const App: React.FC = () => {
     const storedReviews = localStorage.getItem('productReviews');
     if (storedReviews) setReviews(JSON.parse(storedReviews)); else setReviews(initialReviews);
     
-    // Purchases are authenticated state. Never hydrate global cached unlocks;
+    // Purchases are authenticated state. Never hydrate or clear global cached unlocks on startup;
     // Firestore entitlements are restored from Firebase Auth sessions only.
-    localStorage.removeItem('purchasedProducts');
 
     const storedCart = localStorage.getItem('shoppingCart');
     if (storedCart) setCart(JSON.parse(storedCart));
@@ -1265,9 +1268,6 @@ const App: React.FC = () => {
 
     const storedSubscribers = localStorage.getItem('newsletterSubscribers');
     if (storedSubscribers) setNewsletterSubscribers(JSON.parse(storedSubscribers));
-
-    localStorage.removeItem('currentUser');
-    localStorage.removeItem('purchasedProducts');
 
     const storedCurrentAdmin = localStorage.getItem('currentAdminUser');
     if (storedCurrentAdmin) {
@@ -1525,7 +1525,7 @@ const App: React.FC = () => {
 
   // --- Cart Handlers ---
   const handleAddToCart = (productId: number, quantity: number = 1) => {
-      if (!currentUser) {
+      if (!hasFirebaseUser) {
           setInfoModal({ title: 'Login required', message: 'Please login before adding products to cart.', icon: '🔐' });
           openAuthPage('login');
           return;
@@ -1572,7 +1572,7 @@ const App: React.FC = () => {
 
   const handleInitiateCheckout = () => {
     if (cart.length === 0) return;
-    if (!currentUser) {
+    if (!hasFirebaseUser) {
       setResumeCartCheckoutAfterLogin(true);
       setIsCartOpen(false);
       setIsCartPaymentModalOpen(false);
@@ -1601,7 +1601,7 @@ const App: React.FC = () => {
           finalDiscount = calculateDiscount(couponToApply, currentCartSubtotal);
       }
       const afterCoupon = Math.max(0, currentCartSubtotal - finalDiscount);
-      const safeAppliedCoins = Math.min(currentUser?.eduCoins || 0, Math.max(0, appliedCoins), Math.floor(afterCoupon * eduCoinRedeemRate));
+      const safeAppliedCoins = Math.min(effectiveAppUser?.eduCoins || 0, Math.max(0, appliedCoins), Math.floor(afterCoupon * eduCoinRedeemRate));
       const coinDiscount = Math.min(afterCoupon, safeAppliedCoins / eduCoinRedeemRate);
       const finalPrice = Math.max(0, afterCoupon - coinDiscount);
       if (safeAppliedCoins > 0 && !deductEduCoins(safeAppliedCoins, {
@@ -1619,7 +1619,7 @@ const App: React.FC = () => {
         console.warn('Cart entitlement write failed.', error);
         return;
       }
-      const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
+      const newPurchasedIds = mergePurchasedProductIds(purchasedProductIds, cart.map(item => item.productId));
       setPurchasedProductIds(newPurchasedIds);
       persistUserPurchasedProducts(newPurchasedIds);
 
@@ -1636,8 +1636,8 @@ const App: React.FC = () => {
 
       const newOrder: Order = {
         id: `DC-${Date.now()}`,
-        customerName: currentUser?.name || currentUser?.email.split('@')[0] || 'Valued Customer',
-        customerEmail: currentUser?.email || 'customer@example.com',
+        customerName: effectiveAppUser?.name || effectiveAppUser?.email.split('@')[0] || 'Valued Customer',
+        customerEmail: effectiveAppUser?.email || 'customer@example.com',
         date: new Date().toISOString().split('T')[0],
         total: `₹${finalPrice.toFixed(2)}${safeAppliedCoins > 0 ? ` (🪙 ${safeAppliedCoins} applied)` : ''}`,
         status: 'Completed',
@@ -1693,7 +1693,7 @@ const App: React.FC = () => {
   const cartCouponDiscount = appliedCartCoupon ? calculateDiscount(appliedCartCoupon, cartSubtotal) : 0;
   const cartAfterCoupon = Math.max(0, cartSubtotal - cartCouponDiscount);
   const eduCoinRedeemRate = Math.max(1, Number(economySettings.coinToFiatRatio));
-  const cartAppliedEduCoins = applyCartEduCoins ? Math.min(currentUser?.eduCoins || 0, Math.floor(cartAfterCoupon * eduCoinRedeemRate)) : 0;
+  const cartAppliedEduCoins = applyCartEduCoins ? Math.min(effectiveAppUser?.eduCoins || 0, Math.floor(cartAfterCoupon * eduCoinRedeemRate)) : 0;
   const cartEduCoinDiscount = Math.min(cartAfterCoupon, cartAppliedEduCoins / eduCoinRedeemRate);
   const cartFinalPrice = Math.max(0, cartAfterCoupon - cartEduCoinDiscount);
 
@@ -1729,9 +1729,22 @@ const App: React.FC = () => {
   const authButtonLabel = currentUser ? 'Profile' : rememberedAuthAccount ? 'Login' : 'Sign Up';
 
   // --- Auth Handlers ---
-  const normalizePurchaseIds = (ids: unknown): number[] => {
-      if (!Array.isArray(ids)) return [];
-      return [...new Set(ids.map(id => Number(id)).filter(id => Number.isFinite(id)))];
+  const normalizePurchaseIds = (ids: unknown): number[] => normalizeSharedPurchaseIds(ids);
+
+  const getFirebaseAuthProvider = (firebaseUser: FirebaseUser): 'google' | 'password' =>
+      firebaseUser.providerData.some(provider => provider.providerId === GoogleAuthProvider.PROVIDER_ID) ? 'google' : 'password';
+
+  const getProviderIds = (firebaseUser: FirebaseUser): string[] =>
+      [...new Set(firebaseUser.providerData.map(provider => provider.providerId).filter(Boolean))];
+
+  const getFirebaseUserPhotoURL = (firebaseUser: FirebaseUser): string =>
+      firebaseUser.photoURL || firebaseUser.providerData.find(provider => Boolean(provider.photoURL))?.photoURL || '';
+
+  const shouldReplaceProfilePhoto = (existingPhotoURL: unknown, nextPhotoURL: string) => {
+      if (!nextPhotoURL) return false;
+      const existingPhoto = typeof existingPhotoURL === 'string' ? existingPhotoURL : '';
+      if (!existingPhoto) return true;
+      return existingPhoto.includes('googleusercontent.com') || existingPhoto === nextPhotoURL;
   };
 
   const getFirebaseAuthProvider = (firebaseUser: FirebaseUser): 'google' | 'password' =>
@@ -1762,6 +1775,8 @@ const App: React.FC = () => {
       emailVerified: data.emailVerified ?? firebaseUser.emailVerified,
       role: data.role === 'admin' ? 'admin' : 'user',
       status: data.status === 'blocked' ? 'blocked' : 'active',
+      blocked: data.blocked === true,
+      suspended: data.suspended === true,
       createdAt: data.createdAt || new Date().toISOString(),
       lastLoginAt: new Date().toISOString(),
       eduCoins: data.eduCoins ?? 120,
@@ -1775,6 +1790,35 @@ const App: React.FC = () => {
       profileStreakClaims: data.profileStreakClaims || {},
       coinTransactions: data.coinTransactions || [],
   });
+
+  function createFallbackUserFromFirebase(firebaseUser: FirebaseUser): User {
+      const fallbackDisplayName = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student';
+      return {
+          uid: firebaseUser.uid,
+          id: firebaseUser.uid,
+          email: firebaseUser.email || '',
+          displayName: fallbackDisplayName,
+          name: fallbackDisplayName,
+          photoURL: getFirebaseUserPhotoURL(firebaseUser),
+          role: 'student',
+          isFallbackProfile: true,
+      } as unknown as User;
+  }
+
+
+  const rememberAndStoreUser = (user: User, firebaseUser: FirebaseUser) => {
+      saveRememberedAuthAccount({ uid: user.id, email: user.email, name: user.name, photoURL: user.photoURL || getFirebaseUserPhotoURL(firebaseUser), providerIds: user.providerIds, authProvider: user.authProvider });
+      setRememberedAuthAccount(getRememberedAuthAccount());
+      setCurrentUser(user);
+      setUsers(current => current.some(existingUser => existingUser.id === user.id) ? current.map(existingUser => existingUser.id === user.id ? user : existingUser) : [...current, user]);
+  };
+
+  const unlockMobileAuthWithUser = (firebaseUser: FirebaseUser, user: User) => {
+      if (!getIsMobileViewport()) return;
+      setFirebaseAuthUser(firebaseUser);
+      rememberAndStoreUser(user, firebaseUser);
+      finishMobileAuthSuccess(user);
+  };
 
   const ensureUserProfile = async (firebaseUser: FirebaseUser, profile?: { name?: string; mobile?: string }): Promise<User> => {
       const userRef = doc(db, 'users', firebaseUser.uid);
@@ -1824,20 +1868,17 @@ const App: React.FC = () => {
       const userDoc = await getDoc(doc(db, 'users', uid));
       const idsFromUserDoc = normalizePurchaseIds(userDoc.exists() ? userDoc.data()?.purchasedProductIds : []);
       const purchasesSnapshot = await getDocs(collection(db, 'users', uid, 'purchases'));
-      const validStatuses = new Set(['Completed', 'Verified', 'Active']);
       const idsFromPurchaseDocs = normalizePurchaseIds(purchasesSnapshot.docs
-        .filter(item => validStatuses.has(String(item.data()?.status || '')))
+        .filter(item => shouldRestoreEntitlementStatus(item.data()?.status))
         .map(item => item.data()?.productId ?? item.id));
-      return [...new Set([...idsFromUserDoc, ...idsFromPurchaseDocs])];
+      return mergePurchasedProductIds(idsFromUserDoc, idsFromPurchaseDocs);
   };
 
-  // Frontend-only session locking improves UX, but is not fully tamper-proof.
-  // Stronger enforcement should use Cloud Functions/Admin SDK to revoke old refresh tokens when a new session starts.
+  // Frontend session locking is disabled. Firebase Auth is the source of truth on the client.
+  // Any single-device enforcement must happen on a secure backend/Admin SDK, not from Firestore snapshots.
   const stopSessionWatchers = () => {
       sessionUnsubscribeRef.current?.();
       sessionUnsubscribeRef.current = null;
-      if (sessionHeartbeatRef.current) window.clearInterval(sessionHeartbeatRef.current);
-      sessionHeartbeatRef.current = null;
   };
 
   const getOrCreateDeviceSessionId = () => {
@@ -1848,30 +1889,14 @@ const App: React.FC = () => {
       return sessionId;
   };
 
-  const writeCurrentSession = async (uid: string, sessionId: string) => {
-      const sessionRef = doc(db, 'users', uid, 'session', 'current');
-      const now = serverTimestamp();
-      await setDoc(sessionRef, {
-          uid,
-          sessionId,
-          deviceLabel: navigator.platform || 'Unknown device',
-          userAgent: navigator.userAgent,
-          startedAt: now,
-          lastSeenAt: now,
-      }, { merge: false });
+  const writeCurrentSession = async (_uid: string, _sessionId: string) => {
+      // Frontend session locking is disabled; never mutate users/{uid}/session/current from the client.
+      return;
   };
 
   const clearCurrentSessionDocument = async () => {
-      const uid = activeSessionUidRef.current;
-      const sessionId = activeSessionIdRef.current;
-      if (!uid || !sessionId) return;
-      const sessionRef = doc(db, 'users', uid, 'session', 'current');
-      try {
-          const snapshot = await getDoc(sessionRef);
-          if (snapshot.exists() && snapshot.data()?.sessionId === sessionId) await deleteDoc(sessionRef);
-      } catch (error) {
-          console.warn('Session cleanup failed.', error);
-      }
+      // Frontend session locking is disabled; never mutate users/{uid}/session/current from the client.
+      return;
   };
 
   const subscribeToCurrentSession = (uid: string, sessionId: string) => {
@@ -1880,15 +1905,14 @@ const App: React.FC = () => {
       sessionUnsubscribeRef.current = onSnapshot(sessionRef, snapshot => {
           const remoteSessionId = snapshot.data()?.sessionId;
           if (remoteSessionId && remoteSessionId !== sessionId) {
-              stopSessionWatchers();
-              void signOut(auth).catch(error => console.warn('Firebase sign out failed after session takeover.', error));
-              handleLogout(false, { preserveSessionDocument: true });
-              setInfoModal({ title: 'Logged out', message: 'You were logged out because this account was opened on another device.', icon: '🔒' });
+              console.warn('IGNORED_STALE_SESSION_MISMATCH', {
+                  uid,
+                  localSessionId: sessionId,
+                  remoteSessionId,
+              });
+              return;
           }
-      }, error => console.warn('Session listener failed.', error));
-      sessionHeartbeatRef.current = window.setInterval(() => {
-          updateDoc(sessionRef, { lastSeenAt: serverTimestamp() }).catch(error => console.warn('Session heartbeat failed.', error));
-      }, 45000);
+      }, error => console.warn('Session listener failed; keeping Firebase Auth session active.', error));
   };
 
 
@@ -2023,7 +2047,16 @@ const App: React.FC = () => {
           setAuthRestoreError(getFirebaseAuthErrorMessage(error));
       });
       const unsubscribe = onAuthStateChanged(auth, user => {
+          setAuthError(null);
+          console.info('AUTH_STATE_RESOLVED', { hasUser: Boolean(user), uid: user?.uid || null });
+          console.info('[mobile-auth]', { step: 'firebase-user-detected', hasFirebaseUser: Boolean(user) });
+          console.info('[mobile-auth]', {
+              step: 'auth-state-changed',
+              hasFirebaseUser: Boolean(user),
+              isMobileViewport: getIsMobileViewport(),
+          });
           if (user) {
+              console.info('AUTH_LISTENER_USER', { uid: user.uid });
               setIsAuthRestoring(true);
               setAuthRestoreError(null);
               void completeFirebaseUserSession(user, { redirect: false }).then(hydratedUser => {
@@ -2083,13 +2116,8 @@ const App: React.FC = () => {
           'auth/operation-not-allowed': 'Google login is not enabled. Enable Google provider in Firebase Console.',
       };
 
-      const code = typeof error?.code === 'string'
-          ? error.code
-          : typeof error?.message === 'string'
-              ? error.message.match(/\((auth\/[^)]+)\)/)?.[1]
-              : undefined;
+  const getFirebaseAuthErrorMessage = (error: any) => getFirebaseAuthErrorMessageFromCode(error);
 
-      if (code && firebaseAuthErrorMessages[code]) return firebaseAuthErrorMessages[code];
 
       return 'Unable to continue with Google right now. Please try again.';
   };
@@ -2129,25 +2157,39 @@ const App: React.FC = () => {
   };
 
   const handleEmailLogin = async (email: string, password: string): Promise<{ success: boolean, message: string }> => {
+      beginAuthOperation();
       try {
+          const source = 'email-login';
+          console.info('LOGIN_START', { source });
+          await ensureAuthPersistence();
           const credential = await signInWithEmailAndPassword(auth, email, password);
           const hydratedUser = await completeFirebaseUserSession(credential.user, { redirect: false, profile: { name: credential.user.displayName || undefined, mobile: credential.user.phoneNumber || undefined } });
           if (hydratedUser) redirectAfterSuccessfulAuth({ source: 'email-login', user: hydratedUser, force: true });
           return { success: true, message: 'Login successful.' };
       } catch (error) {
           return { success: false, message: getFirebaseAuthErrorMessage(error) };
+      } finally {
+          endAuthOperation();
       }
   };
 
   const handleEmailSignup = async (profile: { name: string; email: string; mobile: string }, password: string): Promise<{ success: boolean, message: string }> => {
+      beginAuthOperation();
       try {
+          const source = 'email-signup';
+          console.info('LOGIN_START', { source });
+          await ensureAuthPersistence();
           const credential = await createUserWithEmailAndPassword(auth, profile.email, password);
+          await credential.user.getIdToken(true);
+          console.info('LOGIN_FIREBASE_SUCCESS', { uid: credential.user.uid, source });
           await updateProfile(credential.user, { displayName: profile.name });
           const hydratedUser = await completeFirebaseUserSession(credential.user, { redirect: false, profile });
           if (hydratedUser) redirectAfterSuccessfulAuth({ source: 'email-signup', user: hydratedUser, force: true });
           return { success: true, message: 'Account created successfully.' };
       } catch (error) {
           return { success: false, message: getFirebaseAuthErrorMessage(error) };
+      } finally {
+          endAuthOperation();
       }
   };
 
@@ -2205,6 +2247,7 @@ const App: React.FC = () => {
   };
 
   const handleLogout = (remoteSignOut = true, options: { preserveSessionDocument?: boolean } = {}) => {
+      setAuthStatus('logout');
       const cleanup = async () => {
           stopSessionWatchers();
           if (!options.preserveSessionDocument) await clearCurrentSessionDocument();
@@ -2214,7 +2257,9 @@ const App: React.FC = () => {
       };
       void cleanup();
       if (remoteSignOut) void signOut(auth).catch(error => console.warn('Firebase sign out failed.', error));
+      setFirebaseAuthUser(null);
       setCurrentUser(null);
+      setMobileAuthFlowState('logged-out');
       setPurchasedProductIds([]);
       setIsAuthRestoring(false);
       setAuthRestoreError(null);
@@ -2434,7 +2479,7 @@ const App: React.FC = () => {
       { amount: coinReward, type: 'credit', source: 'Milestone unlocked', description: `Unlocked: ${reward.title}${coinReward ? ` (+${coinReward} EduCoins)` : ''}` },
     );
     if (reward.unlockProductIds?.length) {
-      const nextPurchasedIds = [...new Set([...purchasedProductIds, ...reward.unlockProductIds])];
+      const nextPurchasedIds = mergePurchasedProductIds(purchasedProductIds, reward.unlockProductIds);
       setPurchasedProductIds(nextPurchasedIds);
       persistUserPurchasedProducts(nextPurchasedIds);
     }
@@ -2496,7 +2541,7 @@ const App: React.FC = () => {
   const handleBuyNowProduct = (product: ProductWithRating) => {
     setQuickViewProduct(null);
     setIsFreeModalOpen(false);
-    if (!currentUser) {
+    if (!hasFirebaseUser) {
       handleLoginRequired(product);
       return;
     }
@@ -2539,9 +2584,9 @@ const App: React.FC = () => {
   };
   
   const handleViewPurchasedProduct = (product: ProductWithRating) => {
-    if (!currentUser || !purchasedProductIds.includes(product.id)) {
+    if (!hasFirebaseUser || !purchasedProductIds.includes(product.id)) {
       setSelectedProduct(null);
-      setCurrentView(currentUser ? 'myPurchases' : 'auth');
+      setCurrentView(hasFirebaseUser ? 'myPurchases' : 'auth');
       window.scrollTo(0, 0);
       return;
     }
@@ -2579,7 +2624,7 @@ const App: React.FC = () => {
           console.warn('Purchase entitlement write failed.', error);
           return;
         }
-        const newPurchasedIds = [...new Set([...purchasedProductIds, selectedProduct.id])];
+        const newPurchasedIds = mergePurchasedProductIds(purchasedProductIds, [selectedProduct.id]);
         setPurchasedProductIds(newPurchasedIds);
         persistUserPurchasedProducts(newPurchasedIds);
         const purchaseCoins = Math.max(0, Number(economySettings.coinPerPurchase));
@@ -2591,8 +2636,8 @@ const App: React.FC = () => {
 
         const newOrder: Order = {
             id: `DC-${Date.now()}`,
-            customerName: currentUser?.name || currentUser?.email.split('@')[0] || 'Valued Customer',
-            customerEmail: currentUser?.email || 'customer@example.com',
+            customerName: effectiveAppUser?.name || effectiveAppUser?.email.split('@')[0] || 'Valued Customer',
+            customerEmail: effectiveAppUser?.email || 'customer@example.com',
             date: new Date().toISOString().split('T')[0],
             total: `₹${robustFinalPrice.toFixed(2)}${coinDiscount > 0 ? ` (🪙 ${activeCoinDiscount?.coins || 0} applied)` : ''}`,
             status: 'Completed',
@@ -2638,13 +2683,13 @@ const App: React.FC = () => {
       console.warn('Purchase entitlement write failed.', error);
       return false;
     }
-    const newPurchasedIds = [...new Set([...purchasedProductIds, product.id])];
+    const newPurchasedIds = mergePurchasedProductIds(purchasedProductIds, [product.id]);
     setPurchasedProductIds(newPurchasedIds);
     persistUserPurchasedProducts(newPurchasedIds);
     addGlobalOrder({
       id: `DC-${Date.now()}`,
-      customerName: currentUser?.name || currentUser?.email.split('@')[0] || 'Valued Customer',
-      customerEmail: currentUser?.email || 'customer@example.com',
+      customerName: effectiveAppUser?.name || effectiveAppUser?.email.split('@')[0] || 'Valued Customer',
+      customerEmail: effectiveAppUser?.email || 'customer@example.com',
       date: new Date().toISOString().split('T')[0],
       total: totalLabel,
       status,
@@ -2673,7 +2718,7 @@ const App: React.FC = () => {
       setInfoModal({ title: 'EduCoin checkout unavailable', message: 'This product does not have an EduCoin price configured yet.', icon: '🪙' });
       return false;
     }
-    const liveCoinBalance = currentUser.eduCoins || 0;
+    const liveCoinBalance = effectiveAppUser?.eduCoins || 0;
     if (liveCoinBalance < totalCoinPrice) {
       return false;
     }
@@ -2688,10 +2733,10 @@ const App: React.FC = () => {
   };
 
   const handleConfirmCartCoinPurchase = async () => {
-    if (!currentUser || cartDetails.length === 0) return false;
+    if (!hasFirebaseUser || cartDetails.length === 0) return false;
     const totalCoinPrice = cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0);
     const allCoinEnabled = cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0);
-    const liveCoinBalance = currentUser.eduCoins || 0;
+    const liveCoinBalance = effectiveAppUser?.eduCoins || 0;
     if (!allCoinEnabled || !totalCoinPrice || liveCoinBalance < totalCoinPrice) {
       return false;
     }
@@ -2710,13 +2755,13 @@ const App: React.FC = () => {
       console.warn('Cart entitlement write failed.', error);
       return false;
     }
-    const newPurchasedIds = [...new Set([...purchasedProductIds, ...cart.map(item => item.productId)])];
+    const newPurchasedIds = mergePurchasedProductIds(purchasedProductIds, cart.map(item => item.productId));
     setPurchasedProductIds(newPurchasedIds);
     persistUserPurchasedProducts(newPurchasedIds);
     addGlobalOrder({
       id: `DC-${Date.now()}`,
-      customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
-      customerEmail: currentUser.email || 'customer@example.com',
+      customerName: effectiveAppUser?.name || effectiveAppUser?.email?.split('@')[0] || 'Valued Customer',
+      customerEmail: effectiveAppUser?.email || 'customer@example.com',
       date: new Date().toISOString().split('T')[0],
       total: `🪙 ${totalCoinPrice}`,
       status: 'Completed',
@@ -2788,7 +2833,7 @@ const App: React.FC = () => {
 
 
   const unlockSubscriptionPlan = (plan: any, paymentLabel = 'Fiat checkout') => {
-    const newPurchasedIds = [...new Set([...purchasedProductIds, ...plan.unlockProductIds])];
+    const newPurchasedIds = mergePurchasedProductIds(purchasedProductIds, plan.unlockProductIds || []);
     setPurchasedProductIds(newPurchasedIds);
     persistUserPurchasedProducts(newPurchasedIds);
     setInfoModal({ title: 'Subscription active', message: `${plan.name} activated successfully via ${paymentLabel}.`, icon: '✅' });
@@ -2848,8 +2893,8 @@ const App: React.FC = () => {
     unlockSubscriptionPlan(plan, paymentLabel);
     addGlobalOrder({
       id: `DC-SUB-${Date.now()}`,
-      customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
-      customerEmail: currentUser.email || 'customer@example.com',
+      customerName: effectiveAppUser?.name || effectiveAppUser?.email?.split('@')[0] || 'Valued Customer',
+      customerEmail: effectiveAppUser?.email || 'customer@example.com',
       date: new Date().toISOString().split('T')[0],
       total: paymentLabel,
       status: 'Completed',
@@ -2882,8 +2927,8 @@ const App: React.FC = () => {
     unlockSubscriptionPlan(plan, paymentLabel);
     addGlobalOrder({
       id: `DC-SUB-${Date.now()}`,
-      customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
-      customerEmail: currentUser.email || 'customer@example.com',
+      customerName: effectiveAppUser?.name || effectiveAppUser?.email?.split('@')[0] || 'Valued Customer',
+      customerEmail: effectiveAppUser?.email || 'customer@example.com',
       date: new Date().toISOString().split('T')[0],
       total: `🪙 ${coinPrice}`,
       status: 'Completed',
@@ -3099,6 +3144,17 @@ const App: React.FC = () => {
       </div>
   );
 
+
+  const renderMobileSessionStatus = (title: string, message: string, icon = '⏳') => (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-16">
+          <div className="max-w-md w-full bg-white/80 backdrop-blur-xl border border-slate-200 rounded-3xl shadow-[0_20px_70px_rgba(15,23,42,0.08)] p-8 text-center">
+              <div className="w-16 h-16 mx-auto mb-5 rounded-full bg-indigo-50 flex items-center justify-center text-3xl">{icon}</div>
+              <h2 className="text-2xl font-bold text-slate-900 mb-3">{title}</h2>
+              <p className="text-slate-600">{message}</p>
+          </div>
+      </div>
+  );
+
   const renderHomePageContent = () => {
       const visibleHomeSections = websiteSettings.layout.filter(section => section.visible);
       const topRatedSection = visibleHomeSections.find(section => section.id === 'topRated');
@@ -3128,13 +3184,13 @@ const App: React.FC = () => {
       );
   };
 
-  const renderContent = () => {
+  const renderContent = (appUser: User | null = currentUser) => {
     switch (currentView) {
-      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!currentUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={currentUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
+      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
       case 'coursePlayer':
         if (isAuthRestoring || authRestoreError) return renderAuthRestoreStatus();
-        return currentUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={() => handleNavigateBack('myPurchases')} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} /> : renderAuthRestoreStatus();
-      case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={currentUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
+        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={() => handleNavigateBack('myPurchases')} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} /> : renderAuthRestoreStatus();
+      case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={appUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
       case 'myPurchases': return currentUser ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
@@ -3166,6 +3222,7 @@ const App: React.FC = () => {
               onOpenNews={() => openReadingHub('news')}
               onCartClick={() => setIsCartOpen(true)}
               onProfileClick={handleNavigateToProfile}
+              onAuthClick={openAuthPage}
             />
           </div>
           <div className="hidden md:block">{renderHomePageContent()}</div>
@@ -3184,8 +3241,8 @@ const App: React.FC = () => {
     if (currentView === 'auth') return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
-    if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent()}</div>;
-    if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity onClose={() => handleNavigateBack('home')}  isAuthenticated={Boolean(currentUser)} /></div>;
+    if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent(effectiveAppUser)}</div>;
+    if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity onClose={() => handleNavigateBack('home')}  isAuthenticated={isLoggedIn} /></div>;
 
     return (
        <ErrorBoundary>
@@ -3195,7 +3252,7 @@ const App: React.FC = () => {
             {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={currentUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={currentUser?.eduCoins || 0} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
-            {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins)} currentUser={currentUser} coinPrice={cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={handleConfirmCartCoinPurchase} onInsufficientCoins={handleInsufficientEduCoins} />}
+            {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins)} currentUser={effectiveAppUser} coinPrice={cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={handleConfirmCartCoinPurchase} onInsufficientCoins={handleInsufficientEduCoins} />}
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={currentUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
