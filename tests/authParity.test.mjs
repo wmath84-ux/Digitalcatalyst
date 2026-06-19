@@ -22,3 +22,17 @@ test('login failure and locked account rules are shared', () => {
   assert.equal(getFirebaseAuthErrorMessageFromCode({ code: 'auth/invalid-credential' }), 'Invalid email or password. Please check your details.');
   assert.equal(getFirebaseAuthErrorMessageFromCode({ message: 'Firebase: Error (auth/too-many-requests).' }), 'Too many attempts. Please wait and try again.');
 });
+
+
+test('restored entitlement ids merge consistently for homepage unlocks', () => {
+  const desktopCachedIds = [7, '8', 8, null, undefined];
+  const mobileRestoredIds = ['8', '9', 'bad', 9];
+  const profileIds = [7, 10, '10'];
+  assert.deepEqual(mergePurchasedProductIds(desktopCachedIds, mobileRestoredIds, profileIds), [7, 8, 9, 10]);
+});
+
+test('google and password auth errors map through shared Firebase auth messages', () => {
+  assert.equal(getFirebaseAuthErrorMessageFromCode({ code: 'auth/popup-closed-by-user' }), 'Google login was cancelled.');
+  assert.equal(getFirebaseAuthErrorMessageFromCode({ code: 'auth/email-already-in-use' }), 'This email already has an account. Please login instead or use password reset.');
+  assert.equal(getFirebaseAuthErrorMessageFromCode({ code: 'auth/wrong-password' }), 'Incorrect password.');
+});
