@@ -983,6 +983,11 @@ const App: React.FC = () => {
   const [isSavingMobileCompletion, setIsSavingMobileCompletion] = useState(false);
   const [hasSkippedMobileCompletion, setHasSkippedMobileCompletion] = useState(false);
 
+  const effectiveFirebaseUser = firebaseAuthUser || auth.currentUser;
+  const hasFirebaseUser = Boolean(effectiveFirebaseUser);
+  const effectiveAppUser = currentUser || (effectiveFirebaseUser ? createFallbackUserFromFirebase(effectiveFirebaseUser) : null);
+  const isLoggedIn = hasFirebaseUser;
+
 
   useEffect(() => {
     const updateMobileViewport = () => setIsMobileViewport(getIsMobileViewport());
@@ -1536,7 +1541,7 @@ const App: React.FC = () => {
 
   // --- Cart Handlers ---
   const handleAddToCart = (productId: number, quantity: number = 1) => {
-      if (!currentUser) {
+      if (!hasFirebaseUser) {
           setInfoModal({ title: 'Login required', message: 'Please login before adding products to cart.', icon: '🔐' });
           openAuthPage('login');
           return;
@@ -1579,11 +1584,11 @@ const App: React.FC = () => {
     setMobileCompletionError('Please add your 10 digit mobile number before purchases or profile-sensitive actions.');
   };
 
-  const requiresMobileCompletion = () => Boolean(currentUser && !currentUser.mobile);
+  const requiresMobileCompletion = () => Boolean(isLoggedIn && effectiveAppUser && !effectiveAppUser.mobile);
 
   const handleInitiateCheckout = () => {
     if (cart.length === 0) return;
-    if (!currentUser) {
+    if (!hasFirebaseUser) {
       setResumeCartCheckoutAfterLogin(true);
       setIsCartOpen(false);
       setIsCartPaymentModalOpen(false);
@@ -1612,7 +1617,7 @@ const App: React.FC = () => {
           finalDiscount = calculateDiscount(couponToApply, currentCartSubtotal);
       }
       const afterCoupon = Math.max(0, currentCartSubtotal - finalDiscount);
-      const safeAppliedCoins = Math.min(currentUser?.eduCoins || 0, Math.max(0, appliedCoins), Math.floor(afterCoupon * eduCoinRedeemRate));
+      const safeAppliedCoins = Math.min(effectiveAppUser?.eduCoins || 0, Math.max(0, appliedCoins), Math.floor(afterCoupon * eduCoinRedeemRate));
       const coinDiscount = Math.min(afterCoupon, safeAppliedCoins / eduCoinRedeemRate);
       const finalPrice = Math.max(0, afterCoupon - coinDiscount);
       if (safeAppliedCoins > 0 && !deductEduCoins(safeAppliedCoins, {
@@ -1621,7 +1626,7 @@ const App: React.FC = () => {
       })) return;
       // --- End of recalculation ---
 
-      if (!currentUser || !auth.currentUser) { openAuthPage('login'); return; }
+      if (!hasFirebaseUser || !auth.currentUser) { openAuthPage('login'); return; }
       const orderId = `DC-${Date.now()}`;
       try {
         await Promise.all(cartDetails.map(item => persistPurchaseEntitlement(auth.currentUser!.uid, item.product, { quantity: item.quantity, total: `₹${finalPrice.toFixed(2)}`, source: 'razorpay', orderId })));
@@ -1647,8 +1652,8 @@ const App: React.FC = () => {
 
       const newOrder: Order = {
         id: `DC-${Date.now()}`,
-        customerName: currentUser?.name || currentUser?.email.split('@')[0] || 'Valued Customer',
-        customerEmail: currentUser?.email || 'customer@example.com',
+        customerName: effectiveAppUser?.name || effectiveAppUser?.email.split('@')[0] || 'Valued Customer',
+        customerEmail: effectiveAppUser?.email || 'customer@example.com',
         date: new Date().toISOString().split('T')[0],
         total: `₹${finalPrice.toFixed(2)}${safeAppliedCoins > 0 ? ` (🪙 ${safeAppliedCoins} applied)` : ''}`,
         status: 'Completed',
@@ -1704,7 +1709,7 @@ const App: React.FC = () => {
   const cartCouponDiscount = appliedCartCoupon ? calculateDiscount(appliedCartCoupon, cartSubtotal) : 0;
   const cartAfterCoupon = Math.max(0, cartSubtotal - cartCouponDiscount);
   const eduCoinRedeemRate = Math.max(1, Number(economySettings.coinToFiatRatio));
-  const cartAppliedEduCoins = applyCartEduCoins ? Math.min(currentUser?.eduCoins || 0, Math.floor(cartAfterCoupon * eduCoinRedeemRate)) : 0;
+  const cartAppliedEduCoins = applyCartEduCoins ? Math.min(effectiveAppUser?.eduCoins || 0, Math.floor(cartAfterCoupon * eduCoinRedeemRate)) : 0;
   const cartEduCoinDiscount = Math.min(cartAfterCoupon, cartAppliedEduCoins / eduCoinRedeemRate);
   const cartFinalPrice = Math.max(0, cartAfterCoupon - cartEduCoinDiscount);
 
@@ -1737,7 +1742,7 @@ const App: React.FC = () => {
   };
 
   const cartItemCount = cart.reduce((total, item) => total + item.quantity, 0);
-  const authButtonLabel = currentUser ? 'Profile' : rememberedAuthAccount ? 'Login' : 'Sign Up';
+  const authButtonLabel = isLoggedIn ? 'Profile' : rememberedAuthAccount ? 'Login' : 'Sign Up';
 
   // --- Auth Handlers ---
   const normalizePurchaseIds = (ids: unknown): number[] => normalizeSharedPurchaseIds(ids);
@@ -1784,7 +1789,7 @@ const App: React.FC = () => {
       coinTransactions: data.coinTransactions || [],
   });
 
-  const createFallbackUserFromFirebase = (firebaseUser: FirebaseUser): User => {
+  function createFallbackUserFromFirebase(firebaseUser: FirebaseUser): User {
       const fallbackDisplayName = firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Student';
       return {
           uid: firebaseUser.uid,
@@ -1796,7 +1801,7 @@ const App: React.FC = () => {
           role: 'student',
           isFallbackProfile: true,
       } as unknown as User;
-  };
+  }
 
 
   const rememberAndStoreUser = (user: User, firebaseUser: FirebaseUser) => {
@@ -2429,7 +2434,7 @@ const App: React.FC = () => {
   };
 
   const handleNavigateToProfile = () => {
-    if (currentUser) setCurrentView('profile');
+    if (isLoggedIn) setCurrentView('profile');
     else {
       setAuthInitialMode(rememberedAuthAccount ? 'login' : 'signup');
       setCurrentView('auth');
@@ -2650,7 +2655,7 @@ const App: React.FC = () => {
   const handleBuyNowProduct = (product: ProductWithRating) => {
     setQuickViewProduct(null);
     setIsFreeModalOpen(false);
-    if (!currentUser) {
+    if (!hasFirebaseUser) {
       handleLoginRequired(product);
       return;
     }
@@ -2674,7 +2679,7 @@ const App: React.FC = () => {
   };
 
   const handleApplyCoinClaim = (claim: ActiveCoinDiscount) => {
-    if (!currentUser) { openAuthPage('login'); return; }
+    if (!hasFirebaseUser) { openAuthPage('login'); return; }
     setActiveCoinDiscount(claim);
     if (claim.targetType === 'product' && claim.productId) {
       const product = productsWithRatings.find(item => item.id === claim.productId);
@@ -2693,9 +2698,9 @@ const App: React.FC = () => {
   };
   
   const handleViewPurchasedProduct = (product: ProductWithRating) => {
-    if (!currentUser || !purchasedProductIds.includes(product.id)) {
+    if (!hasFirebaseUser || !purchasedProductIds.includes(product.id)) {
       setSelectedProduct(null);
-      setCurrentView(currentUser ? 'myPurchases' : 'auth');
+      setCurrentView(hasFirebaseUser ? 'myPurchases' : 'auth');
       window.scrollTo(0, 0);
       return;
     }
@@ -2724,7 +2729,7 @@ const App: React.FC = () => {
           setActiveCoinDiscount(null);
         }
 
-        if (!currentUser || !auth.currentUser) { openAuthPage('login'); return; }
+        if (!hasFirebaseUser || !auth.currentUser) { openAuthPage('login'); return; }
         const orderId = `DC-${Date.now()}`;
         try {
           await persistPurchaseEntitlement(auth.currentUser.uid, selectedProduct, { quantity, total: `₹${robustFinalPrice.toFixed(2)}`, source: 'razorpay', orderId });
@@ -2745,8 +2750,8 @@ const App: React.FC = () => {
 
         const newOrder: Order = {
             id: `DC-${Date.now()}`,
-            customerName: currentUser?.name || currentUser?.email.split('@')[0] || 'Valued Customer',
-            customerEmail: currentUser?.email || 'customer@example.com',
+            customerName: effectiveAppUser?.name || effectiveAppUser?.email.split('@')[0] || 'Valued Customer',
+            customerEmail: effectiveAppUser?.email || 'customer@example.com',
             date: new Date().toISOString().split('T')[0],
             total: `₹${robustFinalPrice.toFixed(2)}${coinDiscount > 0 ? ` (🪙 ${activeCoinDiscount?.coins || 0} applied)` : ''}`,
             status: 'Completed',
@@ -2783,7 +2788,7 @@ const App: React.FC = () => {
   };
   
   const completeProductUnlock = async (product: ProductWithRating, quantity: number, totalLabel: string, status: Order['status'] = 'Completed') => {
-    if (!currentUser || !auth.currentUser) { openAuthPage('login'); return false; }
+    if (!hasFirebaseUser || !auth.currentUser) { openAuthPage('login'); return false; }
     const orderId = `DC-${Date.now()}`;
     try {
       await persistPurchaseEntitlement(auth.currentUser.uid, product, { quantity, total: totalLabel, source: 'educoin', orderId, status: status as 'Completed' | 'Verified' | 'Active' });
@@ -2797,8 +2802,8 @@ const App: React.FC = () => {
     persistUserPurchasedProducts(newPurchasedIds);
     addGlobalOrder({
       id: `DC-${Date.now()}`,
-      customerName: currentUser?.name || currentUser?.email.split('@')[0] || 'Valued Customer',
-      customerEmail: currentUser?.email || 'customer@example.com',
+      customerName: effectiveAppUser?.name || effectiveAppUser?.email.split('@')[0] || 'Valued Customer',
+      customerEmail: effectiveAppUser?.email || 'customer@example.com',
       date: new Date().toISOString().split('T')[0],
       total: totalLabel,
       status,
@@ -2821,13 +2826,13 @@ const App: React.FC = () => {
   };
 
   const handleProductCoinPurchase = async (product: ProductWithRating, quantity: number): Promise<boolean> => {
-    if (!currentUser) { openAuthPage('login'); window.scrollTo(0, 0); return false; }
+    if (!hasFirebaseUser) { openAuthPage('login'); window.scrollTo(0, 0); return false; }
     const totalCoinPrice = resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity;
     if (!totalCoinPrice) {
       setInfoModal({ title: 'EduCoin checkout unavailable', message: 'This product does not have an EduCoin price configured yet.', icon: '🪙' });
       return false;
     }
-    const liveCoinBalance = currentUser.eduCoins || 0;
+    const liveCoinBalance = effectiveAppUser?.eduCoins || 0;
     if (liveCoinBalance < totalCoinPrice) {
       return false;
     }
@@ -2842,10 +2847,10 @@ const App: React.FC = () => {
   };
 
   const handleConfirmCartCoinPurchase = async () => {
-    if (!currentUser || cartDetails.length === 0) return false;
+    if (!hasFirebaseUser || cartDetails.length === 0) return false;
     const totalCoinPrice = cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0);
     const allCoinEnabled = cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0);
-    const liveCoinBalance = currentUser.eduCoins || 0;
+    const liveCoinBalance = effectiveAppUser?.eduCoins || 0;
     if (!allCoinEnabled || !totalCoinPrice || liveCoinBalance < totalCoinPrice) {
       return false;
     }
@@ -2869,8 +2874,8 @@ const App: React.FC = () => {
     persistUserPurchasedProducts(newPurchasedIds);
     addGlobalOrder({
       id: `DC-${Date.now()}`,
-      customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
-      customerEmail: currentUser.email || 'customer@example.com',
+      customerName: effectiveAppUser?.name || effectiveAppUser?.email?.split('@')[0] || 'Valued Customer',
+      customerEmail: effectiveAppUser?.email || 'customer@example.com',
       date: new Date().toISOString().split('T')[0],
       total: `🪙 ${totalCoinPrice}`,
       status: 'Completed',
@@ -2949,7 +2954,7 @@ const App: React.FC = () => {
   };
 
   const handleActivateSubscription = (plan: any, appliedCouponCode?: string | null) => {
-    if (!currentUser) { openAuthPage('login'); return; }
+    if (!hasFirebaseUser) { openAuthPage('login'); return; }
 
     const planPrice = Number(plan.price || 0);
     const couponToApply = appliedCouponCode ? coupons.find(c => c.code.trim().toUpperCase() === appliedCouponCode.trim().toUpperCase()) : null;
@@ -3002,8 +3007,8 @@ const App: React.FC = () => {
     unlockSubscriptionPlan(plan, paymentLabel);
     addGlobalOrder({
       id: `DC-SUB-${Date.now()}`,
-      customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
-      customerEmail: currentUser.email || 'customer@example.com',
+      customerName: effectiveAppUser?.name || effectiveAppUser?.email?.split('@')[0] || 'Valued Customer',
+      customerEmail: effectiveAppUser?.email || 'customer@example.com',
       date: new Date().toISOString().split('T')[0],
       total: paymentLabel,
       status: 'Completed',
@@ -3028,7 +3033,7 @@ const App: React.FC = () => {
   };
 
   const handleActivateSubscriptionWithCoins = (plan: any) => {
-    if (!currentUser) { openAuthPage('login'); return; }
+    if (!hasFirebaseUser) { openAuthPage('login'); return; }
     const coinPrice = activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(plan.id) ? activeCoinDiscount.coins : resolveCoinPrice(plan.coinPrice, economySettings, 'subscription', plan.id);
     if (!coinPrice || !deductEduCoins(coinPrice, { source: 'Subscription EduCoin purchase', description: `Activated ${plan.name} with EduCoins` })) return;
     if (activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(plan.id)) setActiveCoinDiscount(null);
@@ -3036,8 +3041,8 @@ const App: React.FC = () => {
     unlockSubscriptionPlan(plan, paymentLabel);
     addGlobalOrder({
       id: `DC-SUB-${Date.now()}`,
-      customerName: currentUser.name || currentUser.email?.split('@')[0] || 'Valued Customer',
-      customerEmail: currentUser.email || 'customer@example.com',
+      customerName: effectiveAppUser?.name || effectiveAppUser?.email?.split('@')[0] || 'Valued Customer',
+      customerEmail: effectiveAppUser?.email || 'customer@example.com',
       date: new Date().toISOString().split('T')[0],
       total: `🪙 ${coinPrice}`,
       status: 'Completed',
@@ -3295,19 +3300,19 @@ const App: React.FC = () => {
 
   const renderContent = (appUser: User | null = currentUser) => {
     switch (currentView) {
-      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={!!appUser} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
+      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
       case 'coursePlayer':
         if (isAuthRestoring || authRestoreError) return renderAuthRestoreStatus();
-        return appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={() => handleNavigateBack('myPurchases')} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} /> : renderAuthRestoreStatus();
+        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={() => handleNavigateBack('myPurchases')} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} /> : renderAuthRestoreStatus();
       case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={appUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
       case 'myPurchases':
         if (!isAuthStateReady) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
-        return appUser ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+        return isLoggedIn ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
       case 'profile':
         if (!isAuthStateReady) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
-        return appUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={appUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+        return isLoggedIn && appUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={appUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={() => handleNavigateBack('home')} onActivatePlan={handleActivateSubscription} currentUser={appUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={() => handleNavigateBack('home')} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;
@@ -3318,6 +3323,7 @@ const App: React.FC = () => {
               settings={websiteSettings}
               rememberedAccount={rememberedAuthAccount}
               currentUser={appUser}
+              isLoggedIn={isLoggedIn}
               purchasedProducts={purchasedProducts}
               topRatedProducts={topRatedProducts}
               visibleProducts={visibleProducts}
@@ -3348,9 +3354,6 @@ const App: React.FC = () => {
   const appleOpenClass = "animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]";
 
   const renderPage = () => {
-    const effectiveFirebaseUser = firebaseAuthUser || auth.currentUser;
-    const effectiveAppUser = currentUser || (effectiveFirebaseUser ? createFallbackUserFromFirebase(effectiveFirebaseUser) : null);
-    const hasFirebaseUser = Boolean(effectiveFirebaseUser);
     const isAuthChecking = !isAuthStateReady || isRedirectResultPending || authStatus === 'checking-session';
     const isSignedIn = !isAuthChecking && hasFirebaseUser;
     const isSignedOut = !isAuthChecking && !hasFirebaseUser;
@@ -3364,14 +3367,14 @@ const App: React.FC = () => {
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent(effectiveAppUser)}</div>;
-    if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity onClose={() => handleNavigateBack('home')}  isAuthenticated={Boolean(effectiveAppUser)} /></div>;
+    if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity onClose={() => handleNavigateBack('home')}  isAuthenticated={isLoggedIn} /></div>;
 
     return (
        <ErrorBoundary>
          <div className="font-sans">
             <WelcomeOverlay onAnimationComplete={playWelcomeVoice} />
-            <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
-            {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />}
+            <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
+            {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={effectiveAppUser?.eduCoins || 0} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
             {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins)} currentUser={effectiveAppUser} coinPrice={cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={handleConfirmCartCoinPurchase} onInsufficientCoins={handleInsufficientEduCoins} />}

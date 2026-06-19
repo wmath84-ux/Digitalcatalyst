@@ -7,6 +7,7 @@ import { ProductImageSlot, getProductImage } from '../utils/productImages';
 interface MobileAppHomeProps {
   settings: WebsiteSettings;
   currentUser: User | null;
+  isLoggedIn: boolean;
   rememberedAccount?: RememberedAuthAccount | null;
   purchasedProducts: ProductWithRating[];
   topRatedProducts: ProductWithRating[];
@@ -56,6 +57,7 @@ const SectionHead: React.FC<{ title: string; subtitle?: string; onViewAll?: () =
 const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   settings,
   currentUser,
+  isLoggedIn,
   rememberedAccount,
   purchasedProducts,
   topRatedProducts,
@@ -110,7 +112,7 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
           <p className="text-[11px] font-bold text-[#64708F]">Premium learning store</p>
         </div>
         <button type="button" onClick={onCartClick} className="relative grid h-10 w-10 place-items-center rounded-2xl border border-[#D8E6FF] bg-[#F5F9FF] text-lg text-[#081A44]">🛒{cartCount > 0 ? <span className="absolute -right-1 -top-1 rounded-full bg-[#0B63FF] px-1.5 text-[10px] font-black text-white">{cartCount}</span> : null}</button>
-        {currentUser ? (
+        {isLoggedIn && currentUser ? (
           <>
             <button type="button" onClick={onProfileClick} className="grid h-10 w-10 place-items-center rounded-2xl border border-[#D8E6FF] bg-white text-lg" aria-label="Open profile"><UserAvatar name={currentUser.name} email={currentUser.email} photoURL={resolvedPhotoURL} size={34} /></button>
             <button type="button" onClick={onProfileClick} className="flex h-10 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 text-xs font-black text-[#081A44]">🪙 {coins}</button>
