@@ -37,7 +37,7 @@ import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
 import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
-import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
+import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { browserLocalPersistence, createUserWithEmailAndPassword, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
@@ -973,7 +973,6 @@ const App: React.FC = () => {
   const activeSessionIdRef = useRef<string | null>(null);
   const activeSessionUidRef = useRef<string | null>(null);
   const sessionUnsubscribeRef = useRef<(() => void) | null>(null);
-  const sessionHeartbeatRef = useRef<ReturnType<typeof window.setInterval> | null>(null);
   const sessionCompletionRef = useRef<{ uid: string; startedAt: number } | null>(null);
   const sessionCompletionPromiseRef = useRef<Promise<User | null> | null>(null);
   const lastCompletedSessionRef = useRef<{ uid: string; at: number } | null>(null);
@@ -1884,8 +1883,6 @@ const App: React.FC = () => {
   const stopSessionWatchers = () => {
       sessionUnsubscribeRef.current?.();
       sessionUnsubscribeRef.current = null;
-      if (sessionHeartbeatRef.current) window.clearInterval(sessionHeartbeatRef.current);
-      sessionHeartbeatRef.current = null;
   };
 
   const getOrCreateDeviceSessionId = () => {
@@ -1896,17 +1893,9 @@ const App: React.FC = () => {
       return sessionId;
   };
 
-  const writeCurrentSession = async (uid: string, sessionId: string) => {
-      const sessionRef = doc(db, 'users', uid, 'session', 'current');
-      const now = serverTimestamp();
-      await setDoc(sessionRef, {
-          uid,
-          sessionId,
-          deviceLabel: navigator.platform || 'Unknown device',
-          userAgent: navigator.userAgent,
-          startedAt: now,
-          lastSeenAt: now,
-      }, { merge: false });
+  const writeCurrentSession = async (_uid: string, _sessionId: string) => {
+      // Frontend session locking is disabled; never mutate users/{uid}/session/current from the client.
+      return;
   };
 
   const clearCurrentSessionDocument = async () => {
@@ -1928,9 +1917,6 @@ const App: React.FC = () => {
               return;
           }
       }, error => console.warn('Session listener failed; keeping Firebase Auth session active.', error));
-      sessionHeartbeatRef.current = window.setInterval(() => {
-          updateDoc(sessionRef, { lastSeenAt: serverTimestamp() }).catch(error => console.warn('Session heartbeat failed.', error));
-      }, 45000);
   };
 
 
