@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ActiveCoinDiscount, ProductWithRating, Review, Coupon, WebsiteSettings, PriceHistoryEntry, User } from '../App';
 import { EconomySettings, resolveCoinPrice } from '../utils/economy';
-import { unlockProductWithCoins } from '../utils/coinWallet';
+import { getProductCoinPrice, redeemProductWithEduCoins, watchUserCoinWallet } from '../utils/coinWallet';
 import PaymentModal from './PaymentModal';
 import RatingsAndReviews from './RatingsAndReviews';
 import FeaturedProducts from './FeaturedProducts';
@@ -131,6 +131,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [isCoinButtonChecking, setIsCoinButtonChecking] = useState(false);
+  const [liveCoinPrice, setLiveCoinPrice] = useState(0);
+  const [isCoinRedeemEnabled, setIsCoinRedeemEnabled] = useState(true);
+  const [liveUserCoinBalance, setLiveUserCoinBalance] = useState(0);
+  const [isRedeemingWithCoins, setIsRedeemingWithCoins] = useState(false);
+  const [coinRedeemModal, setCoinRedeemModal] = useState<{ open: boolean; title: string; message: string; showProfileButton?: boolean; }>({ open: false, title: '', message: '' });
   const [openCoinGuideOnMount, setOpenCoinGuideOnMount] = useState(false);
   const [openRazorpayOnMount, setOpenRazorpayOnMount] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
@@ -280,6 +285,35 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     }
   }, [modalOpen]);
 
+  useEffect(() => {
+    const productId = String(product?.id || '');
+    if (!productId) return;
+
+    getProductCoinPrice(productId)
+      .then((coinConfig) => {
+        setLiveCoinPrice(coinConfig.coinPrice);
+        setIsCoinRedeemEnabled(coinConfig.isCoinRedeemEnabled && coinConfig.status === 'active');
+      })
+      .catch((error) => {
+        console.error('Failed to load product EduCoin price:', error);
+      });
+  }, [product?.id]);
+
+  useEffect(() => {
+    const userId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
+    if (!userId) {
+      setLiveUserCoinBalance(0);
+      return;
+    }
+
+    const unsubscribe = watchUserCoinWallet(userId, (wallet) => {
+      setLiveUserCoinBalance(wallet.coinBalance);
+    });
+
+    return () => unsubscribe();
+  }, [currentUser?.uid, currentUser?.id]);
+
+
   const handleBuyClick = () => {
     if (!isLoggedIn) {
       onLoginRequired();
@@ -292,8 +326,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     setModalOpen(true);
   };
 
-  const productCoinPrice = resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id);
-  const userCoinBalance = (currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0;
+  const productCoinPrice = liveCoinPrice || resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id);
+  const userCoinBalance = liveUserCoinBalance || ((currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0);
   const requiredProductCoins = Math.max(0, productCoinPrice * quantity);
   const missingProductCoins = Math.max(0, requiredProductCoins - userCoinBalance);
   const coinCheckoutDisabled = isCoinButtonChecking || isPurchased || requiredProductCoins <= 0 || userCoinBalance < requiredProductCoins;
@@ -309,76 +343,46 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const handleEduCoinButtonClick = async () => {
     if (!isLoggedIn || !currentUser) {
-      onLoginRequired();
+      setCoinRedeemModal({ open: true, title: 'Login required', message: 'Please login to redeem this product with EduCoins.', showProfileButton: false });
       return;
     }
 
-    const userId = currentUser.uid || currentUser.id;
-    const requiredCoins = Math.max(0, productCoinPrice * quantity);
-    const missingCoins = Math.max(0, requiredCoins - userCoinBalance);
-
+    const userId = currentUser.uid || (currentUser.id ? String(currentUser.id) : '');
+    const productId = String(product?.id || '');
     if (!userId) {
       onLoginRequired();
       return;
     }
+    if (!productId || isRedeemingWithCoins) return;
 
-    if (requiredCoins <= 0) {
-      alert('Coin checkout is not enabled for this product.');
-      return;
-    }
+    try {
+      setIsRedeemingWithCoins(true);
+      setIsCoinButtonChecking(true);
+      const result = await redeemProductWithEduCoins({ userId, productId });
 
-    if (isPurchased) {
-      alert('Course already unlocked.');
-      return;
-    }
-
-    if (userCoinBalance < requiredCoins) {
-      if (onInsufficientCoins) {
-        onInsufficientCoins({
-          requiredCoins,
-          balance: userCoinBalance,
-          missingCoins,
-          productTitle: product.title,
-        });
+      if (result.success) {
+        if (onCoinPurchase) await onCoinPurchase(product, quantity);
+        setCoinRedeemModal({ open: true, title: 'Product unlocked successfully', message: 'Your EduCoins were deducted and this product is now unlocked.', showProfileButton: false });
+        window.setTimeout(() => window.location.reload(), 900);
         return;
       }
 
-      setOpenCoinGuideOnMount(true);
-      setModalOpen(true);
-      return;
-    }
-
-    try {
-      setIsCoinButtonChecking(true);
-      window.scrollTo(0, 0);
-
-      await unlockProductWithCoins({
-        userId,
-        productId: product.id,
-        productTitle: product.title,
-        requiredCoins,
-      });
-
-      if (onCoinPurchase) {
-        await onCoinPurchase(product, quantity);
+      if (result.reason === 'not_enough_coins') {
+        setCoinRedeemModal({ open: true, title: 'Not enough EduCoins', message: 'Check profile page to know how to earn coin efficiently.', showProfileButton: true });
+        return;
       }
 
-      alert(`Course unlocked successfully with ${requiredCoins} coins.`);
-    } catch (error: any) {
-      const message = error?.message || 'Coin unlock failed. Try again.';
-      if (message.toLowerCase().includes('insufficient')) {
-        if (onInsufficientCoins) {
-          onInsufficientCoins({
-            requiredCoins,
-            balance: userCoinBalance,
-            missingCoins,
-            productTitle: product.title,
-          });
-          return;
-        }
+      if (result.reason === 'already_unlocked') {
+        setCoinRedeemModal({ open: true, title: 'Already unlocked', message: 'You already have access to this product.', showProfileButton: false });
+        return;
       }
-      alert(message);
+
+      setCoinRedeemModal({ open: true, title: 'EduCoin redeem not available', message: 'This product cannot be redeemed with EduCoins right now.', showProfileButton: false });
+    } catch (error) {
+      console.error('EduCoin redeem failed:', error);
+      setCoinRedeemModal({ open: true, title: 'Redeem failed', message: 'Something went wrong. Please try again.', showProfileButton: false });
     } finally {
+      setIsRedeemingWithCoins(false);
       setIsCoinButtonChecking(false);
     }
   };
@@ -593,11 +597,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     {isPurchased ? 'Purchased' : 'Pay with Razorpay'}
                   </button>
                   {onCoinPurchase && productCoinPrice > 0 && (
-                    <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
-                      {coinCheckoutLabel}
+                    <button disabled={!isCoinRedeemEnabled || isRedeemingWithCoins || liveCoinPrice <= 0} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
+                      {isRedeemingWithCoins ? 'Unlocking...' : isCoinRedeemEnabled ? `Pay with ${liveCoinPrice || requiredProductCoins} EduCoins` : 'EduCoin redeem not available'}
                       {requiredProductCoins > 0 && (
                         <span className="mt-2 block text-xs font-bold text-slate-600">
-                          Balance: {userCoinBalance} coins
+                          Your balance: {userCoinBalance} EduCoins
                           {missingProductCoins > 0 ? ` • Missing: ${missingProductCoins}` : ' • Ready to unlock'}
                         </span>
                       )}
@@ -655,6 +659,23 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             title={product.title}
             onClose={() => setIsShareModalOpen(false)}
         />
+      )}
+
+      {coinRedeemModal.open && (
+        <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/50 p-4 sm:items-center">
+          <div className="w-full max-w-md rounded-3xl bg-white p-5 shadow-2xl">
+            <div className="mb-4">
+              <h3 className="text-lg font-bold text-slate-900">{coinRedeemModal.title}</h3>
+              <p className="mt-2 text-sm text-slate-600">{coinRedeemModal.message}</p>
+            </div>
+            <div className="flex gap-3">
+              {coinRedeemModal.showProfileButton && (
+                <button type="button" onClick={() => { window.location.href = '/profile'; }} className="flex-1 rounded-full bg-blue-600 px-4 py-3 text-sm font-bold text-white">Go to Profile</button>
+              )}
+              <button type="button" onClick={() => setCoinRedeemModal({ open: false, title: '', message: '' })} className="flex-1 rounded-full border border-slate-200 px-4 py-3 text-sm font-bold text-slate-700">Close</button>
+            </div>
+          </div>
+        </div>
       )}
 
     </>
