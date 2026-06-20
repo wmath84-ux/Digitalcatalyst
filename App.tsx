@@ -938,6 +938,8 @@ const App: React.FC = () => {
   const isRedirectResultPendingRef = useRef(false);
   const authOperationInProgressRef = useRef(false);
   const committedFirebaseUidRef = useRef<string | null>(null);
+  const logoutInProgressRef = useRef(false);
+  const [isLocalLogoutPending, setIsLocalLogoutPending] = useState(false);
   const [isMobileViewport, setIsMobileViewport] = useState(() => getIsMobileViewport());
   const [mobileAuthFlowState, setMobileAuthFlowState] = useState<MobileAuthFlowState>('checking');
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<FirebaseUser | null>(null);
@@ -992,8 +994,9 @@ const App: React.FC = () => {
   const [mobileCompletionInput, setMobileCompletionInput] = useState('');
   const [mobileCompletionError, setMobileCompletionError] = useState('');
   const [isSavingMobileCompletion, setIsSavingMobileCompletion] = useState(false);
+  const [isMobileCompletionModalOpen, setIsMobileCompletionModalOpen] = useState(false);
 
-  const effectiveFirebaseUser = firebaseAuthUser || auth.currentUser || null;
+  const effectiveFirebaseUser = isLocalLogoutPending ? null : (firebaseAuthUser || auth.currentUser || null);
   const hasFirebaseUser = Boolean(effectiveFirebaseUser);
   const effectiveAppUser = currentUser || (effectiveFirebaseUser ? createFallbackUserFromFirebase(effectiveFirebaseUser) : null);
   const isLoggedIn = Boolean(effectiveFirebaseUser);
@@ -1586,11 +1589,33 @@ const App: React.FC = () => {
       setCart(prevCart => prevCart.filter(item => item.productId !== productId));
   };
 
+  const getNormalizedMobile = (mobile?: string | null) => String(mobile || '').replace(/\D/g, '').slice(-10);
+
+  const hasCompletedMobile = (user?: Pick<User, 'mobile'> | null) => getNormalizedMobile(user?.mobile).length === 10;
+
   const promptForMobileCompletion = () => {
+    setIsMobileCompletionModalOpen(true);
     setMobileCompletionError('Please add your 10 digit mobile number before purchases or profile-sensitive actions.');
   };
 
-  const requiresMobileCompletion = () => Boolean(isLoggedIn && effectiveAppUser && !effectiveAppUser.mobile);
+  const requiresMobileCompletion = () => Boolean(isLoggedIn && effectiveAppUser && !hasCompletedMobile(effectiveAppUser));
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setIsMobileCompletionModalOpen(false);
+      setMobileCompletionError('');
+      setMobileCompletionInput('');
+      return;
+    }
+    if (!effectiveAppUser) return;
+    if (hasCompletedMobile(effectiveAppUser)) {
+      setIsMobileCompletionModalOpen(false);
+      setMobileCompletionError('');
+      setMobileCompletionInput('');
+      return;
+    }
+    setIsMobileCompletionModalOpen(true);
+  }, [isLoggedIn, effectiveAppUser?.id, effectiveAppUser?.mobile]);
 
   const handleInitiateCheckout = () => {
     if (cart.length === 0) return;
@@ -2007,6 +2032,10 @@ const App: React.FC = () => {
       try {
           setProfileStatus('loading');
           const ensuredUser = await ensureUserProfile(firebaseUser, profile);
+          if (logoutInProgressRef.current || auth.currentUser?.uid !== firebaseUser.uid) {
+              console.info('AUTH_HYDRATION_CANCELLED_AFTER_LOGOUT', { uid: firebaseUser.uid });
+              return null;
+          }
           if (isBlockedUserProfile(ensuredUser)) {
               console.warn('AUTO_SIGNOUT_BLOCKED_REASON', { uid: firebaseUser.uid, status: ensuredUser.status });
               await signOut(auth);
@@ -2023,6 +2052,11 @@ const App: React.FC = () => {
           setProfileStatus('fallback');
           setAuthRestoreError('Login restored. Profile sync will retry when the database is reachable.');
           console.info('AUTH_PROFILE_READY', { uid: firebaseUser.uid, status: 'fallback' });
+      }
+
+      if (logoutInProgressRef.current || auth.currentUser?.uid !== firebaseUser.uid) {
+          console.info('AUTH_HYDRATION_CANCELLED_AFTER_LOGOUT', { uid: firebaseUser.uid });
+          return null;
       }
 
       try {
@@ -2045,6 +2079,10 @@ const App: React.FC = () => {
           setAuthRestoreError('Login restored, but purchases could not be refreshed. Showing saved purchases if available.');
           console.info('AUTH_PURCHASES_READY', { uid: firebaseUser.uid, status: 'error' });
       }
+      if (logoutInProgressRef.current || auth.currentUser?.uid !== firebaseUser.uid) {
+          console.info('AUTH_HYDRATION_CANCELLED_AFTER_LOGOUT', { uid: firebaseUser.uid });
+          return null;
+      }
       setAuthStatus('authenticated');
       console.info('AUTH_COMPLETE_DONE', { uid: firebaseUser.uid });
       return nextUser;
@@ -2054,9 +2092,12 @@ const App: React.FC = () => {
       if (!firebaseUser) return null;
       const { redirect = true, profile, source = 'unknown' } = options;
       const uid = firebaseUser.uid;
+      if (logoutInProgressRef.current) return null;
       const fallbackUser = createFallbackUserFromFirebase(firebaseUser);
 
       console.info('AUTH_COMMIT_START', { uid, source });
+      logoutInProgressRef.current = false;
+      setIsLocalLogoutPending(false);
       committedFirebaseUidRef.current = firebaseUser.uid;
       setFirebaseAuthUser(firebaseUser);
       rememberAndStoreUser(fallbackUser, firebaseUser);
@@ -2102,6 +2143,8 @@ const App: React.FC = () => {
   const ensureAuthPersistence = () => setPersistence(auth, browserLocalPersistence);
 
   const beginAuthOperation = () => {
+      logoutInProgressRef.current = false;
+      setIsLocalLogoutPending(false);
       authOperationInProgressRef.current = true;
   };
 
@@ -2170,6 +2213,8 @@ const App: React.FC = () => {
           }
 
           console.info('AUTH_LISTENER_NULL_PUBLIC_HOME');
+          logoutInProgressRef.current = false;
+          setIsLocalLogoutPending(false);
           setFirebaseAuthUser(null);
           setCurrentUser(null);
           setAuthStatus('unauthenticated');
@@ -2177,6 +2222,9 @@ const App: React.FC = () => {
           setIsAuthRestoring(false);
           setAuthRestoreError(null);
           if (getIsMobileViewport()) setMobileAuthFlowState('logged-out');
+          setIsMobileCompletionModalOpen(false);
+          setMobileCompletionInput('');
+          setMobileCompletionError('');
       });
       return () => {
           window.clearTimeout(redirectTimeout);
@@ -2202,11 +2250,11 @@ const App: React.FC = () => {
 
 
   useEffect(() => {
-      const effectiveFirebaseUser = firebaseAuthUser || auth.currentUser;
-      if (!isAuthStateReady || isRedirectResultPending || !effectiveFirebaseUser || currentView !== 'auth') return;
+      const effectiveFirebaseUser = isLocalLogoutPending ? null : (firebaseAuthUser || auth.currentUser);
+      if (isLocalLogoutPending || !isAuthStateReady || isRedirectResultPending || !effectiveFirebaseUser || currentView !== 'auth') return;
       const effectiveAppUser = currentUser || createFallbackUserFromFirebase(effectiveFirebaseUser);
       redirectAfterSuccessfulAuth({ source: 'auth-page-existing-user', user: effectiveAppUser, force: true });
-  }, [isAuthStateReady, isRedirectResultPending, firebaseAuthUser?.uid, auth.currentUser?.uid, currentUser?.id, currentView]);
+  }, [isLocalLogoutPending, isAuthStateReady, isRedirectResultPending, firebaseAuthUser?.uid, auth.currentUser?.uid, currentUser?.id, currentView]);
 
 
   const handleRetryAuthRestore = () => {
@@ -2396,6 +2444,8 @@ const App: React.FC = () => {
   };
 
   const handleLogout = (remoteSignOut = true, options: { preserveSessionDocument?: boolean } = {}) => {
+      logoutInProgressRef.current = true;
+      setIsLocalLogoutPending(true);
       setAuthStatus('logout');
       const cleanup = async () => {
           stopSessionWatchers();
@@ -2407,9 +2457,15 @@ const App: React.FC = () => {
       void cleanup();
       if (remoteSignOut) void signOut(auth).catch(error => console.warn('Firebase sign out failed.', error));
       committedFirebaseUidRef.current = null;
+      sessionCompletionRef.current = null;
+      sessionCompletionPromiseRef.current = null;
+      lastCompletedSessionRef.current = null;
       setFirebaseAuthUser(null);
       setCurrentUser(null);
       setMobileAuthFlowState('logged-out');
+      setIsMobileCompletionModalOpen(false);
+      setMobileCompletionInput('');
+      setMobileCompletionError('');
       setPurchasedProductIds([]);
       setIsAuthRestoring(false);
       setAuthRestoreError(null);
@@ -3421,8 +3477,8 @@ const App: React.FC = () => {
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
             {mobileWelcomeMessage && <div className="fixed left-1/2 top-5 z-[1600] -translate-x-1/2 rounded-full border border-emerald-200/70 bg-white/95 px-5 py-3 text-sm font-black text-emerald-700 shadow-[0_18px_54px_rgba(16,185,129,0.20)] backdrop-blur-2xl md:hidden">{mobileWelcomeMessage}</div>}
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
-            {effectiveAppUser && !effectiveAppUser.mobile && (
-              <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+            {isMobileCompletionModalOpen && effectiveAppUser && !hasCompletedMobile(effectiveAppUser) && (
+              <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
                 <div className="w-full max-w-md rounded-[2rem] border border-blue-100 bg-white p-6 shadow-2xl">
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Complete profile</p>
                   <h2 className="mt-2 text-2xl font-black text-slate-950">Add your mobile number</h2>
@@ -3434,7 +3490,7 @@ const App: React.FC = () => {
                   {mobileCompletionError && <p className="mt-3 rounded-xl border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{mobileCompletionError}</p>}
                   <div className="mt-5">
                     <button type="button" disabled={isSavingMobileCompletion} onClick={async () => {
-                      const normalizedMobile = mobileCompletionInput.replace(/\D/g, '').slice(-10);
+                      const normalizedMobile = getNormalizedMobile(mobileCompletionInput);
                       if (normalizedMobile.length !== 10) { setMobileCompletionError('Please enter a valid 10 digit mobile number.'); return; }
                       if (!effectiveAppUser || !auth.currentUser) return;
                       setIsSavingMobileCompletion(true); setMobileCompletionError('');
