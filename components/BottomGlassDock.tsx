@@ -1,4 +1,4 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useRef } from 'react';
 import type { ProductWithRating, User, WebsiteSettings } from '../App';
 
 interface BottomGlassDockProps {
@@ -95,16 +95,45 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
   const labelSize = Math.min(14, Math.max(9, Number(dockStyle.labelSize || defaultDockStyle.labelSize)));
   const dockPadding = Math.min(22, Math.max(8, Number(dockStyle.padding || defaultDockStyle.padding)));
 
+  const dockScrollRef = useRef<HTMLDivElement>(null);
+  const dockScrollLeftRef = useRef(0);
+
+  const preserveDockScroll = () => {
+    if (dockScrollRef.current) {
+      dockScrollLeftRef.current = dockScrollRef.current.scrollLeft;
+    }
+  };
+
+  useEffect(() => {
+    const dock = dockScrollRef.current;
+    if (!dock) return;
+    dock.scrollLeft = dockScrollLeftRef.current;
+  }, [items.length, currentUser?.id, isLoggedIn]);
+
   return (
     <div className="fixed inset-x-0 bottom-2 md:bottom-4 z-[65] flex justify-center pointer-events-none px-3">
       <div className="pointer-events-auto group relative max-w-[95vw] overflow-hidden rounded-[2rem] border border-[var(--mobile-border)] shadow-[var(--shadow-blue)] ring-1 ring-[var(--mobile-border-active)] backdrop-blur-3xl transition-all duration-500 hover:-translate-y-0.5 data-[hidden=true]:translate-y-24" id="main-bottom-dock" style={{ backgroundColor: dockBackground, minHeight: dockHeight, padding: dockPadding }}>
         <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(23,105,255,0.12),transparent_30%),radial-gradient(circle_at_82%_10%,rgba(191,215,255,0.46),transparent_30%),linear-gradient(180deg,rgba(238,246,255,0.52),rgba(255,255,255,0.18))]" />
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--mobile-border-active)] to-transparent" />
-        <div className="relative flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
+        <div ref={dockScrollRef} onScroll={preserveDockScroll} className="relative flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
           {items.map((item) => {
             const tone = dockToneClasses[item.label] || 'from-[var(--mobile-bg)] to-[var(--mobile-bg-soft)] hover:border-[var(--mobile-border-active)]';
             return (
-              <button key={item.label} onClick={item.action} className={`group/item relative flex min-w-[86px] flex-col items-center rounded-2xl border border-[var(--mobile-border)] text-[var(--mobile-body)] shadow-[var(--shadow-soft)] transition duration-300 hover:-translate-y-1 hover:border-[var(--mobile-border-active)] hover:text-[var(--mobile-primary)] md:min-w-[92px] ${tone}`} style={{ backgroundColor: itemBackground, padding: Math.max(8, dockPadding - 2) }}>
+              <button
+  key={item.label}
+  onPointerDown={preserveDockScroll}
+  onClick={() => {
+    preserveDockScroll();
+    item.action();
+    requestAnimationFrame(() => {
+      if (dockScrollRef.current) {
+        dockScrollRef.current.scrollLeft = dockScrollLeftRef.current;
+      }
+    });
+  }}
+  className={`group/item relative flex min-w-[86px] flex-col items-center rounded-2xl border border-[var(--mobile-border)] text-[var(--mobile-body)] shadow-[var(--shadow-soft)] transition duration-300 hover:-translate-y-1 hover:border-[var(--mobile-border-active)] hover:text-[var(--mobile-primary)] md:min-w-[92px] ${tone}`}
+  style={{ backgroundColor: itemBackground, padding: Math.max(8, dockPadding - 2) }}
+>
                 <span className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${tone.split(' hover:')[0]} transition duration-300 group-hover/item:opacity-75`} style={{ opacity: accentOpacity }} />
                 <span className="relative flex items-center justify-center rounded-2xl border border-[var(--mobile-border)] bg-[var(--mobile-bg-soft)] shadow-inner transition duration-300 group-hover/item:scale-110 group-hover/item:bg-[var(--mobile-card)]" style={{ width: iconSize, height: iconSize, fontSize: Math.max(16, iconSize * 0.55) }}>{item.icon}</span>
                 <span className="relative mt-1.5 font-black tracking-wide text-[var(--mobile-body)] transition group-hover/item:text-[var(--mobile-primary)]" style={{ fontSize: labelSize }}>{item.label}</span>

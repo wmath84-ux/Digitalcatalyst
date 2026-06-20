@@ -324,6 +324,30 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const eduCoinRules = ((localSettings.content as any).eduCoinRules || { purchase: 25, redeemRate: 10 }) as { purchase: number; redeemRate: number };
     const dockItems = (((localSettings.content as any).dockItems || []) as string[]);
     const dockStyle = { backgroundColor: '#FBFDFF', backgroundOpacity: 92, itemOpacity: 96, accentOpacity: 22, height: 76, iconSize: 36, labelSize: 11, padding: 12, ...((localSettings.content as any).dockStyle || {}) };
+    const communityStyle = {
+        pageBackground: '#F8FBFF',
+        surfaceColor: '#FFFFFF',
+        cardColor: '#FFFFFF',
+        softBackground: '#EEF6FF',
+        primaryColor: '#1769FF',
+        secondaryColor: '#7B61FF',
+        accentColor: '#C2E7FF',
+        headingColor: '#081A45',
+        bodyColor: '#536178',
+        mutedColor: '#7C879A',
+        borderColor: '#D9E7F8',
+        activeTabBackground: '#E8F2FF',
+        activeTabText: '#1769FF',
+        dockBackground: '#FFFFFF',
+        dockItemBackground: '#F8FBFF',
+        dockActiveBackground: '#E8F2FF',
+        dockTextColor: '#536178',
+        dockActiveTextColor: '#1769FF',
+        outgoingBubble: '#1769FF',
+        incomingBubble: '#FFFFFF',
+        shadowOpacity: 16,
+        ...((localSettings.content as any).communityStyle || {}),
+    };
     const readingStyle = { backgroundColor: '#F8FAFD', backgroundOpacity: 98, panelOpacity: 96, cardOpacity: 94, accentColor: '#C2E7FF', accentOpacity: 66, ...((localSettings.content as any).readingStyle || {}) };
     const profileStyle = { backgroundColor: '#e2e8f0', backgroundTint: '#e0e7ff', cardOpacity: 82, heroOverlayOpacity: 76, accentColor: '#f97316', ...((localSettings.content as any).profileStyle || {}) };
     const profileStreaks = (((localSettings.content as any).profileStreaks || []) as ProfileStreakConfig[]);
@@ -375,6 +399,10 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
 
     const updateDockStyle = (field: string, value: string | number) => {
         updateContentValue('dockStyle', { ...dockStyle, [field]: value });
+    };
+
+    const updateCommunityStyle = (field: string, value: string | number) => {
+        updateContentValue('communityStyle', { ...communityStyle, [field]: value });
     };
 
     const updateReadingStyle = (field: string, value: string | number) => {
@@ -760,6 +788,55 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             {defaultDockItems.map(label => (
                                 <button type="button" key={label} onClick={() => toggleDockItem(label)} className={`rounded-full border px-4 py-2 text-sm font-bold ${selectedDockItems.includes(label) ? 'border-blue-600 bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'border-slate-200/80 bg-slate-100/80 text-gray-700'}`}>{label}</button>
                             ))}
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border bg-white p-4">
+                        <h4 className="font-bold text-gray-800">Community Color Customization</h4>
+                        <p className="text-sm text-slate-600">These colors globally apply to every user's Community screen, mobile community dock, sidebar, cards, tabs, and chat surfaces.</p>
+
+                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <FormRow label="Community Page Background"><input type="color" value={communityStyle.pageBackground} onChange={e => updateCommunityStyle('pageBackground', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Surface Color"><input type="color" value={communityStyle.surfaceColor} onChange={e => updateCommunityStyle('surfaceColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Card Color"><input type="color" value={communityStyle.cardColor} onChange={e => updateCommunityStyle('cardColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Soft Background"><input type="color" value={communityStyle.softBackground} onChange={e => updateCommunityStyle('softBackground', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Primary Color"><input type="color" value={communityStyle.primaryColor} onChange={e => updateCommunityStyle('primaryColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Secondary Color"><input type="color" value={communityStyle.secondaryColor} onChange={e => updateCommunityStyle('secondaryColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Accent Color"><input type="color" value={communityStyle.accentColor} onChange={e => updateCommunityStyle('accentColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Heading Text"><input type="color" value={communityStyle.headingColor} onChange={e => updateCommunityStyle('headingColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Body Text"><input type="color" value={communityStyle.bodyColor} onChange={e => updateCommunityStyle('bodyColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Muted Text"><input type="color" value={communityStyle.mutedColor} onChange={e => updateCommunityStyle('mutedColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Border Color"><input type="color" value={communityStyle.borderColor} onChange={e => updateCommunityStyle('borderColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Active Tab Background"><input type="color" value={communityStyle.activeTabBackground} onChange={e => updateCommunityStyle('activeTabBackground', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Active Tab Text"><input type="color" value={communityStyle.activeTabText} onChange={e => updateCommunityStyle('activeTabText', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Outgoing Bubble"><input type="color" value={communityStyle.outgoingBubble} onChange={e => updateCommunityStyle('outgoingBubble', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Incoming Bubble"><input type="color" value={communityStyle.incomingBubble} onChange={e => updateCommunityStyle('incomingBubble', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label={`Shadow Opacity (${communityStyle.shadowOpacity}%)`}><input type="range" min="0" max="40" step="1" value={communityStyle.shadowOpacity} onChange={e => updateCommunityStyle('shadowOpacity', Number(e.target.value))} className="w-full" /></FormRow>
+                        </div>
+                    </div>
+
+                    <div className="rounded-xl border bg-white p-4">
+                        <h4 className="font-bold text-gray-800">Community Dock Color Customization</h4>
+                        <p className="text-sm text-slate-600">These colors globally apply to the mobile community dock buttons.</p>
+
+                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
+                            <FormRow label="Community Dock Background"><input type="color" value={communityStyle.dockBackground} onChange={e => updateCommunityStyle('dockBackground', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Dock Item Background"><input type="color" value={communityStyle.dockItemBackground} onChange={e => updateCommunityStyle('dockItemBackground', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Active Dock Background"><input type="color" value={communityStyle.dockActiveBackground} onChange={e => updateCommunityStyle('dockActiveBackground', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Dock Text Color"><input type="color" value={communityStyle.dockTextColor} onChange={e => updateCommunityStyle('dockTextColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                            <FormRow label="Active Dock Text"><input type="color" value={communityStyle.dockActiveTextColor} onChange={e => updateCommunityStyle('dockActiveTextColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
+                        </div>
+
+                        <div className="mt-5 rounded-[2rem] border border-slate-200 bg-slate-100 p-4">
+                            <p className="text-sm font-bold text-slate-700">Community Dock Preview</p>
+                            <div className="mt-4 flex gap-2 overflow-hidden rounded-[1.65rem] border p-2 shadow-xl" style={{ backgroundColor: communityStyle.dockBackground, borderColor: communityStyle.borderColor }}>
+                                {['Feed', 'Status', 'Chat'].map((label, index) => (
+                                    <div key={label} className="min-w-[76px] rounded-[1.2rem] px-2 py-2 text-center" style={{ backgroundColor: index === 0 ? communityStyle.dockActiveBackground : communityStyle.dockItemBackground, color: index === 0 ? communityStyle.dockActiveTextColor : communityStyle.dockTextColor }}>
+                                        <span className="block text-xl">{index === 0 ? '📢' : index === 1 ? '⭕' : '💬'}</span>
+                                        <span className="text-[10px] font-black">{label}</span>
+                                    </div>
+                                ))}
+                            </div>
                         </div>
                     </div>
 

@@ -335,6 +335,30 @@ export interface ProfileStyleSettings {
     accentColor: string;
 }
 
+export interface CommunityStyleSettings {
+    pageBackground: string;
+    surfaceColor: string;
+    cardColor: string;
+    softBackground: string;
+    primaryColor: string;
+    secondaryColor: string;
+    accentColor: string;
+    headingColor: string;
+    bodyColor: string;
+    mutedColor: string;
+    borderColor: string;
+    activeTabBackground: string;
+    activeTabText: string;
+    dockBackground: string;
+    dockItemBackground: string;
+    dockActiveBackground: string;
+    dockTextColor: string;
+    dockActiveTextColor: string;
+    outgoingBubble: string;
+    incomingBubble: string;
+    shadowOpacity: number;
+}
+
 // Coupon structure, now managed globally
 export interface Coupon {
     id: number;
@@ -573,6 +597,7 @@ export interface WebsiteSettings {
             accentOpacity: number;
         };
         profileStyle?: ProfileStyleSettings;
+        communityStyle?: CommunityStyleSettings;
         profileStreaks?: ProfileStreakConfig[];
         profileMilestones?: ProfileMilestoneConfig[];
         socialLinks: {
@@ -828,6 +853,29 @@ const defaultWebsiteSettings: WebsiteSettings = {
             iconSize: 36,
             labelSize: 11,
             padding: 12,
+        },
+        communityStyle: {
+            pageBackground: '#F8FBFF',
+            surfaceColor: '#FFFFFF',
+            cardColor: '#FFFFFF',
+            softBackground: '#EEF6FF',
+            primaryColor: '#1769FF',
+            secondaryColor: '#7B61FF',
+            accentColor: '#C2E7FF',
+            headingColor: '#081A45',
+            bodyColor: '#536178',
+            mutedColor: '#7C879A',
+            borderColor: '#D9E7F8',
+            activeTabBackground: '#E8F2FF',
+            activeTabText: '#1769FF',
+            dockBackground: '#FFFFFF',
+            dockItemBackground: '#F8FBFF',
+            dockActiveBackground: '#E8F2FF',
+            dockTextColor: '#536178',
+            dockActiveTextColor: '#1769FF',
+            outgoingBubble: '#1769FF',
+            incomingBubble: '#FFFFFF',
+            shadowOpacity: 16,
         },
         readingStyle: {
             backgroundColor: '#F8FAFD',
@@ -1278,7 +1326,23 @@ const App: React.FC = () => {
     const storedSettings = localStorage.getItem('websiteSettings');
     if (storedSettings) {
         const parsedSettings = JSON.parse(storedSettings);
-        setWebsiteSettings({ ...defaultWebsiteSettings, ...parsedSettings, mobile: { ...defaultWebsiteSettings.mobile, ...(parsedSettings.mobile || {}) }, content: { ...defaultWebsiteSettings.content, ...(parsedSettings.content || {}) } });
+        setWebsiteSettings({
+    ...defaultWebsiteSettings,
+    ...parsedSettings,
+    mobile: { ...defaultWebsiteSettings.mobile, ...(parsedSettings.mobile || {}) },
+    content: {
+        ...defaultWebsiteSettings.content,
+        ...(parsedSettings.content || {}),
+        dockStyle: {
+            ...defaultWebsiteSettings.content.dockStyle,
+            ...((parsedSettings.content as any)?.dockStyle || {}),
+        },
+        communityStyle: {
+            ...defaultWebsiteSettings.content.communityStyle,
+            ...((parsedSettings.content as any)?.communityStyle || {}),
+        },
+    },
+});
     }
     
     const storedCoupons = localStorage.getItem('siteCoupons');
@@ -1366,7 +1430,23 @@ const App: React.FC = () => {
     const unsubscribeWebsiteSettings = onSnapshot(doc(db, ...GLOBAL_WEBSITE_SETTINGS_DOC), (snapshot) => {
       if (!snapshot.exists()) return;
       const remoteSettings = snapshot.data() as WebsiteSettings;
-      const mergedSettings = { ...defaultWebsiteSettings, ...remoteSettings, mobile: { ...defaultWebsiteSettings.mobile, ...(remoteSettings.mobile || {}) }, content: { ...defaultWebsiteSettings.content, ...(remoteSettings.content || {}) } };
+      const mergedSettings = {
+  ...defaultWebsiteSettings,
+  ...remoteSettings,
+  mobile: { ...defaultWebsiteSettings.mobile, ...(remoteSettings.mobile || {}) },
+  content: {
+    ...defaultWebsiteSettings.content,
+    ...(remoteSettings.content || {}),
+    dockStyle: {
+      ...defaultWebsiteSettings.content.dockStyle,
+      ...((remoteSettings.content as any)?.dockStyle || {}),
+    },
+    communityStyle: {
+      ...defaultWebsiteSettings.content.communityStyle,
+      ...((remoteSettings.content as any)?.communityStyle || {}),
+    },
+  },
+};
       setWebsiteSettings(mergedSettings);
       safeSetItem('websiteSettings', mergedSettings);
     }, error => logGlobalSyncWarning('Website settings', error));
@@ -3506,7 +3586,7 @@ const App: React.FC = () => {
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent(effectiveAppUser)}</div>;
-    if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity onClose={() => handleNavigateBack('home')}  isAuthenticated={isLoggedIn} /></div>;
+    if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity settings={websiteSettings} onClose={() => handleNavigateBack('home')}  isAuthenticated={isLoggedIn} /></div>;
 
     return (
        <ErrorBoundary>
