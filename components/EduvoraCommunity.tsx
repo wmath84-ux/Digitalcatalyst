@@ -944,17 +944,19 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (postType === 'poll' && cleanedOptions.length < 2) return;
     setComposerError('');
     setIsPublishingCreator(true);
-    const imageBytes = postType === 'image' ? dataUrlBytes(postImagePreview) : 0;
-    const draftSnapshot = { body: postDraft, imageName: postImageName, imagePreview: postImagePreview, pollOptions: [...postPollOptions] };
-    try { await claimDailyUploadSlot('creator', postType, imageBytes); } catch (error) { setProfileFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Daily limit or storage lock is active.' }); setIsPublishingCreator(false); return; }
+
+    const publishType = postType;
+    const publishImagePreview = postImagePreview;
+    const publishImageBytes = publishType === 'image' ? dataUrlBytes(publishImagePreview) : 0;
     const labels: Record<PostType, { badge: string; title: string; avatar: string }> = {
       text: { badge: 'Creator text · +1 EduCoin', title: `${profile.name} shared a note`, avatar: profile.avatar },
       image: { badge: 'Creator image · +1 EduCoin', title: `${profile.name} shared an image idea`, avatar: profile.avatar },
       poll: { badge: 'Creator poll · +1 EduCoin', title: `${profile.name} opened a poll`, avatar: profile.avatar },
     };
-    const meta = labels[postType];
-    const newMessage: FeedMessage = {
-      id: Date.now(),
+    const meta = labels[publishType];
+    const now = Date.now();
+    const localMessage = normalizeFeedMessage({
+      id: now,
       admin: profile.name,
       badge: meta.badge,
       avatar: meta.avatar,
@@ -962,16 +964,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       body: draft,
       time: 'Just now',
       creatorId: currentUserKey,
-      postType,
-      imagePreview: postType === 'image' ? (postImagePreview || '🖼️') : undefined,
-      imageLayout: postType === 'image' ? 'thumbnail' : undefined,
-      pollOptions: postType === 'poll' ? cleanedOptions : undefined,
-      pollVotes: postType === 'poll' ? cleanedOptions.map(() => 0) : undefined,
+      postType: publishType,
+      imagePreview: publishType === 'image' ? (publishImagePreview || '🖼️') : undefined,
+      imageLayout: publishType === 'image' ? 'thumbnail' : undefined,
+      pollOptions: publishType === 'poll' ? cleanedOptions : undefined,
+      pollVotes: publishType === 'poll' ? cleanedOptions.map(() => 0) : undefined,
       reactions: [],
       likeCount: 0,
       replies: [],
-      createdAt: Date.now(),
-      expiresAt: Date.now() + POST_TTL_MS,
+      createdAt: now,
+      expiresAt: now + POST_TTL_MS,
       ownerId: currentUserKey,
       source: 'creator',
       reactionCounts: {},
@@ -979,62 +981,45 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       pollVoters: {},
       reactionUsers: {},
       replyCount: 0,
-    };
-    const upload = postType === 'image' && postImagePreview ? await uploadCommunityImage('creator-posts', newMessage.id, postImagePreview) : { imageUrl: newMessage.imagePreview, storagePath: undefined, uploadBytes: 0 };
-    const now = Date.now();
-    const cloudMessage = normalizeFeedMessage({ ...newMessage, imagePreview: upload.imageUrl, storagePath: upload.storagePath, uploadBytes: upload.uploadBytes, ownerId: currentUserKey, createdAt: now, expiresAt: now + POST_TTL_MS, source: 'creator' });
-    flushSync(() => setMessages((current) => [cloudMessage, ...current.filter((message) => message.id !== cloudMessage.id)]));
-    openPublishedCreatorPost(cloudMessage.id);
-    const creatorPostPayload = stripUndefinedDeep({
-      id: cloudMessage.id,
-      admin: cloudMessage.admin,
-      badge: cloudMessage.badge,
-      avatar: cloudMessage.avatar,
-      title: cloudMessage.title,
-      body: cloudMessage.body,
-      time: cloudMessage.time,
-      creatorId: currentUserKey,
-      ownerId: currentUserKey,
-      postType: cloudMessage.postType,
-      reactions: [],
-      replies: [],
-      likeCount: 0,
-      reactionCounts: {},
-      likedByUsers: {},
-      reactionUsers: {},
-      replyCount: 0,
-      createdAt: now,
-      expiresAt: now + POST_TTL_MS,
-      source: 'creator' as const,
-      ...(postType === 'image' ? { imagePreview: upload.imageUrl, imageLayout: cloudMessage.imageLayout, storagePath: upload.storagePath, uploadBytes: upload.uploadBytes } : {}),
-      ...(postType === 'poll' ? { pollOptions: cleanedOptions, pollVotes: cleanedOptions.map(() => 0), pollVoters: {} } : {}),
     });
-    addDoc(collection(db, COMMUNITY_FEED), creatorPostPayload)
-      .then((docRef) => {
-        const firebasePostId = Number.parseInt(docRef.id.replace(/\D/g, '').slice(-9), 10) || newMessage.id;
-        setMessages((current) => current.map((message) => message.id === newMessage.id ? { ...message, docId: docRef.id } : message));
-        setSelectedMessageId(newMessage.id || firebasePostId);
-        setProfileFeedback({ type: 'success', message: 'Creator post published and opened.' });
-        setEduCoins((coins) => coins + 1);
-        setPostDraft('');
-        setPostImageName('');
-        setPostImagePreview('');
-        setPostPollOptions(['', '', '']);
-      })
-      .catch((error) => {
-        console.warn('Creator post write failed; showing local post fallback', error);
-        setMessages((current) => current.filter((message) => message.id !== newMessage.id));
-        releaseDailyUploadSlot('creator', postType, imageBytes);
-        setPostDraft(draftSnapshot.body);
-        setPostImageName(draftSnapshot.imageName);
-        setPostImagePreview(draftSnapshot.imagePreview);
-        setPostPollOptions(draftSnapshot.pollOptions);
-        setComposerError('Creator post failed to publish. Your draft was restored — please try again.');
-        setPage('creators');
-        setPageStack([]);
-        setProfileFeedback({ type: 'error', message: 'Creator post failed to publish. Nothing was locked; please try again.' });
-      })
-      .finally(() => setIsPublishingCreator(false));
+
+    flushSync(() => setMessages((current) => [localMessage, ...current.filter((message) => message.id !== localMessage.id)]));
+    openPublishedCreatorPost(localMessage.id);
+    setProfileFeedback({ type: 'success', message: 'Creator post published and opened.' });
+    setEduCoins((coins) => coins + 1);
+    setPostDraft('');
+    setPostImageName('');
+    setPostImagePreview('');
+    setPostPollOptions(['', '', '']);
+    setIsPublishingCreator(false);
+
+    (async () => {
+      try {
+        await claimDailyUploadSlot('creator', publishType, publishImageBytes);
+        const upload = publishType === 'image' && publishImagePreview
+          ? await uploadCommunityImage('creator-posts', localMessage.id, publishImagePreview)
+          : { imageUrl: localMessage.imagePreview, storagePath: undefined, uploadBytes: 0 };
+        const cloudMessage = normalizeFeedMessage({
+          ...localMessage,
+          imagePreview: upload.imageUrl,
+          storagePath: upload.storagePath,
+          uploadBytes: upload.uploadBytes,
+          ownerId: currentUserKey,
+          creatorId: currentUserKey,
+          createdAt: now,
+          expiresAt: now + POST_TTL_MS,
+          source: 'creator',
+          reactionCounts: {},
+          replyCount: 0,
+        });
+        const docRef = await addDoc(collection(db, COMMUNITY_FEED), stripUndefinedDeep(cloudMessage));
+        setMessages((current) => current.map((message) => message.id === localMessage.id ? { ...cloudMessage, docId: docRef.id } : message));
+        setSelectedMessageId(localMessage.id);
+      } catch (error) {
+        console.warn('Creator post remote publish failed; keeping local post visible', error);
+        releaseDailyUploadSlot('creator', publishType, publishImageBytes);
+      }
+    })();
 
   };
 
