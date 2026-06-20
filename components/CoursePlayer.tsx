@@ -1,17 +1,9 @@
 // components/CoursePlayer.tsx
-import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, ProductDocPage, QuizAnswerState } from '../App';
 import { EconomySettings } from '../utils/economy';
 import AiMentor from './AiMentor';
 import ProductMusicPlayer, { type AudioTrack } from './ProductMusicPlayer';
-import { auth } from '../firebase';
-import {
-  EDUCOIN_SECONDS_PER_COIN,
-  creditWatchSessionCoins,
-  markWatchSessionPaused,
-  startWatchSession,
-  watchUserCoinWallet,
-} from '../utils/coinWallet';
 
 const FileIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -86,11 +78,6 @@ const useViewportSize = () => {
 };
 
 
-const formatActiveWatchTime = (totalSeconds: number) => {
-  const minutes = Math.floor(totalSeconds / 60);
-  const seconds = totalSeconds % 60;
-  return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-};
 
 const GlassDownloadCard: React.FC<{ file: ProductFile; headline?: string; onDownloadRequest?: (file: ProductFile) => void; }> = ({ file, headline = 'Your download is ready', onDownloadRequest }) => (
   <div className="flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-white/70 p-3 text-slate-900 sm:p-6 custom-scrollbar">
@@ -577,44 +564,14 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
   );
 };
 
-const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: EconomySettings; product: ProductWithRating; onBack: () => void; onWatchTimeMinutes?: (minutes: number, lessonTitle?: string) => void; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ settings, economySettings, product, onBack, onWatchTimeMinutes, onQuizReward }) => {
+const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: EconomySettings; product: ProductWithRating; onBack: () => void; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ settings, economySettings, product, onBack, onQuizReward }) => {
   const viewport = useViewportSize();
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [activeWatchSeconds, setActiveWatchSeconds] = useState(0);
-  const [sessionEarnedCoins, setSessionEarnedCoins] = useState(0);
-  const [isVideoPlaying, setIsVideoPlaying] = useState(false);
-  const [isPlaybackWindowFocused, setIsPlaybackWindowFocused] = useState(() => typeof document === 'undefined' ? true : document.visibilityState === 'visible' && document.hasFocus());
-  const [coinPulse, setCoinPulse] = useState(false);
-  const [pendingPdfDownload, setPendingPdfDownload] = useState<ProductFile | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
-  const [youtubeRewardClaimed, setYoutubeRewardClaimed] = useState(false);
-  const [eduCoinSessionId, setEduCoinSessionId] = useState(() => {
-    const randomPart =
-      typeof crypto !== 'undefined' && 'randomUUID' in crypto
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random().toString(36).slice(2)}`;
-
-    return `watch-${randomPart}`;
-  });
-  const [validWatchedSeconds, setValidWatchedSeconds] = useState(0);
-  const [earnedSessionCoins, setEarnedSessionCoins] = useState(0);
-  const [coinBalance, setCoinBalance] = useState(0);
-  const [coinStatusMessage, setCoinStatusMessage] = useState(
-    'Watch YouTube course videos to earn EduCoins.'
-  );
-  const [isCoinSyncing, setIsCoinSyncing] = useState(false);
-  const validWatchRef = useRef({
-    isPlaying: false,
-    isSuspiciousJump: false,
-    lastTickAt: 0,
-    lastPlaybackTime: 0,
-    validSeconds: 0,
-  });
 
   useEffect(() => {
     const findFirst = (modules?: CourseModule[]): ProductFile | null => {
@@ -631,31 +588,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
 
   useEffect(() => {
     setMediaHasError(false);
-    setActiveWatchSeconds(0);
-    setSessionEarnedCoins(0);
-    setIsVideoPlaying(false);
-    setCoinPulse(false);
-    setYoutubeRewardClaimed(false);
-    setEduCoinSessionId(`watch-${Date.now()}-${Math.random().toString(36).slice(2)}`);
-    setValidWatchedSeconds(0);
-    setEarnedSessionCoins(0);
-    validWatchRef.current = { isPlaying: false, isSuspiciousJump: false, lastTickAt: 0, lastPlaybackTime: 0, validSeconds: 0 };
   }, [activeFile]);
-
-  useEffect(() => {
-    const updateFocusState = () => {
-      setIsPlaybackWindowFocused(document.visibilityState === 'visible' && document.hasFocus());
-    };
-    window.addEventListener('focus', updateFocusState);
-    window.addEventListener('blur', updateFocusState);
-    document.addEventListener('visibilitychange', updateFocusState);
-    updateFocusState();
-    return () => {
-      window.removeEventListener('focus', updateFocusState);
-      window.removeEventListener('blur', updateFocusState);
-      document.removeEventListener('visibilitychange', updateFocusState);
-    };
-  }, []);
 
   const backgroundImage = useMemo(() => getCourseBackground(product, activeFile), [product, activeFile]);
   const isAudioExperience = activeFile?.type === 'audio';
@@ -686,146 +619,6 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     document.body.removeChild(link);
   };
 
-  useEffect(() => {
-    if (activeFile?.type !== 'video' || !isVideoPlaying || !isPlaybackWindowFocused) return;
-    const timer = window.setInterval(() => {
-      const video = videoRef.current;
-      const isActivelyPlaying = !!video && !video.paused && !video.ended && video.readyState >= 2 && document.visibilityState === 'visible' && document.hasFocus();
-      if (!isActivelyPlaying) return;
-
-      setActiveWatchSeconds((seconds) => {
-        const nextSeconds = seconds + 1;
-        if (nextSeconds % 60 === 0) {
-          const earnedThisMinute = Math.max(0, Number(economySettings.coinPerVideoMinute));
-          setSessionEarnedCoins((coins) => coins + earnedThisMinute);
-          setCoinPulse(true);
-          window.setTimeout(() => setCoinPulse(false), 1000);
-          onWatchTimeMinutes?.(1, activeFile.name);
-        }
-        return nextSeconds;
-      });
-    }, 1000);
-    return () => window.clearInterval(timer);
-  }, [activeFile, economySettings.coinPerVideoMinute, isPlaybackWindowFocused, isVideoPlaying, onWatchTimeMinutes]);
-
-
-
-  const syncEarnedCoins = useCallback(async () => {
-    const user = auth.currentUser;
-    if (!user?.uid || isCoinSyncing || activeFile?.type !== 'youtube') return;
-
-    const seconds = Math.floor(validWatchRef.current.validSeconds);
-    const completedCoins = Math.floor(seconds / EDUCOIN_SECONDS_PER_COIN);
-
-    if (completedCoins <= 0) {
-      setCoinStatusMessage('No completed 2-minute EduCoin block yet.');
-      return;
-    }
-
-    try {
-      setIsCoinSyncing(true);
-      setCoinStatusMessage('Adding earned coins to your profile...');
-      const credited = await creditWatchSessionCoins({
-        sessionId: eduCoinSessionId,
-        userId: user.uid,
-        courseId: String(product.id || ''),
-        videoId: String(activeFile.id || ''),
-        youtubeVideoId: extractYouTubeID(activeFile.url) || '',
-        validWatchedSeconds: seconds,
-        lastPlaybackPosition: validWatchRef.current.lastPlaybackTime,
-      });
-      setCoinStatusMessage(credited > 0 ? 'EduCoins added successfully.' : 'EduCoins already synced safely.');
-    } catch (error) {
-      console.error('EduCoin sync failed:', error);
-      setCoinStatusMessage('Coin sync failed. We will retry safely.');
-    } finally {
-      setIsCoinSyncing(false);
-    }
-  }, [activeFile, eduCoinSessionId, isCoinSyncing, product.id]);
-
-  useEffect(() => {
-    const user = auth.currentUser;
-    if (!user?.uid) {
-      setCoinBalance(0);
-      setCoinStatusMessage('Login to earn EduCoins.');
-      return;
-    }
-
-    if (activeFile?.type === 'youtube') {
-      startWatchSession({
-        sessionId: eduCoinSessionId,
-        userId: user.uid,
-        courseId: String(product.id || ''),
-        videoId: String(activeFile.id || ''),
-        youtubeVideoId: extractYouTubeID(activeFile.url) || '',
-      }).catch((error) => console.error('Could not start EduCoin watch session:', error));
-    }
-
-    const unsubscribe = watchUserCoinWallet(user.uid, (wallet) => setCoinBalance(wallet.coinBalance));
-    return () => unsubscribe();
-  }, [activeFile, eduCoinSessionId, product.id]);
-
-  useEffect(() => {
-    const tick = window.setInterval(() => {
-      const tracker = validWatchRef.current;
-      if (!tracker.isPlaying || document.hidden || tracker.isSuspiciousJump || activeFile?.type !== 'youtube') return;
-      const now = Date.now();
-      if (!tracker.lastTickAt) {
-        tracker.lastTickAt = now;
-        return;
-      }
-      const elapsedSeconds = Math.min(1.5, Math.max(0, (now - tracker.lastTickAt) / 1000));
-      tracker.lastTickAt = now;
-      tracker.validSeconds += elapsedSeconds;
-      const roundedSeconds = Math.floor(tracker.validSeconds);
-      const completedCoins = Math.floor(roundedSeconds / EDUCOIN_SECONDS_PER_COIN);
-      setValidWatchedSeconds(roundedSeconds);
-      setEarnedSessionCoins(completedCoins);
-      setActiveWatchSeconds(roundedSeconds);
-      setSessionEarnedCoins(completedCoins);
-      const remaining = EDUCOIN_SECONDS_PER_COIN - (roundedSeconds % EDUCOIN_SECONDS_PER_COIN);
-      setCoinStatusMessage(
-        completedCoins > 0
-          ? `Earned this session: ${completedCoins} EduCoin${completedCoins > 1 ? 's' : ''}. Next coin in ${remaining}s.`
-          : `Next EduCoin in ${remaining}s.`
-      );
-    }, 1000);
-    return () => window.clearInterval(tick);
-  }, [activeFile?.type]);
-
-  useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.hidden) {
-        validWatchRef.current.isPlaying = false;
-        setCoinStatusMessage('Timer paused. Resume video to continue earning.');
-        if (auth.currentUser?.uid) markWatchSessionPaused(eduCoinSessionId).catch(console.error);
-      }
-    };
-    const handleBeforeUnload = () => { syncEarnedCoins(); };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    window.addEventListener('beforeunload', handleBeforeUnload);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-      window.removeEventListener('beforeunload', handleBeforeUnload);
-      syncEarnedCoins();
-    };
-  }, [eduCoinSessionId, syncEarnedCoins]);
-
-  const handleEduCoinYoutubeStateChange = useCallback((state: 'play' | 'pause' | 'ended') => {
-    const tracker = validWatchRef.current;
-    if (state === 'play') {
-      tracker.isPlaying = true;
-      tracker.isSuspiciousJump = false;
-      tracker.lastTickAt = Date.now();
-      setCoinStatusMessage('Valid watch time running...');
-      return;
-    }
-    tracker.isPlaying = false;
-    tracker.lastTickAt = Date.now();
-    setCoinStatusMessage(state === 'ended' ? 'Video ended. Syncing earned EduCoins...' : 'Timer paused. Resume video to continue earning.');
-    if (state === 'ended') syncEarnedCoins();
-  }, [syncEarnedCoins]);
-
   const activeAudioTracks = useMemo<AudioTrack[]>(() => {
     if (activeFile?.type !== 'audio') return [];
 
@@ -844,23 +637,26 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     </span>
   );
 
-  const liveEarningHud = (activeFile?.type === 'video' || activeFile?.type === 'youtube') ? (
-    <div className="bg-white/50 backdrop-blur-md border border-slate-200 shadow-sm rounded-full px-4 py-1.5 flex items-center gap-2 text-sm font-semibold text-slate-800 transition-all whitespace-nowrap max-sm:px-3 max-sm:text-xs" aria-live="polite">
-      <span>⏱️ {formatActiveWatchTime(activeWatchSeconds)} Mins</span>
-      <span className="h-4 w-px bg-slate-300" />
-      <span className={`text-amber-700 transition-all duration-300 ${coinPulse ? 'animate-bounce scale-110 text-amber-600 drop-shadow-[0_0_10px_rgba(251,191,36,0.65)]' : ''}`}>✦ +{sessionEarnedCoins} Coins</span>
-    </div>
-  ) : null;
-
   const renderMedia = () => {
     if (!activeFile) return <div className="flex h-full items-center justify-center bg-white/70 text-slate-900/70 backdrop-blur-xl">Select content to begin.</div>;
     if (mediaHasError) return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
     switch (activeFile.type) {
       case 'youtube': {
         const videoId = extractYouTubeID(activeFile.url);
-        return videoId ? (<div className="flex h-full w-full flex-col"><iframe key={activeFile.id} className="min-h-0 flex-1 bg-white/70" src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`} title={activeFile.name} frameBorder="0" allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture" allowFullScreen onLoad={() => handleEduCoinYoutubeStateChange('play')} onError={() => setMediaHasError(true)} /><div className="m-3 rounded-3xl border border-blue-100 bg-white/90 p-4 shadow-sm"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><p className="text-sm font-semibold text-slate-900">EduCoin Progress</p><p className="text-xs text-slate-500">1 EduCoin for every completed 2 minutes of valid YouTube watch time.</p></div><div className="grid grid-cols-3 gap-3 text-center"><div className="rounded-2xl bg-blue-50 px-3 py-2"><p className="text-xs text-slate-500">Valid watch</p><p className="text-sm font-bold text-blue-700">{validWatchedSeconds}s</p></div><div className="rounded-2xl bg-violet-50 px-3 py-2"><p className="text-xs text-slate-500">Earned now</p><p className="text-sm font-bold text-violet-700">{earnedSessionCoins}</p></div><div className="rounded-2xl bg-emerald-50 px-3 py-2"><p className="text-xs text-slate-500">Balance</p><p className="text-sm font-bold text-emerald-700">{coinBalance}</p></div></div></div><div className="mt-3 flex items-center justify-between gap-3 rounded-2xl bg-slate-50 px-3 py-2"><p className="text-xs font-medium text-slate-600">{coinStatusMessage}</p><button type="button" onClick={syncEarnedCoins} disabled={isCoinSyncing} className="rounded-full bg-blue-600 px-4 py-2 text-xs font-semibold text-white disabled:cursor-not-allowed disabled:bg-slate-300">{isCoinSyncing ? 'Adding...' : 'Sync Coins'}</button></div></div></div>) : <VideoUnavailablePlaceholder />;
+        return videoId ? (
+          <iframe
+            key={activeFile.id}
+            className="h-full w-full bg-white/70"
+            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
+            title={activeFile.name}
+            frameBorder="0"
+            allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+            allowFullScreen
+            onError={() => setMediaHasError(true)}
+          />
+        ) : <VideoUnavailablePlaceholder />;
       }
-      case 'video': return <video ref={videoRef} key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onPlay={() => setIsVideoPlaying(true)} onPause={() => setIsVideoPlaying(false)} onEnded={() => setIsVideoPlaying(false)} onError={() => { setIsVideoPlaying(false); setMediaHasError(true); }} />;
+      case 'video': return <video key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onError={() => setMediaHasError(true)} />;
       case 'audio': {
         return (
           <div className="flex h-full min-h-0 w-full bg-[#d5fbff]/70 text-slate-900">
@@ -916,8 +712,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
         <button onClick={onBack} className={`${compactPlayerChrome ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} shrink-0 rounded-lg border border-[#ded8ff] bg-white font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]`} aria-label="Back to course details">← {viewport.isTinyPlayer ? '' : 'Back'}</button>
         <button onClick={() => setIsSidebarOpen(true)} className={`${compactPlayerChrome ? 'p-1.5' : 'p-2'} shrink-0 rounded-lg border border-[#ded8ff] bg-[#ece7ff]`} aria-label="Open modules"><svg className={`${compactPlayerChrome ? 'h-5 w-5' : 'h-6 w-6'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
         <h1 className="min-w-0 flex-1 truncate text-base font-black sm:text-lg">{activeFile?.name || product.title}</h1>
-        <div className="ml-auto flex max-w-[48vw] shrink-0 items-center gap-2 overflow-x-auto sm:max-w-none">
-          {liveEarningHud}
+        <div className="ml-auto flex shrink-0 items-center gap-2">
           <button onClick={() => setIsMentorOpen(value => !value)} className={`${viewport.isTinyPlayer ? 'px-2 py-1.5 text-xs' : 'px-2.5 py-2 text-xs sm:px-3 sm:text-sm'} rounded-xl border border-[#ded8ff] bg-white/80 font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)]`}>🧠 AI</button>
         </div>
       </header>
@@ -932,7 +727,6 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           </div>
           <div className="flex items-center justify-center gap-3">
             <button onClick={() => setIsDesktopSidebarCollapsed(value => !value)} className="rounded-2xl border border-[#ded8ff] bg-white px-5 py-3 text-base font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5">{isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize modules'}</button><button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-[#ded8ff] bg-white/85 px-6 py-3 text-base font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.12)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]">🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}</button>
-            {liveEarningHud}
           </div>
           <span className="truncate text-right text-sm font-bold text-[#50527a]/70">Welcome to the Course</span>
         </div>
