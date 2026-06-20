@@ -48,7 +48,7 @@ const COMMUNITY_PRIVACY_STORAGE_KEY = 'eduvoraCommunityPrivacySettings';
 const COMMUNITY_NOTIFICATION_PREFS_KEY = 'eduvoraCommunityNotificationPreferences';
 const COMMUNITY_CREATOR_QUOTA_KEY = 'eduvoraCommunityCreatorQuota';
 const COMMUNITY_STATUS_QUOTA_KEY = 'eduvoraCommunityStatusQuota';
-const STORY_TTL_MS = 24 * 60 * 60 * 1000;
+const STORY_TTL_MS = 15 * 24 * 60 * 60 * 1000;
 const PROFILE_BIO_MAX_LENGTH = 180;
 
 
@@ -143,6 +143,7 @@ const statusTone: Record<PostType, string> = {
 };
 
 const todayKey = () => new Date().toISOString().slice(0, 10);
+const isTimestampFromToday = (value: unknown) => typeof value === 'number' && new Date(value).toISOString().slice(0, 10) === todayKey();
 const STATUS_IMAGE_FALLBACK = '🖼️';
 const REACTION_EMOJIS = ['👍', '❤️', '😂', '😮', '😢', '🙏'];
 const COMMUNITY_FEED = 'community_feed';
@@ -150,7 +151,9 @@ const COMMUNITY_STATUS = 'community_status';
 const COMMUNITY_MASTER_TAGS = 'community_master_tags';
 const COMMUNITY_UPLOAD_QUOTAS = 'community_upload_quotas';
 const COMMUNITY_STORAGE_META = 'community_storage_meta';
-const POST_TTL_MS = 24 * 60 * 60 * 1000;
+const ADMIN_POST_FALLBACK_STORAGE_KEY = 'eduvoraAdminPostFallbacks';
+const ADMIN_POST_FALLBACK_EVENT = 'eduvoraAdminPostFallbackUpdated';
+const POST_TTL_MS = 15 * 24 * 60 * 60 * 1000;
 const STORAGE_LOCK_BYTES = 4 * 1024 * 1024 * 1024;
 const STORAGE_TOTAL_BYTES = 5 * 1024 * 1024 * 1024;
 const MAX_STATUS_FILE_BYTES = 1048576;
@@ -194,7 +197,11 @@ const mergeUnexpiredByIdentity = <T extends { id: number; docId?: string; create
   const merged = new Map<string, T>();
   const put = (item: T) => {
     if (!isUnexpired(item, ttlMs)) return;
-    const key = item.docId ? `doc:${item.docId}` : `id:${item.id}`;
+    const idKey = `id:${item.id}`;
+    const hasSyncedVersion = Array.from(merged.values()).some((existing) => existing.id === item.id && existing.docId);
+    if (!item.docId && hasSyncedVersion) return;
+    const key = item.docId ? `doc:${item.docId}` : idKey;
+    if (item.docId) merged.delete(idKey);
     merged.set(key, { ...merged.get(key), ...item });
   };
   seedItems.forEach(put);
@@ -424,8 +431,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const selectedStatus = statusCards.find((status) => status.id === selectedStatusId) || statusCards[0];
   const allCreators = useMemo(() => creators.map((creator) => creator.id === 'me' ? { ...creator, name: profile.name, username: profile.username, avatar: profile.avatar } : creator), [profile]);
   const followingMessages = messages.filter((message) => message.creatorId && (followedIds.includes(message.creatorId) || isOwnCommunityId(message.creatorId)));
-  const usedCreatorTypesToday: string[] = [];
-  const usedStatusTypesToday: string[] = [];
+  const usedCreatorTypesToday = creatorQuota[todayKey()] || [];
+  const usedStatusTypesToday = statusQuota[todayKey()] || [];
   const isStorageLocked = storageUsedBytes >= STORAGE_LOCK_BYTES;
   const statusAvailableSlots = Math.max(0, Math.floor((STORAGE_LOCK_BYTES - storageUsedBytes) / MAX_STATUS_FILE_BYTES));
   const isCreatorTypeUsedToday = usedCreatorTypesToday.includes(postType);
@@ -511,7 +518,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       const usedBytes = Number(usageSnap.exists() ? usageSnap.data().usedBytes : 0) || 0;
       if (usedBytes + uploadBytes >= STORAGE_LOCK_BYTES) throw new Error('Community uploads are paused because Firebase Storage reached the 4GB safety limit.');
       const lastUsed = Number(usedTypes[type] || 0);
-      if (lastUsed && Date.now() - lastUsed < POST_TTL_MS) throw new Error(`Daily ${type} ${kind} slot already used. Try again after the 24-hour window resets.`);
+      if (isTimestampFromToday(lastUsed)) throw new Error(`Daily ${type} ${kind} slot already used. Try again tomorrow.`);
       transaction.set(quotaRef, { userId: currentUserKey, kind, usedTypes: { ...usedTypes, [type]: Date.now() }, updatedAt: Date.now() }, { merge: true });
       transaction.set(usageRef, { usedBytes: usedBytes + uploadBytes, limitBytes: STORAGE_LOCK_BYTES, bucketBytes: STORAGE_TOTAL_BYTES, updatedAt: Date.now() }, { merge: true });
     });
@@ -621,6 +628,28 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   useEffect(() => {
     if (!isCommunityAllowed) return undefined;
+    const syncLocalAdminPosts = () => {
+      const localAdminPosts = readJsonArray<FeedMessage>(ADMIN_POST_FALLBACK_STORAGE_KEY, [])
+        .map((post) => normalizeFeedMessage({ ...post, source: 'admin', badge: post.badge || 'ADMIN POST', creatorId: post.creatorId || 'admin', ownerId: post.ownerId || 'admin' }))
+        .filter((message) => isUnexpired(message, POST_TTL_MS));
+      if (!localAdminPosts.length) return;
+      setMessages((current) => {
+        const mergedMessages = mergeUnexpiredByIdentity(localAdminPosts, current.map(normalizeFeedMessage), initialMessages.map(normalizeFeedMessage), POST_TTL_MS);
+        setAdminPosts(mergedMessages.filter((message) => message.source === 'admin' || message.badge === 'ADMIN POST' || message.creatorId === 'admin'));
+        return mergedMessages;
+      });
+    };
+    syncLocalAdminPosts();
+    window.addEventListener(ADMIN_POST_FALLBACK_EVENT, syncLocalAdminPosts);
+    window.addEventListener('storage', syncLocalAdminPosts);
+    return () => {
+      window.removeEventListener(ADMIN_POST_FALLBACK_EVENT, syncLocalAdminPosts);
+      window.removeEventListener('storage', syncLocalAdminPosts);
+    };
+  }, [isCommunityAllowed]);
+
+  useEffect(() => {
+    if (!isCommunityAllowed) return undefined;
     const feedQuery = query(collection(db, COMMUNITY_FEED), where('expiresAt', '>', Date.now()), orderBy('expiresAt', 'desc'), limit(150));
     return onSnapshot(feedQuery, (snapshot) => {
       snapshot.docs.forEach((item) => { const expiresAt = asMillis(item.data().expiresAt); if (expiresAt <= Date.now()) deleteExpiredCommunityItem(COMMUNITY_FEED, item.id, item.data().storagePath, Number(item.data().uploadBytes) || 0); });
@@ -660,7 +689,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return onSnapshot(doc(db, COMMUNITY_STORAGE_META, 'usage'), (snapshot) => {
       const usedBytes = Number(snapshot.data()?.usedBytes) || 0;
       setStorageUsedBytes(Math.max(0, usedBytes));
-      setLimitMessage(usedBytes >= STORAGE_LOCK_BYTES ? 'Firebase Storage 4GB safety limit reached. Uploads are locked for all users until 24-hour stories or 5-day posts are cleaned up.' : '');
+      setLimitMessage(usedBytes >= STORAGE_LOCK_BYTES ? 'Firebase Storage 4GB safety limit reached. Uploads are locked for all users until 15-day posts and stories are cleaned up.' : '');
     }, (error) => console.warn('Storage usage sync failed', error));
   }, [isCommunityAllowed]);
 
@@ -669,11 +698,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (!isCommunityAllowed || !currentUserKey) return undefined;
     const unsubCreator = onSnapshot(doc(db, COMMUNITY_UPLOAD_QUOTAS, `${currentUserKey}_creator`), (snapshot) => {
       const used = snapshot.data()?.usedTypes || {};
-      setCreatorQuota({ [todayKey()]: postOptions.map((option) => option.type).filter((type) => Number(used[type]) > Date.now() - 24 * 60 * 60 * 1000) });
+      setCreatorQuota({ [todayKey()]: postOptions.map((option) => option.type).filter((type) => isTimestampFromToday(Number(used[type]))) });
     }, (error) => console.warn('Creator quota sync failed', error));
     const unsubStatus = onSnapshot(doc(db, COMMUNITY_UPLOAD_QUOTAS, `${currentUserKey}_status`), (snapshot) => {
       const used = snapshot.data()?.usedTypes || {};
-      setStatusQuota({ [todayKey()]: postOptions.map((option) => option.type).filter((type) => Number(used[type]) > Date.now() - 24 * 60 * 60 * 1000) });
+      setStatusQuota({ [todayKey()]: postOptions.map((option) => option.type).filter((type) => isTimestampFromToday(Number(used[type]))) });
     }, (error) => console.warn('Status quota sync failed', error));
     return () => { unsubCreator(); unsubStatus(); };
   }, [currentUserKey, isCommunityAllowed]);
@@ -914,16 +943,19 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (!draft || isCreatorTypeUsedToday || isStorageLocked || isPublishingCreator) return;
     if (postType === 'poll' && cleanedOptions.length < 2) return;
     setIsPublishingCreator(true);
-    const imageBytes = postType === 'image' ? dataUrlBytes(postImagePreview) : 0;
-    try { await claimDailyUploadSlot('creator', postType, imageBytes); } catch (error) { setProfileFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Daily limit or storage lock is active.' }); setIsPublishingCreator(false); return; }
+
+    const publishType = postType;
+    const publishImagePreview = postImagePreview;
+    const publishImageBytes = publishType === 'image' ? dataUrlBytes(publishImagePreview) : 0;
     const labels: Record<PostType, { badge: string; title: string; avatar: string }> = {
       text: { badge: 'Creator text · +1 EduCoin', title: `${profile.name} shared a note`, avatar: profile.avatar },
       image: { badge: 'Creator image · +1 EduCoin', title: `${profile.name} shared an image idea`, avatar: profile.avatar },
       poll: { badge: 'Creator poll · +1 EduCoin', title: `${profile.name} opened a poll`, avatar: profile.avatar },
     };
-    const meta = labels[postType];
-    const newMessage: FeedMessage = {
-      id: Date.now(),
+    const meta = labels[publishType];
+    const now = Date.now();
+    const localMessage = normalizeFeedMessage({
+      id: now,
       admin: profile.name,
       badge: meta.badge,
       avatar: meta.avatar,
@@ -931,16 +963,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       body: draft,
       time: 'Just now',
       creatorId: currentUserKey,
-      postType,
-      imagePreview: postType === 'image' ? (postImagePreview || '🖼️') : undefined,
-      imageLayout: postType === 'image' ? 'thumbnail' : undefined,
-      pollOptions: postType === 'poll' ? cleanedOptions : undefined,
-      pollVotes: postType === 'poll' ? cleanedOptions.map(() => 0) : undefined,
+      postType: publishType,
+      imagePreview: publishType === 'image' ? (publishImagePreview || '🖼️') : undefined,
+      imageLayout: publishType === 'image' ? 'thumbnail' : undefined,
+      pollOptions: publishType === 'poll' ? cleanedOptions : undefined,
+      pollVotes: publishType === 'poll' ? cleanedOptions.map(() => 0) : undefined,
       reactions: [],
       likeCount: 0,
       replies: [],
-      createdAt: Date.now(),
-      expiresAt: Date.now() + POST_TTL_MS,
+      createdAt: now,
+      expiresAt: now + POST_TTL_MS,
       ownerId: currentUserKey,
       source: 'creator',
       reactionCounts: {},
@@ -948,31 +980,46 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       pollVoters: {},
       reactionUsers: {},
       replyCount: 0,
-    };
-    const upload = postType === 'image' && postImagePreview ? await uploadCommunityImage('creator-posts', newMessage.id, postImagePreview) : { imageUrl: newMessage.imagePreview, storagePath: undefined, uploadBytes: 0 };
-    const now = Date.now();
-    const cloudMessage = normalizeFeedMessage({ ...newMessage, imagePreview: upload.imageUrl, storagePath: upload.storagePath, uploadBytes: upload.uploadBytes, ownerId: currentUserKey, createdAt: now, expiresAt: now + POST_TTL_MS, source: 'creator' });
-    flushSync(() => setMessages((current) => [cloudMessage, ...current.filter((message) => message.id !== cloudMessage.id)]));
-    openPublishedCreatorPost(cloudMessage.id);
-    addDoc(collection(db, COMMUNITY_FEED), stripUndefinedDeep({ ...cloudMessage, ownerId: currentUserKey, creatorId: currentUserKey, createdAt: now, expiresAt: now + POST_TTL_MS, source: 'creator', reactionCounts: {}, replyCount: 0 }))
-      .then((docRef) => {
-        const firebasePostId = Number.parseInt(docRef.id.replace(/\D/g, '').slice(-9), 10) || newMessage.id;
-        setMessages((current) => current.map((message) => message.id === newMessage.id ? { ...message, docId: docRef.id } : message));
-        setSelectedMessageId(newMessage.id || firebasePostId);
-        setProfileFeedback({ type: 'success', message: 'Creator post published and opened.' });
-        setEduCoins((coins) => coins + 1);
-        setPostDraft('');
-        setPostImageName('');
-        setPostImagePreview('');
-        setPostPollOptions(['', '', '']);
-      })
-      .catch((error) => {
-        console.warn('Creator post write failed; showing local post fallback', error);
-        setMessages((current) => current.filter((message) => message.id !== newMessage.id));
-        releaseDailyUploadSlot('creator', postType, imageBytes);
-        setProfileFeedback({ type: 'error', message: 'Creator post failed to publish. Nothing was locked; please try again.' });
-      })
-      .finally(() => setIsPublishingCreator(false));
+    });
+
+    flushSync(() => setMessages((current) => [localMessage, ...current.filter((message) => message.id !== localMessage.id)]));
+    openPublishedCreatorPost(localMessage.id);
+    setProfileFeedback({ type: 'success', message: 'Creator post published and opened.' });
+    setEduCoins((coins) => coins + 1);
+    setPostDraft('');
+    setPostImageName('');
+    setPostImagePreview('');
+    setPostPollOptions(['', '', '']);
+    setCreatorQuota((current) => ({ [todayKey()]: Array.from(new Set([...(current[todayKey()] || []), publishType])) }));
+    setIsPublishingCreator(false);
+
+    (async () => {
+      try {
+        await claimDailyUploadSlot('creator', publishType, publishImageBytes);
+        const upload = publishType === 'image' && publishImagePreview
+          ? await uploadCommunityImage('creator-posts', localMessage.id, publishImagePreview)
+          : { imageUrl: localMessage.imagePreview, storagePath: undefined, uploadBytes: 0 };
+        const cloudMessage = normalizeFeedMessage({
+          ...localMessage,
+          imagePreview: upload.imageUrl,
+          storagePath: upload.storagePath,
+          uploadBytes: upload.uploadBytes,
+          ownerId: currentUserKey,
+          creatorId: currentUserKey,
+          createdAt: now,
+          expiresAt: now + POST_TTL_MS,
+          source: 'creator',
+          reactionCounts: {},
+          replyCount: 0,
+        });
+        const docRef = await addDoc(collection(db, COMMUNITY_FEED), stripUndefinedDeep(cloudMessage));
+        setMessages((current) => current.map((message) => message.id === localMessage.id ? { ...cloudMessage, docId: docRef.id } : message));
+        setSelectedMessageId(localMessage.id);
+      } catch (error) {
+        console.warn('Creator post remote publish failed; keeping local post visible', error);
+        releaseDailyUploadSlot('creator', publishType, publishImageBytes);
+      }
+    })();
 
   };
 
@@ -982,40 +1029,62 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if ((!draft && statusType !== 'image') || isStatusTypeUsedToday || isStorageLocked || isPublishingStatus) return;
     if (statusType === 'poll' && cleanedOptions.length < 2) return;
     setIsPublishingStatus(true);
-    const imageBytes = statusType === 'image' ? dataUrlBytes(statusImagePreview) : 0;
-    try { await claimDailyUploadSlot('status', statusType, imageBytes); } catch (error) { setProfileFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Daily limit or storage lock is active.' }); setIsPublishingStatus(false); return; }
-    const title = statusType === 'image' ? (statusImageName || 'Image story') : draft.slice(0, 54) || 'Fresh status';
+
+    const publishType = statusType;
+    const publishImagePreview = statusImagePreview;
+    const publishImageBytes = publishType === 'image' ? dataUrlBytes(publishImagePreview) : 0;
+    const title = publishType === 'image' ? (statusImageName || 'Image story') : draft.slice(0, 54) || 'Fresh status';
     const statusStoryId = Date.now();
     const statusStory = createStatusStory({
       id: statusStoryId,
-      type: statusType,
+      type: publishType,
       title,
       body: draft,
-      imagePreview: statusImagePreview,
+      imagePreview: publishImagePreview,
       pollOptions: cleanedOptions,
     });
-    const upload = statusType === 'image' && statusImagePreview ? await uploadCommunityImage('stories', statusStoryId, statusImagePreview) : { imageUrl: statusStory.imagePreview, storagePath: undefined, uploadBytes: 0 };
     const now = Date.now();
-    const cloudStory = { ...statusStory, imagePreview: upload.imageUrl, storagePath: upload.storagePath, uploadBytes: upload.uploadBytes, ownerId: currentUserKey, createdAt: now, expiresAt: now + STORY_TTL_MS, source: 'status' as const };
-    flushSync(() => setStatusCards((current) => [cloudStory, ...current.filter((status) => status.id !== cloudStory.id)]));
+    const localStory = {
+      ...statusStory,
+      ownerId: currentUserKey,
+      createdAt: now,
+      expiresAt: now + STORY_TTL_MS,
+      source: 'status' as const,
+    };
+    flushSync(() => setStatusCards((current) => [localStory, ...current.filter((status) => status.id !== localStory.id)]));
     openPublishedStatusStory(statusStoryId);
-    addDoc(collection(db, COMMUNITY_STATUS), stripUndefinedDeep({ ...cloudStory, ownerId: currentUserKey, createdAt: now, expiresAt: now + STORY_TTL_MS, source: 'status' }))
-      .then((docRef) => {
-        setStatusCards((current) => current.map((status) => status.id === statusStoryId ? { ...status, docId: docRef.id } : status));
+    setProfileFeedback({ type: 'success', message: 'Status story published and opened.' });
+    setStatusDraft('');
+    setStatusImageName('');
+    setStatusImagePreview('');
+    setStatusPollOptions(['', '', '']);
+    setStatusQuota((current) => ({ [todayKey()]: Array.from(new Set([...(current[todayKey()] || []), publishType])) }));
+    setIsPublishingStatus(false);
+
+    (async () => {
+      try {
+        await claimDailyUploadSlot('status', publishType, publishImageBytes);
+        const upload = publishType === 'image' && publishImagePreview
+          ? await uploadCommunityImage('stories', statusStoryId, publishImagePreview)
+          : { imageUrl: localStory.imagePreview, storagePath: undefined, uploadBytes: 0 };
+        const cloudStory = {
+          ...localStory,
+          imagePreview: upload.imageUrl,
+          storagePath: upload.storagePath,
+          uploadBytes: upload.uploadBytes,
+          ownerId: currentUserKey,
+          createdAt: now,
+          expiresAt: now + STORY_TTL_MS,
+          source: 'status' as const,
+        };
+        const docRef = await addDoc(collection(db, COMMUNITY_STATUS), stripUndefinedDeep(cloudStory));
+        setStatusCards((current) => current.map((status) => status.id === statusStoryId ? { ...cloudStory, docId: docRef.id } : status));
         openPublishedStatusStory(statusStoryId);
-        setProfileFeedback({ type: 'success', message: 'Status story published and opened.' });
-        setStatusDraft('');
-        setStatusImageName('');
-        setStatusImagePreview('');
-        setStatusPollOptions(['', '', '']);
-      })
-      .catch((error) => {
-        console.warn('Status write failed; showing local story fallback', error);
-        setStatusCards((current) => current.filter((status) => status.id !== statusStoryId));
-        releaseDailyUploadSlot('status', statusType, imageBytes);
-        setProfileFeedback({ type: 'error', message: 'Status story failed to publish. Nothing was locked; please try again.' });
-      })
-      .finally(() => setIsPublishingStatus(false));
+      } catch (error) {
+        console.warn('Status story remote publish failed; keeping local story visible', error);
+        releaseDailyUploadSlot('status', publishType, publishImageBytes);
+      }
+    })();
   };
 
   const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -1419,20 +1488,24 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return <div className="mx-auto grid h-[clamp(32rem,calc(100dvh-10.5rem),76rem)] min-h-0 w-full min-w-0 max-w-[1800px] gap-4 overflow-hidden lg:gap-5 md:grid-cols-[minmax(0,clamp(17rem,30vw,27.5rem))_minmax(0,1fr)]"><aside className="hidden h-full min-h-0 min-w-0 overflow-y-auto rounded-[2rem] border border-[#E0E3EB] bg-white p-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] ring-1 ring-[#D2E3FC] backdrop-blur-xl custom-scrollbar md:block"><div className={`relative mb-4 overflow-hidden rounded-[1.6rem] bg-gradient-to-br ${heroGradient} p-5 text-[#202124] shadow-[0_18px_50px_rgba(37,99,235,0.18)]`}><div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/20 blur-2xl" /><p className="relative text-xs font-black uppercase tracking-[0.28em] text-[#202124]/80">{heroEyebrow}</p><h2 className="relative mt-2 text-3xl font-black tracking-tight">{heroIcon} {title}</h2><p className="relative mt-2 text-sm font-semibold leading-6 text-[#202124]/78">{subtitle}</p></div><div className="space-y-3">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} isActive={activeMessage?.id === message.id} />)}</div></aside><section className="hidden min-h-0 min-w-0 overflow-hidden md:block">{activeMessage ? renderMessageDetails(activeMessage) : null}</section><div className="h-full space-y-3 overflow-y-auto pb-4 custom-scrollbar md:hidden">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)}</div></div>;
   };
 
-  const renderTypeComposer = (activeType: PostType, setActiveType: (type: PostType) => void, accent: 'sky' | 'orange' = 'sky') => {
+  const renderTypeComposer = (activeType: PostType, setActiveType: (type: PostType) => void, accent: 'sky' | 'orange' = 'sky', isStatus = false) => {
+    const usedTypes = isStatus ? usedStatusTypesToday : usedCreatorTypesToday;
     const activeClass = accent === 'orange'
       ? 'border-[#FDD663] bg-[#FEF7E0] shadow-[0_18px_42px_rgba(251,188,4,0.14)] ring-2 ring-white'
       : 'border-[#C2E7FF] bg-[#E8F0FE] shadow-[0_18px_42px_rgba(26,115,232,0.12)] ring-2 ring-white';
 
     return (
       <div className="grid gap-3 sm:grid-cols-3">
-        {postOptions.map((option) => (
-          <button key={option.type} type="button" onClick={() => setActiveType(option.type)} className={`rounded-[1.35rem] border p-4 text-left transition duration-300 hover:-translate-y-1 ${activeType === option.type ? activeClass : 'border-[#E0E3EB] bg-white hover:bg-[#E8F0FE]'}`}>
-            <span className="text-3xl">{option.icon}</span>
-            <span className="mt-3 block text-lg font-black text-[#202124]">{option.label}</span>
-            <span className="mt-1 block text-sm font-bold text-[#5F6368]">{option.helper}</span>
-          </button>
-        ))}
+        {postOptions.map((option) => {
+          const isUsedToday = usedTypes.includes(option.type);
+          return (
+            <button key={option.type} type="button" disabled={isUsedToday} onClick={() => setActiveType(option.type)} className={`rounded-[1.35rem] border p-4 text-left transition duration-300 disabled:cursor-not-allowed disabled:opacity-55 ${isUsedToday ? 'border-[#E0E3EB] bg-[#F1F3F4]' : activeType === option.type ? activeClass : 'border-[#E0E3EB] bg-white hover:-translate-y-1 hover:bg-[#E8F0FE]'}`}>
+              <span className="text-3xl">{option.icon}</span>
+              <span className="mt-3 block text-lg font-black text-[#202124]">{option.label}</span>
+              <span className="mt-1 block text-sm font-bold text-[#5F6368]">{isUsedToday ? 'Used today · unlocks tomorrow' : option.helper}</span>
+            </button>
+          );
+        })}
       </div>
     );
   };
@@ -1592,14 +1665,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {page === 'chat' && activeView === 'feed' && renderFeedLayout(messages, 'Chat Feed', 'Fresh community prompts, replies, and streak ideas are shown here.')}
       {page === 'thread' && <div className="space-y-3"><button type="button" onClick={goBack} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-sm font-black text-[#64748B] shadow-sm">← Back to posts</button>{renderMessageDetails(selectedMessage, true)}</div>}
       {page === 'profile' && renderProfilePage()}
-      {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_28px_90px_rgba(79,123,255,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.28em] text-[#4F7BFF]">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Post freely for 24-hour community visibility.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">Creator posts stay visible for 24 hours across login, logout, and other devices, then auto-delete from the main chat feed for all users.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EAF5FF] p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || !postDraft.trim() || isStorageLocked || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.28)] disabled:opacity-45">{isPublishingCreator ? 'Publishing creator post...' : isStorageLocked ? 'Storage limit reached' : 'Publish creator post'}</button></div></div>}
+      {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_28px_90px_rgba(79,123,255,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.28em] text-[#4F7BFF]">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Post once per type daily with 15-day community visibility.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">Each user can publish one text, one image, and one poll creator post per day. Posts sync through Firebase for all users and auto-delete after 15 days.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EAF5FF] p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || isCreatorTypeUsedToday || !postDraft.trim() || isStorageLocked || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.28)] disabled:opacity-45">{isPublishingCreator ? 'Publishing creator post...' : isCreatorTypeUsedToday ? `${postType} post used today` : isStorageLocked ? 'Storage limit reached' : 'Publish creator post'}</button></div></div>}
       {page === 'network' && <div className="mx-auto max-w-5xl rounded-[2rem] bg-white p-4 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="sticky top-0 z-10 bg-white pb-3"><h2 className="text-4xl font-black text-[#081B5C]">{profile.username}</h2><div className="mt-6 grid grid-cols-4 border-b border-[#E3ECF8] text-center text-sm font-black sm:text-lg">{(['mutual', 'followers', 'following', 'forYou'] as const).map((tab) => <button key={tab} type="button" onClick={() => setNetworkTab(tab)} className={`pb-3 capitalize ${networkTab === tab ? 'border-b-4 border-[#4F7BFF] text-[#4F46E5]' : 'text-[#64748B]'}`}>{tab === 'forYou' ? 'For you' : tab}</button>)}</div><input value={networkSearch} onChange={(event) => setNetworkSearch(event.target.value)} placeholder="Search creators..." className="mt-4 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></div><div className="space-y-3 pt-3">{filteredCreators.map((creator) => { const followed = followedIds.includes(creator.id); return <article key={creator.id} className="flex items-center gap-3 rounded-3xl border border-[#E3ECF8] bg-white p-4 shadow-sm"><Avatar value={creator.avatar} /><div className="min-w-0 flex-1"><h3 className="truncate text-xl font-black text-[#081B5C]">{creator.name} {creator.verified ? '✅' : ''}</h3><p className="text-sm font-bold text-[#64748B]">@{creator.username} · {creator.role}</p><p className="text-sm font-black text-[#64748B]">{creator.followers.toLocaleString()} followers</p></div><button type="button" onClick={() => setFollowedIds((current) => followed ? current.filter((id) => id !== creator.id) : [...current, creator.id])} className={`rounded-full px-4 py-2 text-sm font-black transition ${followed ? 'bg-[#EEF2FF] text-[#4F46E5]' : 'bg-[#4F7BFF] text-white'}`}>{followed ? 'Following' : 'Follow'}</button></article>; })}</div></div>}
       {page === 'following' && renderFeedLayout(followingMessages, 'Your followers feed', 'Only posts from creators you follow are shown here.')}
       {page === 'adminPosts' && renderFeedLayout(adminPosts, 'ADMIN POST', 'Official admin posts from Firebase. Like, react, vote, and reply here.')}
       {page === 'tagMaster' && renderTagMasterPage()}{page === 'masterTags' && renderMasterTagsPage()}{page === 'masterTagDetail' && renderMasterTagDetailPage()}
       {page === 'directChat' && renderChatPage()}{page === 'directChatThread' && renderChatThreadPage()}{page === 'statusDetail' && renderStatusDetailPage()}
-      {page === 'chat' && activeView === 'status' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[1.8rem] border border-[#E3ECF8] bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-5 text-center text-[#081B5C] shadow-[0_22px_70px_rgba(79,123,255,0.16)]"><p className="text-lg font-black sm:text-2xl">1MB Limit &amp; {statusAvailableSlots.toLocaleString()} real slots left</p><p className="mt-2 text-sm font-bold text-[#64748B]">Firebase Storage tracked up to 4GB safety limit · Tap any status to open a scroll-snap reel.</p><div className="mt-4 flex justify-center gap-2"><button type="button" onClick={() => pushPage('statusUpload')} disabled={isStorageLocked} className="rounded-2xl bg-[#4F7BFF] px-4 py-3 text-xs font-black text-white disabled:bg-transparent disabled:text-[#64748B] disabled:ring-2 disabled:ring-[#E3ECF8]">{isStorageLocked ? 'Uploads locked' : 'Upload your status'}</button><button type="button" onClick={() => pushPage('statusMine')} className="rounded-2xl bg-white px-4 py-3 text-xs font-black text-[#081B5C]">View your status</button></div></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
-      {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_30px_90px_rgba(79,123,255,0.16)]"><div className="bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.3em] text-[#4F7BFF]">Story studio</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2></div><div className="p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : <div className="mb-4 rounded-2xl border border-[#D2E3FC] bg-[#E8F0FE] px-4 py-3 text-sm font-black text-[#1967D2]">Real available slots: {statusAvailableSlots.toLocaleString()} · Storage used: {storagePercent(storageUsedBytes)}% of 4GB safety limit</div>}<div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange')}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={isPublishingStatus || isStorageLocked || (statusType === 'image' && !statusImagePreview) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white disabled:opacity-45">{isPublishingStatus ? 'Publishing status story...' : isStorageLocked ? 'Storage limit reached' : 'Publish status story'}</button></div></div>}
+      {page === 'chat' && activeView === 'status' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[1.8rem] border border-[#E3ECF8] bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-5 text-center text-[#081B5C] shadow-[0_22px_70px_rgba(79,123,255,0.16)]"><p className="text-lg font-black sm:text-2xl">Daily one per type · {statusAvailableSlots.toLocaleString()} real slots left</p><p className="mt-2 text-sm font-bold text-[#64748B]">Text, image, and poll stories each lock after one daily use and stay visible for 15 days via Firebase.</p><div className="mt-4 flex justify-center gap-2"><button type="button" onClick={() => pushPage('statusUpload')} disabled={isStorageLocked} className="rounded-2xl bg-[#4F7BFF] px-4 py-3 text-xs font-black text-white disabled:bg-transparent disabled:text-[#64748B] disabled:ring-2 disabled:ring-[#E3ECF8]">{isStorageLocked ? 'Uploads locked' : 'Upload your status'}</button><button type="button" onClick={() => pushPage('statusMine')} className="rounded-2xl bg-white px-4 py-3 text-xs font-black text-[#081B5C]">View your status</button></div></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
+      {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_30px_90px_rgba(79,123,255,0.16)]"><div className="bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.3em] text-[#4F7BFF]">Story studio</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2></div><div className="p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : <div className="mb-4 rounded-2xl border border-[#D2E3FC] bg-[#E8F0FE] px-4 py-3 text-sm font-black text-[#1967D2]">Real available slots: {statusAvailableSlots.toLocaleString()} · Storage used: {storagePercent(storageUsedBytes)}% of 4GB safety limit</div>}<div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange', true)}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={isPublishingStatus || isStatusTypeUsedToday || isStorageLocked || (statusType === 'image' && !statusImagePreview) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white disabled:opacity-45">{isPublishingStatus ? 'Publishing status story...' : isStatusTypeUsedToday ? `${statusType} story used today` : isStorageLocked ? 'Storage limit reached' : 'Publish status story'}</button></div></div>}
       {page === 'statusMine' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[2rem] border border-[#E3ECF8] bg-white p-6"><h2 className="text-4xl font-black tracking-tight text-[#081B5C]">View your status</h2><p className="mt-2 text-sm font-bold text-[#64748B]">Tap a card to open reel view.</p></div>{myStatuses.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{myStatuses.map(renderStatusTile)}</div> : <div className="rounded-[2rem] border border-dashed border-[#E3ECF8] bg-white p-10 text-center font-black text-[#64748B]">No status uploaded yet.</div>}</div>}
     </div>
   );
