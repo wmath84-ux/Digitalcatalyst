@@ -96,6 +96,29 @@ service cloud.firestore {
       allow delete: if isAdmin();
     }
 
+    match /community_profiles/{uid} {
+      allow read: if signedIn();
+      allow create, update: if isOwner(uid)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.ownerId == request.auth.uid;
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    match /community_follows/{followId} {
+      allow read: if signedIn();
+
+      allow create: if signedIn()
+        && request.resource.data.followerId == request.auth.uid
+        && request.resource.data.followingId is string
+        && request.resource.data.followingId != request.auth.uid
+        && followId == request.auth.uid + '_' + request.resource.data.followingId;
+
+      allow update: if false;
+
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.followerId == request.auth.uid);
+    }
+
     match /community_master_tags/{tagId} {
       allow read: if signedIn();
       allow create: if signedIn();

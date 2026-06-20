@@ -16,7 +16,22 @@ type CommunityPage = 'chat' | 'adminPosts' | 'thread' | 'profile' | 'creators' |
 type PostType = 'text' | 'image' | 'poll';
 type Reply = { id: number; author: string; text: string; time: string; avatar?: string; docId?: string; createdAt?: number; ownerId?: string };
 type FeedMessage = { id: number; admin: string; badge: string; avatar: string; title: string; body: string; time: string; reactions: string[]; replies: Reply[]; creatorId?: string; ownerId?: string; postType?: PostType; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; likeCount?: number; docId?: string; createdAt?: number; reactionCounts?: Record<string, number>; replyCount?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; reactionUsers?: Record<string, string>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'creator' | 'admin' };
-type Creator = { id: string; username: string; name: string; avatar: string; role: string; followers: number; mutual: boolean; verified?: boolean };
+type Creator = {
+  id: string;
+  username: string;
+  name: string;
+  avatar: string;
+  role: string;
+  followers: number;
+  mutual: boolean;
+  verified?: boolean;
+  ownerId?: string;
+  followerCount?: number;
+  followingCount?: number;
+  isFollowing?: boolean;
+  isFollower?: boolean;
+  source?: 'profile' | 'seed';
+};
 type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'status' };
 type SharedStory = { id: number; statusId: number; recipientId: string; senderId: 'me'; senderName: string; time: string };
 type MasterTagRequest = { id: number; author: string; avatar: string; category: string; title: string; detail: string; time: string; likes: number; reactions: Record<string, number>; ownerId?: string; docId?: string; likedByUsers?: Record<string, boolean>; reactionUsers?: Record<string, string>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'creator' | 'admin' };
@@ -151,6 +166,9 @@ const COMMUNITY_STATUS = 'community_status';
 const COMMUNITY_MASTER_TAGS = 'community_master_tags';
 const COMMUNITY_UPLOAD_QUOTAS = 'community_upload_quotas';
 const COMMUNITY_STORAGE_META = 'community_storage_meta';
+const COMMUNITY_PROFILES = 'community_profiles';
+const COMMUNITY_FOLLOWS = 'community_follows';
+const getFollowDocId = (followerId: string, followingId: string) => `${followerId}_${followingId}`;
 const ADMIN_POST_FALLBACK_STORAGE_KEY = 'eduvoraAdminPostFallbacks';
 const ADMIN_POST_FALLBACK_EVENT = 'eduvoraAdminPostFallbackUpdated';
 const POST_TTL_MS = 15 * 24 * 60 * 60 * 1000;
@@ -388,7 +406,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [isPublishingStatus, setIsPublishingStatus] = useState(false);
   const [creatorQuota, setCreatorQuota] = useState<Record<string, string[]>>(() => readJsonObject<Record<string, string[]>>(COMMUNITY_CREATOR_QUOTA_KEY, { [todayKey()]: [] }));
   const [statusQuota, setStatusQuota] = useState<Record<string, string[]>>(() => readJsonObject<Record<string, string[]>>(COMMUNITY_STATUS_QUOTA_KEY, { [todayKey()]: [] }));
-  const [followedIds, setFollowedIds] = useState<string[]>(['riya', 'meera']);
+  const [communityProfiles, setCommunityProfiles] = useState<Creator[]>([]);
+  const [followedIds, setFollowedIds] = useState<string[]>([]);
+  const [followerIds, setFollowerIds] = useState<string[]>([]);
+  const [followedByCreatorIds, setFollowedByCreatorIds] = useState<Record<string, boolean>>({});
+  const [followerByCreatorIds, setFollowerByCreatorIds] = useState<Record<string, boolean>>({});
+  const [followerCounts, setFollowerCounts] = useState<Record<string, number>>({});
+  const [followingCounts, setFollowingCounts] = useState<Record<string, number>>({});
+  const [followLoadingIds, setFollowLoadingIds] = useState<Record<string, boolean>>({});
   const [networkTab, setNetworkTab] = useState<'mutual' | 'followers' | 'following' | 'forYou'>('following');
   const [networkSearch, setNetworkSearch] = useState('');
   const [masterTagRequests, setMasterTagRequests] = useState<MasterTagRequest[]>(() => readJsonArray(MASTER_TAG_STORAGE_KEY, initialMasterTagRequests));
@@ -430,8 +455,49 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const isOwnCommunityId = (id?: string) => id === currentUserKey || id === 'me';
   const selectedMessage = messages.find((message) => message.id === selectedMessageId) || messages[0];
   const selectedStatus = statusCards.find((status) => status.id === selectedStatusId) || statusCards[0];
-  const allCreators = useMemo(() => creators.map((creator) => creator.id === 'me' ? { ...creator, name: profile.name, username: profile.username, avatar: profile.avatar } : creator), [profile]);
-  const followingMessages = messages.filter((message) => message.creatorId && (followedIds.includes(message.creatorId) || isOwnCommunityId(message.creatorId)));
+  const currentProfileCreator = useMemo<Creator>(() => ({
+    id: currentUserKey,
+    ownerId: currentUserKey,
+    username: normalizeUsername(profile.username) || 'eduvora_member',
+    name: profile.name || 'Eduvora Member',
+    avatar: profile.avatar || '🧑‍🎓',
+    role: 'Community member',
+    followers: followerIds.length,
+    followerCount: followerIds.length,
+    followingCount: followedIds.length,
+    mutual: false,
+    verified: false,
+    source: 'profile',
+  }), [currentUserKey, followedIds.length, followerIds.length, profile.avatar, profile.name, profile.username]);
+
+  const allCreators = useMemo(() => {
+    const merged = new Map<string, Creator>();
+
+    communityProfiles.forEach((creator) => {
+      if (!creator.id) return;
+      merged.set(creator.id, {
+        ...creator,
+        followers: followerCounts[creator.id] || creator.followers || 0,
+        followerCount: followerCounts[creator.id] || 0,
+        followingCount: followingCounts[creator.id] || 0,
+        mutual: Boolean(followedByCreatorIds[creator.id] && followerByCreatorIds[creator.id]),
+        isFollowing: Boolean(followedByCreatorIds[creator.id]),
+        isFollower: Boolean(followerByCreatorIds[creator.id]),
+        source: 'profile',
+      });
+    });
+
+    if (currentUserKey) {
+      merged.set(currentUserKey, currentProfileCreator);
+    }
+
+    return Array.from(merged.values()).sort((a, b) => {
+      if (Boolean(b.verified) !== Boolean(a.verified)) return Number(Boolean(b.verified)) - Number(Boolean(a.verified));
+      return a.name.localeCompare(b.name);
+    });
+  }, [communityProfiles, currentProfileCreator, currentUserKey, followedByCreatorIds, followerByCreatorIds, followerCounts, followingCounts]);
+
+  const followingMessages = messages.filter((message) => message.creatorId && (followedByCreatorIds[message.creatorId] || isOwnCommunityId(message.creatorId)));
   const usedCreatorTypesToday = creatorQuota[todayKey()] || [];
   const usedStatusTypesToday = statusQuota[todayKey()] || [];
   const isStorageLocked = storageUsedBytes >= STORAGE_LOCK_BYTES;
@@ -445,12 +511,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const shouldShowStatusDetail = (card: StatusCard) => card.body.length > 140 || Boolean(card.imagePreview && card.body.trim().length > 0);
   const profileStats = useMemo(() => ({
     coinBalance: eduCoins,
+    followers: followerIds.length,
     following: followedIds.length,
     creatorPosts: messages.filter((message) => isOwnCommunityId(message.creatorId)).length,
     myStatuses: myStatuses.length,
     masterTags: masterTagRequests.filter((request) => isOwnCommunityId(request.ownerId) || request.author === profile.name).length,
     repliesGiven: messages.reduce((count, message) => count + message.replies.filter((reply) => isOwnCommunityId(reply.ownerId) || reply.author === profile.name).length, 0),
-  }), [eduCoins, followedIds.length, masterTagRequests, messages, myStatuses.length, profile.name]);
+  }), [eduCoins, followedIds.length, followerIds.length, masterTagRequests, messages, myStatuses.length, profile.name]);
 
   const notifications = useMemo<CommunityNotification[]>(() => {
     const feedReplyAlerts = messages.flatMap((message) => message.replies.slice(-2).map((reply) => ({
@@ -726,6 +793,104 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return () => { unsubCreator(); unsubStatus(); };
   }, [currentUserKey, isCommunityAllowed]);
 
+
+  useEffect(() => {
+    if (!isCommunityAllowed || !guardedAuth.currentUser || !currentUserKey) return undefined;
+
+    const profilePayload = stripUndefinedDeep({
+      id: currentUserKey,
+      userId: currentUserKey,
+      ownerId: currentUserKey,
+      name: profile.name || 'Eduvora Member',
+      username: normalizeUsername(profile.username || profile.name) || `member_${currentUserKey.slice(0, 6)}`,
+      avatar: profile.avatar || '🧑‍🎓',
+      role: 'Community member',
+      bio: profile.bio || '',
+      updatedAt: Date.now(),
+      createdAt: Date.now(),
+    });
+
+    setDoc(doc(db, COMMUNITY_PROFILES, currentUserKey), profilePayload, { merge: true })
+      .catch((error) => console.warn('Community profile sync failed', error));
+
+    return undefined;
+  }, [currentUserKey, guardedAuth.currentUser, isCommunityAllowed, profile.avatar, profile.bio, profile.name, profile.username]);
+
+  useEffect(() => {
+    if (!isCommunityAllowed) return undefined;
+
+    const profilesQuery = query(collection(db, COMMUNITY_PROFILES), limit(500));
+    return onSnapshot(profilesQuery, (snapshot) => {
+      const firebaseProfiles = snapshot.docs.map((item): Creator => {
+        const data = item.data() as Record<string, unknown>;
+        const userId = String(data.userId || data.ownerId || item.id);
+        const rawName = typeof data.name === 'string' && data.name.trim() ? data.name : 'Eduvora Member';
+        const rawUsername = typeof data.username === 'string' && data.username.trim() ? data.username : rawName;
+        const rawAvatar = typeof data.avatar === 'string' && data.avatar.trim() ? data.avatar : '🧑‍🎓';
+        const rawRole = typeof data.role === 'string' && data.role.trim() ? data.role : 'Community member';
+
+        return {
+          id: userId,
+          ownerId: userId,
+          username: normalizeUsername(rawUsername) || `member_${userId.slice(0, 6)}`,
+          name: rawName,
+          avatar: rawAvatar,
+          role: rawRole,
+          followers: 0,
+          followerCount: 0,
+          followingCount: 0,
+          mutual: false,
+          verified: Boolean(data.verified),
+          source: 'profile',
+        };
+      }).filter((creator) => Boolean(creator.id));
+
+      setCommunityProfiles(firebaseProfiles);
+    }, (error) => console.warn('Community profiles sync failed', error));
+  }, [isCommunityAllowed]);
+
+  useEffect(() => {
+    if (!isCommunityAllowed || !currentUserKey) return undefined;
+
+    const followsQuery = query(collection(db, COMMUNITY_FOLLOWS), limit(2000));
+    return onSnapshot(followsQuery, (snapshot) => {
+      const nextFollowedIds: string[] = [];
+      const nextFollowerIds: string[] = [];
+      const nextFollowedByCreatorIds: Record<string, boolean> = {};
+      const nextFollowerByCreatorIds: Record<string, boolean> = {};
+      const nextFollowerCounts: Record<string, number> = {};
+      const nextFollowingCounts: Record<string, number> = {};
+
+      snapshot.docs.forEach((item) => {
+        const data = item.data() as Record<string, unknown>;
+        const followerId = typeof data.followerId === 'string' ? data.followerId : '';
+        const followingId = typeof data.followingId === 'string' ? data.followingId : '';
+
+        if (!followerId || !followingId || followerId === followingId) return;
+
+        nextFollowerCounts[followingId] = (nextFollowerCounts[followingId] || 0) + 1;
+        nextFollowingCounts[followerId] = (nextFollowingCounts[followerId] || 0) + 1;
+
+        if (followerId === currentUserKey) {
+          nextFollowedByCreatorIds[followingId] = true;
+          nextFollowedIds.push(followingId);
+        }
+
+        if (followingId === currentUserKey) {
+          nextFollowerByCreatorIds[followerId] = true;
+          nextFollowerIds.push(followerId);
+        }
+      });
+
+      setFollowedIds(Array.from(new Set(nextFollowedIds)));
+      setFollowerIds(Array.from(new Set(nextFollowerIds)));
+      setFollowedByCreatorIds(nextFollowedByCreatorIds);
+      setFollowerByCreatorIds(nextFollowerByCreatorIds);
+      setFollowerCounts(nextFollowerCounts);
+      setFollowingCounts(nextFollowingCounts);
+    }, (error) => console.warn('Community follows sync failed', error));
+  }, [currentUserKey, isCommunityAllowed]);
+
   useEffect(() => {
     const getDock = () => document.getElementById('community-bottom-dock');
     const getReplyBars = () => Array.from(document.querySelectorAll<HTMLElement>('[data-community-replybar="true"]'));
@@ -954,6 +1119,53 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setPageStack([]);
     recordStatusView(statusId);
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+
+  const toggleFollowCreator = async (creator: Creator) => {
+    if (!guardedAuth.currentUser || !currentUserKey) {
+      redirectToAuth();
+      return;
+    }
+
+    const followerId = currentUserKey;
+    const followingId = creator.id;
+
+    if (!followingId || followerId === followingId || followLoadingIds[followingId]) return;
+
+    const isAlreadyFollowing = Boolean(followedByCreatorIds[followingId]);
+    const followRef = doc(db, COMMUNITY_FOLLOWS, getFollowDocId(followerId, followingId));
+
+    setFollowLoadingIds((current) => ({ ...current, [followingId]: true }));
+
+    try {
+      if (isAlreadyFollowing) {
+        await deleteDoc(followRef);
+        setProfileFeedback({ type: 'success', message: `Unfollowed ${creator.name}.` });
+      } else {
+        await setDoc(followRef, stripUndefinedDeep({
+          followerId,
+          followingId,
+          followerName: profile.name,
+          followerUsername: normalizeUsername(profile.username || profile.name),
+          followerAvatar: profile.avatar,
+          followingName: creator.name,
+          followingUsername: creator.username,
+          followingAvatar: creator.avatar,
+          createdAt: Date.now(),
+        }));
+        setProfileFeedback({ type: 'success', message: `You are now following ${creator.name}.` });
+      }
+    } catch (error) {
+      console.warn('Follow update failed', error);
+      setProfileFeedback({ type: 'error', message: 'Follow update failed. Please try again.' });
+    } finally {
+      setFollowLoadingIds((current) => {
+        const next = { ...current };
+        delete next[followingId];
+        return next;
+      });
+    }
   };
 
   const submitCreatorPost = async () => {
@@ -1628,8 +1840,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const filteredCreators = allCreators.filter((creator) => {
     const textMatches = `${creator.username} ${creator.name} ${creator.role}`.toLowerCase().includes(networkSearch.toLowerCase());
-    const tabMatches = networkTab === 'mutual' ? creator.mutual : networkTab === 'following' ? followedIds.includes(creator.id) : true;
-    return textMatches && tabMatches;
+    const tabMatches =
+      networkTab === 'mutual'
+        ? creator.mutual
+        : networkTab === 'followers'
+          ? followerIds.includes(creator.id)
+          : networkTab === 'following'
+            ? followedIds.includes(creator.id)
+            : true;
+
+    return textMatches && tabMatches && !isOwnCommunityId(creator.id);
   });
 
 
@@ -1676,6 +1896,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const ProfileSummaryCard = () => {
     const items = [
       ['Coin Balance', String(profileStats.coinBalance)],
+      ['Followers', String(profileStats.followers)],
       ['Following', String(profileStats.following)],
       ['Creator Posts', String(profileStats.creatorPosts)],
       ['My Statuses', String(profileStats.myStatuses)],
@@ -1701,7 +1922,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {page === 'thread' && <div className="space-y-3"><button type="button" onClick={goBack} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-sm font-black text-[#64748B] shadow-sm">← Back to posts</button>{renderMessageDetails(selectedMessage, true)}</div>}
       {page === 'profile' && renderProfilePage()}
       {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_28px_90px_rgba(79,123,255,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.28em] text-[#4F7BFF]">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Post once per type daily with 15-day community visibility.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">Each user can publish one text, one image, and one poll creator post per day. The used type locks immediately, syncs through Firebase for all users, and auto-deletes after 15 days.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EAF5FF] p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || isCreatorTypeUsedToday || !postDraft.trim() || isStorageLocked || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.28)] disabled:opacity-45">{isPublishingCreator ? 'Publishing creator post...' : isCreatorTypeUsedToday ? `${postType} post used today` : isStorageLocked ? 'Storage limit reached' : 'Publish creator post'}</button></div></div>}
-      {page === 'network' && <div className="mx-auto max-w-5xl rounded-[2rem] bg-white p-4 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="sticky top-0 z-10 bg-white pb-3"><h2 className="text-4xl font-black text-[#081B5C]">{profile.username}</h2><div className="mt-6 grid grid-cols-4 border-b border-[#E3ECF8] text-center text-sm font-black sm:text-lg">{(['mutual', 'followers', 'following', 'forYou'] as const).map((tab) => <button key={tab} type="button" onClick={() => setNetworkTab(tab)} className={`pb-3 capitalize ${networkTab === tab ? 'border-b-4 border-[#4F7BFF] text-[#4F46E5]' : 'text-[#64748B]'}`}>{tab === 'forYou' ? 'For you' : tab}</button>)}</div><input value={networkSearch} onChange={(event) => setNetworkSearch(event.target.value)} placeholder="Search creators..." className="mt-4 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></div><div className="space-y-3 pt-3">{filteredCreators.map((creator) => { const followed = followedIds.includes(creator.id); return <article key={creator.id} className="flex items-center gap-3 rounded-3xl border border-[#E3ECF8] bg-white p-4 shadow-sm"><Avatar value={creator.avatar} /><div className="min-w-0 flex-1"><h3 className="truncate text-xl font-black text-[#081B5C]">{creator.name} {creator.verified ? '✅' : ''}</h3><p className="text-sm font-bold text-[#64748B]">@{creator.username} · {creator.role}</p><p className="text-sm font-black text-[#64748B]">{creator.followers.toLocaleString()} followers</p></div><button type="button" onClick={() => setFollowedIds((current) => followed ? current.filter((id) => id !== creator.id) : [...current, creator.id])} className={`rounded-full px-4 py-2 text-sm font-black transition ${followed ? 'bg-[#EEF2FF] text-[#4F46E5]' : 'bg-[#4F7BFF] text-white'}`}>{followed ? 'Following' : 'Follow'}</button></article>; })}</div></div>}
+      {page === 'network' && <div className="mx-auto max-w-5xl rounded-[2rem] bg-white p-4 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="sticky top-0 z-10 bg-white pb-3"><h2 className="text-4xl font-black text-[#081B5C]">{profile.username}</h2><div className="mt-6 grid grid-cols-4 border-b border-[#E3ECF8] text-center text-sm font-black sm:text-lg">{(['mutual', 'followers', 'following', 'forYou'] as const).map((tab) => <button key={tab} type="button" onClick={() => setNetworkTab(tab)} className={`pb-3 capitalize ${networkTab === tab ? 'border-b-4 border-[#4F7BFF] text-[#4F46E5]' : 'text-[#64748B]'}`}>{tab === 'forYou' ? 'For you' : tab}</button>)}</div><input value={networkSearch} onChange={(event) => setNetworkSearch(event.target.value)} placeholder="Search creators..." className="mt-4 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></div><div className="space-y-3 pt-3">{filteredCreators.map((creator) => { const followed = followedIds.includes(creator.id); return <article key={creator.id} className="flex items-center gap-3 rounded-3xl border border-[#E3ECF8] bg-white p-4 shadow-sm"><Avatar value={creator.avatar} /><div className="min-w-0 flex-1"><h3 className="truncate text-xl font-black text-[#081B5C]">{creator.name} {creator.verified ? '✅' : ''}</h3><p className="text-sm font-bold text-[#64748B]">@{creator.username} · {creator.role}</p><p className="text-sm font-black text-[#64748B]">{creator.followers.toLocaleString()} followers</p></div><button type="button" onClick={() => toggleFollowCreator(creator)} disabled={Boolean(followLoadingIds[creator.id]) || isOwnCommunityId(creator.id)} className={`rounded-full px-4 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${followed ? 'bg-[#EEF2FF] text-[#4F46E5]' : 'bg-[#4F7BFF] text-white'}`}>{followLoadingIds[creator.id] ? 'Saving...' : followed ? 'Following' : 'Follow'}</button></article>; })}</div></div>}
       {page === 'following' && renderFeedLayout(followingMessages, 'Your followers feed', 'Only posts from creators you follow are shown here.')}
       {page === 'adminPosts' && renderFeedLayout(adminPosts, 'ADMIN POST', 'Official admin posts from Firebase. Like, react, vote, and reply here.')}
       {page === 'tagMaster' && renderTagMasterPage()}{page === 'masterTags' && renderMasterTagsPage()}{page === 'masterTagDetail' && renderMasterTagDetailPage()}
