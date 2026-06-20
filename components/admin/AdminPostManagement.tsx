@@ -5,10 +5,30 @@ import { db, storage } from '../../firebase';
 
 const COMMUNITY_FEED = 'community_feed';
 const POST_TTL_MS = 24 * 60 * 60 * 1000;
+const ADMIN_PUBLISH_TIMEOUT_MS = 20000;
+const FIRESTORE_INLINE_IMAGE_MAX_BYTES = 900 * 1024;
 type PostType = 'text' | 'image' | 'poll';
 
 const stripUndefinedFields = <T extends Record<string, unknown>>(payload: T): Partial<T> =>
   Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined)) as Partial<T>;
+
+const dataUrlBytes = (value = '') => {
+  const base64 = value.split(',')[1] || '';
+  return Math.ceil((base64.length * 3) / 4);
+};
+
+const withTimeout = async <T,>(promise: Promise<T>, label: string): Promise<T> => {
+  let timeoutId: ReturnType<typeof setTimeout> | undefined;
+  const timeout = new Promise<never>((_, reject) => {
+    timeoutId = setTimeout(() => reject(new Error(`${label} timed out. Please check your connection and try again.`)), ADMIN_PUBLISH_TIMEOUT_MS);
+  });
+
+  try {
+    return await Promise.race([promise, timeout]);
+  } finally {
+    if (timeoutId) clearTimeout(timeoutId);
+  }
+};
 
 const AdminPostManagement: React.FC = () => {
   const [type, setType] = useState<PostType>('text');
@@ -41,8 +61,15 @@ const AdminPostManagement: React.FC = () => {
       let storagePath = '';
       if (type === 'image') {
         storagePath = `community/admin-posts/${id}.jpg`;
-        await uploadString(ref(storage, storagePath), image, 'data_url');
-        imagePreview = await getDownloadURL(ref(storage, storagePath));
+        try {
+          await withTimeout(uploadString(ref(storage, storagePath), image, 'data_url'), 'Admin image upload');
+          imagePreview = await withTimeout(getDownloadURL(ref(storage, storagePath)), 'Admin image URL fetch');
+        } catch (uploadError) {
+          console.error('Admin image upload failed; falling back to inline preview:', uploadError);
+          if (dataUrlBytes(image) > FIRESTORE_INLINE_IMAGE_MAX_BYTES) throw uploadError;
+          imagePreview = image;
+          storagePath = '';
+        }
       }
       const payload: Record<string, unknown> = {
         id,
@@ -55,6 +82,7 @@ const AdminPostManagement: React.FC = () => {
         creatorId: 'admin',
         ownerId: 'admin',
         postType: type,
+        type,
         source: 'admin',
         reactions: {},
         reactionCounts: {},
@@ -67,14 +95,14 @@ const AdminPostManagement: React.FC = () => {
         createdAt: Date.now(),
         expiresAt: Date.now() + POST_TTL_MS,
       };
-      if (type === 'image') Object.assign(payload, { imagePreview, imageLayout: 'thumbnail', storagePath });
+      if (type === 'image') Object.assign(payload, { imagePreview, imageLayout: 'thumbnail', storagePath: storagePath || undefined });
       if (type === 'poll') Object.assign(payload, { pollOptions: options, pollVotes: options.map(() => 0) });
-      await addDoc(collection(db, COMMUNITY_FEED), stripUndefinedFields(payload));
+      await withTimeout(addDoc(collection(db, COMMUNITY_FEED), stripUndefinedFields(payload)), 'Admin post publish');
       setText(''); setLink(''); setImage(''); setImageName(''); setPollOptions(['', '', '']);
       setFeedback('Admin post published to the community ADMIN POST page and main feed. It will auto-delete after 24 hours.');
     } catch (error) {
       console.error('Admin post publish failed:', error);
-      setFeedback('Admin post publish failed. Please check the image/poll fields and try again.');
+      setFeedback('Admin post publish failed. Please check the image/poll fields, internet connection, and try again.');
     } finally {
       setIsSaving(false);
     }
