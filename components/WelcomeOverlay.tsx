@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 interface WelcomeOverlayProps {
   onAnimationComplete?: () => void;
@@ -7,28 +7,33 @@ interface WelcomeOverlayProps {
 const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ onAnimationComplete }) => {
   const [visible, setVisible] = useState(false);
   const [isLeaving, setIsLeaving] = useState(false);
+  const onAnimationCompleteRef = useRef(onAnimationComplete);
+
+  useEffect(() => {
+    onAnimationCompleteRef.current = onAnimationComplete;
+  }, [onAnimationComplete]);
 
   useEffect(() => {
     const seen = sessionStorage.getItem('welcomeOverlaySeen');
     if (seen) {
-      const t = setTimeout(() => onAnimationComplete?.(), 250);
+      const t = setTimeout(() => onAnimationCompleteRef.current?.(), 250);
       return () => clearTimeout(t);
     }
 
-    sessionStorage.setItem('welcomeOverlaySeen', '1');
     setVisible(true);
     setIsLeaving(false);
 
     const leaveTimer = setTimeout(() => setIsLeaving(true), 3000);
     const hideTimer = setTimeout(() => {
+      sessionStorage.setItem('welcomeOverlaySeen', '1');
       setVisible(false);
-      onAnimationComplete?.();
+      onAnimationCompleteRef.current?.();
     }, 3360);
     return () => {
       clearTimeout(leaveTimer);
       clearTimeout(hideTimer);
     };
-  }, [onAnimationComplete]);
+  }, []);
 
   if (!visible) return null;
 
