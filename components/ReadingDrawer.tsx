@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Announcement, NewsArticle, User, WebsiteSettings } from '../App';
 import { EconomySettings } from '../utils/economy';
 import GoogleAd from './GoogleAd';
+import { countVisibleWords, hasUnsafePublicPlaceholder } from '../utils/reviewStableMode';
 
 type ReadingListType = 'news' | 'blog';
 type ReadingView = ReadingListType | 'article' | 'announcement';
@@ -90,7 +91,7 @@ const InlineMarkdown: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean }> = ({ content, includeInArticleAd = false }) => {
+const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean; articleWordCount?: number; articleAdDisabled?: boolean }> = ({ content, includeInArticleAd = false, articleWordCount = 0, articleAdDisabled = false }) => {
   if (/<\/?[a-z][\s\S]*>/i.test(content)) {
     return <div className="reading-rich-html" dangerouslySetInnerHTML={{ __html: content }} />;
   }
@@ -119,7 +120,19 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean 
       nodes.push(<p key={`p-${nodes.length}`} className="my-5 text-lg leading-9" style={{ color: chatPalette.secondaryText }}><InlineMarkdown text={text} /></p>);
       const paragraphCount = nodes.filter(node => React.isValidElement(node) && node.type === 'p').length;
       if (includeInArticleAd && paragraphCount === 2) {
-        nodes.push(<GoogleAd key={`in-article-ad-${nodes.length}`} variant="inArticle" label="Advertisement" className="my-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderColor: chatPalette.cardBorder }} />);
+        nodes.push(
+          <GoogleAd
+            key={`in-article-ad-${nodes.length}`}
+            variant="inArticle"
+            label="Advertisement"
+            pageType="article"
+            visibleWordCount={articleWordCount}
+            isContentLoaded={true}
+            disabled={articleAdDisabled}
+            className="my-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
+            style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderColor: chatPalette.cardBorder }}
+          />
+        );
       }
     }
   };
@@ -282,7 +295,24 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
     return { title: listType === 'news' ? 'Student News' : 'Study Blog', source: listType === 'news' ? 'Current student updates' : 'In-depth learning guides', date: new Date().toISOString(), readTime: 6 };
   }, [listType, selectedArticle, selectedAnnouncement, view]);
 
-  const visibleArticles = useMemo(() => articles.filter((article) => getArticleType(article) === listType), [articles, listType]);
+  const visibleArticles = useMemo(
+    () =>
+      articles.filter(
+        (article) =>
+          getArticleType(article) === listType &&
+          !hasUnsafePublicPlaceholder(article.title, article.excerpt, article.content)
+      ),
+    [articles, listType]
+  );
+
+  const selectedArticleWordCount = selectedArticle
+    ? countVisibleWords(selectedArticle.title, selectedArticle.excerpt, selectedArticle.content)
+    : 0;
+
+  const selectedArticleAdDisabled = selectedArticle
+    ? hasUnsafePublicPlaceholder(selectedArticle.title, selectedArticle.excerpt, selectedArticle.content)
+    : true;
+
   const listTitle = listType === 'news' ? 'Student News' : 'Study Blog';
   const listDescription = listType === 'news'
     ? 'Current education updates, exam alerts, student opportunities, and quick signals curated for focused learners.'
@@ -396,14 +426,22 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                       <div className="rounded-[2rem] border p-8 shadow-sm backdrop-blur-xl lg:col-span-3" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
                         <p className="text-3xl">📚</p>
                         <h3 className="mt-3 text-2xl font-black" style={{ color: chatPalette.primaryText }}>No {listType} posts yet</h3>
-                        <p className="mt-2">Run AI Fetch Now in the admin panel or add a manual {listType} post to fill this list.</p>
+                        <p className="mt-2">Fresh learning posts will appear here after they are reviewed and published.</p>
                       </div>
                     )}
                     {visibleArticles.map((article, index) => (
                       <React.Fragment key={`article-${article.id}`}>
                         <HubCard title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(stripMarkdown(article.content))} min`} excerpt={article.excerpt} badge={article.type === 'news' ? 'News' : article.category || 'Blog'} imageSeed={getArticleImage(article)} onClick={() => onSelectArticle(article)} />
                         {(index + 1) % 3 === 0 && index < visibleArticles.length - 1 && (
-                          <GoogleAd variant="inFeed" label="Sponsored" className="lg:col-span-3 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
+                          <GoogleAd
+                            variant="inFeed"
+                            label="Sponsored"
+                            pageType={listType === 'news' ? 'news-list' : 'blog-list'}
+                            realContentCardCount={visibleArticles.length}
+                            isContentLoaded={true}
+                            className="lg:col-span-3 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
+                            style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}
+                          />
                         )}
                       </React.Fragment>
                     ))}
@@ -438,7 +476,16 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                       <div className="mt-8 overflow-hidden rounded-[2rem] border p-2 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl lg:mt-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
                         <iframe src={getArticleUrl(selectedArticle)} title={selectedArticle.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-white [scrollbar-width:none] lg:h-[76vh]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
                       </div>
-                      <GoogleAd variant="multiplex" label="Related Content" className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
+                      <GoogleAd
+                        variant="multiplex"
+                        label="Related Content"
+                        pageType="article"
+                        visibleWordCount={selectedArticleWordCount}
+                        isContentLoaded={true}
+                        disabled={selectedArticleAdDisabled}
+                        className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
+                        style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}
+                      />
                     </>
                   ) : (
                     <>
@@ -446,9 +493,23 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                         <img src={getArticleImage(selectedArticle, '1400/800')} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" />
                       </div>
                       <div className="mx-auto mt-8 max-w-4xl rounded-[2rem] border p-6 text-lg leading-9 shadow-[0_18px_50px_rgba(60,64,67,0.08)] backdrop-blur-2xl sm:p-8 lg:mt-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
-                        <MarkdownContent content={selectedArticle.content} includeInArticleAd />
+                        <MarkdownContent
+                          content={selectedArticle.content}
+                          includeInArticleAd
+                          articleWordCount={selectedArticleWordCount}
+                          articleAdDisabled={selectedArticleAdDisabled}
+                        />
                         {shouldShowPremiumLearningCta(selectedArticle) && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} />}
-                        <GoogleAd variant="multiplex" label="Related Content" className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
+                        <GoogleAd
+                          variant="multiplex"
+                          label="Related Content"
+                          pageType="article"
+                          visibleWordCount={selectedArticleWordCount}
+                          isContentLoaded={true}
+                          disabled={selectedArticleAdDisabled}
+                          className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
+                          style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}
+                        />
                       </div>
                     </>
                   )}

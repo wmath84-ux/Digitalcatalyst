@@ -2,6 +2,7 @@
 import React, { useRef, useEffect } from 'react';
 import { NewsArticle, WebsiteSettings } from '../App';
 import GoogleAd from './GoogleAd';
+import { hasUnsafePublicPlaceholder } from '../utils/reviewStableMode';
 
 interface LatestNewsProps {
   settings: WebsiteSettings;
@@ -106,7 +107,11 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
     };
   }, []);
 
-  const newsArticles = articles.filter(article => article.type === 'news');
+  const newsArticles = articles.filter(
+    article =>
+      article.type === 'news' &&
+      !hasUnsafePublicPlaceholder(article.title, article.excerpt, article.content)
+  );
   const storedReadingStyle = ((settings.content as any).readingStyle || {}) as Partial<typeof defaultReadingStyle>;
   const readingStyle = {
     ...defaultReadingStyle,
@@ -129,7 +134,15 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
       style={{ background: sectionBackground }}
     >
       <div className="container mx-auto px-6">
-        <GoogleAd variant="display" label="Advertisement" className="mb-12 rounded-[2rem] border p-4 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }} />
+        <GoogleAd
+          variant="display"
+          label="Advertisement"
+          pageType="news-list"
+          realContentCardCount={newsArticles.length}
+          isContentLoaded={true}
+          className="mb-12 rounded-[2rem] border p-4 shadow-sm backdrop-blur-xl"
+          style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }}
+        />
 
         <div className="flex flex-col md:flex-row justify-between items-end mb-12">
             <div className="max-w-2xl">
@@ -157,7 +170,15 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
                 cardBackground={cardBackground}
               />
               {(index + 1) % 3 === 0 && index < newsArticles.length - 1 && (
-                <GoogleAd variant="inFeed" label="Sponsored" className="md:col-span-2 lg:col-span-3 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }} />
+                <GoogleAd
+                  variant="inFeed"
+                  label="Sponsored"
+                  pageType="news-list"
+                  realContentCardCount={newsArticles.length}
+                  isContentLoaded={true}
+                  className="md:col-span-2 lg:col-span-3 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
+                  style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }}
+                />
               )}
             </React.Fragment>
           ))}
@@ -167,7 +188,15 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
             Open News
         </button>
 
-        <GoogleAd variant="display" label="Advertisement" className="mt-12 rounded-[2rem] border p-4 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }} />
+        <GoogleAd
+          variant="display"
+          label="Advertisement"
+          pageType="news-list"
+          realContentCardCount={newsArticles.length}
+          isContentLoaded={true}
+          className="mt-12 rounded-[2rem] border p-4 shadow-sm backdrop-blur-xl"
+          style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }}
+        />
       </div>
     </section>
   );
