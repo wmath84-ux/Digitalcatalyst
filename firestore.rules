@@ -6,7 +6,7 @@ service cloud.firestore {
     function isAdmin() {
       return signedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
-        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin';
+        && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'];
     }
     function protectedUserFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'purchasedProductIds']);
@@ -90,14 +90,22 @@ service cloud.firestore {
     }
 
     match /community_upload_quotas/{quotaId} {
-      allow read: if signedIn();
-      allow create, update: if signedIn() && request.resource.data.userId == request.auth.uid;
+      allow read: if signedIn() && (isAdmin() || resource.data.userId == request.auth.uid);
+      allow create, update: if signedIn()
+        && quotaId in [request.auth.uid + '_creator', request.auth.uid + '_status']
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.kind in ['creator', 'status']
+        && request.resource.data.keys().hasOnly(['userId', 'kind', 'usedTypes', 'updatedAt']);
       allow delete: if isAdmin();
     }
 
     match /community_storage_meta/{metaId} {
       allow read: if signedIn();
-      allow create, update: if signedIn();
+      allow create, update: if signedIn()
+        && metaId == 'usage'
+        && request.resource.data.keys().hasOnly(['usedBytes', 'limitBytes', 'bucketBytes', 'updatedAt'])
+        && request.resource.data.usedBytes is number
+        && request.resource.data.usedBytes >= 0;
       allow delete: if isAdmin();
     }
 
@@ -105,7 +113,12 @@ service cloud.firestore {
       allow read: if signedIn();
       allow create, update: if isOwner(uid)
         && request.resource.data.userId == request.auth.uid
-        && request.resource.data.ownerId == request.auth.uid;
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'id', 'userId', 'ownerId', 'username', 'name', 'avatar', 'role', 'bio',
+          'followers', 'followerCount', 'followingCount', 'mutual',
+          'verified', 'source', 'createdAt', 'updatedAt'
+        ]);
       allow delete: if isOwner(uid) || isAdmin();
     }
 
@@ -132,8 +145,9 @@ service cloud.firestore {
     }
 
     match /siteSupportTickets/{ticketId} {
-      allow read: if signedIn();
-      allow create: if signedIn();
+      allow read: if isAdmin() || (signedIn() && resource.data.customerUid == request.auth.uid);
+      allow create: if signedIn()
+        && request.resource.data.customerUid == request.auth.uid;
       allow update, delete: if isAdmin();
     }
 

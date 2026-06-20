@@ -1,9 +1,22 @@
 // components/CoursePlayer.tsx
-import React, { useEffect, useMemo, useRef, useState } from "react";
-import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, ProductDocPage, QuizAnswerState } from '../App';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, ProductDocPage, QuizAnswerState, User } from '../App';
 import { EconomySettings } from '../utils/economy';
+import {
+  creditWatchSessionCoins,
+  EDUCOIN_SECONDS_PER_COIN,
+  markWatchSessionPaused,
+  startWatchSession,
+} from '../utils/coinWallet';
 import AiMentor from './AiMentor';
 import ProductMusicPlayer, { type AudioTrack } from './ProductMusicPlayer';
+
+declare global {
+  interface Window {
+    YT?: any;
+    onYouTubeIframeAPIReady?: () => void;
+  }
+}
 
 const FileIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -143,6 +156,27 @@ const extractYouTubeID = (url: string): string | null => {
   if (match && match[2].length === 11) return match[2];
   const matchIframe = url.match(/youtube\.com\/embed\/([^"?]+)/);
   return matchIframe?.[1] || null;
+};
+
+const ensureYouTubeIframeApi = (): Promise<void> => {
+  if (typeof window === 'undefined' || typeof document === 'undefined') return Promise.resolve();
+  if (window.YT?.Player) return Promise.resolve();
+
+  return new Promise((resolve) => {
+    const previousReady = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      previousReady?.();
+      resolve();
+    };
+
+    const existingScript = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+    if (existingScript) return;
+
+    const script = document.createElement('script');
+    script.src = 'https://www.youtube.com/iframe_api';
+    script.async = true;
+    document.body.appendChild(script);
+  });
 };
 
 const getCourseBackground = (product: ProductWithRating, activeFile: ProductFile | null) => {
@@ -564,7 +598,14 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
   );
 };
 
-const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: EconomySettings; product: ProductWithRating; onBack: () => void; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ settings, economySettings, product, onBack, onQuizReward }) => {
+const CoursePlayer: React.FC<{
+  settings: WebsiteSettings;
+  economySettings: EconomySettings;
+  product: ProductWithRating;
+  currentUser?: User | null;
+  onBack: () => void;
+  onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean;
+}> = ({ settings, economySettings, product, currentUser = null, onBack, onQuizReward }) => {
   const viewport = useViewportSize();
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
@@ -572,6 +613,73 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
   const [showWelcome, setShowWelcome] = useState(true);
+  const youtubePlayerRef = useRef<any>(null);
+  const youtubeTickTimerRef = useRef<number | null>(null);
+  const youtubeSessionRef = useRef<{
+    sessionId: string;
+    userId: string;
+    courseId: string;
+    videoId: string;
+    youtubeVideoId: string;
+    validWatchedSeconds: number;
+    lastPlaybackPosition: number;
+    isFlushing: boolean;
+  } | null>(null);
+  const [youtubeRewardNotice, setYoutubeRewardNotice] = useState('');
+  const [youtubeWatchSeconds, setYoutubeWatchSeconds] = useState(0);
+
+  const currentUserId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
+
+  const stopYoutubeTickTimer = useCallback(() => {
+    if (youtubeTickTimerRef.current !== null) {
+      window.clearInterval(youtubeTickTimerRef.current);
+      youtubeTickTimerRef.current = null;
+    }
+  }, []);
+
+  const flushYoutubeCoins = useCallback(async (nextStatus: 'paused' | 'closed' | 'credited' = 'closed') => {
+    const session = youtubeSessionRef.current;
+    if (!session || session.isFlushing) return 0;
+
+    session.isFlushing = true;
+    stopYoutubeTickTimer();
+
+    try {
+      const player = youtubePlayerRef.current;
+      const lastPosition = Number(player?.getCurrentTime?.() || session.lastPlaybackPosition || 0);
+      session.lastPlaybackPosition = Math.max(session.lastPlaybackPosition, lastPosition);
+
+      const creditedCoins = await creditWatchSessionCoins({
+        sessionId: session.sessionId,
+        userId: session.userId,
+        courseId: session.courseId,
+        videoId: session.videoId,
+        youtubeVideoId: session.youtubeVideoId,
+        validWatchedSeconds: session.validWatchedSeconds,
+        lastPlaybackPosition: session.lastPlaybackPosition,
+      });
+
+      if (nextStatus === 'paused') {
+        await markWatchSessionPaused(session.sessionId).catch(() => undefined);
+      }
+
+      if (creditedCoins > 0) {
+        setYoutubeRewardNotice(`+${creditedCoins} EduCoin credited for ${creditedCoins * EDUCOIN_SECONDS_PER_COIN}s valid YouTube watch time.`);
+      }
+
+      return creditedCoins;
+    } catch (error) {
+      console.warn('YouTube EduCoin flush failed:', error);
+      return 0;
+    } finally {
+      session.isFlushing = false;
+    }
+  }, [stopYoutubeTickTimer]);
+
+  const handlePlayerBack = () => {
+    void flushYoutubeCoins('closed');
+    onBack();
+  };
 
   useEffect(() => {
     const findFirst = (modules?: CourseModule[]): ProductFile | null => {
@@ -597,8 +705,108 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const useDesktopSidebar = !forceOverlaySidebar && !isDesktopSidebarCollapsed;
   const compactPlayerChrome = viewport.isShortHeight || viewport.isTinyPlayer || viewport.isLandscapeCompact;
 
+  const youtubeFrameId = useMemo(() => {
+    if (activeFile?.type !== 'youtube') return '';
+    return `youtube-player-${product.id}-${activeFile.id}`.replace(/[^a-zA-Z0-9_-]/g, '-');
+  }, [activeFile?.id, activeFile?.type, product.id]);
+
+  useEffect(() => {
+    if (showWelcome || activeFile?.type !== 'youtube') return undefined;
+
+    const youtubeVideoId = extractYouTubeID(activeFile.url);
+    if (!youtubeVideoId || !currentUserId || !youtubeFrameId) return undefined;
+
+    let cancelled = false;
+    const sessionId = `${currentUserId}_${product.id}_${activeFile.id}_${Date.now()}`;
+
+    youtubeSessionRef.current = {
+      sessionId,
+      userId: currentUserId,
+      courseId: String(product.id),
+      videoId: activeFile.id,
+      youtubeVideoId,
+      validWatchedSeconds: 0,
+      lastPlaybackPosition: 0,
+      isFlushing: false,
+    };
+    setYoutubeWatchSeconds(0);
+    setYoutubeRewardNotice('');
+
+    startWatchSession({
+      sessionId,
+      userId: currentUserId,
+      courseId: String(product.id),
+      videoId: activeFile.id,
+      youtubeVideoId,
+    }).catch((error) => console.warn('YouTube watch session start failed:', error));
+
+    ensureYouTubeIframeApi().then(() => {
+      if (cancelled || !window.YT?.Player) return;
+
+      youtubePlayerRef.current = new window.YT.Player(youtubeFrameId, {
+        events: {
+          onStateChange: (event: any) => {
+            const playerState = event?.data;
+            const playing = playerState === window.YT.PlayerState.PLAYING;
+            const paused = playerState === window.YT.PlayerState.PAUSED;
+            const ended = playerState === window.YT.PlayerState.ENDED;
+
+            if (playing) {
+              stopYoutubeTickTimer();
+              youtubeTickTimerRef.current = window.setInterval(() => {
+                const session = youtubeSessionRef.current;
+                const player = youtubePlayerRef.current;
+                if (!session || !player?.getCurrentTime) return;
+
+                const currentPosition = Number(player.getCurrentTime() || 0);
+                const delta = currentPosition - session.lastPlaybackPosition;
+
+                if (delta > 0 && delta < 3) {
+                  session.validWatchedSeconds += delta;
+                  setYoutubeWatchSeconds(Math.floor(session.validWatchedSeconds));
+                }
+
+                session.lastPlaybackPosition = Math.max(session.lastPlaybackPosition, currentPosition);
+              }, 1000);
+            }
+
+            if (paused) {
+              void flushYoutubeCoins('paused');
+            }
+
+            if (ended) {
+              void flushYoutubeCoins('credited');
+            }
+          },
+        },
+      });
+    });
+
+    const handleBeforeUnload = () => {
+      void flushYoutubeCoins('closed');
+    };
+    window.addEventListener('beforeunload', handleBeforeUnload);
+
+    return () => {
+      cancelled = true;
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      void flushYoutubeCoins('closed');
+      try {
+        youtubePlayerRef.current?.destroy?.();
+      } catch {
+        // Ignore YouTube iframe destroy errors.
+      }
+      youtubePlayerRef.current = null;
+      youtubeSessionRef.current = null;
+      stopYoutubeTickTimer();
+    };
+  }, [activeFile, currentUserId, flushYoutubeCoins, product.id, showWelcome, stopYoutubeTickTimer, youtubeFrameId]);
+
   const onSelectFile = (file: ProductFile) => {
+    void flushYoutubeCoins('closed');
     setActiveFile(file);
+    setYoutubeRewardNotice('');
+    setYoutubeWatchSeconds(0);
     setIsSidebarOpen(false);
     setIsMentorOpen(false);
   };
@@ -619,6 +827,8 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     document.body.removeChild(link);
   };
 
+  const completedYoutubeCoins = Math.floor(youtubeWatchSeconds / EDUCOIN_SECONDS_PER_COIN);
+
   const activeAudioTracks = useMemo<AudioTrack[]>(() => {
     if (activeFile?.type !== 'audio') return [];
 
@@ -630,6 +840,20 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       cover: backgroundImage,
     }];
   }, [activeFile, backgroundImage, product.title]);
+
+  const YoutubeRewardMeter = () => {
+    if (activeFile?.type !== 'youtube') return null;
+
+    return (
+      <div className="mx-2 mt-2 rounded-2xl border border-[#ded8ff] bg-white/85 px-4 py-3 text-sm font-bold text-slate-800 shadow-sm">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <span>Valid YouTube watch: {youtubeWatchSeconds}s</span>
+          <span>Earned blocks: {completedYoutubeCoins} / every {EDUCOIN_SECONDS_PER_COIN}s</span>
+        </div>
+        {youtubeRewardNotice && <p className="mt-2 text-emerald-700">{youtubeRewardNotice}</p>}
+      </div>
+    );
+  };
 
   const ThreeDotMenuIcon = () => (
     <span className="inline-flex h-12 w-12 items-center justify-center rounded-2xl border border-[#ded8ff] bg-[#ece7ff] text-slate-950 shadow-[0_10px_30px_rgba(89,71,242,0.10)]" aria-hidden="true">
@@ -646,8 +870,9 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
         return videoId ? (
           <iframe
             key={activeFile.id}
+            id={youtubeFrameId}
             className="h-full w-full bg-white/70"
-            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
+            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
             title={activeFile.name}
             frameBorder="0"
             allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
@@ -709,7 +934,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-[#c9f8ff]/70' : 'bg-[#d9d2ff]/45'}`} />
 
       <header className={`relative z-30 min-w-0 items-center gap-2 border-b shadow-sm backdrop-blur-xl ${forceOverlaySidebar ? 'flex' : 'flex lg:hidden'} ${compactPlayerChrome ? 'p-1.5' : 'p-2.5 sm:gap-3 sm:p-3'} ${'border-[#ded8ff] bg-white/85'}`} style={{ paddingLeft: 'max(0.375rem, env(safe-area-inset-left))', paddingRight: 'max(0.375rem, env(safe-area-inset-right))' }}>
-        <button onClick={onBack} className={`${compactPlayerChrome ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} shrink-0 rounded-lg border border-[#ded8ff] bg-white font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]`} aria-label="Back to course details">← {viewport.isTinyPlayer ? '' : 'Back'}</button>
+        <button onClick={handlePlayerBack} className={`${compactPlayerChrome ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} shrink-0 rounded-lg border border-[#ded8ff] bg-white font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]`} aria-label="Back to course details">← {viewport.isTinyPlayer ? '' : 'Back'}</button>
         <button onClick={() => setIsSidebarOpen(true)} className={`${compactPlayerChrome ? 'p-1.5' : 'p-2'} shrink-0 rounded-lg border border-[#ded8ff] bg-[#ece7ff]`} aria-label="Open modules"><svg className={`${compactPlayerChrome ? 'h-5 w-5' : 'h-6 w-6'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
         <h1 className="min-w-0 flex-1 truncate text-base font-black sm:text-lg">{activeFile?.name || product.title}</h1>
         <div className="ml-auto flex shrink-0 items-center gap-2">
@@ -722,7 +947,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
       <main className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${compactPlayerChrome ? 'gap-1 p-1.5' : 'gap-2 p-2 sm:gap-3 sm:p-3 lg:p-3'}`} style={{ paddingLeft: 'max(0.375rem, env(safe-area-inset-left))', paddingRight: 'max(0.375rem, env(safe-area-inset-right))', paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}>
         <div className={`${forceOverlaySidebar ? 'hidden' : 'hidden lg:grid'} shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl ${'border-[#ded8ff] bg-white/85'}`}>
           <div className="flex min-w-0 items-center gap-3">
-            <button onClick={onBack} className="shrink-0 rounded-2xl border border-[#ded8ff] bg-white px-5 py-3 text-base font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]" aria-label="Back to course details">← Back</button>
+            <button onClick={handlePlayerBack} className="shrink-0 rounded-2xl border border-[#ded8ff] bg-white px-5 py-3 text-base font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]" aria-label="Back to course details">← Back</button>
             <span className="truncate">{activeFile?.name || product.title}</span>
           </div>
           <div className="flex items-center justify-center gap-3">
@@ -735,7 +960,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           <aside className={`${useDesktopSidebar ? 'lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl' : ''} fixed inset-y-0 left-0 z-40 w-[min(88svw,20rem)] max-w-full transform transition sm:w-80 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col border-r border-[#ded8ff] bg-white/85 shadow-sm backdrop-blur-xl lg:rounded-2xl lg:border lg:border-[#ded8ff] lg:bg-white/85 lg:shadow-sm">
               <div className="shrink-0 border-b border-[#ded8ff] bg-white/85 px-4 py-4 shadow-sm lg:border-[#ded8ff] lg:py-5">
-                <button onClick={onBack} className="mb-3 flex items-center gap-2 text-lg font-medium text-slate-900 hover:opacity-70 sm:mb-4 sm:text-[22px]">← <span>Back</span></button>
+                <button onClick={handlePlayerBack} className="mb-3 flex items-center gap-2 text-lg font-medium text-slate-900 hover:opacity-70 sm:mb-4 sm:text-[22px]">← <span>Back</span></button>
                 <h2 className="text-xl font-black leading-tight text-slate-900 sm:text-[25px]">{product.title}</h2>
               </div>
               <nav className="flex-1 overflow-y-auto p-2 sm:p-3">
@@ -747,6 +972,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           <div className={`relative min-h-0 min-w-0 overflow-hidden backdrop-blur-2xl ${isAudioExperience ? 'rounded-none border-0 bg-transparent shadow-none' : 'rounded-2xl border border-[#ded8ff] bg-white/72 shadow-[0_20px_60px_rgba(0,0,0,0.05)] sm:rounded-3xl'}`}>
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
+          <YoutubeRewardMeter />
         </section>
       </main>
 

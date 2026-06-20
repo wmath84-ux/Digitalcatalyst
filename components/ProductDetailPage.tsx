@@ -113,7 +113,11 @@ interface ProductDetailPageProps {
   onInsufficientCoins?: (details: { requiredCoins: number; balance: number; missingCoins: number; productTitle?: string }) => void;
   isPurchased?: boolean;
   currentUser?: User | null;
-  onCoinPurchase?: (product: ProductWithRating, quantity: number) => boolean | Promise<boolean>;
+  onCoinPurchase?: (
+  product: ProductWithRating,
+  quantity: number,
+  options?: { coinDebitAlreadyProcessed?: boolean; totalCoinsCharged?: number }
+) => boolean | Promise<boolean>;
 }
 
 const ShareIcon = () => (
@@ -131,7 +135,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [isCoinButtonChecking, setIsCoinButtonChecking] = useState(false);
-  const [liveCoinPrice, setLiveCoinPrice] = useState(0);
+  const [liveCoinPrice, setLiveCoinPrice] = useState<number | null>(null);
   const [isCoinRedeemEnabled, setIsCoinRedeemEnabled] = useState(true);
   const [liveUserCoinBalance, setLiveUserCoinBalance] = useState(0);
   const [isRedeemingWithCoins, setIsRedeemingWithCoins] = useState(false);
@@ -326,20 +330,29 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     setModalOpen(true);
   };
 
-  const productCoinPrice = liveCoinPrice || resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id);
+  const productCoinPrice = liveCoinPrice ?? resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id);
   const userCoinBalance = liveUserCoinBalance || ((currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0);
   const requiredProductCoins = Math.max(0, productCoinPrice * quantity);
   const missingProductCoins = Math.max(0, requiredProductCoins - userCoinBalance);
-  const coinCheckoutDisabled = isCoinButtonChecking || isPurchased || requiredProductCoins <= 0 || userCoinBalance < requiredProductCoins;
+  const coinCheckoutDisabled =
+    isCoinButtonChecking ||
+    isRedeemingWithCoins ||
+    !isCoinRedeemEnabled ||
+    isPurchased ||
+    requiredProductCoins <= 0 ||
+    userCoinBalance < requiredProductCoins;
+
   const coinCheckoutLabel = isPurchased
     ? 'Course Unlocked'
-    : isCoinButtonChecking
+    : isCoinButtonChecking || isRedeemingWithCoins
       ? 'Unlocking...'
-      : requiredProductCoins <= 0
-        ? 'Coin checkout unavailable'
-        : userCoinBalance < requiredProductCoins
-          ? `Need ${missingProductCoins} more coins`
-          : `Pay with ${requiredProductCoins} coins`;
+      : !isCoinRedeemEnabled
+        ? 'EduCoin checkout disabled'
+        : requiredProductCoins <= 0
+          ? 'Coin checkout unavailable'
+          : userCoinBalance < requiredProductCoins
+            ? `Need ${missingProductCoins} more coins`
+            : `Pay with ${requiredProductCoins} coins`;
 
   const handleEduCoinButtonClick = async () => {
     if (!isLoggedIn || !currentUser) {
@@ -361,9 +374,21 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       const result = await redeemProductWithEduCoins({ userId, productId });
 
       if (result.success) {
-        if (onCoinPurchase) await onCoinPurchase(product, quantity);
-        setCoinRedeemModal({ open: true, title: 'Product unlocked successfully', message: 'Your EduCoins were deducted and this product is now unlocked.', showProfileButton: false });
-        window.setTimeout(() => window.location.reload(), 900);
+        const appUnlockSynced = onCoinPurchase
+          ? await onCoinPurchase(product, quantity, {
+              coinDebitAlreadyProcessed: true,
+              totalCoinsCharged: result.requiredCoins || requiredProductCoins,
+            })
+          : true;
+
+        setCoinRedeemModal({
+          open: true,
+          title: appUnlockSynced ? 'Product unlocked successfully' : 'Unlock sync pending',
+          message: appUnlockSynced
+            ? 'Your EduCoins were deducted once and this product is now unlocked.'
+            : 'Coins were deducted, but app access sync failed. Please refresh purchases once.',
+          showProfileButton: !appUnlockSynced,
+        });
         return;
       }
 
@@ -440,7 +465,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         onConfirm={handleModalConfirm}
         paymentLink={product.paymentLink}
         currentUser={currentUser}
-        coinPrice={resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity}
+        coinPrice={productCoinPrice * quantity}
         onConfirmWithCoins={onCoinPurchase ? handleModalConfirmWithCoins : undefined}
         onStartEarning={onStartEarning}
         onInsufficientCoins={(details) => onInsufficientCoins?.({ ...details, productTitle: product.title })}
@@ -597,8 +622,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     {isPurchased ? 'Purchased' : 'Pay with Razorpay'}
                   </button>
                   {onCoinPurchase && productCoinPrice > 0 && (
-                    <button disabled={!isCoinRedeemEnabled || isRedeemingWithCoins || liveCoinPrice <= 0} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
-                      {isRedeemingWithCoins ? 'Unlocking...' : isCoinRedeemEnabled ? `Pay with ${liveCoinPrice || requiredProductCoins} EduCoins` : 'EduCoin redeem not available'}
+                    <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
+                      {coinCheckoutLabel}
                       {requiredProductCoins > 0 && (
                         <span className="mt-2 block text-xs font-bold text-slate-600">
                           Your balance: {userCoinBalance} EduCoins

@@ -3036,24 +3036,48 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
-  const handleProductCoinPurchase = async (product: ProductWithRating, quantity: number): Promise<boolean> => {
-    if (!hasFirebaseUser) { openAuthPage('login'); window.scrollTo(0, 0); return false; }
-    const totalCoinPrice = resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity;
+  const handleProductCoinPurchase = async (
+    product: ProductWithRating,
+    quantity: number,
+    options: { coinDebitAlreadyProcessed?: boolean; totalCoinsCharged?: number } = {}
+  ): Promise<boolean> => {
+    if (!hasFirebaseUser) {
+      openAuthPage('login');
+      window.scrollTo(0, 0);
+      return false;
+    }
+
+    const totalCoinPrice = Math.max(
+      0,
+      Math.floor(options.totalCoinsCharged ?? (resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity))
+    );
+
     if (!totalCoinPrice) {
-      setInfoModal({ title: 'EduCoin checkout unavailable', message: 'This product does not have an EduCoin price configured yet.', icon: '🪙' });
+      setInfoModal({
+        title: 'EduCoin checkout unavailable',
+        message: 'This product does not have an EduCoin price configured yet.',
+        icon: '🪙',
+      });
       return false;
     }
-    const liveCoinBalance = effectiveAppUser?.eduCoins || 0;
-    if (liveCoinBalance < totalCoinPrice) {
-      return false;
+
+    if (!options.coinDebitAlreadyProcessed) {
+      const liveCoinBalance = effectiveAppUser?.eduCoins || 0;
+      if (liveCoinBalance < totalCoinPrice) return false;
+
+      try {
+        const success = deductEduCoins(totalCoinPrice, {
+          source: 'Product EduCoin purchase',
+          description: `Unlocked ${product.title} with EduCoins`,
+          productId: product.id,
+        });
+        if (!success) return false;
+      } catch (error) {
+        console.warn('EduCoin deduction ledger failed; using local wallet fallback for product unlock.', error);
+        syncCurrentUser(user => ({ ...user, eduCoins: Math.max(0, (user.eduCoins || 0) - totalCoinPrice) }));
+      }
     }
-    try {
-      const success = deductEduCoins(totalCoinPrice, { source: 'Product EduCoin purchase', description: `Unlocked ${product.title} with EduCoins`, productId: product.id });
-      if (!success) return false;
-    } catch (error) {
-      console.warn('EduCoin deduction ledger failed; using local wallet fallback for product unlock.', error);
-      syncCurrentUser(user => ({ ...user, eduCoins: Math.max(0, (user.eduCoins || 0) - totalCoinPrice) }));
-    }
+
     return await completeProductUnlock(product, quantity, `🪙 ${totalCoinPrice}`) !== false;
   };
 
@@ -3511,10 +3535,10 @@ const App: React.FC = () => {
 
   const renderContent = (appUser: User | null = currentUser) => {
     switch (currentView) {
-      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
+      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} onCoinPurchase={(product, quantity, options) => handleProductCoinPurchase(product, quantity, options)} />;
       case 'coursePlayer':
         if (isAuthRestoring || authRestoreError) return renderAuthRestoreStatus();
-        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={() => handleNavigateBack('myPurchases')} onQuizReward={handleQuizReward} /> : renderAuthRestoreStatus();
+        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} currentUser={appUser} onBack={() => handleNavigateBack('myPurchases')} onQuizReward={handleQuizReward} /> : renderAuthRestoreStatus();
       case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={appUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
