@@ -1593,12 +1593,40 @@ const App: React.FC = () => {
 
   const hasCompletedMobile = (user?: Pick<User, 'mobile'> | null) => getNormalizedMobile(user?.mobile).length === 10;
 
+  const getResolvedSavedMobile = (user?: Pick<User, 'mobile'> | null, firebaseUser?: FirebaseUser | null) =>
+    getNormalizedMobile(user?.mobile) || getNormalizedMobile(firebaseUser?.phoneNumber);
+
+  const shouldAskForMobileCompletion = () => {
+    if (!isLoggedIn || !effectiveAppUser) return false;
+    if (profileStatus === 'loading' || profileStatus === 'idle') return false;
+    return getResolvedSavedMobile(effectiveAppUser, effectiveFirebaseUser).length !== 10;
+  };
+
+  const mergeCompletedMobileIntoCurrentUser = (mobile: string) => {
+    const normalizedMobile = getNormalizedMobile(mobile);
+    if (!effectiveAppUser || normalizedMobile.length !== 10) return;
+
+    const updatedUser = { ...effectiveAppUser, mobile: normalizedMobile } as User;
+
+    setCurrentUser(updatedUser);
+    setUsers(current => {
+      const nextUsers = current.some(user => user.id === updatedUser.id)
+        ? current.map(user => user.id === updatedUser.id ? { ...user, mobile: normalizedMobile } : user)
+        : [...current, updatedUser];
+
+      safeSetItem('siteUsers', nextUsers);
+      return nextUsers;
+    });
+
+    safeSetItem('currentUser', updatedUser);
+  };
+
   const promptForMobileCompletion = () => {
     setIsMobileCompletionModalOpen(true);
     setMobileCompletionError('Please add your 10 digit mobile number before purchases or profile-sensitive actions.');
   };
 
-  const requiresMobileCompletion = () => Boolean(isLoggedIn && effectiveAppUser && !hasCompletedMobile(effectiveAppUser));
+  const requiresMobileCompletion = () => shouldAskForMobileCompletion();
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -1607,15 +1635,32 @@ const App: React.FC = () => {
       setMobileCompletionInput('');
       return;
     }
+
     if (!effectiveAppUser) return;
-    if (hasCompletedMobile(effectiveAppUser)) {
+
+    const savedMobile = getResolvedSavedMobile(effectiveAppUser, effectiveFirebaseUser);
+
+    if (savedMobile.length === 10) {
+      mergeCompletedMobileIntoCurrentUser(savedMobile);
       setIsMobileCompletionModalOpen(false);
       setMobileCompletionError('');
       setMobileCompletionInput('');
       return;
     }
+
+    if (profileStatus === 'loading' || profileStatus === 'idle') {
+      return;
+    }
+
+    setMobileCompletionInput(current => getNormalizedMobile(current));
     setIsMobileCompletionModalOpen(true);
-  }, [isLoggedIn, effectiveAppUser?.id, effectiveAppUser?.mobile]);
+  }, [
+    isLoggedIn,
+    effectiveAppUser?.id,
+    effectiveAppUser?.mobile,
+    effectiveFirebaseUser?.phoneNumber,
+    profileStatus,
+  ]);
 
   const handleInitiateCheckout = () => {
     if (cart.length === 0) return;
@@ -3477,7 +3522,7 @@ const App: React.FC = () => {
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
             {mobileWelcomeMessage && <div className="fixed left-1/2 top-5 z-[1600] -translate-x-1/2 rounded-full border border-emerald-200/70 bg-white/95 px-5 py-3 text-sm font-black text-emerald-700 shadow-[0_18px_54px_rgba(16,185,129,0.20)] backdrop-blur-2xl md:hidden">{mobileWelcomeMessage}</div>}
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
-            {isMobileCompletionModalOpen && effectiveAppUser && !hasCompletedMobile(effectiveAppUser) && (
+            {isMobileCompletionModalOpen && effectiveAppUser && shouldAskForMobileCompletion() && (
               <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
                 <div className="w-full max-w-md rounded-[2rem] border border-blue-100 bg-white p-6 shadow-2xl">
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Complete profile</p>
@@ -3485,7 +3530,15 @@ const App: React.FC = () => {
                   <p className="mt-2 text-sm leading-6 text-slate-600">Google does not share your phone number. Add a 10 digit Indian mobile number to continue using your account for purchase support and profile-sensitive actions. No OTP or SMS verification is used.</p>
                   <div className="mt-5 flex overflow-hidden rounded-2xl border border-slate-300 bg-white focus-within:border-blue-700 focus-within:ring-4 focus-within:ring-blue-100">
                     <span className="bg-slate-100 px-4 py-3 font-bold text-slate-700">+91</span>
-                    <input value={mobileCompletionInput} onChange={e => setMobileCompletionInput(e.target.value.replace(/\D/g, '').slice(-10))} className="w-full bg-transparent px-4 py-3 outline-none" placeholder="10 digit mobile" inputMode="numeric" />
+                    <input
+                      value={mobileCompletionInput}
+                      onChange={e => setMobileCompletionInput(e.target.value.replace(/\D/g, '').slice(-10))}
+                      className="w-full bg-transparent px-4 py-3 outline-none"
+                      placeholder="10 digit mobile"
+                      inputMode="numeric"
+                      autoComplete="tel-national"
+                      autoFocus
+                    />
                   </div>
                   {mobileCompletionError && <p className="mt-3 rounded-xl border border-red-100 bg-red-50 p-3 text-sm font-bold text-red-700">{mobileCompletionError}</p>}
                   <div className="mt-5">
@@ -3496,9 +3549,10 @@ const App: React.FC = () => {
                       setIsSavingMobileCompletion(true); setMobileCompletionError('');
                       try {
                         await setDoc(doc(db, 'users', effectiveAppUser.id), { mobile: normalizedMobile, updatedAt: serverTimestamp() }, { merge: true });
-                        const updatedUser = { ...effectiveAppUser, mobile: normalizedMobile };
-                        setCurrentUser(updatedUser);
-                        setUsers(current => current.map(user => user.id === updatedUser.id ? updatedUser : user));
+                        mergeCompletedMobileIntoCurrentUser(normalizedMobile);
+                        setIsMobileCompletionModalOpen(false);
+                        setMobileCompletionInput('');
+                        setMobileCompletionError('');
                       } catch (error) {
                         console.warn('Mobile profile completion failed.', error);
                         setMobileCompletionError('Could not save mobile number. Please try again.');
