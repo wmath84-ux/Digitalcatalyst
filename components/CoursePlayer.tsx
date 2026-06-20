@@ -303,13 +303,15 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   const defaultPages = useMemo(() => normalizeDocPages(file), [file]);
   const [pages, setPages] = useState<ProductDocPage[]>(defaultPages);
   const [activePageId, setActivePageId] = useState(defaultPages[0]?.id || 'page-1');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [savedAt, setSavedAt] = useState('Loaded admin version');
   const [isReadingMode, setIsReadingMode] = useState(false);
   const [fontSize, setFontSize] = useState(18);
   const [lineSpacing, setLineSpacing] = useState(1.7);
   const [fontStyle, setFontStyle] = useState<'sans' | 'serif'>('sans');
   const [theme, setTheme] = useState<'dark' | 'sepia' | 'light'>('dark');
+  const docsViewport = useViewportSize();
+  const isCompactDocs = docsViewport.width < 768;
 
   const activePage = pages.find(page => page.id === activePageId) || pages[0];
   const activeContent = activePage?.content || OPEN_DOCS_DEFAULT_HTML;
@@ -422,18 +424,26 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
         <span className="ml-auto shrink-0 rounded-full bg-white/60 px-3 py-1 text-xs font-bold text-slate-600/90">{savedAt}</span>
       </div>
 
-      <div className="flex min-h-0 flex-1">
-        <aside className={`${isSidebarOpen ? 'block' : 'hidden'} w-64 shrink-0 overflow-y-auto border-r border-white/50 bg-white/60 p-3 custom-scrollbar`}>
-          <p className="mb-2 text-xs font-black uppercase tracking-widest text-slate-500">Pages on this device</p>
-          <div className="space-y-2">{pages.map(page => (<button key={page.id} type="button" onClick={() => selectPage(page.id)} className={`w-full rounded-xl px-3 py-2 text-left text-sm font-bold transition ${page.id === activePageId ? 'bg-cyan-100 text-cyan-800 shadow-sm' : 'bg-white/70 text-slate-700 hover:bg-white'}`}><span className="block truncate">{page.title}</span><span className="mt-1 block text-[10px] font-bold uppercase tracking-widest text-slate-400">{getMeaningfulDocText(page.content).slice(0, 36) || 'Empty page'}</span></button>))}</div>
-          <button type="button" onClick={addPage} className="mt-4 w-full rounded-xl bg-cyan-600 px-3 py-2 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ New page</button>
-          <button type="button" onClick={renamePage} className="mt-2 w-full rounded-xl bg-white/80 px-3 py-2 text-sm font-black text-slate-700 hover:bg-white">Rename</button>
-          {pages.length > 1 && (<button type="button" onClick={deletePage} className="mt-2 w-full rounded-xl bg-rose-100 px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-200">Delete</button>)}
-          <p className="mt-4 rounded-xl bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-800">Learner pages are saved locally in this browser for this product file.</p>
-        </aside>
-
-        <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-          <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={saveCurrentPage} onBlur={saveCurrentPage} onKeyUp={() => saveEditorSelection(editorRef.current, selectionRef)} onMouseUp={() => saveEditorSelection(editorRef.current, selectionRef)} onTouchEnd={() => saveEditorSelection(editorRef.current, selectionRef)} onFocus={() => saveEditorSelection(editorRef.current, selectionRef)} className="open-docs-page mx-auto min-h-full max-w-4xl rounded-[1.25rem] border border-white/50 bg-white/70 px-4 py-6 text-base leading-7 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl sm:rounded-[1.5rem] sm:px-8 sm:py-10 sm:text-lg sm:leading-8 md:px-14 [&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6" />
+      <div className="relative min-h-0 flex-1 overflow-hidden">
+        {isSidebarOpen && (
+          <div className={`${isCompactDocs ? 'absolute inset-x-2 top-2 z-20 max-h-[70vh] rounded-[1.5rem] border border-cyan-100 bg-white/95 shadow-[0_24px_70px_rgba(15,23,42,0.18)] backdrop-blur-2xl' : 'absolute left-3 top-3 z-20 h-[calc(100%-1.5rem)] w-72 rounded-[1.5rem] border border-white/60 bg-white/85 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur-2xl'} flex min-h-0 flex-col overflow-hidden`}>
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200/70 p-3">
+              <button type="button" onClick={() => setIsSidebarOpen(false)} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50">← Back</button>
+              <p className="min-w-0 flex-1 truncate text-right text-xs font-black uppercase tracking-[0.2em] text-cyan-700">Open Docs</p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
+              <p className="mb-2 text-xs font-black uppercase tracking-widest text-slate-500">Pages on this device</p>
+              <div className="space-y-2">{pages.map(page => (<button key={page.id} type="button" onClick={() => { selectPage(page.id); if (isCompactDocs) setIsSidebarOpen(false); }} className={`w-full rounded-xl px-3 py-3 text-left text-sm font-bold transition ${page.id === activePageId ? 'bg-cyan-100 text-cyan-800 shadow-sm' : 'bg-white/80 text-slate-700 hover:bg-white'}`}><span className="block truncate">{page.title}</span><span className="mt-1 block text-[10px] font-bold uppercase tracking-widest text-slate-400">{getMeaningfulDocText(page.content).slice(0, 42) || 'Empty page'}</span></button>))}</div>
+              <button type="button" onClick={addPage} className="mt-4 w-full rounded-xl bg-cyan-600 px-3 py-2 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ New page</button>
+              <button type="button" onClick={renamePage} className="mt-2 w-full rounded-xl bg-white/90 px-3 py-2 text-sm font-black text-slate-700 hover:bg-white">Rename page</button>
+              {pages.length > 1 && (<button type="button" onClick={deletePage} className="mt-2 w-full rounded-xl bg-rose-100 px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-200">Delete page</button>)}
+              <p className="mt-4 rounded-xl bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-800">Learner-created pages are saved locally in this browser for this product file.</p>
+            </div>
+          </div>
+        )}
+        {isSidebarOpen && isCompactDocs && (<button type="button" aria-label="Close Open Docs panel" onClick={() => setIsSidebarOpen(false)} className="absolute inset-0 z-10 bg-slate-950/20 backdrop-blur-[1px]" />)}
+        <div className="h-full min-h-0 overflow-y-auto p-3 sm:p-4 md:p-8 custom-scrollbar">
+          <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={saveCurrentPage} onBlur={saveCurrentPage} onKeyUp={() => saveEditorSelection(editorRef.current, selectionRef)} onMouseUp={() => saveEditorSelection(editorRef.current, selectionRef)} onTouchEnd={() => saveEditorSelection(editorRef.current, selectionRef)} onFocus={() => saveEditorSelection(editorRef.current, selectionRef)} className="open-docs-page mx-auto min-h-full max-w-4xl rounded-[1.25rem] border border-white/50 bg-white/80 px-4 py-6 text-base leading-7 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl sm:rounded-[1.5rem] sm:px-8 sm:py-10 sm:text-lg sm:leading-8 md:px-14 [&_h1]:text-3xl sm:[&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-2xl sm:[&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6" />
         </div>
       </div>
 

@@ -350,7 +350,7 @@ const AdminOpenDocsBuilder: React.FC<{
     const renamePage = () => {
         if (!activePage) return;
 
-        const title = prompt('Open Docs page title', activePage.title)?.trim();
+        const title = prompt('Rename this docs tab', activePage.title)?.trim();
         if (!title) return;
 
         onPagesChange((pages || []).map(page =>
@@ -360,7 +360,7 @@ const AdminOpenDocsBuilder: React.FC<{
 
     const deletePage = () => {
         if (!activePage || pages.length <= 1) return;
-        if (!confirm('Delete this Open Docs page?')) return;
+        if (!confirm('Delete this docs page?')) return;
 
         const nextPages = pages.filter(page => page.id !== activePage.id);
         onPagesChange(nextPages);
@@ -368,83 +368,34 @@ const AdminOpenDocsBuilder: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 z-50 bg-slate-950/70 p-3 backdrop-blur-xl sm:p-5">
-            <div className="flex h-full min-h-0 overflow-hidden rounded-[2rem] border border-white/40 bg-[#f8fbff] text-slate-900 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
-                <aside className="flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white/85 p-4 backdrop-blur-xl">
-                    <button type="button" onClick={onBack} className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-black text-slate-700 hover:bg-slate-50">
-                        ← Back to content types
-                    </button>
-
-                    <label className={labelClass}>Open Docs Name</label>
-                    <input value={resourceName} onChange={event => onResourceNameChange(event.target.value)} className={fieldClass} placeholder="Chapter notes, workbook..." />
-
-                    {error && <p className="mt-3 rounded-2xl bg-rose-50 p-3 text-xs font-bold text-rose-700">{error}</p>}
-
-                    <div className="mt-5 flex-1 overflow-y-auto custom-scrollbar">
-                        <p className="mb-2 text-xs font-black uppercase tracking-[0.24em] text-slate-500">Pages</p>
-                        <div className="space-y-2">
-                            {(pages || []).map(page => (
-                                <button
-                                    key={page.id}
-                                    type="button"
-                                    onClick={() => onActivePageChange(page.id)}
-                                    className={`w-full rounded-2xl px-3 py-3 text-left text-sm font-bold transition ${
-                                        page.id === activePageId
-                                            ? 'bg-cyan-100 text-cyan-800 shadow-sm'
-                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-50'
-                                    }`}
-                                >
-                                    <span className="block truncate">{page.title}</span>
-                                    <span className="mt-1 block truncate text-[10px] uppercase tracking-widest text-slate-400">
-                                        {getMeaningfulDocText(page.content).slice(0, 42) || 'Empty page'}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
+        <div className="fixed inset-0 z-[2200] bg-slate-950/75 p-0 backdrop-blur-xl sm:p-4">
+            <div className="flex h-full min-h-0 overflow-hidden bg-[#f8fbff] text-slate-900 shadow-[0_30px_90px_rgba(15,23,42,0.28)] sm:rounded-[2rem] sm:border sm:border-white/40">
+                <aside className="flex w-[86vw] max-w-[320px] shrink-0 flex-col border-r border-slate-200 bg-white/90 p-3 backdrop-blur-xl sm:w-80 sm:p-4">
+                    <button type="button" onClick={onBack} className="mb-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50">← Back to Add Content</button>
+                    <div className="rounded-2xl border border-cyan-100 bg-cyan-50/80 p-3">
+                        <p className="text-xs font-black uppercase tracking-[0.24em] text-cyan-700">Nested docs page</p>
+                        <p className="mt-1 text-xs font-bold leading-5 text-slate-600">Create multiple pages, switch tabs, rename them, then save as one Open Docs content item.</p>
                     </div>
-
+                    <label className={`${labelClass} mt-4`}>Open Docs Name</label>
+                    <input value={resourceName} onChange={event => onResourceNameChange(event.target.value)} className={fieldClass} placeholder="Chapter notes, workbook..." />
+                    {error && <p className="mt-3 rounded-2xl bg-rose-50 p-3 text-xs font-bold text-rose-700">{error}</p>}
+                    <div className="mt-5 flex-1 overflow-y-auto custom-scrollbar">
+                        <p className="mb-2 text-xs font-black uppercase tracking-[0.24em] text-slate-500">Docs tabs</p>
+                        <div className="space-y-2">{(pages || []).map((page, index) => (<button key={page.id} type="button" onClick={() => onActivePageChange(page.id)} className={`w-full rounded-2xl px-3 py-3 text-left text-sm font-bold transition ${page.id === activePageId ? 'bg-cyan-100 text-cyan-800 shadow-sm' : 'bg-slate-100 text-slate-700 hover:bg-slate-50'}`}><span className="block truncate">Tab {index + 1}: {page.title}</span><span className="mt-1 block truncate text-[10px] uppercase tracking-widest text-slate-400">{getMeaningfulDocText(page.content).slice(0, 42) || 'Empty page'}</span></button>))}</div>
+                    </div>
                     <div className="mt-4 space-y-2">
-                        <button type="button" onClick={addPage} className="w-full rounded-2xl bg-cyan-600 px-4 py-3 text-sm font-black text-white hover:bg-cyan-700">
-                            + Add page
-                        </button>
-                        <button type="button" onClick={renamePage} className="w-full rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-200">
-                            Rename page
-                        </button>
-                        {pages.length > 1 && (
-                            <button type="button" onClick={deletePage} className="w-full rounded-2xl bg-rose-100 px-4 py-3 text-sm font-black text-rose-700 hover:bg-rose-200">
-                                Delete page
-                            </button>
-                        )}
+                        <button type="button" onClick={addPage} className="w-full rounded-2xl bg-cyan-600 px-4 py-3 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ Create new page</button>
+                        <button type="button" onClick={renamePage} className="w-full rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-200">Rename current tab</button>
+                        {pages.length > 1 && (<button type="button" onClick={deletePage} className="w-full rounded-2xl bg-rose-100 px-4 py-3 text-sm font-black text-rose-700 hover:bg-rose-200">Delete current page</button>)}
                     </div>
                 </aside>
-
                 <main className="flex min-w-0 flex-1 flex-col">
-                    <div className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white/80 p-4 backdrop-blur-xl">
-                        <div className="min-w-0">
-                            <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-600">Full-page builder</p>
-                            <h3 className="truncate text-2xl font-black text-slate-900">Open Docs Builder</h3>
-                        </div>
-                        <button type="button" onClick={onSave} className="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-black text-white shadow-sm hover:bg-slate-800">
-                            Save Open Docs
-                        </button>
+                    <div className="flex shrink-0 flex-col gap-3 border-b border-slate-200 bg-white/85 p-3 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:p-4">
+                        <div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-600">Full-page builder</p><h3 className="truncate text-xl font-black text-slate-900 sm:text-2xl">{activePage?.title || 'Open Docs Builder'}</h3></div>
+                        <div className="flex shrink-0 gap-2"><button type="button" onClick={onBack} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-50">Back</button><button type="button" onClick={onSave} className="rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm hover:bg-slate-800">Save Open Docs</button></div>
                     </div>
-
-                    <div className="min-h-0 flex-1 overflow-y-auto p-4 custom-scrollbar md:p-6">
-                        {activePage ? (
-                            <AdminDocsEditor
-                                value={activePage.content}
-                                onChange={content => onPagesChange((pages || []).map(page =>
-                                    page.id === activePage.id ? { ...page, content, updatedAt: Date.now() } : page
-                                ))}
-                            />
-                        ) : (
-                            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
-                                <p className="font-black text-slate-900">No page selected</p>
-                                <button type="button" onClick={addPage} className="mt-4 rounded-2xl bg-cyan-600 px-5 py-3 font-black text-white">
-                                    Create first page
-                                </button>
-                            </div>
-                        )}
+                    <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar sm:p-5 md:p-6">
+                        {activePage ? (<AdminDocsEditor value={activePage.content} onChange={content => onPagesChange((pages || []).map(page => page.id === activePage.id ? { ...page, content, updatedAt: Date.now() } : page))} />) : (<div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center"><p className="font-black text-slate-900">No docs page selected</p><button type="button" onClick={addPage} className="mt-4 rounded-2xl bg-cyan-600 px-5 py-3 font-black text-white">Create first page</button></div>)}
                     </div>
                 </main>
             </div>
@@ -468,7 +419,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
         { type: 'video', title: 'Video Upload', description: 'Upload MP4/WebM lesson files.', icon: '🎬', accept: 'video/*' },
         { type: 'youtube', title: 'YouTube Video', description: 'Embed a hosted YouTube lesson.', icon: '▶️' },
         { type: 'pdf', title: 'PDF', description: 'Attach worksheets, notes, or guides.', icon: '📄', accept: 'application/pdf' },
-        { type: 'doc', title: 'Open Docs', description: 'Build full-page multi-page HTML lesson notes.', icon: '🧠' },
+        { type: 'doc', title: 'Open Docs', description: 'Open a full-page builder for multi-page lesson notes.', icon: '🧠' },
         { type: 'quiz', title: 'Quiz', description: 'Create interactive assessment questions.', icon: '✅' },
         { type: 'link', title: 'External Link', description: 'Reference any hosted resource.', icon: '🔗' },
         { type: 'sheet', title: 'Spreadsheet', description: 'Upload CSV/XLS study material.', icon: '📊', accept: '.csv,.xls,.xlsx' },
