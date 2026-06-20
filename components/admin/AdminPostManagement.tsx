@@ -4,7 +4,7 @@ import { getDownloadURL, ref, uploadString } from 'firebase/storage';
 import { db, storage } from '../../firebase';
 
 const COMMUNITY_FEED = 'community_feed';
-const POST_TTL_MS = 24 * 60 * 60 * 1000;
+const POST_TTL_MS = 15 * 24 * 60 * 60 * 1000;
 const ADMIN_POST_FALLBACK_STORAGE_KEY = 'eduvoraAdminPostFallbacks';
 const ADMIN_POST_FALLBACK_EVENT = 'eduvoraAdminPostFallbackUpdated';
 type PostType = 'text' | 'image' | 'poll';
@@ -98,7 +98,7 @@ const AdminPostManagement: React.FC = () => {
       persistLocalAdminPost(payload);
       publishRemoteAdminPost(payload, image).catch((remoteError) => console.error('Admin post remote publish failed:', remoteError));
       setText(''); setLink(''); setImage(''); setImageName(''); setPollOptions(['', '', '']);
-      setFeedback('Admin post published to the community ADMIN POST page and main feed. It will auto-delete after 24 hours.');
+      setFeedback('Admin post published to the community ADMIN POST page and main feed. It will auto-delete after 15 days.');
     } catch (error) {
       console.error('Admin post publish failed:', error);
       setFeedback('Admin post publish failed. Please check the image/poll fields and try again.');
