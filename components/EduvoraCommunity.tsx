@@ -150,6 +150,8 @@ const COMMUNITY_STATUS = 'community_status';
 const COMMUNITY_MASTER_TAGS = 'community_master_tags';
 const COMMUNITY_UPLOAD_QUOTAS = 'community_upload_quotas';
 const COMMUNITY_STORAGE_META = 'community_storage_meta';
+const ADMIN_POST_FALLBACK_STORAGE_KEY = 'eduvoraAdminPostFallbacks';
+const ADMIN_POST_FALLBACK_EVENT = 'eduvoraAdminPostFallbackUpdated';
 const POST_TTL_MS = 24 * 60 * 60 * 1000;
 const STORAGE_LOCK_BYTES = 4 * 1024 * 1024 * 1024;
 const STORAGE_TOTAL_BYTES = 5 * 1024 * 1024 * 1024;
@@ -194,7 +196,11 @@ const mergeUnexpiredByIdentity = <T extends { id: number; docId?: string; create
   const merged = new Map<string, T>();
   const put = (item: T) => {
     if (!isUnexpired(item, ttlMs)) return;
-    const key = item.docId ? `doc:${item.docId}` : `id:${item.id}`;
+    const idKey = `id:${item.id}`;
+    const hasSyncedVersion = Array.from(merged.values()).some((existing) => existing.id === item.id && existing.docId);
+    if (!item.docId && hasSyncedVersion) return;
+    const key = item.docId ? `doc:${item.docId}` : idKey;
+    if (item.docId) merged.delete(idKey);
     merged.set(key, { ...merged.get(key), ...item });
   };
   seedItems.forEach(put);
@@ -618,6 +624,28 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     });
     return unsubscribe;
   }, [guardedAuth, isAuthenticated, navigate]);
+
+  useEffect(() => {
+    if (!isCommunityAllowed) return undefined;
+    const syncLocalAdminPosts = () => {
+      const localAdminPosts = readJsonArray<FeedMessage>(ADMIN_POST_FALLBACK_STORAGE_KEY, [])
+        .map((post) => normalizeFeedMessage({ ...post, source: 'admin', badge: post.badge || 'ADMIN POST', creatorId: post.creatorId || 'admin', ownerId: post.ownerId || 'admin' }))
+        .filter((message) => isUnexpired(message, POST_TTL_MS));
+      if (!localAdminPosts.length) return;
+      setMessages((current) => {
+        const mergedMessages = mergeUnexpiredByIdentity(localAdminPosts, current.map(normalizeFeedMessage), initialMessages.map(normalizeFeedMessage), POST_TTL_MS);
+        setAdminPosts(mergedMessages.filter((message) => message.source === 'admin' || message.badge === 'ADMIN POST' || message.creatorId === 'admin'));
+        return mergedMessages;
+      });
+    };
+    syncLocalAdminPosts();
+    window.addEventListener(ADMIN_POST_FALLBACK_EVENT, syncLocalAdminPosts);
+    window.addEventListener('storage', syncLocalAdminPosts);
+    return () => {
+      window.removeEventListener(ADMIN_POST_FALLBACK_EVENT, syncLocalAdminPosts);
+      window.removeEventListener('storage', syncLocalAdminPosts);
+    };
+  }, [isCommunityAllowed]);
 
   useEffect(() => {
     if (!isCommunityAllowed) return undefined;
