@@ -19,11 +19,11 @@ const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ onAnimationComplete }) 
     setVisible(true);
     setIsLeaving(false);
 
-    const leaveTimer = setTimeout(() => setIsLeaving(true), 2850);
+    const leaveTimer = setTimeout(() => setIsLeaving(true), 3000);
     const hideTimer = setTimeout(() => {
       setVisible(false);
       onAnimationComplete?.();
-    }, 3300);
+    }, 3360);
     return () => {
       clearTimeout(leaveTimer);
       clearTimeout(hideTimer);
@@ -33,8 +33,8 @@ const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ onAnimationComplete }) 
   if (!visible) return null;
 
   return (
-    <div className={`fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur-2xl ${isLeaving ? 'animate-[welcomeOverlayOut_0.45s_ease-in_forwards]' : 'animate-[welcomeOverlayFade_0.45s_ease-out_forwards]'}`}>
-      <div className="relative flex h-[min(82vw,24rem)] w-[min(82vw,24rem)] items-center justify-center rounded-full bg-gradient-to-br from-white via-cyan-100 to-sky-200 p-7 text-center text-slate-900 shadow-[0_24px_90px_rgba(14,165,233,0.38),0_0_70px_rgba(103,232,249,0.28)] animate-[welcomeCirclePop_0.7s_cubic-bezier(0.16,1,0.3,1)_both,welcomeFloat_2.4s_ease-in-out_0.7s_infinite] sm:p-10">
+    <div className={`fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/75 px-4 backdrop-blur-2xl ${isLeaving ? 'welcome-overlay-exit' : 'welcome-overlay-enter'}`}>
+      <div className="relative flex h-[min(82vw,24rem)] w-[min(82vw,24rem)] items-center justify-center rounded-full bg-gradient-to-br from-white via-cyan-100 to-sky-200 p-7 text-center text-slate-900 shadow-[0_24px_90px_rgba(14,165,233,0.38),0_0_70px_rgba(103,232,249,0.28)] welcome-circle-shell sm:p-10">
         <div className="absolute -inset-3 rounded-full bg-cyan-300/30 blur-3xl animate-pulse" />
         <div className="absolute inset-4 rounded-full bg-[radial-gradient(circle_at_32%_24%,rgba(255,255,255,0.98),transparent_34%),linear-gradient(145deg,rgba(236,254,255,0.95),rgba(219,234,254,0.82))]" />
         <div className="absolute inset-7 rounded-full border border-white/65 shadow-[inset_0_0_40px_rgba(14,165,233,0.12)]" />
@@ -49,12 +49,12 @@ const WelcomeOverlay: React.FC<WelcomeOverlayProps> = ({ onAnimationComplete }) 
             </linearGradient>
           </defs>
         </svg>
-        <div className="absolute left-[18%] top-[17%] h-3 w-3 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.85)] animate-[welcomeSpark_2.4s_ease-in-out_0.45s_both]" />
+        <div className="absolute left-[18%] top-[17%] h-3 w-3 rounded-full bg-cyan-300 shadow-[0_0_18px_rgba(34,211,238,0.85)] animate-[welcomeSpark_2.35s_ease-in-out_0.45s_both]" />
         <div className="relative z-10 flex max-w-[18rem] flex-col items-center">
           <p className="welcome-write-text text-5xl font-semibold leading-tight tracking-wide text-slate-950 sm:text-7xl" style={{ fontFamily: '"Brush Script MT", "Segoe Script", cursive' }}>
             Welcome
           </p>
-          <p className="mt-4 text-xs font-bold uppercase tracking-[0.42em] text-cyan-700 opacity-0 animate-[slideUp_0.55s_ease-out_1.85s_forwards] sm:text-sm">Digital Catalyst</p>
+          <p className="mt-4 text-xs font-bold uppercase tracking-[0.42em] text-cyan-700 opacity-0 animate-[slideUp_0.5s_ease-out_1.55s_forwards] sm:text-sm">Digital Catalyst</p>
         </div>
       </div>
     </div>

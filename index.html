@@ -406,10 +406,13 @@
         from { opacity: 1; }
         to { opacity: 0; }
       }
-      @keyframes welcomeCirclePop {
-        0% { opacity: 0; transform: scale(0.78) rotate(-8deg); filter: blur(8px); }
-        58% { opacity: 1; transform: scale(1.035) rotate(1deg); filter: blur(0); }
-        100% { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
+      @keyframes welcomeCircleMotion {
+        0% { opacity: 0; transform: translateY(18px) scale(0.86) rotate(-3deg); }
+        18% { opacity: 1; transform: translateY(0) scale(1.035) rotate(0deg); }
+        30% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
+        55% { opacity: 1; transform: translateY(-7px) scale(1.012) rotate(0deg); }
+        78% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
+        100% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
       }
       @keyframes welcomeCircleDraw {
         from { stroke-dashoffset: 295.31; }
@@ -418,10 +421,6 @@
       @keyframes welcomeTextWrite {
         0% { opacity: 1; clip-path: inset(0 100% 0 0); transform: translateY(8px); }
         100% { opacity: 1; clip-path: inset(0 0 0 0); transform: translateY(0); }
-      }
-      @keyframes welcomeFloat {
-        0%, 100% { transform: translateY(0) scale(1); }
-        50% { transform: translateY(-8px) scale(1.012); }
       }
       @keyframes welcomeCaretBlink {
         0%, 45% { opacity: 1; }
@@ -432,16 +431,19 @@
         20%, 82% { opacity: 1; transform: scale(1); }
         100% { opacity: 0; transform: scale(0.35); }
       }
+      .welcome-overlay-enter { animation: welcomeOverlayFade 260ms ease-out both; }
+      .welcome-overlay-exit { animation: welcomeOverlayOut 320ms ease-in both; }
+      .welcome-circle-shell { animation: welcomeCircleMotion 3.05s cubic-bezier(0.16, 1, 0.3, 1) both; will-change: transform, opacity; }
       .welcome-circle-draw {
         stroke-dasharray: 295.31;
         stroke-dashoffset: 295.31;
-        animation: welcomeCircleDraw 2.35s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+        animation: welcomeCircleDraw 2.15s cubic-bezier(0.65, 0, 0.35, 1) 180ms forwards;
       }
       .welcome-write-text {
         display: inline-block;
         opacity: 0;
         position: relative;
-        animation: welcomeTextWrite 1.75s steps(7, end) 0.35s forwards;
+        animation: welcomeTextWrite 1.25s steps(7, end) 0.32s forwards;
       }
       .welcome-write-text::after {
         background: currentColor;
@@ -451,7 +453,7 @@
         right: -0.14em;
         top: 0.12em;
         width: 0.045em;
-        animation: welcomeCaretBlink 0.5s steps(1, end) 0.35s 5 both;
+        animation: welcomeCaretBlink 0.45s steps(1, end) 0.32s 5 both;
       }
 
 
