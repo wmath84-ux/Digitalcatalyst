@@ -5,6 +5,7 @@ import { ActiveCoinDiscount, CoinTransaction, Coupon, ProductWithRating, Profile
 import { EconomySettings, resolveCoinPrice, resolveMaxDiscountPercentage } from '../utils/economy';
 import { db } from '../firebase';
 import UserAvatar from './common/UserAvatar';
+import { ensureUserCoinWallet, watchUserCoinWallet } from '../utils/coinWallet';
 
 interface ProfilePageProps {
   settings: WebsiteSettings;
@@ -137,6 +138,39 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const [locallyRedeemedRewardIds, setLocallyRedeemedRewardIds] = React.useState<string[]>([]);
   const [dailyActivity, setDailyActivity] = React.useState<DailyActivityState>({ lastActiveDate: '', streakDays: 0 });
   const [courseAccessError, setCourseAccessError] = React.useState('');
+  const [profileCoinWallet, setProfileCoinWallet] = React.useState({
+    coinBalance: 0,
+    totalCoinsEarned: 0,
+    totalCoinsSpent: 0,
+  });
+  const [profileCoinError, setProfileCoinError] = React.useState('');
+
+  React.useEffect(() => {
+    const userId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
+    if (!userId) {
+      setProfileCoinWallet({ coinBalance: 0, totalCoinsEarned: 0, totalCoinsSpent: 0 });
+      return;
+    }
+
+    ensureUserCoinWallet(userId).catch((error) => {
+      console.error('Profile coin wallet setup failed:', error);
+      setProfileCoinError('Unable to load profile coins. Please refresh.');
+    });
+
+    const unsubscribe = watchUserCoinWallet(
+      userId,
+      (wallet) => {
+        setProfileCoinWallet(wallet);
+        setProfileCoinError('');
+      },
+      (error) => {
+        console.error('Profile coin wallet watch failed:', error);
+        setProfileCoinError('Unable to load profile coins. Please refresh.');
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser?.uid, currentUser?.id]);
 
   React.useEffect(() => {
     const storedCover = localStorage.getItem(getStorageKey(currentUser?.id));
@@ -504,6 +538,22 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
       </div>
 
       <main className="relative mx-auto min-w-0 w-full max-w-[1600px] px-3 py-4 pb-32 sm:px-6 sm:py-5 sm:pb-36 lg:px-8 xl:px-10">
+
+        <div className="mb-6 rounded-3xl border border-blue-100 bg-white/90 p-5 shadow-sm">
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-semibold text-slate-500">EduCoin Balance</p>
+              <h2 className="mt-1 text-3xl font-black text-slate-900">{profileCoinWallet.coinBalance} EduCoins</h2>
+              <p className="mt-1 text-sm text-slate-500">Start watching eligible YouTube course videos to earn.</p>
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-center"><p className="text-xs text-slate-500">Lifetime earned</p><p className="text-lg font-bold text-emerald-700">{profileCoinWallet.totalCoinsEarned}</p></div>
+              <div className="rounded-2xl bg-rose-50 px-4 py-3 text-center"><p className="text-xs text-slate-500">Spent</p><p className="text-lg font-bold text-rose-700">{profileCoinWallet.totalCoinsSpent}</p></div>
+            </div>
+          </div>
+          {profileCoinError && <p className="mt-3 rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{profileCoinError}</p>}
+        </div>
+
         <button
           onClick={onBack}
           className="hub-animate mb-4 rounded-2xl border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-xs font-black uppercase tracking-[0.16em] text-[#202124] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-[#E8F0FE] hover:shadow-sm hover:shadow-sm hover:shadow-black/5 sm:mb-5 sm:px-5 sm:py-3 sm:text-sm sm:tracking-[0.2em]"

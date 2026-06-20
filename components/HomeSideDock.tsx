@@ -44,7 +44,7 @@ const HomeSideDock: React.FC<HomeSideDockProps> = ({ currentUser, cartCount, wis
         {!collapsed && currentUser && (
           <div className="mb-3 rounded-2xl bg-[#E8F0FE] p-3 text-[#202124] shadow-sm">
             <p className="text-xs font-bold uppercase tracking-widest text-[#5F6368]">EduCoins</p>
-            <p className="text-2xl font-black">🪙 {currentUser.eduCoins ?? 120}</p>
+            <p className="text-2xl font-black">🪙 {currentUser.eduCoins ?? 0}</p>
           </div>
         )}
         <div className="space-y-2">

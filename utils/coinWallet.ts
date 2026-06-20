@@ -1,505 +1,415 @@
 import {
+  collection,
   doc,
   getDoc,
+  onSnapshot,
   runTransaction,
   serverTimestamp,
   setDoc,
+  updateDoc,
+  type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../firebase';
 
-export type CoinDirection = 'credit' | 'debit';
+export const EDUCOIN_SECONDS_PER_COIN = 120;
 
-export type CoinTransactionType =
-  | 'youtube_watch_reward'
-  | 'pdf_download_reward'
-  | 'product_unlock_spend'
+export type CoinTransactionType = 'earned' | 'spent' | 'adjustment' | 'refund';
+export type CoinTransactionSource =
+  | 'youtube_watch'
+  | 'product_redeem'
   | 'admin_adjustment'
-  | 'refund'
-  | 'bonus';
+  | 'migration';
 
-export interface WalletSnapshot {
-  balance: number;
-  lifetimeEarned: number;
-  lifetimeSpent: number;
+export type WatchSessionStatus =
+  | 'active'
+  | 'paused'
+  | 'closed'
+  | 'credited'
+  | 'failed'
+  | 'expired';
+
+export interface WatchSessionInput {
+  sessionId: string;
+  userId: string;
+  courseId: string;
+  videoId: string;
+  youtubeVideoId?: string;
 }
 
-export interface CoinLedgerInput {
-  userId: string;
-  amount: number;
-  direction: CoinDirection;
-  type: CoinTransactionType;
-  sourceType: string;
-  sourceId: string;
-  productId?: string | number;
-  courseId?: string | number;
-  lessonId?: string | number;
-  pdfId?: string | number;
-  title?: string;
-  description?: string;
-  idempotencyKey: string;
-}
-
-export interface ProductUnlockInput {
-  userId: string;
-  productId: string | number;
-  productTitle: string;
-  requiredCoins: number;
-}
-
-export interface YouTubeRewardInput {
-  userId: string;
-  courseId: string | number;
-  lessonId: string | number;
-  youtubeVideoId: string;
+export interface CreditWatchSessionInput extends WatchSessionInput {
   validWatchedSeconds: number;
-  totalDurationSeconds: number;
-  rewardCoins: number;
-  rewardThresholdPercent?: number;
+  lastPlaybackPosition?: number;
 }
 
-export interface PdfRewardInput {
+export interface RedeemProductInput {
   userId: string;
-  courseId: string | number;
-  pdfId: string | number;
-  pdfName: string;
-  rewardCoins: number;
+  productId: string;
+}
+
+export interface CoinWalletSnapshot {
+  coinBalance: number;
+  totalCoinsEarned: number;
+  totalCoinsSpent: number;
 }
 
 const safeNumber = (value: unknown, fallback = 0): number => {
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : fallback;
+  return typeof value === 'number' && Number.isFinite(value) ? value : fallback;
 };
 
-const cleanDocId = (value: string | number): string => {
-  return String(value).replace(/[\/#?[\]]/g, '_');
+const completedCoinsFromSeconds = (seconds: number): number => {
+  return Math.max(0, Math.floor(seconds / EDUCOIN_SECONDS_PER_COIN));
 };
 
-export const getWallet = async (userId: string): Promise<WalletSnapshot> => {
-  if (!userId) {
-    return { balance: 0, lifetimeEarned: 0, lifetimeSpent: 0 };
-  }
-
-  const walletRef = doc(db, 'wallets', userId);
-  const walletSnap = await getDoc(walletRef);
-
-  if (!walletSnap.exists()) {
-    return { balance: 0, lifetimeEarned: 0, lifetimeSpent: 0 };
-  }
-
-  const data = walletSnap.data();
-
-  return {
-    balance: safeNumber(data.balance),
-    lifetimeEarned: safeNumber(data.lifetimeEarned),
-    lifetimeSpent: safeNumber(data.lifetimeSpent),
-  };
+export const normalizeCoinPrice = (value: unknown): number => {
+  const price = safeNumber(value, 0);
+  return Math.max(0, Math.floor(price));
 };
 
-export const ensureWallet = async (userId: string): Promise<void> => {
+export const ensureUserCoinWallet = async (userId: string): Promise<void> => {
   if (!userId) return;
 
-  const walletRef = doc(db, 'wallets', userId);
-  const walletSnap = await getDoc(walletRef);
+  const userRef = doc(db, 'users', userId);
 
-  if (!walletSnap.exists()) {
-    await setDoc(walletRef, {
-      balance: 0,
-      lifetimeEarned: 0,
-      lifetimeSpent: 0,
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-  }
-};
+  await runTransaction(db, async (transaction) => {
+    const userSnap = await transaction.get(userRef);
 
-export const writeCoinLedgerTransaction = async (input: CoinLedgerInput): Promise<WalletSnapshot> => {
-  if (!input.userId) {
-    throw new Error('Login required.');
-  }
-
-  if (!Number.isFinite(input.amount) || input.amount <= 0) {
-    throw new Error('Invalid coin amount.');
-  }
-
-  const walletRef = doc(db, 'wallets', input.userId);
-  const transactionRef = doc(db, 'coinTransactions', cleanDocId(input.idempotencyKey));
-
-  return runTransaction(db, async (transaction) => {
-    const existingTransaction = await transaction.get(transactionRef);
-    if (existingTransaction.exists()) {
-      const walletSnap = await transaction.get(walletRef);
-      const wallet = walletSnap.exists() ? walletSnap.data() : {};
-      return {
-        balance: safeNumber(wallet.balance),
-        lifetimeEarned: safeNumber(wallet.lifetimeEarned),
-        lifetimeSpent: safeNumber(wallet.lifetimeSpent),
-      };
+    if (!userSnap.exists()) {
+      transaction.set(userRef, {
+        coinBalance: 0,
+        totalCoinsEarned: 0,
+        totalCoinsSpent: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+      return;
     }
 
-    const walletSnap = await transaction.get(walletRef);
-    const walletData = walletSnap.exists() ? walletSnap.data() : {};
-    const balanceBefore = safeNumber(walletData.balance);
-    const lifetimeEarnedBefore = safeNumber(walletData.lifetimeEarned);
-    const lifetimeSpentBefore = safeNumber(walletData.lifetimeSpent);
-
-    const balanceAfter =
-      input.direction === 'credit'
-        ? balanceBefore + input.amount
-        : balanceBefore - input.amount;
-
-    if (balanceAfter < 0) {
-      throw new Error('Insufficient coins.');
-    }
-
-    const lifetimeEarned =
-      input.direction === 'credit'
-        ? lifetimeEarnedBefore + input.amount
-        : lifetimeEarnedBefore;
-
-    const lifetimeSpent =
-      input.direction === 'debit'
-        ? lifetimeSpentBefore + input.amount
-        : lifetimeSpentBefore;
+    const userData = userSnap.data();
 
     transaction.set(
-      walletRef,
+      userRef,
       {
-        balance: balanceAfter,
-        lifetimeEarned,
-        lifetimeSpent,
+        coinBalance: safeNumber(userData.coinBalance, 0),
+        totalCoinsEarned: safeNumber(userData.totalCoinsEarned, 0),
+        totalCoinsSpent: safeNumber(userData.totalCoinsSpent, 0),
         updatedAt: serverTimestamp(),
-        createdAt: walletData.createdAt || serverTimestamp(),
+      },
+      { merge: true }
+    );
+  });
+};
+
+export const watchUserCoinWallet = (
+  userId: string,
+  onChange: (wallet: CoinWalletSnapshot) => void,
+  onError?: (error: Error) => void
+): Unsubscribe => {
+  if (!userId) {
+    onChange({
+      coinBalance: 0,
+      totalCoinsEarned: 0,
+      totalCoinsSpent: 0,
+    });
+    return () => {};
+  }
+
+  return onSnapshot(
+    doc(db, 'users', userId),
+    (snapshot) => {
+      const data = snapshot.data();
+
+      onChange({
+        coinBalance: safeNumber(data?.coinBalance, 0),
+        totalCoinsEarned: safeNumber(data?.totalCoinsEarned, 0),
+        totalCoinsSpent: safeNumber(data?.totalCoinsSpent, 0),
+      });
+    },
+    (error) => {
+      onError?.(error);
+    }
+  );
+};
+
+export const startWatchSession = async ({
+  sessionId,
+  userId,
+  courseId,
+  videoId,
+  youtubeVideoId,
+}: WatchSessionInput): Promise<void> => {
+  if (!sessionId || !userId || !courseId || !videoId) return;
+
+  await ensureUserCoinWallet(userId);
+
+  await setDoc(
+    doc(db, 'watchSessions', sessionId),
+    {
+      sessionId,
+      userId,
+      courseId,
+      videoId,
+      youtubeVideoId: youtubeVideoId || '',
+      validWatchedSeconds: 0,
+      earnedCoins: 0,
+      creditedCoins: 0,
+      lastPlaybackPosition: 0,
+      status: 'active' satisfies WatchSessionStatus,
+      startedAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    },
+    { merge: true }
+  );
+};
+
+export const markWatchSessionPaused = async (sessionId: string): Promise<void> => {
+  if (!sessionId) return;
+
+  await updateDoc(doc(db, 'watchSessions', sessionId), {
+    status: 'paused' satisfies WatchSessionStatus,
+    updatedAt: serverTimestamp(),
+  });
+};
+
+export const creditWatchSessionCoins = async ({
+  sessionId,
+  userId,
+  courseId,
+  videoId,
+  youtubeVideoId,
+  validWatchedSeconds,
+  lastPlaybackPosition = 0,
+}: CreditWatchSessionInput): Promise<number> => {
+  if (!sessionId || !userId) return 0;
+
+  const completedCoins = completedCoinsFromSeconds(validWatchedSeconds);
+  const sessionRef = doc(db, 'watchSessions', sessionId);
+  const userRef = doc(db, 'users', userId);
+  const transactionRef = doc(collection(db, 'coinTransactions'));
+
+  return runTransaction(db, async (transaction) => {
+    const [sessionSnap, userSnap] = await Promise.all([
+      transaction.get(sessionRef),
+      transaction.get(userRef),
+    ]);
+
+    if (!userSnap.exists()) {
+      transaction.set(userRef, {
+        coinBalance: 0,
+        totalCoinsEarned: 0,
+        totalCoinsSpent: 0,
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+      });
+    }
+
+    const sessionData = sessionSnap.exists() ? sessionSnap.data() : {};
+    const creditedCoins = safeNumber(sessionData.creditedCoins, 0);
+    const coinsToCredit = Math.max(0, completedCoins - creditedCoins);
+
+    if (coinsToCredit <= 0) {
+      transaction.set(
+        sessionRef,
+        {
+          sessionId,
+          userId,
+          courseId,
+          videoId,
+          youtubeVideoId: youtubeVideoId || '',
+          validWatchedSeconds,
+          earnedCoins: completedCoins,
+          creditedCoins,
+          lastPlaybackPosition,
+          status: 'credited' satisfies WatchSessionStatus,
+          endedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+
+      return 0;
+    }
+
+    const userData = userSnap.exists() ? userSnap.data() : {};
+    const balanceBefore = safeNumber(userData.coinBalance, 0);
+    const balanceAfter = balanceBefore + coinsToCredit;
+
+    transaction.set(
+      sessionRef,
+      {
+        sessionId,
+        userId,
+        courseId,
+        videoId,
+        youtubeVideoId: youtubeVideoId || '',
+        validWatchedSeconds,
+        earnedCoins: completedCoins,
+        creditedCoins: creditedCoins + coinsToCredit,
+        lastPlaybackPosition,
+        status: 'credited' satisfies WatchSessionStatus,
+        endedAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
       },
       { merge: true }
     );
 
     transaction.set(transactionRef, {
-      userId: input.userId,
-      amount: input.amount,
-      direction: input.direction,
-      type: input.type,
-      sourceType: input.sourceType,
-      sourceId: String(input.sourceId),
-      productId: input.productId ?? null,
-      courseId: input.courseId ?? null,
-      lessonId: input.lessonId ?? null,
-      pdfId: input.pdfId ?? null,
-      title: input.title || '',
-      description: input.description || '',
-      idempotencyKey: input.idempotencyKey,
+      userId,
+      type: 'earned' satisfies CoinTransactionType,
+      source: 'youtube_watch' satisfies CoinTransactionSource,
+      amount: coinsToCredit,
       balanceBefore,
       balanceAfter,
+      courseId,
+      videoId,
+      youtubeVideoId: youtubeVideoId || '',
+      sessionId,
       status: 'success',
       createdAt: serverTimestamp(),
     });
 
-    return {
-      balance: balanceAfter,
-      lifetimeEarned,
-      lifetimeSpent,
-    };
-  });
-};
-
-export const unlockProductWithCoins = async (input: ProductUnlockInput): Promise<{
-  alreadyUnlocked: boolean;
-  balance: number;
-}> => {
-  if (!input.userId) {
-    throw new Error('Login required.');
-  }
-
-  const requiredCoins = Math.max(0, Math.floor(Number(input.requiredCoins) || 0));
-  if (requiredCoins <= 0) {
-    throw new Error('Coin price is not enabled for this product.');
-  }
-
-  const productId = cleanDocId(input.productId);
-  const unlockId = `${input.userId}_${productId}`;
-  const transactionId = `product_unlock_spend:${unlockId}:${requiredCoins}`;
-
-  const walletRef = doc(db, 'wallets', input.userId);
-  const unlockRef = doc(db, 'productUnlocks', unlockId);
-  const ledgerRef = doc(db, 'coinTransactions', cleanDocId(transactionId));
-
-  const result = await runTransaction(db, async (transaction) => {
-    const [walletSnap, unlockSnap, ledgerSnap] = await Promise.all([
-      transaction.get(walletRef),
-      transaction.get(unlockRef),
-      transaction.get(ledgerRef),
-    ]);
-
-    const walletData = walletSnap.exists() ? walletSnap.data() : {};
-    const balanceBefore = safeNumber(walletData.balance);
-
-    if (unlockSnap.exists() || ledgerSnap.exists()) {
-      return {
-        alreadyUnlocked: true,
-        balance: balanceBefore,
-      };
-    }
-
-    if (balanceBefore < requiredCoins) {
-      throw new Error('Insufficient coins.');
-    }
-
-    const balanceAfter = balanceBefore - requiredCoins;
-    const lifetimeSpent = safeNumber(walletData.lifetimeSpent) + requiredCoins;
-
     transaction.set(
-      walletRef,
+      userRef,
       {
-        balance: balanceAfter,
-        lifetimeEarned: safeNumber(walletData.lifetimeEarned),
-        lifetimeSpent,
-        createdAt: walletData.createdAt || serverTimestamp(),
+        coinBalance: balanceAfter,
+        totalCoinsEarned: safeNumber(userData.totalCoinsEarned, 0) + coinsToCredit,
+        totalCoinsSpent: safeNumber(userData.totalCoinsSpent, 0),
         updatedAt: serverTimestamp(),
       },
       { merge: true }
     );
+
+    return coinsToCredit;
+  });
+};
+
+export const getProductCoinPrice = async (productId: string): Promise<{
+  coinPrice: number;
+  isCoinRedeemEnabled: boolean;
+  status: string;
+}> => {
+  if (!productId) {
+    return {
+      coinPrice: 0,
+      isCoinRedeemEnabled: false,
+      status: 'inactive',
+    };
+  }
+
+  const productSnap = await getDoc(doc(db, 'products', productId));
+  const product = productSnap.data();
+
+  return {
+    coinPrice: normalizeCoinPrice(product?.coinPrice),
+    isCoinRedeemEnabled: product?.isCoinRedeemEnabled !== false,
+    status: String(product?.status || 'active'),
+  };
+};
+
+export const redeemProductWithEduCoins = async ({
+  userId,
+  productId,
+}: RedeemProductInput): Promise<{
+  success: boolean;
+  reason?: 'login_required' | 'product_not_found' | 'redeem_disabled' | 'already_unlocked' | 'not_enough_coins';
+  requiredCoins?: number;
+  currentBalance?: number;
+}> => {
+  if (!userId) {
+    return {
+      success: false,
+      reason: 'login_required',
+    };
+  }
+
+  const userRef = doc(db, 'users', userId);
+  const productRef = doc(db, 'products', productId);
+  const unlockRef = doc(db, 'users', userId, 'unlockedProducts', productId);
+  const transactionRef = doc(collection(db, 'coinTransactions'));
+
+  return runTransaction(db, async (transaction) => {
+    const [userSnap, productSnap, unlockSnap] = await Promise.all([
+      transaction.get(userRef),
+      transaction.get(productRef),
+      transaction.get(unlockRef),
+    ]);
+
+    if (!productSnap.exists()) {
+      return {
+        success: false,
+        reason: 'product_not_found' as const,
+      };
+    }
+
+    const product = productSnap.data();
+    const coinPrice = normalizeCoinPrice(product.coinPrice);
+    const isCoinRedeemEnabled = product.isCoinRedeemEnabled !== false;
+    const productStatus = String(product.status || 'active');
+
+    if (!isCoinRedeemEnabled || productStatus === 'inactive' || productStatus === 'draft') {
+      return {
+        success: false,
+        reason: 'redeem_disabled' as const,
+        requiredCoins: coinPrice,
+      };
+    }
+
+    if (unlockSnap.exists()) {
+      return {
+        success: false,
+        reason: 'already_unlocked' as const,
+        requiredCoins: coinPrice,
+      };
+    }
+
+    const userData = userSnap.exists() ? userSnap.data() : {};
+    const balanceBefore = safeNumber(userData.coinBalance, 0);
+
+    if (balanceBefore < coinPrice) {
+      return {
+        success: false,
+        reason: 'not_enough_coins' as const,
+        requiredCoins: coinPrice,
+        currentBalance: balanceBefore,
+      };
+    }
+
+    const balanceAfter = balanceBefore - coinPrice;
 
     transaction.set(unlockRef, {
-      userId: input.userId,
-      productId: String(input.productId),
-      productTitle: input.productTitle,
-      unlockMethod: 'coins',
-      coinPricePaid: requiredCoins,
-      transactionId,
+      productId,
+      unlockMethod: 'educoin',
+      coinSpent: coinPrice,
       status: 'active',
-      createdAt: serverTimestamp(),
+      unlockedAt: serverTimestamp(),
     });
 
-    transaction.set(ledgerRef, {
-      userId: input.userId,
-      amount: requiredCoins,
-      direction: 'debit',
-      type: 'product_unlock_spend',
-      sourceType: 'product',
-      sourceId: String(input.productId),
-      productId: String(input.productId),
-      title: input.productTitle,
-      description: `Unlocked ${input.productTitle} with ${requiredCoins} coins.`,
-      idempotencyKey: transactionId,
+    transaction.set(transactionRef, {
+      userId,
+      productId,
+      type: 'spent' satisfies CoinTransactionType,
+      source: 'product_redeem' satisfies CoinTransactionSource,
+      amount: coinPrice,
       balanceBefore,
       balanceAfter,
       status: 'success',
       createdAt: serverTimestamp(),
     });
 
-    return {
-      alreadyUnlocked: false,
-      balance: balanceAfter,
-    };
-  });
-
-  return result;
-};
-
-export const claimYouTubeWatchReward = async (input: YouTubeRewardInput): Promise<{
-  claimed: boolean;
-  balance: number;
-  watchedPercent: number;
-}> => {
-  if (!input.userId) {
-    throw new Error('Login required.');
-  }
-
-  const rewardCoins = Math.max(0, Math.floor(Number(input.rewardCoins) || 0));
-  if (rewardCoins <= 0) {
-    throw new Error('Reward is not enabled for this lesson.');
-  }
-
-  const duration = Math.max(1, Math.floor(Number(input.totalDurationSeconds) || 1));
-  const validWatched = Math.max(0, Math.floor(Number(input.validWatchedSeconds) || 0));
-  const threshold = Math.max(1, Math.min(100, Number(input.rewardThresholdPercent ?? 70)));
-  const watchedPercent = Math.min(100, Math.floor((validWatched / duration) * 100));
-
-  if (watchedPercent < threshold) {
-    throw new Error(`Watch at least ${threshold}% valid time to earn coins.`);
-  }
-
-  const lessonId = cleanDocId(input.lessonId);
-  const rewardId = `${input.userId}_${lessonId}`;
-  const transactionId = `youtube_watch_reward:${rewardId}`;
-
-  const walletRef = doc(db, 'wallets', input.userId);
-  const rewardRef = doc(db, 'youtubeWatchRewards', rewardId);
-  const progressRef = doc(db, 'watchProgress', rewardId);
-  const ledgerRef = doc(db, 'coinTransactions', cleanDocId(transactionId));
-
-  return runTransaction(db, async (transaction) => {
-    const [walletSnap, rewardSnap, ledgerSnap] = await Promise.all([
-      transaction.get(walletRef),
-      transaction.get(rewardRef),
-      transaction.get(ledgerRef),
-    ]);
-
-    const walletData = walletSnap.exists() ? walletSnap.data() : {};
-    const balanceBefore = safeNumber(walletData.balance);
-
     transaction.set(
-      progressRef,
+      userRef,
       {
-        userId: input.userId,
-        courseId: String(input.courseId),
-        lessonId: String(input.lessonId),
-        youtubeVideoId: input.youtubeVideoId,
-        validWatchedSeconds: validWatched,
-        totalDurationSeconds: duration,
-        watchedPercent,
-        rewardEligible: true,
-        rewardClaimed: rewardSnap.exists() || ledgerSnap.exists(),
+        coinBalance: balanceAfter,
+        totalCoinsEarned: safeNumber(userData.totalCoinsEarned, 0),
+        totalCoinsSpent: safeNumber(userData.totalCoinsSpent, 0) + coinPrice,
         updatedAt: serverTimestamp(),
       },
       { merge: true }
     );
 
-    if (rewardSnap.exists() || ledgerSnap.exists()) {
-      return {
-        claimed: false,
-        balance: balanceBefore,
-        watchedPercent,
-      };
-    }
-
-    const balanceAfter = balanceBefore + rewardCoins;
-    const lifetimeEarned = safeNumber(walletData.lifetimeEarned) + rewardCoins;
-
-    transaction.set(
-      walletRef,
-      {
-        balance: balanceAfter,
-        lifetimeEarned,
-        lifetimeSpent: safeNumber(walletData.lifetimeSpent),
-        createdAt: walletData.createdAt || serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
-
-    transaction.set(rewardRef, {
-      userId: input.userId,
-      courseId: String(input.courseId),
-      lessonId: String(input.lessonId),
-      youtubeVideoId: input.youtubeVideoId,
-      rewardCoins,
-      validWatchedSeconds: validWatched,
-      totalDurationSeconds: duration,
-      watchedPercent,
-      rewardClaimed: true,
-      rewardClaimedAt: serverTimestamp(),
-    });
-
-    transaction.set(ledgerRef, {
-      userId: input.userId,
-      amount: rewardCoins,
-      direction: 'credit',
-      type: 'youtube_watch_reward',
-      sourceType: 'youtube_lesson',
-      sourceId: String(input.lessonId),
-      courseId: String(input.courseId),
-      lessonId: String(input.lessonId),
-      title: 'YouTube lesson reward',
-      description: `Earned ${rewardCoins} coins for watching a YouTube lesson.`,
-      idempotencyKey: transactionId,
-      balanceBefore,
-      balanceAfter,
-      status: 'success',
-      createdAt: serverTimestamp(),
-    });
-
     return {
-      claimed: true,
-      balance: balanceAfter,
-      watchedPercent,
-    };
-  });
-};
-
-export const claimPdfDownloadReward = async (input: PdfRewardInput): Promise<{
-  claimed: boolean;
-  balance: number;
-}> => {
-  if (!input.userId) {
-    throw new Error('Login required.');
-  }
-
-  const rewardCoins = Math.max(0, Math.floor(Number(input.rewardCoins) || 0));
-  if (rewardCoins <= 0) {
-    throw new Error('PDF reward is not enabled.');
-  }
-
-  const pdfId = cleanDocId(input.pdfId);
-  const rewardId = `${input.userId}_${pdfId}`;
-  const transactionId = `pdf_download_reward:${rewardId}`;
-
-  const walletRef = doc(db, 'wallets', input.userId);
-  const rewardRef = doc(db, 'pdfDownloadRewards', rewardId);
-  const ledgerRef = doc(db, 'coinTransactions', cleanDocId(transactionId));
-
-  return runTransaction(db, async (transaction) => {
-    const [walletSnap, rewardSnap, ledgerSnap] = await Promise.all([
-      transaction.get(walletRef),
-      transaction.get(rewardRef),
-      transaction.get(ledgerRef),
-    ]);
-
-    const walletData = walletSnap.exists() ? walletSnap.data() : {};
-    const balanceBefore = safeNumber(walletData.balance);
-
-    if (rewardSnap.exists() || ledgerSnap.exists()) {
-      return {
-        claimed: false,
-        balance: balanceBefore,
-      };
-    }
-
-    const balanceAfter = balanceBefore + rewardCoins;
-    const lifetimeEarned = safeNumber(walletData.lifetimeEarned) + rewardCoins;
-
-    transaction.set(
-      walletRef,
-      {
-        balance: balanceAfter,
-        lifetimeEarned,
-        lifetimeSpent: safeNumber(walletData.lifetimeSpent),
-        createdAt: walletData.createdAt || serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      },
-      { merge: true }
-    );
-
-    transaction.set(rewardRef, {
-      userId: input.userId,
-      courseId: String(input.courseId),
-      pdfId: String(input.pdfId),
-      pdfName: input.pdfName,
-      rewardCoins,
-      rewardClaimed: true,
-      downloadedAt: serverTimestamp(),
-    });
-
-    transaction.set(ledgerRef, {
-      userId: input.userId,
-      amount: rewardCoins,
-      direction: 'credit',
-      type: 'pdf_download_reward',
-      sourceType: 'pdf',
-      sourceId: String(input.pdfId),
-      courseId: String(input.courseId),
-      pdfId: String(input.pdfId),
-      title: input.pdfName,
-      description: `Earned ${rewardCoins} coins for downloading PDF.`,
-      idempotencyKey: transactionId,
-      balanceBefore,
-      balanceAfter,
-      status: 'success',
-      createdAt: serverTimestamp(),
-    });
-
-    return {
-      claimed: true,
-      balance: balanceAfter,
+      success: true,
+      requiredCoins: coinPrice,
+      currentBalance: balanceAfter,
     };
   });
 };

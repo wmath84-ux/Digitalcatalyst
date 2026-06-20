@@ -6,6 +6,7 @@ import { PRODUCT_IMAGE_SLOTS, ProductImageSlot } from '../../utils/productImages
 type ProductViewState = 'list' | 'add' | 'edit';
 
 type ProductAdminInitialState = Omit<Product, 'id'> & {
+    isCoinRedeemEnabled?: boolean;
     faqs: unknown[];
     modules: CourseModule[];
 };
@@ -17,6 +18,7 @@ type ProductFormData = {
     price: string;
     salePrice: string;
     coinPrice: string;
+    isCoinRedeemEnabled: boolean;
     imageSeed: string;
     category: string;
     department: 'Men' | 'Women' | 'Unisex';
@@ -45,6 +47,7 @@ const initialProductState: ProductAdminInitialState = {
     price: '₹0',
     salePrice: undefined,
     coinPrice: 0,
+    isCoinRedeemEnabled: true,
     category: '',
     department: 'Unisex',
     inStock: true,
@@ -84,6 +87,7 @@ const createEmptyProductForm = (product?: ProductWithRating | null): ProductForm
         price: source.price ? source.price.replace('₹', '') : '',
         salePrice: source.salePrice ? source.salePrice.replace('₹', '') : '',
         coinPrice: source.coinPrice ? String(source.coinPrice) : '',
+        isCoinRedeemEnabled: (source as any).isCoinRedeemEnabled !== false,
         imageSeed: source.imageSeed || '',
         category: source.category || '',
         department: source.department || 'Unisex',
@@ -841,7 +845,8 @@ const ProductForm: React.FC<{
             tags,
             price: formattedPrice,
             salePrice: formattedSalePrice,
-            coinPrice: Number(formData.coinPrice || 0),
+            coinPrice: Math.max(0, Number(formData.coinPrice || 0)),
+            isCoinRedeemEnabled: formData.isCoinRedeemEnabled !== false,
             category: formData.category,
             department: formData.department,
             inStock: formData.inStock,
@@ -955,6 +960,11 @@ const ProductForm: React.FC<{
                                     <div><label className={labelClass}>Regular Price</label><input required type="number" value={formData.price} onChange={event => setFormData(prev => ({ ...prev, price: event.target.value }))} className={fieldClass} placeholder="999" /></div>
                                     <div><label className={labelClass}>Sale Price</label><input type="number" value={formData.salePrice} onChange={event => setFormData(prev => ({ ...prev, salePrice: event.target.value }))} className={fieldClass} placeholder="499" /></div>
                                     <div><label className={labelClass}>EduCoin Price (Leave 0 to disable coin purchase)</label><input type="number" min="0" value={formData.coinPrice} onChange={event => setFormData(prev => ({ ...prev, coinPrice: event.target.value }))} className={fieldClass} placeholder="1200" /></div>
+                                    <div className="mt-4">
+                                      <label className="mb-2 block text-sm font-semibold text-slate-700">EduCoin Redeem Price</label>
+                                      <input type="number" min="0" value={formData.coinPrice || 0} onChange={(event) => setFormData((previous) => ({ ...previous, coinPrice: String(Math.max(0, Number(event.target.value || 0))) }))} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="Example: 299" />
+                                      <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={formData.isCoinRedeemEnabled !== false} onChange={(event) => setFormData((previous) => ({ ...previous, isCoinRedeemEnabled: event.target.checked }))} />Enable Pay with EduCoin</label>
+                                    </div>
                                     <div><label className={labelClass}>Coupon Code</label><select value={formData.couponCode} onChange={event => setFormData(prev => ({ ...prev, couponCode: event.target.value }))} className={fieldClass}><option value="">No coupon</option>{(coupons || []).map(coupon => <option key={coupon.id} value={coupon.code}>{coupon.code}</option>)}</select></div>
                                     <div><label className={labelClass}>Razorpay Payment Page Link</label><input required value={formData.paymentLink} onChange={event => setFormData(prev => ({ ...prev, paymentLink: event.target.value }))} className={fieldClass} placeholder="https://pages.razorpay.com/..." /></div>
                                 </div>
