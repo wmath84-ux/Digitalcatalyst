@@ -3583,6 +3583,13 @@ const App: React.FC = () => {
     return (
        <ErrorBoundary>
          <div className={`font-sans ${websiteSettings.animations.enabled ? '' : 'animations-off'}`}>
+            <style>{`
+              .animations-off .hub-animate {
+                opacity: 1 !important;
+                transform: none !important;
+                animation: none !important;
+              }
+            `}</style>
             <WelcomeOverlay
               message={mobileWelcomeMessage}
               onAnimationComplete={() => {

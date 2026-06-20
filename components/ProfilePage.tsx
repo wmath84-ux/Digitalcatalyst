@@ -523,8 +523,27 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           from { opacity: 0; transform: translateY(28px); }
           to { opacity: 1; transform: translateY(0); }
         }
-        .hub-animate { opacity: 0; animation: hubFadeUp 680ms ease-out forwards; }
-        .profile-glass-card { background-color: rgba(255,255,255,var(--profile-card-opacity,0.95)); }
+
+        .hub-animate {
+          opacity: 1;
+          transform: translateY(0);
+        }
+
+        @media (prefers-reduced-motion: no-preference) {
+          .hub-animate {
+            animation: hubFadeUp 680ms ease-out both;
+          }
+        }
+
+        .animations-off .hub-animate {
+          opacity: 1 !important;
+          transform: none !important;
+          animation: none !important;
+        }
+
+        .profile-glass-card {
+          background-color: rgba(255,255,255,var(--profile-card-opacity,0.95));
+        }
       `}</style>
 
       <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-80">
