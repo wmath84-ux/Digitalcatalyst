@@ -5,17 +5,40 @@ import { db, storage } from '../../firebase';
 
 const COMMUNITY_FEED = 'community_feed';
 const POST_TTL_MS = 24 * 60 * 60 * 1000;
+const ADMIN_POST_FALLBACK_STORAGE_KEY = 'eduvoraAdminPostFallbacks';
+const ADMIN_POST_FALLBACK_EVENT = 'eduvoraAdminPostFallbackUpdated';
 type PostType = 'text' | 'image' | 'poll';
 
-const stripUndefinedDeep = <T,>(value: T): T => {
-  if (Array.isArray(value)) return value.map(item => stripUndefinedDeep(item)) as T;
-  if (value && typeof value === 'object') {
-    return Object.entries(value as Record<string, unknown>).reduce((acc, [key, entry]) => {
-      if (entry !== undefined) (acc as Record<string, unknown>)[key] = stripUndefinedDeep(entry);
-      return acc;
-    }, {} as Record<string, unknown>) as T;
+const stripUndefinedFields = <T extends Record<string, unknown>>(payload: T): Partial<T> =>
+  Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined)) as Partial<T>;
+
+const persistLocalAdminPost = (payload: Record<string, unknown>) => {
+  if (typeof window === 'undefined') return;
+  const sanitizedPayload = stripUndefinedFields(payload);
+  try {
+    const storedPosts = JSON.parse(localStorage.getItem(ADMIN_POST_FALLBACK_STORAGE_KEY) || '[]');
+    const posts = Array.isArray(storedPosts) ? storedPosts : [];
+    const nextPosts = [sanitizedPayload, ...posts.filter((post) => post?.id !== sanitizedPayload.id)].slice(0, 50);
+    localStorage.setItem(ADMIN_POST_FALLBACK_STORAGE_KEY, JSON.stringify(nextPosts));
+    window.dispatchEvent(new Event(ADMIN_POST_FALLBACK_EVENT));
+  } catch (error) {
+    console.error('Unable to save local admin post fallback:', error);
   }
-  return value;
+};
+
+const publishRemoteAdminPost = async (payload: Record<string, unknown>, imageDataUrl: string) => {
+  const remotePayload = { ...payload };
+  if (payload.postType === 'image') {
+    const id = Number(payload.id) || Date.now();
+    const storagePath = `community/admin-posts/${id}.jpg`;
+    await uploadString(ref(storage, storagePath), imageDataUrl, 'data_url');
+    Object.assign(remotePayload, {
+      imagePreview: await getDownloadURL(ref(storage, storagePath)),
+      imageLayout: 'thumbnail',
+      storagePath,
+    });
+  }
+  await addDoc(collection(db, COMMUNITY_FEED), stripUndefinedFields(remotePayload));
 };
 
 const AdminPostManagement: React.FC = () => {
@@ -45,13 +68,7 @@ const AdminPostManagement: React.FC = () => {
     setFeedback('');
     try {
       const id = Date.now();
-      let imagePreview = '';
-      let storagePath = '';
-      if (type === 'image') {
-        storagePath = `community/admin-posts/${id}.jpg`;
-        await uploadString(ref(storage, storagePath), image, 'data_url');
-        imagePreview = await getDownloadURL(ref(storage, storagePath));
-      }
+      const imagePreview = type === 'image' ? image : '';
       const payload: Record<string, unknown> = {
         id,
         admin: 'Digital Catalyst Admin',
@@ -64,11 +81,6 @@ const AdminPostManagement: React.FC = () => {
         ownerId: 'admin',
         postType: type,
         source: 'admin',
-        imagePreview: type === 'image' ? imagePreview : undefined,
-        imageLayout: type === 'image' ? 'thumbnail' : undefined,
-        storagePath: storagePath || undefined,
-        pollOptions: type === 'poll' ? options : undefined,
-        pollVotes: type === 'poll' ? options.map(() => 0) : undefined,
         reactions: {},
         reactionCounts: {},
         likedByUsers: {},
@@ -80,13 +92,15 @@ const AdminPostManagement: React.FC = () => {
         createdAt: Date.now(),
         expiresAt: Date.now() + POST_TTL_MS,
       };
-      if (type === 'image') Object.assign(payload, { imagePreview, imageLayout: 'thumbnail', storagePath });
+      if (type === 'image') Object.assign(payload, { imagePreview, imageLayout: 'thumbnail' });
       if (type === 'poll') Object.assign(payload, { pollOptions: options, pollVotes: options.map(() => 0) });
-      await addDoc(collection(db, COMMUNITY_FEED), stripUndefinedDeep(payload));
+      persistLocalAdminPost(payload);
+      publishRemoteAdminPost(payload, image).catch((remoteError) => console.error('Admin post remote publish failed:', remoteError));
       setText(''); setLink(''); setImage(''); setImageName(''); setPollOptions(['', '', '']);
       setFeedback('Admin post published to the community ADMIN POST page and main feed. It will auto-delete after 24 hours.');
     } catch (error) {
-      setFeedback(`Admin post publish failed. Please check the image/poll fields and try again. ${error instanceof Error ? error.message : ''}`.trim());
+      console.error('Admin post publish failed:', error);
+      setFeedback('Admin post publish failed. Please check the image/poll fields and try again.');
     } finally {
       setIsSaving(false);
     }
