@@ -7,16 +7,8 @@ const COMMUNITY_FEED = 'community_feed';
 const POST_TTL_MS = 24 * 60 * 60 * 1000;
 type PostType = 'text' | 'image' | 'poll';
 
-const stripUndefinedDeep = <T,>(value: T): T => {
-  if (Array.isArray(value)) return value.map(item => stripUndefinedDeep(item)) as T;
-  if (value && typeof value === 'object') {
-    return Object.entries(value as Record<string, unknown>).reduce((acc, [key, entry]) => {
-      if (entry !== undefined) (acc as Record<string, unknown>)[key] = stripUndefinedDeep(entry);
-      return acc;
-    }, {} as Record<string, unknown>) as T;
-  }
-  return value;
-};
+const stripUndefinedFields = <T extends Record<string, unknown>>(payload: T): Partial<T> =>
+  Object.fromEntries(Object.entries(payload).filter(([, value]) => value !== undefined)) as Partial<T>;
 
 const AdminPostManagement: React.FC = () => {
   const [type, setType] = useState<PostType>('text');
@@ -64,11 +56,6 @@ const AdminPostManagement: React.FC = () => {
         ownerId: 'admin',
         postType: type,
         source: 'admin',
-        imagePreview: type === 'image' ? imagePreview : undefined,
-        imageLayout: type === 'image' ? 'thumbnail' : undefined,
-        storagePath: storagePath || undefined,
-        pollOptions: type === 'poll' ? options : undefined,
-        pollVotes: type === 'poll' ? options.map(() => 0) : undefined,
         reactions: {},
         reactionCounts: {},
         likedByUsers: {},
@@ -82,11 +69,12 @@ const AdminPostManagement: React.FC = () => {
       };
       if (type === 'image') Object.assign(payload, { imagePreview, imageLayout: 'thumbnail', storagePath });
       if (type === 'poll') Object.assign(payload, { pollOptions: options, pollVotes: options.map(() => 0) });
-      await addDoc(collection(db, COMMUNITY_FEED), stripUndefinedDeep(payload));
+      await addDoc(collection(db, COMMUNITY_FEED), stripUndefinedFields(payload));
       setText(''); setLink(''); setImage(''); setImageName(''); setPollOptions(['', '', '']);
       setFeedback('Admin post published to the community ADMIN POST page and main feed. It will auto-delete after 24 hours.');
     } catch (error) {
-      setFeedback(`Admin post publish failed. Please check the image/poll fields and try again. ${error instanceof Error ? error.message : ''}`.trim());
+      console.error('Admin post publish failed:', error);
+      setFeedback('Admin post publish failed. Please check the image/poll fields and try again.');
     } finally {
       setIsSaving(false);
     }
