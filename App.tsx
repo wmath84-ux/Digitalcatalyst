@@ -158,7 +158,7 @@ export interface ProductFile {
   name: string;
   type: ProductFileType;
   url: string; // For uploads, this is a Base64 data URL. For links, it's the URL.
-  content?: string; // Backward-compatible first page for Open Docs / e-book HTML content
+  content?: string; // Backward-compatible first page for Open Docs / e-book HTML content.
   docPages?: ProductDocPage[];
   quiz?: ProductQuiz;
 }

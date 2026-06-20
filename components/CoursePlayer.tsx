@@ -172,128 +172,236 @@ const getCourseBackground = (product: ProductWithRating, activeFile: ProductFile
   return product.images?.[0] || `https://picsum.photos/seed/${product.imageSeed || product.id}/1600/900`;
 };
 
+const OPEN_DOCS_DEFAULT_HTML = '<h1>Open Docs Workspace</h1><p>Start writing here.</p>';
+
 const htmlFromPlainText = (value: string) => {
-  const trimmed = value.trim();
+  const trimmed = (value || '').trim();
   return trimmed.startsWith('<') ? trimmed : `<p>${trimmed.replace(/\n/g, '<br />')}</p>`;
 };
 
-type ReadingTheme = 'dark' | 'light' | 'sepia';
-type ReadingFontSize = 'comfortable' | 'large' | 'immersive';
-type ReadingLineSpacing = 'relaxed' | 'loose' | 'wide';
-type ReadingFontStyle = 'sans' | 'serif' | 'mono';
+const getMeaningfulDocText = (html: string) =>
+  (html || '')
+    .replace(/<style[\s\S]*?<\/style>/gi, '')
+    .replace(/<script[\s\S]*?<\/script>/gi, '')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/g, ' ')
+    .trim();
 
-const fontSizeClasses: Record<ReadingFontSize, string> = {
-  comfortable: 'text-lg',
-  large: 'text-xl',
-  immersive: 'text-2xl',
+const createOpenDocsPage = (title: string, content = OPEN_DOCS_DEFAULT_HTML): ProductDocPage => {
+  const now = Date.now();
+  return {
+    id: `open-doc-page-${now}-${Math.random().toString(36).slice(2, 7)}`,
+    title: title.trim() || 'Untitled Page',
+    content,
+    createdAt: now,
+    updatedAt: now,
+  };
 };
 
-const lineSpacingClasses: Record<ReadingLineSpacing, string> = {
-  relaxed: 'leading-8',
-  loose: 'leading-9',
-  wide: 'leading-10',
+const normalizeDocPages = (file: ProductFile): ProductDocPage[] => {
+  const pages = (file.docPages || [])
+    .filter(page => page && page.id && page.title)
+    .map(page => ({
+      ...page,
+      title: page.title.trim() || 'Untitled Page',
+      content: htmlFromPlainText(page.content || OPEN_DOCS_DEFAULT_HTML),
+    }));
+
+  if (pages.length > 0) return pages;
+
+  return [
+    {
+      id: 'page-1',
+      title: file.name || 'Page 1',
+      content: htmlFromPlainText(file.content || OPEN_DOCS_DEFAULT_HTML),
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    },
+  ];
 };
 
-const fontStyleClasses: Record<ReadingFontStyle, string> = {
-  sans: 'font-sans',
-  serif: 'font-serif',
-  mono: 'font-mono',
+const readOpenDocsPagesFromStorage = (storageKey: string, fallback: ProductDocPage[]): ProductDocPage[] => {
+  try {
+    const raw = localStorage.getItem(storageKey);
+    if (!raw) return fallback;
+
+    const parsed = JSON.parse(raw) as ProductDocPage[];
+    if (!Array.isArray(parsed) || parsed.length === 0) return fallback;
+
+    return parsed
+      .filter(page => page && page.id && page.title)
+      .map(page => ({
+        ...page,
+        title: page.title.trim() || 'Untitled Page',
+        content: htmlFromPlainText(page.content || OPEN_DOCS_DEFAULT_HTML),
+      }));
+  } catch {
+    return fallback;
+  }
 };
 
-const readingThemeClasses: Record<ReadingTheme, string> = {
-  dark: 'border-white/50 bg-white/70 text-slate-900',
-  light: 'border-slate-200/80 bg-slate-50/95 text-slate-900',
-  sepia: 'border-amber-200/60 bg-[#f4ecd8]/95 text-[#352516]',
+const writeOpenDocsPagesToStorage = (storageKey: string, pages: ProductDocPage[]) => {
+  try {
+    localStorage.setItem(storageKey, JSON.stringify(pages));
+  } catch {
+    // Keep editor usable even if browser storage is full.
+  }
 };
 
-const RichTextButton: React.FC<{ active?: boolean; children: React.ReactNode; onClick: () => void; title?: string; }> = ({ active = false, children, onClick, title }) => (
-  <button
-    type="button"
-    title={title}
-    onMouseDown={(event) => event.preventDefault()}
-    onClick={onClick}
-    className={`rounded-xl border px-3 py-2 text-sm font-black text-slate-900 shadow-sm transition hover:-translate-y-0.5 hover:bg-white/80 hover:shadow-sm ${active ? 'border-cyan-200 bg-cyan-300/25 shadow-sm' : 'border-white/50 bg-white/70'}`}
-  >
-    {children}
-  </button>
-);
+const saveEditorSelection = (editor: HTMLDivElement | null, selectionRef: React.MutableRefObject<Range | null>) => {
+  const selection = window.getSelection();
+  if (!selection || selection.rangeCount === 0 || !editor) return;
 
-const normalizeDocPages = (file: ProductFile): ProductDocPage[] => (file.docPages && file.docPages.length ? file.docPages : [{ id: 'page-1', title: file.name || 'Page 1', content: file.content || '<h1>Open Docs Workspace</h1><p>Start writing here.</p>' }]);
+  const range = selection.getRangeAt(0);
+  if (editor.contains(range.commonAncestorContainer)) {
+    selectionRef.current = range.cloneRange();
+  }
+};
+
+const restoreEditorSelection = (editor: HTMLDivElement | null, selectionRef: React.MutableRefObject<Range | null>) => {
+  const selection = window.getSelection();
+  const range = selectionRef.current;
+  if (!selection || !range || !editor || !editor.contains(range.commonAncestorContainer)) return;
+
+  selection.removeAllRanges();
+  selection.addRange(range);
+};
+
+const runBrowserRichTextCommand = (
+  editor: HTMLDivElement | null,
+  selectionRef: React.MutableRefObject<Range | null>,
+  command: string,
+  value?: string
+) => {
+  if (!editor) return false;
+
+  editor.focus();
+  restoreEditorSelection(editor, selectionRef);
+
+  try {
+    const supported = typeof document.queryCommandSupported === 'function'
+      ? document.queryCommandSupported(command)
+      : true;
+
+    if (!supported && command !== 'formatBlock') return false;
+
+    const ok = document.execCommand(command, false, value);
+    saveEditorSelection(editor, selectionRef);
+    return ok;
+  } catch {
+    return false;
+  }
+};
 
 const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = ({ file, productId }) => {
   const editorRef = useRef<HTMLDivElement>(null);
   const selectionRef = useRef<Range | null>(null);
+
   const legacyStorageKey = `smart-docs-workspace-${productId}-${file.id}`;
   const pagesStorageKey = `open-docs-pages-${productId}-${file.id}`;
-  const defaultPages = useMemo(() => normalizeDocPages(file).map(page => ({ ...page, content: htmlFromPlainText(page.content) })), [file]);
+
+  const defaultPages = useMemo(() => normalizeDocPages(file), [file]);
   const [pages, setPages] = useState<ProductDocPage[]>(defaultPages);
   const [activePageId, setActivePageId] = useState(defaultPages[0]?.id || 'page-1');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const activePage = pages.find(page => page.id === activePageId) || pages[0];
-  const defaultContent = activePage?.content || '<h1>Open Docs Workspace</h1><p>Start writing here.</p>';
-  const [html, setHtml] = useState(defaultContent);
-  const [savedAt, setSavedAt] = useState('Saved locally');
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [savedAt, setSavedAt] = useState('Loaded admin version');
   const [isReadingMode, setIsReadingMode] = useState(false);
   const [fontSize, setFontSize] = useState(18);
   const [lineSpacing, setLineSpacing] = useState(1.7);
   const [fontStyle, setFontStyle] = useState<'sans' | 'serif'>('sans');
   const [theme, setTheme] = useState<'dark' | 'sepia' | 'light'>('dark');
 
+  const activePage = pages.find(page => page.id === activePageId) || pages[0];
+  const activeContent = activePage?.content || OPEN_DOCS_DEFAULT_HTML;
+
   useEffect(() => {
-    const savedPages = localStorage.getItem(pagesStorageKey);
-    const legacy = localStorage.getItem(legacyStorageKey);
-    const nextPages = savedPages ? JSON.parse(savedPages) as ProductDocPage[] : defaultPages.map((page, index) => index === 0 && legacy ? { ...page, content: legacy } : page);
+    const restoredPages = readOpenDocsPagesFromStorage(pagesStorageKey, defaultPages);
+    const legacyHtml = localStorage.getItem(legacyStorageKey);
+
+    const nextPages = legacyHtml && !localStorage.getItem(pagesStorageKey)
+      ? restoredPages.map((page, index) => index === 0 ? { ...page, content: legacyHtml, updatedAt: Date.now() } : page)
+      : restoredPages;
+
     setPages(nextPages);
     setActivePageId(nextPages[0]?.id || 'page-1');
-    setSavedAt(savedPages || legacy ? 'Restored from local autosave' : 'Loaded admin version');
+    setSavedAt(legacyHtml || localStorage.getItem(pagesStorageKey) ? 'Restored from this device' : 'Loaded admin version');
   }, [pagesStorageKey, legacyStorageKey, defaultPages]);
 
   useEffect(() => {
-    const nextHtml = activePage?.content || defaultContent;
-    setHtml(nextHtml);
-    if (editorRef.current) editorRef.current.innerHTML = nextHtml;
-  }, [activePageId, activePage?.content, defaultContent]);
-
-  const saveSelection = () => {
-    const selection = window.getSelection();
-    if (!selection || selection.rangeCount === 0) return;
-    const range = selection.getRangeAt(0);
-    if (editorRef.current?.contains(range.commonAncestorContainer)) {
-      selectionRef.current = range.cloneRange();
+    if (editorRef.current && editorRef.current.innerHTML !== activeContent) {
+      editorRef.current.innerHTML = activeContent;
     }
-  };
+  }, [activePageId, activeContent]);
 
-  const restoreSelection = () => {
-    const selection = window.getSelection();
-    const range = selectionRef.current;
-    if (!selection || !range || !editorRef.current?.contains(range.commonAncestorContainer)) return;
-    selection.removeAllRanges();
-    selection.addRange(range);
-  };
-
-  const persist = () => {
-    saveSelection();
-    const nextContent = editorRef.current?.innerHTML || '';
-    setHtml(nextContent);
-    const nextPages = pages.map(page => page.id === activePageId ? { ...page, content: nextContent, updatedAt: Date.now() } : page);
+  const persistPages = (nextPages: ProductDocPage[], status = 'Saved locally') => {
     setPages(nextPages);
-    localStorage.setItem(pagesStorageKey, JSON.stringify(nextPages));
-    setSavedAt(`Saved ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+    writeOpenDocsPagesToStorage(pagesStorageKey, nextPages);
+    setSavedAt(status);
+  };
+
+  const saveCurrentPage = () => {
+    const nextContent = editorRef.current?.innerHTML || activeContent;
+    const now = Date.now();
+
+    const nextPages = pages.map(page =>
+      page.id === activePageId
+        ? { ...page, content: nextContent, updatedAt: now }
+        : page
+    );
+
+    persistPages(nextPages, `Saved ${new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`);
+  };
+
+  const selectPage = (pageId: string) => {
+    saveCurrentPage();
+    setActivePageId(pageId);
+  };
+
+  const addPage = () => {
+    saveCurrentPage();
+    const title = prompt('New Open Docs page title', `Page ${pages.length + 1}`)?.trim();
+    if (!title) return;
+
+    const nextPage = createOpenDocsPage(title);
+    const nextPages = [...pages, nextPage];
+
+    persistPages(nextPages, 'New page created locally');
+    setActivePageId(nextPage.id);
+    setIsSidebarOpen(true);
+  };
+
+  const renamePage = () => {
+    if (!activePage) return;
+
+    const title = prompt('Rename Open Docs page', activePage.title)?.trim();
+    if (!title) return;
+
+    const nextPages = pages.map(page =>
+      page.id === activePage.id ? { ...page, title, updatedAt: Date.now() } : page
+    );
+
+    persistPages(nextPages, 'Page renamed locally');
+  };
+
+  const deletePage = () => {
+    if (!activePage || pages.length <= 1) return;
+    if (!confirm('Delete this Open Docs page from this device?')) return;
+
+    const nextPages = pages.filter(page => page.id !== activePage.id);
+    persistPages(nextPages, 'Page deleted locally');
+    setActivePageId(nextPages[0]?.id || 'page-1');
   };
 
   const runCommand = (command: string, value?: string) => {
-    editorRef.current?.focus();
-    restoreSelection();
-    try {
-      document.execCommand(command, false, value);
-      saveSelection();
-      persist();
-    } catch {
+    const ok = runBrowserRichTextCommand(editorRef.current, selectionRef, command, value);
+    if (!ok) {
       setSavedAt('Formatting failed — click inside the page and try again');
+      return;
     }
+    saveCurrentPage();
   };
 
-  const readingTheme = {
+  const readingThemeClass = {
     dark: 'bg-white/70 text-slate-900',
     sepia: 'bg-[#2b2118]/95 text-[#f7e7c6]',
     light: 'bg-slate-100/95 text-slate-900',
@@ -302,31 +410,33 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   return (
     <div className="relative flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-white/70 text-slate-900 backdrop-blur-xl">
       <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-b border-white/50 bg-white/70 p-2 shadow-sm backdrop-blur-xl sm:gap-2 sm:p-3 custom-scrollbar">
-        <button type="button" onClick={() => setIsSidebarOpen(value => !value)} className="mr-1 shrink-0 rounded-full border border-cyan-200 bg-white/80 px-2.5 py-2 text-[10px] font-black uppercase tracking-widest text-cyan-700 sm:mr-2 sm:px-3 sm:text-xs">Open Docs</button>
-        <button type="button" onClick={() => setIsReadingMode(true)} className="rounded-2xl border border-cyan-200/30 bg-cyan-200/15 px-4 py-2 font-black text-cyan-700 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition hover:-translate-y-0.5 hover:bg-cyan-200/25">Reading Mode</button>
-        {(smartDocToolbarCommands || []).map(([cmd, label]) => <button key={cmd} type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand(cmd)} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 shadow-sm transition active:scale-95 hover:bg-white/90 hover:shadow-sm">{label}</button>)}
-        <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('formatBlock', 'H1')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">H1</button>
-        <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('formatBlock', 'H2')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">H2</button>
+        <button type="button" onClick={() => setIsSidebarOpen(value => !value)} className="shrink-0 rounded-full border border-cyan-200 bg-white/90 px-3 py-2 text-xs font-black uppercase tracking-widest text-cyan-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-cyan-50 hover:shadow-md" aria-expanded={isSidebarOpen}>Open Docs</button>
+        <button type="button" onClick={() => { saveCurrentPage(); setIsReadingMode(true); }} className="shrink-0 rounded-full border border-cyan-200/60 bg-cyan-200/20 px-3 py-2 text-xs font-black uppercase tracking-widest text-cyan-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-cyan-200/30 hover:shadow-md">Reading Mode</button>
+        {(smartDocToolbarCommands || []).map(([cmd, label]) => (<button key={cmd} type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand(cmd)} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 shadow-sm transition active:scale-95 hover:bg-white/90 hover:shadow-sm">{label}</button>))}
+        <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('formatBlock', '<h1>')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">H1</button>
+        <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('formatBlock', '<h2>')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">H2</button>
         <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('insertUnorderedList')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">• List</button>
         <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('justifyLeft')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">Left</button>
         <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('justifyCenter')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">Center</button>
         <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('justifyRight')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">Right</button>
-        <span className="ml-auto text-xs font-bold text-slate-600/80">{savedAt}</span>
+        <span className="ml-auto shrink-0 rounded-full bg-white/60 px-3 py-1 text-xs font-bold text-slate-600/90">{savedAt}</span>
+      </div>
+
+      <div className="flex min-h-0 flex-1">
+        <aside className={`${isSidebarOpen ? 'block' : 'hidden'} w-64 shrink-0 overflow-y-auto border-r border-white/50 bg-white/60 p-3 custom-scrollbar`}>
+          <p className="mb-2 text-xs font-black uppercase tracking-widest text-slate-500">Pages on this device</p>
+          <div className="space-y-2">{pages.map(page => (<button key={page.id} type="button" onClick={() => selectPage(page.id)} className={`w-full rounded-xl px-3 py-2 text-left text-sm font-bold transition ${page.id === activePageId ? 'bg-cyan-100 text-cyan-800 shadow-sm' : 'bg-white/70 text-slate-700 hover:bg-white'}`}><span className="block truncate">{page.title}</span><span className="mt-1 block text-[10px] font-bold uppercase tracking-widest text-slate-400">{getMeaningfulDocText(page.content).slice(0, 36) || 'Empty page'}</span></button>))}</div>
+          <button type="button" onClick={addPage} className="mt-4 w-full rounded-xl bg-cyan-600 px-3 py-2 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ New page</button>
+          <button type="button" onClick={renamePage} className="mt-2 w-full rounded-xl bg-white/80 px-3 py-2 text-sm font-black text-slate-700 hover:bg-white">Rename</button>
+          {pages.length > 1 && (<button type="button" onClick={deletePage} className="mt-2 w-full rounded-xl bg-rose-100 px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-200">Delete</button>)}
+          <p className="mt-4 rounded-xl bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-800">Learner pages are saved locally in this browser for this product file.</p>
+        </aside>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
+          <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={saveCurrentPage} onBlur={saveCurrentPage} onKeyUp={() => saveEditorSelection(editorRef.current, selectionRef)} onMouseUp={() => saveEditorSelection(editorRef.current, selectionRef)} onTouchEnd={() => saveEditorSelection(editorRef.current, selectionRef)} onFocus={() => saveEditorSelection(editorRef.current, selectionRef)} className="open-docs-page mx-auto min-h-full max-w-4xl rounded-[1.25rem] border border-white/50 bg-white/70 px-4 py-6 text-base leading-7 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl sm:rounded-[1.5rem] sm:px-8 sm:py-10 sm:text-lg sm:leading-8 md:px-14 [&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6" />
         </div>
-      <div className="flex min-h-0 flex-1"><aside className={`${isSidebarOpen ? 'block' : 'hidden'} w-64 shrink-0 overflow-y-auto border-r border-white/50 bg-white/60 p-3 custom-scrollbar`}><p className="mb-2 text-xs font-black uppercase tracking-widest text-slate-500">Saved on this device</p>{pages.map(page => <button key={page.id} type="button" onClick={() => setActivePageId(page.id)} className={`mb-2 w-full rounded-xl px-3 py-2 text-left text-sm font-bold ${page.id === activePageId ? 'bg-cyan-100 text-cyan-800' : 'bg-white/70 text-slate-700'}`}>{page.title}</button>)}<button type="button" onClick={() => { const title = prompt('Page title', `Page ${pages.length + 1}`)?.trim(); if (!title) return; const now = Date.now(); const page = { id: `page-${now}`, title, content: '<h1>New page</h1><p>Start writing here.</p>', createdAt: now, updatedAt: now }; const next = [...pages, page]; setPages(next); localStorage.setItem(pagesStorageKey, JSON.stringify(next)); setActivePageId(page.id); }} className="mt-2 w-full rounded-xl bg-cyan-600 px-3 py-2 text-sm font-black text-white">+ New page</button><button type="button" onClick={() => { const title = prompt('Rename page', activePage?.title || 'Page')?.trim(); if (!title || !activePage) return; const next = pages.map(page => page.id === activePage.id ? { ...page, title, updatedAt: Date.now() } : page); setPages(next); localStorage.setItem(pagesStorageKey, JSON.stringify(next)); }} className="mt-2 w-full rounded-xl bg-white/80 px-3 py-2 text-sm font-black text-slate-700">Rename</button>{pages.length > 1 && <button type="button" onClick={() => { if (!activePage || !confirm('Delete this docs page?')) return; const next = pages.filter(page => page.id !== activePage.id); setPages(next); localStorage.setItem(pagesStorageKey, JSON.stringify(next)); setActivePageId(next[0].id); }} className="mt-2 w-full rounded-xl bg-rose-100 px-3 py-2 text-sm font-black text-rose-700">Delete</button>}</aside><div className="min-h-0 flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar">
-        <div
-          ref={editorRef}
-          contentEditable
-          suppressContentEditableWarning
-          onInput={persist}
-          onBlur={persist}
-          onKeyUp={saveSelection}
-          onMouseUp={saveSelection}
-          onTouchEnd={saveSelection}
-          onFocus={saveSelection}
-          className="open-docs-page mx-auto min-h-full max-w-4xl rounded-[1.25rem] border border-white/50 bg-white/70 px-4 py-6 text-base leading-7 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl sm:rounded-[1.5rem] sm:px-8 sm:py-10 sm:text-lg sm:leading-8 md:px-14 [&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6"
-        />
-      </div></div>
+      </div>
+
       {isReadingMode && (
         <div className="absolute inset-2 z-20 flex min-h-0 flex-col overflow-hidden rounded-[1.5rem] border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl sm:inset-4 sm:rounded-[2rem]">
           <div className="open-docs-toolbar flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-b border-white/50 bg-white/70 p-2 sm:gap-2 sm:p-3 custom-scrollbar">
@@ -336,12 +446,12 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
             <button type="button" onClick={() => setLineSpacing(value => Math.max(1.25, Number((value - 0.15).toFixed(2))))} className="min-h-9 shrink-0 rounded-xl bg-white/75 px-3 py-2 text-sm font-black hover:bg-white/90 hover:shadow-sm">Line -</button>
             <button type="button" onClick={() => setLineSpacing(value => Math.min(2.4, Number((value + 0.15).toFixed(2))))} className="min-h-9 shrink-0 rounded-xl bg-white/75 px-3 py-2 text-sm font-black hover:bg-white/90 hover:shadow-sm">Line +</button>
             <button type="button" onClick={() => setFontStyle(value => value === 'sans' ? 'serif' : 'sans')} className="min-h-9 shrink-0 rounded-xl bg-white/75 px-3 py-2 text-sm font-black hover:bg-white/90 hover:shadow-sm">{fontStyle === 'sans' ? 'Serif' : 'Sans'}</button>
-            {(readingThemeOptions || []).map(option => <button key={option} type="button" onClick={() => setTheme(option)} className={`min-h-9 shrink-0 rounded-xl px-3 py-2 text-sm font-black capitalize ${theme === option ? 'bg-cyan-200 text-slate-900' : 'bg-white/75 hover:bg-white/90 hover:shadow-sm'}`}>{option}</button>)}
+            {(readingThemeOptions || []).map(option => (<button key={option} type="button" onClick={() => setTheme(option)} className={`min-h-9 shrink-0 rounded-xl px-3 py-2 text-sm font-black capitalize ${theme === option ? 'bg-cyan-200 text-slate-900' : 'bg-white/75 hover:bg-white/90 hover:shadow-sm'}`}>{option}</button>))}
             <button type="button" onClick={() => setIsReadingMode(false)} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-4 py-2 text-sm font-black hover:bg-white/90 hover:shadow-sm">Close</button>
           </div>
-          <div className={`min-h-0 flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar ${readingTheme}`}>
+          <div className={`min-h-0 flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar ${readingThemeClass}`}>
             <style>{`.reader-content, .reader-content * { line-height: ${lineSpacing} !important; } .reader-content p, .reader-content li, .reader-content div, .reader-content span, .reader-content blockquote { font-size: ${fontSize}px !important; } .reader-content h1 { font-size: ${Math.round(fontSize * 2)}px !important; } .reader-content h2 { font-size: ${Math.round(fontSize * 1.65)}px !important; } .reader-content h3 { font-size: ${Math.round(fontSize * 1.35)}px !important; }`}</style>
-            <article className={`reader-content mx-auto max-w-3xl ${fontStyle === 'serif' ? 'font-serif' : 'font-sans'} [&_h1]:mb-5 [&_h1]:font-black [&_h2]:mb-4 [&_h2]:font-black [&_p]:mb-4 [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6`} dangerouslySetInnerHTML={{ __html: editorRef.current?.innerHTML || defaultContent }} />
+            <article className={`reader-content mx-auto max-w-3xl ${fontStyle === 'serif' ? 'font-serif' : 'font-sans'} [&_h1]:mb-5 [&_h1]:font-black [&_h2]:mb-4 [&_h2]:font-black [&_p]:mb-4 [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6`} dangerouslySetInnerHTML={{ __html: editorRef.current?.innerHTML || activeContent }} />
           </div>
         </div>
       )}
