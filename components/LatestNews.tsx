@@ -1,7 +1,6 @@
 
 import React, { useRef, useEffect } from 'react';
 import { NewsArticle, WebsiteSettings } from '../App';
-import GoogleAd from './GoogleAd';
 
 interface LatestNewsProps {
   settings: WebsiteSettings;
@@ -129,8 +128,6 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
       style={{ background: sectionBackground }}
     >
       <div className="container mx-auto px-6">
-        <GoogleAd variant="display" label="Advertisement" className="mb-12 rounded-[2rem] border p-4 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }} />
-
         <div className="flex flex-col md:flex-row justify-between items-end mb-12">
             <div className="max-w-2xl">
                 <h2 className="text-4xl font-extrabold tracking-tight" style={{ color: chatPalette.primaryText }}>{title}</h2>
@@ -148,26 +145,19 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
             className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
         >
           {newsArticles.map((article, index) => (
-            <React.Fragment key={article.id}>
-              <NewsCard 
+            <NewsCard key={article.id} 
                 settings={settings}
                 article={article} 
                 animationDelay={index}
                 onReadMoreClick={onReadMoreClick}
                 cardBackground={cardBackground}
               />
-              {(index + 1) % 3 === 0 && index < newsArticles.length - 1 && (
-                <GoogleAd variant="inFeed" label="Sponsored" className="md:col-span-2 lg:col-span-3 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }} />
-              )}
-            </React.Fragment>
           ))}
         </div>
         
         <button onClick={onOpenHub} className="md:hidden w-full mt-8 border py-3 rounded-lg font-semibold" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
             Open News
         </button>
-
-        <GoogleAd variant="display" label="Advertisement" className="mt-12 rounded-[2rem] border p-4 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }} />
       </div>
     </section>
   );

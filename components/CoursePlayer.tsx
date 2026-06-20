@@ -4,7 +4,6 @@ import { WebsiteSettings, ProductWithRating, CourseModule, ProductFile, ProductD
 import { EconomySettings } from '../utils/economy';
 import AiMentor from './AiMentor';
 import ProductMusicPlayer, { type AudioTrack } from './ProductMusicPlayer';
-import GoogleAd from './GoogleAd';
 
 const FileIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -104,30 +103,6 @@ const GlassDownloadCard: React.FC<{ file: ProductFile; headline?: string; onDown
           Click here to download <span className="ml-2 transition group-hover:translate-y-0.5">↓</span>
         </a>
       )}
-    </div>
-  </div>
-);
-
-const PdfAdDownloadModal: React.FC<{ file: ProductFile; onCloseAndDownload: () => void; }> = ({ file, onCloseAndDownload }) => (
-  <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-xl" role="dialog" aria-modal="true" aria-labelledby="pdf-download-ad-title">
-    <div className="relative w-full max-w-2xl overflow-hidden rounded-[2rem] border border-white/40 bg-white/25 p-4 text-slate-900 shadow-[0_30px_90px_rgba(15,23,42,0.22)] backdrop-blur-3xl sm:p-6">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_12%,rgba(255,255,255,0.58),transparent_28%),radial-gradient(circle_at_85%_22%,rgba(125,211,252,0.30),transparent_25%),linear-gradient(135deg,rgba(255,255,255,0.42),rgba(255,255,255,0.12))]" />
-      <div className="relative rounded-[1.6rem] border border-white/45 bg-white/45 p-5 shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] backdrop-blur-2xl sm:p-7">
-        <p className="text-center text-xs font-black uppercase tracking-[0.32em] text-cyan-700">Premium PDF Access</p>
-        <h2 id="pdf-download-ad-title" className="mt-2 text-center text-2xl font-black text-slate-950 sm:text-3xl">Your download will start after this sponsored message</h2>
-        <p className="mx-auto mt-2 max-w-md truncate text-center text-sm font-bold text-slate-700" title={file.name}>{file.name}</p>
-
-        <div className="my-6 rounded-[1.5rem] border border-white/60 bg-white/70 p-4 shadow-sm backdrop-blur-xl">
-          <GoogleAd variant="display" label="Sponsored" />
-        </div>
-
-        <div className="flex justify-center">
-          <button type="button" onClick={onCloseAndDownload} className="group inline-flex items-center gap-3 rounded-full border border-white/60 bg-white/70 px-7 py-4 text-base font-black text-slate-950 shadow-[0_12px_36px_rgba(15,23,42,0.10)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white/90 hover:shadow-[0_18px_44px_rgba(15,23,42,0.14)] focus:outline-none focus:ring-4 focus:ring-cyan-200/60" aria-label="Close sponsored popup and download PDF">
-            <span className="grid h-9 w-9 place-items-center rounded-full bg-slate-950 text-white shadow-sm transition group-hover:rotate-90">❌</span>
-            Close & Download
-          </button>
-        </div>
-      </div>
     </div>
   </div>
 );
@@ -476,7 +451,6 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const [isVideoPlaying, setIsVideoPlaying] = useState(false);
   const [isPlaybackWindowFocused, setIsPlaybackWindowFocused] = useState(() => typeof document === 'undefined' ? true : document.visibilityState === 'visible' && document.hasFocus());
   const [coinPulse, setCoinPulse] = useState(false);
-  const [pendingPdfDownload, setPendingPdfDownload] = useState<ProductFile | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
 
   useEffect(() => {
@@ -528,10 +502,6 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     setIsMentorOpen(false);
   };
 
-  const requestPdfDownload = (file: ProductFile) => {
-    setPendingPdfDownload(file);
-  };
-
   const triggerFileDownload = (file: ProductFile) => {
     if (typeof document === 'undefined') return;
     const link = document.createElement('a');
@@ -542,13 +512,6 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
-  };
-
-  const closePdfAdAndDownload = () => {
-    if (!pendingPdfDownload) return;
-    const fileToDownload = pendingPdfDownload;
-    setPendingPdfDownload(null);
-    window.setTimeout(() => triggerFileDownload(fileToDownload), 0);
   };
 
   useEffect(() => {
@@ -623,7 +586,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           </div>
         );
       }
-      case 'pdf': return <GlassDownloadCard file={activeFile} onDownloadRequest={requestPdfDownload} />;
+      case 'pdf': return <GlassDownloadCard file={activeFile} onDownloadRequest={triggerFileDownload} />;
       case 'sheet': return <GlassDownloadCard file={activeFile} />;
       case 'doc':
       case 'ebook': return <SmartDocsWorkspace file={activeFile} productId={product.id} />;
@@ -702,8 +665,6 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
           </div>
         </section>
       </main>
-
-      {pendingPdfDownload && <PdfAdDownloadModal file={pendingPdfDownload} onCloseAndDownload={closePdfAdAndDownload} />}
     </div>
   );
 };

@@ -11,7 +11,6 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta name="mobile-web-app-capable" content="yes" />
     <link rel="apple-touch-icon" href="/icons/icon-192x192.svg" />
-    <meta name="google-adsense-account" content="ca-pub-7301571867236257" />
     <title>Digital Catalyst | Notes, Courses & AI Learning Store</title>
     <meta name="description" content="A premium marketplace for online notes, rich learning documents, private video courses, subscriptions, coupons, reviews, and AI-assisted study inside Digital Catalyst." />
     <script src="https://cdn.tailwindcss.com"></script>
@@ -399,17 +398,30 @@
       @keyframes typing { from { width: 0 } to { width: 100% } }
       @keyframes blink { 50% { border-color: transparent; } }
       @keyframes slideUp { from { opacity: 0; transform: translateY(16px);} to { opacity: 1; transform: translateY(0);} }
+      @keyframes welcomeOverlayFade {
+        from { opacity: 0; }
+        to { opacity: 1; }
+      }
+      @keyframes welcomeOverlayOut {
+        from { opacity: 1; }
+        to { opacity: 0; }
+      }
       @keyframes welcomeCirclePop {
-        from { opacity: 0; transform: scale(0.9); }
-        to { opacity: 1; transform: scale(1); }
+        0% { opacity: 0; transform: scale(0.78) rotate(-8deg); filter: blur(8px); }
+        58% { opacity: 1; transform: scale(1.035) rotate(1deg); filter: blur(0); }
+        100% { opacity: 1; transform: scale(1) rotate(0deg); filter: blur(0); }
       }
       @keyframes welcomeCircleDraw {
         from { stroke-dashoffset: 295.31; }
         to { stroke-dashoffset: 0; }
       }
       @keyframes welcomeTextWrite {
-        from { opacity: 1; clip-path: inset(0 100% 0 0); }
-        to { opacity: 1; clip-path: inset(0 0 0 0); }
+        0% { opacity: 1; clip-path: inset(0 100% 0 0); transform: translateY(8px); }
+        100% { opacity: 1; clip-path: inset(0 0 0 0); transform: translateY(0); }
+      }
+      @keyframes welcomeFloat {
+        0%, 100% { transform: translateY(0) scale(1); }
+        50% { transform: translateY(-8px) scale(1.012); }
       }
       @keyframes welcomeCaretBlink {
         0%, 45% { opacity: 1; }
@@ -423,13 +435,13 @@
       .welcome-circle-draw {
         stroke-dasharray: 295.31;
         stroke-dashoffset: 295.31;
-        animation: welcomeCircleDraw 2s cubic-bezier(0.65, 0, 0.35, 1) forwards;
+        animation: welcomeCircleDraw 2.35s cubic-bezier(0.65, 0, 0.35, 1) forwards;
       }
       .welcome-write-text {
         display: inline-block;
         opacity: 0;
         position: relative;
-        animation: welcomeTextWrite 2s steps(7, end) forwards;
+        animation: welcomeTextWrite 1.75s steps(7, end) 0.35s forwards;
       }
       .welcome-write-text::after {
         background: currentColor;
@@ -439,7 +451,7 @@
         right: -0.14em;
         top: 0.12em;
         width: 0.045em;
-        animation: welcomeCaretBlink 0.5s steps(1, end) 4 both;
+        animation: welcomeCaretBlink 0.5s steps(1, end) 0.35s 5 both;
       }
 
 

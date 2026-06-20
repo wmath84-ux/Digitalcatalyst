@@ -1,7 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Announcement, NewsArticle, User, WebsiteSettings } from '../App';
 import { EconomySettings } from '../utils/economy';
-import GoogleAd from './GoogleAd';
 
 type ReadingListType = 'news' | 'blog';
 type ReadingView = ReadingListType | 'article' | 'announcement';
@@ -21,10 +20,6 @@ interface ReadingDrawerProps {
   onSelectArticle: (article: NewsArticle) => void;
   onSelectAnnouncement: (announcement: Announcement) => void;
   onBackToList: () => void;
-  onExploreFeature: () => void;
-  promoTitle?: string;
-  promoDescription?: string;
-  promoCtaLabel?: string;
   onReadingReward?: (article: NewsArticle) => boolean;
 }
 
@@ -76,7 +71,6 @@ const getArticleUrl = (article: NewsArticle) => ((article as NewsArticle & { ext
 const buildPremiumArticleImage = (article: NewsArticle) => `https://image.pollinations.ai/prompt/${encodeURIComponent(`premium calm education editorial hero card, ${article.category || article.type} ${article.title}, soft white and ice blue background, deep navy typography space, blue to violet pastel gradient, minimal vector illustration, rounded glass card, subtle geometric lines and dots, student friendly reading mode, no realistic photo, no clutter, 16:9`)}?width=1200&height=675&nologo=true&enhance=true&model=flux`;
 const getArticleImage = (article: NewsArticle, size = '900/540') => article.coverImage || article.thumbnailImage || buildPremiumArticleImage(article);
 const getArticleType = (article: NewsArticle): ReadingListType => article.type === 'news' ? 'news' : 'blog';
-const shouldShowPremiumLearningCta = (article: NewsArticle | null) => Boolean((article as (NewsArticle & { showPremiumLearningCta?: boolean }) | null)?.showPremiumLearningCta);
 const stripMarkdown = (value = '') => value.replace(/[#*_`>-]/g, ' ').replace(/\s+/g, ' ').trim();
 
 const InlineMarkdown: React.FC<{ text: string }> = ({ text }) => {
@@ -90,7 +84,7 @@ const InlineMarkdown: React.FC<{ text: string }> = ({ text }) => {
   );
 };
 
-const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean }> = ({ content, includeInArticleAd = false }) => {
+const MarkdownContent: React.FC<{ content: string }> = ({ content }) => {
   if (/<\/?[a-z][\s\S]*>/i.test(content)) {
     return <div className="reading-rich-html" dangerouslySetInnerHTML={{ __html: content }} />;
   }
@@ -117,10 +111,6 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean 
     paragraph = [];
     if (text) {
       nodes.push(<p key={`p-${nodes.length}`} className="my-5 text-lg leading-9" style={{ color: chatPalette.secondaryText }}><InlineMarkdown text={text} /></p>);
-      const paragraphCount = nodes.filter(node => React.isValidElement(node) && node.type === 'p').length;
-      if (includeInArticleAd && paragraphCount === 2) {
-        nodes.push(<GoogleAd key={`in-article-ad-${nodes.length}`} variant="inArticle" label="Advertisement" className="my-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderColor: chatPalette.cardBorder }} />);
-      }
     }
   };
 
@@ -156,33 +146,6 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean 
   return <>{nodes}</>;
 };
 
-const SponsoredPartnerCard: React.FC<{
-  promoTitle?: string;
-  promoDescription?: string;
-  promoCtaLabel?: string;
-  onExploreFeature: () => void;
-}> = ({
-  promoTitle = "Level up tonight's study sprint",
-  promoDescription = 'Discover a handpicked premium resource built for sharper notes, faster revision, and calmer exam weeks.',
-  promoCtaLabel = 'Explore Feature',
-  onExploreFeature,
-}) => (
-  <aside className="my-12 overflow-hidden rounded-[2rem] border bg-gradient-to-r from-[#EAF2FF] via-[#F8FAFD] to-[#CFE1FF] p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-    <div className="rounded-[1.75rem] p-6 backdrop-blur-2xl sm:p-8" style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}>
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>Sponsored Partner</p>
-          <h3 className="mt-3 text-2xl font-black" style={{ color: chatPalette.primaryText }}>{promoTitle}</h3>
-          <p className="mt-3 max-w-2xl text-sm leading-6" style={{ color: chatPalette.secondaryText }}>{promoDescription}</p>
-        </div>
-        <button type="button" onClick={onExploreFeature} className="rounded-full px-6 py-3 text-sm font-black shadow-sm transition hover:scale-105" style={{ backgroundColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
-          {promoCtaLabel}
-        </button>
-      </div>
-    </div>
-  </aside>
-);
-
 const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: string; imageSeed?: string; onClick: () => void; }> = ({ title, meta, excerpt, badge, imageSeed, onClick }) => (
   <button onClick={onClick} className="group relative overflow-hidden rounded-[1.75rem] border text-left shadow-[0_12px_36px_rgba(60,64,67,0.10)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_48px_rgba(60,64,67,0.14)]" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
     {imageSeed && (
@@ -202,7 +165,7 @@ const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: s
   </button>
 );
 
-const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings, isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
+const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings, isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onReadingReward }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [progress, setProgress] = useState(0);
   const progressRef = useRef(0);
@@ -400,12 +363,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                       </div>
                     )}
                     {visibleArticles.map((article, index) => (
-                      <React.Fragment key={`article-${article.id}`}>
-                        <HubCard title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(stripMarkdown(article.content))} min`} excerpt={article.excerpt} badge={article.type === 'news' ? 'News' : article.category || 'Blog'} imageSeed={getArticleImage(article)} onClick={() => onSelectArticle(article)} />
-                        {(index + 1) % 3 === 0 && index < visibleArticles.length - 1 && (
-                          <GoogleAd variant="inFeed" label="Sponsored" className="lg:col-span-3 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
-                        )}
-                      </React.Fragment>
+                      <HubCard key={`article-${article.id}`} title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(stripMarkdown(article.content))} min`} excerpt={article.excerpt} badge={article.type === 'news' ? 'News' : article.category || 'Blog'} imageSeed={getArticleImage(article)} onClick={() => onSelectArticle(article)} />
                     ))}
                     {listType === 'news' && announcements.map((announcement) => <HubCard key={`announcement-${announcement.id}`} title={announcement.title} meta={formatDate(announcement.date)} excerpt={announcement.content} badge="Announcement" onClick={() => onSelectAnnouncement(announcement)} />)}
                   </div>
@@ -434,21 +392,16 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                     )}
                   </div>
                   {isExternalArticle(selectedArticle) ? (
-                    <>
-                      <div className="mt-8 overflow-hidden rounded-[2rem] border p-2 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl lg:mt-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
-                        <iframe src={getArticleUrl(selectedArticle)} title={selectedArticle.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-white [scrollbar-width:none] lg:h-[76vh]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
-                      </div>
-                      <GoogleAd variant="multiplex" label="Related Content" className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
-                    </>
+                    <div className="mt-8 overflow-hidden rounded-[2rem] border p-2 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl lg:mt-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
+                      <iframe src={getArticleUrl(selectedArticle)} title={selectedArticle.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-white [scrollbar-width:none] lg:h-[76vh]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
+                    </div>
                   ) : (
                     <>
                       <div className="mb-6 mt-8 aspect-video overflow-hidden rounded-2xl border shadow-sm backdrop-blur-2xl lg:hidden" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
                         <img src={getArticleImage(selectedArticle, '1400/800')} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" />
                       </div>
                       <div className="mx-auto mt-8 max-w-4xl rounded-[2rem] border p-6 text-lg leading-9 shadow-[0_18px_50px_rgba(60,64,67,0.08)] backdrop-blur-2xl sm:p-8 lg:mt-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
-                        <MarkdownContent content={selectedArticle.content} includeInArticleAd />
-                        {shouldShowPremiumLearningCta(selectedArticle) && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} />}
-                        <GoogleAd variant="multiplex" label="Related Content" className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }} />
+                        <MarkdownContent content={selectedArticle.content} />
                       </div>
                     </>
                   )}
@@ -461,10 +414,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                   <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-6xl" style={{ color: chatPalette.primaryText }}>{selectedAnnouncement.title}</h1>
                   <div className="mt-12 space-y-7 rounded-[2rem] border p-6 text-lg leading-9 shadow-sm backdrop-blur-2xl sm:p-8" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
                     {selectedAnnouncement.content.split('\n').filter(Boolean).map((paragraph, index) => (
-                      <React.Fragment key={index}>
-                        {index === 1 && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} />}
-                        <p>{paragraph}</p>
-                      </React.Fragment>
+                      <p key={index}>{paragraph}</p>
                     ))}
                   </div>
                 </article>
