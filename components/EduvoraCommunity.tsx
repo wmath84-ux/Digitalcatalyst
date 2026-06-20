@@ -410,6 +410,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [profile, setProfile] = useState<CommunityProfile>(() => readJsonObject(COMMUNITY_PROFILE_STORAGE_KEY, defaultCommunityProfile));
   const [profileDraft, setProfileDraft] = useState<CommunityProfile>(() => readJsonObject(COMMUNITY_PROFILE_STORAGE_KEY, defaultCommunityProfile));
   const [profileFeedback, setProfileFeedback] = useState<ProfileFeedback>(null);
+  const [composerError, setComposerError] = useState('');
   const [activeProfilePanel, setActiveProfilePanel] = useState<ProfilePanel>('privacy');
   const [privacySettings, setPrivacySettings] = useState<PrivacySettings>(() => readJsonObject(COMMUNITY_PRIVACY_STORAGE_KEY, defaultPrivacySettings));
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(() => readJsonObject(COMMUNITY_NOTIFICATION_PREFS_KEY, defaultNotificationPreferences));
@@ -909,9 +910,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     )));
     if (targetMessage?.docId) {
       if (existingReply?.docId) {
-        updateDoc(doc(db, COMMUNITY_FEED, targetMessage.docId, 'replies', existingReply.docId), reply).catch((error) => console.warn('Reply edit failed', error));
+        updateDoc(doc(db, COMMUNITY_FEED, targetMessage.docId, 'replies', existingReply.docId), stripUndefinedDeep(reply)).catch((error) => console.warn('Reply edit failed', error));
       } else {
-        addDoc(collection(db, COMMUNITY_FEED, targetMessage.docId, 'replies'), reply).catch((error) => console.warn('Reply write failed', error));
+        addDoc(collection(db, COMMUNITY_FEED, targetMessage.docId, 'replies'), stripUndefinedDeep(reply)).catch((error) => console.warn('Reply write failed', error));
         updateDoc(doc(db, COMMUNITY_FEED, targetMessage.docId), { replyCount: increment(1) }).catch((error) => console.warn('Reply count update failed', error));
       }
     }
@@ -942,6 +943,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const cleanedOptions = postPollOptions.map((option) => option.trim()).filter(Boolean);
     if (!draft || isCreatorTypeUsedToday || isStorageLocked || isPublishingCreator) return;
     if (postType === 'poll' && cleanedOptions.length < 2) return;
+    setComposerError('');
     setIsPublishingCreator(true);
 
     const publishType = postType;
@@ -1028,6 +1030,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const cleanedOptions = statusPollOptions.map((option) => option.trim()).filter(Boolean);
     if ((!draft && statusType !== 'image') || isStatusTypeUsedToday || isStorageLocked || isPublishingStatus) return;
     if (statusType === 'poll' && cleanedOptions.length < 2) return;
+    setComposerError('');
     setIsPublishingStatus(true);
 
     const publishType = statusType;
@@ -1210,10 +1213,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setSelectedChatId(recipientId);
   };
 
-  const submitMasterTag = () => {
+  const submitMasterTag = async () => {
     const title = masterTagTitle.trim();
     const detail = masterTagDetail.trim();
     if (!title || !detail) return;
+    setComposerError('');
+    const draftSnapshot = { title: masterTagTitle, detail: masterTagDetail, category: masterTagCategory };
     const requestId = Date.now();
     const request: MasterTagRequest = {
       id: requestId,
@@ -1233,7 +1238,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setDoc(doc(db, SUPPORT_TICKETS_COLLECTION, supportTicket.id), stripUndefinedDeep(supportTicket)).catch((error) => console.warn('Master tag ticket Firebase write failed', error));
     window.dispatchEvent(new Event('siteSupportTicketsUpdated'));
     setSupportTickets(updatedTickets);
-    addDoc(collection(db, COMMUNITY_MASTER_TAGS), stripUndefinedDeep({ ...request, createdAt: Date.now(), likedByUsers: {}, reactionUsers: {} })).catch((error) => console.warn('Master tag Firebase write failed; using local fallback', error));
     setMasterTagRequests((current) => [request, ...current]);
     setMasterTagFilter('All');
     setMasterTagsAudienceFilter('mine');
@@ -1243,6 +1247,19 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setPage('masterTags');
     setPageStack([]);
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    try {
+      const docRef = await addDoc(collection(db, COMMUNITY_MASTER_TAGS), stripUndefinedDeep({ ...request, ownerId: currentUserKey, createdAt: Date.now(), likedByUsers: {}, reactionUsers: {} }));
+      setMasterTagRequests((current) => current.map((item) => item.id === request.id ? { ...item, ownerId: currentUserKey, docId: docRef.id } : item));
+    } catch (error) {
+      console.warn('Master tag Firebase write failed; restoring draft fallback', error);
+      setMasterTagRequests((current) => current.filter((item) => item.id !== request.id));
+      setMasterTagTitle(draftSnapshot.title);
+      setMasterTagDetail(draftSnapshot.detail);
+      setMasterTagCategory(draftSnapshot.category);
+      setComposerError('Master tag failed to publish. Your draft was restored — please try again.');
+      setPage('tagMaster');
+      setPageStack([]);
+    }
   };
 
   const likeMasterTag = (requestId: number) => {
@@ -1380,7 +1397,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <input value={masterTagTitle} onChange={(event) => setMasterTagTitle(event.target.value)} placeholder="Example: Master, please add doubt session" className="mt-2 w-full rounded-2xl border border-[#E0E3EB] px-4 py-3 text-sm font-bold outline-none focus:border-[#1A73E8]" />
             <label className="mt-4 block text-sm font-black text-[#202124]">Detailed request</label>
             <textarea value={masterTagDetail} onChange={(event) => setMasterTagDetail(event.target.value)} placeholder="Write your doubt, query, bug, feature demand, update request, or any important student need..." rows={8} className="mt-2 w-full resize-none rounded-2xl border border-[#E0E3EB] px-4 py-3 text-sm font-bold leading-6 outline-none focus:border-[#1A73E8]" />
-            <button type="button" onClick={submitMasterTag} disabled={!masterTagTitle.trim() || !masterTagDetail.trim()} className="mt-4 w-full rounded-2xl bg-[#1A73E8] px-5 py-3 text-sm font-black text-white shadow-[0_14px_34px_rgba(26,115,232,0.24)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:bg-[#AECBFA]">Tag master now</button>
+            {composerError ? <div className="mt-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{composerError}</div> : null}<button type="button" onClick={submitMasterTag} disabled={!masterTagTitle.trim() || !masterTagDetail.trim()} className="mt-4 w-full rounded-2xl bg-[#1A73E8] px-5 py-3 text-sm font-black text-white shadow-[0_14px_34px_rgba(26,115,232,0.24)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:bg-[#AECBFA]">Tag master now</button>
           </div>
         </div>
       </section>

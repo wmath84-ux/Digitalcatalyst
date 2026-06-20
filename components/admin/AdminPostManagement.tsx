@@ -80,6 +80,7 @@ const AdminPostManagement: React.FC = () => {
         creatorId: 'admin',
         ownerId: 'admin',
         postType: type,
+        type,
         source: 'admin',
         reactions: {},
         reactionCounts: {},
