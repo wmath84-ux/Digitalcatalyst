@@ -1,14 +1,16 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { CSSProperties, useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal, flushSync } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { addDoc, collection, deleteDoc, deleteField, doc, getDocs, increment, limit, onSnapshot, orderBy, query, runTransaction, setDoc, updateDoc, where } from 'firebase/firestore';
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { db, storage } from '../firebase';
 import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storage';
+import type { WebsiteSettings } from '../App';
 
 interface EduvoraCommunityProps {
   onClose?: () => void;
   isAuthenticated?: boolean;
+  settings?: WebsiteSettings;
 }
 
 type CommunityView = 'feed' | 'status';
@@ -81,6 +83,57 @@ const readJsonObject = <T,>(key: string, fallback: T): T => {
 const defaultCommunityProfile: CommunityProfile = { name: 'Eduvora Member', username: 'eduvora_member', avatar: '🧑‍🎓', bio: 'Building digital skills daily.' };
 const defaultPrivacySettings: PrivacySettings = { profileVisible: true, showActivity: true, allowMessages: true, allowFollowRequests: true };
 const defaultNotificationPreferences: NotificationPreferences = { replies: true, masterTags: true, statuses: true, creatorPosts: true };
+
+const defaultCommunityStyle = {
+  pageBackground: '#F8FBFF',
+  surfaceColor: '#FFFFFF',
+  cardColor: '#FFFFFF',
+  softBackground: '#EEF6FF',
+  primaryColor: '#1769FF',
+  secondaryColor: '#7B61FF',
+  accentColor: '#C2E7FF',
+  headingColor: '#081A45',
+  bodyColor: '#536178',
+  mutedColor: '#7C879A',
+  borderColor: '#D9E7F8',
+  activeTabBackground: '#E8F2FF',
+  activeTabText: '#1769FF',
+  dockBackground: '#FFFFFF',
+  dockItemBackground: '#F8FBFF',
+  dockActiveBackground: '#E8F2FF',
+  dockTextColor: '#536178',
+  dockActiveTextColor: '#1769FF',
+  outgoingBubble: '#1769FF',
+  incomingBubble: '#FFFFFF',
+  shadowOpacity: 16,
+};
+
+const toCommunityCssVars = (style: Partial<typeof defaultCommunityStyle> = {}): CSSProperties => {
+  const merged = { ...defaultCommunityStyle, ...style };
+  return {
+    '--community-page-bg': merged.pageBackground,
+    '--community-surface': merged.surfaceColor,
+    '--community-card': merged.cardColor,
+    '--community-soft': merged.softBackground,
+    '--community-primary': merged.primaryColor,
+    '--community-secondary': merged.secondaryColor,
+    '--community-accent': merged.accentColor,
+    '--community-heading': merged.headingColor,
+    '--community-body': merged.bodyColor,
+    '--community-muted': merged.mutedColor,
+    '--community-border': merged.borderColor,
+    '--community-active-bg': merged.activeTabBackground,
+    '--community-active-text': merged.activeTabText,
+    '--community-dock-bg': merged.dockBackground,
+    '--community-dock-item-bg': merged.dockItemBackground,
+    '--community-dock-active-bg': merged.dockActiveBackground,
+    '--community-dock-text': merged.dockTextColor,
+    '--community-dock-active-text': merged.dockActiveTextColor,
+    '--community-outgoing-bubble': merged.outgoingBubble,
+    '--community-incoming-bubble': merged.incomingBubble,
+    '--community-shadow': `0 18px 54px rgba(23, 105, 255, ${Math.min(40, Math.max(0, Number(merged.shadowOpacity))) / 100})`,
+  } as CSSProperties;
+};
 
 const normalizeUsername = (value: string) => value.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9._]/g, '').replace(/[.]{2,}/g, '.').replace(/_{2,}/g, '_').replace(/^[._]+|[._]+$/g, '');
 
@@ -370,7 +423,7 @@ const dataUrlBytes = (value = '') => {
 
 const storagePercent = (bytes: number) => Math.min(100, Math.round((bytes / STORAGE_LOCK_BYTES) * 100));
 
-const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenticated = false }) => {
+const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenticated = false, settings }) => {
   const navigate = useNavigate();
   const guardedAuth = getAuth();
   const [isCommunityAllowed, setIsCommunityAllowed] = useState(false);
@@ -1862,6 +1915,31 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const notificationDropdownPortal = isNotificationPanelOpen && typeof document !== 'undefined' ? createPortal(<NotificationDropdown />, document.body) : null;
 
+  const communityStyle = {
+    ...defaultCommunityStyle,
+    ...((settings?.content as any)?.communityStyle || {}),
+  };
+
+  const communityCssVars = useMemo(
+    () => toCommunityCssVars(communityStyle),
+    [settings?.content]
+  );
+
+  const communityDockScrollRef = useRef<HTMLDivElement>(null);
+  const communityDockScrollLeftRef = useRef(0);
+
+  const preserveCommunityDockScroll = () => {
+    if (communityDockScrollRef.current) {
+      communityDockScrollLeftRef.current = communityDockScrollRef.current.scrollLeft;
+    }
+  };
+
+  useEffect(() => {
+    const dock = communityDockScrollRef.current;
+    if (!dock) return;
+    dock.scrollLeft = communityDockScrollLeftRef.current;
+  }, [page, activeView, showStatusActions]);
+
   const navItems = [
     { label: 'Feed', icon: '📢', active: activeView === 'feed' && page === 'chat', action: () => switchView('feed') },
     { label: 'Status', icon: '⭕', active: activeView === 'status' && page === 'chat', action: () => { setActiveView('status'); setPage('chat'); setPageStack([]); setShowStatusActions((value) => !value); } },
@@ -1875,21 +1953,53 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   ];
 
   const CommunityHeader = () => (
-    <header className="flex h-[72px] min-w-0 shrink-0 items-center justify-between gap-3 border-b border-[#E3ECF8] bg-white/70 px-3 backdrop-blur-2xl sm:px-5 lg:h-[82px] lg:px-7">
+    <header className="flex h-[72px] min-w-0 shrink-0 items-center justify-between gap-3 border-b border-[var(--community-border)] bg-[var(--community-surface)]/80 px-3 backdrop-blur-2xl sm:px-5 lg:h-[82px] lg:px-7">
       <div className="flex min-w-0 items-center gap-3"><button type="button" onClick={goBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#E3ECF8] bg-white text-xl font-black text-[#081B5C] shadow-[0_12px_30px_rgba(79,123,255,0.10)]">←</button><h1 className="truncate text-xl font-black tracking-tight text-[#081B5C] sm:text-3xl">EDUVORA BOND</h1></div>
       <div className="flex shrink-0 items-center gap-2"><button type="button" onClick={() => pushPage('profile')} className="flex items-center gap-2 rounded-full border border-[#E3ECF8] bg-white px-2.5 py-2 text-xs font-black text-[#081B5C] shadow-sm sm:px-4"><Avatar value={profile.avatar} size="h-8 w-8" /><span className="hidden sm:inline">{profile.name}</span></button><span className="rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400]">🪙 {eduCoins}</span><div ref={notificationPanelRef} className="relative"><button type="button" onClick={() => setIsNotificationPanelOpen((open) => !open)} aria-expanded={isNotificationPanelOpen} aria-label="Community notifications" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#E3ECF8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><span>🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button></div></div>
     </header>
   );
 
   const CommunitySidebar = () => (
-    <aside className="hidden w-[clamp(12.5rem,16vw,15.5rem)] min-h-0 shrink-0 flex-col overflow-y-auto border-r border-[#E3ECF8] bg-white/58 p-3 custom-scrollbar lg:flex xl:p-4">
+    <aside className="hidden w-[clamp(12.5rem,16vw,15.5rem)] min-h-0 shrink-0 flex-col overflow-y-auto border-r border-[var(--community-border)] bg-[var(--community-surface)]/70 p-3 custom-scrollbar lg:flex xl:p-4">
       <div className="mb-3 rounded-[1.6rem] bg-gradient-to-br from-[#6C4CF6] to-[#4F7BFF] p-3 xl:mb-5 xl:rounded-[2rem] xl:p-4 text-white shadow-[0_18px_42px_rgba(79,123,255,0.25)]"><p className="text-xs font-black uppercase tracking-[0.22em] text-white/75">Community</p><h2 className="mt-2 text-2xl font-black">Bond Hub</h2></div>
       <nav className="space-y-1.5 xl:space-y-2">{navItems.map((item) => <button key={item.label} type="button" onClick={item.action} className={`flex w-full items-center gap-2 rounded-[1.15rem] px-3 py-2.5 xl:gap-3 xl:rounded-[1.35rem] xl:px-4 xl:py-3 text-left text-sm font-black transition ${item.active ? 'bg-[#EEF2FF] text-[#4F46E5] shadow-[0_12px_34px_rgba(79,70,229,0.12)]' : 'text-[#64748B] hover:bg-white hover:text-[#081B5C]'}`}><span className={`flex h-9 w-9 items-center justify-center rounded-xl xl:h-10 xl:w-10 xl:rounded-2xl ${item.active ? 'bg-gradient-to-br from-[#6C4CF6] to-[#4F7BFF] text-white' : 'bg-[#F3F7FF]'}`}>{item.icon}</span>{item.label}</button>)}</nav>
       <div className="mt-auto space-y-3 pt-3 xl:space-y-4"><div className="rounded-[1.6rem] bg-gradient-to-br from-[#081B5C] to-[#4F7BFF] p-3 xl:rounded-[2rem] xl:p-5 text-white shadow-[0_18px_48px_rgba(8,27,92,0.18)]"><p className="text-lg font-black">Go Premium</p><p className="mt-1 text-xs font-bold text-white/75">Unlock creator boosts and deep insights.</p><button type="button" className="mt-3 rounded-full bg-white px-3 py-2 xl:mt-4 xl:px-4 text-xs font-black text-[#4F46E5]">Upgrade Now</button></div><button type="button" onClick={() => pushPage('profile')} className="flex w-full items-center gap-3 rounded-[1.6rem] border border-[#E3ECF8] bg-white p-3 text-left"><Avatar value={profile.avatar} size="h-11 w-11" /><span className="min-w-0"><span className="block truncate text-sm font-black text-[#081B5C]">{profile.name}</span><span className="block truncate text-xs font-bold text-[#64748B]">@{profile.username}</span></span></button></div>
     </aside>
   );
 
-  const CommunityBottomNav = () => <nav id="community-bottom-dock" className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[1300] flex items-center gap-1 overflow-x-auto rounded-[1.65rem] border border-[#E3ECF8] bg-white/95 p-2 shadow-[0_18px_50px_rgba(79,123,255,0.18)] backdrop-blur-2xl custom-scrollbar lg:hidden">{navItems.map((item) => <button key={item.label} type="button" onClick={item.action} className={`min-w-[76px] rounded-[1.2rem] px-2 py-2 text-center transition ${item.active ? 'bg-[#EEF2FF] text-[#4F46E5]' : 'text-[#64748B]'}`}><span className="block text-xl">{item.icon}</span><span className="text-[10px] font-black">{item.label}</span></button>)}</nav>;
+  const CommunityBottomNav = () => (
+    <nav
+      ref={communityDockScrollRef}
+      id="community-bottom-dock"
+      className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[1300] flex items-center gap-1 overflow-x-auto rounded-[1.65rem] border border-[var(--community-border)] bg-[var(--community-dock-bg)]/95 p-2 shadow-[var(--community-shadow)] backdrop-blur-2xl custom-scrollbar lg:hidden"
+      onScroll={preserveCommunityDockScroll}
+    >
+      {navItems.map((item) => (
+        <button
+          key={item.label}
+          type="button"
+          onPointerDown={preserveCommunityDockScroll}
+          onClick={() => {
+            preserveCommunityDockScroll();
+            item.action();
+            requestAnimationFrame(() => {
+              if (communityDockScrollRef.current) {
+                communityDockScrollRef.current.scrollLeft = communityDockScrollLeftRef.current;
+              }
+            });
+          }}
+          className={`min-w-[76px] rounded-[1.2rem] px-2 py-2 text-center transition ${
+            item.active
+              ? 'bg-[var(--community-dock-active-bg)] text-[var(--community-dock-active-text)]'
+              : 'bg-[var(--community-dock-item-bg)] text-[var(--community-dock-text)]'
+          }`}
+        >
+          <span className="block text-xl">{item.icon}</span>
+          <span className="text-[10px] font-black">{item.label}</span>
+        </button>
+      ))}
+    </nav>
+  );
 
   const ProfileHeroCard = () => <section className="overflow-hidden rounded-[2rem] border border-[#E3ECF8] bg-white shadow-[0_20px_60px_rgba(79,123,255,0.12)]"><div className="relative min-h-48 bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6"><div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-[#6C4CF6]/18 blur-3xl" /><div className="absolute bottom-4 left-10 h-28 w-28 rounded-full bg-[#4F7BFF]/20 blur-2xl" /><div className="relative flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left"><div className="relative"><Avatar value={profile.avatar} size="h-28 w-28" className="text-5xl ring-4 ring-white" /><label className="absolute bottom-1 right-1 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-[#6C4CF6] to-[#4F7BFF] text-white shadow-lg"><input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />📷</label></div><div className="min-w-0 flex-1"><h2 className="break-words text-4xl font-black text-[#081B5C]">{profile.name}</h2><p className="mt-1 text-sm font-black text-[#4F7BFF]">@{profile.username}</p><p className="mt-3 max-w-2xl whitespace-pre-wrap break-words text-sm font-semibold leading-6 text-[#64748B]">{profile.bio}</p><label className="mt-4 inline-flex cursor-pointer rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-sm font-black text-[#081B5C] shadow-sm"><input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />Stage new avatar</label></div></div></div></section>;
 
@@ -1938,11 +2048,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }
 
   return (
-    <section className="relative h-[100dvh] overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-0 text-[#081B5C] sm:p-4 lg:p-6">
+    <section style={communityCssVars} className="relative h-[100dvh] overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-4 lg:p-6">
       {notificationDropdownPortal}
       {imageLightbox ? <div className="fixed inset-0 z-[1800] flex items-center justify-center bg-[#081B5C]/80 p-4 backdrop-blur-xl"><button type="button" onClick={() => setImageLightbox(null)} className="absolute right-4 top-4 rounded-full bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Close</button><div className="flex max-h-[90dvh] max-w-[94vw] items-center justify-center overflow-hidden rounded-[2rem] bg-white p-3 shadow-2xl">{renderUploadedImage(imageLightbox.src, imageLightbox.alt, 'original')}</div></div> : null}
       {page === 'statusReel' ? renderStatusReel() : null}
-      <div className="mx-auto flex h-full min-w-0 max-w-[1720px] overflow-hidden border border-[#E3ECF8] bg-white/55 shadow-[0_30px_100px_rgba(79,123,255,0.18)] backdrop-blur-2xl sm:rounded-[2rem] lg:rounded-[2.5rem]">
+      <div className="mx-auto flex h-full min-w-0 max-w-[1720px] overflow-hidden border border-[var(--community-border)] bg-[var(--community-surface)]/55 shadow-[var(--community-shadow)] backdrop-blur-2xl sm:rounded-[2rem] lg:rounded-[2.5rem]">
         <CommunitySidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <CommunityHeader />
