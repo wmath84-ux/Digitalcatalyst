@@ -481,7 +481,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                             <span className={`transform transition-transform duration-300 ${openAccordion === i ? 'rotate-45' : ''}`}><svg className="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg></span>
                           </button>
                           <div className={`feature-accordion-content px-4 ${openAccordion === i ? 'is-open' : ''}`}>
-                            <p className="text-sm leading-6 text-slate-600">Detailed information about '{feature}' would go here, explaining the benefits and how it helps the customer achieve their goals.</p>
+                            <p className="text-sm leading-6 text-slate-600">
+                              This feature is included to help learners understand the resource clearly, apply it during study sessions, and get practical value from the product without confusion.
+                            </p>
                           </div>
                         </div>
                       ))}
