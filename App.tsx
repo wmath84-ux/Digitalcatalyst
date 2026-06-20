@@ -3647,7 +3647,20 @@ const App: React.FC = () => {
             )}
             <main key={currentView} className={`${websiteSettings.animations.enabled ? appleOpenClass : ''} ${currentView === 'home' ? 'mobile-app-home' : ''}`}>{renderContent(effectiveAppUser)}</main>
             <div className="mobile-app-chrome"><InstallAppButton enabled={canShowInstallPrompt} /></div>
-            <div className={shouldHideFooterOnMobile ? 'max-md:hidden' : ''}><Footer settings={websiteSettings} socialLinks={websiteSettings.content.socialLinks} onAdminLoginClick={handleNavigateToAdminLogin} onLoginClick={handleNavigateToAuth} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} onNavigateToPolicies={handleNavigateToPolicies} onSubscribe={handleSubscribe} /></div>
+            {currentView === 'home' && (
+              <div className={shouldHideFooterOnMobile ? 'max-md:hidden' : ''}>
+                <Footer
+                  settings={websiteSettings}
+                  socialLinks={websiteSettings.content.socialLinks}
+                  onAdminLoginClick={handleNavigateToAdminLogin}
+                  onLoginClick={handleNavigateToAuth}
+                  onNavigateToAllProducts={handleNavigateToAllProducts}
+                  onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll}
+                  onNavigateToPolicies={handleNavigateToPolicies}
+                  onSubscribe={handleSubscribe}
+                />
+              </div>
+            )}
          </div>
        </ErrorBoundary>
     );
@@ -3655,7 +3668,7 @@ const App: React.FC = () => {
 
   return (
       <ErrorBoundary>
-        <style>{`.animations-off *, .animations-off *::before, .animations-off *::after { animation: none !important; scroll-behavior: auto !important; } .animations-off .animate-child, .animations-off .scroll-animate { opacity: 1 !important; transform: none !important; } .animations-off * { transition-duration: 0.01ms !important; }`}</style>
+        <style>{`.animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *), .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *)::before, .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *)::after { animation: none !important; scroll-behavior: auto !important; } .animations-off .animate-child, .animations-off .scroll-animate, .animations-off .hub-animate { opacity: 1 !important; transform: none !important; } .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *) { transition-duration: 0.01ms !important; }`}</style>
         {renderPage()}
         <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
       </ErrorBoundary>
