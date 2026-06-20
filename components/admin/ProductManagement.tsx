@@ -108,9 +108,32 @@ const normaliseQuizQuestions = (questions?: QuizQuestion[]): QuizQuestion[] => (
     correctAnswer: question.correctAnswer ?? 0,
 }));
 
+const normaliseDocPages = (file: ProductFile): ProductDocPage[] | undefined => {
+    if (file.type !== 'doc') return file.docPages;
+
+    const pages = (file.docPages || [])
+        .filter(page => page && page.id && page.title)
+        .map(page => ({
+            ...page,
+            title: page.title.trim() || 'Untitled Page',
+            content: page.content || '<h1>Open Docs Workspace</h1><p>Start building your lesson here.</p>',
+        }));
+
+    if (pages.length > 0) return pages;
+
+    return [{
+        id: 'doc-page-1',
+        title: file.name || 'Page 1',
+        content: file.content || '<h1>Open Docs Workspace</h1><p>Start building your lesson here.</p>',
+        createdAt: Date.now(),
+        updatedAt: Date.now(),
+    }];
+};
+
 const normaliseFiles = (files?: ProductFile[]): ProductFile[] => (files || []).map(file => ({
     ...file,
     content: file.content || '',
+    docPages: normaliseDocPages(file),
     quiz: file.quiz ? { questions: normaliseQuizQuestions(file.quiz.questions || []) } : file.type === 'quiz' ? { questions: [] } : undefined,
 }));
 
@@ -154,6 +177,7 @@ const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] te
 const editorCommands: Array<[string, string, string?]> = [
     ['bold', 'B'],
     ['italic', 'I'],
+    ['underline', 'U'],
     ['formatBlock', 'H1', '<h1>'],
     ['formatBlock', 'H2', '<h2>'],
     ['insertUnorderedList', '• List'],
@@ -162,47 +186,268 @@ const editorCommands: Array<[string, string, string?]> = [
     ['justifyRight', 'Right'],
 ];
 
+const getMeaningfulDocText = (html: string) =>
+    (html || '')
+        .replace(/<style[\s\S]*?<\/style>/gi, '')
+        .replace(/<script[\s\S]*?<\/script>/gi, '')
+        .replace(/<[^>]+>/g, '')
+        .replace(/&nbsp;/g, ' ')
+        .trim();
+
+const validateOpenDocsContent = (resourceName: string, pages: ProductDocPage[]) => {
+    const trimmedName = resourceName.trim();
+
+    if (!trimmedName) return 'Open Docs resource name is required.';
+    if (!pages.length) return 'At least one Open Docs page is required.';
+
+    const ids = pages.map(page => page.id.trim()).filter(Boolean);
+    const titles = pages.map(page => page.title.trim().toLowerCase()).filter(Boolean);
+
+    if (ids.length !== pages.length) return 'Every Open Docs page must have a valid page ID.';
+    if (new Set(ids).size !== ids.length) return 'Duplicate Open Docs page IDs are not allowed.';
+    if (titles.length !== pages.length) return 'Every Open Docs page must have a title.';
+    if (new Set(titles).size !== titles.length) return 'Duplicate Open Docs page titles are not allowed.';
+
+    const emptyPage = pages.find(page => !getMeaningfulDocText(page.content));
+    if (emptyPage) return `Page "${emptyPage.title}" is empty. Add meaningful content before saving.`;
+
+    return '';
+};
+
+const createAdminDocPage = (title: string, content = '<h1>New page</h1><p>Write here.</p>'): ProductDocPage => {
+    const now = Date.now();
+
+    return {
+        id: `doc-page-${now}-${Math.random().toString(36).slice(2, 7)}`,
+        title: title.trim() || 'Untitled Page',
+        content,
+        createdAt: now,
+        updatedAt: now,
+    };
+};
+
+const saveAdminEditorSelection = (editor: HTMLDivElement | null, selectionRef: React.MutableRefObject<Range | null>) => {
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0 || !editor) return;
+
+    const range = selection.getRangeAt(0);
+    if (editor.contains(range.commonAncestorContainer)) {
+        selectionRef.current = range.cloneRange();
+    }
+};
+
+const restoreAdminEditorSelection = (editor: HTMLDivElement | null, selectionRef: React.MutableRefObject<Range | null>) => {
+    const selection = window.getSelection();
+    const range = selectionRef.current;
+    if (!selection || !range || !editor || !editor.contains(range.commonAncestorContainer)) return;
+
+    selection.removeAllRanges();
+    selection.addRange(range);
+};
+
+const runAdminRichTextCommand = (
+    editor: HTMLDivElement | null,
+    selectionRef: React.MutableRefObject<Range | null>,
+    command: string,
+    commandValue?: string
+) => {
+    if (!editor) return false;
+
+    editor.focus();
+    restoreAdminEditorSelection(editor, selectionRef);
+
+    try {
+        const supported = typeof document.queryCommandSupported === 'function'
+            ? document.queryCommandSupported(command)
+            : true;
+
+        if (!supported && command !== 'formatBlock') return false;
+
+        const ok = document.execCommand(command, false, commandValue);
+        saveAdminEditorSelection(editor, selectionRef);
+        return ok;
+    } catch {
+        return false;
+    }
+};
+
 const AdminDocsEditor: React.FC<{ value: string; onChange: (value: string) => void; }> = ({ value, onChange }) => {
     const editorRef = useRef<HTMLDivElement>(null);
+    const selectionRef = useRef<Range | null>(null);
     const [warning, setWarning] = useState('');
 
     useEffect(() => {
-        if (editorRef.current && editorRef.current.innerHTML !== value) editorRef.current.innerHTML = value;
+        if (editorRef.current && editorRef.current.innerHTML !== value) {
+            editorRef.current.innerHTML = value;
+        }
     }, [value]);
 
     const runCommand = (command: string, commandValue?: string) => {
-        editorRef.current?.focus();
-        try {
-            document.execCommand(command, false, commandValue);
-            setWarning('');
-            onChange(editorRef.current?.innerHTML || '');
-        } catch {
+        const ok = runAdminRichTextCommand(editorRef.current, selectionRef, command, commandValue);
+
+        if (!ok) {
             setWarning('Formatting failed. Click inside the editor and try again.');
+            return;
         }
+
+        setWarning('');
+        onChange(editorRef.current?.innerHTML || '');
     };
 
     return (
-        <div className="overflow-hidden rounded-3xl border border-white/50 bg-white/80">
+        <div className="overflow-hidden rounded-3xl border border-white/50 bg-white/80 shadow-sm">
             <div className="flex flex-wrap gap-2 border-b border-white/50 bg-white/80 p-3 backdrop-blur-xl">
                 {(editorCommands || []).map(([command, label, value]) => (
                     <button
                         key={`${command}-${label}`}
                         type="button"
+                        onPointerDown={event => event.preventDefault()}
                         onClick={() => runCommand(command, value)}
-                        className="rounded-xl border border-white/50 bg-white/80 px-3 py-2 text-xs font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm"
+                        className="rounded-xl border border-white/50 bg-white/80 px-3 py-2 text-xs font-black text-slate-700 transition hover:bg-white hover:shadow-sm"
                     >
                         {label}
                     </button>
                 ))}
             </div>
+
             {warning && <p className="border-b border-amber-200 bg-amber-50 px-4 py-2 text-xs font-bold text-amber-700">{warning}</p>}
+
             <div
                 ref={editorRef}
                 contentEditable
                 suppressContentEditableWarning
                 onInput={() => onChange(editorRef.current?.innerHTML || '')}
-                className="prose prose-invert min-h-72 max-w-none bg-white/80 p-5 text-slate-900 outline-none"
+                onBlur={() => onChange(editorRef.current?.innerHTML || '')}
+                onKeyUp={() => saveAdminEditorSelection(editorRef.current, selectionRef)}
+                onMouseUp={() => saveAdminEditorSelection(editorRef.current, selectionRef)}
+                onTouchEnd={() => saveAdminEditorSelection(editorRef.current, selectionRef)}
+                onFocus={() => saveAdminEditorSelection(editorRef.current, selectionRef)}
+                className="min-h-[62vh] max-w-none bg-white/80 p-5 text-slate-900 outline-none md:p-8 [&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6"
             />
+        </div>
+    );
+};
+
+const AdminOpenDocsBuilder: React.FC<{
+    resourceName: string;
+    pages: ProductDocPage[];
+    activePageId: string;
+    error: string;
+    onResourceNameChange: (value: string) => void;
+    onPagesChange: (pages: ProductDocPage[]) => void;
+    onActivePageChange: (pageId: string) => void;
+    onBack: () => void;
+    onSave: () => void;
+}> = ({ resourceName, pages, activePageId, error, onResourceNameChange, onPagesChange, onActivePageChange, onBack, onSave }) => {
+    const activePage = pages.find(page => page.id === activePageId) || pages[0];
+
+    const addPage = () => {
+        const page = createAdminDocPage(`Page ${pages.length + 1}`);
+        onPagesChange([...(pages || []), page]);
+        onActivePageChange(page.id);
+    };
+
+    const renamePage = () => {
+        if (!activePage) return;
+
+        const title = prompt('Open Docs page title', activePage.title)?.trim();
+        if (!title) return;
+
+        onPagesChange((pages || []).map(page =>
+            page.id === activePage.id ? { ...page, title, updatedAt: Date.now() } : page
+        ));
+    };
+
+    const deletePage = () => {
+        if (!activePage || pages.length <= 1) return;
+        if (!confirm('Delete this Open Docs page?')) return;
+
+        const nextPages = pages.filter(page => page.id !== activePage.id);
+        onPagesChange(nextPages);
+        onActivePageChange(nextPages[0]?.id || '');
+    };
+
+    return (
+        <div className="fixed inset-0 z-50 bg-slate-950/70 p-3 backdrop-blur-xl sm:p-5">
+            <div className="flex h-full min-h-0 overflow-hidden rounded-[2rem] border border-white/40 bg-[#f8fbff] text-slate-900 shadow-[0_30px_90px_rgba(15,23,42,0.28)]">
+                <aside className="flex w-72 shrink-0 flex-col border-r border-slate-200 bg-white/85 p-4 backdrop-blur-xl">
+                    <button type="button" onClick={onBack} className="mb-4 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-black text-slate-700 hover:bg-slate-50">
+                        ← Back to content types
+                    </button>
+
+                    <label className={labelClass}>Open Docs Name</label>
+                    <input value={resourceName} onChange={event => onResourceNameChange(event.target.value)} className={fieldClass} placeholder="Chapter notes, workbook..." />
+
+                    {error && <p className="mt-3 rounded-2xl bg-rose-50 p-3 text-xs font-bold text-rose-700">{error}</p>}
+
+                    <div className="mt-5 flex-1 overflow-y-auto custom-scrollbar">
+                        <p className="mb-2 text-xs font-black uppercase tracking-[0.24em] text-slate-500">Pages</p>
+                        <div className="space-y-2">
+                            {(pages || []).map(page => (
+                                <button
+                                    key={page.id}
+                                    type="button"
+                                    onClick={() => onActivePageChange(page.id)}
+                                    className={`w-full rounded-2xl px-3 py-3 text-left text-sm font-bold transition ${
+                                        page.id === activePageId
+                                            ? 'bg-cyan-100 text-cyan-800 shadow-sm'
+                                            : 'bg-slate-100 text-slate-700 hover:bg-slate-50'
+                                    }`}
+                                >
+                                    <span className="block truncate">{page.title}</span>
+                                    <span className="mt-1 block truncate text-[10px] uppercase tracking-widest text-slate-400">
+                                        {getMeaningfulDocText(page.content).slice(0, 42) || 'Empty page'}
+                                    </span>
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+
+                    <div className="mt-4 space-y-2">
+                        <button type="button" onClick={addPage} className="w-full rounded-2xl bg-cyan-600 px-4 py-3 text-sm font-black text-white hover:bg-cyan-700">
+                            + Add page
+                        </button>
+                        <button type="button" onClick={renamePage} className="w-full rounded-2xl bg-slate-100 px-4 py-3 text-sm font-black text-slate-700 hover:bg-slate-200">
+                            Rename page
+                        </button>
+                        {pages.length > 1 && (
+                            <button type="button" onClick={deletePage} className="w-full rounded-2xl bg-rose-100 px-4 py-3 text-sm font-black text-rose-700 hover:bg-rose-200">
+                                Delete page
+                            </button>
+                        )}
+                    </div>
+                </aside>
+
+                <main className="flex min-w-0 flex-1 flex-col">
+                    <div className="flex shrink-0 items-center justify-between gap-4 border-b border-slate-200 bg-white/80 p-4 backdrop-blur-xl">
+                        <div className="min-w-0">
+                            <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-600">Full-page builder</p>
+                            <h3 className="truncate text-2xl font-black text-slate-900">Open Docs Builder</h3>
+                        </div>
+                        <button type="button" onClick={onSave} className="rounded-2xl bg-slate-950 px-6 py-3 text-sm font-black text-white shadow-sm hover:bg-slate-800">
+                            Save Open Docs
+                        </button>
+                    </div>
+
+                    <div className="min-h-0 flex-1 overflow-y-auto p-4 custom-scrollbar md:p-6">
+                        {activePage ? (
+                            <AdminDocsEditor
+                                value={activePage.content}
+                                onChange={content => onPagesChange((pages || []).map(page =>
+                                    page.id === activePage.id ? { ...page, content, updatedAt: Date.now() } : page
+                                ))}
+                            />
+                        ) : (
+                            <div className="rounded-3xl border border-dashed border-slate-300 bg-white p-10 text-center">
+                                <p className="font-black text-slate-900">No page selected</p>
+                                <button type="button" onClick={addPage} className="mt-4 rounded-2xl bg-cyan-600 px-5 py-3 font-black text-white">
+                                    Create first page
+                                </button>
+                            </div>
+                        )}
+                    </div>
+                </main>
+            </div>
         </div>
     );
 };
@@ -238,14 +483,24 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
 
     const showForm = (type: ProductFileType) => {
         const selected = contentTypes.find(item => item.type === type);
+
         setFormState({
             type,
             url: '',
             name: selected?.title || 'Learning Resource',
             content: type === 'doc' ? '<h1>Open Docs Workspace</h1><p>Start building your lesson here.</p>' : '',
         });
-        if (type === 'doc') { const now = Date.now(); const firstPage = { id: `doc-page-${now}`, title: 'Page 1', content: '<h1>Open Docs Workspace</h1><p>Start building your lesson here.</p>', createdAt: now, updatedAt: now }; setDocPages([firstPage]); setActiveDocPageId(firstPage.id); setDocError(''); }
-        if (type === 'quiz') setQuizQuestions([{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
+
+        if (type === 'doc') {
+            const firstPage = createAdminDocPage('Page 1', '<h1>Open Docs Workspace</h1><p>Start building your lesson here.</p>');
+            setDocPages([firstPage]);
+            setActiveDocPageId(firstPage.id);
+            setDocError('');
+        }
+
+        if (type === 'quiz') {
+            setQuizQuestions([{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
+        }
     };
 
     const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -254,13 +509,21 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
 
         setIsUploading(true);
         const reader = new FileReader();
+
         reader.onload = readerEvent => {
             if (readerEvent.target?.result) {
-                onAdd({ name: file.name, type: uploadConfig.type, url: readerEvent.target.result as string, content: '', quiz: { questions: [] } });
+                onAdd({
+                    name: file.name,
+                    type: uploadConfig.type,
+                    url: readerEvent.target.result as string,
+                    content: '',
+                    quiz: { questions: [] },
+                });
                 setIsUploading(false);
                 onClose();
             }
         };
+
         reader.readAsDataURL(file);
         event.target.value = '';
         setUploadConfig(null);
@@ -293,6 +556,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
 
     const handleFormSubmit = () => {
         if (!formState) return;
+
         const trimmedName = formState.name.trim() || 'Untitled Resource';
 
         if (formState.type === 'quiz') {
@@ -303,23 +567,46 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                 content: '',
                 quiz: { questions: quizQuestions || [] },
             });
-        } else if (formState.type === 'doc') {
-            const meaningfulText = (html: string) => html.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').trim();
-            const ids = new Set(docPages.map(page => page.id));
-            if (!trimmedName || docPages.length === 0 || ids.size !== docPages.length || docPages.some(page => !page.title.trim() || !meaningfulText(page.content))) {
-                setDocError('Resource name, unique page IDs, page titles, and meaningful content on every page are required.');
+            onClose();
+            return;
+        }
+
+        if (formState.type === 'doc') {
+            const validationError = validateOpenDocsContent(trimmedName, docPages);
+
+            if (validationError) {
+                setDocError(validationError);
                 return;
             }
-            onAdd({ name: trimmedName, type: 'doc', url: '', content: docPages[0].content, docPages, quiz: { questions: [] } });
-        } else {
+
+            const cleanPages = docPages.map(page => ({
+                ...page,
+                title: page.title.trim(),
+                content: page.content || '<p></p>',
+                updatedAt: page.updatedAt || Date.now(),
+            }));
+
             onAdd({
                 name: trimmedName,
-                type: formState.type,
-                url: formState.type === 'doc' ? '' : formState.url,
-                content: formState.type === 'doc' ? formState.content : '',
+                type: 'doc',
+                url: '',
+                content: cleanPages[0]?.content || '',
+                docPages: cleanPages,
                 quiz: { questions: [] },
             });
+
+            onClose();
+            return;
         }
+
+        onAdd({
+            name: trimmedName,
+            type: formState.type,
+            url: formState.url,
+            content: '',
+            quiz: { questions: [] },
+        });
+
         onClose();
     };
 
@@ -327,10 +614,12 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
         <div className="mt-5 rounded-[1.75rem] border border-cyan-400/20 bg-cyan-400/5 p-5 backdrop-blur-xl">
             <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
-                    <p className="text-xs font-black uppercase tracking-[0.24em] text-cyan-300">Content Studio</p>
+                    <p className="text-xs font-black uppercase tracking-[0.24em] text-cyan-700">Content Studio</p>
                     <h4 className="text-xl font-black text-slate-900">Add learning content</h4>
                 </div>
-                <button type="button" onClick={onClose} className="rounded-full border border-white/50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-white/80 hover:shadow-sm">Close</button>
+                <button type="button" onClick={onClose} className="rounded-full border border-white/50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-white/80 hover:shadow-sm">
+                    Close
+                </button>
             </div>
 
             {!formState ? (
@@ -348,6 +637,21 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                         </button>
                     ))}
                 </div>
+            ) : formState.type === 'doc' ? (
+                <AdminOpenDocsBuilder
+                    resourceName={formState.name}
+                    pages={docPages}
+                    activePageId={activeDocPageId}
+                    error={docError}
+                    onResourceNameChange={value => setFormState(prev => prev ? { ...prev, name: value } : prev)}
+                    onPagesChange={setDocPages}
+                    onActivePageChange={setActiveDocPageId}
+                    onBack={() => {
+                        setFormState(null);
+                        setDocError('');
+                    }}
+                    onSave={handleFormSubmit}
+                />
             ) : (
                 <div className="flex max-h-[78vh] flex-col overflow-hidden rounded-3xl border border-white/50 bg-white/80">
                     <div className="shrink-0 space-y-5 border-b border-white/50 bg-white/80 p-4 backdrop-blur-xl sm:p-5">
@@ -355,26 +659,32 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                             <label className={labelClass}>Resource Name</label>
                             <input value={formState.name} onChange={event => setFormState(prev => prev ? { ...prev, name: event.target.value } : prev)} className={fieldClass} />
                         </div>
-                        {formState.type === 'quiz' && <p className="rounded-2xl border border-cyan-300/20 bg-cyan-600/10 px-4 py-3 text-sm font-bold text-cyan-700">{quizQuestions.length} question{quizQuestions.length === 1 ? '' : 's'} added. Scroll inside this quiz builder to review every question before saving.</p>}
+
+                        {formState.type === 'quiz' && (
+                            <p className="rounded-2xl border border-cyan-300/20 bg-cyan-600/10 px-4 py-3 text-sm font-bold text-cyan-700">
+                                {quizQuestions.length} question{quizQuestions.length === 1 ? '' : 's'} added. Scroll inside this quiz builder to review every question before saving.
+                            </p>
+                        )}
                     </div>
 
                     <div className="min-h-0 flex-1 overflow-y-auto p-4 sm:p-5 custom-scrollbar">
-                        {formState.type === 'doc' ? (
-                            <div className="fixed inset-0 z-50 flex bg-slate-950/60 p-4 backdrop-blur"><div className="flex min-h-0 flex-1 overflow-hidden rounded-3xl bg-white"><aside className="w-72 shrink-0 overflow-y-auto border-r p-4"><button type="button" onClick={() => setFormState(null)} className="mb-4 rounded-xl border px-3 py-2 text-sm font-bold">Back</button><input value={formState.name} onChange={event => setFormState(prev => prev ? { ...prev, name: event.target.value } : prev)} className={fieldClass} placeholder="Resource name" />{docError && <p className="my-3 rounded-xl bg-rose-50 p-3 text-xs font-bold text-rose-700">{docError}</p>}<div className="mt-4 space-y-2">{docPages.map(page => <button key={page.id} type="button" onClick={() => setActiveDocPageId(page.id)} className={`w-full rounded-xl px-3 py-2 text-left text-sm font-bold ${page.id === activeDocPageId ? 'bg-cyan-100 text-cyan-800' : 'bg-slate-100 text-slate-700'}`}>{page.title}</button>)}</div><button type="button" onClick={() => { const now = Date.now(); const page = { id: `doc-page-${now}`, title: `Page ${docPages.length + 1}`, content: '<h1>New page</h1><p>Write here.</p>', createdAt: now, updatedAt: now }; setDocPages(prev => [...prev, page]); setActiveDocPageId(page.id); }} className="mt-4 w-full rounded-xl bg-cyan-600 px-3 py-2 font-black text-white">+ Add page</button><button type="button" onClick={() => { const title = prompt('Page title', docPages.find(page => page.id === activeDocPageId)?.title || '')?.trim(); if (title) setDocPages(prev => prev.map(page => page.id === activeDocPageId ? { ...page, title, updatedAt: Date.now() } : page)); }} className="mt-2 w-full rounded-xl bg-slate-100 px-3 py-2 font-black text-slate-700">Rename page</button>{docPages.length > 1 && <button type="button" onClick={() => { if (!confirm('Delete this page?')) return; setDocPages(prev => { const next = prev.filter(page => page.id !== activeDocPageId); setActiveDocPageId(next[0].id); return next; }); }} className="mt-2 w-full rounded-xl bg-rose-100 px-3 py-2 font-black text-rose-700">Delete page</button>}</aside><main className="min-w-0 flex-1 overflow-y-auto p-5"><h3 className="mb-4 text-2xl font-black text-slate-900">Open Docs Builder</h3><AdminDocsEditor value={docPages.find(page => page.id === activeDocPageId)?.content || ''} onChange={content => setDocPages(prev => prev.map(page => page.id === activeDocPageId ? { ...page, content, updatedAt: Date.now() } : page))} /></main></div></div>
-                        ) : formState.type === 'quiz' ? (
+                        {formState.type === 'quiz' ? (
                             <div className="space-y-4">
                                 <div ref={quizListRef} className="space-y-4">
                                     {(quizQuestions || []).map((question, questionIndex) => (
                                         <div key={questionIndex} className="rounded-2xl border border-white/50 bg-white/80 p-4">
                                             <label className={labelClass}>Question {questionIndex + 1}</label>
                                             <input value={question.prompt} onChange={event => updateQuizQuestion(questionIndex, q => ({ ...q, prompt: event.target.value }))} className={fieldClass} placeholder="What should learners answer?" />
+
                                             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                                                 {(question.options || []).map((option, optionIndex) => (
                                                     <label key={optionIndex} className="block">
                                                         <span className="mb-2 block text-xs font-bold text-slate-600">Option {optionIndex + 1}</span>
                                                         <div className="flex gap-2">
                                                             <input value={option} onChange={event => updateQuizQuestion(questionIndex, q => ({ ...q, options: (q.options || []).map((current, idx) => idx === optionIndex ? event.target.value : current) }))} className={fieldClass} />
-                                                            <button type="button" onClick={() => updateQuizQuestion(questionIndex, q => ({ ...q, correctAnswer: optionIndex }))} className={`rounded-2xl px-4 text-xs font-black ${question.correctAnswer === optionIndex ? 'bg-emerald-400 text-slate-900' : 'border border-white/50 text-slate-600'}`}>Correct</button>
+                                                            <button type="button" onClick={() => updateQuizQuestion(questionIndex, q => ({ ...q, correctAnswer: optionIndex }))} className={`rounded-2xl px-4 text-xs font-black ${question.correctAnswer === optionIndex ? 'bg-emerald-400 text-slate-900' : 'border border-white/50 text-slate-600'}`}>
+                                                                Correct
+                                                            </button>
                                                         </div>
                                                     </label>
                                                 ))}
@@ -382,7 +692,10 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                                         </div>
                                     ))}
                                 </div>
-                                <button type="button" onClick={addQuizQuestion} className="w-full rounded-2xl border border-dashed border-cyan-300/40 py-3 font-black text-cyan-700 hover:bg-cyan-400/10">+ Add Question</button>
+
+                                <button type="button" onClick={addQuizQuestion} className="w-full rounded-2xl border border-dashed border-cyan-300/40 py-3 font-black text-cyan-700 hover:bg-cyan-400/10">
+                                    + Add Question
+                                </button>
                             </div>
                         ) : (
                             <div>
@@ -394,8 +707,12 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
 
                     <div className="shrink-0 border-t border-white/50 bg-white/80 p-4 backdrop-blur-xl sm:p-5">
                         <div className="flex justify-end gap-3">
-                            <button type="button" onClick={() => setFormState(null)} className="rounded-2xl border border-white/50 px-5 py-3 font-bold text-slate-600 hover:bg-white/80 hover:shadow-sm">Back</button>
-                            <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-600 px-6 py-3 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 hover:bg-cyan-200">Add Content</button>
+                            <button type="button" onClick={() => setFormState(null)} className="rounded-2xl border border-white/50 px-5 py-3 font-bold text-slate-600 hover:bg-white/80 hover:shadow-sm">
+                                Back
+                            </button>
+                            <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-600 px-6 py-3 font-black text-white shadow-sm hover:bg-cyan-700">
+                                Add Content
+                            </button>
                         </div>
                     </div>
                 </div>
