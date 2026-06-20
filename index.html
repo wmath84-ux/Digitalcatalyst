@@ -407,20 +407,19 @@
         to { opacity: 0; }
       }
       @keyframes welcomeCircleMotion {
-        0% { opacity: 0; transform: translateY(18px) scale(0.86) rotate(-3deg); }
-        18% { opacity: 1; transform: translateY(0) scale(1.035) rotate(0deg); }
-        30% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
-        55% { opacity: 1; transform: translateY(-7px) scale(1.012) rotate(0deg); }
-        78% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
-        100% { opacity: 1; transform: translateY(0) scale(1) rotate(0deg); }
+        0% { opacity: 0; transform: translateY(18px) scale(0.86); }
+        16% { opacity: 1; transform: translateY(0) scale(1.04); }
+        28% { opacity: 1; transform: translateY(0) scale(1); }
+        52% { opacity: 1; transform: translateY(-6px) scale(1.01); }
+        76%, 100% { opacity: 1; transform: translateY(0) scale(1); }
       }
       @keyframes welcomeCircleDraw {
         from { stroke-dashoffset: 295.31; }
         to { stroke-dashoffset: 0; }
       }
       @keyframes welcomeTextWrite {
-        0% { opacity: 1; clip-path: inset(0 100% 0 0); transform: translateY(8px); }
-        100% { opacity: 1; clip-path: inset(0 0 0 0); transform: translateY(0); }
+        from { opacity: 1; clip-path: inset(0 100% 0 0); transform: translateY(8px); }
+        to { opacity: 1; clip-path: inset(0 0 0 0); transform: translateY(0); }
       }
       @keyframes welcomeCaretBlink {
         0%, 45% { opacity: 1; }
@@ -428,22 +427,22 @@
       }
       @keyframes welcomeSpark {
         0% { opacity: 0; transform: scale(0.4); }
-        20%, 82% { opacity: 1; transform: scale(1); }
+        18%, 82% { opacity: 1; transform: scale(1); }
         100% { opacity: 0; transform: scale(0.35); }
       }
-      .welcome-overlay-enter { animation: welcomeOverlayFade 260ms ease-out both; }
-      .welcome-overlay-exit { animation: welcomeOverlayOut 320ms ease-in both; }
-      .welcome-circle-shell { animation: welcomeCircleMotion 3.05s cubic-bezier(0.16, 1, 0.3, 1) both; will-change: transform, opacity; }
+      .welcome-overlay-enter { animation: welcomeOverlayFade 240ms ease-out both; }
+      .welcome-overlay-exit { animation: welcomeOverlayOut 360ms ease-in both; }
+      .welcome-circle-shell { animation: welcomeCircleMotion 3.35s cubic-bezier(0.16, 1, 0.3, 1) both; will-change: transform, opacity; }
       .welcome-circle-draw {
         stroke-dasharray: 295.31;
         stroke-dashoffset: 295.31;
-        animation: welcomeCircleDraw 2.15s cubic-bezier(0.65, 0, 0.35, 1) 180ms forwards;
+        animation: welcomeCircleDraw 2.45s cubic-bezier(0.65, 0, 0.35, 1) 220ms forwards;
       }
       .welcome-write-text {
         display: inline-block;
         opacity: 0;
         position: relative;
-        animation: welcomeTextWrite 1.25s steps(7, end) 0.32s forwards;
+        animation: welcomeTextWrite 1.45s steps(7, end) 520ms forwards;
       }
       .welcome-write-text::after {
         background: currentColor;
@@ -453,8 +452,11 @@
         right: -0.14em;
         top: 0.12em;
         width: 0.045em;
-        animation: welcomeCaretBlink 0.45s steps(1, end) 0.32s 5 both;
+        animation: welcomeCaretBlink 0.45s steps(1, end) 520ms 6 both;
       }
+      .welcome-spark { animation: welcomeSpark 2.7s ease-in-out 520ms both; }
+      .welcome-subtitle { animation: slideUp 560ms ease-out 1.85s forwards; }
+
 
 
       @keyframes slide-in-right {
