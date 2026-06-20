@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { ActiveCoinDiscount, ProductWithRating, Review, Coupon, WebsiteSettings, PriceHistoryEntry, User } from '../App';
 import { EconomySettings, resolveCoinPrice } from '../utils/economy';
+import { unlockProductWithCoins } from '../utils/coinWallet';
 import PaymentModal from './PaymentModal';
 import RatingsAndReviews from './RatingsAndReviews';
 import FeaturedProducts from './FeaturedProducts';
@@ -293,35 +294,93 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const productCoinPrice = resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id);
   const userCoinBalance = (currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0;
+  const requiredProductCoins = Math.max(0, productCoinPrice * quantity);
+  const missingProductCoins = Math.max(0, requiredProductCoins - userCoinBalance);
+  const coinCheckoutDisabled = isCoinButtonChecking || isPurchased || requiredProductCoins <= 0 || userCoinBalance < requiredProductCoins;
+  const coinCheckoutLabel = isPurchased
+    ? 'Course Unlocked'
+    : isCoinButtonChecking
+      ? 'Unlocking...'
+      : requiredProductCoins <= 0
+        ? 'Coin checkout unavailable'
+        : userCoinBalance < requiredProductCoins
+          ? `Need ${missingProductCoins} more coins`
+          : `Pay with ${requiredProductCoins} coins`;
 
   const handleEduCoinButtonClick = async () => {
-    if (!isLoggedIn) {
+    if (!isLoggedIn || !currentUser) {
       onLoginRequired();
       return;
     }
 
-    window.scrollTo(0, 0);
-    if (userCoinBalance >= productCoinPrice * quantity && productCoinPrice > 0) {
-      const wasPurchased = await handleModalConfirmWithCoins();
-      if (!wasPurchased) {
-        setIsCoinButtonChecking(false);
+    const userId = currentUser.uid || currentUser.id;
+    const requiredCoins = Math.max(0, productCoinPrice * quantity);
+    const missingCoins = Math.max(0, requiredCoins - userCoinBalance);
+
+    if (!userId) {
+      onLoginRequired();
+      return;
+    }
+
+    if (requiredCoins <= 0) {
+      alert('Coin checkout is not enabled for this product.');
+      return;
+    }
+
+    if (isPurchased) {
+      alert('Course already unlocked.');
+      return;
+    }
+
+    if (userCoinBalance < requiredCoins) {
+      if (onInsufficientCoins) {
+        onInsufficientCoins({
+          requiredCoins,
+          balance: userCoinBalance,
+          missingCoins,
+          productTitle: product.title,
+        });
+        return;
+      }
+
+      setOpenCoinGuideOnMount(true);
+      setModalOpen(true);
+      return;
+    }
+
+    try {
+      setIsCoinButtonChecking(true);
+      window.scrollTo(0, 0);
+
+      await unlockProductWithCoins({
+        userId,
+        productId: product.id,
+        productTitle: product.title,
+        requiredCoins,
+      });
+
+      if (onCoinPurchase) {
+        await onCoinPurchase(product, quantity);
+      }
+
+      alert(`Course unlocked successfully with ${requiredCoins} coins.`);
+    } catch (error: any) {
+      const message = error?.message || 'Coin unlock failed. Try again.';
+      if (message.toLowerCase().includes('insufficient')) {
         if (onInsufficientCoins) {
-          onInsufficientCoins({ requiredCoins: productCoinPrice * quantity, balance: userCoinBalance, missingCoins: Math.max(0, (productCoinPrice * quantity) - userCoinBalance), productTitle: product.title });
-        } else {
-          setOpenCoinGuideOnMount(true);
-          setModalOpen(true);
+          onInsufficientCoins({
+            requiredCoins,
+            balance: userCoinBalance,
+            missingCoins,
+            productTitle: product.title,
+          });
+          return;
         }
       }
-      return;
+      alert(message);
+    } finally {
+      setIsCoinButtonChecking(false);
     }
-
-    if (onInsufficientCoins) {
-      onInsufficientCoins({ requiredCoins: productCoinPrice * quantity, balance: userCoinBalance, missingCoins: Math.max(0, (productCoinPrice * quantity) - userCoinBalance), productTitle: product.title });
-      return;
-    }
-
-    setOpenCoinGuideOnMount(true);
-    setModalOpen(true);
   };
 
   const handleModalClose = () => {
@@ -534,8 +593,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     {isPurchased ? 'Purchased' : 'Pay with Razorpay'}
                   </button>
                   {onCoinPurchase && productCoinPrice > 0 && (
-                    <button disabled={isPurchased || isCoinButtonChecking} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
-                      {isCoinButtonChecking ? 'Checking EduCoins...' : `Pay with ${productCoinPrice} EduCoins`}
+                    <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
+                      {coinCheckoutLabel}
+                      {requiredProductCoins > 0 && (
+                        <span className="mt-2 block text-xs font-bold text-slate-600">
+                          Balance: {userCoinBalance} coins
+                          {missingProductCoins > 0 ? ` • Missing: ${missingProductCoins}` : ' • Ready to unlock'}
+                        </span>
+                      )}
                     </button>
                   )}
                   <button onClick={() => onAddToCart(product.id, 1)} className="w-full rounded-2xl border border-indigo-200/70 bg-white/85 px-6 py-3.5 text-base font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 sm:px-8 sm:py-4">

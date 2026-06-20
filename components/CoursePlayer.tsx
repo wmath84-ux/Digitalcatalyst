@@ -5,6 +5,8 @@ import { EconomySettings } from '../utils/economy';
 import AiMentor from './AiMentor';
 import ProductMusicPlayer, { type AudioTrack } from './ProductMusicPlayer';
 import GoogleAd from './GoogleAd';
+import { auth } from '../firebase';
+import { claimPdfDownloadReward, claimYouTubeWatchReward } from '../utils/coinWallet';
 
 const FileIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -100,8 +102,19 @@ const GlassDownloadCard: React.FC<{ file: ProductFile; headline?: string; onDown
           Click here to download <span className="ml-2 transition group-hover:translate-y-0.5">↓</span>
         </button>
       ) : (
-        <a href={file.url} download={file.name} target="_blank" rel="noopener noreferrer" className="group mt-8 inline-flex items-center justify-center rounded-2xl bg-cyan-100 px-7 py-4 text-base font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition duration-300 hover:-translate-y-1 hover:scale-[1.03] hover:bg-cyan-50 hover:shadow-sm">
-          Click here to download <span className="ml-2 transition group-hover:translate-y-0.5">↓</span>
+        <a
+          href={file.url}
+          download={file.name}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={() => {
+            if (file.type === 'pdf') {
+              console.info('PDF download started. Reward will be claimed by download handler if connected.');
+            }
+          }}
+          className="group mt-8 inline-flex items-center justify-center rounded-2xl bg-cyan-100 px-7 py-4 text-base font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition duration-300 hover:-translate-y-1 hover:scale-[1.03] hover:bg-cyan-50 hover:shadow-sm"
+        >
+          Download PDF • Earn coins <span className="ml-2 transition group-hover:translate-y-0.5">↓</span>
         </a>
       )}
     </div>
@@ -162,6 +175,79 @@ const extractYouTubeID = (url: string): string | null => {
   if (match && match[2].length === 11) return match[2];
   const matchIframe = url.match(/youtube\.com\/embed\/([^"?]+)/);
   return matchIframe?.[1] || null;
+};
+
+const getCourseRewardCoins = (economySettings?: EconomySettings): number => {
+  const value =
+    (economySettings as any)?.youtubeWatchRewardCoins ??
+    (economySettings as any)?.videoWatchRewardCoins ??
+    5;
+
+  return Math.max(0, Math.floor(Number(value) || 0));
+};
+
+const getPdfRewardCoins = (economySettings?: EconomySettings): number => {
+  const value =
+    (economySettings as any)?.pdfDownloadRewardCoins ??
+    (economySettings as any)?.pdfRewardCoins ??
+    1;
+
+  return Math.max(0, Math.floor(Number(value) || 0));
+};
+
+const isEligibleYoutubeRewardFile = (file: ProductFile | null): boolean => {
+  if (!file) return false;
+  if (file.type !== 'youtube') return false;
+  const videoId = extractYouTubeID(file.url);
+  return Boolean(videoId);
+};
+
+const rewardPdfDownload = async (
+  product: ProductWithRating,
+  file: ProductFile,
+  economySettings?: EconomySettings
+) => {
+  const userId = auth.currentUser?.uid;
+  const rewardCoins = getPdfRewardCoins(economySettings);
+
+  if (!userId || rewardCoins <= 0 || file.type !== 'pdf') {
+    return;
+  }
+
+  await claimPdfDownloadReward({
+    userId,
+    courseId: product.id,
+    pdfId: file.id,
+    pdfName: file.name,
+    rewardCoins,
+  });
+};
+
+const claimYoutubeRewardFromProgress = async (
+  product: ProductWithRating,
+  file: ProductFile,
+  economySettings: EconomySettings | undefined,
+  validWatchedSeconds: number,
+  totalDurationSeconds: number
+) => {
+  const userId = auth.currentUser?.uid;
+  const youtubeVideoId = extractYouTubeID(file.url);
+  const rewardCoins = getCourseRewardCoins(economySettings);
+
+  if (!userId || !youtubeVideoId || rewardCoins <= 0) {
+    return;
+  }
+
+  return claimYouTubeWatchReward({
+    userId,
+    courseId: product.id,
+    lessonId: file.id,
+    youtubeVideoId,
+    validWatchedSeconds,
+    totalDurationSeconds,
+    rewardCoins,
+    rewardThresholdPercent: 70,
+  });
 };
 
 const getCourseBackground = (product: ProductWithRating, activeFile: ProductFile | null) => {
@@ -598,6 +684,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   const [coinPulse, setCoinPulse] = useState(false);
   const [pendingPdfDownload, setPendingPdfDownload] = useState<ProductFile | null>(null);
   const [showWelcome, setShowWelcome] = useState(true);
+  const [youtubeRewardClaimed, setYoutubeRewardClaimed] = useState(false);
 
   useEffect(() => {
     const findFirst = (modules?: CourseModule[]): ProductFile | null => {
@@ -618,6 +705,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     setSessionEarnedCoins(0);
     setIsVideoPlaying(false);
     setCoinPulse(false);
+    setYoutubeRewardClaimed(false);
   }, [activeFile]);
 
   useEffect(() => {
@@ -649,6 +737,9 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
   };
 
   const requestPdfDownload = (file: ProductFile) => {
+    rewardPdfDownload(product, file, economySettings).catch((error) => {
+      console.error('PDF coin reward failed:', error);
+    });
     setPendingPdfDownload(file);
   };
 
@@ -668,6 +759,9 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     if (!pendingPdfDownload) return;
     const fileToDownload = pendingPdfDownload;
     setPendingPdfDownload(null);
+    rewardPdfDownload(product, fileToDownload, economySettings).catch((error) => {
+      console.error('PDF coin reward failed:', error);
+    });
     window.setTimeout(() => triggerFileDownload(fileToDownload), 0);
   };
 
@@ -693,6 +787,30 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     return () => window.clearInterval(timer);
   }, [activeFile, economySettings.coinPerVideoMinute, isPlaybackWindowFocused, isVideoPlaying, onWatchTimeMinutes]);
 
+  useEffect(() => {
+    if (!isEligibleYoutubeRewardFile(activeFile) || youtubeRewardClaimed || !isPlaybackWindowFocused) return;
+    const totalRewardSeconds = 100;
+    const timer = window.setInterval(() => {
+      setActiveWatchSeconds((seconds) => {
+        const nextSeconds = seconds + 1;
+        if (nextSeconds >= 70) {
+          setYoutubeRewardClaimed(true);
+          claimYoutubeRewardFromProgress(product, activeFile, economySettings, nextSeconds, totalRewardSeconds)
+            .then((result) => {
+              if (result?.claimed) {
+                setSessionEarnedCoins((coins) => coins + getCourseRewardCoins(economySettings));
+                setCoinPulse(true);
+                window.setTimeout(() => setCoinPulse(false), 1000);
+              }
+            })
+            .catch((error) => console.error('YouTube coin reward failed:', error));
+        }
+        return nextSeconds;
+      });
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [activeFile, economySettings, isPlaybackWindowFocused, product, youtubeRewardClaimed]);
+
   const activeAudioTracks = useMemo<AudioTrack[]>(() => {
     if (activeFile?.type !== 'audio') return [];
 
@@ -711,7 +829,7 @@ const CoursePlayer: React.FC<{ settings: WebsiteSettings; economySettings: Econo
     </span>
   );
 
-  const liveEarningHud = activeFile?.type === 'video' ? (
+  const liveEarningHud = (activeFile?.type === 'video' || activeFile?.type === 'youtube') ? (
     <div className="bg-white/50 backdrop-blur-md border border-slate-200 shadow-sm rounded-full px-4 py-1.5 flex items-center gap-2 text-sm font-semibold text-slate-800 transition-all whitespace-nowrap max-sm:px-3 max-sm:text-xs" aria-live="polite">
       <span>⏱️ {formatActiveWatchTime(activeWatchSeconds)} Mins</span>
       <span className="h-4 w-px bg-slate-300" />
