@@ -1,5 +1,4 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
 import { ActiveCoinDiscount, CoinTransaction, Coupon, ProductWithRating, ProfileMilestoneConfig, ProfileStreakConfig, ProfileStreakMetric, ProfileMilestoneMetric, ThemeName, themes, User, WebsiteSettings } from '../App';
 import { EconomySettings, resolveCoinPrice, resolveMaxDiscountPercentage } from '../utils/economy';
@@ -129,7 +128,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   onClaimMilestoneReward,
   onOpenVerifiedCourse,
 }) => {
-  const navigate = useNavigate();
   const coverInputRef = React.useRef<HTMLInputElement | null>(null);
   const [coverImage, setCoverImage] = React.useState(defaultCoverImage);
   const [redeeming, setRedeeming] = React.useState<string | null>(null);
@@ -313,7 +311,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
       setCourseAccessError(`Purchase verification failed for ${course.title}. Please buy this course or refresh your account access.`);
       return;
     }
-    navigate(`/course/${course.id}`);
     onOpenVerifiedCourse?.(course.product);
   };
 

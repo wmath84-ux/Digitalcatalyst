@@ -2654,8 +2654,14 @@ const App: React.FC = () => {
   };
 
   const handleNavigateToProfile = () => {
-    if (isLoggedIn) setCurrentView('profile');
-    else openAuthPage(rememberedAuthAccount ? 'login' : 'signup');
+    const hasActiveFirebaseSession = Boolean(firebaseAuthUser || auth.currentUser);
+
+    if (isLoggedIn || hasActiveFirebaseSession || currentUser) {
+      setCurrentView('profile');
+    } else {
+      openAuthPage(rememberedAuthAccount ? 'login' : 'signup');
+    }
+
     window.scrollTo(0, 0);
   };
 
@@ -3591,7 +3597,19 @@ const App: React.FC = () => {
     return (
        <ErrorBoundary>
          <div className={`font-sans ${websiteSettings.animations.enabled ? '' : 'animations-off'}`}>
-            <WelcomeOverlay onAnimationComplete={playWelcomeVoice} />
+            <WelcomeOverlay
+              message={mobileWelcomeMessage}
+              onAnimationComplete={() => {
+                playWelcomeVoice();
+                if (mobileWelcomeMessage) {
+                  setMobileWelcomeMessage('');
+                }
+                if (mobileWelcomeTimeoutRef.current) {
+                  window.clearTimeout(mobileWelcomeTimeoutRef.current);
+                  mobileWelcomeTimeoutRef.current = null;
+                }
+              }}
+            />
             <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={effectiveAppUser?.eduCoins || 0} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
@@ -3600,7 +3618,6 @@ const App: React.FC = () => {
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
-            {mobileWelcomeMessage && <div className="fixed left-1/2 top-5 z-[1600] -translate-x-1/2 rounded-full border border-emerald-200/70 bg-white/95 px-5 py-3 text-sm font-black text-emerald-700 shadow-[0_18px_54px_rgba(16,185,129,0.20)] backdrop-blur-2xl md:hidden">{mobileWelcomeMessage}</div>}
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
             {isMobileCompletionModalOpen && effectiveAppUser && shouldAskForMobileCompletion() && (
               <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
