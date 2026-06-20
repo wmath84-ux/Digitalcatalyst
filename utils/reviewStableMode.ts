@@ -10,5 +10,23 @@ export const normalizePlainText = (value = '') => value
   .replace(/\s+/g, ' ')
   .trim();
 
-export const countVisibleWords = (value = '') => {
-  const
+export const countVisibleWords = (value = ''): number => {
+  const plainText = normalizePlainText(value);
+  if (!plainText) return 0;
+  return plainText.split(/\s+/).filter(Boolean).length;
+};
+
+export const hasUnsafePublicPlaceholder = (...values: Array<string | undefined | null>): boolean => {
+  const combined = values.filter(Boolean).join(' ').toLowerCase();
+  if (!combined) return false;
+
+  return [
+    'placeholder',
+    'demo',
+    'full content for',
+    'coming soon',
+    'under construction',
+    'would go here',
+    'lorem ipsum',
+  ].some((marker) => combined.includes(marker));
+};
