@@ -37,7 +37,7 @@ type Creator = {
 type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'status' };
 type SharedStory = { id: number; statusId: number; recipientId: string; senderId: 'me'; senderName: string; time: string };
 type MasterTagRequest = { id: number; author: string; avatar: string; category: string; title: string; detail: string; time: string; likes: number; reactions: Record<string, number>; ownerId?: string; docId?: string; likedByUsers?: Record<string, boolean>; reactionUsers?: Record<string, string>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'creator' | 'admin' };
-type CommunitySupportTicket = { id: string; customerName: string; customerEmail: string; subject: string; message: string; date: string; status: 'Open' | 'Resolved' | 'Pending'; source?: 'contact' | 'masterTag'; communityThreadId?: number; customerAvatar?: string; category?: string; adminReply?: string; repliedAt?: string; inboxMessage?: string; inboxRead?: boolean };
+type CommunitySupportTicket = { id: string; customerName: string; customerEmail: string; subject: string; message: string; date: string; status: 'Open' | 'Resolved' | 'Pending'; customerUid?: string; source?: 'contact' | 'masterTag'; communityThreadId?: number; customerAvatar?: string; category?: string; adminReply?: string; repliedAt?: string; inboxMessage?: string; inboxRead?: boolean };
 type CommunityNotification = { id: string; title: string; body: string; time: string; read: boolean; type: 'reply' | 'masterTag' | 'status' | 'creator'; targetPage?: CommunityPage; targetId?: number | string };
 type CommunityProfile = { name: string; username: string; avatar: string; bio: string };
 type ProfileFeedback = { type: 'success' | 'error'; message: string } | null;
@@ -65,7 +65,8 @@ const COMMUNITY_PRIVACY_STORAGE_KEY = 'eduvoraCommunityPrivacySettings';
 const COMMUNITY_NOTIFICATION_PREFS_KEY = 'eduvoraCommunityNotificationPreferences';
 const COMMUNITY_CREATOR_QUOTA_KEY = 'eduvoraCommunityCreatorQuota';
 const COMMUNITY_STATUS_QUOTA_KEY = 'eduvoraCommunityStatusQuota';
-const STORY_TTL_MS = 15 * 24 * 60 * 60 * 1000;
+const STORY_TTL_MS = 24 * 60 * 60 * 1000;
+const DAILY_UPLOAD_LOCK_MS = 24 * 60 * 60 * 1000;
 const PROFILE_BIO_MAX_LENGTH = 180;
 
 
@@ -262,6 +263,10 @@ const normalizeFeedMessage = (message: FeedMessage): FeedMessage => ({
 const isUnexpired = (item: { expiresAt?: number; createdAt?: number }, ttlMs: number) => {
   const expiresAt = item.expiresAt || ((item.createdAt || Date.now()) + ttlMs);
   return expiresAt > Date.now();
+};
+
+const isWithinRollingUploadLock = (timestamp: number) => {
+  return Number.isFinite(timestamp) && Date.now() - timestamp < DAILY_UPLOAD_LOCK_MS;
 };
 
 const mergeUnexpiredByIdentity = <T extends { id: number; docId?: string; createdAt?: number; expiresAt?: number }>(remoteItems: T[], currentItems: T[], seedItems: T[], ttlMs: number): T[] => {
@@ -645,7 +650,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       const usedBytes = Number(usageSnap.exists() ? usageSnap.data().usedBytes : 0) || 0;
       if (usedBytes + uploadBytes >= STORAGE_LOCK_BYTES) throw new Error('Community uploads are paused because Firebase Storage reached the 4GB safety limit.');
       const lastUsed = Number(usedTypes[type] || 0);
-      if (isTimestampFromToday(lastUsed)) throw new Error(`Daily ${type} ${kind} slot already used. Try again tomorrow.`);
+      if (isWithinRollingUploadLock(lastUsed)) {
+        const unlockAt = new Date(lastUsed + DAILY_UPLOAD_LOCK_MS).toLocaleString();
+        throw new Error(`Daily ${type} ${kind} slot already used. Unlocks after ${unlockAt}.`);
+      }
       transaction.set(quotaRef, { userId: currentUserKey, kind, usedTypes: { ...usedTypes, [type]: Date.now() }, updatedAt: Date.now() }, { merge: true });
       transaction.set(usageRef, { usedBytes: usedBytes + uploadBytes, limitBytes: STORAGE_LOCK_BYTES, bucketBytes: STORAGE_TOTAL_BYTES, updatedAt: Date.now() }, { merge: true });
     });
@@ -828,7 +836,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return onSnapshot(doc(db, COMMUNITY_STORAGE_META, 'usage'), (snapshot) => {
       const usedBytes = Number(snapshot.data()?.usedBytes) || 0;
       setStorageUsedBytes(Math.max(0, usedBytes));
-      setLimitMessage(usedBytes >= STORAGE_LOCK_BYTES ? 'Firebase Storage 4GB safety limit reached. Uploads are locked for all users until 15-day posts and stories are cleaned up.' : '');
+      setLimitMessage(usedBytes >= STORAGE_LOCK_BYTES ? 'Firebase Storage 4GB safety limit reached. Uploads are locked for all users until expired 24-hour stories/posts are cleaned up.' : '');
     }, (error) => console.warn('Storage usage sync failed', error));
   }, [isCommunityAllowed]);
 
@@ -837,11 +845,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (!isCommunityAllowed || !currentUserKey) return undefined;
     const unsubCreator = onSnapshot(doc(db, COMMUNITY_UPLOAD_QUOTAS, `${currentUserKey}_creator`), (snapshot) => {
       const used = snapshot.data()?.usedTypes || {};
-      setCreatorQuota({ [todayKey()]: postOptions.map((option) => option.type).filter((type) => isTimestampFromToday(Number(used[type]))) });
+      setCreatorQuota({ [todayKey()]: postOptions.map((option) => option.type).filter((type) => isWithinRollingUploadLock(Number(used[type]))) });
     }, (error) => console.warn('Creator quota sync failed', error));
     const unsubStatus = onSnapshot(doc(db, COMMUNITY_UPLOAD_QUOTAS, `${currentUserKey}_status`), (snapshot) => {
       const used = snapshot.data()?.usedTypes || {};
-      setStatusQuota({ [todayKey()]: postOptions.map((option) => option.type).filter((type) => isTimestampFromToday(Number(used[type]))) });
+      setStatusQuota({ [todayKey()]: postOptions.map((option) => option.type).filter((type) => isWithinRollingUploadLock(Number(used[type]))) });
     }, (error) => console.warn('Status quota sync failed', error));
     return () => { unsubCreator(); unsubStatus(); };
   }, [currentUserKey, isCommunityAllowed]);
@@ -1515,7 +1523,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       reactions: {},
       ownerId: 'me',
     };
-    const supportTicket: CommunitySupportTicket = buildMasterTagTicket(request);
+    const supportTicket: CommunitySupportTicket = { ...buildMasterTagTicket(request), customerUid: currentUserKey };
     const updatedTickets = [supportTicket, ...readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []).filter((ticket) => ticket.id !== supportTicket.id)];
     localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(updatedTickets));
     setDoc(doc(db, SUPPORT_TICKETS_COLLECTION, supportTicket.id), stripUndefinedDeep(supportTicket)).catch((error) => console.warn('Master tag ticket Firebase write failed', error));
