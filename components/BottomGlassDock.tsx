@@ -75,15 +75,39 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
     ...(onOpenCommunity ? [{ label: 'Community', action: onOpenCommunity, icon: '💬', badge: null }] : []),
     { label: 'Blog', action: onOpenBlogModal, icon: '📝', badge: null },
     { label: 'Free', action: onOpenFreeModal, icon: '🎁', badge: null },
-    { label: isLoggedIn ? 'Profile' : authButtonLabel, action: onProfileClick, icon: isLoggedIn ? '🪙' : '🔐', badge: null },
+    { label: isLoggedIn ? 'Profile' : authButtonLabel, action: () => {
+      if (typeof onProfileClick === 'function') {
+        onProfileClick();
+        return;
+      }
+
+      window.history.pushState({}, '', '/profile');
+      window.dispatchEvent(new PopStateEvent('popstate'));
+    }, icon: isLoggedIn ? '🪙' : '🔐', badge: null },
   ]), [onHomeClick, onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenCommunity, onOpenBlogModal, onOpenFreeModal, isLoggedIn, authButtonLabel, onProfileClick]);
   const configuredBase = ((settings.content as any).dockItems || dockCustomizationItems) as string[];
   const configuredWithHome = configuredBase.includes('Home') ? configuredBase : ['Home', ...configuredBase];
   const configured = configuredWithHome.filter((label, index, labels) => labels.indexOf(label) === index);
   const map: any = Object.fromEntries(defaultItems.map(i => [i.label, i]));
   map['Home'] = map['Home'] || { label: 'Home', action: onHomeClick, icon: '🏠', badge: null };
-  map['EduCoins'] = map['Profile'] || { label: isLoggedIn ? 'Profile' : authButtonLabel, action: onProfileClick, icon: isLoggedIn ? '🪙' : '🔐', badge: null };
-  map['Profile'] = map['Profile'] || { label: isLoggedIn ? 'Profile' : authButtonLabel, action: onProfileClick, icon: isLoggedIn ? '🪙' : '🔐', badge: null };
+  map['EduCoins'] = map['Profile'] || { label: isLoggedIn ? 'Profile' : authButtonLabel, action: () => {
+    if (typeof onProfileClick === 'function') {
+      onProfileClick();
+      return;
+    }
+
+    window.history.pushState({}, '', '/profile');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, icon: isLoggedIn ? '🪙' : '🔐', badge: null };
+  map['Profile'] = map['Profile'] || { label: isLoggedIn ? 'Profile' : authButtonLabel, action: () => {
+    if (typeof onProfileClick === 'function') {
+      onProfileClick();
+      return;
+    }
+
+    window.history.pushState({}, '', '/profile');
+    window.dispatchEvent(new PopStateEvent('popstate'));
+  }, icon: isLoggedIn ? '🪙' : '🔐', badge: null };
   map['Subscriptions'] = { label: 'Subscriptions', action: onSubscriptionClick, icon: '💎', badge: null };
   const items = configured.map((l) => map[l]).filter(Boolean);
   const dockStyle = { ...defaultDockStyle, ...((settings.content as any).dockStyle || {}) };
