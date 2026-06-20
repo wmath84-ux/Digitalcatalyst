@@ -994,6 +994,7 @@ const App: React.FC = () => {
   const [mobileCompletionInput, setMobileCompletionInput] = useState('');
   const [mobileCompletionError, setMobileCompletionError] = useState('');
   const [isSavingMobileCompletion, setIsSavingMobileCompletion] = useState(false);
+  const [isMobileCompletionModalOpen, setIsMobileCompletionModalOpen] = useState(false);
 
   const effectiveFirebaseUser = isLocalLogoutPending ? null : (firebaseAuthUser || auth.currentUser || null);
   const hasFirebaseUser = Boolean(effectiveFirebaseUser);
@@ -1593,10 +1594,28 @@ const App: React.FC = () => {
   const hasCompletedMobile = (user?: Pick<User, 'mobile'> | null) => getNormalizedMobile(user?.mobile).length === 10;
 
   const promptForMobileCompletion = () => {
+    setIsMobileCompletionModalOpen(true);
     setMobileCompletionError('Please add your 10 digit mobile number before purchases or profile-sensitive actions.');
   };
 
   const requiresMobileCompletion = () => Boolean(isLoggedIn && effectiveAppUser && !hasCompletedMobile(effectiveAppUser));
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setIsMobileCompletionModalOpen(false);
+      setMobileCompletionError('');
+      setMobileCompletionInput('');
+      return;
+    }
+    if (!effectiveAppUser) return;
+    if (hasCompletedMobile(effectiveAppUser)) {
+      setIsMobileCompletionModalOpen(false);
+      setMobileCompletionError('');
+      setMobileCompletionInput('');
+      return;
+    }
+    setIsMobileCompletionModalOpen(true);
+  }, [isLoggedIn, effectiveAppUser?.id, effectiveAppUser?.mobile]);
 
   const handleInitiateCheckout = () => {
     if (cart.length === 0) return;
@@ -2203,6 +2222,9 @@ const App: React.FC = () => {
           setIsAuthRestoring(false);
           setAuthRestoreError(null);
           if (getIsMobileViewport()) setMobileAuthFlowState('logged-out');
+          setIsMobileCompletionModalOpen(false);
+          setMobileCompletionInput('');
+          setMobileCompletionError('');
       });
       return () => {
           window.clearTimeout(redirectTimeout);
@@ -2441,6 +2463,9 @@ const App: React.FC = () => {
       setFirebaseAuthUser(null);
       setCurrentUser(null);
       setMobileAuthFlowState('logged-out');
+      setIsMobileCompletionModalOpen(false);
+      setMobileCompletionInput('');
+      setMobileCompletionError('');
       setPurchasedProductIds([]);
       setIsAuthRestoring(false);
       setAuthRestoreError(null);
@@ -3452,8 +3477,8 @@ const App: React.FC = () => {
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
             {mobileWelcomeMessage && <div className="fixed left-1/2 top-5 z-[1600] -translate-x-1/2 rounded-full border border-emerald-200/70 bg-white/95 px-5 py-3 text-sm font-black text-emerald-700 shadow-[0_18px_54px_rgba(16,185,129,0.20)] backdrop-blur-2xl md:hidden">{mobileWelcomeMessage}</div>}
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
-            {effectiveAppUser && !hasCompletedMobile(effectiveAppUser) && (
-              <div className="fixed inset-0 z-[1500] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
+            {isMobileCompletionModalOpen && effectiveAppUser && !hasCompletedMobile(effectiveAppUser) && (
+              <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
                 <div className="w-full max-w-md rounded-[2rem] border border-blue-100 bg-white p-6 shadow-2xl">
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Complete profile</p>
                   <h2 className="mt-2 text-2xl font-black text-slate-950">Add your mobile number</h2>
