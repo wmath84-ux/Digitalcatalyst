@@ -2773,20 +2773,6 @@ const App: React.FC = () => {
     return true;
   };
 
-  const handleWatchTimeMinutes = (minutes: number, lessonTitle = 'Course video') => {
-    if (!currentUser || minutes <= 0) return;
-    syncCurrentUser(
-      user => ({
-        ...user,
-        studyMinutes: (user.studyMinutes || 0) + minutes,
-        totalWatchTimeMinutes: (user.totalWatchTimeMinutes || 0) + minutes,
-        eduCoins: (user.eduCoins || 0) + (minutes * Math.max(0, Number(economySettings.coinPerVideoMinute))),
-        totalLifetimeCoins: (user.totalLifetimeCoins || 0) + (minutes * Math.max(0, Number(economySettings.coinPerVideoMinute))),
-      }),
-      { amount: minutes * Math.max(0, Number(economySettings.coinPerVideoMinute)), type: 'credit', source: `Video: ${lessonTitle}`, description: `Watched ${lessonTitle} (${minutes} min${minutes > 1 ? 's' : ''})` },
-    );
-  };
-
   const handleQuizReward = (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => {
     if (!currentUser || coins <= 0) return false;
     if ((currentUser.rewardedQuizIds || []).includes(quizId)) return false;
@@ -3528,7 +3514,7 @@ const App: React.FC = () => {
       case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} onCoinPurchase={(product, quantity) => handleProductCoinPurchase(product, quantity)} />;
       case 'coursePlayer':
         if (isAuthRestoring || authRestoreError) return renderAuthRestoreStatus();
-        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={() => handleNavigateBack('myPurchases')} onWatchTimeMinutes={handleWatchTimeMinutes} onQuizReward={handleQuizReward} /> : renderAuthRestoreStatus();
+        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} onBack={() => handleNavigateBack('myPurchases')} onQuizReward={handleQuizReward} /> : renderAuthRestoreStatus();
       case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={appUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
