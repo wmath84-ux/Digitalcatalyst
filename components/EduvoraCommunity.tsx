@@ -32,18 +32,20 @@ type Creator = {
   followingCount?: number;
   isFollowing?: boolean;
   isFollower?: boolean;
+  isOnline?: boolean;
   source?: 'profile' | 'seed';
 };
 type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'status' };
 type SharedStory = { id: number; statusId: number; recipientId: string; senderId: 'me'; senderName: string; time: string };
 type MasterTagRequest = { id: number; author: string; avatar: string; category: string; title: string; detail: string; time: string; likes: number; reactions: Record<string, number>; ownerId?: string; docId?: string; likedByUsers?: Record<string, boolean>; reactionUsers?: Record<string, string>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'creator' | 'admin' };
 type CommunitySupportTicket = { id: string; customerName: string; customerEmail: string; subject: string; message: string; date: string; status: 'Open' | 'Resolved' | 'Pending'; customerUid?: string; source?: 'contact' | 'masterTag'; communityThreadId?: number; customerAvatar?: string; category?: string; adminReply?: string; repliedAt?: string; inboxMessage?: string; inboxRead?: boolean };
-type CommunityNotification = { id: string; title: string; body: string; time: string; read: boolean; type: 'reply' | 'masterTag' | 'status' | 'creator'; targetPage?: CommunityPage; targetId?: number | string };
+type CommunityNotification = { id: string; title: string; body: string; time: string; read: boolean; type: 'reply' | 'masterTag' | 'status' | 'creator' | 'follow'; targetPage?: CommunityPage; targetId?: number | string };
 type CommunityProfile = { name: string; username: string; avatar: string; bio: string };
 type ProfileFeedback = { type: 'success' | 'error'; message: string } | null;
 type ProfilePanel = 'privacy' | 'notifications' | 'connected' | 'logout';
 type PrivacySettings = { profileVisible: boolean; showActivity: boolean; allowMessages: boolean; allowFollowRequests: boolean };
-type NotificationPreferences = { replies: boolean; masterTags: boolean; statuses: boolean; creatorPosts: boolean };
+type NotificationPreferences = { replies: boolean; masterTags: boolean; statuses: boolean; creatorPosts: boolean; follows: boolean };
+type NotificationFilter = 'all' | CommunityNotification['type'];
 
 const stripUndefinedDeep = <T,>(value: T): T => {
   if (Array.isArray(value)) return value.map(item => stripUndefinedDeep(item)) as T;
@@ -83,7 +85,7 @@ const readJsonObject = <T,>(key: string, fallback: T): T => {
 
 const defaultCommunityProfile: CommunityProfile = { name: 'Eduvora Member', username: 'eduvora_member', avatar: '🧑‍🎓', bio: 'Building digital skills daily.' };
 const defaultPrivacySettings: PrivacySettings = { profileVisible: true, showActivity: true, allowMessages: true, allowFollowRequests: true };
-const defaultNotificationPreferences: NotificationPreferences = { replies: true, masterTags: true, statuses: true, creatorPosts: true };
+const defaultNotificationPreferences: NotificationPreferences = { replies: true, masterTags: true, statuses: true, creatorPosts: true, follows: true };
 
 const defaultCommunityStyle = {
   pageBackground: '#F8FBFF',
@@ -222,6 +224,7 @@ const COMMUNITY_UPLOAD_QUOTAS = 'community_upload_quotas';
 const COMMUNITY_STORAGE_META = 'community_storage_meta';
 const COMMUNITY_PROFILES = 'community_profiles';
 const COMMUNITY_FOLLOWS = 'community_follows';
+const COMMUNITY_NOTIFICATIONS = 'community_notifications';
 const getFollowDocId = (followerId: string, followingId: string) => `${followerId}_${followingId}`;
 const ADMIN_POST_FALLBACK_STORAGE_KEY = 'eduvoraAdminPostFallbacks';
 const ADMIN_POST_FALLBACK_EVENT = 'eduvoraAdminPostFallbackUpdated';
@@ -499,12 +502,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(() => readJsonObject(COMMUNITY_NOTIFICATION_PREFS_KEY, defaultNotificationPreferences));
   const [showStatusActions, setShowStatusActions] = useState(false);
   const [notificationReads, setNotificationReads] = useState<Record<string, boolean>>(() => readJsonArray<string>(COMMUNITY_NOTIFICATION_READ_KEY, []).reduce<Record<string, boolean>>((reads, id) => ({ ...reads, [id]: true }), {}));
+  const [firebaseNotifications, setFirebaseNotifications] = useState<CommunityNotification[]>([]);
+  const [notificationFilter, setNotificationFilter] = useState<NotificationFilter>('all');
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
   const [storageUsedBytes, setStorageUsedBytes] = useState(0);
   const [limitMessage, setLimitMessage] = useState('');
   const [adminPosts, setAdminPosts] = useState<FeedMessage[]>([]);
   const [authEmail, setAuthEmail] = useState<string | null>(() => guardedAuth.currentUser?.email || null);
   const scrollContainerRef = useRef<HTMLElement>(null);
+  const feedScrollPositionsRef = useRef<Record<string, number>>({});
   const replyInputRef = useRef<HTMLInputElement>(null);
   const replyComposerRef = useRef<HTMLDivElement>(null);
   const notificationPanelRef = useRef<HTMLDivElement>(null);
@@ -577,6 +583,25 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     repliesGiven: messages.reduce((count, message) => count + message.replies.filter((reply) => isOwnCommunityId(reply.ownerId) || reply.author === profile.name).length, 0),
   }), [eduCoins, followedIds.length, followerIds.length, masterTagRequests, messages, myStatuses.length, profile.name]);
 
+  const visibleForYouCreators = useMemo(() => {
+    return allCreators
+      .filter((creator) => !isOwnCommunityId(creator.id))
+      .sort((a, b) => {
+        const aFollowing = followedByCreatorIds[a.id] ? 1 : 0;
+        const bFollowing = followedByCreatorIds[b.id] ? 1 : 0;
+        if (aFollowing !== bFollowing) return aFollowing - bFollowing;
+        return a.name.localeCompare(b.name);
+      });
+  }, [allCreators, followedByCreatorIds, currentUserKey]);
+
+  const notificationTypeLabels: Array<{ value: NotificationFilter; label: string }> = [
+    { value: 'all', label: 'All' },
+    { value: 'follow', label: 'Follow' },
+    { value: 'reply', label: 'Replies' },
+    { value: 'status', label: 'Status' },
+    { value: 'creator', label: 'Posts' },
+  ];
+
   const notifications = useMemo<CommunityNotification[]>(() => {
     const feedReplyAlerts = messages.flatMap((message) => message.replies.slice(-2).map((reply) => ({
       id: `reply-${message.id}-${reply.id}`,
@@ -619,12 +644,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       targetId: message.id,
     }));
     return [
+      ...(notificationPreferences.follows ? firebaseNotifications : []),
       ...(notificationPreferences.replies ? feedReplyAlerts : []),
       ...(notificationPreferences.masterTags ? masterTagAlerts : []),
       ...(notificationPreferences.statuses ? statusAlerts : []),
       ...(notificationPreferences.creatorPosts ? creatorAlerts : []),
-    ].slice(0, 20);
-  }, [messages, notificationPreferences, notificationReads, statusCards, supportTickets]);
+    ].filter((notification) => notificationFilter === 'all' || notification.type === notificationFilter).slice(0, 30);
+  }, [firebaseNotifications, messages, notificationFilter, notificationPreferences, notificationReads, statusCards, supportTickets]);
   const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
 
 
@@ -672,14 +698,22 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return { imageUrl: await getDownloadURL(ref(storage, storagePath)), storagePath, uploadBytes: dataUrlBytes(dataUrl) };
   };
 
-  const pushPage = (nextPage: CommunityPage) => {
+  const pushPage = (nextPage: CommunityPage, options: { preserveScroll?: boolean } = {}) => {
     setIsNotificationPanelOpen(false);
     setShowStatusActions(false);
     setShareStatusId(null);
     setExpandedReplyId(null);
+
+    if (page === 'chat' && activeView === 'feed' && scrollContainerRef.current) {
+      feedScrollPositionsRef.current.chatFeed = scrollContainerRef.current.scrollTop;
+    }
+
     setPageStack((stack) => [...stack, page]);
     setPage(nextPage);
-    scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+
+    if (!options.preserveScroll) {
+      requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }));
+    }
   };
 
   const goBack = () => {
@@ -862,11 +896,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       id: currentUserKey,
       userId: currentUserKey,
       ownerId: currentUserKey,
+      email: guardedAuth.currentUser.email || authEmail || '',
       name: profile.name || 'Eduvora Member',
       username: normalizeUsername(profile.username || profile.name) || `member_${currentUserKey.slice(0, 6)}`,
       avatar: profile.avatar || '🧑‍🎓',
       role: 'Community member',
       bio: profile.bio || '',
+      isOnline: true,
+      lastActiveAt: Date.now(),
       updatedAt: Date.now(),
       createdAt: Date.now(),
     });
@@ -902,6 +939,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           followingCount: 0,
           mutual: false,
           verified: Boolean(data.verified),
+          isOnline: Boolean(data.isOnline),
           source: 'profile',
         };
       }).filter((creator) => Boolean(creator.id));
@@ -951,6 +989,38 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       setFollowingCounts(nextFollowingCounts);
     }, (error) => console.warn('Community follows sync failed', error));
   }, [currentUserKey, isCommunityAllowed]);
+
+  useEffect(() => {
+    if (!isCommunityAllowed || !currentUserKey) return undefined;
+
+    const notificationsQuery = query(
+      collection(db, COMMUNITY_NOTIFICATIONS),
+      where('recipientId', '==', currentUserKey),
+      orderBy('createdAt', 'desc'),
+      limit(50)
+    );
+
+    return onSnapshot(notificationsQuery, (snapshot) => {
+      const nextNotifications = snapshot.docs.map((item): CommunityNotification => {
+        const data = item.data() as Record<string, unknown>;
+        const createdAt = typeof data.createdAt === 'number' ? data.createdAt : Date.now();
+        const type = data.type === 'follow' ? 'follow' : 'creator';
+
+        return {
+          id: item.id,
+          title: typeof data.title === 'string' ? data.title : 'Community notification',
+          body: typeof data.body === 'string' ? data.body : '',
+          time: formatCommunityReplyTime(new Date(createdAt).toISOString()),
+          read: Boolean(notificationReads[item.id]),
+          type,
+          targetPage: typeof data.targetPage === 'string' ? data.targetPage as CommunityPage : 'network',
+          targetId: typeof data.targetId === 'string' || typeof data.targetId === 'number' ? data.targetId : undefined,
+        };
+      });
+
+      setFirebaseNotifications(nextNotifications);
+    }, (error) => console.warn('Community notification sync failed', error));
+  }, [currentUserKey, isCommunityAllowed, notificationReads]);
 
   useEffect(() => {
     const getDock = () => document.getElementById('community-bottom-dock');
@@ -1124,8 +1194,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const openMessage = (messageId: number) => {
     setExpandedReplyId(null);
+
+    if (page === 'chat' && activeView === 'feed' && scrollContainerRef.current) {
+      feedScrollPositionsRef.current.chatFeed = scrollContainerRef.current.scrollTop;
+    }
+
     setSelectedMessageId(messageId);
-    if (window.matchMedia('(max-width: 767px)').matches) pushPage('thread');
+
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      pushPage('thread', { preserveScroll: true });
+    }
   };
 
   const recordStatusView = (statusId: number) => {
@@ -1214,6 +1292,21 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           followingUsername: creator.username,
           followingAvatar: creator.avatar,
           createdAt: Date.now(),
+        }));
+
+        await addDoc(collection(db, COMMUNITY_NOTIFICATIONS), stripUndefinedDeep({
+          recipientId: followingId,
+          actorId: followerId,
+          actorName: profile.name,
+          actorUsername: normalizeUsername(profile.username || profile.name),
+          actorAvatar: profile.avatar,
+          type: 'follow',
+          title: `${profile.name} started following you`,
+          body: `@${normalizeUsername(profile.username || profile.name)} followed your community profile.`,
+          targetPage: 'network',
+          targetId: followerId,
+          createdAt: Date.now(),
+          read: false,
         }));
         setProfileFeedback({ type: 'success', message: `You are now following ${creator.name}.` });
       }
@@ -1917,7 +2010,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const NotificationDropdown = () => (
     <div ref={notificationDropdownRef} className="fixed right-[clamp(0.75rem,3vw,2.5rem)] top-[calc(env(safe-area-inset-top)+5.75rem)] z-[2147483647] w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-[1.75rem] border border-[#E3ECF8] bg-white/95 shadow-[0_28px_90px_rgba(8,27,92,0.22)] backdrop-blur-2xl isolate">
       <div className="flex items-center justify-between gap-3 border-b border-[#E3ECF8] bg-gradient-to-br from-[#EEF2FF] to-white p-4"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Notifications</p><h2 className="text-lg font-black text-[#081B5C]">Community updates</h2></div><button type="button" onClick={markAllNotificationsRead} disabled={!unreadNotificationCount} className="rounded-full bg-white px-3 py-2 text-[11px] font-black text-[#4F46E5] shadow-sm disabled:opacity-45">Mark all as read</button></div>
-      <div className="max-h-[min(54dvh,28rem)] overflow-y-auto p-2 custom-scrollbar">{notifications.length ? notifications.map((notification) => <button key={notification.id} type="button" onClick={() => openNotification(notification)} className={`flex w-full gap-3 rounded-[1.35rem] p-3 text-left transition hover:bg-[#F8FBFF] ${notification.read ? 'opacity-70' : 'bg-[#EEF2FF]'}`}><span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${notification.read ? 'bg-[#DADCE0]' : 'bg-[#4F7BFF]'}`} /><span className="min-w-0 flex-1"><span className="block text-sm font-black text-[#081B5C]">{notification.title}</span><span className="mt-1 line-clamp-2 block text-xs font-bold leading-5 text-[#64748B]">{notification.body}</span><span className="mt-2 block text-[11px] font-black uppercase tracking-[0.16em] text-[#4F7BFF]">{notification.time}</span></span></button>) : <div className="p-8 text-center"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF2FF] text-2xl">🔕</div><p className="mt-3 text-sm font-black text-[#081B5C]">No notifications yet</p><p className="mt-1 text-xs font-bold text-[#64748B]">Replies, status interactions, and master tag updates will appear here.</p></div>}</div>
+      <div className="border-b border-[#E3ECF8] bg-white px-3 py-2">
+        <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">{notificationTypeLabels.map((item) => <button key={item.value} type="button" onClick={() => setNotificationFilter(item.value)} className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-black transition ${notificationFilter === item.value ? 'bg-[#4F7BFF] text-white shadow-sm' : 'bg-[#F8FBFF] text-[#64748B]'}`}>{item.label}</button>)}</div>
+      </div>
+      <div className="max-h-[min(54dvh,28rem)] overflow-y-auto p-2 custom-scrollbar">{notifications.length ? notifications.map((notification) => <button key={notification.id} type="button" onClick={() => openNotification(notification)} className={`flex w-full gap-3 rounded-[1.35rem] p-3 text-left transition hover:bg-[#F8FBFF] ${notification.read ? 'opacity-70' : 'bg-[#EEF2FF]'}`}><span className={`mt-1 h-2.5 w-2.5 shrink-0 rounded-full ${notification.read ? 'bg-[#DADCE0]' : 'bg-[#4F7BFF]'}`} /><span className="min-w-0 flex-1"><span className="block text-sm font-black text-[#081B5C]">{notification.title}</span><span className="mt-1 line-clamp-2 block text-xs font-bold leading-5 text-[#64748B]">{notification.body}</span><span className="mt-2 block text-[11px] font-black uppercase tracking-[0.16em] text-[#4F7BFF]">{notification.time}</span></span></button>) : <div className="p-8 text-center"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF2FF] text-2xl">🔕</div><p className="mt-3 text-sm font-black text-[#081B5C]">No notifications yet</p><p className="mt-1 text-xs font-bold text-[#64748B]">Follow, replies, status interactions, and master tag updates will appear here.</p></div>}</div>
     </div>
   );
 
@@ -2028,19 +2124,20 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const ToggleRow = ({ label, description, checked, onChange }: { label: string; description: string; checked: boolean; onChange: (checked: boolean) => void }) => <label className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] p-4"><span className="min-w-0"><span className="block text-sm font-black text-[#081B5C]">{label}</span><span className="mt-1 block text-xs font-bold leading-5 text-[#64748B]">{description}</span></span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 shrink-0 accent-[#4F7BFF]" /></label>;
 
-  const ProfileSettingsPanel = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><h3 className="text-2xl font-black text-[#081B5C]">Account Settings</h3>{activeProfilePanel === 'privacy' && <div className="mt-5 space-y-3"><ToggleRow label="Public profile" description="Allow your profile card to be visible inside the community." checked={privacySettings.profileVisible} onChange={(value) => setPrivacySettings((current) => ({ ...current, profileVisible: value }))} /><ToggleRow label="Show activity" description="Show your creator posts, replies, statuses, and master-tag activity in summaries." checked={privacySettings.showActivity} onChange={(value) => setPrivacySettings((current) => ({ ...current, showActivity: value }))} /><ToggleRow label="Allow messages" description="Let creators receive status shares and future direct-message requests from you." checked={privacySettings.allowMessages} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowMessages: value }))} /><ToggleRow label="Allow follow requests" description="Keep your profile available for follow-request features when they launch." checked={privacySettings.allowFollowRequests} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowFollowRequests: value }))} /></div>}{activeProfilePanel === 'notifications' && <div className="mt-5 space-y-3"><ToggleRow label="Replies" description="Show reply alerts in the bell dropdown." checked={notificationPreferences.replies} onChange={(value) => setNotificationPreferences((current) => ({ ...current, replies: value }))} /><ToggleRow label="Master-tag replies" description="Show admin/master responses to your tag requests." checked={notificationPreferences.masterTags} onChange={(value) => setNotificationPreferences((current) => ({ ...current, masterTags: value }))} /><ToggleRow label="Status interactions" description="Show likes and views for your statuses." checked={notificationPreferences.statuses} onChange={(value) => setNotificationPreferences((current) => ({ ...current, statuses: value }))} /><ToggleRow label="Creator posts" description="Show new post alerts from community creators." checked={notificationPreferences.creatorPosts} onChange={(value) => setNotificationPreferences((current) => ({ ...current, creatorPosts: value }))} /></div>}{activeProfilePanel === 'connected' && <div className="mt-5 space-y-3"><div className="rounded-2xl bg-[#F8FBFF] p-4 text-sm font-bold text-[#64748B]">Signed in email: <span className="font-black text-[#081B5C]">{authEmail || 'Local community session'}</span></div>{['Google', 'Email password', 'Social account'].map((account) => <button key={account} type="button" disabled className="flex w-full justify-between rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] px-4 py-3 text-sm font-black text-[#64748B] opacity-70"><span>{account}</span><span>Coming soon</span></button>)}</div>}{activeProfilePanel === 'logout' && <div className="mt-5 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] p-4"><p className="text-sm font-bold leading-6 text-[#5F6368]">Sign out of Firebase when available and return to the app auth flow. Local profile preferences remain saved for the next session.</p><button type="button" onClick={handleLogout} className="mt-4 w-full rounded-2xl bg-[#C5221F] px-5 py-3 font-black text-white">Log out and go to auth</button></div>}</section>;
+  const ProfileSettingsPanel = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><h3 className="text-2xl font-black text-[#081B5C]">Account Settings</h3>{activeProfilePanel === 'privacy' && <div className="mt-5 space-y-3"><ToggleRow label="Public profile" description="Allow your profile card to be visible inside the community." checked={privacySettings.profileVisible} onChange={(value) => setPrivacySettings((current) => ({ ...current, profileVisible: value }))} /><ToggleRow label="Show activity" description="Show your creator posts, replies, statuses, and master-tag activity in summaries." checked={privacySettings.showActivity} onChange={(value) => setPrivacySettings((current) => ({ ...current, showActivity: value }))} /><ToggleRow label="Allow messages" description="Let creators receive status shares and future direct-message requests from you." checked={privacySettings.allowMessages} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowMessages: value }))} /><ToggleRow label="Allow follow requests" description="Keep your profile available for follow-request features when they launch." checked={privacySettings.allowFollowRequests} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowFollowRequests: value }))} /></div>}{activeProfilePanel === 'notifications' && <div className="mt-5 space-y-3"><ToggleRow label="Replies" description="Show reply alerts in the bell dropdown." checked={notificationPreferences.replies} onChange={(value) => setNotificationPreferences((current) => ({ ...current, replies: value }))} /><ToggleRow label="Master-tag replies" description="Show admin/master responses to your tag requests." checked={notificationPreferences.masterTags} onChange={(value) => setNotificationPreferences((current) => ({ ...current, masterTags: value }))} /><ToggleRow label="Status interactions" description="Show likes and views for your statuses." checked={notificationPreferences.statuses} onChange={(value) => setNotificationPreferences((current) => ({ ...current, statuses: value }))} /><ToggleRow label="Creator posts" description="Show new post alerts from community creators." checked={notificationPreferences.creatorPosts} onChange={(value) => setNotificationPreferences((current) => ({ ...current, creatorPosts: value }))} />
+<ToggleRow label="Follows" description="Show alerts when someone follows your community profile." checked={notificationPreferences.follows} onChange={(value) => setNotificationPreferences((current) => ({ ...current, follows: value }))} /></div>}{activeProfilePanel === 'connected' && <div className="mt-5 space-y-3"><div className="rounded-2xl bg-[#F8FBFF] p-4 text-sm font-bold text-[#64748B]">Signed in email: <span className="font-black text-[#081B5C]">{authEmail || 'Local community session'}</span></div>{['Google', 'Email password', 'Social account'].map((account) => <button key={account} type="button" disabled className="flex w-full justify-between rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] px-4 py-3 text-sm font-black text-[#64748B] opacity-70"><span>{account}</span><span>Coming soon</span></button>)}</div>}{activeProfilePanel === 'logout' && <div className="mt-5 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] p-4"><p className="text-sm font-bold leading-6 text-[#5F6368]">Sign out of Firebase when available and return to the app auth flow. Local profile preferences remain saved for the next session.</p><button type="button" onClick={handleLogout} className="mt-4 w-full rounded-2xl bg-[#C5221F] px-5 py-3 font-black text-white">Log out and go to auth</button></div>}</section>;
 
   const ProfileAccountCard = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><h3 className="text-2xl font-black text-[#081B5C]">Edit Profile</h3>{profileFeedback ? <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-black ${profileFeedback.type === 'success' ? 'border-[#CEEAD6] bg-[#E6F4EA] text-[#137333]' : 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]'}`}>{profileFeedback.message}</div> : null}<div className="mt-5 grid min-w-0 gap-4 sm:grid-cols-2"><label className="min-w-0 text-sm font-black text-[#081B5C]">Display Name<input value={profileDraft.name} onChange={(event) => setProfileDraft((current) => ({ ...current, name: event.target.value }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C]">Username<input value={profileDraft.username} onChange={(event) => setProfileDraft((current) => ({ ...current, username: normalizeUsername(event.target.value) }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C] sm:col-span-2">Bio<textarea value={profileDraft.bio} maxLength={PROFILE_BIO_MAX_LENGTH} onChange={(event) => setProfileDraft((current) => ({ ...current, bio: event.target.value.slice(0, PROFILE_BIO_MAX_LENGTH) }))} className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold leading-7 outline-none focus:border-[#4F7BFF]" /><span className="mt-1 block text-right text-xs font-bold text-[#64748B]">{profileDraft.bio.length}/{PROFILE_BIO_MAX_LENGTH}</span></label></div><div className="mt-5 flex flex-col gap-3 sm:flex-row"><button type="button" onClick={saveProfileChanges} className="flex-1 rounded-2xl bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-5 py-4 font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.22)]">Save Changes</button><button type="button" onClick={resetProfileDraft} className="rounded-2xl border border-[#E3ECF8] bg-white px-5 py-4 font-black text-[#081B5C]">Cancel / Reset</button></div></section>;
 
   const renderProfilePage = () => <div className="mx-auto grid min-w-0 max-w-7xl gap-5 lg:grid-cols-[minmax(0,1fr)_340px]"><div className="min-w-0 space-y-5"><ProfileHeroCard /><ProfileAccountCard /><ProfileSettingsPanel /></div><div className="hidden min-w-0 lg:block"><ProfileSummaryCard /></div><div className="min-w-0 lg:hidden"><ProfileSummaryCard /></div></div>;
 
   const renderMainContent = () => (
-    <div key={`${page}-${activeView}`} className="animate-in fade-in slide-in-from-bottom-3 duration-500">
+    <div className="animate-in fade-in slide-in-from-bottom-3 duration-500">
       {page === 'chat' && activeView === 'feed' && renderFeedLayout(messages, 'Chat Feed', 'Fresh community prompts, replies, and streak ideas are shown here.')}
-      {page === 'thread' && <div className="space-y-3"><button type="button" onClick={goBack} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-sm font-black text-[#64748B] shadow-sm">← Back to posts</button>{renderMessageDetails(selectedMessage, true)}</div>}
+      {page === 'thread' && <div className="space-y-3"><button type="button" onClick={() => { goBack(); requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: feedScrollPositionsRef.current.chatFeed || 0, behavior: 'auto' })); }} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-sm font-black text-[#64748B] shadow-sm">← Back to posts</button>{renderMessageDetails(selectedMessage, true)}</div>}
       {page === 'profile' && renderProfilePage()}
       {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_28px_90px_rgba(79,123,255,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.28em] text-[#4F7BFF]">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Post once per type daily with 15-day community visibility.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">Each user can publish one text, one image, and one poll creator post per day. The used type locks immediately, syncs through Firebase for all users, and auto-deletes after 15 days.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EAF5FF] p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || isCreatorTypeUsedToday || !postDraft.trim() || isStorageLocked || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.28)] disabled:opacity-45">{isPublishingCreator ? 'Publishing creator post...' : isCreatorTypeUsedToday ? `${postType} post used today` : isStorageLocked ? 'Storage limit reached' : 'Publish creator post'}</button></div></div>}
-      {page === 'network' && <div className="mx-auto max-w-5xl rounded-[2rem] bg-white p-4 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="sticky top-0 z-10 bg-white pb-3"><h2 className="text-4xl font-black text-[#081B5C]">{profile.username}</h2><div className="mt-6 grid grid-cols-4 border-b border-[#E3ECF8] text-center text-sm font-black sm:text-lg">{(['mutual', 'followers', 'following', 'forYou'] as const).map((tab) => <button key={tab} type="button" onClick={() => setNetworkTab(tab)} className={`pb-3 capitalize ${networkTab === tab ? 'border-b-4 border-[#4F7BFF] text-[#4F46E5]' : 'text-[#64748B]'}`}>{tab === 'forYou' ? 'For you' : tab}</button>)}</div><input value={networkSearch} onChange={(event) => setNetworkSearch(event.target.value)} placeholder="Search creators..." className="mt-4 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></div><div className="space-y-3 pt-3">{filteredCreators.map((creator) => { const followed = followedIds.includes(creator.id); return <article key={creator.id} className="flex items-center gap-3 rounded-3xl border border-[#E3ECF8] bg-white p-4 shadow-sm"><Avatar value={creator.avatar} /><div className="min-w-0 flex-1"><h3 className="truncate text-xl font-black text-[#081B5C]">{creator.name} {creator.verified ? '✅' : ''}</h3><p className="text-sm font-bold text-[#64748B]">@{creator.username} · {creator.role}</p><p className="text-sm font-black text-[#64748B]">{creator.followers.toLocaleString()} followers</p></div><button type="button" onClick={() => toggleFollowCreator(creator)} disabled={Boolean(followLoadingIds[creator.id]) || isOwnCommunityId(creator.id)} className={`rounded-full px-4 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${followed ? 'bg-[#EEF2FF] text-[#4F46E5]' : 'bg-[#4F7BFF] text-white'}`}>{followLoadingIds[creator.id] ? 'Saving...' : followed ? 'Following' : 'Follow'}</button></article>; })}</div></div>}
+      {page === 'network' && <div className="mx-auto max-w-5xl rounded-[2rem] bg-white p-4 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="sticky top-0 z-10 bg-white pb-3"><h2 className="text-4xl font-black text-[#081B5C]">{profile.username}</h2><p className="mt-2 text-sm font-bold text-[#64748B]">For You mein app use karne wale real community users dikhte hain. Yahin se follow/unfollow live sync hota hai.</p><div className="mt-6 grid grid-cols-4 border-b border-[#E3ECF8] text-center text-sm font-black sm:text-lg">{(['mutual', 'followers', 'following', 'forYou'] as const).map((tab) => <button key={tab} type="button" onClick={() => setNetworkTab(tab)} className={`pb-3 capitalize ${networkTab === tab ? 'border-b-4 border-[#4F7BFF] text-[#4F46E5]' : 'text-[#64748B]'}`}>{tab === 'forYou' ? 'For you' : tab}</button>)}</div><input value={networkSearch} onChange={(event) => setNetworkSearch(event.target.value)} placeholder="Search community users..." className="mt-4 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></div><div className="space-y-3 pt-3">{(networkTab === 'forYou' ? visibleForYouCreators : filteredCreators).map((creator) => { const followed = followedIds.includes(creator.id); return <article key={creator.id} className="flex items-center gap-3 rounded-3xl border border-[#E3ECF8] bg-white p-4 shadow-sm"><Avatar value={creator.avatar} /><div className="min-w-0 flex-1"><h3 className="truncate text-xl font-black text-[#081B5C]">{creator.name} {creator.verified ? '✅' : ''}</h3><p className="text-sm font-bold text-[#64748B]">@{creator.username} · {creator.role}</p><p className="text-sm font-black text-[#64748B]">{(followerCounts[creator.id] || creator.followers || 0).toLocaleString()} followers · {(followingCounts[creator.id] || 0).toLocaleString()} following</p></div><button type="button" onClick={() => toggleFollowCreator(creator)} disabled={Boolean(followLoadingIds[creator.id]) || isOwnCommunityId(creator.id)} className={`rounded-full px-4 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${followed ? 'bg-[#EEF2FF] text-[#4F46E5]' : 'bg-[#4F7BFF] text-white'}`}>{followLoadingIds[creator.id] ? 'Saving...' : followed ? 'Unfollow' : 'Follow'}</button></article>; })}</div></div>}
       {page === 'following' && renderFeedLayout(followingMessages, 'Your followers feed', 'Only posts from creators you follow are shown here.')}
       {page === 'adminPosts' && renderFeedLayout(adminPosts, 'ADMIN POST', 'Official admin posts from Firebase. Like, react, vote, and reply here.')}
       {page === 'tagMaster' && renderTagMasterPage()}{page === 'masterTags' && renderMasterTagsPage()}{page === 'masterTagDetail' && renderMasterTagDetailPage()}
