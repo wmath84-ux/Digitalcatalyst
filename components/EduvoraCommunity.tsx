@@ -2903,6 +2903,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 className="min-w-0 flex-1 rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-bold text-[#081A45] outline-none focus:border-[#1769FF]"
               />
               <button type="button" onClick={() => sendPrivateChatMessage()} disabled={sendDisabled} className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(23,105,255,0.22)] disabled:cursor-not-allowed disabled:opacity-45">{isPrivateChatSending ? 'Sending...' : 'Send'}</button>
+            </div>
           </div>
         </section>
       </div>
