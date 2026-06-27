@@ -76,6 +76,7 @@ type PrivateChatMessage = {
   caption?: string;
   imageUrl?: string;
   storagePath?: string;
+  archiveStoragePath?: string;
   uploadBytes?: number;
   poll?: PrivateChatPoll;
   sharedItem?: PrivateSharedItem;
@@ -554,6 +555,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [activeView, setActiveView] = useState<CommunityView>('feed');
   const [page, setPage] = useState<CommunityPage>('chat');
   const [pageStack, setPageStack] = useState<CommunityPage[]>([]);
+  const pageRef = useRef<CommunityPage>('chat');
+  const activeViewRef = useRef<CommunityView>('feed');
+  const pageStackRef = useRef<CommunityPage[]>([]);
   const [selectedMessageId, setSelectedMessageId] = useState(initialMessages[0].id);
   const [selectedStatusId, setSelectedStatusId] = useState(initialStatusCards[0].id);
   const [messages, setMessages] = useState<FeedMessage[]>(initialMessages);
@@ -858,6 +862,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     };
   };
 
+  const uploadPrivateChatMessageArchive = async (conversationId: string, messageId: string, message: PrivateChatMessage) => {
+    const archiveStoragePath = `privateChats/${conversationId}/${messageId}/message.json`;
+    await uploadString(ref(storage, archiveStoragePath), JSON.stringify(message), 'raw');
+    return archiveStoragePath;
+  };
+
   const resetPrivateChatComposer = () => {
     setChatDraft('');
     setChatImagePreview('');
@@ -920,6 +930,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const createdAt = Date.now();
     const expiresAt = createdAt + PRIVATE_CHAT_TTL_MS;
     let storagePath = '';
+    let archiveStoragePath = '';
     let imageUrl = '';
     let uploadBytes = 0;
 
@@ -959,17 +970,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       await ensurePrivateConversation(activeConversationId, activeChatCreator);
 
       if (type === 'image') {
-        try {
-          const uploaded = await uploadPrivateChatImage(activeConversationId, messageId, chatImagePreview);
-          imageUrl = uploaded.imageUrl;
-          storagePath = uploaded.storagePath || '';
-          uploadBytes = uploaded.uploadBytes;
-        } catch (uploadError) {
-          console.warn('Private chat image upload failed; sending local image payload fallback', uploadError);
-          imageUrl = chatImagePreview;
-          storagePath = '';
-          uploadBytes = Math.round((chatImagePreview.length * 3) / 4);
-        }
+        const uploaded = await uploadPrivateChatImage(activeConversationId, messageId, chatImagePreview);
+        imageUrl = uploaded.imageUrl;
+        storagePath = uploaded.storagePath || '';
+        uploadBytes = uploaded.uploadBytes;
       }
 
       const lastMessage =
@@ -985,6 +989,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         storagePath: type === 'image' ? storagePath : undefined,
         uploadBytes: type === 'image' ? uploadBytes : 0,
       };
+
+      archiveStoragePath = await uploadPrivateChatMessageArchive(activeConversationId, messageId, messagePayload);
+      messagePayload.archiveStoragePath = archiveStoragePath;
 
       await setDoc(doc(db, PRIVATE_CHATS, activeConversationId, PRIVATE_CHAT_MESSAGES, messageId), stripUndefinedDeep(messagePayload));
 
@@ -1012,6 +1019,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     } catch (error) {
       console.warn('Private chat send failed', error);
       if (storagePath) deleteObject(ref(storage, storagePath)).catch((deleteError) => console.warn('Private chat image rollback failed', deleteError));
+      if (archiveStoragePath) deleteObject(ref(storage, archiveStoragePath)).catch((deleteError) => console.warn('Private chat archive rollback failed', deleteError));
             setPrivateMessages((current) => current.filter((message) => message.id !== messageId));
       setPrivateChatError(error instanceof Error ? error.message : 'Message failed. Please try again.');
     } finally {
@@ -1108,11 +1116,26 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             const data = item.data();
             deleteDoc(doc(db, PRIVATE_CHATS, conversationId, PRIVATE_CHAT_MESSAGES, item.id)).catch((error) => console.warn('Expired private message cleanup failed', error));
             if (data.storagePath) deleteObject(ref(storage, data.storagePath)).catch((error) => console.warn('Expired private media cleanup failed', error));
+            if (data.archiveStoragePath) deleteObject(ref(storage, data.archiveStoragePath)).catch((error) => console.warn('Expired private archive cleanup failed', error));
           });
         })
         .catch((error) => console.warn('Private chat cleanup query failed', error));
     });
   };
+
+  useEffect(() => {
+    if (!isCommunityAllowed || !currentUserKey) return undefined;
+
+    const cleanupVisibleExpiredMessages = () => {
+      setPrivateMessages((current) => current.filter((message) => message.expiresAt > Date.now()));
+      cleanupExpiredPrivateChatMessages(privateConversations.map((conversation) => conversation.id));
+    };
+
+    cleanupVisibleExpiredMessages();
+    const cleanupTimer = window.setInterval(cleanupVisibleExpiredMessages, 60 * 60 * 1000);
+
+    return () => window.clearInterval(cleanupTimer);
+  }, [isCommunityAllowed, currentUserKey, privateConversations]);
 
   useEffect(() => {
     if (!isCommunityAllowed || !guardedAuth.currentUser || !currentUserKey) return undefined;
@@ -1162,6 +1185,41 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     directChatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [activeConversationId, activePrivateMessages.length]);
 
+  useEffect(() => {
+    pageRef.current = page;
+    activeViewRef.current = activeView;
+    pageStackRef.current = pageStack;
+  }, [page, activeView, pageStack]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onCommunityPopState = (event: PopStateEvent) => {
+      const state = event.state || {};
+      if (state.dcView !== 'community') return;
+
+      const targetPage = state.dcCommunityPage as CommunityPage | undefined;
+      if (targetPage) {
+        pageRef.current = targetPage;
+        setPage(targetPage);
+        if (targetPage === 'chat') {
+          activeViewRef.current = 'feed';
+          setActiveView('feed');
+        }
+      } else {
+        activeViewRef.current = 'feed';
+        pageRef.current = 'chat';
+        pageStackRef.current = [];
+        setActiveView('feed');
+        setPage('chat');
+        setPageStack([]);
+      }
+    };
+
+    window.addEventListener('popstate', onCommunityPopState);
+    return () => window.removeEventListener('popstate', onCommunityPopState);
+  }, []);
+
   const pushPage = (nextPage: CommunityPage, options: { preserveScroll?: boolean } = {}) => {
     setIsNotificationPanelOpen(false);
     setShowStatusActions(false);
@@ -1176,8 +1234,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       feedScrollPositionsRef.current.chatFeed = scrollContainerRef.current.scrollTop;
     }
 
-    setPageStack((stack) => [...stack, page]);
+    const nextStack = [...pageStackRef.current, pageRef.current];
+    pageStackRef.current = nextStack;
+    setPageStack(nextStack);
     setPage(nextPage);
+    pageRef.current = nextPage;
+
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ ...(window.history.state || {}), dcView: 'community', dcCommunityPage: nextPage }, '', window.location.href);
+    }
 
     if (!options.preserveScroll) {
       requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }));
@@ -1187,10 +1252,23 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const goBack = () => {
     setIsNotificationPanelOpen(false);
     setExpandedReplyId(null);
-    if (pageStack.length) {
-      const previous = pageStack[pageStack.length - 1];
+    const stack = pageStackRef.current;
+    if (stack.length) {
+      const previous = stack[stack.length - 1];
+      const nextStack = stack.slice(0, -1);
+      pageStackRef.current = nextStack;
       setPage(previous);
-      setPageStack((stack) => stack.slice(0, -1));
+      setPageStack(nextStack);
+      pageRef.current = previous;
+      return;
+    }
+    if (pageRef.current !== 'chat' || activeViewRef.current !== 'feed') {
+      activeViewRef.current = 'feed';
+      pageRef.current = 'chat';
+      pageStackRef.current = [];
+      setActiveView('feed');
+      setPage('chat');
+      setPageStack([]);
       return;
     }
     onClose?.();
@@ -2164,6 +2242,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const expiresAt = createdAt + PRIVATE_CHAT_TTL_MS;
     const caption = shareCaption.trim();
     let copiedStoragePath = '';
+    let archiveStoragePath = '';
 
     setShareSendingId(receiver.id);
     setShareFeedback('');
@@ -2191,6 +2270,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         readBy: { [currentUserKey]: true },
         status: 'sent',
       };
+
+      archiveStoragePath = await uploadPrivateChatMessageArchive(conversationId, messageId, messagePayload);
+      messagePayload.archiveStoragePath = archiveStoragePath;
 
       await setDoc(doc(db, PRIVATE_CHATS, conversationId, PRIVATE_CHAT_MESSAGES, messageId), stripUndefinedDeep(messagePayload));
 
@@ -2220,6 +2302,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       console.warn('Shared item send failed', error);
       if (copiedStoragePath) {
         deleteObject(ref(storage, copiedStoragePath)).catch((deleteError) => console.warn('Shared media rollback failed', deleteError));
+      }
+      if (archiveStoragePath) {
+        deleteObject(ref(storage, archiveStoragePath)).catch((deleteError) => console.warn('Shared message archive rollback failed', deleteError));
       }
       setShareFeedback('Could not share. Please try again.');
     } finally {
@@ -2771,7 +2856,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         const canSendAnyPrivateMessage = canSendText || canSendImage || canSendPoll;
     const sendDisabled = isPrivateChatSending || !canSendAnyPrivateMessage;
     return (
-      <div className={`mx-auto grid overflow-hidden bg-white ${mobile ? 'h-full min-h-0 w-full border-0 shadow-none' : 'h-[calc(100dvh-10.5rem)] max-w-[1800px] rounded-[2.4rem] border border-[#D9E7F8] shadow-[0_26px_80px_rgba(8,26,69,0.10)] lg:grid-cols-[360px_1fr]'}`}>
+      <div className={`mx-auto grid overflow-hidden bg-white ${mobile ? 'h-full min-h-0 w-full overscroll-none border-0 shadow-none' : 'h-[calc(100dvh-10.5rem)] max-w-[1800px] rounded-[2.4rem] border border-[#D9E7F8] shadow-[0_26px_80px_rgba(8,26,69,0.10)] lg:grid-cols-[360px_1fr]'}`}>
         {!mobile ? (
           <aside className="flex min-h-0 flex-col border-r border-[#D9E7F8] bg-gradient-to-b from-[#F8FBFF] to-white">
             <div className="border-b border-[#D9E7F8] p-5">
@@ -2849,7 +2934,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <div ref={directChatMessagesEndRef} />
           </div>
 
-          <div className={`shrink-0 border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl ${mobile ? 'z-20 shadow-[0_-18px_45px_rgba(8,26,69,0.08)]' : 'sm:p-4'}`}>
+          <div className={`shrink-0 border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl ${mobile ? 'z-20 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-18px_45px_rgba(8,26,69,0.08)]' : 'sm:p-4'}`}>
             {privateChatError ? <div className="mb-3 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-xs font-black text-[#C5221F]">{privateChatError}</div> : null}
 
             {chatAttachmentMode === 'image' ? (
@@ -2902,7 +2987,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 maxLength={1200}
                 className="min-w-0 flex-1 rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-bold text-[#081A45] outline-none focus:border-[#1769FF]"
               />
-              <button type="button" onClick={() => sendPrivateChatMessage()} disabled={sendDisabled} className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(23,105,255,0.22)] disabled:cursor-not-allowed disabled:opacity-45">{isPrivateChatSending ? 'Sending...' : 'Send'}</button>
+              <button type="button" onClick={() => sendPrivateChatMessage()} disabled={sendDisabled} className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(23,105,255,0.22)] disabled:cursor-not-allowed disabled:opacity-45">Send</button>
+            </div>
           </div>
         </section>
       </div>
@@ -3009,7 +3095,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   );
 
   const renderChatThreadPage = () => (
-    <div className="fixed inset-0 z-[1450] h-[100dvh] overflow-hidden bg-[#F8FBFF] pt-[env(safe-area-inset-top)] md:static md:z-auto md:h-auto md:bg-transparent md:p-0">
+    <div className="fixed inset-0 z-[1450] flex h-[100svh] max-h-[100dvh] flex-col overflow-hidden overscroll-none bg-white pt-[env(safe-area-inset-top)] md:static md:z-auto md:h-auto md:max-h-none md:bg-transparent md:p-0">
       {renderPrivateChatShell(true)}
     </div>
   );
@@ -3154,18 +3240,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
-  const communityDockVisiblePages: CommunityPage[] = [
-    'chat',
-    'directChat',
-    'creators',
-    'adminPosts',
-    'network',
-    'following',
-    'tagMaster',
-    'masterTags',
-  ];
-
-  const shouldHideCommunityDockOnMobile = !communityDockVisiblePages.includes(page);
+  const shouldHideCommunityDockOnMobile = !(page === 'chat' && activeView === 'feed');
 
   const CommunityBottomNav = () => (
     <nav
@@ -3273,7 +3348,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <main ref={scrollContainerRef} className={`min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-4 custom-scrollbar sm:px-5 lg:px-7 lg:pb-7 ${
             shouldHideCommunityDockOnMobile
               ? 'pb-32 max-md:pb-0 max-md:overscroll-contain'
-              : 'pb-32 max-md:pb-0 max-md:overscroll-contain'
+              : 'pb-32 max-md:pb-32 max-md:overscroll-contain'
           }`}>
             {renderMainContent()}
           </main>

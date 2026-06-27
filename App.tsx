@@ -995,6 +995,7 @@ const App: React.FC = () => {
   const currentViewRef = React.useRef(currentView);
   const historyNavigationRef = React.useRef(false);
   const lastHistoryViewRef = React.useRef(currentView);
+  const appViewStackRef = React.useRef<string[]>([currentView]);
   const [selectedProduct, setSelectedProduct] = useState<ProductWithRating | null>(null);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
@@ -1030,6 +1031,8 @@ const App: React.FC = () => {
   const [quickViewProduct, setQuickViewProduct] = useState<ProductWithRating | null>(null);
   const [cartToastMessage, setCartToastMessage] = useState('');
   const [isCartPaymentModalOpen, setIsCartPaymentModalOpen] = useState(false);
+  const isCartOpenRef = useRef(false);
+  const isCartPaymentModalOpenRef = useRef(false);
   const activeSessionIdRef = useRef<string | null>(null);
   const activeSessionUidRef = useRef<string | null>(null);
   const sessionUnsubscribeRef = useRef<(() => void) | null>(null);
@@ -1121,6 +1124,14 @@ const App: React.FC = () => {
     lastHistoryViewRef.current = currentView;
 
     const onPopState = (event: PopStateEvent) => {
+      if (isCartPaymentModalOpenRef.current) {
+        setIsCartPaymentModalOpen(false);
+        return;
+      }
+      if (isCartOpenRef.current) {
+        setIsCartOpen(false);
+        return;
+      }
       const nextView = event.state?.dcView;
       if (typeof nextView === 'string') {
         historyNavigationRef.current = true;
@@ -1139,6 +1150,14 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    isCartOpenRef.current = isCartOpen;
+  }, [isCartOpen]);
+
+  useEffect(() => {
+    isCartPaymentModalOpenRef.current = isCartPaymentModalOpen;
+  }, [isCartPaymentModalOpen]);
+
+  useEffect(() => {
     currentViewRef.current = currentView;
     if (typeof window === 'undefined') return;
     if (historyNavigationRef.current) {
@@ -1147,6 +1166,7 @@ const App: React.FC = () => {
       return;
     }
     if (lastHistoryViewRef.current === currentView) return;
+    appViewStackRef.current = [...appViewStackRef.current.filter((view) => view !== currentView), currentView].slice(-12);
     window.history.pushState({ ...(window.history.state || {}), dcView: currentView }, '', window.location.href);
     lastHistoryViewRef.current = currentView;
   }, [currentView]);
@@ -1635,6 +1655,13 @@ const App: React.FC = () => {
   };
 
   // --- Cart Handlers ---
+  const openCartSidebar = () => {
+      if (typeof window !== 'undefined' && !isCartOpenRef.current) {
+          window.history.pushState({ ...(window.history.state || {}), dcView: currentViewRef.current, dcOverlay: 'cart' }, '', window.location.href);
+      }
+      setIsCartOpen(true);
+  };
+
   const handleAddToCart = (productId: number, quantity: number = 1) => {
       setCart(prevCart => {
           const existingItem = prevCart.find(item => item.productId === productId);
@@ -1651,7 +1678,7 @@ const App: React.FC = () => {
           setCartToastMessage(`'${product.title}' added to cart!`);
           setTimeout(() => setCartToastMessage(''), 3000);
       }
-      setIsCartOpen(true);
+      openCartSidebar();
   };
   
   const handleUpdateCartQuantity = (productId: number, newQuantity: number) => {
@@ -2624,17 +2651,22 @@ const App: React.FC = () => {
   const handleBackToHome = () => {
     if (currentView === 'home') window.scrollTo({ top: 0, behavior: 'smooth' });
     else {
+      appViewStackRef.current = ['home'];
       setCurrentView('home');
       window.scrollTo(0, 0);
     }
   };
 
   const handleNavigateBack = (fallbackView: string = 'home') => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      window.history.back();
-      return;
+    const stack = appViewStackRef.current.filter(Boolean);
+    const currentIndex = stack.lastIndexOf(currentView);
+    const previousView = currentIndex > 0 ? stack[currentIndex - 1] : fallbackView;
+    appViewStackRef.current = previousView === 'home' ? ['home'] : stack.slice(0, Math.max(1, currentIndex));
+    historyNavigationRef.current = true;
+    setCurrentView(previousView);
+    if (typeof window !== 'undefined') {
+      window.history.replaceState({ ...(window.history.state || {}), dcView: previousView }, '', window.location.href);
     }
-    setCurrentView(fallbackView);
     window.scrollTo(0, 0);
   };
 
@@ -3154,11 +3186,12 @@ const App: React.FC = () => {
 
   const handleBackFromEduCoinGuide = () => {
     if (selectedProduct) {
-      setAutoOpenPaymentModalFor(selectedProduct.id);
       setCurrentView('product');
+      window.setTimeout(() => setAutoOpenPaymentModalFor(selectedProduct.id), 0);
     } else {
       setCurrentView(cart.length > 0 ? 'allProducts' : 'home');
     }
+    setEduCoinGuideRequest(null);
     window.scrollTo(0, 0);
   };
 
@@ -3573,7 +3606,7 @@ const App: React.FC = () => {
               onNavigateToPurchases={handleNavigateToPurchases}
               onNavigateToFreeProducts={handleNavigateToFreeProducts}
               onOpenNews={() => openReadingHub('news')}
-              onCartClick={() => setIsCartOpen(true)}
+              onCartClick={openCartSidebar}
               onProfileClick={handleNavigateToProfile}
               onAuthClick={openAuthPage}
             />
@@ -3619,12 +3652,26 @@ const App: React.FC = () => {
 
     return (
        <ErrorBoundary>
-         <div className={`font-sans ${websiteSettings.animations.enabled ? '' : 'animations-off'}`}>
+         <div className={`font-sans ${currentView === 'home' ? 'desktop-home-performance' : ''} ${websiteSettings.animations.enabled ? '' : 'animations-off'}`}>
             <style>{`
               .animations-off .hub-animate {
                 opacity: 1 !important;
                 transform: none !important;
                 animation: none !important;
+              }
+              @media (min-width: 1024px) {
+                .desktop-home-performance .animate-pulse,
+                .desktop-home-performance .animate-icon-float,
+                .desktop-home-performance .animate-bounce,
+                .desktop-home-performance .scroll-animate,
+                .desktop-home-performance .stagger-animate-container > * {
+                  animation: none !important;
+                  transform: none !important;
+                }
+                .desktop-home-performance [class*="backdrop-blur"] {
+                  -webkit-backdrop-filter: none !important;
+                  backdrop-filter: none !important;
+                }
               }
             `}</style>
             <WelcomeOverlay
@@ -3643,17 +3690,17 @@ const App: React.FC = () => {
                         {shouldShowMainPageBackButtonOnMobile && (
               <button
                 type="button"
-                onClick={handleBackToHome}
+                onClick={() => handleNavigateBack('home')}
                 aria-label="Back to home"
                 className="fixed left-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-[1500] flex h-11 w-11 items-center justify-center rounded-2xl border border-blue-100 bg-white/95 text-xl font-black text-slate-950 shadow-[0_14px_40px_rgba(15,23,42,0.16)] backdrop-blur-2xl transition active:scale-95 md:hidden"
               >
                 ←
               </button>
             )}
-            <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
+            <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={shouldHideMainDockOnMobile ? 'max-md:hidden' : ''}>
-                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
+                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>
             )}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={effectiveAppUser?.eduCoins || 0} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
