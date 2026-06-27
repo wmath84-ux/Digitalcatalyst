@@ -3139,7 +3139,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       ref={communityDockScrollRef}
       id="community-bottom-dock"
       className={`fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[1300] flex items-center gap-1 overflow-x-auto rounded-[1.65rem] border border-[var(--community-border)] bg-[var(--community-dock-bg)]/95 p-2 shadow-[var(--community-shadow)] backdrop-blur-2xl transition-all duration-300 custom-scrollbar lg:hidden ${
-        page === 'directChatThread'
+        page === 'directChatThread' || page === 'thread'
           ? 'max-md:pointer-events-none max-md:translate-y-[calc(100%+2rem)] max-md:opacity-0'
           : 'max-md:translate-y-0 max-md:opacity-100'
       }`}
@@ -3237,7 +3237,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <CommunitySidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <CommunityHeader />
-          <main ref={scrollContainerRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-32 pt-4 custom-scrollbar sm:px-5 lg:px-7 lg:pb-7">
+          <main ref={scrollContainerRef} className={`min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-4 custom-scrollbar sm:px-5 lg:px-7 lg:pb-7 ${
+            page === 'directChatThread' || page === 'thread'
+              ? 'max-md:pb-0 max-md:overscroll-contain'
+              : 'pb-32'
+          }`}>
             {renderMainContent()}
           </main>
         </div>
