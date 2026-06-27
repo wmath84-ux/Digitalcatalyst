@@ -161,7 +161,7 @@ const EduCoinGuidePage: React.FC<EduCoinGuidePageProps> = ({
                   <h2 className="text-lg font-black text-slate-950">{method.title}</h2>
                   <p className="mt-1 text-sm font-black text-indigo-600">{method.reward}</p>
                 </div>
-              </div>
+              </div>F
               <p className="mt-5 text-sm font-semibold leading-6 text-slate-600">{method.exactLogic}</p>
               <p className="mt-3 rounded-2xl bg-slate-50 px-4 py-3 text-xs font-black text-slate-700">{method.estimate}</p>
               <button onClick={method.action} className="mt-auto rounded-2xl bg-slate-950 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-700">
