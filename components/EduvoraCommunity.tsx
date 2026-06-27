@@ -555,6 +555,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [activeView, setActiveView] = useState<CommunityView>('feed');
   const [page, setPage] = useState<CommunityPage>('chat');
   const [pageStack, setPageStack] = useState<CommunityPage[]>([]);
+  const pageRef = useRef<CommunityPage>('chat');
+  const activeViewRef = useRef<CommunityView>('feed');
+  const pageStackRef = useRef<CommunityPage[]>([]);
   const [selectedMessageId, setSelectedMessageId] = useState(initialMessages[0].id);
   const [selectedStatusId, setSelectedStatusId] = useState(initialStatusCards[0].id);
   const [messages, setMessages] = useState<FeedMessage[]>(initialMessages);
@@ -967,17 +970,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       await ensurePrivateConversation(activeConversationId, activeChatCreator);
 
       if (type === 'image') {
-        try {
-          const uploaded = await uploadPrivateChatImage(activeConversationId, messageId, chatImagePreview);
-          imageUrl = uploaded.imageUrl;
-          storagePath = uploaded.storagePath || '';
-          uploadBytes = uploaded.uploadBytes;
-        } catch (uploadError) {
-          console.warn('Private chat image upload failed; sending local image payload fallback', uploadError);
-          imageUrl = chatImagePreview;
-          storagePath = '';
-          uploadBytes = Math.round((chatImagePreview.length * 3) / 4);
-        }
+        const uploaded = await uploadPrivateChatImage(activeConversationId, messageId, chatImagePreview);
+        imageUrl = uploaded.imageUrl;
+        storagePath = uploaded.storagePath || '';
+        uploadBytes = uploaded.uploadBytes;
       }
 
       const lastMessage =
@@ -1189,6 +1185,41 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     directChatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [activeConversationId, activePrivateMessages.length]);
 
+  useEffect(() => {
+    pageRef.current = page;
+    activeViewRef.current = activeView;
+    pageStackRef.current = pageStack;
+  }, [page, activeView, pageStack]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onCommunityPopState = (event: PopStateEvent) => {
+      const state = event.state || {};
+      if (state.dcView !== 'community') return;
+
+      const targetPage = state.dcCommunityPage as CommunityPage | undefined;
+      if (targetPage) {
+        pageRef.current = targetPage;
+        setPage(targetPage);
+        if (targetPage === 'chat') {
+          activeViewRef.current = 'feed';
+          setActiveView('feed');
+        }
+      } else {
+        activeViewRef.current = 'feed';
+        pageRef.current = 'chat';
+        pageStackRef.current = [];
+        setActiveView('feed');
+        setPage('chat');
+        setPageStack([]);
+      }
+    };
+
+    window.addEventListener('popstate', onCommunityPopState);
+    return () => window.removeEventListener('popstate', onCommunityPopState);
+  }, []);
+
   const pushPage = (nextPage: CommunityPage, options: { preserveScroll?: boolean } = {}) => {
     setIsNotificationPanelOpen(false);
     setShowStatusActions(false);
@@ -1203,8 +1234,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       feedScrollPositionsRef.current.chatFeed = scrollContainerRef.current.scrollTop;
     }
 
-    setPageStack((stack) => [...stack, page]);
+    const nextStack = [...pageStackRef.current, pageRef.current];
+    pageStackRef.current = nextStack;
+    setPageStack(nextStack);
     setPage(nextPage);
+    pageRef.current = nextPage;
+
+    if (typeof window !== 'undefined') {
+      window.history.pushState({ ...(window.history.state || {}), dcView: 'community', dcCommunityPage: nextPage }, '', window.location.href);
+    }
 
     if (!options.preserveScroll) {
       requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }));
@@ -1214,10 +1252,23 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const goBack = () => {
     setIsNotificationPanelOpen(false);
     setExpandedReplyId(null);
-    if (pageStack.length) {
-      const previous = pageStack[pageStack.length - 1];
+    const stack = pageStackRef.current;
+    if (stack.length) {
+      const previous = stack[stack.length - 1];
+      const nextStack = stack.slice(0, -1);
+      pageStackRef.current = nextStack;
       setPage(previous);
-      setPageStack((stack) => stack.slice(0, -1));
+      setPageStack(nextStack);
+      pageRef.current = previous;
+      return;
+    }
+    if (pageRef.current !== 'chat' || activeViewRef.current !== 'feed') {
+      activeViewRef.current = 'feed';
+      pageRef.current = 'chat';
+      pageStackRef.current = [];
+      setActiveView('feed');
+      setPage('chat');
+      setPageStack([]);
       return;
     }
     onClose?.();
@@ -2936,7 +2987,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 maxLength={1200}
                 className="min-w-0 flex-1 rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-bold text-[#081A45] outline-none focus:border-[#1769FF]"
               />
-              <button type="button" onClick={() => sendPrivateChatMessage()} disabled={sendDisabled} className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(23,105,255,0.22)] disabled:cursor-not-allowed disabled:opacity-45">{isPrivateChatSending ? 'Sending...' : 'Send'}</button>
+              <button type="button" onClick={() => sendPrivateChatMessage()} disabled={sendDisabled} className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(23,105,255,0.22)] disabled:cursor-not-allowed disabled:opacity-45">Send</button>
             </div>
           </div>
         </section>

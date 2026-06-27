@@ -1031,6 +1031,8 @@ const App: React.FC = () => {
   const [quickViewProduct, setQuickViewProduct] = useState<ProductWithRating | null>(null);
   const [cartToastMessage, setCartToastMessage] = useState('');
   const [isCartPaymentModalOpen, setIsCartPaymentModalOpen] = useState(false);
+  const isCartOpenRef = useRef(false);
+  const isCartPaymentModalOpenRef = useRef(false);
   const activeSessionIdRef = useRef<string | null>(null);
   const activeSessionUidRef = useRef<string | null>(null);
   const sessionUnsubscribeRef = useRef<(() => void) | null>(null);
@@ -1122,6 +1124,14 @@ const App: React.FC = () => {
     lastHistoryViewRef.current = currentView;
 
     const onPopState = (event: PopStateEvent) => {
+      if (isCartPaymentModalOpenRef.current) {
+        setIsCartPaymentModalOpen(false);
+        return;
+      }
+      if (isCartOpenRef.current) {
+        setIsCartOpen(false);
+        return;
+      }
       const nextView = event.state?.dcView;
       if (typeof nextView === 'string') {
         historyNavigationRef.current = true;
@@ -1138,6 +1148,14 @@ const App: React.FC = () => {
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
   }, []);
+
+  useEffect(() => {
+    isCartOpenRef.current = isCartOpen;
+  }, [isCartOpen]);
+
+  useEffect(() => {
+    isCartPaymentModalOpenRef.current = isCartPaymentModalOpen;
+  }, [isCartPaymentModalOpen]);
 
   useEffect(() => {
     currentViewRef.current = currentView;
@@ -1637,6 +1655,13 @@ const App: React.FC = () => {
   };
 
   // --- Cart Handlers ---
+  const openCartSidebar = () => {
+      if (typeof window !== 'undefined' && !isCartOpenRef.current) {
+          window.history.pushState({ ...(window.history.state || {}), dcView: currentViewRef.current, dcOverlay: 'cart' }, '', window.location.href);
+      }
+      setIsCartOpen(true);
+  };
+
   const handleAddToCart = (productId: number, quantity: number = 1) => {
       setCart(prevCart => {
           const existingItem = prevCart.find(item => item.productId === productId);
@@ -1653,7 +1678,7 @@ const App: React.FC = () => {
           setCartToastMessage(`'${product.title}' added to cart!`);
           setTimeout(() => setCartToastMessage(''), 3000);
       }
-      setIsCartOpen(true);
+      openCartSidebar();
   };
   
   const handleUpdateCartQuantity = (productId: number, newQuantity: number) => {
@@ -3581,7 +3606,7 @@ const App: React.FC = () => {
               onNavigateToPurchases={handleNavigateToPurchases}
               onNavigateToFreeProducts={handleNavigateToFreeProducts}
               onOpenNews={() => openReadingHub('news')}
-              onCartClick={() => setIsCartOpen(true)}
+              onCartClick={openCartSidebar}
               onProfileClick={handleNavigateToProfile}
               onAuthClick={openAuthPage}
             />
@@ -3672,10 +3697,10 @@ const App: React.FC = () => {
                 ←
               </button>
             )}
-            <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={() => setIsCartOpen(true)} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
+            <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={shouldHideMainDockOnMobile ? 'max-md:hidden' : ''}>
-                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={() => setIsCartOpen(true)} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
+                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>
             )}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={effectiveAppUser?.eduCoins || 0} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
