@@ -927,10 +927,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       await ensurePrivateConversation(activeConversationId, activeChatCreator);
 
       if (type === 'image') {
-        const uploaded = await uploadPrivateChatImage(activeConversationId, messageId, chatImagePreview);
-        imageUrl = uploaded.imageUrl;
-        storagePath = uploaded.storagePath || '';
-        uploadBytes = uploaded.uploadBytes;
+        try {
+          const uploaded = await uploadPrivateChatImage(activeConversationId, messageId, chatImagePreview);
+          imageUrl = uploaded.imageUrl;
+          storagePath = uploaded.storagePath || '';
+          uploadBytes = uploaded.uploadBytes;
+        } catch (uploadError) {
+          console.warn('Private chat image upload failed; sending local image payload fallback', uploadError);
+          imageUrl = chatImagePreview;
+          storagePath = '';
+          uploadBytes = Math.round((chatImagePreview.length * 3) / 4);
+        }
       }
 
       const lastMessage =
@@ -2494,7 +2501,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         </div>
         <div className="mt-5 space-y-3 pb-4">{message.replies.map((reply) => <div key={reply.id} className="flex items-start gap-3"><Avatar value={isOwnCommunityId(reply.ownerId) || reply.author === profile.name ? profile.avatar : (reply.avatar || '👤')} size="h-9 w-9" className="mt-1 text-base shadow-[0_8px_24px_rgba(37,99,235,0.12)]" /><div className="max-w-[92%] flex-1 rounded-[1.35rem] rounded-bl-md border border-[#D2E3FC] border-l-4 border-l-[#1A73E8] bg-gradient-to-br from-white via-[#F8FAFD] to-[#EDF2FA] px-4 py-3 shadow-[0_10px_32px_rgba(15,23,42,0.06)]"><div className="flex flex-wrap items-center gap-2"><span className="font-black text-[#202124]">{isOwnCommunityId(reply.ownerId) || reply.author === profile.name ? profile.name : reply.author}</span><span className="text-xs font-bold text-[#5F6368]">{reply.time}</span></div><p className="mt-1 text-sm font-semibold leading-6 text-[#5F6368] sm:text-base">{reply.text}</p></div></div>)}</div>
       </div>
-      {expandedReplyId === message.id ? <div ref={replyComposerRef} data-community-replybar="true" className="fixed bottom-[calc(env(safe-area-inset-bottom)+7.75rem)] left-3 right-3 z-[1600] rounded-[1.65rem] border border-[#D2E3FC] bg-white/95 p-3 shadow-[0_24px_80px_rgba(15,23,42,0.20)] backdrop-blur-2xl transition-all duration-500 data-[hidden=true]:translate-y-8 data-[hidden=true]:opacity-0 md:bottom-28 md:left-auto md:right-8 md:w-[min(760px,calc(100vw-4rem))]"><div className="flex items-center gap-2"><input ref={replyInputRef} value={replyDrafts[message.id] || ''} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value }))} placeholder={message.replies.some((reply) => isOwnCommunityId(reply.ownerId) || reply.author === profile.name) ? 'Edit your reply...' : 'Write a quick reply...'} maxLength={1000} className="min-w-0 flex-1 rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-sm font-bold text-[#202124] outline-none transition focus:border-[#1A73E8] focus:bg-white" /><button type="button" onClick={() => submitReply(message.id)} className="rounded-2xl bg-[#1A73E8] px-5 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5">{message.replies.some((reply) => isOwnCommunityId(reply.ownerId) || reply.author === profile.name) ? 'Save' : 'Send'}</button></div></div> : <div className="shrink-0 border-t border-[#E0E3EB] bg-white/95 p-3 backdrop-blur-xl lg:p-4"><button type="button" onClick={() => { loadRepliesForMessage(message); setExpandedReplyId(message.id); }} className="w-full rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-left text-sm font-black text-[#5F6368] transition hover:bg-[#E8F0FE]">💬 Reply to this thread</button></div>}
+      {expandedReplyId === message.id ? <div ref={replyComposerRef} data-community-replybar="true" className="shrink-0 border-t border-[#E0E3EB] bg-white/95 p-3 backdrop-blur-xl lg:p-4"><div className="flex items-center gap-2"><input ref={replyInputRef} value={replyDrafts[message.id] || ''} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value }))} placeholder={message.replies.some((reply) => isOwnCommunityId(reply.ownerId) || reply.author === profile.name) ? 'Edit your reply...' : 'Write a quick reply...'} maxLength={1000} className="min-w-0 flex-1 rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-sm font-bold text-[#202124] outline-none transition focus:border-[#1A73E8] focus:bg-white" /><button type="button" onClick={() => submitReply(message.id)} className="rounded-2xl bg-[#1A73E8] px-5 py-3 text-sm font-black text-white shadow-lg transition hover:-translate-y-0.5">{message.replies.some((reply) => isOwnCommunityId(reply.ownerId) || reply.author === profile.name) ? 'Save' : 'Send'}</button><button type="button" onClick={() => setExpandedReplyId(null)} className="rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-sm font-black text-[#5F6368]">Cancel</button></div></div> : <div className="shrink-0 border-t border-[#E0E3EB] bg-white/95 p-3 backdrop-blur-xl lg:p-4"><button type="button" onClick={() => { loadRepliesForMessage(message); setExpandedReplyId(message.id); }} className="w-full rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-left text-sm font-black text-[#5F6368] transition hover:bg-[#E8F0FE]">💬 Reply to this thread</button></div>}
     </div>
   );
 
@@ -2506,7 +2513,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const heroEyebrow = isAdminFeed ? 'Admin broadcast' : isFollowingFeed ? 'Following pulse' : 'Chat feed live';
     const heroIcon = isAdminFeed ? '📣' : isFollowingFeed ? '👥' : '💬';
     if (!feedMessages.length) return <div className="mx-auto max-w-5xl rounded-[2rem] border border-dashed border-[#C2E7FF] bg-gradient-to-br from-[#F8FAFD] via-white to-[#E8F0FE] p-8 text-center font-bold text-[#5F6368] shadow-[0_18px_54px_rgba(37,99,235,0.10)]"><div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white text-3xl shadow-inner">{isAdminFeed ? '📣' : '👀'}</div>{isAdminFeed ? 'No unexpired admin posts are available right now.' : 'Follow creators to build this feed.'}</div>;
-    return <div className="mx-auto grid h-[clamp(32rem,calc(100dvh-10.5rem),76rem)] min-h-0 w-full min-w-0 max-w-[1800px] gap-4 overflow-hidden lg:gap-5 md:grid-cols-[minmax(0,clamp(17rem,30vw,27.5rem))_minmax(0,1fr)]"><aside className="hidden h-full min-h-0 min-w-0 overflow-y-auto rounded-[2rem] border border-[#E0E3EB] bg-white p-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] ring-1 ring-[#D2E3FC] backdrop-blur-xl custom-scrollbar md:block"><div className={`relative mb-4 overflow-hidden rounded-[1.6rem] bg-gradient-to-br ${heroGradient} p-5 text-[#202124] shadow-[0_18px_50px_rgba(37,99,235,0.18)]`}><div className="absolute -right-8 -top-10 h-28 w-28 rounded-full bg-white/20 blur-2xl" /><p className="relative text-xs font-black uppercase tracking-[0.28em] text-[#202124]/80">{heroEyebrow}</p><h2 className="relative mt-2 text-3xl font-black tracking-tight">{heroIcon} {title}</h2><p className="relative mt-2 text-sm font-semibold leading-6 text-[#202124]/78">{subtitle}</p></div><div className="space-y-3">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} isActive={activeMessage?.id === message.id} />)}</div></aside><section className="hidden min-h-0 min-w-0 overflow-hidden md:block">{activeMessage ? renderMessageDetails(activeMessage) : null}</section><div className="h-full space-y-3 overflow-y-auto pb-4 custom-scrollbar md:hidden">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)}</div></div>;
+    return <div className="mx-auto grid h-[clamp(32rem,calc(100dvh-10.5rem),76rem)] min-h-0 w-full min-w-0 max-w-[1800px] gap-4 overflow-hidden lg:gap-5 md:grid-cols-[minmax(0,clamp(17rem,30vw,27.5rem))_minmax(0,1fr)]"><aside className="hidden h-full min-h-0 min-w-0 overflow-y-auto rounded-[2rem] border border-[#E0E3EB] bg-white p-3 shadow-[0_20px_60px_rgba(15,23,42,0.08)] ring-1 ring-[#D2E3FC] backdrop-blur-xl custom-scrollbar md:block"><div className="space-y-3">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} isActive={activeMessage?.id === message.id} />)}</div></aside><section className="hidden min-h-0 min-w-0 overflow-hidden md:block">{activeMessage ? renderMessageDetails(activeMessage) : null}</section><div className="h-full space-y-3 overflow-y-auto pb-4 custom-scrollbar md:hidden">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)}</div></div>;
   };
 
   const renderTypeComposer = (activeType: PostType, setActiveType: (type: PostType) => void, accent: 'sky' | 'orange' = 'sky', isStatus = false) => {
@@ -2749,7 +2756,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const sendDisabled = isPrivateChatSending || (!canSendText && !canSendImage && !canSendPoll);
 
     return (
-      <div className={`mx-auto grid overflow-hidden border border-[#D9E7F8] bg-white shadow-[0_26px_80px_rgba(8,26,69,0.10)] ${mobile ? 'h-full w-full max-w-3xl rounded-[1.75rem]' : 'h-[calc(100dvh-10.5rem)] max-w-[1800px] rounded-[2.4rem] lg:grid-cols-[360px_1fr]'}`}>
+      <div className={`mx-auto grid overflow-hidden bg-white ${mobile ? 'h-full min-h-0 w-full border-0 shadow-none' : 'h-[calc(100dvh-10.5rem)] max-w-[1800px] rounded-[2.4rem] border border-[#D9E7F8] shadow-[0_26px_80px_rgba(8,26,69,0.10)] lg:grid-cols-[360px_1fr]'}`}>
         {!mobile ? (
           <aside className="flex min-h-0 flex-col border-r border-[#D9E7F8] bg-gradient-to-b from-[#F8FBFF] to-white">
             <div className="border-b border-[#D9E7F8] p-5">
@@ -2779,7 +2786,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           </aside>
         ) : null}
 
-        <section className="flex min-h-0 flex-col bg-[radial-gradient(circle_at_18%_10%,rgba(23,105,255,0.10),transparent_28%),linear-gradient(180deg,#ffffff,#f8fbff)]">
+        <section className="flex min-h-0 overflow-hidden flex-col bg-[radial-gradient(circle_at_18%_10%,rgba(23,105,255,0.10),transparent_28%),linear-gradient(180deg,#ffffff,#f8fbff)]">
           <div className={`flex items-center gap-3 border-b border-[#D9E7F8] bg-white/95 backdrop-blur-xl ${mobile ? 'sticky top-0 z-20 p-3' : 'p-4 sm:p-5'}`}>
             {mobile ? <button type="button" onClick={() => setPage('directChat')} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-sm">←</button> : null}
             <Avatar value={activeChatCreator?.avatar || '👤'} size={mobile ? 'h-10 w-10' : 'h-12 w-12'} />
@@ -2812,7 +2819,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             </div>
           ) : null}
 
-          <div className={`min-h-0 flex-1 space-y-3 overflow-y-auto custom-scrollbar ${mobile ? 'bg-[radial-gradient(circle_at_20%_0%,rgba(23,105,255,0.10),transparent_28%),#F8FBFF] px-3 py-4' : 'p-4 sm:p-6'}`}>
+          <div className={`min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain custom-scrollbar ${mobile ? 'bg-[radial-gradient(circle_at_20%_0%,rgba(23,105,255,0.10),transparent_28%),#F8FBFF] px-3 py-4' : 'p-4 sm:p-6'}`}>
             {activePrivateMessages.length ? (
               activePrivateMessages.map(renderPrivateMessageBubble)
             ) : (
@@ -2827,7 +2834,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <div ref={directChatMessagesEndRef} />
           </div>
 
-          <div className={`border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl ${mobile ? 'sticky bottom-0 z-20 shadow-[0_-18px_45px_rgba(8,26,69,0.08)]' : 'sm:p-4'}`}>
+          <div className={`shrink-0 border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl ${mobile ? 'z-20 shadow-[0_-18px_45px_rgba(8,26,69,0.08)]' : 'sm:p-4'}`}>
             {privateChatError ? <div className="mb-3 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-xs font-black text-[#C5221F]">{privateChatError}</div> : null}
 
             {chatAttachmentMode === 'image' ? (
@@ -2989,7 +2996,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   );
 
   const renderChatThreadPage = () => (
-    <div className="fixed inset-0 z-[1450] bg-[#F8FBFF] px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:px-4 md:static md:z-auto md:bg-transparent md:p-0">
+    <div className="fixed inset-0 z-[1450] h-[100dvh] overflow-hidden bg-[#F8FBFF] pt-[env(safe-area-inset-top)] md:static md:z-auto md:h-auto md:bg-transparent md:p-0">
       {renderPrivateChatShell(true)}
     </div>
   );
@@ -3065,7 +3072,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const navItems = [
     { label: 'Feed', icon: '📢', active: activeView === 'feed' && page === 'chat', action: () => switchView('feed') },
-    { label: 'Status', icon: '⭕', active: activeView === 'status' && page === 'chat', action: () => { setActiveView('status'); setPage('chat'); setPageStack([]); setShowStatusActions((value) => window.matchMedia('(max-width: 1023px)').matches ? !value : false); } },
+    { label: 'Status', icon: '⭕', active: activeView === 'status' && page === 'chat', action: () => { setActiveView('status'); setPage('chat'); setPageStack([]); setShowStatusActions((value) => window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches ? !value : false); } },
     { label: 'Chat', icon: '💬', active: page === 'directChat' || page === 'directChatThread', action: () => pushPage('directChat') },
     { label: 'Creators', icon: '✍️', active: page === 'creators', action: () => pushPage('creators') },
     { label: 'Admin Post', icon: '📣', active: page === 'adminPosts', action: () => pushPage('adminPosts') },
@@ -3134,11 +3141,28 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
+  const communityDockVisiblePages: CommunityPage[] = [
+    'chat',
+    'directChat',
+    'creators',
+    'adminPosts',
+    'network',
+    'following',
+    'tagMaster',
+    'masterTags',
+  ];
+
+  const shouldHideCommunityDockOnMobile = !communityDockVisiblePages.includes(page);
+
   const CommunityBottomNav = () => (
     <nav
       ref={communityDockScrollRef}
       id="community-bottom-dock"
-      className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[1300] flex items-center gap-1 overflow-x-auto rounded-[1.65rem] border border-[var(--community-border)] bg-[var(--community-dock-bg)]/95 p-2 shadow-[var(--community-shadow)] backdrop-blur-2xl custom-scrollbar lg:hidden"
+      className={`fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[1300] flex items-center gap-1 overflow-x-auto rounded-[1.65rem] border border-[var(--community-border)] bg-[var(--community-dock-bg)]/95 p-2 shadow-[var(--community-shadow)] backdrop-blur-2xl transition-all duration-300 custom-scrollbar lg:hidden ${
+        shouldHideCommunityDockOnMobile
+          ? 'max-md:pointer-events-none max-md:translate-y-[calc(100%+2rem)] max-md:opacity-0'
+          : 'max-md:translate-y-0 max-md:opacity-100'
+      }`}
       onScroll={preserveCommunityDockScroll}
     >
       {navItems.map((item) => (
@@ -3233,7 +3257,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <CommunitySidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <CommunityHeader />
-          <main ref={scrollContainerRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-32 pt-4 custom-scrollbar sm:px-5 lg:px-7 lg:pb-7">
+          <main ref={scrollContainerRef} className={`min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-4 custom-scrollbar sm:px-5 lg:px-7 lg:pb-7 ${
+            shouldHideCommunityDockOnMobile
+              ? 'pb-32 max-md:pb-0 max-md:overscroll-contain'
+              : 'pb-32 max-md:pb-0 max-md:overscroll-contain'
+          }`}>
             {renderMainContent()}
           </main>
         </div>

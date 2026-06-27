@@ -44,6 +44,8 @@ export interface CreditWatchSessionInput extends WatchSessionInput {
 export interface RedeemProductInput {
   userId: string;
   productId: string;
+  requiredCoins?: number;
+  productTitle?: string;
 }
 
 export interface CoinWalletSnapshot {
@@ -308,6 +310,8 @@ export const getProductCoinPrice = async (productId: string): Promise<{
 export const redeemProductWithEduCoins = async ({
   userId,
   productId,
+  requiredCoins,
+  productTitle,
 }: RedeemProductInput): Promise<{
   success: boolean;
   reason?: 'login_required' | 'product_not_found' | 'redeem_disabled' | 'already_unlocked' | 'not_enough_coins';
@@ -333,17 +337,18 @@ export const redeemProductWithEduCoins = async ({
       transaction.get(unlockRef),
     ]);
 
-    if (!productSnap.exists()) {
+    const product = productSnap.exists() ? productSnap.data() : null;
+    const explicitCoinPrice = normalizeCoinPrice(requiredCoins);
+    const coinPrice = explicitCoinPrice > 0 ? explicitCoinPrice : normalizeCoinPrice(product?.coinPrice);
+    const isCoinRedeemEnabled = product ? product.isCoinRedeemEnabled !== false : coinPrice > 0;
+    const productStatus = String(product?.status || 'active');
+
+    if (!productSnap.exists() && coinPrice <= 0) {
       return {
         success: false,
         reason: 'product_not_found' as const,
       };
     }
-
-    const product = productSnap.data();
-    const coinPrice = normalizeCoinPrice(product.coinPrice);
-    const isCoinRedeemEnabled = product.isCoinRedeemEnabled !== false;
-    const productStatus = String(product.status || 'active');
 
     if (!isCoinRedeemEnabled || productStatus === 'inactive' || productStatus === 'draft') {
       return {
@@ -377,6 +382,7 @@ export const redeemProductWithEduCoins = async ({
 
     transaction.set(unlockRef, {
       productId,
+      title: productTitle || product?.title || '',
       unlockMethod: 'educoin',
       coinSpent: coinPrice,
       status: 'active',

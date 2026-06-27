@@ -1,6 +1,7 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { User, WebsiteSettings } from '../App';
 import { EconomySettings } from '../utils/economy';
+import { ensureUserCoinWallet, watchUserCoinWallet } from '../utils/coinWallet';
 
 interface EduCoinGuidePageProps {
   settings: WebsiteSettings;
@@ -24,7 +25,33 @@ const EduCoinGuidePage: React.FC<EduCoinGuidePageProps> = ({
   onOpenProfile,
   onOpenReadingHub,
 }) => {
-  const balance = currentUser?.eduCoins || 0;
+  const [liveWallet, setLiveWallet] = useState<{ coinBalance: number; totalCoinsEarned: number } | null>(null);
+  const walletUserId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
+
+  useEffect(() => {
+    if (!walletUserId) {
+      setLiveWallet(null);
+      return undefined;
+    }
+
+    ensureUserCoinWallet(walletUserId).catch((error) => {
+      console.error('EduCoin guide wallet setup failed:', error);
+    });
+
+    const unsubscribe = watchUserCoinWallet(
+      walletUserId,
+      (wallet) => setLiveWallet({ coinBalance: wallet.coinBalance, totalCoinsEarned: wallet.totalCoinsEarned }),
+      (error) => {
+        console.error('EduCoin guide wallet watch failed:', error);
+        setLiveWallet(null);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [walletUserId]);
+
+  const balance = liveWallet?.coinBalance ?? (currentUser as (User & { coinBalance?: number }) | null)?.coinBalance ?? currentUser?.eduCoins ?? 0;
+  const totalLifetimeCoins = liveWallet?.totalCoinsEarned ?? currentUser?.totalLifetimeCoins ?? balance;
   const missingCoins = Math.max(0, requiredCoins - balance);
   const articleMinutes = Math.max(1, Math.ceil(economySettings.articleReadTimeRequiredSec / 60));
   const coinPerVideoMinute = Math.max(0, Number(economySettings.coinPerVideoMinute));
@@ -75,7 +102,7 @@ const EduCoinGuidePage: React.FC<EduCoinGuidePageProps> = ({
       title: 'Profile milestones',
       reward: '500 / 1000 / 2000 lifetime coin milestone unlocks',
       exactLogic: 'Milestones compare your total lifetime coins with the milestone requirement, then unlock one-time rewards from the profile hub.',
-      estimate: `Your lifetime total is ${currentUser?.totalLifetimeCoins || balance} EduCoins. Claim ready milestones from Profile if available.`,
+      estimate: `Your lifetime total is ${totalLifetimeCoins} EduCoins. Claim ready milestones from Profile if available.`,
       action: onOpenProfile,
       actionLabel: 'Open Profile',
     },
@@ -88,7 +115,7 @@ const EduCoinGuidePage: React.FC<EduCoinGuidePageProps> = ({
       action: onOpenProfile,
       actionLabel: 'Open Vault',
     },
-  ], [articleMinutes, balance, coinPerArticleRead, coinPerPurchase, coinPerQuizCorrect, coinPerVideoMinute, coinToFiatRatio, currentUser?.totalLifetimeCoins, missingCoins, onBack, onExplorePurchases, onOpenProfile, onOpenReadingHub]);
+  ], [articleMinutes, balance, coinPerArticleRead, coinPerPurchase, coinPerQuizCorrect, coinPerVideoMinute, coinToFiatRatio, missingCoins, totalLifetimeCoins, onBack, onExplorePurchases, onOpenProfile, onOpenReadingHub]);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-amber-50 via-white to-indigo-50 px-4 py-10 text-slate-900 sm:px-6 lg:px-8">
