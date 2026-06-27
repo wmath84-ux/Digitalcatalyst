@@ -327,6 +327,12 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   const [theme, setTheme] = useState<'dark' | 'sepia' | 'light'>('dark');
   const docsViewport = useViewportSize();
   const isCompactDocs = docsViewport.width < 768;
+  const editorShellClass = isSidebarOpen && !isCompactDocs
+    ? 'pl-[19.75rem]'
+    : '';
+  const editorPageWidthClass = isSidebarOpen && !isCompactDocs
+    ? 'max-w-4xl'
+    : 'max-w-[min(96rem,calc(100vw-2rem))] xl:max-w-[104rem]';
 
   const activePage = pages.find(page => page.id === activePageId) || pages[0];
   const activeContent = activePage?.content || OPEN_DOCS_DEFAULT_HTML;
@@ -457,8 +463,8 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
           </div>
         )}
         {isSidebarOpen && isCompactDocs && (<button type="button" aria-label="Close Open Docs panel" onClick={() => setIsSidebarOpen(false)} className="absolute inset-0 z-10 bg-slate-950/20 backdrop-blur-[1px]" />)}
-        <div className="h-full min-h-0 overflow-y-auto p-3 sm:p-4 md:p-8 custom-scrollbar">
-          <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={saveCurrentPage} onBlur={saveCurrentPage} onKeyUp={() => saveEditorSelection(editorRef.current, selectionRef)} onMouseUp={() => saveEditorSelection(editorRef.current, selectionRef)} onTouchEnd={() => saveEditorSelection(editorRef.current, selectionRef)} onFocus={() => saveEditorSelection(editorRef.current, selectionRef)} className="open-docs-page mx-auto min-h-full max-w-4xl rounded-[1.25rem] border border-white/50 bg-white/80 px-4 py-6 text-base leading-7 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl sm:rounded-[1.5rem] sm:px-8 sm:py-10 sm:text-lg sm:leading-8 md:px-14 [&_h1]:text-3xl sm:[&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-2xl sm:[&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6" />
+        <div className={`h-full min-h-0 overflow-y-auto p-3 transition-[padding] duration-300 sm:p-4 md:p-8 custom-scrollbar ${editorShellClass}`}>
+          <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={saveCurrentPage} onBlur={saveCurrentPage} onKeyUp={() => saveEditorSelection(editorRef.current, selectionRef)} onMouseUp={() => saveEditorSelection(editorRef.current, selectionRef)} onTouchEnd={() => saveEditorSelection(editorRef.current, selectionRef)} onFocus={() => saveEditorSelection(editorRef.current, selectionRef)} className={`open-docs-page mx-auto min-h-full w-full ${editorPageWidthClass} rounded-[1.25rem] border border-white/50 bg-white/80 px-4 py-6 text-base leading-7 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl transition-[max-width] duration-300 sm:rounded-[1.5rem] sm:px-8 sm:py-10 sm:text-lg sm:leading-8 md:px-14 [&_h1]:text-3xl sm:[&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-2xl sm:[&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6`} />
         </div>
       </div>
 
