@@ -2601,12 +2601,47 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setSelectedChatId(creatorId);
     setChatMenuOpen(false);
     resetPrivateChatComposer();
-    if (window.matchMedia('(max-width: 1023px)').matches) {
+
+    // Only mobile phones should open the nested full chat page.
+    // Tablet and desktop keep the normal split chat layout.
+    if (window.matchMedia('(max-width: 767px)').matches) {
       pushPage('directChatThread');
       return;
     }
 
     if (page !== 'directChat') pushPage('directChat');
+  };
+
+  const renderPrivateChatInbox = () => {
+    const inboxCreators = chatCreators.length ? chatCreators : [];
+
+    return (
+      <div className="mx-auto flex h-[calc(100dvh-10.5rem)] max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-[#D9E7F8] bg-white shadow-[0_26px_80px_rgba(8,26,69,0.10)]">
+        <div className="border-b border-[#D9E7F8] bg-gradient-to-br from-[#F8FBFF] to-white p-5">
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-[#1769FF]">Private messages</p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight text-[#081A45]">Chats</h2>
+          <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">Tap a chat to open the mobile full-screen thread. Messages stay private for 30 days.</p>
+        </div>
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-[#F8FBFF] p-3 custom-scrollbar">
+          {inboxCreators.map((creator) => {
+            const conversationId = getPrivateConversationId(currentUserKey, creator.id);
+            const conversation = privateConversations.find((item) => item.id === conversationId);
+            const unread = conversation?.unreadCounts?.[currentUserKey] || 0;
+
+            return (
+              <button key={creator.id} type="button" onClick={() => openChatCreator(creator.id)} className="flex w-full items-center gap-3 rounded-2xl border border-[#D9E7F8] bg-white p-3 text-left shadow-sm transition hover:bg-[#F8FBFF]">
+                <Avatar value={creator.avatar} size="h-12 w-12" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-base font-black text-[#081A45]">{getCreatorDisplayName(creator)}</span>
+                  <span className="block truncate text-xs font-bold text-[#7C879A]">{conversation?.lastMessage || 'Start private chat'}</span>
+                </span>
+                {unread ? <span className="rounded-full bg-[#1769FF] px-2.5 py-1 text-xs font-black text-white">{unread > 9 ? '9+' : unread}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   const renderPrivateMessageBubble = (message: PrivateChatMessage) => {
@@ -2942,10 +2977,19 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
-  const renderChatPage = () => renderPrivateChatShell(false);
+  const renderChatPage = () => (
+    <>
+      <div className="md:hidden">
+        {renderPrivateChatInbox()}
+      </div>
+      <div className="hidden md:block">
+        {renderPrivateChatShell(false)}
+      </div>
+    </>
+  );
 
   const renderChatThreadPage = () => (
-    <div className="fixed inset-0 z-[1450] bg-[#F8FBFF] px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:px-4 lg:static lg:z-auto lg:bg-transparent lg:p-0">
+    <div className="fixed inset-0 z-[1450] bg-[#F8FBFF] px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:px-4 md:static md:z-auto md:bg-transparent md:p-0">
       {renderPrivateChatShell(true)}
     </div>
   );
