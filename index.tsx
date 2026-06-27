@@ -1,10 +1,24 @@
-
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
-import { registerSW } from 'virtual:pwa-register';
 
-registerSW({ immediate: true });
+const clearStaleServiceWorkers = async () => {
+  if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+  try {
+    const registrations = await navigator.serviceWorker.getRegistrations();
+    await Promise.all(registrations.map((registration) => registration.unregister()));
+
+    if ('caches' in window) {
+      const cacheNames = await window.caches.keys();
+      await Promise.all(cacheNames.map((cacheName) => window.caches.delete(cacheName)));
+    }
+  } catch (error) {
+    console.warn('Service worker cleanup failed; continuing with live app render.', error);
+  }
+};
+
+void clearStaleServiceWorkers();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

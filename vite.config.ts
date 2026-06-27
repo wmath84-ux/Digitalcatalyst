@@ -13,6 +13,8 @@ export default defineConfig(({ mode }) => {
       plugins: [
         react(),
         VitePWA({
+          selfDestroying: true,
+          injectRegister: 'script',
           registerType: 'autoUpdate',
           includeAssets: ['ads.txt'],
           manifest: {
