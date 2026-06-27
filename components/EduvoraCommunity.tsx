@@ -2749,7 +2749,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const sendDisabled = isPrivateChatSending || (!canSendText && !canSendImage && !canSendPoll);
 
     return (
-      <div className={`mx-auto grid overflow-hidden border border-[#D9E7F8] bg-white shadow-[0_26px_80px_rgba(8,26,69,0.10)] ${mobile ? 'h-full w-full max-w-3xl rounded-[1.75rem]' : 'h-[calc(100dvh-10.5rem)] max-w-[1800px] rounded-[2.4rem] lg:grid-cols-[360px_1fr]'}`}>
+      <div className={`mx-auto grid overflow-hidden bg-white ${mobile ? 'h-full w-full border-0 shadow-none' : 'h-[calc(100dvh-10.5rem)] max-w-[1800px] rounded-[2.4rem] border border-[#D9E7F8] shadow-[0_26px_80px_rgba(8,26,69,0.10)] lg:grid-cols-[360px_1fr]'}`}>
         {!mobile ? (
           <aside className="flex min-h-0 flex-col border-r border-[#D9E7F8] bg-gradient-to-b from-[#F8FBFF] to-white">
             <div className="border-b border-[#D9E7F8] p-5">
@@ -2812,7 +2812,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             </div>
           ) : null}
 
-          <div className={`min-h-0 flex-1 space-y-3 overflow-y-auto custom-scrollbar ${mobile ? 'bg-[radial-gradient(circle_at_20%_0%,rgba(23,105,255,0.10),transparent_28%),#F8FBFF] px-3 py-4' : 'p-4 sm:p-6'}`}>
+          <div className={`min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain custom-scrollbar ${mobile ? 'bg-[radial-gradient(circle_at_20%_0%,rgba(23,105,255,0.10),transparent_28%),#F8FBFF] px-3 py-4' : 'p-4 sm:p-6'}`}>
             {activePrivateMessages.length ? (
               activePrivateMessages.map(renderPrivateMessageBubble)
             ) : (
@@ -2827,7 +2827,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <div ref={directChatMessagesEndRef} />
           </div>
 
-          <div className={`border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl ${mobile ? 'sticky bottom-0 z-20 shadow-[0_-18px_45px_rgba(8,26,69,0.08)]' : 'sm:p-4'}`}>
+          <div className={`shrink-0 border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl ${mobile ? 'z-20 shadow-[0_-18px_45px_rgba(8,26,69,0.08)]' : 'sm:p-4'}`}>
             {privateChatError ? <div className="mb-3 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-xs font-black text-[#C5221F]">{privateChatError}</div> : null}
 
             {chatAttachmentMode === 'image' ? (
@@ -2989,7 +2989,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   );
 
   const renderChatThreadPage = () => (
-    <div className="fixed inset-0 z-[1450] bg-[#F8FBFF] px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:px-4 md:static md:z-auto md:bg-transparent md:p-0">
+    <div className="fixed inset-0 z-[1450] overflow-hidden bg-[#F8FBFF] pt-[env(safe-area-inset-top)] md:static md:z-auto md:bg-transparent md:p-0">
       {renderPrivateChatShell(true)}
     </div>
   );
@@ -3065,7 +3065,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const navItems = [
     { label: 'Feed', icon: '📢', active: activeView === 'feed' && page === 'chat', action: () => switchView('feed') },
-    { label: 'Status', icon: '⭕', active: activeView === 'status' && page === 'chat', action: () => { setActiveView('status'); setPage('chat'); setPageStack([]); setShowStatusActions((value) => window.matchMedia('(max-width: 1023px)').matches ? !value : false); } },
+    { label: 'Status', icon: '⭕', active: activeView === 'status' && page === 'chat', action: () => { setActiveView('status'); setPage('chat'); setPageStack([]); setShowStatusActions((value) => window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches ? !value : false); } },
     { label: 'Chat', icon: '💬', active: page === 'directChat' || page === 'directChatThread', action: () => pushPage('directChat') },
     { label: 'Creators', icon: '✍️', active: page === 'creators', action: () => pushPage('creators') },
     { label: 'Admin Post', icon: '📣', active: page === 'adminPosts', action: () => pushPage('adminPosts') },
@@ -3134,11 +3134,28 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
+  const communityDockVisiblePages: CommunityPage[] = [
+    'chat',
+    'directChat',
+    'creators',
+    'adminPosts',
+    'network',
+    'following',
+    'tagMaster',
+    'masterTags',
+  ];
+
+  const shouldHideCommunityDockOnMobile = !communityDockVisiblePages.includes(page);
+
   const CommunityBottomNav = () => (
     <nav
       ref={communityDockScrollRef}
       id="community-bottom-dock"
-      className="fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[1300] flex items-center gap-1 overflow-x-auto rounded-[1.65rem] border border-[var(--community-border)] bg-[var(--community-dock-bg)]/95 p-2 shadow-[var(--community-shadow)] backdrop-blur-2xl custom-scrollbar lg:hidden"
+      className={`fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[1300] flex items-center gap-1 overflow-x-auto rounded-[1.65rem] border border-[var(--community-border)] bg-[var(--community-dock-bg)]/95 p-2 shadow-[var(--community-shadow)] backdrop-blur-2xl transition-all duration-300 custom-scrollbar lg:hidden ${
+        shouldHideCommunityDockOnMobile
+          ? 'max-md:pointer-events-none max-md:translate-y-[calc(100%+2rem)] max-md:opacity-0'
+          : 'max-md:translate-y-0 max-md:opacity-100'
+      }`}
       onScroll={preserveCommunityDockScroll}
     >
       {navItems.map((item) => (
@@ -3233,7 +3250,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <CommunitySidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <CommunityHeader />
-          <main ref={scrollContainerRef} className="min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pb-32 pt-4 custom-scrollbar sm:px-5 lg:px-7 lg:pb-7">
+          <main ref={scrollContainerRef} className={`min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-4 custom-scrollbar sm:px-5 lg:px-7 lg:pb-7 ${
+            shouldHideCommunityDockOnMobile
+              ? 'pb-32 max-md:pb-0 max-md:overscroll-contain'
+              : 'pb-32'
+          }`}>
             {renderMainContent()}
           </main>
         </div>
