@@ -36,8 +36,25 @@ type Creator = {
   source?: 'profile' | 'seed';
 };
 type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'status' };
-type SharedStory = { id: number; statusId: number; recipientId: string; senderId: 'me'; senderName: string; time: string };
-type PrivateChatMessageType = 'text' | 'image' | 'poll';
+type PrivateSharedItem = {
+  sourceType: 'status' | 'feed_message';
+  sourceId: string;
+  sourceCollection: string;
+  sourceOwnerId?: string;
+  title: string;
+  previewText: string;
+  imageUrl?: string;
+  imageLayout?: 'thumbnail' | 'original';
+  storagePath?: string;
+  originalCreatedAt?: number;
+  originalExpiresAt?: number;
+};
+
+type ShareTarget =
+  | { sourceType: 'status'; status: StatusCard }
+  | { sourceType: 'feed_message'; message: FeedMessage };
+
+type PrivateChatMessageType = 'text' | 'image' | 'poll' | 'shared_item';
 
 type PrivateChatPoll = {
   question: string;
@@ -61,6 +78,7 @@ type PrivateChatMessage = {
   storagePath?: string;
   uploadBytes?: number;
   poll?: PrivateChatPoll;
+  sharedItem?: PrivateSharedItem;
   createdAt: number;
   expiresAt: number;
   readBy: Record<string, boolean>;
@@ -514,6 +532,7 @@ const mapPrivateChatMessageDoc = (snapshotDoc: { id: string; data: () => Record<
     storagePath: data.storagePath || '',
     uploadBytes: Number(data.uploadBytes) || 0,
     poll: data.poll,
+    sharedItem: data.sharedItem && typeof data.sharedItem === 'object' ? data.sharedItem as PrivateSharedItem : undefined,
     createdAt: asMillis(data.createdAt),
     expiresAt: asMillis(data.expiresAt),
     readBy: data.readBy || {},
@@ -543,8 +562,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [likedMessages, setLikedMessages] = useState<number[]>([]);
   const [viewedStatusIds, setViewedStatusIds] = useState<number[]>([]);
   const [imageLightbox, setImageLightbox] = useState<{ src: string; alt: string; mode: 'thumbnail' | 'original' } | null>(null);
-  const [sharedStories, setSharedStories] = useState<SharedStory[]>([]);
-  const [shareStatusId, setShareStatusId] = useState<number | null>(null);
+  const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
+  const [shareRecipientSearch, setShareRecipientSearch] = useState('');
+  const [shareCaption, setShareCaption] = useState('');
+  const [shareSendingId, setShareSendingId] = useState('');
+  const [shareFeedback, setShareFeedback] = useState('');
   const [selectedChatId, setSelectedChatId] = useState(creators[0].id);
   const [privateConversations, setPrivateConversations] = useState<PrivateConversation[]>([]);
   const [privateMessages, setPrivateMessages] = useState<PrivateChatMessage[]>([]);
@@ -680,9 +702,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const isCreatorTypeUsedToday = usedCreatorTypesToday.includes(postType);
   const isStatusTypeUsedToday = usedStatusTypesToday.includes(statusType);
   const myStatuses = statusCards.filter((status) => isOwnCommunityId(status.ownerId));
-  const privateChatCreators = allCreators.filter((creator) => !isOwnCommunityId(creator.id));
-  const chatCreators = privateChatCreators.length ? privateChatCreators : allCreators.filter((creator) => creator.id !== currentUserKey);
-  const activeChatCreator = allCreators.find((creator) => creator.id === selectedChatId && !isOwnCommunityId(creator.id)) || chatCreators[0];
+  const chatCreators = allCreators.length ? allCreators : [currentProfileCreator];
+  const activeChatCreator = allCreators.find((creator) => creator.id === selectedChatId) || chatCreators[0];
   const activeConversationId = activeChatCreator ? getPrivateConversationId(currentUserKey, activeChatCreator.id) : '';
   const activeConversation = privateConversations.find((conversation) => conversation.id === activeConversationId);
   const activePrivateMessages = privateMessages
@@ -691,7 +712,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const activePinnedMessage = activeConversation?.pinnedMessageId
     ? activePrivateMessages.find((message) => message.id === activeConversation.pinnedMessageId)
     : undefined;
-  const activeChatStories = sharedStories.filter((story) => story.recipientId === activeChatCreator?.id);
   const shouldShowStatusDetail = (card: StatusCard) => card.body.length > 140 || Boolean(card.imagePreview && card.body.trim().length > 0);
   const profileStats = useMemo(() => ({
     coinBalance: eduCoins,
@@ -705,11 +725,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const visibleForYouCreators = useMemo(() => {
     return allCreators
-      .filter((creator) => !isOwnCommunityId(creator.id))
       .sort((a, b) => {
+        const aSelf = isOwnCommunityId(a.id) ? 1 : 0;
+        const bSelf = isOwnCommunityId(b.id) ? 1 : 0;
+        if (aSelf !== bSelf) return bSelf - aSelf;
+
         const aFollowing = followedByCreatorIds[a.id] ? 1 : 0;
         const bFollowing = followedByCreatorIds[b.id] ? 1 : 0;
         if (aFollowing !== bFollowing) return aFollowing - bFollowing;
+
         return a.name.localeCompare(b.name);
       });
   }, [allCreators, followedByCreatorIds, currentUserKey]);
@@ -845,19 +869,24 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const ensurePrivateConversation = async (conversationId: string, receiver: Creator) => {
+    const existingConversation = privateConversations.find((conversation) => conversation.id === conversationId);
     const conversationRef = doc(db, PRIVATE_CHATS, conversationId);
+
     await setDoc(conversationRef, stripUndefinedDeep({
       participants: [currentUserKey, receiver.id],
       participantMap: { [currentUserKey]: true, [receiver.id]: true },
-      participantNames: { [currentUserKey]: profile.name, [receiver.id]: receiver.name },
+      participantNames: {
+        [currentUserKey]: profile.name,
+        [receiver.id]: isOwnCommunityId(receiver.id) ? 'Saved messages' : receiver.name,
+      },
       participantAvatars: { [currentUserKey]: profile.avatar, [receiver.id]: receiver.avatar },
-      createdAt: activeConversation?.createdAt || Date.now(),
+      createdAt: existingConversation?.createdAt || Date.now(),
       updatedAt: Date.now(),
-      lastMessage: activeConversation?.lastMessage || '',
-      lastMessageType: activeConversation?.lastMessageType || 'text',
-      lastMessageAt: activeConversation?.lastMessageAt || Date.now(),
-      lastSenderId: activeConversation?.lastSenderId || '',
-      unreadCounts: activeConversation?.unreadCounts || { [currentUserKey]: 0, [receiver.id]: 0 },
+      lastMessage: existingConversation?.lastMessage || '',
+      lastMessageType: existingConversation?.lastMessageType || 'text',
+      lastMessageAt: existingConversation?.lastMessageAt || Date.now(),
+      lastSenderId: existingConversation?.lastSenderId || '',
+      unreadCounts: existingConversation?.unreadCounts || { [currentUserKey]: 0, [receiver.id]: 0 },
     }), { merge: true });
   };
 
@@ -867,7 +896,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       return;
     }
 
-    if (!activeChatCreator || !activeConversationId || activeChatCreator.id === currentUserKey) return;
+    if (!activeChatCreator || !activeConversationId) return;
 
     const type = forcedType || chatAttachmentMode || 'text';
     const text = chatDraft.trim();
@@ -917,7 +946,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         senderId: currentUserKey,
         receiverId: activeChatCreator.id,
         senderName: profile.name,
-        receiverName: activeChatCreator.name,
+        receiverName: getCreatorDisplayName(activeChatCreator),
         type,
         text: type === 'text' ? text : undefined,
         caption: type === 'image' ? text : undefined,
@@ -944,7 +973,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       await setDoc(doc(db, PRIVATE_CHATS, activeConversationId), stripUndefinedDeep({
         participants: [currentUserKey, activeChatCreator.id],
         participantMap: { [currentUserKey]: true, [activeChatCreator.id]: true },
-        participantNames: { [currentUserKey]: profile.name, [activeChatCreator.id]: activeChatCreator.name },
+        participantNames: { [currentUserKey]: profile.name, [activeChatCreator.id]: getCreatorDisplayName(activeChatCreator) },
         participantAvatars: { [currentUserKey]: profile.avatar, [activeChatCreator.id]: activeChatCreator.avatar },
         updatedAt: createdAt,
         lastMessage,
@@ -953,7 +982,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         lastSenderId: currentUserKey,
         unreadCounts: {
           ...(activeConversation?.unreadCounts || {}),
-          [activeChatCreator.id]: (activeConversation?.unreadCounts?.[activeChatCreator.id] || 0) + 1,
+          [activeChatCreator.id]: activeChatCreator.id === currentUserKey ? 0 : (activeConversation?.unreadCounts?.[activeChatCreator.id] || 0) + 1,
           [currentUserKey]: 0,
         },
       }), { merge: true });
@@ -1114,7 +1143,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const pushPage = (nextPage: CommunityPage, options: { preserveScroll?: boolean } = {}) => {
     setIsNotificationPanelOpen(false);
     setShowStatusActions(false);
-    setShareStatusId(null);
+    setShareTarget(null);
+    setShareRecipientSearch('');
+    setShareCaption('');
+    setShareSendingId('');
+    setShareFeedback('');
     setExpandedReplyId(null);
 
     if (page === 'chat' && activeView === 'feed' && scrollContainerRef.current) {
@@ -2004,10 +2037,159 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     }
   };
 
-  const shareStatusWithCreator = (statusId: number, recipientId: string) => {
-    const sharedStory: SharedStory = { id: Date.now() + Math.floor(Math.random() * 1000), statusId, recipientId, senderId: 'me', senderName: profile.name, time: 'Just now' };
-    setSharedStories((current) => [sharedStory, ...current]);
-    setSelectedChatId(recipientId);
+  const closeShareComposer = () => {
+    setShareTarget(null);
+    setShareRecipientSearch('');
+    setShareCaption('');
+    setShareSendingId('');
+    setShareFeedback('');
+  };
+
+  const openShareComposer = (target: ShareTarget) => {
+    if (!guardedAuth.currentUser || !currentUserKey) {
+      redirectToAuth();
+      return;
+    }
+
+    setShareTarget(target);
+    setShareRecipientSearch('');
+    setShareCaption('');
+    setShareSendingId('');
+    setShareFeedback('');
+  };
+
+  const getCreatorDisplayName = (creator?: Creator) => {
+    if (!creator) return 'Private chat';
+    return isOwnCommunityId(creator.id) ? 'Saved messages' : creator.name;
+  };
+
+  const getCreatorSubtitle = (creator?: Creator) => {
+    if (!creator) return 'Private · Firebase synced · Auto-hidden after 30 days';
+    return isOwnCommunityId(creator.id) ? 'Only you can see this' : 'Private · Firebase synced · Auto-hidden after 30 days';
+  };
+
+  const buildSharedItemFromTarget = (target: ShareTarget): PrivateSharedItem => {
+    if (target.sourceType === 'status') {
+      const status = target.status;
+
+      return {
+        sourceType: 'status',
+        sourceId: status.docId || String(status.id),
+        sourceCollection: COMMUNITY_STATUS,
+        sourceOwnerId: status.ownerId,
+        title: status.title || 'Shared status',
+        previewText: status.body || status.slots || 'Status story',
+        imageUrl: status.imagePreview,
+        imageLayout: status.imageLayout || 'original',
+        storagePath: undefined,
+        originalCreatedAt: status.createdAt,
+        originalExpiresAt: status.expiresAt,
+      };
+    }
+
+    const message = target.message;
+
+    return {
+      sourceType: 'feed_message',
+      sourceId: message.docId || String(message.id),
+      sourceCollection: COMMUNITY_FEED,
+      sourceOwnerId: message.ownerId || message.creatorId,
+      title: message.title || 'Shared post',
+      previewText: message.body || message.badge || 'Community feed post',
+      imageUrl: message.imagePreview,
+      imageLayout: message.imageLayout || 'thumbnail',
+      storagePath: undefined,
+      originalCreatedAt: message.createdAt,
+      originalExpiresAt: message.expiresAt,
+    };
+  };
+
+  const copySharedMediaIfNeeded = async (conversationId: string, messageId: string, sharedItem: PrivateSharedItem) => {
+    if (!sharedItem.imageUrl || !sharedItem.imageUrl.startsWith('data:')) return sharedItem;
+
+    const uploaded = await uploadPrivateChatImage(conversationId, messageId, sharedItem.imageUrl);
+
+    return {
+      ...sharedItem,
+      imageUrl: uploaded.imageUrl,
+      storagePath: uploaded.storagePath,
+    };
+  };
+
+  const sendSharedItemToPrivateChat = async (receiver: Creator) => {
+    if (!shareTarget || !guardedAuth.currentUser || !currentUserKey) {
+      redirectToAuth();
+      return;
+    }
+
+    const conversationId = getPrivateConversationId(currentUserKey, receiver.id);
+    const existingConversation = privateConversations.find((conversation) => conversation.id === conversationId);
+    const messageId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const createdAt = Date.now();
+    const expiresAt = createdAt + PRIVATE_CHAT_TTL_MS;
+    const caption = shareCaption.trim();
+    let copiedStoragePath = '';
+
+    setShareSendingId(receiver.id);
+    setShareFeedback('');
+
+    try {
+      await ensurePrivateConversation(conversationId, receiver);
+
+      const sharedItem = await copySharedMediaIfNeeded(conversationId, messageId, buildSharedItemFromTarget(shareTarget));
+      copiedStoragePath = sharedItem.storagePath || '';
+
+      const messagePayload: PrivateChatMessage = {
+        id: messageId,
+        conversationId,
+        senderId: currentUserKey,
+        receiverId: receiver.id,
+        senderName: profile.name,
+        receiverName: getCreatorDisplayName(receiver),
+        type: 'shared_item',
+        caption: caption || undefined,
+        sharedItem,
+        storagePath: sharedItem.storagePath,
+        uploadBytes: 0,
+        createdAt,
+        expiresAt,
+        readBy: { [currentUserKey]: true },
+        status: 'sent',
+      };
+
+      await setDoc(doc(db, PRIVATE_CHATS, conversationId, PRIVATE_CHAT_MESSAGES, messageId), stripUndefinedDeep(messagePayload));
+
+      await setDoc(doc(db, PRIVATE_CHATS, conversationId), stripUndefinedDeep({
+        participants: [currentUserKey, receiver.id],
+        participantMap: { [currentUserKey]: true, [receiver.id]: true },
+        participantNames: {
+          [currentUserKey]: profile.name,
+          [receiver.id]: getCreatorDisplayName(receiver),
+        },
+        participantAvatars: { [currentUserKey]: profile.avatar, [receiver.id]: receiver.avatar },
+        updatedAt: createdAt,
+        lastMessage: shareTarget.sourceType === 'status' ? '↗️ Shared status' : '↗️ Shared post',
+        lastMessageType: 'shared_item',
+        lastMessageAt: createdAt,
+        lastSenderId: currentUserKey,
+        unreadCounts: {
+          ...(existingConversation?.unreadCounts || {}),
+          [receiver.id]: receiver.id === currentUserKey ? 0 : (existingConversation?.unreadCounts?.[receiver.id] || 0) + 1,
+          [currentUserKey]: 0,
+        },
+      }), { merge: true });
+
+      setSelectedChatId(receiver.id);
+      setShareFeedback(`Shared to ${getCreatorDisplayName(receiver)}.`);
+    } catch (error) {
+      console.warn('Shared item send failed', error);
+      if (copiedStoragePath) {
+        deleteObject(ref(storage, copiedStoragePath)).catch((deleteError) => console.warn('Shared media rollback failed', deleteError));
+      }
+      setShareFeedback('Could not share. Please try again.');
+    } finally {
+      setShareSendingId('');
+    }
   };
 
   const submitMasterTag = async () => {
@@ -2276,6 +2458,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className="rounded-full bg-[#FCE8E6] px-2 py-1 text-[11px] font-black text-[#C5221F]">❤️ {message.likeCount || 0}</span>
             <span className="rounded-full bg-[#E8F0FE] px-2 py-1 text-[11px] font-black text-[#1967D2]">💬 {message.replyCount || message.replies.length}</span>
+            <button type="button" onClick={(event) => { event.stopPropagation(); openShareComposer({ sourceType: 'feed_message', message }); }} className="rounded-full border border-[#DADCE0] bg-white px-2 py-1 text-[11px] font-black text-[#202124] transition hover:border-[#1A73E8] hover:text-[#1967D2]">↗️ Share</button>
             {REACTION_EMOJIS.slice(0, 3).map((emoji) => <button key={emoji} type="button" onClick={(event) => { event.stopPropagation(); reactToMessage(message, emoji); }} className="rounded-full border border-[#DADCE0] bg-white px-2 py-1 text-[11px] font-black text-[#202124]">{emoji} {(message.reactionCounts || {})[emoji] || 0}</button>)}
           </div>
         </div>
@@ -2290,6 +2473,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <Avatar value={resolveAvatar(message)} />
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2"><h2 className="text-lg font-black text-[#202124] sm:text-xl">{resolveName(message)}</h2><span className="rounded-full border border-[#D2E3FC] bg-white px-2.5 py-1 text-[11px] font-black text-[#1967D2]">{message.badge}</span><span className="text-xs font-bold text-[#5F6368]">{message.time}</span></div>
+            <button type="button" onClick={() => openShareComposer({ sourceType: 'feed_message', message })} className="mt-3 rounded-full border border-[#D2E3FC] bg-[#F8FBFF] px-4 py-2 text-xs font-black text-[#1967D2] transition hover:border-[#1A73E8] hover:bg-[#E8F0FE]">↗️ Share privately</button>
             <h3 className="mt-3 text-2xl font-black tracking-tight text-[#202124] lg:text-4xl">{message.title}</h3>
             <p className="mt-3 whitespace-pre-wrap text-base font-semibold leading-8 text-[#5F6368] sm:text-lg">{message.body}</p>{message.imagePreview ? <div className="mt-5 aspect-square max-w-md overflow-hidden rounded-[2rem] border border-[#C2E7FF] bg-gradient-to-br from-[#E8F0FE] via-[#EDF2FA] to-[#C2E7FF] shadow-inner">{renderUploadedImage(message.imagePreview, message.title, message.imageLayout || 'thumbnail')}</div> : null}{message.pollOptions ? <div className="mt-5 space-y-3 rounded-[1.6rem] border border-[#CEEAD6] bg-[#E6F4EA] p-4">{message.pollOptions.map((option, index) => { const votes = message.pollVotes || message.pollOptions!.map(() => 0); const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0)); const percent = Math.round((votes[index] / total) * 100); const selectedOption = message.pollVoters?.[currentUserKey] ?? message.selectedPollOption; const selected = selectedOption === index; return <button key={option} type="button" onClick={() => voteOnMessagePoll(message.id, index)} className={`relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left font-black transition ${selected ? 'border-[#34A853] bg-white text-[#137333]' : 'border-[#CEEAD6] bg-white text-[#202124] hover:border-[#34A853]'}`}><span className="absolute inset-y-0 left-0 bg-[#CEEAD6]" style={{ width: selectedOption !== undefined ? `${percent}%` : '0%' }} /><span className="relative flex items-center justify-between"><span>{option}</span>{selectedOption !== undefined ? <span>{percent}% · {votes[index]}</span> : <span>Vote</span>}</span></button>; })}</div> : null}
             {renderReactionStrip(message)}<div className="mt-5 flex flex-wrap gap-2"><button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-3 py-1.5 text-sm font-black transition ${(message.likedByUsers?.[currentUserKey] || likedMessages.includes(message.id)) ? 'border-[#F8D7DA] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D2E3FC] bg-[#E8F0FE] text-[#1967D2]'}`}>❤️ {message.likeCount || 0}</button><span className="rounded-full border border-[#D2E3FC] bg-[#E8F0FE] px-3 py-1.5 text-sm font-black text-[#1967D2]">💬 {message.replyCount || message.replies.length}</span></div>
@@ -2390,12 +2574,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 {renderStatusReelContent(card)}
                 <div className="flex items-center justify-between text-sm font-black text-white/80"><span>Swipe for next status</span><span>👁️ {card.views} views</span></div>
               </article>
-              <div className="mx-auto flex flex-row justify-center gap-3 md:flex-col"><button type="button" onClick={() => toggleStatusLike(card.id)} className={`flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 ${(card.likedByUsers?.[currentUserKey] || likedStatuses.includes(card.id)) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#202124]/20 text-white'} shadow-2xl backdrop-blur-xl transition hover:scale-105`}><span>❤️</span><span className="text-[11px] font-black">{card.likedBy}</span></button><button type="button" onClick={() => setShareStatusId(card.id)} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#202124]/20 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>↗️</span><span className="text-[11px] font-black">Share</span></button></div>
+              <div className="mx-auto flex flex-row justify-center gap-3 md:flex-col"><button type="button" onClick={() => toggleStatusLike(card.id)} className={`flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 ${(card.likedByUsers?.[currentUserKey] || likedStatuses.includes(card.id)) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#202124]/20 text-white'} shadow-2xl backdrop-blur-xl transition hover:scale-105`}><span>❤️</span><span className="text-[11px] font-black">{card.likedBy}</span></button><button type="button" onClick={() => openShareComposer({ sourceType: 'status', status: card })} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#202124]/20 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>↗️</span><span className="text-[11px] font-black">Share</span></button></div>
             </div>
           </section>
         ))}
       </div>
-      {shareStatusId !== null ? <div className="fixed inset-0 z-30 flex items-end justify-center bg-[#1A73E8]/35 p-4 backdrop-blur-sm sm:items-center"><div className="w-full max-w-lg overflow-hidden rounded-[2rem] border border-white/20 bg-[#D3E3FD] text-[#202124] shadow-[0_28px_90px_rgba(0,0,0,0.35)]"><div className="bg-gradient-to-br from-[#E8F0FE] via-[#D3E3FD] to-[#C2E7FF] p-5 text-[#202124]"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.28em] text-[#202124]/80">Send story</p><h3 className="mt-2 text-2xl font-black">Share with followers</h3></div><button type="button" onClick={() => setShareStatusId(null)} className="rounded-full bg-white/70 px-3 py-2 text-sm font-black text-[#202124]">✕</button></div><p className="mt-2 text-sm font-semibold text-[#202124]/75">Story chat abhi sirf shared stories dikhata hai — direct messages pending rakhe gaye hain.</p></div><div className="max-h-[55vh] space-y-2 overflow-y-auto p-3 custom-scrollbar">{allCreators.map((creator) => { const sent = sharedStories.some((story) => story.statusId === shareStatusId && story.recipientId === creator.id); return <button key={creator.id} type="button" onClick={() => shareStatusWithCreator(shareStatusId, creator.id)} className="flex w-full items-center gap-3 rounded-2xl border border-[#E0E3EB] bg-[#F8FAFD] p-3 text-left transition hover:-translate-y-0.5 hover:bg-white hover:shadow-md"><Avatar value={creator.avatar} size="h-11 w-11" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-black text-[#202124]">{creator.name}</span><span className="block truncate text-xs font-bold text-[#5F6368]">@{creator.username}</span></span><span className={`rounded-full px-3 py-1 text-xs font-black ${sent ? 'bg-[#E6F4EA] text-[#137333]' : 'bg-[#1A73E8] text-white'}`}>{sent ? 'Sent' : 'Send'}</span></button>; })}</div><button type="button" onClick={() => { setShareStatusId(null); pushPage('directChat'); }} className="m-3 mt-0 w-[calc(100%-1.5rem)] rounded-2xl bg-[#1A73E8] px-4 py-3 text-sm font-black text-white">Open Chat</button></div></div> : null}
+
       </div>
     );
   };
@@ -2404,17 +2588,66 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setSelectedChatId(creatorId);
     setChatMenuOpen(false);
     resetPrivateChatComposer();
-    if (window.matchMedia('(max-width: 1023px)').matches) pushPage('directChatThread');
+    if (window.matchMedia('(max-width: 1023px)').matches) {
+      pushPage('directChatThread');
+      return;
+    }
+
+    if (page !== 'directChat') pushPage('directChat');
   };
 
   const renderPrivateMessageBubble = (message: PrivateChatMessage) => {
     const mine = message.senderId === currentUserKey;
     const poll = message.poll;
     const selectedPollOption = poll?.voters?.[currentUserKey];
+    const sharedItem = message.sharedItem;
+
+    const openSharedItem = () => {
+      if (!sharedItem) return;
+
+      if (sharedItem.sourceType === 'status') {
+        const targetStatus = statusCards.find((status) => String(status.docId || status.id) === sharedItem.sourceId);
+        if (targetStatus) {
+          openStatusReel(targetStatus.id);
+          return;
+        }
+        setPrivateChatError('Original status has expired, but this shared preview is still saved here.');
+        return;
+      }
+
+      const targetMessage = messages.find((item) => String(item.docId || item.id) === sharedItem.sourceId);
+      if (targetMessage) {
+        setSelectedMessageId(targetMessage.id);
+        setActiveView('feed');
+        setPage(window.matchMedia('(max-width: 767px)').matches ? 'thread' : 'chat');
+        setPageStack([]);
+        return;
+      }
+
+      setPrivateChatError('Original post is not available, but this shared preview is still saved here.');
+    };
 
     return (
       <div key={message.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
         <article className={`max-w-[min(82%,34rem)] overflow-hidden rounded-[1.65rem] px-4 py-3 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${mine ? 'rounded-br-md bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-white' : 'rounded-bl-md border border-[#D9E7F8] bg-white text-[#081A45]'}`}>
+          {message.type === 'shared_item' && sharedItem ? (
+            <button type="button" onClick={openSharedItem} className={`block w-full overflow-hidden rounded-[1.35rem] border text-left transition hover:scale-[1.01] ${mine ? 'border-white/25 bg-white/12' : 'border-[#D9E7F8] bg-[#F8FBFF]'}`}>
+              {sharedItem.imageUrl ? (
+                <div className="max-h-56 overflow-hidden bg-white/15">
+                  {renderUploadedImage(sharedItem.imageUrl, sharedItem.title, sharedItem.imageLayout || 'thumbnail')}
+                </div>
+              ) : null}
+              <div className="p-3">
+                <span className={`rounded-full px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${mine ? 'bg-white/20 text-white' : 'bg-[#E8F2FF] text-[#1769FF]'}`}>
+                  {sharedItem.sourceType === 'status' ? 'Shared status' : 'Shared post'}
+                </span>
+                <h4 className="mt-2 line-clamp-2 text-sm font-black">{sharedItem.title}</h4>
+                <p className={`mt-1 line-clamp-3 text-xs font-semibold leading-5 ${mine ? 'text-white/82' : 'text-[#536178]'}`}>{sharedItem.previewText}</p>
+                {message.caption ? <p className={`mt-3 whitespace-pre-wrap rounded-2xl px-3 py-2 text-xs font-bold ${mine ? 'bg-white/12 text-white' : 'bg-white text-[#081A45]'}`}>{message.caption}</p> : null}
+              </div>
+            </button>
+          ) : null}
+
           {message.type === 'image' && message.imageUrl ? (
             <button type="button" onClick={() => setImageLightbox({ src: message.imageUrl!, alt: message.caption || 'Chat image', mode: 'original' })} className="mb-3 block max-h-80 w-full overflow-hidden rounded-[1.25rem] bg-white/15">
               {renderUploadedImage(message.imageUrl, message.caption || 'Chat image', 'original')}
@@ -2448,9 +2681,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 })}
               </div>
             </div>
-          ) : (
+          ) : message.type !== 'shared_item' ? (
             <p className="whitespace-pre-wrap break-words text-sm font-semibold leading-6">{message.type === 'image' ? message.caption : message.text}</p>
-          )}
+          ) : null}
 
           <div className={`mt-2 text-right text-[10px] font-black ${mine ? 'text-white/70' : 'text-[#7C879A]'}`}>
             {formatCommunityTime(message.createdAt)} · expires in 30d
@@ -2487,7 +2720,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                   <button key={creator.id} type="button" onClick={() => openChatCreator(creator.id)} className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${active ? 'border-[#BFD7FF] bg-[#E8F2FF] shadow-md' : 'border-transparent bg-white hover:bg-[#F8FBFF]'}`}>
                     <Avatar value={creator.avatar} size="h-12 w-12" />
                     <span className="min-w-0 flex-1">
-                      <span className="block truncate text-base font-black text-[#081A45]">{creator.name}</span>
+                      <span className="block truncate text-base font-black text-[#081A45]">{getCreatorDisplayName(creator)}</span>
                       <span className="block truncate text-xs font-bold text-[#7C879A]">{conversation?.lastMessage || 'Start private chat'}</span>
                     </span>
                     {unread ? <span className="rounded-full bg-[#1769FF] px-2.5 py-1 text-xs font-black text-white">{unread > 9 ? '9+' : unread}</span> : null}
@@ -2503,8 +2736,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             {mobile ? <button type="button" onClick={() => setPage('directChat')} className="rounded-2xl border border-[#D9E7F8] bg-white px-3 py-2 text-sm font-black text-[#536178]">←</button> : null}
             <Avatar value={activeChatCreator?.avatar || '👤'} size="h-12 w-12" />
             <div className="min-w-0 flex-1">
-              <h3 className="truncate text-xl font-black text-[#081A45] sm:text-2xl">{activeChatCreator?.name || 'Private chat'}</h3>
-              <p className="truncate text-xs font-bold text-[#7C879A]">Private · Firebase synced · Auto-hidden after 30 days</p>
+              <h3 className="truncate text-xl font-black text-[#081A45] sm:text-2xl">{getCreatorDisplayName(activeChatCreator)}</h3>
+              <p className="truncate text-xs font-bold text-[#7C879A]">{getCreatorSubtitle(activeChatCreator)}</p>
             </div>
             <div className="relative">
               <button type="button" onClick={() => setChatMenuOpen((open) => !open)} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-xl font-black text-[#081A45]">⋯</button>
@@ -2524,7 +2757,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 <span className="text-lg">📌</span>
                 <div className="min-w-0 flex-1">
                   <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1769FF]">Pinned message</p>
-                  <p className="mt-1 line-clamp-2 text-sm font-bold text-[#536178]">{activePinnedMessage.text || activePinnedMessage.caption || activePinnedMessage.poll?.question || 'Pinned media'}</p>
+                  <p className="mt-1 line-clamp-2 text-sm font-bold text-[#536178]">{activePinnedMessage.text || activePinnedMessage.caption || activePinnedMessage.poll?.question || activePinnedMessage.sharedItem?.title || 'Pinned media'}</p>
                 </div>
                 <button type="button" onClick={clearPinnedPrivateMessage} className="text-xs font-black text-[#EF4444]">Remove</button>
               </div>
@@ -2608,6 +2841,94 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
+  const ShareComposerModal = () => {
+    if (!shareTarget) return null;
+
+    const sharedItemPreview = buildSharedItemFromTarget(shareTarget);
+
+    return (
+      <div className="fixed inset-0 z-[1700] flex items-end justify-center bg-[#081A45]/45 p-3 backdrop-blur-sm sm:items-center sm:p-5">
+        <div className="grid max-h-[88dvh] w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/40 bg-white shadow-[0_32px_120px_rgba(8,26,69,0.30)] sm:grid-cols-[1fr_1.15fr]">
+          <section className="border-b border-[#D9E7F8] bg-gradient-to-br from-[#EEF6FF] via-white to-[#E8F2FF] p-5 sm:border-b-0 sm:border-r">
+            <div className="flex items-start justify-between gap-3">
+              <div>
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Share privately</p>
+                <h3 className="mt-2 text-2xl font-black text-[#081A45]">Send to chat</h3>
+                <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">This creates a private 30-day chat message. It will not appear in public feed.</p>
+              </div>
+              <button type="button" onClick={closeShareComposer} className="rounded-full border border-[#D9E7F8] bg-white px-3 py-2 text-sm font-black text-[#081A45]">✕</button>
+            </div>
+
+            <div className="mt-5 overflow-hidden rounded-[1.5rem] border border-[#D9E7F8] bg-white shadow-sm">
+              {sharedItemPreview.imageUrl ? (
+                <div className="max-h-48 overflow-hidden bg-[#EEF6FF]">
+                  {renderUploadedImage(sharedItemPreview.imageUrl, sharedItemPreview.title, sharedItemPreview.imageLayout || 'thumbnail')}
+                </div>
+              ) : null}
+              <div className="p-4">
+                <span className="rounded-full bg-[#E8F2FF] px-3 py-1 text-[11px] font-black text-[#1769FF]">{sharedItemPreview.sourceType === 'status' ? 'Status story' : 'Feed post'}</span>
+                <h4 className="mt-3 line-clamp-2 text-lg font-black text-[#081A45]">{sharedItemPreview.title}</h4>
+                <p className="mt-2 line-clamp-3 text-sm font-bold leading-6 text-[#536178]">{sharedItemPreview.previewText}</p>
+              </div>
+            </div>
+
+            <textarea
+              value={shareCaption}
+              onChange={(event) => setShareCaption(event.target.value.slice(0, 280))}
+              placeholder="Add optional caption..."
+              rows={4}
+              className="mt-4 w-full resize-none rounded-[1.35rem] border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-bold text-[#081A45] outline-none focus:border-[#1769FF]"
+            />
+
+            {shareFeedback ? <div className="mt-3 rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-xs font-black text-[#081A45]">{shareFeedback}</div> : null}
+          </section>
+
+          <section className="flex min-h-0 flex-col bg-white">
+            <div className="border-b border-[#D9E7F8] p-4">
+              <input
+                value={shareRecipientSearch}
+                onChange={(event) => setShareRecipientSearch(event.target.value)}
+                placeholder="Search users to share..."
+                className="w-full rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-3 text-sm font-bold text-[#081A45] outline-none focus:border-[#1769FF]"
+              />
+            </div>
+
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 custom-scrollbar">
+              {shareRecipients.length ? shareRecipients.map((creator) => (
+                <button
+                  key={creator.id}
+                  type="button"
+                  onClick={() => sendSharedItemToPrivateChat(creator)}
+                  disabled={Boolean(shareSendingId)}
+                  className="flex w-full items-center gap-3 rounded-2xl border border-[#D9E7F8] bg-white p-3 text-left transition hover:-translate-y-0.5 hover:bg-[#F8FBFF] hover:shadow-md disabled:opacity-60"
+                >
+                  <Avatar value={creator.avatar} size="h-12 w-12" />
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-sm font-black text-[#081A45]">
+                      {getCreatorDisplayName(creator)} {isOwnCommunityId(creator.id) ? <span className="text-[#1769FF]">· You</span> : null}
+                    </span>
+                    <span className="block truncate text-xs font-bold text-[#7C879A]">@{creator.username} · {creator.role}</span>
+                  </span>
+                  <span className="rounded-full bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-3 py-2 text-xs font-black text-white">
+                    {shareSendingId === creator.id ? 'Sending...' : 'Send'}
+                  </span>
+                </button>
+              )) : (
+                <div className="rounded-2xl border border-dashed border-[#BFD7FF] bg-[#F8FBFF] p-8 text-center text-sm font-black text-[#536178]">
+                  No user found.
+                </div>
+              )}
+            </div>
+
+            <div className="border-t border-[#D9E7F8] p-3">
+              <button type="button" onClick={() => { closeShareComposer(); pushPage('directChat'); }} className="w-full rounded-2xl bg-[#081A45] px-4 py-3 text-sm font-black text-white">Open private chats</button>
+            </div>
+          </section>
+        </div>
+      </div>
+    );
+  };
+
   const renderChatPage = () => renderPrivateChatShell(false);
 
   const renderChatThreadPage = () => renderPrivateChatShell(true);
@@ -2615,7 +2936,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const renderStatusDetailPage = () => <div className="mx-auto flex h-[calc(100dvh-10.5rem)] max-w-4xl flex-col overflow-hidden rounded-[2rem] border border-[#E0E3EB] bg-white shadow-[0_22px_70px_rgba(15,23,42,0.10)]"><div className="flex items-center justify-between gap-3 border-b border-[#E0E3EB] bg-white p-4"><button type="button" onClick={() => setPage('statusReel')} className="rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-sm font-black text-[#5F6368]">← Back to story</button><span className="rounded-full bg-[#E8F0FE] px-3 py-1 text-xs font-black text-[#1967D2]">{selectedStatus.slots}</span></div><div className={`min-h-0 flex-1 overflow-y-auto bg-gradient-to-br ${selectedStatus.gradient} p-5 text-white custom-scrollbar sm:p-8`}><article className="mx-auto max-w-3xl rounded-[2rem] border border-white/20 bg-[#202124]/10 p-5 shadow-2xl backdrop-blur-xl sm:p-8">{selectedStatus.imagePreview ? <div className={`mb-6 ${selectedStatus.imageLayout === 'original' ? 'max-h-[54dvh] min-h-48' : 'aspect-square'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-[#202124]/20 shadow-inner`}>{renderUploadedImage(selectedStatus.imagePreview, selectedStatus.title, selectedStatus.imageLayout || 'original')}</div> : null}<h2 className="text-4xl font-black tracking-tight sm:text-6xl">{selectedStatus.title}</h2><p className="mt-5 whitespace-pre-wrap text-lg font-semibold leading-9 text-white/90">{selectedStatus.body}</p>{renderStatusPoll(selectedStatus)}</article></div></div>;
 
   const filteredCreators = allCreators.filter((creator) => {
-    const textMatches = `${creator.username} ${creator.name} ${creator.role}`.toLowerCase().includes(networkSearch.toLowerCase());
+    const query = networkSearch.trim().toLowerCase();
+    const textMatches = !query || `${creator.username} ${creator.name} ${creator.role}`.toLowerCase().includes(query);
+    const selfSearchMatch = Boolean(query) && isOwnCommunityId(creator.id) && textMatches;
     const tabMatches =
       networkTab === 'mutual'
         ? creator.mutual
@@ -2625,7 +2948,20 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             ? followedIds.includes(creator.id)
             : true;
 
-    return textMatches && tabMatches && !isOwnCommunityId(creator.id);
+    return textMatches && (tabMatches || selfSearchMatch);
+  });
+
+  const shareRecipientQuery = shareRecipientSearch.trim().toLowerCase();
+  const shareRecipients = allCreators.filter((creator) => {
+    if (!shareRecipientQuery) return true;
+    return `${creator.username} ${creator.name} ${creator.role}`.toLowerCase().includes(shareRecipientQuery);
+  });
+
+  const networkVisibleCreators = (networkTab === 'forYou' ? visibleForYouCreators : filteredCreators).filter((creator) => {
+    const query = networkSearch.trim().toLowerCase();
+    if (!query) return true;
+
+    return `${creator.username} ${creator.name} ${creator.role}`.toLowerCase().includes(query);
   });
 
 
@@ -2695,7 +3031,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         className={`hidden min-h-0 shrink-0 flex-col overflow-y-auto border-r border-[var(--community-border)] bg-[var(--community-surface)]/78 p-3 transition-all duration-300 custom-scrollbar lg:flex ${sidebarExpanded ? 'w-[clamp(13rem,17vw,16rem)] xl:p-4' : 'w-[5.35rem]'}`}
       >
         <div className="mb-3 flex items-center justify-between gap-2">
-          {sidebarExpanded ? <p className="truncate text-xs font-black uppercase tracking-[0.2em] text-[#4F7BFF]">Navigation</p> : null}
+          {sidebarExpanded ? <div className="relative overflow-hidden rounded-2xl border border-[#BFD7FF] bg-gradient-to-r from-[#E8F2FF] via-white to-[#EEF6FF] px-3 py-2 shadow-[0_12px_34px_rgba(23,105,255,0.14)]">
+            <span className="absolute inset-y-0 -left-10 w-10 animate-[eduvoraBondShine_2.8s_linear_infinite] bg-white/70 blur-md" />
+            <p className="relative truncate text-xs font-black uppercase tracking-[0.22em] text-[#1769FF]">Eduvora Bond</p>
+          </div> : null}
           <button
             type="button"
             onClick={() => setIsDesktopSidebarPinned((pinned) => !pinned)}
@@ -2800,7 +3139,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {page === 'thread' && <div className="space-y-3"><button type="button" onClick={() => { goBack(); requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: feedScrollPositionsRef.current.chatFeed || 0, behavior: 'auto' })); }} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-sm font-black text-[#64748B] shadow-sm">← Back to posts</button>{renderMessageDetails(selectedMessage, true)}</div>}
       {page === 'profile' && renderProfilePage()}
       {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_28px_90px_rgba(79,123,255,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.28em] text-[#4F7BFF]">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Post once per type daily with 15-day community visibility.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">Each user can publish one text, one image, and one poll creator post per day. The used type locks immediately, syncs through Firebase for all users, and auto-deletes after 15 days.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EAF5FF] p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || isCreatorTypeUsedToday || !postDraft.trim() || isStorageLocked || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.28)] disabled:opacity-45">{isPublishingCreator ? 'Publishing creator post...' : isCreatorTypeUsedToday ? `${postType} post used today` : isStorageLocked ? 'Storage limit reached' : 'Publish creator post'}</button></div></div>}
-      {page === 'network' && <div className="mx-auto max-w-5xl rounded-[2rem] bg-white p-4 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="sticky top-0 z-10 bg-white pb-3"><h2 className="text-4xl font-black text-[#081B5C]">{profile.username}</h2><p className="mt-2 text-sm font-bold text-[#64748B]">For You mein app use karne wale real community users dikhte hain. Yahin se follow/unfollow live sync hota hai.</p><div className="mt-6 grid grid-cols-4 border-b border-[#E3ECF8] text-center text-sm font-black sm:text-lg">{(['mutual', 'followers', 'following', 'forYou'] as const).map((tab) => <button key={tab} type="button" onClick={() => setNetworkTab(tab)} className={`pb-3 capitalize ${networkTab === tab ? 'border-b-4 border-[#4F7BFF] text-[#4F46E5]' : 'text-[#64748B]'}`}>{tab === 'forYou' ? 'For you' : tab}</button>)}</div><input value={networkSearch} onChange={(event) => setNetworkSearch(event.target.value)} placeholder="Search community users..." className="mt-4 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></div><div className="space-y-3 pt-3">{(networkTab === 'forYou' ? visibleForYouCreators : filteredCreators).map((creator) => { const followed = followedIds.includes(creator.id); return <article key={creator.id} className="flex items-center gap-3 rounded-3xl border border-[#E3ECF8] bg-white p-4 shadow-sm"><Avatar value={creator.avatar} /><div className="min-w-0 flex-1"><h3 className="truncate text-xl font-black text-[#081B5C]">{creator.name} {creator.verified ? '✅' : ''}</h3><p className="text-sm font-bold text-[#64748B]">@{creator.username} · {creator.role}</p><p className="text-sm font-black text-[#64748B]">{(followerCounts[creator.id] || creator.followers || 0).toLocaleString()} followers · {(followingCounts[creator.id] || 0).toLocaleString()} following</p></div><button type="button" onClick={() => toggleFollowCreator(creator)} disabled={Boolean(followLoadingIds[creator.id]) || isOwnCommunityId(creator.id)} className={`rounded-full px-4 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${followed ? 'bg-[#EEF2FF] text-[#4F46E5]' : 'bg-[#4F7BFF] text-white'}`}>{followLoadingIds[creator.id] ? 'Saving...' : followed ? 'Unfollow' : 'Follow'}</button></article>; })}</div></div>}
+      {page === 'network' && <div className="mx-auto max-w-5xl rounded-[2rem] bg-white p-4 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="sticky top-0 z-10 bg-white pb-3"><h2 className="text-4xl font-black text-[#081B5C]">{profile.username}</h2><p className="mt-2 text-sm font-bold text-[#64748B]">For You mein app use karne wale real community users dikhte hain. Search self-user ko bhi find karega, aur har card se direct chat open hoga.</p><div className="mt-6 grid grid-cols-4 border-b border-[#E3ECF8] text-center text-sm font-black sm:text-lg">{(['mutual', 'followers', 'following', 'forYou'] as const).map((tab) => <button key={tab} type="button" onClick={() => setNetworkTab(tab)} className={`pb-3 capitalize ${networkTab === tab ? 'border-b-4 border-[#4F7BFF] text-[#4F46E5]' : 'text-[#64748B]'}`}>{tab === 'forYou' ? 'For you' : tab}</button>)}</div><input value={networkSearch} onChange={(event) => setNetworkSearch(event.target.value)} placeholder="Search community users..." className="mt-4 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></div><div className="space-y-3 pt-3">{networkVisibleCreators.length ? networkVisibleCreators.map((creator) => { const followed = followedIds.includes(creator.id); const self = isOwnCommunityId(creator.id); return <article key={creator.id} className="flex items-center gap-3 rounded-3xl border border-[#E3ECF8] bg-white p-4 shadow-sm"><Avatar value={creator.avatar} /><div className="min-w-0 flex-1"><h3 className="truncate text-xl font-black text-[#081B5C]">{self ? 'Saved messages' : creator.name} {creator.verified ? '✅' : ''} {self ? <span className="text-sm text-[#4F7BFF]">· You</span> : null}</h3><p className="text-sm font-bold text-[#64748B]">@{creator.username} · {creator.role}</p><p className="text-sm font-black text-[#64748B]">{(followerCounts[creator.id] || creator.followers || 0).toLocaleString()} followers · {(followingCounts[creator.id] || 0).toLocaleString()} following</p></div><div className="flex shrink-0 items-center gap-2"><button type="button" onClick={() => openChatCreator(creator.id)} className="flex h-11 w-11 items-center justify-center rounded-full border border-[#D2E3FC] bg-[#F8FBFF] text-lg shadow-sm transition hover:-translate-y-0.5 hover:border-[#4F7BFF] hover:bg-[#EEF2FF]" title={self ? 'Open saved messages' : `Message ${creator.name}`}>💬</button><button type="button" onClick={() => toggleFollowCreator(creator)} disabled={Boolean(followLoadingIds[creator.id]) || self} className={`rounded-full px-4 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${followed ? 'bg-[#EEF2FF] text-[#4F46E5]' : 'bg-[#4F7BFF] text-white'}`}>{self ? 'You' : followLoadingIds[creator.id] ? 'Saving...' : followed ? 'Unfollow' : 'Follow'}</button></div></article>; }) : <div className="rounded-3xl border border-dashed border-[#BFD7FF] bg-[#F8FBFF] p-10 text-center text-sm font-black text-[#64748B]">No user found.</div>}</div></div>}
       {page === 'following' && renderFeedLayout(followingMessages, 'Your followers feed', 'Only posts from creators you follow are shown here.')}
       {page === 'adminPosts' && renderFeedLayout(adminPosts, 'ADMIN POST', 'Official admin posts from Firebase. Like, react, vote, and reply here.')}
       {page === 'tagMaster' && renderTagMasterPage()}{page === 'masterTags' && renderMasterTagsPage()}{page === 'masterTagDetail' && renderMasterTagDetailPage()}
@@ -2817,9 +3156,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   return (
     <section style={communityCssVars} className="relative h-[100dvh] overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-4 lg:p-6">
+      <style>{`
+        @keyframes eduvoraBondShine {
+          0% { transform: translateX(0); opacity: 0; }
+          22% { opacity: 1; }
+          55% { transform: translateX(220px); opacity: 0.75; }
+          100% { transform: translateX(320px); opacity: 0; }
+        }
+      `}</style>
       {notificationDropdownPortal}
       {imageLightbox ? <div className="fixed inset-0 z-[1800] flex items-center justify-center bg-[#081B5C]/80 p-4 backdrop-blur-xl"><button type="button" onClick={() => setImageLightbox(null)} className="absolute right-4 top-4 rounded-full bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Close</button><div className="flex max-h-[90dvh] max-w-[94vw] items-center justify-center overflow-hidden rounded-[2rem] bg-white p-3 shadow-2xl">{renderUploadedImage(imageLightbox.src, imageLightbox.alt, 'original')}</div></div> : null}
       {page === 'statusReel' ? renderStatusReel() : null}
+      <ShareComposerModal />
       <div className="mx-auto flex h-full min-w-0 max-w-[1720px] overflow-hidden border border-[var(--community-border)] bg-[var(--community-surface)]/55 shadow-[var(--community-shadow)] backdrop-blur-2xl sm:rounded-[2rem] lg:rounded-[2.5rem]">
         <CommunitySidebar />
         <div className="flex min-w-0 flex-1 flex-col">

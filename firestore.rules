@@ -168,7 +168,7 @@ service cloud.firestore {
           && request.resource.data.conversationId == chatId
           && request.resource.data.senderId == request.auth.uid
           && request.resource.data.receiverId is string
-          && request.resource.data.type in ['text', 'image', 'poll']
+          && request.resource.data.type in ['text', 'image', 'poll', 'shared_item']
           && request.resource.data.expiresAt > request.time.toMillis();
 
         allow update: if signedIn()
