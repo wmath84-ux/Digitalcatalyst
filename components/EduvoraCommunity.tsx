@@ -923,6 +923,38 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     let imageUrl = '';
     let uploadBytes = 0;
 
+        const optimisticMessage: PrivateChatMessage = {
+      id: messageId,
+      conversationId: activeConversationId,
+      senderId: currentUserKey,
+      receiverId: activeChatCreator.id,
+      senderName: profile.name,
+      receiverName: getCreatorDisplayName(activeChatCreator),
+      type,
+      text: type === 'text' ? text : undefined,
+      caption: type === 'image' ? text : undefined,
+      imageUrl: type === 'image' ? chatImagePreview : undefined,
+      uploadBytes: type === 'image' ? dataUrlBytes(chatImagePreview) : 0,
+      poll: type === 'poll'
+        ? {
+            question: pollQuestion,
+            options: cleanedPollOptions,
+            votes: cleanedPollOptions.map(() => 0),
+            voters: {},
+            totalVotes: 0,
+          }
+        : undefined,
+      createdAt,
+      expiresAt,
+      readBy: { [currentUserKey]: true },
+      status: 'sent',
+    };
+
+    setPrivateMessages((current) => {
+      if (current.some((message) => message.id === optimisticMessage.id)) return current;
+      return [...current, optimisticMessage].sort((a, b) => a.createdAt - b.createdAt);
+    });
+
     try {
       await ensurePrivateConversation(activeConversationId, activeChatCreator);
 
@@ -941,31 +973,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             : text;
 
       const messagePayload: PrivateChatMessage = {
-        id: messageId,
-        conversationId: activeConversationId,
-        senderId: currentUserKey,
-        receiverId: activeChatCreator.id,
-        senderName: profile.name,
-        receiverName: getCreatorDisplayName(activeChatCreator),
-        type,
-        text: type === 'text' ? text : undefined,
-        caption: type === 'image' ? text : undefined,
+        ...optimisticMessage,
         imageUrl: type === 'image' ? imageUrl : undefined,
         storagePath: type === 'image' ? storagePath : undefined,
         uploadBytes: type === 'image' ? uploadBytes : 0,
-        poll: type === 'poll'
-          ? {
-              question: pollQuestion,
-              options: cleanedPollOptions,
-              votes: cleanedPollOptions.map(() => 0),
-              voters: {},
-              totalVotes: 0,
-            }
-          : undefined,
-        createdAt,
-        expiresAt,
-        readBy: { [currentUserKey]: true },
-        status: 'sent',
       };
 
       await setDoc(doc(db, PRIVATE_CHATS, activeConversationId, PRIVATE_CHAT_MESSAGES, messageId), stripUndefinedDeep(messagePayload));
@@ -988,9 +999,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       }), { merge: true });
 
       resetPrivateChatComposer();
+            requestAnimationFrame(() => {
+        directChatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+      });
     } catch (error) {
       console.warn('Private chat send failed', error);
       if (storagePath) deleteObject(ref(storage, storagePath)).catch((deleteError) => console.warn('Private chat image rollback failed', deleteError));
+            setPrivateMessages((current) => current.filter((message) => message.id !== messageId));
       setPrivateChatError(error instanceof Error ? error.message : 'Message failed. Please try again.');
     } finally {
       setIsPrivateChatSending(false);
@@ -2677,7 +2692,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
     return (
       <div key={message.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-        <article className={`max-w-[min(86%,34rem)] overflow-hidden rounded-[1.65rem] px-4 py-3 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${mine ? 'rounded-br-md bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-white' : 'rounded-bl-md border border-[#D9E7F8] bg-white text-[#081A45]'}`}>
+        <article className={`max-w-[min(86%,34rem)] overflow-hidden rounded-[1.65rem] px-4 py-3 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${mine ? 'rounded-br-md bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-white' : 'rounded-bl-md border border-[#D9E7F8] bg-white text-[#081A45]'}`}>          
           {message.type === 'shared_item' && sharedItem ? (
             <button type="button" onClick={openSharedItem} className={`block w-full overflow-hidden rounded-[1.35rem] border text-left transition hover:scale-[1.01] ${mine ? 'border-white/25 bg-white/12' : 'border-[#D9E7F8] bg-[#F8FBFF]'}`}>
               {sharedItem.imageUrl ? (
@@ -2746,10 +2761,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const canSendText = Boolean(chatDraft.trim()) && !chatAttachmentMode;
     const canSendImage = chatAttachmentMode === 'image' && Boolean(chatImagePreview);
     const canSendPoll = chatAttachmentMode === 'poll' && Boolean(chatPollQuestion.trim()) && chatPollOptions.filter((option) => option.trim()).length >= 2;
-    const sendDisabled = isPrivateChatSending || (!canSendText && !canSendImage && !canSendPoll);
-
+        const canSendAnyPrivateMessage = canSendText || canSendImage || canSendPoll;
+    const sendDisabled = isPrivateChatSending || !canSendAnyPrivateMessage;
     return (
-      <div className={`mx-auto grid overflow-hidden bg-white ${mobile ? 'h-full w-full border-0 shadow-none' : 'h-[calc(100dvh-10.5rem)] max-w-[1800px] rounded-[2.4rem] border border-[#D9E7F8] shadow-[0_26px_80px_rgba(8,26,69,0.10)] lg:grid-cols-[360px_1fr]'}`}>
+      <div className={`mx-auto grid min-h-0 overflow-hidden bg-white ${mobile ? 'h-full w-full flex-1 border-0 shadow-none' : 'h-[calc(100dvh-10.5rem)] max-w-[1800px] rounded-[2.4rem] border border-[#D9E7F8] shadow-[0_26px_80px_rgba(8,26,69,0.10)] lg:grid-cols-[360px_1fr]'}`}>
         {!mobile ? (
           <aside className="flex min-h-0 flex-col border-r border-[#D9E7F8] bg-gradient-to-b from-[#F8FBFF] to-white">
             <div className="border-b border-[#D9E7F8] p-5">
@@ -2779,7 +2794,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           </aside>
         ) : null}
 
-        <section className="flex min-h-0 flex-col bg-[radial-gradient(circle_at_18%_10%,rgba(23,105,255,0.10),transparent_28%),linear-gradient(180deg,#ffffff,#f8fbff)]">
+        <section className="flex h-full min-h-0 flex-col overflow-hidden bg-[radial-gradient(circle_at_18%_10%,rgba(23,105,255,0.10),transparent_28%),linear-gradient(180deg,#ffffff,#f8fbff)]">          
           <div className={`flex items-center gap-3 border-b border-[#D9E7F8] bg-white/95 backdrop-blur-xl ${mobile ? 'sticky top-0 z-20 p-3' : 'p-4 sm:p-5'}`}>
             {mobile ? <button type="button" onClick={() => setPage('directChat')} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-sm">←</button> : null}
             <Avatar value={activeChatCreator?.avatar || '👤'} size={mobile ? 'h-10 w-10' : 'h-12 w-12'} />
@@ -2812,7 +2827,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             </div>
           ) : null}
 
-          <div className={`min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain custom-scrollbar ${mobile ? 'bg-[radial-gradient(circle_at_20%_0%,rgba(23,105,255,0.10),transparent_28%),#F8FBFF] px-3 py-4' : 'p-4 sm:p-6'}`}>
+          <div className={`min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain custom-scrollbar ${mobile ? 'bg-[radial-gradient(circle_at_20%_0%,rgba(23,105,255,0.10),transparent_28%),#F8FBFF] px-3 py-4 pb-5' : 'p-4 sm:p-6'}`}>            
             {activePrivateMessages.length ? (
               activePrivateMessages.map(renderPrivateMessageBubble)
             ) : (
@@ -2827,8 +2842,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <div ref={directChatMessagesEndRef} />
           </div>
 
-          <div className={`shrink-0 border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl ${mobile ? 'z-20 shadow-[0_-18px_45px_rgba(8,26,69,0.08)]' : 'sm:p-4'}`}>
-            {privateChatError ? <div className="mb-3 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-xs font-black text-[#C5221F]">{privateChatError}</div> : null}
+          <div className={`shrink-0 border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl ${mobile ? 'z-20 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-18px_45px_rgba(8,26,69,0.08)]' : 'sm:p-4'}`}>            
+          {privateChatError ? <div className="mb-3 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-xs font-black text-[#C5221F]">{privateChatError}</div> : null}
 
             {chatAttachmentMode === 'image' ? (
               <div className="mb-3 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] p-3">
@@ -2880,9 +2895,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 maxLength={1200}
                 className="min-w-0 flex-1 rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-bold text-[#081A45] outline-none focus:border-[#1769FF]"
               />
-
-              <button type="button" onClick={() => sendPrivateChatMessage()} disabled={sendDisabled} className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(23,105,255,0.22)] disabled:opacity-45">Send</button>
-            </div>
+              <button type="button" onClick={() => sendPrivateChatMessage()} disabled={sendDisabled} className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(23,105,255,0.22)] disabled:cursor-not-allowed disabled:opacity-45">{isPrivateChatSending ? 'Sending...' : 'Send'}</button>
           </div>
         </section>
       </div>
@@ -2988,8 +3001,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     </>
   );
 
-  const renderChatThreadPage = () => (
-    <div className="fixed inset-0 z-[1450] overflow-hidden bg-[#F8FBFF] pt-[env(safe-area-inset-top)] md:static md:z-auto md:bg-transparent md:p-0">
+    const renderChatThreadPage = () => (
+    <div className="fixed inset-0 z-[1450] flex overflow-hidden bg-[#F8FBFF] pt-[env(safe-area-inset-top)] md:static md:z-auto md:bg-transparent md:p-0">
       {renderPrivateChatShell(true)}
     </div>
   );
