@@ -1,8 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Coupon, ProductWithRating, User, WebsiteSettings } from '../App';
 import UserAvatar from './common/UserAvatar';
 import { RememberedAuthAccount } from '../utils/rememberedAuth';
 import { ProductImageSlot, getProductImage } from '../utils/productImages';
+import { ensureUserCoinWallet, watchUserCoinWallet } from '../utils/coinWallet';
 
 interface MobileAppHomeProps {
   settings: WebsiteSettings;
@@ -86,7 +87,32 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
     return [product.title, product.description, product.category, ...(product.tags || [])].filter(Boolean).join(' ').toLowerCase().includes(q);
   }).slice(0, 6), [visibleProducts, purchasedProductIds, query]);
   const topPreview = topRatedProducts.slice(0, 4);
-  const coins = currentUser?.eduCoins ?? 250;
+  const [mobileCoinBalance, setMobileCoinBalance] = useState<number | null>(null);
+  const walletUserId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
+
+  useEffect(() => {
+    if (!isLoggedIn || !walletUserId) {
+      setMobileCoinBalance(null);
+      return undefined;
+    }
+
+    ensureUserCoinWallet(walletUserId).catch((error) => {
+      console.error('Mobile home coin wallet setup failed:', error);
+    });
+
+    const unsubscribe = watchUserCoinWallet(
+      walletUserId,
+      (wallet) => setMobileCoinBalance(wallet.coinBalance),
+      (error) => {
+        console.error('Mobile home coin wallet watch failed:', error);
+        setMobileCoinBalance(null);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [isLoggedIn, walletUserId]);
+
+  const coins = mobileCoinBalance ?? currentUser?.eduCoins ?? 0;
   const resolvedPhotoURL = currentUser?.photoURL || ((rememberedAccount?.uid && rememberedAccount.uid === currentUser?.id) || (rememberedAccount?.email && rememberedAccount.email === currentUser?.email) ? rememberedAccount.photoURL : '');
   const loggedOutAuthMode: 'login' | 'signup' = rememberedAccount ? 'login' : 'signup';
   const loggedOutAuthLabel = rememberedAccount ? 'Login' : 'Sign Up';
