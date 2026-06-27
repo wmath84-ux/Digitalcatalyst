@@ -11,6 +11,8 @@ type ProductAdminInitialState = Omit<Product, 'id'> & {
     modules: CourseModule[];
 };
 
+const DEFAULT_PRODUCT_PAYMENT_LINK = 'https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view';
+
 type ProductFormData = {
     title: string;
     description: string;
@@ -62,7 +64,7 @@ const initialProductState: ProductAdminInitialState = {
     priceHistory: [],
     isFree: false,
     couponCode: '',
-    paymentLink: '',
+    paymentLink: DEFAULT_PRODUCT_PAYMENT_LINK,
     wishlistCount: 0,
     viewCount: 0,
     faqs: [],
@@ -824,10 +826,7 @@ const ProductForm: React.FC<{
 
     const handleSubmit = (event: React.FormEvent) => {
         event.preventDefault();
-        if (!formData.paymentLink.trim()) {
-            alert('Payment Link Required');
-            return;
-        }
+        const resolvedPaymentLink = formData.paymentLink.trim() || product?.paymentLink?.trim() || DEFAULT_PRODUCT_PAYMENT_LINK;
 
         const features = ((formData.featuresText || '').split('\n') || []).map(item => item.trim()).filter(Boolean);
         const tags = ((formData.tagsText || '').split(',') || []).map(item => item.trim()).filter(Boolean);
@@ -858,7 +857,7 @@ const ProductForm: React.FC<{
             aspectRatio: formData.aspectRatio,
             isFree: formData.isFree,
             couponCode: formData.couponCode,
-            paymentLink: formData.paymentLink,
+            paymentLink: resolvedPaymentLink,
             courseContent: normaliseModules(modules || []),
             priceHistory: product?.priceHistory || [],
             wishlistCount: product?.wishlistCount,
@@ -966,7 +965,7 @@ const ProductForm: React.FC<{
                                       <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={formData.isCoinRedeemEnabled !== false} onChange={(event) => setFormData((previous) => ({ ...previous, isCoinRedeemEnabled: event.target.checked }))} />Enable Pay with EduCoin</label>
                                     </div>
                                     <div><label className={labelClass}>Coupon Code</label><select value={formData.couponCode} onChange={event => setFormData(prev => ({ ...prev, couponCode: event.target.value }))} className={fieldClass}><option value="">No coupon</option>{(coupons || []).map(coupon => <option key={coupon.id} value={coupon.code}>{coupon.code}</option>)}</select></div>
-                                    <div><label className={labelClass}>Razorpay Payment Page Link</label><input required value={formData.paymentLink} onChange={event => setFormData(prev => ({ ...prev, paymentLink: event.target.value }))} className={fieldClass} placeholder="https://pages.razorpay.com/..." /></div>
+                                    <div><label className={labelClass}>Razorpay Payment Page Link</label><input value={formData.paymentLink} onChange={event => setFormData(prev => ({ ...prev, paymentLink: event.target.value }))} className={fieldClass} placeholder="https://pages.razorpay.com/..." /></div>
                                 </div>
                             </div>
 

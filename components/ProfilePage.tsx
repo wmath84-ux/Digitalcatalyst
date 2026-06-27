@@ -226,8 +226,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const coinRedeemRate = Math.max(1, Number(economySettings.coinToFiatRatio));
   const studyMinutes = currentUser?.studyMinutes ?? 0;
   const watchTimeMinutes = currentUser?.totalWatchTimeMinutes ?? studyMinutes;
-  const eduPoints = currentUser?.eduCoins ?? 0;
-  const totalLifetimeCoins = currentUser?.totalLifetimeCoins ?? eduPoints;
+  const eduPoints = profileCoinWallet.coinBalance;
+  const totalLifetimeCoins = profileCoinWallet.totalCoinsEarned || eduPoints;
   const profileStyle = { ...fallbackProfileStyle, ...((settings.content as any).profileStyle || {}) };
   const profileStreakConfigs = (((settings.content as any).profileStreaks || fallbackStreakConfigs) as ProfileStreakConfig[]).filter(streak => streak.active !== false).slice(0, 12);
   const profileMilestoneConfigs = (((settings.content as any).profileMilestones || fallbackMilestoneConfigs) as ProfileMilestoneConfig[]).filter(milestone => milestone.active !== false).slice(0, 12);
@@ -615,43 +615,18 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </section>
 
-        <section className="mt-4 grid gap-4 sm:mt-6 sm:gap-5 lg:grid-cols-[1.2fr_0.8fr]">
-          <div className={`hub-animate rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '160ms' }}>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">EduCoin Engine</p>
-                <h2 className="mt-2 text-3xl font-black sm:text-5xl">{eduPoints.toLocaleString()} EduCoins</h2>
-                <p className="mt-2 text-sm leading-5 text-[#5F6368] sm:text-base">Earned from purchases, module momentum, study time, and quiz performance.</p>
-              </div>
-              <div className="rounded-2xl border border-[#D2E3FC] bg-[#E8F0FE] p-4 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 sm:rounded-3xl sm:p-5">
-                <p className="text-xs font-black uppercase tracking-[0.25em] text-[#1967D2]">Next Rank</p>
-                <p className="mt-1 text-2xl font-black">Level {level + 1}</p>
-              </div>
-            </div>
-            <div className="mt-6">
-              <div className="mb-2 flex flex-col gap-1 text-xs font-bold text-[#5F6368] sm:flex-row sm:justify-between sm:text-sm">
-                <span>Level {level} Scholar progress</span>
-                <span>{pointsRemaining} pts to next level</span>
-              </div>
-              <div className="h-3 overflow-hidden rounded-full border border-[#D2E3FC] bg-white/95 sm:h-4">
-                <div className="h-full rounded-full bg-gradient-to-r from-[#1A73E8] via-[#1967D2] to-[#174EA6] shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5" style={{ width: `${nextLevelProgress}%` }} />
-              </div>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-3 sm:gap-5 lg:grid-cols-1">
-            {statCards.map((stat, index) => (
-              <div key={stat.label} className={`hub-animate rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-5 ${glassCard}`} style={{ animationDelay: `${220 + index * 80}ms` }}>
-                <div className="flex items-center justify-between gap-4">
-                  <div>
-                    <p className="text-sm font-bold text-[#5F6368]">{stat.label}</p>
-                    <p className="mt-1 text-2xl font-black sm:text-3xl">{stat.value}</p>
-                  </div>
-                  <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#D2E3FC] bg-white/95 text-xl sm:h-14 sm:w-14 sm:text-2xl">{stat.icon}</div>
+        <section className="mt-4 grid gap-4 sm:mt-6 sm:grid-cols-3 sm:gap-5">
+          {statCards.map((stat, index) => (
+            <div key={stat.label} className={`hub-animate rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-5 ${glassCard}`} style={{ animationDelay: `${160 + index * 80}ms` }}>
+              <div className="flex items-center justify-between gap-4">
+                <div>
+                  <p className="text-sm font-bold text-[#5F6368]">{stat.label}</p>
+                  <p className="mt-1 text-2xl font-black sm:text-3xl">{stat.value}</p>
                 </div>
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#D2E3FC] bg-white/95 text-xl sm:h-14 sm:w-14 sm:text-2xl">{stat.icon}</div>
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
         </section>
 
         <section className={`hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '320ms' }}>
