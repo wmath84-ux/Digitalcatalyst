@@ -37,6 +37,51 @@ type Creator = {
 };
 type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; selectedPollOption?: number; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'status' };
 type SharedStory = { id: number; statusId: number; recipientId: string; senderId: 'me'; senderName: string; time: string };
+type PrivateChatMessageType = 'text' | 'image' | 'poll';
+
+type PrivateChatPoll = {
+  question: string;
+  options: string[];
+  votes: number[];
+  voters: Record<string, number>;
+  totalVotes: number;
+};
+
+type PrivateChatMessage = {
+  id: string;
+  conversationId: string;
+  senderId: string;
+  receiverId: string;
+  senderName: string;
+  receiverName: string;
+  type: PrivateChatMessageType;
+  text?: string;
+  caption?: string;
+  imageUrl?: string;
+  storagePath?: string;
+  uploadBytes?: number;
+  poll?: PrivateChatPoll;
+  createdAt: number;
+  expiresAt: number;
+  readBy: Record<string, boolean>;
+  status: 'sent' | 'failed';
+};
+
+type PrivateConversation = {
+  id: string;
+  participants: string[];
+  participantMap: Record<string, boolean>;
+  participantNames: Record<string, string>;
+  participantAvatars: Record<string, string>;
+  createdAt: number;
+  updatedAt: number;
+  lastMessage: string;
+  lastMessageType: PrivateChatMessageType;
+  lastMessageAt: number;
+  lastSenderId: string;
+  unreadCounts: Record<string, number>;
+  pinnedMessageId?: string;
+};
 type MasterTagRequest = { id: number; author: string; avatar: string; category: string; title: string; detail: string; time: string; likes: number; reactions: Record<string, number>; ownerId?: string; docId?: string; likedByUsers?: Record<string, boolean>; reactionUsers?: Record<string, string>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'creator' | 'admin' };
 type CommunitySupportTicket = { id: string; customerName: string; customerEmail: string; subject: string; message: string; date: string; status: 'Open' | 'Resolved' | 'Pending'; customerUid?: string; source?: 'contact' | 'masterTag'; communityThreadId?: number; customerAvatar?: string; category?: string; adminReply?: string; repliedAt?: string; inboxMessage?: string; inboxRead?: boolean };
 type CommunityNotification = { id: string; title: string; body: string; time: string; read: boolean; type: 'reply' | 'masterTag' | 'status' | 'creator' | 'follow'; targetPage?: CommunityPage; targetId?: number | string };
@@ -225,6 +270,16 @@ const COMMUNITY_STORAGE_META = 'community_storage_meta';
 const COMMUNITY_PROFILES = 'community_profiles';
 const COMMUNITY_FOLLOWS = 'community_follows';
 const COMMUNITY_NOTIFICATIONS = 'community_notifications';
+const PRIVATE_CHATS = 'private_chats';
+const PRIVATE_CHAT_MESSAGES = 'messages';
+const PRIVATE_CHAT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
+const PRIVATE_CHAT_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
+
+const getPrivateConversationId = (firstUid: string, secondUid: string) => {
+  const first = firstUid.trim();
+  const second = secondUid.trim();
+  return first < second ? `${first}__${second}` : `${second}__${first}`;
+};
 const getFollowDocId = (followerId: string, followingId: string) => `${followerId}_${followingId}`;
 const ADMIN_POST_FALLBACK_STORAGE_KEY = 'eduvoraAdminPostFallbacks';
 const ADMIN_POST_FALLBACK_EVENT = 'eduvoraAdminPostFallbackUpdated';
@@ -424,6 +479,48 @@ const mapStatusDoc = (snapshotDoc: { id: string; data: () => Record<string, any>
   };
 };
 
+const mapPrivateConversationDoc = (snapshotDoc: { id: string; data: () => Record<string, any> }): PrivateConversation => {
+  const data = snapshotDoc.data();
+  return {
+    id: snapshotDoc.id,
+    participants: Array.isArray(data.participants) ? data.participants : [],
+    participantMap: data.participantMap || {},
+    participantNames: data.participantNames || {},
+    participantAvatars: data.participantAvatars || {},
+    createdAt: asMillis(data.createdAt),
+    updatedAt: asMillis(data.updatedAt),
+    lastMessage: data.lastMessage || '',
+    lastMessageType: data.lastMessageType || 'text',
+    lastMessageAt: asMillis(data.lastMessageAt || data.updatedAt),
+    lastSenderId: data.lastSenderId || '',
+    unreadCounts: data.unreadCounts || {},
+    pinnedMessageId: data.pinnedMessageId,
+  };
+};
+
+const mapPrivateChatMessageDoc = (snapshotDoc: { id: string; data: () => Record<string, any> }): PrivateChatMessage => {
+  const data = snapshotDoc.data();
+  return {
+    id: snapshotDoc.id,
+    conversationId: data.conversationId || '',
+    senderId: data.senderId || '',
+    receiverId: data.receiverId || '',
+    senderName: data.senderName || 'Member',
+    receiverName: data.receiverName || 'Member',
+    type: data.type || 'text',
+    text: data.text || '',
+    caption: data.caption || '',
+    imageUrl: data.imageUrl || '',
+    storagePath: data.storagePath || '',
+    uploadBytes: Number(data.uploadBytes) || 0,
+    poll: data.poll,
+    createdAt: asMillis(data.createdAt),
+    expiresAt: asMillis(data.expiresAt),
+    readBy: data.readBy || {},
+    status: data.status || 'sent',
+  };
+};
+
 const dataUrlBytes = (value = '') => {
   const base64 = value.split(',')[1] || '';
   return Math.ceil((base64.length * 3) / 4);
@@ -449,6 +546,19 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [sharedStories, setSharedStories] = useState<SharedStory[]>([]);
   const [shareStatusId, setShareStatusId] = useState<number | null>(null);
   const [selectedChatId, setSelectedChatId] = useState(creators[0].id);
+  const [privateConversations, setPrivateConversations] = useState<PrivateConversation[]>([]);
+  const [privateMessages, setPrivateMessages] = useState<PrivateChatMessage[]>([]);
+  const [chatDraft, setChatDraft] = useState('');
+  const [chatImagePreview, setChatImagePreview] = useState('');
+  const [chatImageName, setChatImageName] = useState('');
+  const [chatPollQuestion, setChatPollQuestion] = useState('');
+  const [chatPollOptions, setChatPollOptions] = useState(['', '']);
+  const [chatAttachmentMode, setChatAttachmentMode] = useState<PrivateChatMessageType | null>(null);
+  const [isPrivateChatSending, setIsPrivateChatSending] = useState(false);
+  const [privateChatError, setPrivateChatError] = useState('');
+  const [chatMenuOpen, setChatMenuOpen] = useState(false);
+  const [isDesktopSidebarPinned, setIsDesktopSidebarPinned] = useState(false);
+  const [isDesktopSidebarHovering, setIsDesktopSidebarHovering] = useState(false);
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [expandedReplyId, setExpandedReplyId] = useState<number | null>(null);
   const [loadedReplyDocIds, setLoadedReplyDocIds] = useState<Record<string, boolean>>({});
@@ -515,6 +625,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const replyComposerRef = useRef<HTMLDivElement>(null);
   const notificationPanelRef = useRef<HTMLDivElement>(null);
   const notificationDropdownRef = useRef<HTMLDivElement>(null);
+  const directChatMessagesEndRef = useRef<HTMLDivElement>(null);
   const currentUserKey = guardedAuth.currentUser?.uid || authEmail || `profile-${normalizeUsername(profile.username || profile.name) || 'local'}`;
   const isOwnCommunityId = (id?: string) => id === currentUserKey || id === 'me';
   const selectedMessage = messages.find((message) => message.id === selectedMessageId) || messages[0];
@@ -569,8 +680,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const isCreatorTypeUsedToday = usedCreatorTypesToday.includes(postType);
   const isStatusTypeUsedToday = usedStatusTypesToday.includes(statusType);
   const myStatuses = statusCards.filter((status) => isOwnCommunityId(status.ownerId));
-  const chatCreators = allCreators.filter((creator) => sharedStories.some((story) => story.recipientId === creator.id));
-  const activeChatCreator = allCreators.find((creator) => creator.id === selectedChatId) || chatCreators[0] || allCreators[0];
+  const privateChatCreators = allCreators.filter((creator) => !isOwnCommunityId(creator.id));
+  const chatCreators = privateChatCreators.length ? privateChatCreators : allCreators.filter((creator) => creator.id !== currentUserKey);
+  const activeChatCreator = allCreators.find((creator) => creator.id === selectedChatId && !isOwnCommunityId(creator.id)) || chatCreators[0];
+  const activeConversationId = activeChatCreator ? getPrivateConversationId(currentUserKey, activeChatCreator.id) : '';
+  const activeConversation = privateConversations.find((conversation) => conversation.id === activeConversationId);
+  const activePrivateMessages = privateMessages
+    .filter((message) => message.conversationId === activeConversationId && message.expiresAt > Date.now())
+    .sort((a, b) => a.createdAt - b.createdAt);
+  const activePinnedMessage = activeConversation?.pinnedMessageId
+    ? activePrivateMessages.find((message) => message.id === activeConversation.pinnedMessageId)
+    : undefined;
   const activeChatStories = sharedStories.filter((story) => story.recipientId === activeChatCreator?.id);
   const shouldShowStatusDetail = (card: StatusCard) => card.body.length > 140 || Boolean(card.imagePreview && card.body.trim().length > 0);
   const profileStats = useMemo(() => ({
@@ -697,6 +817,299 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     await uploadString(ref(storage, storagePath), dataUrl, 'data_url');
     return { imageUrl: await getDownloadURL(ref(storage, storagePath)), storagePath, uploadBytes: dataUrlBytes(dataUrl) };
   };
+
+  const uploadPrivateChatImage = async (conversationId: string, messageId: string, dataUrl: string) => {
+    if (!dataUrl.startsWith('data:')) return { imageUrl: dataUrl, storagePath: undefined, uploadBytes: 0 };
+    const uploadBytes = dataUrlBytes(dataUrl);
+    if (uploadBytes > PRIVATE_CHAT_IMAGE_MAX_BYTES) {
+      throw new Error('Image is too large. Please upload an image under 2MB.');
+    }
+
+    const storagePath = `privateChats/${conversationId}/${messageId}/image.jpg`;
+    await uploadString(ref(storage, storagePath), dataUrl, 'data_url');
+    return {
+      imageUrl: await getDownloadURL(ref(storage, storagePath)),
+      storagePath,
+      uploadBytes,
+    };
+  };
+
+  const resetPrivateChatComposer = () => {
+    setChatDraft('');
+    setChatImagePreview('');
+    setChatImageName('');
+    setChatPollQuestion('');
+    setChatPollOptions(['', '']);
+    setChatAttachmentMode(null);
+    setPrivateChatError('');
+  };
+
+  const ensurePrivateConversation = async (conversationId: string, receiver: Creator) => {
+    const conversationRef = doc(db, PRIVATE_CHATS, conversationId);
+    await setDoc(conversationRef, stripUndefinedDeep({
+      participants: [currentUserKey, receiver.id],
+      participantMap: { [currentUserKey]: true, [receiver.id]: true },
+      participantNames: { [currentUserKey]: profile.name, [receiver.id]: receiver.name },
+      participantAvatars: { [currentUserKey]: profile.avatar, [receiver.id]: receiver.avatar },
+      createdAt: activeConversation?.createdAt || Date.now(),
+      updatedAt: Date.now(),
+      lastMessage: activeConversation?.lastMessage || '',
+      lastMessageType: activeConversation?.lastMessageType || 'text',
+      lastMessageAt: activeConversation?.lastMessageAt || Date.now(),
+      lastSenderId: activeConversation?.lastSenderId || '',
+      unreadCounts: activeConversation?.unreadCounts || { [currentUserKey]: 0, [receiver.id]: 0 },
+    }), { merge: true });
+  };
+
+  const sendPrivateChatMessage = async (forcedType?: PrivateChatMessageType) => {
+    if (!guardedAuth.currentUser || !currentUserKey) {
+      redirectToAuth();
+      return;
+    }
+
+    if (!activeChatCreator || !activeConversationId || activeChatCreator.id === currentUserKey) return;
+
+    const type = forcedType || chatAttachmentMode || 'text';
+    const text = chatDraft.trim();
+    const pollQuestion = chatPollQuestion.trim();
+    const cleanedPollOptions = chatPollOptions.map((option) => option.trim()).filter(Boolean);
+
+    if (type === 'text' && !text) return;
+    if (type === 'image' && !chatImagePreview) {
+      setPrivateChatError('Please choose an image first.');
+      return;
+    }
+    if (type === 'poll' && (!pollQuestion || cleanedPollOptions.length < 2)) {
+      setPrivateChatError('Poll needs one question and at least 2 options.');
+      return;
+    }
+
+    setIsPrivateChatSending(true);
+    setPrivateChatError('');
+
+    const messageId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const createdAt = Date.now();
+    const expiresAt = createdAt + PRIVATE_CHAT_TTL_MS;
+    let storagePath = '';
+    let imageUrl = '';
+    let uploadBytes = 0;
+
+    try {
+      await ensurePrivateConversation(activeConversationId, activeChatCreator);
+
+      if (type === 'image') {
+        const uploaded = await uploadPrivateChatImage(activeConversationId, messageId, chatImagePreview);
+        imageUrl = uploaded.imageUrl;
+        storagePath = uploaded.storagePath || '';
+        uploadBytes = uploaded.uploadBytes;
+      }
+
+      const lastMessage =
+        type === 'image'
+          ? (text || '🖼️ Image')
+          : type === 'poll'
+            ? `📊 ${pollQuestion}`
+            : text;
+
+      const messagePayload: PrivateChatMessage = {
+        id: messageId,
+        conversationId: activeConversationId,
+        senderId: currentUserKey,
+        receiverId: activeChatCreator.id,
+        senderName: profile.name,
+        receiverName: activeChatCreator.name,
+        type,
+        text: type === 'text' ? text : undefined,
+        caption: type === 'image' ? text : undefined,
+        imageUrl: type === 'image' ? imageUrl : undefined,
+        storagePath: type === 'image' ? storagePath : undefined,
+        uploadBytes: type === 'image' ? uploadBytes : 0,
+        poll: type === 'poll'
+          ? {
+              question: pollQuestion,
+              options: cleanedPollOptions,
+              votes: cleanedPollOptions.map(() => 0),
+              voters: {},
+              totalVotes: 0,
+            }
+          : undefined,
+        createdAt,
+        expiresAt,
+        readBy: { [currentUserKey]: true },
+        status: 'sent',
+      };
+
+      await setDoc(doc(db, PRIVATE_CHATS, activeConversationId, PRIVATE_CHAT_MESSAGES, messageId), stripUndefinedDeep(messagePayload));
+
+      await setDoc(doc(db, PRIVATE_CHATS, activeConversationId), stripUndefinedDeep({
+        participants: [currentUserKey, activeChatCreator.id],
+        participantMap: { [currentUserKey]: true, [activeChatCreator.id]: true },
+        participantNames: { [currentUserKey]: profile.name, [activeChatCreator.id]: activeChatCreator.name },
+        participantAvatars: { [currentUserKey]: profile.avatar, [activeChatCreator.id]: activeChatCreator.avatar },
+        updatedAt: createdAt,
+        lastMessage,
+        lastMessageType: type,
+        lastMessageAt: createdAt,
+        lastSenderId: currentUserKey,
+        unreadCounts: {
+          ...(activeConversation?.unreadCounts || {}),
+          [activeChatCreator.id]: (activeConversation?.unreadCounts?.[activeChatCreator.id] || 0) + 1,
+          [currentUserKey]: 0,
+        },
+      }), { merge: true });
+
+      resetPrivateChatComposer();
+    } catch (error) {
+      console.warn('Private chat send failed', error);
+      if (storagePath) deleteObject(ref(storage, storagePath)).catch((deleteError) => console.warn('Private chat image rollback failed', deleteError));
+      setPrivateChatError(error instanceof Error ? error.message : 'Message failed. Please try again.');
+    } finally {
+      setIsPrivateChatSending(false);
+    }
+  };
+
+  const votePrivatePoll = async (message: PrivateChatMessage, optionIndex: number) => {
+    if (!message.poll || message.poll.voters?.[currentUserKey] !== undefined) return;
+    const messageRef = doc(db, PRIVATE_CHATS, message.conversationId, PRIVATE_CHAT_MESSAGES, message.id);
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(messageRef);
+        if (!snap.exists()) return;
+
+        const data = snap.data();
+        const poll = data.poll as PrivateChatPoll | undefined;
+        if (!poll || poll.voters?.[currentUserKey] !== undefined) return;
+
+        const votes = Array.isArray(poll.votes) ? [...poll.votes] : poll.options.map(() => 0);
+        votes[optionIndex] = (votes[optionIndex] || 0) + 1;
+
+        transaction.update(messageRef, {
+          poll: {
+            ...poll,
+            votes,
+            voters: { ...(poll.voters || {}), [currentUserKey]: optionIndex },
+            totalVotes: votes.reduce((sum, count) => sum + count, 0),
+          },
+        });
+      });
+    } catch (error) {
+      console.warn('Private poll vote failed', error);
+      setPrivateChatError('Vote failed. Please try again.');
+    }
+  };
+
+  const handlePrivateChatImagePick = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setPrivateChatError('Only image files are allowed.');
+      return;
+    }
+
+    if (file.size > PRIVATE_CHAT_IMAGE_MAX_BYTES) {
+      setPrivateChatError('Image is too large. Please upload an image under 2MB.');
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      setChatImagePreview(String(reader.result || ''));
+      setChatImageName(file.name);
+      setChatAttachmentMode('image');
+      setPrivateChatError('');
+    };
+    reader.onerror = () => setPrivateChatError('Image preview failed. Please try again.');
+    reader.readAsDataURL(file);
+  };
+
+  const pinLatestPrivateMessage = () => {
+    const latest = activePrivateMessages[activePrivateMessages.length - 1];
+    if (!latest || !activeConversationId) return;
+    updateDoc(doc(db, PRIVATE_CHATS, activeConversationId), {
+      pinnedMessageId: latest.id,
+      updatedAt: Date.now(),
+    }).catch((error) => {
+      console.warn('Pin private message failed', error);
+      setPrivateChatError('Could not pin this message.');
+    });
+    setChatMenuOpen(false);
+  };
+
+  const clearPinnedPrivateMessage = () => {
+    if (!activeConversationId) return;
+    updateDoc(doc(db, PRIVATE_CHATS, activeConversationId), {
+      pinnedMessageId: deleteField(),
+      updatedAt: Date.now(),
+    }).catch((error) => {
+      console.warn('Unpin private message failed', error);
+      setPrivateChatError('Could not unpin message.');
+    });
+    setChatMenuOpen(false);
+  };
+
+  const cleanupExpiredPrivateChatMessages = (conversationIds: string[]) => {
+    conversationIds.slice(0, 20).forEach((conversationId) => {
+      getDocs(query(collection(db, PRIVATE_CHATS, conversationId, PRIVATE_CHAT_MESSAGES), where('expiresAt', '<=', Date.now()), limit(25)))
+        .then((snapshot) => {
+          snapshot.docs.forEach((item) => {
+            const data = item.data();
+            deleteDoc(doc(db, PRIVATE_CHATS, conversationId, PRIVATE_CHAT_MESSAGES, item.id)).catch((error) => console.warn('Expired private message cleanup failed', error));
+            if (data.storagePath) deleteObject(ref(storage, data.storagePath)).catch((error) => console.warn('Expired private media cleanup failed', error));
+          });
+        })
+        .catch((error) => console.warn('Private chat cleanup query failed', error));
+    });
+  };
+
+  useEffect(() => {
+    if (!isCommunityAllowed || !guardedAuth.currentUser || !currentUserKey) return undefined;
+
+    const conversationsQuery = query(collection(db, PRIVATE_CHATS), where('participants', 'array-contains', currentUserKey), limit(100));
+
+    return onSnapshot(conversationsQuery, (snapshot) => {
+      const conversations = snapshot.docs
+        .map((item) => mapPrivateConversationDoc(item))
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+
+      setPrivateConversations(conversations);
+      cleanupExpiredPrivateChatMessages(conversations.map((conversation) => conversation.id));
+    }, (error) => console.warn('Private conversations sync failed', error));
+  }, [isCommunityAllowed, currentUserKey, guardedAuth.currentUser?.uid]);
+
+  useEffect(() => {
+    if (!isCommunityAllowed || !activeConversationId) {
+      setPrivateMessages([]);
+      return undefined;
+    }
+
+    const messagesQuery = query(
+      collection(db, PRIVATE_CHATS, activeConversationId, PRIVATE_CHAT_MESSAGES),
+      where('expiresAt', '>', Date.now()),
+      orderBy('expiresAt', 'desc'),
+      limit(150)
+    );
+
+    return onSnapshot(messagesQuery, (snapshot) => {
+      const liveMessages = snapshot.docs
+        .map((item) => mapPrivateChatMessageDoc(item))
+        .filter((message) => message.expiresAt > Date.now())
+        .sort((a, b) => a.createdAt - b.createdAt);
+
+      setPrivateMessages(liveMessages);
+
+      if (guardedAuth.currentUser && activeConversationId) {
+        updateDoc(doc(db, PRIVATE_CHATS, activeConversationId), {
+          [`unreadCounts.${currentUserKey}`]: 0,
+        }).catch((error) => console.warn('Private chat read update failed', error));
+      }
+    }, (error) => console.warn('Private messages sync failed', error));
+  }, [isCommunityAllowed, activeConversationId, currentUserKey, guardedAuth.currentUser?.uid]);
+
+  useEffect(() => {
+    directChatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+  }, [activeConversationId, activePrivateMessages.length]);
 
   const pushPage = (nextPage: CommunityPage, options: { preserveScroll?: boolean } = {}) => {
     setIsNotificationPanelOpen(false);
@@ -1847,14 +2260,24 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   );
 
   const MessageSummaryCard: React.FC<{ message: FeedMessage; isActive?: boolean }> = ({ message, isActive = false }) => (
-    <article className={`overflow-hidden rounded-2xl border bg-white shadow-sm transition duration-300 ${isActive ? 'scale-[1.012] border-[#C2E7FF] shadow-[0_18px_48px_rgba(26,115,232,0.10)] ring-2 ring-[#E8F0FE]' : 'border-[#E0E3EB] hover:-translate-y-0.5 hover:border-[#C2E7FF] hover:shadow-[0_16px_40px_rgba(60,64,67,0.10)]'}`}>
-      <button type="button" onClick={() => openMessage(message.id)} className={`flex w-full items-center gap-3 border-l-4 p-3 text-left transition sm:p-4 ${isActive ? 'border-[#1A73E8] bg-[#E8F0FE]' : 'border-transparent'}`}>
-        <Avatar value={resolveAvatar(message)} size="h-11 w-11" />
+    <article className={`overflow-hidden rounded-[1.35rem] border bg-white shadow-sm transition duration-300 ${isActive ? 'border-[#C2E7FF] bg-[#F8FBFF] shadow-[0_14px_34px_rgba(26,115,232,0.10)] ring-2 ring-[#E8F0FE]' : 'border-[#E0E3EB] hover:border-[#C2E7FF] hover:bg-[#F8FBFF]'}`}>
+      <button type="button" onClick={() => openMessage(message.id)} className={`flex w-full items-center gap-3 border-l-4 px-3 py-2.5 text-left transition sm:px-4 ${isActive ? 'border-[#1A73E8]' : 'border-transparent'}`}>
+        <Avatar value={resolveAvatar(message)} size="h-10 w-10" />
         <div className="min-w-0 flex-1">
-          <h3 className="truncate text-base font-black text-[#202124] sm:text-lg">{message.title}</h3>
-          <div className="mt-1 flex flex-wrap items-center gap-2 text-xs font-bold text-[#5F6368] sm:text-sm"><span>{resolveName(message)}</span><span>•</span><span>{message.time}</span><span className="rounded-full border border-[#D2E3FC] px-2 py-0.5 text-[#1967D2]">{message.badge}</span></div>
-          <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-[#5F6368] sm:text-[15px]">{message.body}</p>
-          <div className="mt-2 flex flex-wrap gap-1.5"><span className="rounded-full bg-[#FCE8E6] px-2 py-1 text-[11px] font-black text-[#C5221F]">❤️ {message.likeCount || 0}</span><span className="rounded-full bg-[#E8F0FE] px-2 py-1 text-[11px] font-black text-[#1967D2]">💬 {message.replyCount || message.replies.length}</span></div>{renderReactionStrip(message)}
+          <div className="flex min-w-0 items-center justify-between gap-3">
+            <h3 className="truncate text-sm font-black text-[#202124] sm:text-base">{message.title}</h3>
+            <span className="shrink-0 text-[11px] font-black text-[#7C879A]">{message.time}</span>
+          </div>
+          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-[#5F6368] sm:text-xs">
+            <span className="truncate">{resolveName(message)}</span>
+            <span>•</span>
+            <span className="rounded-full border border-[#D2E3FC] bg-[#F8FBFF] px-2 py-0.5 text-[#1967D2]">{message.badge}</span>
+          </div>
+          <div className="mt-2 flex flex-wrap items-center gap-1.5">
+            <span className="rounded-full bg-[#FCE8E6] px-2 py-1 text-[11px] font-black text-[#C5221F]">❤️ {message.likeCount || 0}</span>
+            <span className="rounded-full bg-[#E8F0FE] px-2 py-1 text-[11px] font-black text-[#1967D2]">💬 {message.replyCount || message.replies.length}</span>
+            {REACTION_EMOJIS.slice(0, 3).map((emoji) => <button key={emoji} type="button" onClick={(event) => { event.stopPropagation(); reactToMessage(message, emoji); }} className="rounded-full border border-[#DADCE0] bg-white px-2 py-1 text-[11px] font-black text-[#202124]">{emoji} {(message.reactionCounts || {})[emoji] || 0}</button>)}
+          </div>
         </div>
       </button>
     </article>
@@ -1979,16 +2402,215 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const openChatCreator = (creatorId: string) => {
     setSelectedChatId(creatorId);
+    setChatMenuOpen(false);
+    resetPrivateChatComposer();
     if (window.matchMedia('(max-width: 1023px)').matches) pushPage('directChatThread');
   };
 
-  const renderChatPage = () => {
-    const sidebarCreators = chatCreators.length ? chatCreators : allCreators;
+  const renderPrivateMessageBubble = (message: PrivateChatMessage) => {
+    const mine = message.senderId === currentUserKey;
+    const poll = message.poll;
+    const selectedPollOption = poll?.voters?.[currentUserKey];
 
-    return <div className="mx-auto grid h-[calc(100dvh-10.5rem)] max-w-[1800px] overflow-hidden rounded-[2.4rem] border border-[#E0E3EB] bg-white shadow-[0_26px_80px_rgba(15,23,42,0.10)] lg:grid-cols-[380px_1fr]"><aside className="flex h-full min-h-0 flex-col border-b border-[#E0E3EB] bg-gradient-to-b from-[#F8FAFD] to-white lg:border-b-0 lg:border-r"><div className="border-b border-[#E0E3EB] p-5"><p className="text-xs font-black uppercase tracking-[0.28em] text-[#1967D2]">Story inbox</p><h2 className="mt-2 text-3xl font-black tracking-tight">Chats</h2><p className="mt-2 text-sm font-bold leading-6 text-[#5F6368]">Abhi yahan sirf shared stories dikhengi. Direct text chat baad mein enable hoga.</p></div><div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 custom-scrollbar">{sidebarCreators.map((creator) => { const count = sharedStories.filter((story) => story.recipientId === creator.id).length; const active = activeChatCreator?.id === creator.id; return <button key={creator.id} type="button" onClick={() => openChatCreator(creator.id)} className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${active ? 'border-[#C2E7FF] bg-[#E8F0FE] shadow-md text-[#202124]' : 'border-transparent bg-white hover:bg-[#E8F0FE] text-[#202124] hover:shadow-sm'}`}><Avatar value={creator.avatar} size="h-12 w-12" /><span className="min-w-0 flex-1"><span className="block truncate text-base font-black text-[#202124]">{creator.name}</span><span className="block truncate text-xs font-bold text-[#5F6368]">{count ? `${count} shared ${count === 1 ? 'story' : 'stories'}` : 'No shared story yet'}</span></span>{count ? <span className="rounded-full bg-[#1A73E8] px-2.5 py-1 text-xs font-black text-white">{count}</span> : null}</button>; })}</div></aside><section className="hidden min-h-0 flex-col bg-[radial-gradient(circle_at_18%_10%,rgba(14,165,233,0.10),transparent_28%),linear-gradient(180deg,#ffffff,#f8fafc)] lg:flex"><div className="flex items-center gap-3 border-b border-[#E0E3EB] bg-white/95 p-5 backdrop-blur-xl"><Avatar value={activeChatCreator?.avatar || '👤'} size="h-12 w-12" /><div className="min-w-0 flex-1"><h3 className="truncate text-2xl font-black text-[#202124]">{activeChatCreator?.name || 'Story chat'}</h3><p className="text-sm font-bold text-[#5F6368]">Stories shared with this follower appear here for both sides.</p></div><button type="button" onClick={() => { setActiveView('status'); setPage('chat'); }} className="rounded-2xl bg-[#1A73E8] px-4 py-3 text-sm font-black text-white transition hover:-translate-y-0.5">Share more</button></div><div className="min-h-0 flex-1 space-y-4 overflow-y-auto p-4 custom-scrollbar sm:p-6">{activeChatStories.length ? activeChatStories.map((story) => { const status = statusCards.find((card) => card.id === story.statusId); if (!status) return null; return <div key={story.id} className="flex justify-end"><article className="max-w-[min(520px,92%)] overflow-hidden rounded-[2rem] rounded-br-md border border-[#E0E3EB] bg-white shadow-[0_18px_48px_rgba(15,23,42,0.10)]"><div className={`bg-gradient-to-br ${status.gradient} p-5 text-white`}><div className="flex items-center justify-between gap-3"><span className="rounded-full bg-white/85 px-3 py-1 text-xs font-black text-[#202124]">{status.slots}</span><span className="text-xs font-black text-[#202124]/80">{story.time}</span></div>{status.imagePreview ? <div className="my-8 aspect-square overflow-hidden rounded-[1.5rem] bg-[#202124]/20 shadow-inner">{renderUploadedImage(status.imagePreview, status.title, status.imageLayout || 'thumbnail')}</div> : null}<h4 className="mt-16 text-3xl font-black tracking-tight">{status.title}</h4><p className="mt-3 text-sm font-semibold leading-6 text-white/90">{status.body}</p></div><div className="flex items-center justify-between gap-3 p-4"><p className="text-xs font-bold text-[#5F6368]">Sent by {story.senderId === 'me' ? profile.name : story.senderName}</p><button type="button" onClick={() => openStatusReel(status.id)} className="rounded-full bg-[#1A73E8] px-4 py-2 text-xs font-black text-white">Open story</button></div></article></div>; }) : <div className="flex h-full items-center justify-center text-center"><div className="max-w-md rounded-[2rem] border border-dashed border-[#D2E3FC] bg-white p-8 shadow-inner"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E8F0FE] text-3xl text-[#1A73E8]">↗️</div><h3 className="mt-4 text-2xl font-black">No story shared yet</h3><p className="mt-2 text-sm font-bold leading-6 text-[#5F6368]">Status reel mein Share dabao, follower select karo, phir story yahan chat mein dikhegi.</p></div></div>}</div><div className="border-t border-[#E0E3EB] bg-white/95 p-4 text-center text-xs font-black text-[#5F6368] backdrop-blur-xl">Text messages disabled · Stories only chat</div></section></div>;
+    return (
+      <div key={message.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+        <article className={`max-w-[min(82%,34rem)] overflow-hidden rounded-[1.65rem] px-4 py-3 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${mine ? 'rounded-br-md bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-white' : 'rounded-bl-md border border-[#D9E7F8] bg-white text-[#081A45]'}`}>
+          {message.type === 'image' && message.imageUrl ? (
+            <button type="button" onClick={() => setImageLightbox({ src: message.imageUrl!, alt: message.caption || 'Chat image', mode: 'original' })} className="mb-3 block max-h-80 w-full overflow-hidden rounded-[1.25rem] bg-white/15">
+              {renderUploadedImage(message.imageUrl, message.caption || 'Chat image', 'original')}
+            </button>
+          ) : null}
+
+          {message.type === 'poll' && poll ? (
+            <div>
+              <p className="text-sm font-black">{poll.question}</p>
+              <div className="mt-3 space-y-2">
+                {poll.options.map((option, index) => {
+                  const total = Math.max(1, poll.totalVotes || poll.votes.reduce((sum, count) => sum + count, 0));
+                  const percent = Math.round(((poll.votes[index] || 0) / total) * 100);
+                  const selected = selectedPollOption === index;
+
+                  return (
+                    <button
+                      key={`${message.id}-${option}`}
+                      type="button"
+                      onClick={() => votePrivatePoll(message, index)}
+                      disabled={selectedPollOption !== undefined}
+                      className={`relative w-full overflow-hidden rounded-2xl border px-3 py-2 text-left text-xs font-black transition ${mine ? 'border-white/30 bg-white/10 text-white disabled:opacity-95' : 'border-[#D9E7F8] bg-[#F8FBFF] text-[#081A45] disabled:opacity-95'}`}
+                    >
+                      <span className={`absolute inset-y-0 left-0 ${mine ? 'bg-white/20' : 'bg-[#E8F2FF]'}`} style={{ width: selectedPollOption !== undefined ? `${percent}%` : '0%' }} />
+                      <span className="relative flex items-center justify-between gap-3">
+                        <span>{selected ? '✓ ' : ''}{option}</span>
+                        <span>{selectedPollOption !== undefined ? `${percent}%` : 'Vote'}</span>
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          ) : (
+            <p className="whitespace-pre-wrap break-words text-sm font-semibold leading-6">{message.type === 'image' ? message.caption : message.text}</p>
+          )}
+
+          <div className={`mt-2 text-right text-[10px] font-black ${mine ? 'text-white/70' : 'text-[#7C879A]'}`}>
+            {formatCommunityTime(message.createdAt)} · expires in 30d
+          </div>
+        </article>
+      </div>
+    );
   };
 
-  const renderChatThreadPage = () => <div className="mx-auto flex h-[calc(100dvh-10.5rem)] max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-[#E0E3EB] bg-white shadow-[0_22px_70px_rgba(15,23,42,0.10)]"><div className="flex items-center gap-3 border-b border-[#E0E3EB] bg-white p-4"><button type="button" onClick={() => setPage('directChat')} className="rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-sm font-black text-[#5F6368]">← Back to Chat</button><Avatar value={activeChatCreator?.avatar || '👤'} size="h-11 w-11" /><div className="min-w-0"><h3 className="truncate text-xl font-black">{activeChatCreator?.name || 'Story chat'}</h3><p className="text-xs font-bold text-[#5F6368]">Shared stories only</p></div></div><div className="min-h-0 flex-1 space-y-4 overflow-y-auto bg-white p-4 custom-scrollbar">{activeChatStories.length ? activeChatStories.map((story) => { const status = statusCards.find((card) => card.id === story.statusId); if (!status) return null; return <article key={story.id} className="overflow-hidden rounded-[2rem] border border-[#E0E3EB] bg-white shadow-[0_16px_44px_rgba(15,23,42,0.08)]"><div className={`bg-gradient-to-br ${status.gradient} p-5 text-white`}><span className="rounded-full bg-white/85 px-3 py-1 text-xs font-black text-[#202124]">{status.slots}</span>{status.imagePreview ? <div className="my-8 aspect-square overflow-hidden rounded-[2rem] bg-[#202124]/20 shadow-inner">{renderUploadedImage(status.imagePreview, status.title, status.imageLayout || 'thumbnail')}</div> : null}<h4 className="mt-10 text-3xl font-black">{status.title}</h4><p className="mt-3 text-sm font-semibold leading-6 text-white/90">{status.body}</p></div><div className="flex items-center justify-between gap-3 p-4"><p className="text-xs font-bold text-[#5F6368]">{story.time}</p><button type="button" onClick={() => openStatusReel(status.id)} className="rounded-full bg-[#1A73E8] px-4 py-2 text-xs font-black text-white">Open story</button></div></article>; }) : <div className="flex h-full items-center justify-center text-center"><div className="rounded-[2rem] border border-dashed border-[#D2E3FC] bg-white p-8"><h3 className="text-2xl font-black">No story shared yet</h3><p className="mt-2 text-sm font-bold text-[#5F6368]">Share a status to this follower first.</p></div></div>}</div><div className="border-t border-[#E0E3EB] p-3 text-center text-xs font-black text-[#5F6368]">Text messages disabled · Stories only chat</div></div>;
+  const renderPrivateChatShell = (mobile = false) => {
+    const sidebarCreators = chatCreators.length ? chatCreators : [];
+    const canSendText = Boolean(chatDraft.trim()) && !chatAttachmentMode;
+    const canSendImage = chatAttachmentMode === 'image' && Boolean(chatImagePreview);
+    const canSendPoll = chatAttachmentMode === 'poll' && Boolean(chatPollQuestion.trim()) && chatPollOptions.filter((option) => option.trim()).length >= 2;
+    const sendDisabled = isPrivateChatSending || (!canSendText && !canSendImage && !canSendPoll);
+
+    return (
+      <div className={`mx-auto grid overflow-hidden border border-[#D9E7F8] bg-white shadow-[0_26px_80px_rgba(8,26,69,0.10)] ${mobile ? 'h-[calc(100dvh-9.5rem)] max-w-3xl rounded-[2rem]' : 'h-[calc(100dvh-10.5rem)] max-w-[1800px] rounded-[2.4rem] lg:grid-cols-[360px_1fr]'}`}>
+        {!mobile ? (
+          <aside className="flex min-h-0 flex-col border-r border-[#D9E7F8] bg-gradient-to-b from-[#F8FBFF] to-white">
+            <div className="border-b border-[#D9E7F8] p-5">
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-[#1769FF]">Private messages</p>
+              <h2 className="mt-2 text-3xl font-black tracking-tight text-[#081A45]">Chats</h2>
+              <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">1-to-1 text, image with text, and poll messages stay private for 30 days.</p>
+            </div>
+            <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 custom-scrollbar">
+              {sidebarCreators.map((creator) => {
+                const conversationId = getPrivateConversationId(currentUserKey, creator.id);
+                const conversation = privateConversations.find((item) => item.id === conversationId);
+                const active = activeChatCreator?.id === creator.id;
+                const unread = conversation?.unreadCounts?.[currentUserKey] || 0;
+
+                return (
+                  <button key={creator.id} type="button" onClick={() => openChatCreator(creator.id)} className={`flex w-full items-center gap-3 rounded-2xl border p-3 text-left transition ${active ? 'border-[#BFD7FF] bg-[#E8F2FF] shadow-md' : 'border-transparent bg-white hover:bg-[#F8FBFF]'}`}>
+                    <Avatar value={creator.avatar} size="h-12 w-12" />
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-base font-black text-[#081A45]">{creator.name}</span>
+                      <span className="block truncate text-xs font-bold text-[#7C879A]">{conversation?.lastMessage || 'Start private chat'}</span>
+                    </span>
+                    {unread ? <span className="rounded-full bg-[#1769FF] px-2.5 py-1 text-xs font-black text-white">{unread > 9 ? '9+' : unread}</span> : null}
+                  </button>
+                );
+              })}
+            </div>
+          </aside>
+        ) : null}
+
+        <section className="flex min-h-0 flex-col bg-[radial-gradient(circle_at_18%_10%,rgba(23,105,255,0.10),transparent_28%),linear-gradient(180deg,#ffffff,#f8fbff)]">
+          <div className="flex items-center gap-3 border-b border-[#D9E7F8] bg-white/95 p-4 backdrop-blur-xl sm:p-5">
+            {mobile ? <button type="button" onClick={() => setPage('directChat')} className="rounded-2xl border border-[#D9E7F8] bg-white px-3 py-2 text-sm font-black text-[#536178]">←</button> : null}
+            <Avatar value={activeChatCreator?.avatar || '👤'} size="h-12 w-12" />
+            <div className="min-w-0 flex-1">
+              <h3 className="truncate text-xl font-black text-[#081A45] sm:text-2xl">{activeChatCreator?.name || 'Private chat'}</h3>
+              <p className="truncate text-xs font-bold text-[#7C879A]">Private · Firebase synced · Auto-hidden after 30 days</p>
+            </div>
+            <div className="relative">
+              <button type="button" onClick={() => setChatMenuOpen((open) => !open)} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-xl font-black text-[#081A45]">⋯</button>
+              {chatMenuOpen ? (
+                <div className="absolute right-0 top-12 z-20 w-56 overflow-hidden rounded-2xl border border-[#D9E7F8] bg-white p-2 shadow-[0_20px_60px_rgba(8,26,69,0.18)]">
+                  <button type="button" onClick={pinLatestPrivateMessage} className="w-full rounded-xl px-3 py-2 text-left text-xs font-black text-[#081A45] hover:bg-[#F8FBFF]">📌 Pin latest message</button>
+                  <button type="button" onClick={clearPinnedPrivateMessage} className="w-full rounded-xl px-3 py-2 text-left text-xs font-black text-[#081A45] hover:bg-[#F8FBFF]">🧹 Clear pinned message</button>
+                  <button type="button" onClick={() => { resetPrivateChatComposer(); setChatMenuOpen(false); }} className="w-full rounded-xl px-3 py-2 text-left text-xs font-black text-[#081A45] hover:bg-[#F8FBFF]">✍️ Clear draft</button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+
+          {activePinnedMessage ? (
+            <div className="border-b border-[#D9E7F8] bg-[#EEF6FF] px-4 py-3">
+              <div className="flex items-start gap-3 rounded-2xl border border-[#BFD7FF] bg-white px-4 py-3">
+                <span className="text-lg">📌</span>
+                <div className="min-w-0 flex-1">
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-[#1769FF]">Pinned message</p>
+                  <p className="mt-1 line-clamp-2 text-sm font-bold text-[#536178]">{activePinnedMessage.text || activePinnedMessage.caption || activePinnedMessage.poll?.question || 'Pinned media'}</p>
+                </div>
+                <button type="button" onClick={clearPinnedPrivateMessage} className="text-xs font-black text-[#EF4444]">Remove</button>
+              </div>
+            </div>
+          ) : null}
+
+          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 custom-scrollbar sm:p-6">
+            {activePrivateMessages.length ? (
+              activePrivateMessages.map(renderPrivateMessageBubble)
+            ) : (
+              <div className="flex h-full items-center justify-center text-center">
+                <div className="max-w-md rounded-[2rem] border border-dashed border-[#BFD7FF] bg-white/90 p-8 shadow-inner">
+                  <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E8F2FF] text-3xl">💬</div>
+                  <h3 className="mt-4 text-2xl font-black text-[#081A45]">Start a private conversation</h3>
+                  <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">Send text, image with caption, or a private poll. Nothing is saved to public Chat Feed.</p>
+                </div>
+              </div>
+            )}
+            <div ref={directChatMessagesEndRef} />
+          </div>
+
+          <div className="border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl sm:p-4">
+            {privateChatError ? <div className="mb-3 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-xs font-black text-[#C5221F]">{privateChatError}</div> : null}
+
+            {chatAttachmentMode === 'image' ? (
+              <div className="mb-3 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] p-3">
+                <div className="flex items-center justify-between gap-3">
+                  <p className="truncate text-xs font-black text-[#081A45]">🖼️ {chatImageName || 'Image selected'}</p>
+                  <button type="button" onClick={() => { setChatImagePreview(''); setChatImageName(''); setChatAttachmentMode(null); }} className="text-xs font-black text-[#EF4444]">Remove</button>
+                </div>
+                {chatImagePreview ? <div className="mt-3 max-h-48 overflow-hidden rounded-2xl bg-white">{renderUploadedImage(chatImagePreview, chatImageName || 'Image preview', 'original')}</div> : null}
+              </div>
+            ) : null}
+
+            {chatAttachmentMode === 'poll' ? (
+              <div className="mb-3 space-y-2 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] p-3">
+                <input value={chatPollQuestion} onChange={(event) => setChatPollQuestion(event.target.value)} placeholder="Poll question..." className="w-full rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-bold outline-none focus:border-[#1769FF]" />
+                {chatPollOptions.map((option, index) => (
+                  <input key={index} value={option} onChange={(event) => setChatPollOptions((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder={`Option ${index + 1}`} className="w-full rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-bold outline-none focus:border-[#1769FF]" />
+                ))}
+                <div className="flex gap-2">
+                  <button type="button" onClick={() => setChatPollOptions((current) => current.length >= 5 ? current : [...current, ''])} className="rounded-full bg-white px-3 py-2 text-xs font-black text-[#1769FF]">+ Option</button>
+                  <button type="button" onClick={() => setChatAttachmentMode(null)} className="rounded-full bg-white px-3 py-2 text-xs font-black text-[#EF4444]">Cancel poll</button>
+                </div>
+              </div>
+            ) : null}
+
+            <div className="flex items-center gap-2">
+              <div className="relative">
+                <button type="button" onClick={() => setChatAttachmentMode((mode) => mode ? null : 'image')} className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] text-xl">📎</button>
+                {chatAttachmentMode === 'image' && !chatImagePreview ? (
+                  <div className="absolute bottom-14 left-0 z-20 w-60 overflow-hidden rounded-2xl border border-[#D9E7F8] bg-white p-2 shadow-[0_20px_60px_rgba(8,26,69,0.18)]">
+                    <label className="block cursor-pointer rounded-xl px-3 py-3 text-sm font-black text-[#081A45] hover:bg-[#F8FBFF]">
+                      🖼️ Image with text
+                      <input type="file" accept="image/*" onChange={handlePrivateChatImagePick} className="hidden" />
+                    </label>
+                    <button type="button" onClick={() => setChatAttachmentMode('poll')} className="w-full rounded-xl px-3 py-3 text-left text-sm font-black text-[#081A45] hover:bg-[#F8FBFF]">📊 Poll</button>
+                  </div>
+                ) : null}
+              </div>
+
+              <input
+                value={chatDraft}
+                onChange={(event) => setChatDraft(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter' && !event.shiftKey && !sendDisabled) {
+                    event.preventDefault();
+                    sendPrivateChatMessage();
+                  }
+                }}
+                placeholder={chatAttachmentMode === 'image' ? 'Add caption...' : 'Type a message...'}
+                maxLength={1200}
+                className="min-w-0 flex-1 rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-bold text-[#081A45] outline-none focus:border-[#1769FF]"
+              />
+
+              <button type="button" onClick={() => sendPrivateChatMessage()} disabled={sendDisabled} className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(23,105,255,0.22)] disabled:opacity-45">Send</button>
+            </div>
+          </div>
+        </section>
+      </div>
+    );
+  };
+
+  const renderChatPage = () => renderPrivateChatShell(false);
+
+  const renderChatThreadPage = () => renderPrivateChatShell(true);
 
   const renderStatusDetailPage = () => <div className="mx-auto flex h-[calc(100dvh-10.5rem)] max-w-4xl flex-col overflow-hidden rounded-[2rem] border border-[#E0E3EB] bg-white shadow-[0_22px_70px_rgba(15,23,42,0.10)]"><div className="flex items-center justify-between gap-3 border-b border-[#E0E3EB] bg-white p-4"><button type="button" onClick={() => setPage('statusReel')} className="rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-sm font-black text-[#5F6368]">← Back to story</button><span className="rounded-full bg-[#E8F0FE] px-3 py-1 text-xs font-black text-[#1967D2]">{selectedStatus.slots}</span></div><div className={`min-h-0 flex-1 overflow-y-auto bg-gradient-to-br ${selectedStatus.gradient} p-5 text-white custom-scrollbar sm:p-8`}><article className="mx-auto max-w-3xl rounded-[2rem] border border-white/20 bg-[#202124]/10 p-5 shadow-2xl backdrop-blur-xl sm:p-8">{selectedStatus.imagePreview ? <div className={`mb-6 ${selectedStatus.imageLayout === 'original' ? 'max-h-[54dvh] min-h-48' : 'aspect-square'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-[#202124]/20 shadow-inner`}>{renderUploadedImage(selectedStatus.imagePreview, selectedStatus.title, selectedStatus.imageLayout || 'original')}</div> : null}<h2 className="text-4xl font-black tracking-tight sm:text-6xl">{selectedStatus.title}</h2><p className="mt-5 whitespace-pre-wrap text-lg font-semibold leading-9 text-white/90">{selectedStatus.body}</p>{renderStatusPoll(selectedStatus)}</article></div></div>;
 
@@ -2063,13 +2685,54 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     </header>
   );
 
-  const CommunitySidebar = () => (
-    <aside className="hidden w-[clamp(12.5rem,16vw,15.5rem)] min-h-0 shrink-0 flex-col overflow-y-auto border-r border-[var(--community-border)] bg-[var(--community-surface)]/70 p-3 custom-scrollbar lg:flex xl:p-4">
-      <div className="mb-3 rounded-[1.6rem] bg-gradient-to-br from-[#6C4CF6] to-[#4F7BFF] p-3 xl:mb-5 xl:rounded-[2rem] xl:p-4 text-white shadow-[0_18px_42px_rgba(79,123,255,0.25)]"><p className="text-xs font-black uppercase tracking-[0.22em] text-white/75">Community</p><h2 className="mt-2 text-2xl font-black">Bond Hub</h2></div>
-      <nav className="space-y-1.5 xl:space-y-2">{navItems.map((item) => <button key={item.label} type="button" onClick={item.action} className={`flex w-full items-center gap-2 rounded-[1.15rem] px-3 py-2.5 xl:gap-3 xl:rounded-[1.35rem] xl:px-4 xl:py-3 text-left text-sm font-black transition ${item.active ? 'bg-[#EEF2FF] text-[#4F46E5] shadow-[0_12px_34px_rgba(79,70,229,0.12)]' : 'text-[#64748B] hover:bg-white hover:text-[#081B5C]'}`}><span className={`flex h-9 w-9 items-center justify-center rounded-xl xl:h-10 xl:w-10 xl:rounded-2xl ${item.active ? 'bg-gradient-to-br from-[#6C4CF6] to-[#4F7BFF] text-white' : 'bg-[#F3F7FF]'}`}>{item.icon}</span>{item.label}</button>)}</nav>
-      <div className="mt-auto space-y-3 pt-3 xl:space-y-4"><div className="rounded-[1.6rem] bg-gradient-to-br from-[#081B5C] to-[#4F7BFF] p-3 xl:rounded-[2rem] xl:p-5 text-white shadow-[0_18px_48px_rgba(8,27,92,0.18)]"><p className="text-lg font-black">Go Premium</p><p className="mt-1 text-xs font-bold text-white/75">Unlock creator boosts and deep insights.</p><button type="button" className="mt-3 rounded-full bg-white px-3 py-2 xl:mt-4 xl:px-4 text-xs font-black text-[#4F46E5]">Upgrade Now</button></div><button type="button" onClick={() => pushPage('profile')} className="flex w-full items-center gap-3 rounded-[1.6rem] border border-[#E3ECF8] bg-white p-3 text-left"><Avatar value={profile.avatar} size="h-11 w-11" /><span className="min-w-0"><span className="block truncate text-sm font-black text-[#081B5C]">{profile.name}</span><span className="block truncate text-xs font-bold text-[#64748B]">@{profile.username}</span></span></button></div>
-    </aside>
-  );
+  const CommunitySidebar = () => {
+    const sidebarExpanded = isDesktopSidebarPinned || isDesktopSidebarHovering;
+
+    return (
+      <aside
+        onMouseEnter={() => setIsDesktopSidebarHovering(true)}
+        onMouseLeave={() => setIsDesktopSidebarHovering(false)}
+        className={`hidden min-h-0 shrink-0 flex-col overflow-y-auto border-r border-[var(--community-border)] bg-[var(--community-surface)]/78 p-3 transition-all duration-300 custom-scrollbar lg:flex ${sidebarExpanded ? 'w-[clamp(13rem,17vw,16rem)] xl:p-4' : 'w-[5.35rem]'}`}
+      >
+        <div className="mb-3 flex items-center justify-between gap-2">
+          {sidebarExpanded ? <p className="truncate text-xs font-black uppercase tracking-[0.2em] text-[#4F7BFF]">Navigation</p> : null}
+          <button
+            type="button"
+            onClick={() => setIsDesktopSidebarPinned((pinned) => !pinned)}
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#E3ECF8] bg-white text-sm font-black text-[#081B5C] shadow-sm"
+            title={isDesktopSidebarPinned ? 'Auto-collapse sidebar' : 'Pin sidebar open'}
+          >
+            {isDesktopSidebarPinned ? '⟨' : '☰'}
+          </button>
+        </div>
+
+        <nav className="space-y-1.5 xl:space-y-2">
+          {navItems.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={item.action}
+              title={item.label}
+              className={`flex w-full items-center gap-2 rounded-[1.15rem] px-2.5 py-2.5 text-left text-sm font-black transition xl:gap-3 xl:rounded-[1.35rem] xl:py-3 ${item.active ? 'bg-[#EEF2FF] text-[#4F46E5] shadow-[0_12px_34px_rgba(79,70,229,0.12)]' : 'text-[#64748B] hover:bg-white hover:text-[#081B5C]'}`}
+            >
+              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl xl:h-10 xl:w-10 xl:rounded-2xl ${item.active ? 'bg-gradient-to-br from-[#6C4CF6] to-[#4F7BFF] text-white' : 'bg-[#F3F7FF]'}`}>{item.icon}</span>
+              {sidebarExpanded ? <span className="truncate">{item.label}</span> : null}
+            </button>
+          ))}
+        </nav>
+
+        <button type="button" onClick={() => pushPage('profile')} className="mt-auto flex w-full items-center gap-3 rounded-[1.6rem] border border-[#E3ECF8] bg-white p-3 text-left">
+          <Avatar value={profile.avatar} size="h-11 w-11" />
+          {sidebarExpanded ? (
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-black text-[#081B5C]">{profile.name}</span>
+              <span className="block truncate text-xs font-bold text-[#64748B]">@{profile.username}</span>
+            </span>
+          ) : null}
+        </button>
+      </aside>
+    );
+  };
 
   const CommunityBottomNav = () => (
     <nav

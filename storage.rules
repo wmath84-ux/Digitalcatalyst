@@ -1,0 +1,31 @@
+rules_version = '2';
+
+service firebase.storage {
+  match /b/{bucket}/o {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isPrivateChatParticipant(chatId) {
+      return signedIn()
+        && firestore.exists(/databases/(default)/documents/private_chats/$(chatId))
+        && firestore.get(/databases/(default)/documents/private_chats/$(chatId)).data.participantMap[request.auth.uid] == true;
+    }
+
+    match /privateChats/{chatId}/{messageId}/{fileName} {
+      allow read: if isPrivateChatParticipant(chatId);
+      allow write: if isPrivateChatParticipant(chatId)
+        && request.resource.size < 3 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+      allow delete: if isPrivateChatParticipant(chatId);
+    }
+
+    match /community/{allPaths=**} {
+      allow read, write: if signedIn();
+    }
+
+    match /{allPaths=**} {
+      allow read, write: if signedIn();
+    }
+  }
+}
