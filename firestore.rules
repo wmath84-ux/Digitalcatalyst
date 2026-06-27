@@ -137,6 +137,49 @@ service cloud.firestore {
         || (signedIn() && resource.data.followerId == request.auth.uid);
     }
 
+    match /private_chats/{chatId} {
+      allow read: if signedIn()
+        && resource.data.participantMap[request.auth.uid] == true;
+
+      allow create: if signedIn()
+        && request.auth.uid in request.resource.data.participants
+        && request.resource.data.participants.size() == 2
+        && request.resource.data.participantMap[request.auth.uid] == true
+        && request.resource.data.keys().hasOnly([
+          'participants', 'participantMap', 'participantNames', 'participantAvatars',
+          'createdAt', 'updatedAt', 'lastMessage', 'lastMessageType',
+          'lastMessageAt', 'lastSenderId', 'unreadCounts', 'pinnedMessageId'
+        ]);
+
+      allow update: if signedIn()
+        && resource.data.participantMap[request.auth.uid] == true
+        && request.resource.data.participants == resource.data.participants
+        && request.resource.data.participantMap == resource.data.participantMap;
+
+      allow delete: if isAdmin();
+
+      match /messages/{messageId} {
+        allow read: if signedIn()
+          && get(/databases/$(database)/documents/private_chats/$(chatId)).data.participantMap[request.auth.uid] == true
+          && resource.data.expiresAt > request.time.toMillis();
+
+        allow create: if signedIn()
+          && get(/databases/$(database)/documents/private_chats/$(chatId)).data.participantMap[request.auth.uid] == true
+          && request.resource.data.conversationId == chatId
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.receiverId is string
+          && request.resource.data.type in ['text', 'image', 'poll']
+          && request.resource.data.expiresAt > request.time.toMillis();
+
+        allow update: if signedIn()
+          && get(/databases/$(database)/documents/private_chats/$(chatId)).data.participantMap[request.auth.uid] == true;
+
+        allow delete: if isAdmin()
+          || (signedIn() && resource.data.senderId == request.auth.uid)
+          || (signedIn() && resource.data.expiresAt < request.time.toMillis());
+      }
+    }
+
     match /community_master_tags/{tagId} {
       allow read: if signedIn();
       allow create: if signedIn();
