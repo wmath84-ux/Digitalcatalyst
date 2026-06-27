@@ -5,7 +5,7 @@
       <stop offset="0.46" stop-color="#2563eb"/>
       <stop offset="1" stop-color="#4f46e5"/>
     </linearGradient>
-    <linearGradient id="dc-page-192" x1="55" y1="64" x2="137" y2="134" gradientUnits="userSpaceOnUse">
+    <linearGradient id="dc-page-192" x1="54" y1="67" x2="138" y2="134" gradientUnits="userSpaceOnUse">
       <stop stop-color="#ffffff"/>
       <stop offset="1" stop-color="#dbeafe"/>
     </linearGradient>
@@ -13,8 +13,10 @@
   <rect x="8" y="8" width="176" height="176" rx="44" fill="url(#dc-bg-192)"/>
   <circle cx="142" cy="48" r="10" fill="#facc15"/>
   <path d="M142 25v13M142 58v13M119 48h13M152 48h13" stroke="#fef3c7" stroke-width="5" stroke-linecap="round"/>
-  <path d="M48 65c0-8 6-14 14-14h25c8 0 15 4 19 10 4-6 11-10 19-10h25c8 0 14 6 14 14v75c0 3-3 6-6 5l-38-8c-5-1-10 0-14 4-4-4-9-5-14-4l-38 8c-3 1-6-2-6-5V65z" fill="#0f172a" opacity=".22"/>
-  <path d="M42 61c0-8 6-14 14-14h27c9 0 17 5 21 13v76c-5-7-12-10-21-10H56c-8 0-14-6-14-14V61z" fill="url(#dc-page-192)"/>
-  <path d="M150 47c8 0 14 6 14 14v51c0 8-6 14-14 14h-27c-9 0-16 3-21 10V60c4-8 12-13 21-13h27z" fill="#eff6ff"/>
-  <path d="M70 78h20M70 94h20M122 78h25M122 94h25" stroke="#2563eb" stroke-width="6" stroke-linecap="round" opacity=".72"/>
+  <g transform="translate(0 8)">
+    <path d="M39 64c0-9 8-17 17-17h29c10 0 19 5 24 14 5-9 14-14 24-14h29c9 0 17 8 17 17v71c0 4-4 7-8 6l-42-8c-7-1-14 1-20 6-6-5-13-7-20-6l-42 8c-4 1-8-2-8-6V64z" fill="#0f172a" opacity=".22"/>
+    <path d="M32 57c0-9 8-17 17-17h32c12 0 22 6 27 17v77c-6-8-15-12-27-12H49c-9 0-17-8-17-17V57z" fill="url(#dc-page-192)"/>
+    <path d="M160 40c9 0 17 8 17 17v48c0 9-8 17-17 17h-32c-12 0-21 4-27 12V57c5-11 15-17 27-17h32z" fill="#eff6ff"/>
+    <path d="M63 75h23M63 92h23M123 75h28M123 92h28" stroke="#2563eb" stroke-width="6" stroke-linecap="round" opacity=".72"/>
+  </g>
 </svg>

@@ -1704,6 +1704,19 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setPageStack([]);
     recordStatusView(statusId);
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+    setShowStatusActions(false);
+  };
+
+  const openStatusUploadFromTop = () => {
+    setActiveView('status');
+    setShowStatusActions(false);
+    pushPage('statusUpload');
+  };
+
+  const openMyStatusesFromTop = () => {
+    setActiveView('status');
+    setShowStatusActions(false);
+    pushPage('statusMine');
   };
 
 
@@ -2588,12 +2601,47 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setSelectedChatId(creatorId);
     setChatMenuOpen(false);
     resetPrivateChatComposer();
-    if (window.matchMedia('(max-width: 1023px)').matches) {
+
+    // Only mobile phones should open the nested full chat page.
+    // Tablet and desktop keep the normal split chat layout.
+    if (window.matchMedia('(max-width: 767px)').matches) {
       pushPage('directChatThread');
       return;
     }
 
     if (page !== 'directChat') pushPage('directChat');
+  };
+
+  const renderPrivateChatInbox = () => {
+    const inboxCreators = chatCreators.length ? chatCreators : [];
+
+    return (
+      <div className="mx-auto flex h-[calc(100dvh-10.5rem)] max-w-3xl flex-col overflow-hidden rounded-[2rem] border border-[#D9E7F8] bg-white shadow-[0_26px_80px_rgba(8,26,69,0.10)]">
+        <div className="border-b border-[#D9E7F8] bg-gradient-to-br from-[#F8FBFF] to-white p-5">
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-[#1769FF]">Private messages</p>
+          <h2 className="mt-2 text-3xl font-black tracking-tight text-[#081A45]">Chats</h2>
+          <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">Tap a chat to open the mobile full-screen thread. Messages stay private for 30 days.</p>
+        </div>
+        <div className="min-h-0 flex-1 space-y-2 overflow-y-auto bg-[#F8FBFF] p-3 custom-scrollbar">
+          {inboxCreators.map((creator) => {
+            const conversationId = getPrivateConversationId(currentUserKey, creator.id);
+            const conversation = privateConversations.find((item) => item.id === conversationId);
+            const unread = conversation?.unreadCounts?.[currentUserKey] || 0;
+
+            return (
+              <button key={creator.id} type="button" onClick={() => openChatCreator(creator.id)} className="flex w-full items-center gap-3 rounded-2xl border border-[#D9E7F8] bg-white p-3 text-left shadow-sm transition hover:bg-[#F8FBFF]">
+                <Avatar value={creator.avatar} size="h-12 w-12" />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-base font-black text-[#081A45]">{getCreatorDisplayName(creator)}</span>
+                  <span className="block truncate text-xs font-bold text-[#7C879A]">{conversation?.lastMessage || 'Start private chat'}</span>
+                </span>
+                {unread ? <span className="rounded-full bg-[#1769FF] px-2.5 py-1 text-xs font-black text-white">{unread > 9 ? '9+' : unread}</span> : null}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+    );
   };
 
   const renderPrivateMessageBubble = (message: PrivateChatMessage) => {
@@ -2629,7 +2677,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
     return (
       <div key={message.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
-        <article className={`max-w-[min(82%,34rem)] overflow-hidden rounded-[1.65rem] px-4 py-3 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${mine ? 'rounded-br-md bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-white' : 'rounded-bl-md border border-[#D9E7F8] bg-white text-[#081A45]'}`}>
+        <article className={`max-w-[min(86%,34rem)] overflow-hidden rounded-[1.65rem] px-4 py-3 shadow-[0_12px_34px_rgba(15,23,42,0.08)] ${mine ? 'rounded-br-md bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-white' : 'rounded-bl-md border border-[#D9E7F8] bg-white text-[#081A45]'}`}>
           {message.type === 'shared_item' && sharedItem ? (
             <button type="button" onClick={openSharedItem} className={`block w-full overflow-hidden rounded-[1.35rem] border text-left transition hover:scale-[1.01] ${mine ? 'border-white/25 bg-white/12' : 'border-[#D9E7F8] bg-[#F8FBFF]'}`}>
               {sharedItem.imageUrl ? (
@@ -2701,7 +2749,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const sendDisabled = isPrivateChatSending || (!canSendText && !canSendImage && !canSendPoll);
 
     return (
-      <div className={`mx-auto grid overflow-hidden border border-[#D9E7F8] bg-white shadow-[0_26px_80px_rgba(8,26,69,0.10)] ${mobile ? 'h-[calc(100dvh-9.5rem)] max-w-3xl rounded-[2rem]' : 'h-[calc(100dvh-10.5rem)] max-w-[1800px] rounded-[2.4rem] lg:grid-cols-[360px_1fr]'}`}>
+      <div className={`mx-auto grid overflow-hidden border border-[#D9E7F8] bg-white shadow-[0_26px_80px_rgba(8,26,69,0.10)] ${mobile ? 'h-full w-full max-w-3xl rounded-[1.75rem]' : 'h-[calc(100dvh-10.5rem)] max-w-[1800px] rounded-[2.4rem] lg:grid-cols-[360px_1fr]'}`}>
         {!mobile ? (
           <aside className="flex min-h-0 flex-col border-r border-[#D9E7F8] bg-gradient-to-b from-[#F8FBFF] to-white">
             <div className="border-b border-[#D9E7F8] p-5">
@@ -2732,12 +2780,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         ) : null}
 
         <section className="flex min-h-0 flex-col bg-[radial-gradient(circle_at_18%_10%,rgba(23,105,255,0.10),transparent_28%),linear-gradient(180deg,#ffffff,#f8fbff)]">
-          <div className="flex items-center gap-3 border-b border-[#D9E7F8] bg-white/95 p-4 backdrop-blur-xl sm:p-5">
-            {mobile ? <button type="button" onClick={() => setPage('directChat')} className="rounded-2xl border border-[#D9E7F8] bg-white px-3 py-2 text-sm font-black text-[#536178]">←</button> : null}
-            <Avatar value={activeChatCreator?.avatar || '👤'} size="h-12 w-12" />
+          <div className={`flex items-center gap-3 border-b border-[#D9E7F8] bg-white/95 backdrop-blur-xl ${mobile ? 'sticky top-0 z-20 p-3' : 'p-4 sm:p-5'}`}>
+            {mobile ? <button type="button" onClick={() => setPage('directChat')} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-sm">←</button> : null}
+            <Avatar value={activeChatCreator?.avatar || '👤'} size={mobile ? 'h-10 w-10' : 'h-12 w-12'} />
             <div className="min-w-0 flex-1">
-              <h3 className="truncate text-xl font-black text-[#081A45] sm:text-2xl">{getCreatorDisplayName(activeChatCreator)}</h3>
-              <p className="truncate text-xs font-bold text-[#7C879A]">{getCreatorSubtitle(activeChatCreator)}</p>
+              <h3 className={`truncate font-black text-[#081A45] ${mobile ? 'text-lg' : 'text-xl sm:text-2xl'}`}>{getCreatorDisplayName(activeChatCreator)}</h3>
+              <p className="truncate text-xs font-bold text-[#7C879A]">{activePrivateMessages.length ? `${activePrivateMessages.length} active messages · 30-day expiry` : getCreatorSubtitle(activeChatCreator)}</p>
             </div>
             <div className="relative">
               <button type="button" onClick={() => setChatMenuOpen((open) => !open)} className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-xl font-black text-[#081A45]">⋯</button>
@@ -2764,7 +2812,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             </div>
           ) : null}
 
-          <div className="min-h-0 flex-1 space-y-3 overflow-y-auto p-4 custom-scrollbar sm:p-6">
+          <div className={`min-h-0 flex-1 space-y-3 overflow-y-auto custom-scrollbar ${mobile ? 'bg-[radial-gradient(circle_at_20%_0%,rgba(23,105,255,0.10),transparent_28%),#F8FBFF] px-3 py-4' : 'p-4 sm:p-6'}`}>
             {activePrivateMessages.length ? (
               activePrivateMessages.map(renderPrivateMessageBubble)
             ) : (
@@ -2779,7 +2827,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <div ref={directChatMessagesEndRef} />
           </div>
 
-          <div className="border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl sm:p-4">
+          <div className={`border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl ${mobile ? 'sticky bottom-0 z-20 shadow-[0_-18px_45px_rgba(8,26,69,0.08)]' : 'sm:p-4'}`}>
             {privateChatError ? <div className="mb-3 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-xs font-black text-[#C5221F]">{privateChatError}</div> : null}
 
             {chatAttachmentMode === 'image' ? (
@@ -2929,9 +2977,22 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
-  const renderChatPage = () => renderPrivateChatShell(false);
+  const renderChatPage = () => (
+    <>
+      <div className="md:hidden">
+        {renderPrivateChatInbox()}
+      </div>
+      <div className="hidden md:block">
+        {renderPrivateChatShell(false)}
+      </div>
+    </>
+  );
 
-  const renderChatThreadPage = () => renderPrivateChatShell(true);
+  const renderChatThreadPage = () => (
+    <div className="fixed inset-0 z-[1450] bg-[#F8FBFF] px-2 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-[calc(env(safe-area-inset-top)+0.75rem)] sm:px-4 md:static md:z-auto md:bg-transparent md:p-0">
+      {renderPrivateChatShell(true)}
+    </div>
+  );
 
   const renderStatusDetailPage = () => <div className="mx-auto flex h-[calc(100dvh-10.5rem)] max-w-4xl flex-col overflow-hidden rounded-[2rem] border border-[#E0E3EB] bg-white shadow-[0_22px_70px_rgba(15,23,42,0.10)]"><div className="flex items-center justify-between gap-3 border-b border-[#E0E3EB] bg-white p-4"><button type="button" onClick={() => setPage('statusReel')} className="rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-sm font-black text-[#5F6368]">← Back to story</button><span className="rounded-full bg-[#E8F0FE] px-3 py-1 text-xs font-black text-[#1967D2]">{selectedStatus.slots}</span></div><div className={`min-h-0 flex-1 overflow-y-auto bg-gradient-to-br ${selectedStatus.gradient} p-5 text-white custom-scrollbar sm:p-8`}><article className="mx-auto max-w-3xl rounded-[2rem] border border-white/20 bg-[#202124]/10 p-5 shadow-2xl backdrop-blur-xl sm:p-8">{selectedStatus.imagePreview ? <div className={`mb-6 ${selectedStatus.imageLayout === 'original' ? 'max-h-[54dvh] min-h-48' : 'aspect-square'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-[#202124]/20 shadow-inner`}>{renderUploadedImage(selectedStatus.imagePreview, selectedStatus.title, selectedStatus.imageLayout || 'original')}</div> : null}<h2 className="text-4xl font-black tracking-tight sm:text-6xl">{selectedStatus.title}</h2><p className="mt-5 whitespace-pre-wrap text-lg font-semibold leading-9 text-white/90">{selectedStatus.body}</p>{renderStatusPoll(selectedStatus)}</article></div></div>;
 
@@ -3004,7 +3065,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const navItems = [
     { label: 'Feed', icon: '📢', active: activeView === 'feed' && page === 'chat', action: () => switchView('feed') },
-    { label: 'Status', icon: '⭕', active: activeView === 'status' && page === 'chat', action: () => { setActiveView('status'); setPage('chat'); setPageStack([]); setShowStatusActions((value) => !value); } },
+    { label: 'Status', icon: '⭕', active: activeView === 'status' && page === 'chat', action: () => { setActiveView('status'); setPage('chat'); setPageStack([]); setShowStatusActions((value) => window.matchMedia('(max-width: 1023px)').matches ? !value : false); } },
     { label: 'Chat', icon: '💬', active: page === 'directChat' || page === 'directChatThread', action: () => pushPage('directChat') },
     { label: 'Creators', icon: '✍️', active: page === 'creators', action: () => pushPage('creators') },
     { label: 'Admin Post', icon: '📣', active: page === 'adminPosts', action: () => pushPage('adminPosts') },
@@ -3144,7 +3205,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {page === 'adminPosts' && renderFeedLayout(adminPosts, 'ADMIN POST', 'Official admin posts from Firebase. Like, react, vote, and reply here.')}
       {page === 'tagMaster' && renderTagMasterPage()}{page === 'masterTags' && renderMasterTagsPage()}{page === 'masterTagDetail' && renderMasterTagDetailPage()}
       {page === 'directChat' && renderChatPage()}{page === 'directChatThread' && renderChatThreadPage()}{page === 'statusDetail' && renderStatusDetailPage()}
-      {page === 'chat' && activeView === 'status' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[1.8rem] border border-[#E3ECF8] bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-5 text-center text-[#081B5C] shadow-[0_22px_70px_rgba(79,123,255,0.16)]"><p className="text-lg font-black sm:text-2xl">Daily one per type · {statusAvailableSlots.toLocaleString()} real slots left</p><p className="mt-2 text-sm font-bold text-[#64748B]">Text, image, and poll stories each lock after one daily use and stay visible for 15 days via Firebase.</p><div className="mt-4 flex justify-center gap-2"><button type="button" onClick={() => pushPage('statusUpload')} disabled={isStorageLocked} className="rounded-2xl bg-[#4F7BFF] px-4 py-3 text-xs font-black text-white disabled:bg-transparent disabled:text-[#64748B] disabled:ring-2 disabled:ring-[#E3ECF8]">{isStorageLocked ? 'Uploads locked' : 'Upload your status'}</button><button type="button" onClick={() => pushPage('statusMine')} className="rounded-2xl bg-white px-4 py-3 text-xs font-black text-[#081B5C]">View your status</button></div></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
+      {page === 'chat' && activeView === 'status' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[1.8rem] border border-[#E3ECF8] bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-5 text-center text-[#081B5C] shadow-[0_22px_70px_rgba(79,123,255,0.16)]"><p className="text-lg font-black sm:text-2xl">Daily one per type · {statusAvailableSlots.toLocaleString()} real slots left</p><p className="mt-2 text-sm font-bold text-[#64748B]">Text, image, and poll stories each lock after one daily use and stay visible for 15 days via Firebase.</p><div className="mt-4 flex justify-center gap-2"><button type="button" onClick={openStatusUploadFromTop} disabled={isStorageLocked} className="rounded-2xl bg-[#4F7BFF] px-4 py-3 text-xs font-black text-white disabled:bg-transparent disabled:text-[#64748B] disabled:ring-2 disabled:ring-[#E3ECF8]">{isStorageLocked ? 'Uploads locked' : 'Upload your status'}</button><button type="button" onClick={openMyStatusesFromTop} className="rounded-2xl bg-white px-4 py-3 text-xs font-black text-[#081B5C]">View your status</button></div></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
       {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_30px_90px_rgba(79,123,255,0.16)]"><div className="bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.3em] text-[#4F7BFF]">Story studio</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2></div><div className="p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : <div className="mb-4 rounded-2xl border border-[#D2E3FC] bg-[#E8F0FE] px-4 py-3 text-sm font-black text-[#1967D2]">Each story type locks after one daily publish · Visible for 15 days · Storage used: {storagePercent(storageUsedBytes)}%</div>}<div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange', true)}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={isPublishingStatus || isStatusTypeUsedToday || isStorageLocked || (statusType === 'image' && !statusImagePreview) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white disabled:opacity-45">{isPublishingStatus ? 'Publishing status story...' : isStatusTypeUsedToday ? `${statusType} story used today` : isStorageLocked ? 'Storage limit reached' : 'Publish status story'}</button></div></div>}
       {page === 'statusMine' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[2rem] border border-[#E3ECF8] bg-white p-6"><h2 className="text-4xl font-black tracking-tight text-[#081B5C]">View your status</h2><p className="mt-2 text-sm font-bold text-[#64748B]">Tap a card to open reel view.</p></div>{myStatuses.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{myStatuses.map(renderStatusTile)}</div> : <div className="rounded-[2rem] border border-dashed border-[#E3ECF8] bg-white p-10 text-center font-black text-[#64748B]">No status uploaded yet.</div>}</div>}
     </div>
