@@ -577,6 +577,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [chatDraft, setChatDraft] = useState('');
   const [chatImagePreview, setChatImagePreview] = useState('');
   const [chatImageName, setChatImageName] = useState('');
+  const [chatImageInputKey, setChatImageInputKey] = useState(0);
   const [chatPollQuestion, setChatPollQuestion] = useState('');
   const [chatPollOptions, setChatPollOptions] = useState(['', '']);
   const [chatAttachmentMode, setChatAttachmentMode] = useState<PrivateChatMessageType | null>(null);
@@ -872,6 +873,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setChatDraft('');
     setChatImagePreview('');
     setChatImageName('');
+    setChatImageInputKey((key) => key + 1);
     setChatPollQuestion('');
     setChatPollOptions(['', '']);
     setChatAttachmentMode(null);
@@ -923,6 +925,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       return;
     }
 
+    const selectedImagePreview = chatImagePreview;
+    const selectedImageName = chatImageName;
+
     setIsPrivateChatSending(true);
     setPrivateChatError('');
 
@@ -944,8 +949,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       type,
       text: type === 'text' ? text : undefined,
       caption: type === 'image' ? text : undefined,
-      imageUrl: type === 'image' ? chatImagePreview : undefined,
-      uploadBytes: type === 'image' ? dataUrlBytes(chatImagePreview) : 0,
+      imageUrl: type === 'image' ? selectedImagePreview : undefined,
+      uploadBytes: type === 'image' ? dataUrlBytes(selectedImagePreview) : 0,
       poll: type === 'poll'
         ? {
             question: pollQuestion,
@@ -965,12 +970,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       if (current.some((message) => message.id === optimisticMessage.id)) return current;
       return [...current, optimisticMessage].sort((a, b) => a.createdAt - b.createdAt);
     });
+    resetPrivateChatComposer();
 
     try {
       await ensurePrivateConversation(activeConversationId, activeChatCreator);
 
       if (type === 'image') {
-        const uploaded = await uploadPrivateChatImage(activeConversationId, messageId, chatImagePreview);
+        const uploaded = await uploadPrivateChatImage(activeConversationId, messageId, selectedImagePreview);
         imageUrl = uploaded.imageUrl;
         storagePath = uploaded.storagePath || '';
         uploadBytes = uploaded.uploadBytes;
@@ -1012,8 +1018,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         },
       }), { merge: true });
 
-      resetPrivateChatComposer();
-            requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
         directChatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
       });
     } catch (error) {
@@ -1021,6 +1026,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       if (storagePath) deleteObject(ref(storage, storagePath)).catch((deleteError) => console.warn('Private chat image rollback failed', deleteError));
       if (archiveStoragePath) deleteObject(ref(storage, archiveStoragePath)).catch((deleteError) => console.warn('Private chat archive rollback failed', deleteError));
             setPrivateMessages((current) => current.filter((message) => message.id !== messageId));
+      if (type === 'text') setChatDraft(text);
+      if (type === 'image') { setChatDraft(text); setChatImagePreview(selectedImagePreview); setChatImageName(selectedImageName); setChatAttachmentMode('image'); }
+      if (type === 'poll') { setChatPollQuestion(pollQuestion); setChatPollOptions(cleanedPollOptions.length ? cleanedPollOptions : ['', '']); setChatAttachmentMode('poll'); }
       setPrivateChatError(error instanceof Error ? error.message : 'Message failed. Please try again.');
     } finally {
       setIsPrivateChatSending(false);
@@ -1196,7 +1204,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
     const onCommunityPopState = (event: PopStateEvent) => {
       const state = event.state || {};
-      if (state.dcView !== 'community') return;
+      if (state.dcView !== 'community') {
+        if (pageRef.current !== 'chat' || activeViewRef.current !== 'feed') {
+          activeViewRef.current = 'feed';
+          pageRef.current = 'chat';
+          pageStackRef.current = [];
+          setActiveView('feed');
+          setPage('chat');
+          setPageStack([]);
+          window.history.pushState({ ...(window.history.state || {}), dcView: 'community', dcCommunityPage: 'chat' }, '', window.location.href);
+        }
+        return;
+      }
 
       const targetPage = state.dcCommunityPage as CommunityPage | undefined;
       if (targetPage) {
@@ -2941,7 +2960,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
               <div className="mb-3 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] p-3">
                 <div className="flex items-center justify-between gap-3">
                   <p className="truncate text-xs font-black text-[#081A45]">🖼️ {chatImageName || 'Image selected'}</p>
-                  <button type="button" onClick={() => { setChatImagePreview(''); setChatImageName(''); setChatAttachmentMode(null); }} className="text-xs font-black text-[#EF4444]">Remove</button>
+                  <button type="button" onClick={() => { setChatImagePreview(''); setChatImageName(''); setChatImageInputKey((key) => key + 1); setChatAttachmentMode(null); }} className="text-xs font-black text-[#EF4444]">Remove</button>
                 </div>
                 {chatImagePreview ? <div className="mt-3 max-h-48 overflow-hidden rounded-2xl bg-white">{renderUploadedImage(chatImagePreview, chatImageName || 'Image preview', 'original')}</div> : null}
               </div>
@@ -2967,7 +2986,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                   <div className="absolute bottom-14 left-0 z-20 w-60 overflow-hidden rounded-2xl border border-[#D9E7F8] bg-white p-2 shadow-[0_20px_60px_rgba(8,26,69,0.18)]">
                     <label className="block cursor-pointer rounded-xl px-3 py-3 text-sm font-black text-[#081A45] hover:bg-[#F8FBFF]">
                       🖼️ Image with text
-                      <input type="file" accept="image/*" onChange={handlePrivateChatImagePick} className="hidden" />
+                      <input key={chatImageInputKey} type="file" accept="image/*" onChange={handlePrivateChatImagePick} className="hidden" />
                     </label>
                     <button type="button" onClick={() => setChatAttachmentMode('poll')} className="w-full rounded-xl px-3 py-3 text-left text-sm font-black text-[#081A45] hover:bg-[#F8FBFF]">📊 Poll</button>
                   </div>

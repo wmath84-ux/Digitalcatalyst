@@ -1800,7 +1800,8 @@ const App: React.FC = () => {
           finalDiscount = calculateDiscount(couponToApply, currentCartSubtotal);
       }
       const afterCoupon = Math.max(0, currentCartSubtotal - finalDiscount);
-      const safeAppliedCoins = Math.min(effectiveAppUser?.eduCoins || 0, Math.max(0, appliedCoins), Math.floor(afterCoupon * eduCoinRedeemRate));
+      const liveCartCoinBalance = Math.max(0, Number((effectiveAppUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? effectiveAppUser?.eduCoins ?? 0));
+      const safeAppliedCoins = Math.min(liveCartCoinBalance, Math.max(0, appliedCoins), Math.floor(afterCoupon * eduCoinRedeemRate));
       const coinDiscount = Math.min(afterCoupon, safeAppliedCoins / eduCoinRedeemRate);
       const finalPrice = Math.max(0, afterCoupon - coinDiscount);
       if (safeAppliedCoins > 0 && !deductEduCoins(safeAppliedCoins, {
@@ -1877,6 +1878,8 @@ const App: React.FC = () => {
 
   const parseCurrency = (value: string | number | undefined | null) => parseFloat(String(value || '0').replace('₹', '').replace('🪙', '').replace(/,/g, '')) || 0;
 
+  const cartUserCoinBalance = Math.max(0, Number((effectiveAppUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? effectiveAppUser?.eduCoins ?? 0));
+
   const cartSubtotal = cartDetails.reduce((acc, item) => {
     const priceStr = item.product.salePrice || item.product.price;
     const price = parseCurrency(priceStr);
@@ -1892,7 +1895,7 @@ const App: React.FC = () => {
   const cartCouponDiscount = appliedCartCoupon ? calculateDiscount(appliedCartCoupon, cartSubtotal) : 0;
   const cartAfterCoupon = Math.max(0, cartSubtotal - cartCouponDiscount);
   const eduCoinRedeemRate = Math.max(1, Number(economySettings.coinToFiatRatio));
-  const cartAppliedEduCoins = applyCartEduCoins ? Math.min(effectiveAppUser?.eduCoins || 0, Math.floor(cartAfterCoupon * eduCoinRedeemRate)) : 0;
+  const cartAppliedEduCoins = applyCartEduCoins ? Math.min(cartUserCoinBalance, Math.floor(cartAfterCoupon * eduCoinRedeemRate)) : 0;
   const cartEduCoinDiscount = Math.min(cartAfterCoupon, cartAppliedEduCoins / eduCoinRedeemRate);
   const cartFinalPrice = Math.max(0, cartAfterCoupon - cartEduCoinDiscount);
 
@@ -3703,7 +3706,7 @@ const App: React.FC = () => {
                 <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>
             )}
-            <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={effectiveAppUser?.eduCoins || 0} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
+            <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
             {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins)} currentUser={effectiveAppUser} coinPrice={cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={handleConfirmCartCoinPurchase} onInsufficientCoins={handleInsufficientEduCoins} />}
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
