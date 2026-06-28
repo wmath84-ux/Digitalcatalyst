@@ -301,7 +301,7 @@ const getPrivateConversationId = (firstUid: string, secondUid: string) => {
 };
 
 const getPrivateConversationParticipants = (firstUid: string, secondUid: string) =>
-  [firstUid.trim(), secondUid.trim()].filter(Boolean).sort();
+  Array.from(new Set([firstUid.trim(), secondUid.trim()].filter(Boolean))).sort();
 
 const getPrivateParticipantMap = (participants: string[]) =>
   participants.reduce<Record<string, boolean>>((map, participantId) => ({ ...map, [participantId]: true }), {});
@@ -587,7 +587,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [chatPollQuestion, setChatPollQuestion] = useState('');
   const [chatPollOptions, setChatPollOptions] = useState(['', '']);
   const [chatAttachmentMode, setChatAttachmentMode] = useState<PrivateChatMessageType | null>(null);
-  const [isPrivateChatSending, setIsPrivateChatSending] = useState(false);
+  const [pendingPrivateChatSends, setPendingPrivateChatSends] = useState(0);
+  const isPrivateChatSending = pendingPrivateChatSends > 0;
   const [privateChatError, setPrivateChatError] = useState('');
   const [chatMenuOpen, setChatMenuOpen] = useState(false);
   const [isDesktopSidebarPinned, setIsDesktopSidebarPinned] = useState(false);
@@ -918,8 +919,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const sendPrivateChatMessage = async (forcedType?: PrivateChatMessageType) => {
-    if (isPrivateChatSending) return;
-
     if (!guardedAuth.currentUser || !currentUserKey) {
       redirectToAuth();
       return;
@@ -957,7 +956,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     let storagePath = '';
     let archiveStoragePath = '';
 
-    setIsPrivateChatSending(true);
+    setPendingPrivateChatSends((count) => count + 1);
     setPrivateChatError('');
 
     const optimisticMessage: PrivateChatMessage = {
@@ -1090,7 +1089,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
       setPrivateChatError(error instanceof Error ? error.message : 'Message failed. Please try again.');
     } finally {
-      setIsPrivateChatSending(false);
+      setPendingPrivateChatSends((count) => Math.max(0, count - 1));
     }
   };
 
@@ -1251,6 +1250,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   useEffect(() => {
     directChatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
   }, [activeConversationId, activePrivateMessages.length]);
+
+  useEffect(() => {
+    if (!isPrivateChatSending || typeof window === 'undefined') return undefined;
+
+    const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
+      event.preventDefault();
+      event.returnValue = '';
+    };
+
+    window.addEventListener('beforeunload', warnBeforeLeaving);
+    return () => window.removeEventListener('beforeunload', warnBeforeLeaving);
+  }, [isPrivateChatSending]);
 
   useEffect(() => {
     pageRef.current = page;
@@ -2996,8 +3007,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const canSendText = Boolean(chatDraft.trim()) && !chatAttachmentMode;
     const canSendImage = chatAttachmentMode === 'image' && Boolean(chatImagePreview);
     const canSendPoll = chatAttachmentMode === 'poll' && Boolean(chatPollQuestion.trim()) && chatPollOptions.filter((option) => option.trim()).length >= 2;
-        const canSendAnyPrivateMessage = canSendText || canSendImage || canSendPoll;
-    const sendDisabled = isPrivateChatSending || !canSendAnyPrivateMessage;
+    const canSendAnyPrivateMessage = canSendText || canSendImage || canSendPoll;
+    const sendDisabled = !canSendAnyPrivateMessage;
     return (
       <div className={`mx-auto grid overflow-hidden bg-white ${mobile ? 'h-full min-h-0 w-full overscroll-none border-0 shadow-none' : 'h-[calc(100dvh-10.5rem)] max-w-[1800px] rounded-[2.4rem] border border-[#D9E7F8] shadow-[0_26px_80px_rgba(8,26,69,0.10)] lg:grid-cols-[360px_1fr]'}`}>
         {!mobile ? (
@@ -3079,6 +3090,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
           <div className={`shrink-0 border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl ${mobile ? 'z-20 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-18px_45px_rgba(8,26,69,0.08)]' : 'sm:p-4'}`}>
             {privateChatError ? <div className="mb-3 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-xs font-black text-[#C5221F]">{privateChatError}</div> : null}
+            {isPrivateChatSending ? <div className="mb-3 rounded-2xl border border-[#BFD7FF] bg-[#EEF6FF] px-4 py-3 text-xs font-black text-[#1769FF]">Saving previous message to Firebase. You can continue typing the next message.</div> : null}
 
             {chatAttachmentMode === 'image' ? (
               <div className="mb-3 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] p-3">

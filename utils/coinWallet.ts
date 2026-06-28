@@ -307,6 +307,150 @@ export const getProductCoinPrice = async (productId: string): Promise<{
   };
 };
 
+export interface SpendUserCoinWalletInput {
+  userId: string;
+  amount: number;
+  source?: string;
+  description?: string;
+  productId?: string | number;
+  articleId?: string | number;
+  orderId?: string;
+}
+
+export interface SpendUserCoinWalletResult {
+  success: boolean;
+  reason?: 'login_required' | 'invalid_amount' | 'not_enough_coins';
+  currentBalance: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  totalCoinsEarned: number;
+  totalCoinsSpent: number;
+}
+
+export const spendUserCoinWallet = async ({
+  userId,
+  amount,
+  source = 'product_redeem',
+  description,
+  productId,
+  articleId,
+  orderId,
+}: SpendUserCoinWalletInput): Promise<SpendUserCoinWalletResult> => {
+  if (!userId) {
+    return {
+      success: false,
+      reason: 'login_required',
+      currentBalance: 0,
+      balanceBefore: 0,
+      balanceAfter: 0,
+      totalCoinsEarned: 0,
+      totalCoinsSpent: 0,
+    };
+  }
+
+  const coinsToSpend = normalizeCoinPrice(amount);
+
+  if (coinsToSpend <= 0) {
+    return {
+      success: false,
+      reason: 'invalid_amount',
+      currentBalance: 0,
+      balanceBefore: 0,
+      balanceAfter: 0,
+      totalCoinsEarned: 0,
+      totalCoinsSpent: 0,
+    };
+  }
+
+  const userRef = doc(db, 'users', userId);
+  const analyticsTransactionRef = doc(collection(db, 'coinTransactions'));
+  const userTransactionRef = doc(collection(db, 'users', userId, 'coinTransactions'));
+
+  return runTransaction(db, async (transaction) => {
+    const userSnap = await transaction.get(userRef);
+    const userData = userSnap.exists() ? userSnap.data() : {};
+
+    const balanceBefore = safeNumber(userData.coinBalance, 0);
+    const totalCoinsEarned = safeNumber(
+      userData.totalCoinsEarned,
+      safeNumber(userData.totalLifetimeCoins, safeNumber(userData.eduCoins, balanceBefore))
+    );
+    const totalCoinsSpent = safeNumber(userData.totalCoinsSpent, 0);
+
+    if (balanceBefore < coinsToSpend) {
+      return {
+        success: false,
+        reason: 'not_enough_coins' as const,
+        currentBalance: balanceBefore,
+        balanceBefore,
+        balanceAfter: balanceBefore,
+        totalCoinsEarned,
+        totalCoinsSpent,
+      };
+    }
+
+    const balanceAfter = balanceBefore - coinsToSpend;
+    const nextTotalCoinsSpent = totalCoinsSpent + coinsToSpend;
+
+    const optionalPayload = {
+      ...(productId !== undefined ? { productId: String(productId) } : {}),
+      ...(articleId !== undefined ? { articleId: String(articleId) } : {}),
+      ...(orderId !== undefined ? { orderId: String(orderId) } : {}),
+    };
+
+    transaction.set(analyticsTransactionRef, {
+      userId,
+      type: 'spent',
+      source,
+      amount: coinsToSpend,
+      balanceBefore,
+      balanceAfter,
+      description: description || `${coinsToSpend} EduCoins spent`,
+      status: 'success',
+      createdAt: serverTimestamp(),
+      ...optionalPayload,
+    });
+
+    transaction.set(userTransactionRef, {
+      id: userTransactionRef.id,
+      userId,
+      amount: -coinsToSpend,
+      type: 'debit',
+      source,
+      title: source,
+      description: description || `${coinsToSpend} EduCoins redeemed`,
+      balanceBefore,
+      balanceAfter,
+      status: 'success',
+      createdAt: serverTimestamp(),
+      timestamp: serverTimestamp(),
+      ...optionalPayload,
+    });
+
+    transaction.set(
+      userRef,
+      {
+        coinBalance: balanceAfter,
+        eduCoins: balanceAfter,
+        totalCoinsEarned,
+        totalCoinsSpent: nextTotalCoinsSpent,
+        totalLifetimeCoins: Math.max(safeNumber(userData.totalLifetimeCoins, totalCoinsEarned), totalCoinsEarned),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return {
+      success: true,
+      currentBalance: balanceAfter,
+      balanceBefore,
+      balanceAfter,
+      totalCoinsEarned,
+      totalCoinsSpent: nextTotalCoinsSpent,
+    };
+  });
+};
+
 export const redeemProductWithEduCoins = async ({
   userId,
   productId,

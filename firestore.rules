@@ -143,7 +143,8 @@ service cloud.firestore {
 
       allow create: if signedIn()
         && request.auth.uid in request.resource.data.participants
-        && request.resource.data.participants.size() == 2
+        && request.resource.data.participants.size() >= 1
+        && request.resource.data.participants.size() <= 2
         && request.resource.data.participantMap[request.auth.uid] == true
         && request.resource.data.keys().hasOnly([
           'participants', 'participantMap', 'participantNames', 'participantAvatars',
