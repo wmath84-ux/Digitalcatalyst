@@ -37,7 +37,10 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
         return acc + (price * item.quantity);
     }, 0);
 
-    const canUseEduCoins = coinBalance > 0 && coinRedeemRate > 0 && subtotal > 0;
+    const safeCoinBalance = Math.max(0, Math.floor(Number(coinBalance) || 0));
+    const safeRedeemRate = Math.max(1, Math.floor(Number(coinRedeemRate) || 1));
+    const maxDiscountCoins = Math.min(safeCoinBalance, Math.floor(subtotal * safeRedeemRate));
+    const canUseEduCoins = maxDiscountCoins > 0 && subtotal > 0;
 
     const prevSubtotalRef = useRef<number | undefined>(undefined);
     useEffect(() => {
@@ -137,7 +140,7 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
                                     />
                                     <span className="flex-1">
                                         <span className="block text-sm font-black text-slate-900">Apply EduCoins Balance</span>
-                                        <span className="mt-1 block text-xs leading-5 text-slate-600">🪙 {coinBalance} available • {coinRedeemRate} coins = ₹1 discount</span>
+                                        <span className="mt-1 block text-xs leading-5 text-slate-600">🪙 {safeCoinBalance} available • {safeRedeemRate} coins = ₹1 discount</span>
                                     </span>
                                 </label>
                                 {!canUseEduCoins && (
