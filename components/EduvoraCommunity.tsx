@@ -299,6 +299,12 @@ const getPrivateConversationId = (firstUid: string, secondUid: string) => {
   const second = secondUid.trim();
   return first < second ? `${first}__${second}` : `${second}__${first}`;
 };
+
+const getPrivateConversationParticipants = (firstUid: string, secondUid: string) =>
+  [firstUid.trim(), secondUid.trim()].filter(Boolean).sort();
+
+const getPrivateParticipantMap = (participants: string[]) =>
+  participants.reduce<Record<string, boolean>>((map, participantId) => ({ ...map, [participantId]: true }), {});
 const getFollowDocId = (followerId: string, followingId: string) => `${followerId}_${followingId}`;
 const ADMIN_POST_FALLBACK_STORAGE_KEY = 'eduvoraAdminPostFallbacks';
 const ADMIN_POST_FALLBACK_EVENT = 'eduvoraAdminPostFallbackUpdated';
@@ -531,6 +537,7 @@ const mapPrivateChatMessageDoc = (snapshotDoc: { id: string; data: () => Record<
     caption: data.caption || '',
     imageUrl: data.imageUrl || '',
     storagePath: data.storagePath || '',
+    archiveStoragePath: data.archiveStoragePath || '',
     uploadBytes: Number(data.uploadBytes) || 0,
     poll: data.poll,
     sharedItem: data.sharedItem && typeof data.sharedItem === 'object' ? data.sharedItem as PrivateSharedItem : undefined,
@@ -865,8 +872,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const uploadPrivateChatMessageArchive = async (conversationId: string, messageId: string, message: PrivateChatMessage) => {
     const archiveStoragePath = `privateChats/${conversationId}/${messageId}/message.json`;
-    await uploadString(ref(storage, archiveStoragePath), JSON.stringify(message), 'raw');
-    return archiveStoragePath;
+
+    try {
+      await uploadString(ref(storage, archiveStoragePath), JSON.stringify(message), 'raw');
+      return archiveStoragePath;
+    } catch (error) {
+      console.warn('Private chat message archive upload failed; keeping Firestore message as source of truth.', error);
+      return '';
+    }
   };
 
   const resetPrivateChatComposer = () => {
@@ -883,10 +896,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const ensurePrivateConversation = async (conversationId: string, receiver: Creator) => {
     const existingConversation = privateConversations.find((conversation) => conversation.id === conversationId);
     const conversationRef = doc(db, PRIVATE_CHATS, conversationId);
+    const participants = getPrivateConversationParticipants(currentUserKey, receiver.id);
+    const participantMap = getPrivateParticipantMap(participants);
+    const baseUnreadCounts = participants.reduce<Record<string, number>>((counts, participantId) => ({ ...counts, [participantId]: 0 }), {});
 
     await setDoc(conversationRef, stripUndefinedDeep({
-      participants: [currentUserKey, receiver.id],
-      participantMap: { [currentUserKey]: true, [receiver.id]: true },
+      participants,
+      participantMap,
       participantNames: {
         [currentUserKey]: profile.name,
         [receiver.id]: isOwnCommunityId(receiver.id) ? 'Saved messages' : receiver.name,
@@ -898,11 +914,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       lastMessageType: existingConversation?.lastMessageType || 'text',
       lastMessageAt: existingConversation?.lastMessageAt || Date.now(),
       lastSenderId: existingConversation?.lastSenderId || '',
-      unreadCounts: existingConversation?.unreadCounts || { [currentUserKey]: 0, [receiver.id]: 0 },
+      unreadCounts: existingConversation?.unreadCounts || baseUnreadCounts,
     }), { merge: true });
   };
 
   const sendPrivateChatMessage = async (forcedType?: PrivateChatMessageType) => {
+    if (isPrivateChatSending) return;
+
     if (!guardedAuth.currentUser || !currentUserKey) {
       redirectToAuth();
       return;
@@ -916,10 +934,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const cleanedPollOptions = chatPollOptions.map((option) => option.trim()).filter(Boolean);
 
     if (type === 'text' && !text) return;
+
     if (type === 'image' && !chatImagePreview) {
       setPrivateChatError('Please choose an image first.');
       return;
     }
+
     if (type === 'poll' && (!pollQuestion || cleanedPollOptions.length < 2)) {
       setPrivateChatError('Poll needs one question and at least 2 options.');
       return;
@@ -927,25 +947,27 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
     const selectedImagePreview = chatImagePreview;
     const selectedImageName = chatImageName;
+    const messageId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
+    const createdAt = Date.now();
+    const expiresAt = createdAt + PRIVATE_CHAT_TTL_MS;
+    const receiver = activeChatCreator;
+    const conversationId = activeConversationId;
+    const participants = getPrivateConversationParticipants(currentUserKey, receiver.id);
+    const participantMap = getPrivateParticipantMap(participants);
+
+    let storagePath = '';
+    let archiveStoragePath = '';
 
     setIsPrivateChatSending(true);
     setPrivateChatError('');
 
-    const messageId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-    const createdAt = Date.now();
-    const expiresAt = createdAt + PRIVATE_CHAT_TTL_MS;
-    let storagePath = '';
-    let archiveStoragePath = '';
-    let imageUrl = '';
-    let uploadBytes = 0;
-
-        const optimisticMessage: PrivateChatMessage = {
+    const optimisticMessage: PrivateChatMessage = {
       id: messageId,
-      conversationId: activeConversationId,
+      conversationId,
       senderId: currentUserKey,
-      receiverId: activeChatCreator.id,
+      receiverId: receiver.id,
       senderName: profile.name,
-      receiverName: getCreatorDisplayName(activeChatCreator),
+      receiverName: getCreatorDisplayName(receiver),
       type,
       text: type === 'text' ? text : undefined,
       caption: type === 'image' ? text : undefined,
@@ -970,13 +992,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       if (current.some((message) => message.id === optimisticMessage.id)) return current;
       return [...current, optimisticMessage].sort((a, b) => a.createdAt - b.createdAt);
     });
+
     resetPrivateChatComposer();
 
     try {
-      await ensurePrivateConversation(activeConversationId, activeChatCreator);
+      await ensurePrivateConversation(conversationId, receiver);
+
+      let imageUrl = '';
+      let uploadBytes = 0;
 
       if (type === 'image') {
-        const uploaded = await uploadPrivateChatImage(activeConversationId, messageId, selectedImagePreview);
+        const uploaded = await uploadPrivateChatImage(conversationId, messageId, selectedImagePreview);
         imageUrl = uploaded.imageUrl;
         storagePath = uploaded.storagePath || '';
         uploadBytes = uploaded.uploadBytes;
@@ -996,16 +1022,28 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         uploadBytes: type === 'image' ? uploadBytes : 0,
       };
 
-      archiveStoragePath = await uploadPrivateChatMessageArchive(activeConversationId, messageId, messagePayload);
-      messagePayload.archiveStoragePath = archiveStoragePath;
+      archiveStoragePath = await uploadPrivateChatMessageArchive(conversationId, messageId, messagePayload);
 
-      await setDoc(doc(db, PRIVATE_CHATS, activeConversationId, PRIVATE_CHAT_MESSAGES, messageId), stripUndefinedDeep(messagePayload));
+      if (archiveStoragePath) {
+        messagePayload.archiveStoragePath = archiveStoragePath;
+      }
 
-      await setDoc(doc(db, PRIVATE_CHATS, activeConversationId), stripUndefinedDeep({
-        participants: [currentUserKey, activeChatCreator.id],
-        participantMap: { [currentUserKey]: true, [activeChatCreator.id]: true },
-        participantNames: { [currentUserKey]: profile.name, [activeChatCreator.id]: getCreatorDisplayName(activeChatCreator) },
-        participantAvatars: { [currentUserKey]: profile.avatar, [activeChatCreator.id]: activeChatCreator.avatar },
+      await setDoc(
+        doc(db, PRIVATE_CHATS, conversationId, PRIVATE_CHAT_MESSAGES, messageId),
+        stripUndefinedDeep(messagePayload)
+      );
+
+      await setDoc(doc(db, PRIVATE_CHATS, conversationId), stripUndefinedDeep({
+        participants,
+        participantMap,
+        participantNames: {
+          [currentUserKey]: profile.name,
+          [receiver.id]: getCreatorDisplayName(receiver),
+        },
+        participantAvatars: {
+          [currentUserKey]: profile.avatar,
+          [receiver.id]: receiver.avatar,
+        },
         updatedAt: createdAt,
         lastMessage,
         lastMessageType: type,
@@ -1013,22 +1051,44 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         lastSenderId: currentUserKey,
         unreadCounts: {
           ...(activeConversation?.unreadCounts || {}),
-          [activeChatCreator.id]: activeChatCreator.id === currentUserKey ? 0 : (activeConversation?.unreadCounts?.[activeChatCreator.id] || 0) + 1,
+          [receiver.id]: receiver.id === currentUserKey ? 0 : (activeConversation?.unreadCounts?.[receiver.id] || 0) + 1,
           [currentUserKey]: 0,
         },
       }), { merge: true });
+
+      setPrivateMessages((current) => current.map((message) => (
+        message.id === messageId ? { ...messagePayload, status: 'sent' } : message
+      )));
 
       requestAnimationFrame(() => {
         directChatMessagesEndRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' });
       });
     } catch (error) {
       console.warn('Private chat send failed', error);
-      if (storagePath) deleteObject(ref(storage, storagePath)).catch((deleteError) => console.warn('Private chat image rollback failed', deleteError));
-      if (archiveStoragePath) deleteObject(ref(storage, archiveStoragePath)).catch((deleteError) => console.warn('Private chat archive rollback failed', deleteError));
-            setPrivateMessages((current) => current.filter((message) => message.id !== messageId));
+
+      if (storagePath) {
+        deleteObject(ref(storage, storagePath)).catch((deleteError) => console.warn('Private chat image rollback failed', deleteError));
+      }
+
+      if (archiveStoragePath) {
+        deleteObject(ref(storage, archiveStoragePath)).catch((deleteError) => console.warn('Private chat archive rollback failed', deleteError));
+      }
+
+      setPrivateMessages((current) => current.filter((message) => message.id !== messageId));
+
       if (type === 'text') setChatDraft(text);
-      if (type === 'image') { setChatDraft(text); setChatImagePreview(selectedImagePreview); setChatImageName(selectedImageName); setChatAttachmentMode('image'); }
-      if (type === 'poll') { setChatPollQuestion(pollQuestion); setChatPollOptions(cleanedPollOptions.length ? cleanedPollOptions : ['', '']); setChatAttachmentMode('poll'); }
+      if (type === 'image') {
+        setChatDraft(text);
+        setChatImagePreview(selectedImagePreview);
+        setChatImageName(selectedImageName);
+        setChatAttachmentMode('image');
+      }
+      if (type === 'poll') {
+        setChatPollQuestion(pollQuestion);
+        setChatPollOptions(cleanedPollOptions.length ? cleanedPollOptions : ['', '']);
+        setChatAttachmentMode('poll');
+      }
+
       setPrivateChatError(error instanceof Error ? error.message : 'Message failed. Please try again.');
     } finally {
       setIsPrivateChatSending(false);
@@ -1268,19 +1328,33 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     }
   };
 
-  const goBack = () => {
+  const goBack = (options: { fromBrowser?: boolean } = {}): boolean => {
     setIsNotificationPanelOpen(false);
     setExpandedReplyId(null);
+
+    const replaceCommunityHistory = (nextPage: CommunityPage) => {
+      if (typeof window === 'undefined') return;
+      window.history.replaceState(
+        { ...(window.history.state || {}), dcView: 'community', dcCommunityPage: nextPage },
+        '',
+        window.location.href
+      );
+    };
+
     const stack = pageStackRef.current;
+
     if (stack.length) {
       const previous = stack[stack.length - 1];
       const nextStack = stack.slice(0, -1);
+
       pageStackRef.current = nextStack;
       setPage(previous);
       setPageStack(nextStack);
       pageRef.current = previous;
-      return;
+      replaceCommunityHistory(previous);
+      return true;
     }
+
     if (pageRef.current !== 'chat' || activeViewRef.current !== 'feed') {
       activeViewRef.current = 'feed';
       pageRef.current = 'chat';
@@ -1288,10 +1362,27 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       setActiveView('feed');
       setPage('chat');
       setPageStack([]);
-      return;
+      replaceCommunityHistory('chat');
+      return true;
     }
+
+    if (options.fromBrowser) return false;
+
     onClose?.();
+    return false;
   };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    const handleCommunityBackRequest = () => {
+      const handledInsideCommunity = goBack({ fromBrowser: true });
+      (window as any).__eduvoraCommunityHandledBack = handledInsideCommunity;
+    };
+
+    window.addEventListener('eduvora-community-back-request', handleCommunityBackRequest);
+    return () => window.removeEventListener('eduvora-community-back-request', handleCommunityBackRequest);
+  }, []);
 
   const redirectToAuth = () => {
     const nextState = { ...(window.history.state || {}), dcView: 'auth' };
@@ -2296,8 +2387,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       await setDoc(doc(db, PRIVATE_CHATS, conversationId, PRIVATE_CHAT_MESSAGES, messageId), stripUndefinedDeep(messagePayload));
 
       await setDoc(doc(db, PRIVATE_CHATS, conversationId), stripUndefinedDeep({
-        participants: [currentUserKey, receiver.id],
-        participantMap: { [currentUserKey]: true, [receiver.id]: true },
+        participants: getPrivateConversationParticipants(currentUserKey, receiver.id),
+        participantMap: getPrivateParticipantMap(getPrivateConversationParticipants(currentUserKey, receiver.id)),
         participantNames: {
           [currentUserKey]: profile.name,
           [receiver.id]: getCreatorDisplayName(receiver),
@@ -2907,7 +2998,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
         <section className="flex min-h-0 overflow-hidden flex-col bg-[radial-gradient(circle_at_18%_10%,rgba(23,105,255,0.10),transparent_28%),linear-gradient(180deg,#ffffff,#f8fbff)]">
           <div className={`flex items-center gap-3 border-b border-[#D9E7F8] bg-white/95 backdrop-blur-xl ${mobile ? 'sticky top-0 z-20 p-3' : 'p-4 sm:p-5'}`}>
-            {mobile ? <button type="button" onClick={() => setPage('directChat')} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-sm">←</button> : null}
+            {mobile ? <button type="button" onClick={() => goBack()} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-sm">←</button> : null}
             <Avatar value={activeChatCreator?.avatar || '👤'} size={mobile ? 'h-10 w-10' : 'h-12 w-12'} />
             <div className="min-w-0 flex-1">
               <h3 className={`truncate font-black text-[#081A45] ${mobile ? 'text-lg' : 'text-xl sm:text-2xl'}`}>{getCreatorDisplayName(activeChatCreator)}</h3>

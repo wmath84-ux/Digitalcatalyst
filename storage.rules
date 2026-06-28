@@ -15,8 +15,16 @@ service firebase.storage {
     match /privateChats/{chatId}/{messageId}/{fileName} {
       allow read: if isPrivateChatParticipant(chatId);
       allow write: if isPrivateChatParticipant(chatId)
-        && request.resource.size < 3 * 1024 * 1024
-        && request.resource.contentType.matches('image/.*');
+        && (
+          (
+            request.resource.size < 3 * 1024 * 1024
+            && request.resource.contentType.matches('image/.*')
+          )
+          || (
+            fileName == 'message.json'
+            && request.resource.size < 128 * 1024
+          )
+        );
       allow delete: if isPrivateChatParticipant(chatId);
     }
 
