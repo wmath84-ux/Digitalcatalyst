@@ -10,6 +10,9 @@ import {
 } from '../utils/coinWallet';
 import AiMentor from './AiMentor';
 import ProductMusicPlayer, { type AudioTrack } from './ProductMusicPlayer';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db } from '../firebase';
 
 declare global {
   interface Window {
@@ -188,6 +191,7 @@ const getCourseBackground = (product: ProductWithRating, activeFile: ProductFile
 };
 
 const OPEN_DOCS_DEFAULT_HTML = '<h1>Open Docs Workspace</h1><p>Start writing here.</p>';
+const OPEN_DOCS_NOTES_COLLECTION = 'open_docs_notes';
 
 const htmlFromPlainText = (value: string) => {
   const trimmed = (value || '').trim();
@@ -263,6 +267,41 @@ const writeOpenDocsPagesToStorage = (storageKey: string, pages: ProductDocPage[]
   }
 };
 
+const normalizeStoredOpenDocsPages = (value: unknown, fallback: ProductDocPage[]): ProductDocPage[] => {
+  const source = Array.isArray(value) ? value : [];
+
+  const pages = source
+    .filter((page): page is ProductDocPage => Boolean(page && typeof page === 'object'))
+    .map(page => {
+      const now = Date.now();
+
+      return {
+        id: String(page.id || `open-doc-page-${now}-${Math.random().toString(36).slice(2, 7)}`),
+        title: String(page.title || 'Untitled Page').trim() || 'Untitled Page',
+        content: htmlFromPlainText(String(page.content || OPEN_DOCS_DEFAULT_HTML)),
+        createdAt: Number(page.createdAt) || now,
+        updatedAt: Number(page.updatedAt) || now,
+      };
+    });
+
+  return pages.length ? pages : fallback;
+};
+
+const cleanOpenDocsPagesForSave = (pages: ProductDocPage[], fallback: ProductDocPage[]): ProductDocPage[] =>
+  normalizeStoredOpenDocsPages(pages, fallback).map(page => ({
+    id: page.id,
+    title: page.title.trim() || 'Untitled Page',
+    content: htmlFromPlainText(page.content || OPEN_DOCS_DEFAULT_HTML),
+    createdAt: Number(page.createdAt) || Date.now(),
+    updatedAt: Number(page.updatedAt) || Date.now(),
+  }));
+
+const sanitizeOpenDocsDocIdPart = (value: string | number) =>
+  String(value || 'unknown').replace(/[^\w-]/g, '_').slice(0, 80);
+
+const buildOpenDocsCloudDocId = (uid: string, productId: number, fileId: string) =>
+  `${sanitizeOpenDocsDocIdPart(uid)}_${sanitizeOpenDocsDocIdPart(productId)}_${sanitizeOpenDocsDocIdPart(fileId)}`;
+
 const saveEditorSelection = (editor: HTMLDivElement | null, selectionRef: React.MutableRefObject<Range | null>) => {
   const selection = window.getSelection();
   if (!selection || selection.rangeCount === 0 || !editor) return;
@@ -325,6 +364,12 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   const [lineSpacing, setLineSpacing] = useState(1.7);
   const [fontStyle, setFontStyle] = useState<'sans' | 'serif'>('sans');
   const [theme, setTheme] = useState<'dark' | 'sepia' | 'light'>('dark');
+  const [learnerUid, setLearnerUid] = useState(() => auth.currentUser?.uid || '');
+  const cloudSaveTimerRef = useRef<number | null>(null);
+  const cloudDocId = useMemo(
+    () => learnerUid ? buildOpenDocsCloudDocId(learnerUid, productId, file.id) : '',
+    [learnerUid, productId, file.id]
+  );
   const docsViewport = useViewportSize();
   const isCompactDocs = docsViewport.width < 768;
   const editorShellClass = isSidebarOpen && !isCompactDocs
@@ -338,6 +383,14 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   const activeContent = activePage?.content || OPEN_DOCS_DEFAULT_HTML;
 
   useEffect(() => {
+    return onAuthStateChanged(auth, user => {
+      setLearnerUid(user?.uid || '');
+    });
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+
     const restoredPages = readOpenDocsPagesFromStorage(pagesStorageKey, defaultPages);
     const legacyHtml = localStorage.getItem(legacyStorageKey);
 
@@ -345,10 +398,36 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
       ? restoredPages.map((page, index) => index === 0 ? { ...page, content: legacyHtml, updatedAt: Date.now() } : page)
       : restoredPages;
 
-    setPages(nextPages);
-    setActivePageId(nextPages[0]?.id || 'page-1');
+    const cleanLocalPages = cleanOpenDocsPagesForSave(nextPages, defaultPages);
+
+    setPages(cleanLocalPages);
+    setActivePageId(cleanLocalPages[0]?.id || 'page-1');
     setSavedAt(legacyHtml || localStorage.getItem(pagesStorageKey) ? 'Restored from this device' : 'Loaded admin version');
-  }, [pagesStorageKey, legacyStorageKey, defaultPages]);
+
+    if (!learnerUid || !cloudDocId) return () => {
+      cancelled = true;
+    };
+
+    getDoc(doc(db, OPEN_DOCS_NOTES_COLLECTION, cloudDocId))
+      .then(snapshot => {
+        if (cancelled || !snapshot.exists()) return;
+
+        const cloudPages = normalizeStoredOpenDocsPages(snapshot.data()?.pages, cleanLocalPages);
+        const cleanCloudPages = cleanOpenDocsPagesForSave(cloudPages, cleanLocalPages);
+
+        setPages(cleanCloudPages);
+        setActivePageId(cleanCloudPages[0]?.id || 'page-1');
+        writeOpenDocsPagesToStorage(pagesStorageKey, cleanCloudPages);
+        setSavedAt('Synced from your account');
+      })
+      .catch(() => {
+        if (!cancelled) setSavedAt('Local mode · cloud sync unavailable');
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pagesStorageKey, legacyStorageKey, defaultPages, learnerUid, cloudDocId]);
 
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== activeContent) {
@@ -357,10 +436,39 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   }, [activePageId, activeContent]);
 
   const persistPages = (nextPages: ProductDocPage[], status = 'Saved locally') => {
-    setPages(nextPages);
-    writeOpenDocsPagesToStorage(pagesStorageKey, nextPages);
+    const cleanPages = cleanOpenDocsPagesForSave(nextPages, defaultPages);
+
+    setPages(cleanPages);
+    writeOpenDocsPagesToStorage(pagesStorageKey, cleanPages);
     setSavedAt(status);
+
+    if (!learnerUid || !cloudDocId) return;
+
+    if (cloudSaveTimerRef.current) {
+      window.clearTimeout(cloudSaveTimerRef.current);
+    }
+
+    cloudSaveTimerRef.current = window.setTimeout(() => {
+      setDoc(doc(db, OPEN_DOCS_NOTES_COLLECTION, cloudDocId), {
+        ownerId: learnerUid,
+        productId,
+        fileId: file.id,
+        fileName: file.name,
+        pages: cleanPages,
+        updatedAt: Date.now(),
+      }, { merge: true })
+        .then(() => setSavedAt('Saved to your account'))
+        .catch(() => setSavedAt('Saved on this device · cloud sync failed'));
+    }, 700);
   };
+
+  useEffect(() => {
+    return () => {
+      if (cloudSaveTimerRef.current) {
+        window.clearTimeout(cloudSaveTimerRef.current);
+      }
+    };
+  }, []);
 
   const saveCurrentPage = () => {
     const nextContent = editorRef.current?.innerHTML || activeContent;
