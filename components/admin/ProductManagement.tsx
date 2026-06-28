@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Coupon, CourseModule, Product, ProductFile, ProductFileType, ProductWithRating, ProductDocPage, QuizQuestion, User } from '../../App';
 import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
 import { PRODUCT_IMAGE_SLOTS, ProductImageSlot } from '../../utils/productImages';
@@ -374,7 +375,7 @@ const AdminOpenDocsBuilder: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 z-[2200] bg-slate-950/75 p-0 backdrop-blur-xl sm:p-4">
+        <div className="fixed inset-0 z-[9999] h-[100dvh] w-screen overflow-hidden bg-slate-950/75 p-0 backdrop-blur-xl sm:p-4">
             <div className="flex h-full min-h-0 overflow-hidden bg-[#f8fbff] text-slate-900 shadow-[0_30px_90px_rgba(15,23,42,0.28)] sm:rounded-[2rem] sm:border sm:border-white/40">
                 <aside className="flex w-[86vw] max-w-[320px] shrink-0 flex-col border-r border-slate-200 bg-white/90 p-3 backdrop-blur-xl sm:w-80 sm:p-4">
                     <button type="button" onClick={onBack} className="mb-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50">← Back to Add Content</button>
@@ -595,20 +596,38 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                     ))}
                 </div>
             ) : formState.type === 'doc' ? (
-                <AdminOpenDocsBuilder
-                    resourceName={formState.name}
-                    pages={docPages}
-                    activePageId={activeDocPageId}
-                    error={docError}
-                    onResourceNameChange={value => setFormState(prev => prev ? { ...prev, name: value } : prev)}
-                    onPagesChange={setDocPages}
-                    onActivePageChange={setActiveDocPageId}
-                    onBack={() => {
-                        setFormState(null);
-                        setDocError('');
-                    }}
-                    onSave={handleFormSubmit}
-                />
+                typeof document !== 'undefined' ? createPortal(
+                    <AdminOpenDocsBuilder
+                        resourceName={formState.name}
+                        pages={docPages}
+                        activePageId={activeDocPageId}
+                        error={docError}
+                        onResourceNameChange={value => setFormState(prev => prev ? { ...prev, name: value } : prev)}
+                        onPagesChange={setDocPages}
+                        onActivePageChange={setActiveDocPageId}
+                        onBack={() => {
+                            setFormState(null);
+                            setDocError('');
+                        }}
+                        onSave={handleFormSubmit}
+                    />,
+                    document.body
+                ) : (
+                    <AdminOpenDocsBuilder
+                        resourceName={formState.name}
+                        pages={docPages}
+                        activePageId={activeDocPageId}
+                        error={docError}
+                        onResourceNameChange={value => setFormState(prev => prev ? { ...prev, name: value } : prev)}
+                        onPagesChange={setDocPages}
+                        onActivePageChange={setActiveDocPageId}
+                        onBack={() => {
+                            setFormState(null);
+                            setDocError('');
+                        }}
+                        onSave={handleFormSubmit}
+                    />
+                )
             ) : (
                 <div className="flex max-h-[78vh] flex-col overflow-hidden rounded-3xl border border-white/50 bg-white/80">
                     <div className="shrink-0 space-y-5 border-b border-white/50 bg-white/80 p-4 backdrop-blur-xl sm:p-5">
