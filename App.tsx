@@ -1013,6 +1013,7 @@ const App: React.FC = () => {
 
   const [users, setUsers] = useState<User[]>([]);
   const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [liveEduCoinBalance, setLiveEduCoinBalance] = useState<number | null>(null);
   const [rememberedAuthAccount, setRememberedAuthAccount] = useState<RememberedAuthAccount | null>(() => getRememberedAuthAccount());
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(initialAdminUsers);
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
@@ -1052,6 +1053,67 @@ const App: React.FC = () => {
   const effectiveAppUser = currentUser || (effectiveFirebaseUser ? createFallbackUserFromFirebase(effectiveFirebaseUser) : null);
   const isLoggedIn = Boolean(effectiveFirebaseUser);
   const isAuthBooting = authStatus === 'booting' || authStatus === 'checking-session' || isRedirectResultPending;
+
+  const readEduCoinBalance = (user?: (Partial<User> & { coinBalance?: number }) | null) =>
+    Math.max(0, Math.floor(Number(user?.eduCoins ?? user?.coinBalance ?? 0)));
+
+  const liveWalletBalance = liveEduCoinBalance ?? readEduCoinBalance(effectiveAppUser);
+
+  useEffect(() => {
+    const uid = effectiveFirebaseUser?.uid || auth.currentUser?.uid;
+
+    if (!uid || isLocalLogoutPending) {
+      setLiveEduCoinBalance(null);
+      return undefined;
+    }
+
+    const userRef = doc(db, 'users', uid);
+
+    return onSnapshot(userRef, (snapshot) => {
+      if (!snapshot.exists()) {
+        setLiveEduCoinBalance(0);
+        return;
+      }
+
+      const remoteUser = snapshot.data() as Partial<User> & { coinBalance?: number };
+      const remoteBalance = readEduCoinBalance(remoteUser);
+      const remoteLifetimeCoins = Math.max(0, Math.floor(Number(remoteUser.totalLifetimeCoins ?? remoteBalance)));
+
+      setLiveEduCoinBalance(remoteBalance);
+
+      setCurrentUser((current) => {
+        if (!current || String(current.id) !== uid) return current;
+
+        const syncedUser: User = {
+          ...current,
+          uid,
+          eduCoins: remoteBalance,
+          totalLifetimeCoins: Math.max(Number(current.totalLifetimeCoins || 0), remoteLifetimeCoins),
+        };
+
+        safeSetItem('currentUser', syncedUser);
+        return syncedUser;
+      });
+
+      setUsers((current) => {
+        const nextUsers = current.map((user) =>
+          String(user.id) === uid
+            ? {
+                ...user,
+                uid,
+                eduCoins: remoteBalance,
+                totalLifetimeCoins: Math.max(Number(user.totalLifetimeCoins || 0), remoteLifetimeCoins),
+              }
+            : user
+        );
+
+        safeSetItem('siteUsers', nextUsers);
+        return nextUsers;
+      });
+    }, (error) => {
+      console.warn('Live EduCoin wallet sync failed; using cached balance.', error);
+    });
+  }, [effectiveFirebaseUser?.uid, isLocalLogoutPending]);
 
 
   useEffect(() => {
@@ -1809,7 +1871,7 @@ const App: React.FC = () => {
           finalDiscount = calculateDiscount(couponToApply, currentCartSubtotal);
       }
       const afterCoupon = Math.max(0, currentCartSubtotal - finalDiscount);
-      const liveCartCoinBalance = Math.max(0, Number((effectiveAppUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? effectiveAppUser?.eduCoins ?? 0));
+      const liveCartCoinBalance = liveWalletBalance;
       const safeAppliedCoins = Math.min(liveCartCoinBalance, Math.max(0, appliedCoins), Math.floor(afterCoupon * eduCoinRedeemRate));
       const coinDiscount = Math.min(afterCoupon, safeAppliedCoins / eduCoinRedeemRate);
       const finalPrice = Math.max(0, afterCoupon - coinDiscount);
@@ -1891,7 +1953,7 @@ const App: React.FC = () => {
 
   const parseCurrency = (value: string | number | undefined | null) => parseFloat(String(value || '0').replace('₹', '').replace('🪙', '').replace(/,/g, '')) || 0;
 
-  const cartUserCoinBalance = Math.max(0, Number((effectiveAppUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? effectiveAppUser?.eduCoins ?? 0));
+  const cartUserCoinBalance = liveWalletBalance;
 
   const cartSubtotal = cartDetails.reduce((acc, item) => {
     const priceStr = item.product.salePrice || item.product.price;
@@ -3212,7 +3274,7 @@ const App: React.FC = () => {
     if (!hasFirebaseUser || cartDetails.length === 0) return false;
     const totalCoinPrice = cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0);
     const allCoinEnabled = cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0);
-    const liveCoinBalance = effectiveAppUser?.eduCoins || 0;
+    const liveCoinBalance = liveWalletBalance;
     if (!allCoinEnabled || !totalCoinPrice || liveCoinBalance < totalCoinPrice) {
       return false;
     }
@@ -3799,7 +3861,7 @@ const App: React.FC = () => {
             )}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
-            {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins)} currentUser={effectiveAppUser} coinPrice={cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={handleConfirmCartCoinPurchase} onInsufficientCoins={handleInsufficientEduCoins} />}
+            {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins)} currentUser={effectiveAppUser ? { ...effectiveAppUser, eduCoins: liveWalletBalance } : effectiveAppUser} coinPrice={cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={handleConfirmCartCoinPurchase} onInsufficientCoins={handleInsufficientEduCoins} />}
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />

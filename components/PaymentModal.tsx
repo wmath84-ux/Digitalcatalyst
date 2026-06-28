@@ -63,7 +63,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const autoStartedRazorpayRef = useRef(false);
   const razorpayUrl = paymentLink || 'https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view';
   const isCartMode = !!cartItems && cartItems.length > 0;
-  const eduCoinBalance = (currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0;
+  const eduCoinBalance = Math.max(0, Math.floor(Number(currentUser?.eduCoins ?? (currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? 0)));
   const canPayWithCoins = !!onConfirmWithCoins && coinPrice > 0 && eduCoinBalance >= coinPrice;
   const missingCoins = Math.max(0, coinPrice - eduCoinBalance);
 
@@ -132,7 +132,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const handleCoinCheckout = async () => {
     const user = currentUser as (User & { coinBalance?: number }) | null | undefined;
-    const userCoinBalance = user?.coinBalance ?? user?.eduCoins ?? 0;
+    const userCoinBalance = Math.max(0, Math.floor(Number(user?.eduCoins ?? user?.coinBalance ?? 0)));
     if (userCoinBalance < coinPrice || !onConfirmWithCoins) {
       const shortfall = Math.max(0, coinPrice - userCoinBalance);
       setCoinStatus(`You have ${userCoinBalance} EduCoins and need ${coinPrice}. Earn ${shortfall} more.`);
