@@ -1133,6 +1133,15 @@ const App: React.FC = () => {
         return;
       }
       const nextView = event.state?.dcView;
+      if (currentViewRef.current === 'community' && nextView !== 'community') {
+        (window as any).__eduvoraCommunityHandledBack = false;
+        window.dispatchEvent(new CustomEvent('eduvora-community-back-request'));
+
+        if ((window as any).__eduvoraCommunityHandledBack) {
+          (window as any).__eduvoraCommunityHandledBack = false;
+          return;
+        }
+      }
       if (typeof nextView === 'string') {
         historyNavigationRef.current = true;
         setCurrentView(nextView);
@@ -1804,10 +1813,14 @@ const App: React.FC = () => {
       const safeAppliedCoins = Math.min(liveCartCoinBalance, Math.max(0, appliedCoins), Math.floor(afterCoupon * eduCoinRedeemRate));
       const coinDiscount = Math.min(afterCoupon, safeAppliedCoins / eduCoinRedeemRate);
       const finalPrice = Math.max(0, afterCoupon - coinDiscount);
-      if (safeAppliedCoins > 0 && !deductEduCoins(safeAppliedCoins, {
-        source: 'Checkout discount',
-        description: `Applied ${safeAppliedCoins} EduCoins for ₹${coinDiscount.toFixed(2)} cart discount`,
-      })) return;
+      if (safeAppliedCoins > 0) {
+        const coinsDebited = await deductEduCoinsAtomically(safeAppliedCoins, {
+          source: 'Checkout discount',
+          description: `Applied ${safeAppliedCoins} EduCoins for ₹${coinDiscount.toFixed(2)} cart discount`,
+        });
+
+        if (!coinsDebited) return;
+      }
       // --- End of recalculation ---
 
       if (!hasFirebaseUser || !auth.currentUser) { openAuthPage('login'); return; }
@@ -2788,6 +2801,86 @@ const App: React.FC = () => {
     return true;
   };
 
+  const deductEduCoinsAtomically = async (
+    amount: number,
+    metadata?: Partial<Omit<CoinTransaction, 'amount' | 'type' | 'createdAt'>>
+  ) => {
+    const walletUser = currentUser || effectiveAppUser;
+    const debitAmount = Math.max(0, Math.floor(Number(amount) || 0));
+
+    if (!walletUser || !auth.currentUser || debitAmount <= 0) return false;
+
+    const uid = auth.currentUser.uid;
+    const userRef = doc(db, 'users', uid);
+    let nextBalance = 0;
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const snap = await transaction.get(userRef);
+        const remoteData = snap.exists() ? snap.data() : {};
+        const liveBalance = Math.max(0, Number(remoteData.eduCoins ?? walletUser.eduCoins ?? 0));
+
+        if (liveBalance < debitAmount) {
+          throw new Error('INSUFFICIENT_EDUCOINS');
+        }
+
+        nextBalance = liveBalance - debitAmount;
+        transaction.set(userRef, {
+          uid,
+          eduCoins: nextBalance,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+      });
+
+      const syncedUser: User = {
+        ...(walletUser as User),
+        id: uid,
+        uid,
+        eduCoins: nextBalance,
+      };
+
+      const ledgerEntry = recordCoinTransaction(syncedUser, {
+        amount: -debitAmount,
+        type: 'debit',
+        source: metadata?.source || 'EduCoin redemption',
+        description: metadata?.description || `${debitAmount} EduCoins redeemed`,
+        productId: metadata?.productId,
+        articleId: metadata?.articleId,
+      });
+
+      const userWithLedger: User = {
+        ...syncedUser,
+        coinTransactions: [ledgerEntry, ...(syncedUser.coinTransactions || [])].slice(0, 25),
+      };
+
+      setCurrentUser(userWithLedger);
+      setUsers(current => {
+        const nextUsers = current.some(user => user.id === userWithLedger.id)
+          ? current.map(user => user.id === userWithLedger.id ? userWithLedger : user)
+          : [...current, userWithLedger];
+
+        safeSetItem('siteUsers', nextUsers);
+        return nextUsers;
+      });
+
+      safeSetItem('currentUser', userWithLedger);
+      showCoinToast(`🪙 ${debitAmount} EduCoins applied`);
+      return true;
+    } catch (error) {
+      console.warn('Atomic EduCoin debit failed.', error);
+
+      setInfoModal({
+        title: 'EduCoin balance changed',
+        message: error instanceof Error && error.message === 'INSUFFICIENT_EDUCOINS'
+          ? 'Your live EduCoin wallet balance is lower than this checkout needs. Please earn more coins or reduce the coin discount.'
+          : 'Could not verify your EduCoin wallet from Firebase. Please try again.',
+        icon: '🪙',
+      });
+
+      return false;
+    }
+  };
+
   const handleReadingReward = (article: NewsArticle) => {
     const rewardCoins = Math.max(0, Number(economySettings.coinPerArticleRead));
     if (!currentUser) return false;
@@ -2971,7 +3064,13 @@ const App: React.FC = () => {
         const coinDiscount = activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? Math.min(preDiscountTotal - finalDiscount, activeCoinDiscount.amount) : 0;
         const robustFinalPrice = Math.max(0, preDiscountTotal - finalDiscount - coinDiscount);
         if (activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id && activeCoinDiscount.coins > 0) {
-          if (!deductEduCoins(activeCoinDiscount.coins, { source: 'Profile coin claim', description: `Applied ${activeCoinDiscount.coins} EduCoins for ₹${coinDiscount.toFixed(2)} discount`, productId: selectedProduct.id })) return;
+          const coinsDebited = await deductEduCoinsAtomically(activeCoinDiscount.coins, {
+            source: 'Profile coin claim',
+            description: `Applied ${activeCoinDiscount.coins} EduCoins for ₹${coinDiscount.toFixed(2)} discount`,
+            productId: selectedProduct.id,
+          });
+
+          if (!coinsDebited) return;
           setActiveCoinDiscount(null);
         }
 
@@ -3097,20 +3196,13 @@ const App: React.FC = () => {
     }
 
     if (!options.coinDebitAlreadyProcessed) {
-      const liveCoinBalance = effectiveAppUser?.eduCoins || 0;
-      if (liveCoinBalance < totalCoinPrice) return false;
+      const success = await deductEduCoinsAtomically(totalCoinPrice, {
+        source: 'Product EduCoin purchase',
+        description: `Unlocked ${product.title} with EduCoins`,
+        productId: product.id,
+      });
 
-      try {
-        const success = deductEduCoins(totalCoinPrice, {
-          source: 'Product EduCoin purchase',
-          description: `Unlocked ${product.title} with EduCoins`,
-          productId: product.id,
-        });
-        if (!success) return false;
-      } catch (error) {
-        console.warn('EduCoin deduction ledger failed; using local wallet fallback for product unlock.', error);
-        syncCurrentUser(user => ({ ...user, eduCoins: Math.max(0, (user.eduCoins || 0) - totalCoinPrice) }));
-      }
+      if (!success) return false;
     }
 
     return await completeProductUnlock(product, quantity, `🪙 ${totalCoinPrice}`) !== false;
@@ -3124,13 +3216,12 @@ const App: React.FC = () => {
     if (!allCoinEnabled || !totalCoinPrice || liveCoinBalance < totalCoinPrice) {
       return false;
     }
-    try {
-      const deducted = deductEduCoins(totalCoinPrice, { source: 'Cart EduCoin purchase', description: 'Unlocked cart with EduCoins' });
-      if (!deducted) return false;
-    } catch (error) {
-      console.warn('EduCoin deduction ledger failed; using local wallet fallback for cart unlock.', error);
-      syncCurrentUser(user => ({ ...user, eduCoins: Math.max(0, (user.eduCoins || 0) - totalCoinPrice) }));
-    }
+    const deducted = await deductEduCoinsAtomically(totalCoinPrice, {
+      source: 'Cart EduCoin purchase',
+      description: 'Unlocked cart with EduCoins',
+    });
+
+    if (!deducted) return false;
     const orderId = `DC-${Date.now()}`;
     try {
       await Promise.all(cartDetails.map(item => persistPurchaseEntitlement(auth.currentUser!.uid, item.product, { quantity: item.quantity, total: `🪙 ${resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity}`, source: 'educoin', orderId })));

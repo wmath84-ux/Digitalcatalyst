@@ -37,6 +37,8 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
         return acc + (price * item.quantity);
     }, 0);
 
+    const canUseEduCoins = coinBalance > 0 && coinRedeemRate > 0 && subtotal > 0;
+
     const prevSubtotalRef = useRef<number | undefined>(undefined);
     useEffect(() => {
         if (prevSubtotalRef.current !== undefined && subtotal !== prevSubtotalRef.current) {
@@ -125,14 +127,29 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
                                 {couponError && <p className="text-xs text-red-500 mt-1">{couponError}</p>}
                             </div>
                             <div className="mb-4 rounded-2xl border border-amber-200/60 bg-white/80 p-4 shadow-sm backdrop-blur-xl">
-                                <label className="flex cursor-pointer items-start gap-3">
-                                    <input type="checkbox" checked={applyEduCoins} onChange={event => onToggleEduCoins(event.target.checked)} className="mt-1 h-4 w-4 rounded border-amber-300 text-indigo-600" />
+                                <label className={`flex items-start gap-3 ${canUseEduCoins ? 'cursor-pointer' : 'cursor-not-allowed opacity-70'}`}>
+                                    <input
+                                        type="checkbox"
+                                        checked={applyEduCoins && canUseEduCoins}
+                                        disabled={!canUseEduCoins}
+                                        onChange={event => onToggleEduCoins(canUseEduCoins ? event.target.checked : false)}
+                                        className="mt-1 h-4 w-4 rounded border-amber-300 text-indigo-600 disabled:cursor-not-allowed"
+                                    />
                                     <span className="flex-1">
                                         <span className="block text-sm font-black text-slate-900">Apply EduCoins Balance</span>
                                         <span className="mt-1 block text-xs leading-5 text-slate-600">🪙 {coinBalance} available • {coinRedeemRate} coins = ₹1 discount</span>
                                     </span>
                                 </label>
-                                {applyEduCoins && <div className="mt-3 rounded-xl border border-indigo-200/70 bg-indigo-50/80 px-3 py-2 text-xs font-bold text-indigo-700">Applying {appliedEduCoins} coins for ₹{eduCoinDiscount.toFixed(2)} off</div>}
+                                {!canUseEduCoins && (
+                                    <div className="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800">
+                                        Earn EduCoins first to unlock cart discount.
+                                    </div>
+                                )}
+                                {applyEduCoins && canUseEduCoins && (
+                                    <div className="mt-3 rounded-xl border border-indigo-200/70 bg-indigo-50/80 px-3 py-2 text-xs font-bold text-indigo-700">
+                                        Applying {appliedEduCoins} coins for ₹{eduCoinDiscount.toFixed(2)} off
+                                    </div>
+                                )}
                             </div>
                             <div className={`space-y-2 rounded-2xl bg-white/70 p-3 ${flash ? 'subtotal-flash' : ''}`}>
                                 <div className="flex justify-between text-sm font-semibold"><span>Subtotal</span><span>₹{subtotal.toFixed(2)}</span></div>
