@@ -63,7 +63,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const autoStartedRazorpayRef = useRef(false);
   const razorpayUrl = paymentLink || 'https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view';
   const isCartMode = !!cartItems && cartItems.length > 0;
-  const eduCoinBalance = Math.max(0, Math.floor(Number(currentUser?.eduCoins ?? (currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? 0)));
+  const eduCoinBalance = Math.max(0, Math.floor(Number((currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0)));
   const canPayWithCoins = !!onConfirmWithCoins && coinPrice > 0 && eduCoinBalance >= coinPrice;
   const missingCoins = Math.max(0, coinPrice - eduCoinBalance);
 
@@ -132,7 +132,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const handleCoinCheckout = async () => {
     const user = currentUser as (User & { coinBalance?: number }) | null | undefined;
-    const userCoinBalance = Math.max(0, Math.floor(Number(user?.eduCoins ?? user?.coinBalance ?? 0)));
+    const userCoinBalance = Math.max(0, Math.floor(Number(user?.coinBalance ?? user?.eduCoins ?? 0)));
     if (userCoinBalance < coinPrice || !onConfirmWithCoins) {
       const shortfall = Math.max(0, coinPrice - userCoinBalance);
       setCoinStatus(`You have ${userCoinBalance} EduCoins and need ${coinPrice}. Earn ${shortfall} more.`);
@@ -227,7 +227,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         {couponDiscount > 0 && <div className="flex justify-between"><span className="text-slate-600">Coupon savings</span><span className="font-bold text-emerald-600">- ₹{couponDiscount.toFixed(2)}</span></div>}
         {eduCoinDiscount > 0 && <div className="flex justify-between"><span className="text-slate-600">EduCoins applied ({appliedEduCoins} @ {coinRedeemRate}:1)</span><span className="font-bold text-emerald-600">- ₹{eduCoinDiscount.toFixed(2)}</span></div>}
         <div className="mt-3 flex items-center justify-between gap-3"><span className="text-lg font-black text-slate-900">Total</span><span className="text-2xl font-black text-primary sm:text-3xl">₹{finalPrice.toFixed(2)}</span></div>
-        {coinPrice > 0 && <div className="mt-3 rounded-2xl bg-amber-50/90 px-4 py-3 text-sm font-black text-amber-700">EduCoin price: 🪙 {coinPrice} • Your balance: 🪙 {eduCoinBalance}</div>}
+        {appliedEduCoins > 0 ? (
+          <div className="mt-3 rounded-2xl bg-emerald-50/90 px-4 py-3 text-sm font-black text-emerald-700">
+            Wallet discount selected: 🪙 {appliedEduCoins} applied • Live balance: 🪙 {eduCoinBalance}
+          </div>
+        ) : coinPrice > 0 ? (
+          <div className="mt-3 rounded-2xl bg-amber-50/90 px-4 py-3 text-sm font-black text-amber-700">
+            EduCoin price: 🪙 {coinPrice} • Your balance: 🪙 {eduCoinBalance}
+          </div>
+        ) : null}
       </div>
     </div>
   );
@@ -280,7 +288,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
         <div className="space-y-3">
           <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-500 px-5 py-3.5 text-base font-black text-white shadow-[0_16px_45px_rgba(79,70,229,0.24)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg">{finalPrice <= 0 ? 'Complete ₹0 Checkout' : 'Pay with Razorpay'}</button>
-          {onConfirmWithCoins && coinPrice > 0 && (
+          {onConfirmWithCoins && coinPrice > 0 && appliedEduCoins <= 0 && (
             <button disabled={isCompleting} onClick={handleCoinCheckout} className={`w-full rounded-2xl border px-5 py-3.5 text-base font-black shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg ${canPayWithCoins ? 'border-amber-200/60 bg-white/80 text-amber-700' : 'border-amber-200 bg-amber-50/90 text-amber-800'}`}>
               {isCompleting ? 'Checking live DB balance...' : canPayWithCoins ? `Pay with ${coinPrice} EduCoins` : `Need ${missingCoins} more EduCoins`}
             </button>

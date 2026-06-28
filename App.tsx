@@ -41,6 +41,7 @@ import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnap
 import { auth, db } from './firebase';
 import { browserLocalPersistence, createUserWithEmailAndPassword, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
+import { ensureUserCoinWallet, spendUserCoinWallet } from './utils/coinWallet';
 import { clearRememberedAuthAccount, getRememberedAuthAccount, RememberedAuthAccount, saveRememberedAuthAccount } from './utils/rememberedAuth';
 import { isMobileViewport as getIsMobileViewport } from './utils/device';
 import { getFirebaseAuthErrorMessageFromCode, mergePurchasedProductIds, normalizePurchaseIds as normalizeSharedPurchaseIds, shouldRestoreEntitlementStatus } from './utils/authParity';
@@ -264,7 +265,10 @@ export interface User {
     emailVerified?: boolean;
     createdAt: string;
     lastLoginAt?: string;
-    eduCoins?: number;
+    eduCoins?: number; // Legacy mirror only. Checkout/profile must use coinBalance as source of truth.
+    coinBalance?: number;
+    totalCoinsEarned?: number;
+    totalCoinsSpent?: number;
     studyMinutes?: number;
     totalWatchTimeMinutes?: number;
     totalLifetimeCoins?: number;
@@ -1054,8 +1058,8 @@ const App: React.FC = () => {
   const isLoggedIn = Boolean(effectiveFirebaseUser);
   const isAuthBooting = authStatus === 'booting' || authStatus === 'checking-session' || isRedirectResultPending;
 
-  const readEduCoinBalance = (user?: (Partial<User> & { coinBalance?: number }) | null) =>
-    Math.max(0, Math.floor(Number(user?.eduCoins ?? user?.coinBalance ?? 0)));
+  const readEduCoinBalance = (user?: Partial<User> | null) =>
+    Math.max(0, Math.floor(Number(user?.coinBalance ?? user?.eduCoins ?? 0)));
 
   const liveWalletBalance = liveEduCoinBalance ?? readEduCoinBalance(effectiveAppUser);
 
@@ -1067,6 +1071,10 @@ const App: React.FC = () => {
       return undefined;
     }
 
+    void ensureUserCoinWallet(uid).catch((error) => {
+      console.warn('EduCoin wallet initialization failed; live listener will continue with existing data.', error);
+    });
+
     const userRef = doc(db, 'users', uid);
 
     return onSnapshot(userRef, (snapshot) => {
@@ -1075,9 +1083,13 @@ const App: React.FC = () => {
         return;
       }
 
-      const remoteUser = snapshot.data() as Partial<User> & { coinBalance?: number };
+      const remoteUser = snapshot.data() as Partial<User>;
       const remoteBalance = readEduCoinBalance(remoteUser);
-      const remoteLifetimeCoins = Math.max(0, Math.floor(Number(remoteUser.totalLifetimeCoins ?? remoteBalance)));
+      const remoteLifetimeCoins = Math.max(
+        0,
+        Math.floor(Number(remoteUser.totalCoinsEarned ?? remoteUser.totalLifetimeCoins ?? remoteBalance))
+      );
+      const remoteSpentCoins = Math.max(0, Math.floor(Number(remoteUser.totalCoinsSpent ?? 0)));
 
       setLiveEduCoinBalance(remoteBalance);
 
@@ -1087,7 +1099,10 @@ const App: React.FC = () => {
         const syncedUser: User = {
           ...current,
           uid,
+          coinBalance: remoteBalance,
           eduCoins: remoteBalance,
+          totalCoinsEarned: remoteLifetimeCoins,
+          totalCoinsSpent: remoteSpentCoins,
           totalLifetimeCoins: Math.max(Number(current.totalLifetimeCoins || 0), remoteLifetimeCoins),
         };
 
@@ -1101,7 +1116,10 @@ const App: React.FC = () => {
             ? {
                 ...user,
                 uid,
+                coinBalance: remoteBalance,
                 eduCoins: remoteBalance,
+                totalCoinsEarned: remoteLifetimeCoins,
+                totalCoinsSpent: remoteSpentCoins,
                 totalLifetimeCoins: Math.max(Number(user.totalLifetimeCoins || 0), remoteLifetimeCoins),
               }
             : user
@@ -2040,10 +2058,13 @@ const App: React.FC = () => {
       suspended: data.suspended === true,
       createdAt: data.createdAt || new Date().toISOString(),
       lastLoginAt: new Date().toISOString(),
-      eduCoins: data.eduCoins ?? 0,
+      coinBalance: data.coinBalance ?? data.eduCoins ?? 0,
+      totalCoinsEarned: data.totalCoinsEarned ?? data.totalLifetimeCoins ?? data.eduCoins ?? 0,
+      totalCoinsSpent: data.totalCoinsSpent ?? 0,
+      eduCoins: data.coinBalance ?? data.eduCoins ?? 0,
       studyMinutes: data.studyMinutes ?? 0,
       totalWatchTimeMinutes: data.totalWatchTimeMinutes ?? data.studyMinutes ?? 0,
-      totalLifetimeCoins: data.totalLifetimeCoins ?? data.eduCoins ?? 0,
+      totalLifetimeCoins: data.totalCoinsEarned ?? data.totalLifetimeCoins ?? data.eduCoins ?? 0,
       rewardedArticleIds: data.rewardedArticleIds || [],
       readArticles: data.readArticles || data.rewardedArticleIds || [],
       rewardedQuizIds: data.rewardedQuizIds || [],
@@ -2873,48 +2894,60 @@ const App: React.FC = () => {
     if (!walletUser || !auth.currentUser || debitAmount <= 0) return false;
 
     const uid = auth.currentUser.uid;
-    const userRef = doc(db, 'users', uid);
-    let nextBalance = 0;
 
     try {
-      await runTransaction(db, async (transaction) => {
-        const snap = await transaction.get(userRef);
-        const remoteData = snap.exists() ? snap.data() : {};
-        const liveBalance = Math.max(0, Number(remoteData.eduCoins ?? walletUser.eduCoins ?? 0));
-
-        if (liveBalance < debitAmount) {
-          throw new Error('INSUFFICIENT_EDUCOINS');
-        }
-
-        nextBalance = liveBalance - debitAmount;
-        transaction.set(userRef, {
-          uid,
-          eduCoins: nextBalance,
-          updatedAt: serverTimestamp(),
-        }, { merge: true });
-      });
-
-      const syncedUser: User = {
-        ...(walletUser as User),
-        id: uid,
-        uid,
-        eduCoins: nextBalance,
-      };
-
-      const ledgerEntry = recordCoinTransaction(syncedUser, {
-        amount: -debitAmount,
-        type: 'debit',
+      const spendResult = await spendUserCoinWallet({
+        userId: uid,
+        amount: debitAmount,
         source: metadata?.source || 'EduCoin redemption',
         description: metadata?.description || `${debitAmount} EduCoins redeemed`,
         productId: metadata?.productId,
         articleId: metadata?.articleId,
       });
 
+      if (!spendResult.success) {
+        throw new Error(spendResult.reason === 'not_enough_coins' ? 'INSUFFICIENT_EDUCOINS' : 'EDUCOIN_SPEND_FAILED');
+      }
+
+      const timestamp = new Date().toISOString();
+      const ledgerEntry: CoinTransaction = {
+        id: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+        amount: -debitAmount,
+        type: 'debit',
+        source: metadata?.source || 'EduCoin redemption',
+        title: metadata?.title || metadata?.source || 'EduCoin redemption',
+        description: metadata?.description || `${debitAmount} EduCoins redeemed`,
+        productId: metadata?.productId,
+        articleId: metadata?.articleId,
+        createdAt: timestamp,
+        timestamp,
+      };
+
+      const syncedUser: User = {
+        ...(walletUser as User),
+        id: uid,
+        uid,
+        coinBalance: spendResult.balanceAfter,
+        eduCoins: spendResult.balanceAfter,
+        totalCoinsEarned: spendResult.totalCoinsEarned,
+        totalCoinsSpent: spendResult.totalCoinsSpent,
+        totalLifetimeCoins: Math.max(Number((walletUser as User).totalLifetimeCoins || 0), spendResult.totalCoinsEarned),
+      };
+
       const userWithLedger: User = {
         ...syncedUser,
         coinTransactions: [ledgerEntry, ...(syncedUser.coinTransactions || [])].slice(0, 25),
       };
 
+      try {
+        const storageKey = `coinTransactions-${uid}`;
+        const localLedger = JSON.parse(localStorage.getItem(storageKey) || '[]') as CoinTransaction[];
+        safeSetItem(storageKey, [ledgerEntry, ...(Array.isArray(localLedger) ? localLedger : [])].slice(0, 100));
+      } catch (error) {
+        console.warn('Coin transaction local ledger write failed after wallet spend.', error);
+      }
+
+      setLiveEduCoinBalance(spendResult.balanceAfter);
       setCurrentUser(userWithLedger);
       setUsers(current => {
         const nextUsers = current.some(user => user.id === userWithLedger.id)
@@ -3861,7 +3894,7 @@ const App: React.FC = () => {
             )}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
             {quickViewProduct && <QuickViewModal settings={websiteSettings} product={quickViewProduct} onClose={() => setQuickViewProduct(null)} onAddToCart={handleAddToCart} onToggleWishlist={handleToggleWishlist} isWishlisted={wishlist.includes(quickViewProduct.id)} onViewFullDetails={() => { handleViewProduct(quickViewProduct); setQuickViewProduct(null); }} />}
-            {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins)} currentUser={effectiveAppUser ? { ...effectiveAppUser, eduCoins: liveWalletBalance } : effectiveAppUser} coinPrice={cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={handleConfirmCartCoinPurchase} onInsufficientCoins={handleInsufficientEduCoins} />}
+            {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins)} currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser} coinPrice={cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={handleConfirmCartCoinPurchase} onInsufficientCoins={handleInsufficientEduCoins} />}
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={() => setIsReadingDrawerOpen(false)} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
