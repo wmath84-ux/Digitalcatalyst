@@ -54,7 +54,10 @@ type ShareTarget =
   | { sourceType: 'status'; status: StatusCard }
   | { sourceType: 'feed_message'; message: FeedMessage };
 
-type PrivateChatMessageType = 'text' | 'image' | 'poll' | 'shared_item';
+type PrivateChatMessageType = 'text' | 'poll' | 'shared_item';
+
+const normalizePrivateChatMessageType = (value: unknown): PrivateChatMessageType =>
+  value === 'poll' || value === 'shared_item' ? value : 'text';
 
 type PrivateChatPoll = {
   question: string;
@@ -292,7 +295,6 @@ const COMMUNITY_NOTIFICATIONS = 'community_notifications';
 const PRIVATE_CHATS = 'private_chats';
 const PRIVATE_CHAT_MESSAGES = 'messages';
 const PRIVATE_CHAT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
-const PRIVATE_CHAT_IMAGE_MAX_BYTES = 2 * 1024 * 1024;
 
 const getPrivateConversationId = (firstUid: string, secondUid: string) => {
   const first = firstUid.trim();
@@ -514,7 +516,7 @@ const mapPrivateConversationDoc = (snapshotDoc: { id: string; data: () => Record
     createdAt: asMillis(data.createdAt),
     updatedAt: asMillis(data.updatedAt),
     lastMessage: data.lastMessage || '',
-    lastMessageType: data.lastMessageType || 'text',
+    lastMessageType: normalizePrivateChatMessageType(data.lastMessageType),
     lastMessageAt: asMillis(data.lastMessageAt || data.updatedAt),
     lastSenderId: data.lastSenderId || '',
     unreadCounts: data.unreadCounts || {},
@@ -531,7 +533,7 @@ const mapPrivateChatMessageDoc = (snapshotDoc: { id: string; data: () => Record<
     receiverId: data.receiverId || '',
     senderName: data.senderName || 'Member',
     receiverName: data.receiverName || 'Member',
-    type: data.type || 'text',
+    type: normalizePrivateChatMessageType(data.type),
     text: data.text || '',
     caption: data.caption || '',
     imageUrl: data.imageUrl || '',
@@ -581,9 +583,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [privateConversations, setPrivateConversations] = useState<PrivateConversation[]>([]);
   const [privateMessages, setPrivateMessages] = useState<PrivateChatMessage[]>([]);
   const [chatDraft, setChatDraft] = useState('');
-  const [chatImagePreview, setChatImagePreview] = useState('');
-  const [chatImageName, setChatImageName] = useState('');
-  const [chatImageInputKey, setChatImageInputKey] = useState(0);
   const [chatPollQuestion, setChatPollQuestion] = useState('');
   const [chatPollOptions, setChatPollOptions] = useState(['', '']);
   const [chatAttachmentMode, setChatAttachmentMode] = useState<PrivateChatMessageType | null>(null);
@@ -854,22 +853,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return { imageUrl: await getDownloadURL(ref(storage, storagePath)), storagePath, uploadBytes: dataUrlBytes(dataUrl) };
   };
 
-  const uploadPrivateChatImage = async (conversationId: string, messageId: string, dataUrl: string) => {
-    if (!dataUrl.startsWith('data:')) return { imageUrl: dataUrl, storagePath: undefined, uploadBytes: 0 };
-    const uploadBytes = dataUrlBytes(dataUrl);
-    if (uploadBytes > PRIVATE_CHAT_IMAGE_MAX_BYTES) {
-      throw new Error('Image is too large. Please upload an image under 2MB.');
-    }
-
-    const storagePath = `privateChats/${conversationId}/${messageId}/image.jpg`;
-    await uploadString(ref(storage, storagePath), dataUrl, 'data_url');
-    return {
-      imageUrl: await getDownloadURL(ref(storage, storagePath)),
-      storagePath,
-      uploadBytes,
-    };
-  };
-
   const uploadPrivateChatMessageArchive = async (conversationId: string, messageId: string, message: PrivateChatMessage) => {
     const archiveStoragePath = `privateChats/${conversationId}/${messageId}/message.json`;
 
@@ -884,9 +867,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const resetPrivateChatComposer = () => {
     setChatDraft('');
-    setChatImagePreview('');
-    setChatImageName('');
-    setChatImageInputKey((key) => key + 1);
     setChatPollQuestion('');
     setChatPollOptions(['', '']);
     setChatAttachmentMode(null);
@@ -933,18 +913,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
     if (type === 'text' && !text) return;
 
-    if (type === 'image' && !chatImagePreview) {
-      setPrivateChatError('Please choose an image first.');
-      return;
-    }
-
     if (type === 'poll' && (!pollQuestion || cleanedPollOptions.length < 2)) {
       setPrivateChatError('Poll needs one question and at least 2 options.');
       return;
     }
 
-    const selectedImagePreview = chatImagePreview;
-    const selectedImageName = chatImageName;
     const messageId = `${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
     const createdAt = Date.now();
     const expiresAt = createdAt + PRIVATE_CHAT_TTL_MS;
@@ -953,7 +926,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const participants = getPrivateConversationParticipants(currentUserKey, receiver.id);
     const participantMap = getPrivateParticipantMap(participants);
 
-    let storagePath = '';
     let archiveStoragePath = '';
 
     setPendingPrivateChatSends((count) => count + 1);
@@ -968,9 +940,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       receiverName: getCreatorDisplayName(receiver),
       type,
       text: type === 'text' ? text : undefined,
-      caption: type === 'image' ? text : undefined,
-      imageUrl: type === 'image' ? selectedImagePreview : undefined,
-      uploadBytes: type === 'image' ? dataUrlBytes(selectedImagePreview) : 0,
       poll: type === 'poll'
         ? {
             question: pollQuestion,
@@ -996,28 +965,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     try {
       await ensurePrivateConversation(conversationId, receiver);
 
-      let imageUrl = '';
-      let uploadBytes = 0;
-
-      if (type === 'image') {
-        const uploaded = await uploadPrivateChatImage(conversationId, messageId, selectedImagePreview);
-        imageUrl = uploaded.imageUrl;
-        storagePath = uploaded.storagePath || '';
-        uploadBytes = uploaded.uploadBytes;
-      }
-
-      const lastMessage =
-        type === 'image'
-          ? (text || '🖼️ Image')
-          : type === 'poll'
-            ? `📊 ${pollQuestion}`
-            : text;
+      const lastMessage = type === 'poll' ? `📊 ${pollQuestion}` : text;
 
       const messagePayload: PrivateChatMessage = {
         ...optimisticMessage,
-        imageUrl: type === 'image' ? imageUrl : undefined,
-        storagePath: type === 'image' ? storagePath : undefined,
-        uploadBytes: type === 'image' ? uploadBytes : 0,
       };
 
       archiveStoragePath = await uploadPrivateChatMessageArchive(conversationId, messageId, messagePayload);
@@ -1064,10 +1015,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     } catch (error) {
       console.warn('Private chat send failed', error);
 
-      if (storagePath) {
-        deleteObject(ref(storage, storagePath)).catch((deleteError) => console.warn('Private chat image rollback failed', deleteError));
-      }
-
       if (archiveStoragePath) {
         deleteObject(ref(storage, archiveStoragePath)).catch((deleteError) => console.warn('Private chat archive rollback failed', deleteError));
       }
@@ -1075,12 +1022,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       setPrivateMessages((current) => current.filter((message) => message.id !== messageId));
 
       if (type === 'text') setChatDraft(text);
-      if (type === 'image') {
-        setChatDraft(text);
-        setChatImagePreview(selectedImagePreview);
-        setChatImageName(selectedImageName);
-        setChatAttachmentMode('image');
-      }
       if (type === 'poll') {
         setChatPollQuestion(pollQuestion);
         setChatPollOptions(cleanedPollOptions.length ? cleanedPollOptions : ['', '']);
@@ -1122,31 +1063,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       console.warn('Private poll vote failed', error);
       setPrivateChatError('Vote failed. Please try again.');
     }
-  };
-
-  const handlePrivateChatImagePick = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    if (!file.type.startsWith('image/')) {
-      setPrivateChatError('Only image files are allowed.');
-      return;
-    }
-
-    if (file.size > PRIVATE_CHAT_IMAGE_MAX_BYTES) {
-      setPrivateChatError('Image is too large. Please upload an image under 2MB.');
-      return;
-    }
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      setChatImagePreview(String(reader.result || ''));
-      setChatImageName(file.name);
-      setChatAttachmentMode('image');
-      setPrivateChatError('');
-    };
-    reader.onerror = () => setPrivateChatError('Image preview failed. Please try again.');
-    reader.readAsDataURL(file);
   };
 
   const pinLatestPrivateMessage = () => {
@@ -2337,15 +2253,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     };
   };
 
-  const copySharedMediaIfNeeded = async (conversationId: string, messageId: string, sharedItem: PrivateSharedItem) => {
-    if (!sharedItem.imageUrl || !sharedItem.imageUrl.startsWith('data:')) return sharedItem;
-
-    const uploaded = await uploadPrivateChatImage(conversationId, messageId, sharedItem.imageUrl);
-
+  const copySharedMediaIfNeeded = async (_conversationId: string, _messageId: string, sharedItem: PrivateSharedItem) => {
     return {
       ...sharedItem,
-      imageUrl: uploaded.imageUrl,
-      storagePath: uploaded.storagePath,
+      storagePath: undefined,
     };
   };
 
@@ -2957,12 +2868,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             </button>
           ) : null}
 
-          {message.type === 'image' && message.imageUrl ? (
-            <button type="button" onClick={() => setImageLightbox({ src: message.imageUrl!, alt: message.caption || 'Chat image', mode: 'original' })} className="mb-3 block max-h-80 w-full overflow-hidden rounded-[1.25rem] bg-white/15">
-              {renderUploadedImage(message.imageUrl, message.caption || 'Chat image', 'original')}
-            </button>
-          ) : null}
-
           {message.type === 'poll' && poll ? (
             <div>
               <p className="text-sm font-black">{poll.question}</p>
@@ -2991,7 +2896,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
               </div>
             </div>
           ) : message.type !== 'shared_item' ? (
-            <p className="whitespace-pre-wrap break-words text-sm font-semibold leading-6">{message.type === 'image' ? message.caption : message.text}</p>
+            <p className="whitespace-pre-wrap break-words text-sm font-semibold leading-6">{message.text}</p>
           ) : null}
 
           <div className={`mt-2 text-right text-[10px] font-black ${mine ? 'text-white/70' : 'text-[#7C879A]'}`}>
@@ -3005,9 +2910,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const renderPrivateChatShell = (mobile = false) => {
     const sidebarCreators = chatCreators.length ? chatCreators : [];
     const canSendText = Boolean(chatDraft.trim()) && !chatAttachmentMode;
-    const canSendImage = chatAttachmentMode === 'image' && Boolean(chatImagePreview);
     const canSendPoll = chatAttachmentMode === 'poll' && Boolean(chatPollQuestion.trim()) && chatPollOptions.filter((option) => option.trim()).length >= 2;
-    const canSendAnyPrivateMessage = canSendText || canSendImage || canSendPoll;
+    const canSendAnyPrivateMessage = canSendText || canSendPoll;
     const sendDisabled = !canSendAnyPrivateMessage;
     return (
       <div className={`mx-auto grid overflow-hidden bg-white ${mobile ? 'h-full min-h-0 w-full overscroll-none border-0 shadow-none' : 'h-[calc(100dvh-10.5rem)] max-w-[1800px] rounded-[2.4rem] border border-[#D9E7F8] shadow-[0_26px_80px_rgba(8,26,69,0.10)] lg:grid-cols-[360px_1fr]'}`}>
@@ -3016,7 +2920,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <div className="border-b border-[#D9E7F8] p-5">
               <p className="text-xs font-black uppercase tracking-[0.28em] text-[#1769FF]">Private messages</p>
               <h2 className="mt-2 text-3xl font-black tracking-tight text-[#081A45]">Chats</h2>
-              <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">1-to-1 text, image with text, and poll messages stay private for 30 days.</p>
+              <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">1-to-1 text and poll messages stay private for 30 days.</p>
             </div>
             <div className="min-h-0 flex-1 space-y-2 overflow-y-auto p-3 custom-scrollbar">
               {sidebarCreators.map((creator) => {
@@ -3081,7 +2985,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 <div className="max-w-md rounded-[2rem] border border-dashed border-[#BFD7FF] bg-white/90 p-8 shadow-inner">
                   <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#E8F2FF] text-3xl">💬</div>
                   <h3 className="mt-4 text-2xl font-black text-[#081A45]">Start a private conversation</h3>
-                  <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">Send text, image with caption, or a private poll. Nothing is saved to public Chat Feed.</p>
+                  <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">Send text or a private poll. Nothing is saved to public Chat Feed.</p>
                 </div>
               </div>
             )}
@@ -3091,16 +2995,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <div className={`shrink-0 border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl ${mobile ? 'z-20 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-18px_45px_rgba(8,26,69,0.08)]' : 'sm:p-4'}`}>
             {privateChatError ? <div className="mb-3 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-xs font-black text-[#C5221F]">{privateChatError}</div> : null}
             {isPrivateChatSending ? <div className="mb-3 rounded-2xl border border-[#BFD7FF] bg-[#EEF6FF] px-4 py-3 text-xs font-black text-[#1769FF]">Saving previous message to Firebase. You can continue typing the next message.</div> : null}
-
-            {chatAttachmentMode === 'image' ? (
-              <div className="mb-3 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] p-3">
-                <div className="flex items-center justify-between gap-3">
-                  <p className="truncate text-xs font-black text-[#081A45]">🖼️ {chatImageName || 'Image selected'}</p>
-                  <button type="button" onClick={() => { setChatImagePreview(''); setChatImageName(''); setChatImageInputKey((key) => key + 1); setChatAttachmentMode(null); }} className="text-xs font-black text-[#EF4444]">Remove</button>
-                </div>
-                {chatImagePreview ? <div className="mt-3 max-h-48 overflow-hidden rounded-2xl bg-white">{renderUploadedImage(chatImagePreview, chatImageName || 'Image preview', 'original')}</div> : null}
-              </div>
-            ) : null}
 
             {chatAttachmentMode === 'poll' ? (
               <div className="mb-3 space-y-2 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] p-3">
@@ -3116,18 +3010,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             ) : null}
 
             <div className="flex items-center gap-2">
-              <div className="relative">
-                <button type="button" onClick={() => setChatAttachmentMode((mode) => mode ? null : 'image')} className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] text-xl">📎</button>
-                {chatAttachmentMode === 'image' && !chatImagePreview ? (
-                  <div className="absolute bottom-14 left-0 z-20 w-60 overflow-hidden rounded-2xl border border-[#D9E7F8] bg-white p-2 shadow-[0_20px_60px_rgba(8,26,69,0.18)]">
-                    <label className="block cursor-pointer rounded-xl px-3 py-3 text-sm font-black text-[#081A45] hover:bg-[#F8FBFF]">
-                      🖼️ Image with text
-                      <input key={chatImageInputKey} type="file" accept="image/*" onChange={handlePrivateChatImagePick} className="hidden" />
-                    </label>
-                    <button type="button" onClick={() => setChatAttachmentMode('poll')} className="w-full rounded-xl px-3 py-3 text-left text-sm font-black text-[#081A45] hover:bg-[#F8FBFF]">📊 Poll</button>
-                  </div>
-                ) : null}
-              </div>
+              <button type="button" onClick={() => setChatAttachmentMode((mode) => mode === 'poll' ? null : 'poll')} className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] text-xl">📊</button>
 
               <input
                 value={chatDraft}
@@ -3138,7 +3021,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                     sendPrivateChatMessage();
                   }
                 }}
-                placeholder={chatAttachmentMode === 'image' ? 'Add caption...' : 'Type a message...'}
+                placeholder={chatAttachmentMode === 'poll' ? 'Add optional message...' : 'Type a message...'}
                 maxLength={1200}
                 className="min-w-0 flex-1 rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-bold text-[#081A45] outline-none focus:border-[#1769FF]"
               />

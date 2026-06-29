@@ -31,9 +31,9 @@ interface AdminDashboardProps {
     newsletterSubscribers: NewsletterSubscriber[];
     websiteSettings: WebsiteSettings;
     economySettings: EconomySettings;
-    onAddProduct: (product: Omit<Product, 'id'>) => void;
-    onUpdateProduct: (product: Product) => void;
-    onDeleteProduct: (id: number) => void;
+    onAddProduct: (product: Omit<Product, 'id'>) => Promise<boolean>;
+    onUpdateProduct: (product: Product) => Promise<boolean>;
+    onDeleteProduct: (id: number) => Promise<boolean>;
     onDeleteUser: (id: number) => void;
     onAdminUsersUpdate: (users: AdminUser[]) => void;
     onCouponsUpdate: (coupons: Coupon[]) => void;
