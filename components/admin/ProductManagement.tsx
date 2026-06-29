@@ -223,19 +223,23 @@ const ensureAdminUploadAuth = async () => {
     const user = auth.currentUser;
 
     if (!user) {
+        console.error('ADMIN_AUTH_USER_MISSING');
         console.error('ADMIN_UPLOAD_AUTH_CHECK_FAILED', { reason: 'missing_firebase_auth_user' });
-        throw new Error('NOT_AUTHENTICATED: Firebase admin login required before uploading files.');
+        throw new Error('Firebase admin login required before uploading files.');
     }
 
+    console.info('ADMIN_AUTH_USER_FOUND', { uid: user.uid, email: user.email || null });
     const userSnap = await getDoc(doc(db, 'users', user.uid));
     const role = userSnap.exists() ? userSnap.data().role : undefined;
     const isAdmin = role === 'admin' || role === 'super_admin';
 
     if (!isAdmin) {
-        console.error('ADMIN_UPLOAD_AUTH_CHECK_FAILED', { uid: user.uid, role: role || null, reason: 'admin_role_missing' });
-        throw new Error('ADMIN_PERMISSION_MISSING: Firebase admin role required before uploading files. Set users/{uid}.role to admin or super_admin.');
+        console.error('ADMIN_ROLE_CHECK_FAILED', { uid: user.uid, email: user.email || null, role: role || null, reason: 'admin_role_missing' });
+        console.error('ADMIN_UPLOAD_BLOCKED_PERMISSION', { uid: user.uid, email: user.email || null, role: role || null });
+        throw new Error(`Your Firebase user is not marked as admin. Add role: admin in users/${user.uid}. UID: ${user.uid}. Email: ${user.email || 'No email found'}. Current role: ${role || 'missing'}.`);
     }
 
+    console.info('ADMIN_ROLE_CHECK_SUCCESS', { uid: user.uid, email: user.email || null, role });
     console.info('ADMIN_UPLOAD_AUTH_CHECK_SUCCESS', { uid: user.uid, role });
     return user;
 };
@@ -317,6 +321,7 @@ const uploadAdminProductAsset = async (
                 },
             });
             console.info('ADMIN_UPLOAD_TASK_CREATED', { storagePath, attempt, storageBucket: storage.app.options.storageBucket });
+            console.info('ADMIN_UPLOAD_STARTED', { storagePath, attempt, storageBucket: storage.app.options.storageBucket });
 
             await new Promise<void>((resolve, reject) => {
                 let firstByteReceived = false;
