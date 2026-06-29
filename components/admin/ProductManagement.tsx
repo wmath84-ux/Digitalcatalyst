@@ -184,6 +184,7 @@ const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 p
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
 
 const MAX_ADMIN_UPLOAD_BYTES = 75 * 1024 * 1024;
+const MAX_FIRESTORE_INLINE_UPLOAD_BYTES = 700 * 1024;
 const ADMIN_UPLOAD_TIMEOUT_MS = 20000;
 
 const sanitizeStorageName = (value: string) =>
@@ -242,12 +243,15 @@ const uploadAdminProductAsset = async (file: File, storagePath: string) => {
 };
 
 const uploadAdminContentOrInlineFallback = async (file: File, type: ProductFileType) => {
+    if (file.size <= MAX_FIRESTORE_INLINE_UPLOAD_BYTES) {
+        return readFileAsDataUrl(file);
+    }
+
     try {
         return await uploadAdminProductAsset(file, buildAdminContentStoragePath(file, type));
     } catch (error) {
-        console.warn('Firebase Storage content upload failed. Trying small-file inline fallback.', error);
-
-        return readFileAsDataUrl(file);
+        console.warn('Firebase Storage content upload failed for a large file.', error);
+        throw error;
     }
 };
 
@@ -571,7 +575,7 @@ const ContentComposer: React.FC<{
             onClose();
         } catch (error) {
             console.error('Admin content upload failed:', error);
-            alert('File upload failed. Please check Firebase Storage rules/auth or use an external hosted URL.');
+            alert('Large file upload failed. Please use an external hosted URL, or upload a smaller file under 700KB so it can be saved directly in the global product.');
         } finally {
             setIsUploading(false);
         }
@@ -785,7 +789,7 @@ const ContentComposer: React.FC<{
             )}
 
             <input ref={fileInputRef} type="file" accept={uploadConfig?.accept} onChange={handleFileSelected} className="hidden" />
-            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content to Firebase Storage... If Storage is blocked, this file will be added inline automatically.</p>}
+            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Adding content... Small files save directly in the global product; large files use hosted URLs.</p>}
         </div>
     );
 };
