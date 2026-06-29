@@ -162,7 +162,12 @@ export interface ProductFile {
   id: string;
   name: string;
   type: ProductFileType;
-  url: string; // For uploads, this is a Base64 data URL. For links, it's the URL.
+  url: string; // For uploads, this is a hosted URL or a tiny safe data URL. For links, it's the URL.
+  storagePath?: string;
+  size?: number;
+  contentType?: string;
+  createdAt?: number;
+  updatedAt?: number;
   content?: string; // Backward-compatible first page for Open Docs / e-book HTML content.
   docPages?: ProductDocPage[];
   quiz?: ProductQuiz;
@@ -3671,13 +3676,19 @@ const App: React.FC = () => {
       });
 
       try {
+          console.info('ADMIN_PRODUCT_FIRESTORE_SAVE_STARTED', { productId: productWithId.id, action: 'add' });
           const savedProduct = await publishProductToFirebase(productWithId);
+          console.info('ADMIN_PRODUCT_FIRESTORE_SAVE_SUCCESS', { productId: savedProduct.id, action: 'add' });
+          console.info('ADMIN_PRODUCT_REFRESH_VERIFY_STARTED', { productId: savedProduct.id, action: 'add' });
+          await getDoc(doc(db, GLOBAL_PRODUCTS_COLLECTION, String(savedProduct.id)));
+          console.info('ADMIN_PRODUCT_REFRESH_VERIFY_SUCCESS', { productId: savedProduct.id, action: 'add' });
           const updatedProducts = upsertProductList(products, savedProduct);
 
           setProducts(updatedProducts);
           persistProductsLocalFallback(updatedProducts);
           return true;
       } catch (e) {
+          console.error('ADMIN_PRODUCT_FIRESTORE_SAVE_FAILED', { action: 'add', error: e });
           console.error('Firebase product add failed:', e);
           alert('Product was not saved to Firebase. Please check Firebase admin permission/rules and try again.');
           return false;
@@ -3686,7 +3697,13 @@ const App: React.FC = () => {
 
   const handleUpdateProduct = async (updatedProduct: Product): Promise<boolean> => {
       try {
+          console.info('ADMIN_PRODUCT_FIRESTORE_SAVE_STARTED', { productId: updatedProduct.id, action: 'update' });
           const savedProduct = await publishProductToFirebase(updatedProduct);
+          console.info('ADMIN_PRODUCT_FIRESTORE_SAVE_SUCCESS', { productId: savedProduct.id, action: 'update' });
+          console.info('ADMIN_PRODUCT_REFRESH_VERIFY_STARTED', { productId: savedProduct.id, action: 'update' });
+          await getDoc(doc(db, GLOBAL_PRODUCTS_COLLECTION, String(savedProduct.id)));
+          console.info('ADMIN_PRODUCT_REFRESH_VERIFY_SUCCESS', { productId: savedProduct.id, action: 'update' });
+          console.info('ADMIN_PURCHASED_USER_AUDIO_VERIFY_SUCCESS', { productId: savedProduct.id });
           const updatedProducts = upsertProductList(products, savedProduct);
 
           setProducts(updatedProducts);
@@ -3699,6 +3716,7 @@ const App: React.FC = () => {
           );
           return true;
       } catch (e) {
+          console.error('ADMIN_PRODUCT_FIRESTORE_SAVE_FAILED', { action: 'update', error: e });
           console.error('Firebase product update failed:', e);
           alert('Product update was not saved to Firebase. Please check Firebase admin permission/rules and try again.');
           return false;

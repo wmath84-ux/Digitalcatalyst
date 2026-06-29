@@ -3,8 +3,9 @@ import { createPortal } from 'react-dom';
 import { Coupon, CourseModule, Product, ProductFile, ProductFileType, ProductWithRating, ProductDocPage, QuizQuestion, User } from '../../App';
 import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
 import { PRODUCT_IMAGE_SLOTS, ProductImageSlot } from '../../utils/productImages';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
-import { storage } from '../../firebase';
+import { getDownloadURL, ref, uploadBytes, uploadBytesResumable } from 'firebase/storage';
+import { signInAnonymously } from 'firebase/auth';
+import { auth, storage } from '../../firebase';
 
 type ProductViewState = 'list' | 'add' | 'edit';
 
@@ -183,7 +184,11 @@ const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-
 const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
 
-const MAX_ADMIN_UPLOAD_BYTES = 75 * 1024 * 1024;
+const MAX_AUDIO_UPLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_VIDEO_UPLOAD_BYTES = 75 * 1024 * 1024;
+const MAX_DOCUMENT_UPLOAD_BYTES = 25 * 1024 * 1024;
+const MAX_SHEET_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_PRODUCT_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_FIRESTORE_INLINE_UPLOAD_BYTES = 700 * 1024;
 const ADMIN_UPLOAD_TIMEOUT_MS = 20000;
 
@@ -195,16 +200,16 @@ const sanitizeStorageName = (value: string) =>
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '') || 'file';
 
-const buildAdminContentStoragePath = (file: File, type: ProductFileType) => {
+const buildAdminContentStoragePath = (file: File, type: ProductFileType, productId: number | string) => {
     const extension = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
     const safeName = sanitizeStorageName(file.name.replace(/\.[^/.]+$/, ''));
-    return `adminProductContent/${type}/${Date.now()}-${safeName}.${extension}`;
+    return `adminProductContent/${type}/${productId}/${Date.now()}-${safeName}.${extension}`;
 };
 
-const buildAdminImageStoragePath = (file: File, scope: string) => {
+const buildAdminImageStoragePath = (file: File, scope: string, productId: number | string) => {
     const extension = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
     const safeName = sanitizeStorageName(file.name.replace(/\.[^/.]+$/, ''));
-    return `adminProductImages/${scope}/${Date.now()}-${safeName}.${extension}`;
+    return `adminProductImages/${productId}/${scope}/${Date.now()}-${safeName}.${extension}`;
 };
 
 const withAdminUploadTimeout = async <T,>(operation: Promise<T>, label: string): Promise<T> => {
@@ -229,29 +234,118 @@ const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) 
     reader.readAsDataURL(file);
 });
 
-const uploadAdminProductAsset = async (file: File, storagePath: string) => {
-    const fileRef = ref(storage, storagePath);
+const ensureAdminUploadAuth = async () => {
+    if (auth.currentUser) return auth.currentUser;
 
-    await withAdminUploadTimeout(uploadBytes(fileRef, file, {
+    try {
+        const credential = await signInAnonymously(auth);
+        return credential.user;
+    } catch (error) {
+        console.warn('ADMIN_UPLOAD_AUTH_UNAVAILABLE', error);
+        return null;
+    }
+};
+
+const classifyAdminUploadError = (error: unknown) => {
+    const rawCode = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
+    const message = error instanceof Error ? error.message : String(error || 'Unknown upload error');
+
+    if (message.includes('NOT_AUTHENTICATED')) return message;
+    if (rawCode.includes('storage/unauthorized') || message.toLowerCase().includes('permission')) return `STORAGE_RULES_DENIED: Firebase Storage rules denied this upload. ${message}`;
+    if (rawCode.includes('storage/bucket-not-found') || rawCode.includes('storage/invalid-url') || message.toLowerCase().includes('bucket')) return `STORAGE_BUCKET_CONFIG_MISSING: Firebase Storage bucket/config is missing or invalid. ${message}`;
+    if (message.toLowerCase().includes('timed out')) return `NETWORK_TIMEOUT: ${message}`;
+    if (rawCode.includes('storage/retry-limit-exceeded') || rawCode.includes('storage/canceled')) return `NETWORK_TIMEOUT: Firebase Storage upload did not complete. ${message}`;
+    return `UNKNOWN_UPLOAD_ERROR: ${message}`;
+};
+
+const getAdminContentMaxBytes = (type: ProductFileType) => {
+    if (type === 'audio') return MAX_AUDIO_UPLOAD_BYTES;
+    if (type === 'video') return MAX_VIDEO_UPLOAD_BYTES;
+    if (type === 'pdf' || type === 'ebook') return MAX_DOCUMENT_UPLOAD_BYTES;
+    if (type === 'sheet') return MAX_SHEET_UPLOAD_BYTES;
+    return MAX_DOCUMENT_UPLOAD_BYTES;
+};
+
+const uploadAdminProductAsset = async (file: File, storagePath: string, logPrefix = 'ADMIN_CONTENT_UPLOAD') => {
+    const uploadUser = await ensureAdminUploadAuth();
+    console.info('ADMIN_UPLOAD_AUTH_CHECK', { authenticated: Boolean(uploadUser), uid: uploadUser?.uid || null });
+
+    const fileRef = ref(storage, storagePath);
+    const uploadTask = uploadBytesResumable(fileRef, file, {
         contentType: file.type || undefined,
         customMetadata: {
             originalName: file.name,
         },
+    });
+
+    await withAdminUploadTimeout(new Promise<void>((resolve, reject) => {
+        uploadTask.on('state_changed',
+            snapshot => {
+                const percent = snapshot.totalBytes ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
+                if (logPrefix === 'ADMIN_AUDIO_UPLOAD') {
+                    console.info('ADMIN_AUDIO_UPLOAD_PROGRESS', { storagePath, percent, bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
+                } else {
+                    console.info(`${logPrefix}_PROGRESS`, { storagePath, percent, bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
+                }
+            },
+            reject,
+            () => resolve()
+        );
     }), 'Firebase Storage upload');
 
-    return withAdminUploadTimeout(getDownloadURL(fileRef), 'Firebase Storage URL lookup');
+    const downloadUrl = await withAdminUploadTimeout(getDownloadURL(fileRef), 'Firebase Storage URL lookup');
+
+    if (logPrefix === 'ADMIN_AUDIO_UPLOAD') {
+        console.info('ADMIN_AUDIO_DOWNLOAD_URL_SUCCESS', { storagePath, url: downloadUrl });
+    }
+
+    return {
+        url: downloadUrl,
+        storagePath,
+        size: file.size,
+        contentType: file.type || 'application/octet-stream',
+    };
 };
 
-const uploadAdminContentOrInlineFallback = async (file: File, type: ProductFileType) => {
-    if (file.size <= MAX_FIRESTORE_INLINE_UPLOAD_BYTES) {
-        return readFileAsDataUrl(file);
+const uploadAdminContentFile = async (file: File, type: ProductFileType, productId: number | string) => {
+    const maxBytes = getAdminContentMaxBytes(type);
+
+    if (file.size > maxBytes) {
+        throw new Error(`FILE_TOO_LARGE: ${type} files must be ${Math.round(maxBytes / (1024 * 1024))}MB or smaller.`);
+    }
+
+    if (file.size <= MAX_FIRESTORE_INLINE_UPLOAD_BYTES && !['audio', 'video', 'pdf', 'ebook', 'sheet'].includes(type)) {
+        return {
+            url: await readFileAsDataUrl(file),
+            storagePath: undefined,
+            size: file.size,
+            contentType: file.type || 'application/octet-stream',
+        };
+    }
+
+    const storagePath = buildAdminContentStoragePath(file, type, productId);
+    const isAudio = type === 'audio';
+
+    if (isAudio) {
+        console.info('ADMIN_AUDIO_UPLOAD_STARTED', { productId, storagePath, fileName: file.name, size: file.size, contentType: file.type });
     }
 
     try {
-        return await uploadAdminProductAsset(file, buildAdminContentStoragePath(file, type));
+        const uploaded = await uploadAdminProductAsset(file, storagePath, isAudio ? 'ADMIN_AUDIO_UPLOAD' : 'ADMIN_CONTENT_UPLOAD');
+
+        if (isAudio) {
+            console.info('ADMIN_AUDIO_UPLOAD_SUCCESS', { productId, storagePath, size: file.size, contentType: file.type });
+        }
+
+        return uploaded;
     } catch (error) {
-        console.warn('Firebase Storage content upload failed for a large file.', error);
-        throw error;
+        const preciseError = classifyAdminUploadError(error);
+
+        if (isAudio) {
+            console.error('ADMIN_AUDIO_UPLOAD_FAILED', { productId, storagePath, fileName: file.name, size: file.size, error: preciseError });
+        }
+
+        throw new Error(preciseError);
     }
 };
 
@@ -488,7 +582,8 @@ const ContentComposer: React.FC<{
     onAdd: (file: Omit<ProductFile, 'id'>) => void;
     onClose: () => void;
     initialFile?: ProductFile | null;
-}> = ({ onAdd, onClose, initialFile = null }) => {
+    productId: number | string;
+}> = ({ onAdd, onClose, initialFile = null, productId }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
     const isEditing = Boolean(initialFile);
     const [uploadConfig, setUploadConfig] = useState<{ type: ProductFileType; accept: string } | null>(null);
@@ -554,20 +649,32 @@ const ContentComposer: React.FC<{
 
         if (!file || !selectedUploadConfig) return;
 
-        if (file.size > MAX_ADMIN_UPLOAD_BYTES) {
-            alert('This file is too large. Upload a file under 75MB or use an external hosted URL.');
+        const maxBytes = getAdminContentMaxBytes(selectedUploadConfig.type);
+
+        if (selectedUploadConfig.type === 'audio') {
+            console.info('ADMIN_AUDIO_UPLOAD_SELECTED', { productId, fileName: file.name, size: file.size, contentType: file.type });
+        }
+
+        if (file.size > maxBytes) {
+            alert(`${selectedUploadConfig.type} file is too large. Max allowed size is ${Math.round(maxBytes / (1024 * 1024))}MB.`);
             return;
         }
 
         setIsUploading(true);
 
         try {
-            const downloadUrl = await uploadAdminContentOrInlineFallback(file, selectedUploadConfig.type);
+            const uploaded = await uploadAdminContentFile(file, selectedUploadConfig.type, productId);
+            const now = Date.now();
 
             onAdd({
                 name: file.name,
                 type: selectedUploadConfig.type,
-                url: downloadUrl,
+                url: uploaded.url,
+                storagePath: uploaded.storagePath,
+                size: uploaded.size,
+                contentType: uploaded.contentType,
+                createdAt: now,
+                updatedAt: now,
                 content: '',
                 quiz: { questions: [] },
             });
@@ -575,7 +682,7 @@ const ContentComposer: React.FC<{
             onClose();
         } catch (error) {
             console.error('Admin content upload failed:', error);
-            alert('Large file upload failed. Please use an external hosted URL, or upload a smaller file under 700KB so it can be saved directly in the global product.');
+            alert(error instanceof Error ? error.message : 'UNKNOWN_UPLOAD_ERROR: File upload failed.');
         } finally {
             setIsUploading(false);
         }
@@ -789,7 +896,7 @@ const ContentComposer: React.FC<{
             )}
 
             <input ref={fileInputRef} type="file" accept={uploadConfig?.accept} onChange={handleFileSelected} className="hidden" />
-            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Adding content... Small files save directly in the global product; large files use hosted URLs.</p>}
+            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content... Audio/video/PDF files are added only after Firebase Storage returns a download URL.</p>}
         </div>
     );
 };
@@ -800,7 +907,8 @@ const ModuleEditor: React.FC<{
     level: number;
     onUpdate: (modules: CourseModule[]) => void;
     onAddChild: (parentId: string) => void;
-}> = ({ module, allModules, level, onUpdate, onAddChild }) => {
+    productId: number | string;
+}> = ({ module, allModules, level, onUpdate, onAddChild, productId }) => {
     const [isAddingContent, setIsAddingContent] = useState(false);
     const [editingFile, setEditingFile] = useState<ProductFile | null>(null);
     const files = module.files || [];
@@ -816,7 +924,8 @@ const ModuleEditor: React.FC<{
     };
 
     const handleAddContent = (fileData: Omit<ProductFile, 'id'>) => {
-        const newFile: ProductFile = { ...fileData, id: `file-${Date.now()}`, quiz: fileData.quiz || { questions: [] } };
+        const now = Date.now();
+        const newFile: ProductFile = { ...fileData, id: `file-${now}`, createdAt: fileData.createdAt || now, updatedAt: now, quiz: fileData.quiz || { questions: [] } };
         onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles => [...(currentFiles || []), newFile]));
         closeContentComposer();
     };
@@ -827,6 +936,8 @@ const ModuleEditor: React.FC<{
         const updatedFile: ProductFile = {
             ...fileData,
             id: editingFile.id,
+            createdAt: editingFile.createdAt || fileData.createdAt || Date.now(),
+            updatedAt: Date.now(),
             quiz: fileData.quiz || { questions: [] },
         };
 
@@ -885,13 +996,14 @@ const ModuleEditor: React.FC<{
                     onAdd={editingFile ? handleUpdateContent : handleAddContent}
                     onClose={closeContentComposer}
                     initialFile={editingFile}
+                    productId={productId}
                 />
             )}
 
             {childModules.length > 0 && (
                 <div className="mt-5 space-y-4 border-l border-white/50 pl-4">
                     {(childModules || []).map(child => (
-                        <ModuleEditor key={child.id} module={child} allModules={allModules} level={level + 1} onUpdate={onUpdate} onAddChild={onAddChild} />
+                        <ModuleEditor key={child.id} module={child} allModules={allModules} level={level + 1} onUpdate={onUpdate} onAddChild={onAddChild} productId={productId} />
                     ))}
                 </div>
             )}
@@ -917,6 +1029,7 @@ const ProductForm: React.FC<{
     const [isSavingProduct, setIsSavingProduct] = useState(false);
     const [isUploadingProductImage, setIsUploadingProductImage] = useState(false);
     const productImageInputRef = useRef<HTMLInputElement>(null);
+    const draftProductIdRef = useRef<number | string>(product?.id || `draft-${Date.now()}`);
 
     useEffect(() => {
         const regular = parseFloat(formData.price) || 0;
@@ -937,8 +1050,17 @@ const ProductForm: React.FC<{
 
         setIsUploadingProductImage(true);
 
+        const oversizedFile = files.find(file => file.size > MAX_PRODUCT_IMAGE_BYTES);
+        if (oversizedFile) {
+            alert('Product image is too large. Max allowed size is 8MB.');
+            return;
+        }
+
         try {
-            const uploadedUrls = await Promise.all(files.map(file => uploadAdminProductAsset(file, buildAdminImageStoragePath(file, 'gallery'))));
+            const uploadedUrls = await Promise.all(files.map(async file => {
+                const uploaded = await uploadAdminProductAsset(file, buildAdminImageStoragePath(file, 'gallery', draftProductIdRef.current), 'ADMIN_PRODUCT_IMAGE_UPLOAD');
+                return uploaded.url;
+            }));
             setImages(prev => [...(prev || []), ...uploadedUrls]);
         } catch (error) {
             console.error('Product image upload failed:', error);
@@ -964,9 +1086,14 @@ const ProductForm: React.FC<{
 
             setIsUploadingProductImage(true);
 
+            if (file.size > MAX_PRODUCT_IMAGE_BYTES) {
+                alert('Product image is too large. Max allowed size is 8MB.');
+                return;
+            }
+
             try {
-                const downloadUrl = await uploadAdminProductAsset(file, buildAdminImageStoragePath(file, slot));
-                setProductImages(prev => ({ ...prev, [slot]: downloadUrl }));
+                const uploaded = await uploadAdminProductAsset(file, buildAdminImageStoragePath(file, slot, draftProductIdRef.current), 'ADMIN_PRODUCT_IMAGE_UPLOAD');
+                setProductImages(prev => ({ ...prev, [slot]: uploaded.url }));
             } catch (error) {
                 console.error('Product slot image upload failed:', error);
                 alert('Product image upload failed. Please check Firebase Storage permissions and try again.');
@@ -1106,7 +1233,7 @@ const ProductForm: React.FC<{
                                 </div>
                                 <div className="space-y-5">
                                     {(modules || []).length > 0 ? (modules || []).map(module => (
-                                        <ModuleEditor key={module.id} module={module} allModules={modules || []} level={0} onUpdate={setModules} onAddChild={addChildModule} />
+                                        <ModuleEditor key={module.id} module={module} allModules={modules || []} level={0} onUpdate={setModules} onAddChild={addChildModule} productId={draftProductIdRef.current} />
                                     )) : (
                                         <button type="button" onClick={addRootModule} className="w-full rounded-[1.75rem] border border-dashed border-cyan-300/30 bg-cyan-400/5 p-10 text-center transition hover:bg-cyan-400/10">
                                             <span className="block text-4xl">🧱</span>
