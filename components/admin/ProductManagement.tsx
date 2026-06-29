@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { Coupon, CourseModule, Product, ProductFile, ProductFileType, ProductWithRating, ProductDocPage, QuizQuestion, User } from '../../App';
 import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
 import { PRODUCT_IMAGE_SLOTS, ProductImageSlot } from '../../utils/productImages';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { storage } from '../../firebase';
 
 type ProductViewState = 'list' | 'add' | 'edit';
 
@@ -180,6 +182,74 @@ const recursiveModuleUpdate = (
 const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
 const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
+
+const MAX_ADMIN_UPLOAD_BYTES = 75 * 1024 * 1024;
+const ADMIN_UPLOAD_TIMEOUT_MS = 20000;
+
+const sanitizeStorageName = (value: string) =>
+    value
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'file';
+
+const buildAdminContentStoragePath = (file: File, type: ProductFileType) => {
+    const extension = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
+    const safeName = sanitizeStorageName(file.name.replace(/\.[^/.]+$/, ''));
+    return `adminProductContent/${type}/${Date.now()}-${safeName}.${extension}`;
+};
+
+const buildAdminImageStoragePath = (file: File, scope: string) => {
+    const extension = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
+    const safeName = sanitizeStorageName(file.name.replace(/\.[^/.]+$/, ''));
+    return `adminProductImages/${scope}/${Date.now()}-${safeName}.${extension}`;
+};
+
+const withAdminUploadTimeout = async <T,>(operation: Promise<T>, label: string): Promise<T> => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        return await Promise.race([
+            operation,
+            new Promise<T>((_, reject) => {
+                timeoutId = setTimeout(() => reject(new Error(`${label} timed out. Check Firebase Storage auth/rules and network.`)), ADMIN_UPLOAD_TIMEOUT_MS);
+            }),
+        ]);
+    } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+    }
+};
+
+const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Could not read this file. Please try again.'));
+    reader.readAsDataURL(file);
+});
+
+const uploadAdminProductAsset = async (file: File, storagePath: string) => {
+    const fileRef = ref(storage, storagePath);
+
+    await withAdminUploadTimeout(uploadBytes(fileRef, file, {
+        contentType: file.type || undefined,
+        customMetadata: {
+            originalName: file.name,
+        },
+    }), 'Firebase Storage upload');
+
+    return withAdminUploadTimeout(getDownloadURL(fileRef), 'Firebase Storage URL lookup');
+};
+
+const uploadAdminContentOrInlineFallback = async (file: File, type: ProductFileType) => {
+    try {
+        return await uploadAdminProductAsset(file, buildAdminContentStoragePath(file, type));
+    } catch (error) {
+        console.warn('Firebase Storage content upload failed. Trying small-file inline fallback.', error);
+
+        return readFileAsDataUrl(file);
+    }
+};
 
 const editorCommands: Array<[string, string, string?]> = [
     ['bold', 'B'],
@@ -410,14 +480,24 @@ const AdminOpenDocsBuilder: React.FC<{
     );
 };
 
-const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void; onClose: () => void; }> = ({ onAdd, onClose }) => {
+const ContentComposer: React.FC<{
+    onAdd: (file: Omit<ProductFile, 'id'>) => void;
+    onClose: () => void;
+    initialFile?: ProductFile | null;
+}> = ({ onAdd, onClose, initialFile = null }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const isEditing = Boolean(initialFile);
     const [uploadConfig, setUploadConfig] = useState<{ type: ProductFileType; accept: string } | null>(null);
-    const [formState, setFormState] = useState<{ type: ProductFileType; url: string; name: string; content: string } | null>(null);
-    const [docPages, setDocPages] = useState<ProductDocPage[]>([]);
-    const [activeDocPageId, setActiveDocPageId] = useState('');
+    const [formState, setFormState] = useState<{ type: ProductFileType; url: string; name: string; content: string } | null>(() => initialFile ? {
+        type: initialFile.type,
+        url: initialFile.url || '',
+        name: initialFile.name || 'Learning Resource',
+        content: initialFile.content || '',
+    } : null);
+    const [docPages, setDocPages] = useState<ProductDocPage[]>(() => initialFile?.type === 'doc' ? (normaliseDocPages(initialFile) || []) : []);
+    const [activeDocPageId, setActiveDocPageId] = useState(() => initialFile?.type === 'doc' ? (normaliseDocPages(initialFile)?.[0]?.id || '') : '');
     const [docError, setDocError] = useState('');
-    const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
+    const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(() => initialFile?.quiz?.questions?.length ? normaliseQuizQuestions(initialFile.quiz.questions) : [{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
     const [isUploading, setIsUploading] = useState(false);
     const quizListRef = useRef<HTMLDivElement>(null);
     const previousQuizQuestionCountRef = useRef(quizQuestions.length);
@@ -461,30 +541,40 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
         }
     };
 
-    const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (!file || !uploadConfig) return;
+        const selectedUploadConfig = uploadConfig;
 
-        setIsUploading(true);
-        const reader = new FileReader();
-
-        reader.onload = readerEvent => {
-            if (readerEvent.target?.result) {
-                onAdd({
-                    name: file.name,
-                    type: uploadConfig.type,
-                    url: readerEvent.target.result as string,
-                    content: '',
-                    quiz: { questions: [] },
-                });
-                setIsUploading(false);
-                onClose();
-            }
-        };
-
-        reader.readAsDataURL(file);
         event.target.value = '';
         setUploadConfig(null);
+
+        if (!file || !selectedUploadConfig) return;
+
+        if (file.size > MAX_ADMIN_UPLOAD_BYTES) {
+            alert('This file is too large. Upload a file under 75MB or use an external hosted URL.');
+            return;
+        }
+
+        setIsUploading(true);
+
+        try {
+            const downloadUrl = await uploadAdminContentOrInlineFallback(file, selectedUploadConfig.type);
+
+            onAdd({
+                name: file.name,
+                type: selectedUploadConfig.type,
+                url: downloadUrl,
+                content: '',
+                quiz: { questions: [] },
+            });
+
+            onClose();
+        } catch (error) {
+            console.error('Admin content upload failed:', error);
+            alert('File upload failed. Please check Firebase Storage rules/auth or use an external hosted URL.');
+        } finally {
+            setIsUploading(false);
+        }
     };
 
     const updateQuizQuestion = (questionIndex: number, updater: (question: QuizQuestion) => QuizQuestion) => {
@@ -573,7 +663,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
             <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
                     <p className="text-xs font-black uppercase tracking-[0.24em] text-cyan-700">Content Studio</p>
-                    <h4 className="text-xl font-black text-slate-900">Add learning content</h4>
+                    <h4 className="text-xl font-black text-slate-900">{isEditing ? 'Edit learning content' : 'Add learning content'}</h4>
                 </div>
                 <button type="button" onClick={onClose} className="rounded-full border border-white/50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-white/80 hover:shadow-sm">
                     Close
@@ -687,7 +777,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                                 Back
                             </button>
                             <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-600 px-6 py-3 font-black text-white shadow-sm hover:bg-cyan-700">
-                                Add Content
+                                {isEditing ? 'Save Content' : 'Add Content'}
                             </button>
                         </div>
                     </div>
@@ -695,7 +785,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
             )}
 
             <input ref={fileInputRef} type="file" accept={uploadConfig?.accept} onChange={handleFileSelected} className="hidden" />
-            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content...</p>}
+            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content to Firebase Storage... If Storage is blocked, this file will be added inline automatically.</p>}
         </div>
     );
 };
@@ -708,6 +798,7 @@ const ModuleEditor: React.FC<{
     onAddChild: (parentId: string) => void;
 }> = ({ module, allModules, level, onUpdate, onAddChild }) => {
     const [isAddingContent, setIsAddingContent] = useState(false);
+    const [editingFile, setEditingFile] = useState<ProductFile | null>(null);
     const files = module.files || [];
     const childModules = module.modules || [];
 
@@ -715,10 +806,37 @@ const ModuleEditor: React.FC<{
         onUpdate(recursiveModuleUpdate(allModules || [], module.id, updater));
     };
 
+    const closeContentComposer = () => {
+        setIsAddingContent(false);
+        setEditingFile(null);
+    };
+
     const handleAddContent = (fileData: Omit<ProductFile, 'id'>) => {
         const newFile: ProductFile = { ...fileData, id: `file-${Date.now()}`, quiz: fileData.quiz || { questions: [] } };
         onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles => [...(currentFiles || []), newFile]));
-        setIsAddingContent(false);
+        closeContentComposer();
+    };
+
+    const handleUpdateContent = (fileData: Omit<ProductFile, 'id'>) => {
+        if (!editingFile) return;
+
+        const updatedFile: ProductFile = {
+            ...fileData,
+            id: editingFile.id,
+            quiz: fileData.quiz || { questions: [] },
+        };
+
+        onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles =>
+            (currentFiles || []).map(file => file.id === editingFile.id ? updatedFile : file)
+        ));
+
+        closeContentComposer();
+    };
+
+    const handleDeleteContent = (fileId: string) => {
+        onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles =>
+            (currentFiles || []).filter(file => file.id !== fileId)
+        ));
     };
 
     return (
@@ -741,12 +859,30 @@ const ModuleEditor: React.FC<{
                             <p className="font-black text-slate-900">{file.name}</p>
                             <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">{file.type}{file.quiz?.questions?.length ? ` • ${file.quiz.questions.length} questions` : ''}</p>
                         </div>
-                        <button type="button" onClick={() => onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles => (currentFiles || []).filter(item => item.id !== file.id)))} className="self-start rounded-xl border border-red-400/30 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-500/10 sm:self-auto">Remove</button>
+                        <div className="flex gap-2 self-start sm:self-auto">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setEditingFile(file);
+                                    setIsAddingContent(false);
+                                }}
+                                className="rounded-xl border border-cyan-300/30 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-400/10"
+                            >
+                                Edit
+                            </button>
+                            <button type="button" onClick={() => handleDeleteContent(file.id)} className="rounded-xl border border-red-400/30 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-500/10">Remove</button>
+                        </div>
                     </div>
                 )) : <p className="rounded-2xl border border-dashed border-white/50 p-4 text-sm text-slate-600">No content yet. Add videos, PDFs, Open Docs, quizzes, and resource links here.</p>}
             </div>
 
-            {isAddingContent && <ContentComposer onAdd={handleAddContent} onClose={() => setIsAddingContent(false)} />}
+            {(isAddingContent || editingFile) && (
+                <ContentComposer
+                    onAdd={editingFile ? handleUpdateContent : handleAddContent}
+                    onClose={closeContentComposer}
+                    initialFile={editingFile}
+                />
+            )}
 
             {childModules.length > 0 && (
                 <div className="mt-5 space-y-4 border-l border-white/50 pl-4">
@@ -763,7 +899,7 @@ const ProductForm: React.FC<{
     mode: 'add' | 'edit';
     product?: ProductWithRating | null;
     coupons: Coupon[];
-    onSave: (product: Omit<Product, 'id'>) => void;
+    onSave: (product: Omit<Product, 'id'>) => Promise<boolean>;
     onCancel: () => void;
 }> = ({ mode, product, coupons, onSave, onCancel }) => {
     const [formData, setFormData] = useState<ProductFormData>(() => createEmptyProductForm(product));
@@ -774,6 +910,8 @@ const ProductForm: React.FC<{
     const [imageMode, setImageMode] = useState<'upload' | 'ai'>('upload');
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [discountPercent, setDiscountPercent] = useState(0);
+    const [isSavingProduct, setIsSavingProduct] = useState(false);
+    const [isUploadingProductImage, setIsUploadingProductImage] = useState(false);
     const productImageInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -788,14 +926,22 @@ const ProductForm: React.FC<{
         }
     }, [formData.isFree]);
 
-    const handleProductImagesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleProductImagesUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const files: File[] = event.currentTarget.files ? Array.from(event.currentTarget.files) as File[] : [];
-        files.forEach(file => {
-            const reader = new FileReader();
-            reader.onload = () => setImages(prev => [...(prev || []), reader.result as string]);
-            reader.readAsDataURL(file);
-        });
         event.target.value = '';
+        if (!files.length) return;
+
+        setIsUploadingProductImage(true);
+
+        try {
+            const uploadedUrls = await Promise.all(files.map(file => uploadAdminProductAsset(file, buildAdminImageStoragePath(file, 'gallery'))));
+            setImages(prev => [...(prev || []), ...uploadedUrls]);
+        } catch (error) {
+            console.error('Product image upload failed:', error);
+            alert('Product image upload failed. Please check Firebase Storage permissions and try again.');
+        } finally {
+            setIsUploadingProductImage(false);
+        }
     };
 
 
@@ -804,16 +950,25 @@ const ProductForm: React.FC<{
         const config = PRODUCT_IMAGE_SLOTS[slot];
         const objectUrl = URL.createObjectURL(file);
         const image = new Image();
-        image.onload = () => {
+        image.onload = async () => {
             URL.revokeObjectURL(objectUrl);
             const uploadedRatio = image.naturalWidth / image.naturalHeight;
             if (Math.abs(uploadedRatio - config.ratioValue) / config.ratioValue > 0.01) {
                 alert(`This image is not the required ${config.ratio} ratio. Upload ${config.recommendedSize} for best result.`);
                 return;
             }
-            const reader = new FileReader();
-            reader.onload = () => setProductImages(prev => ({ ...prev, [slot]: reader.result as string }));
-            reader.readAsDataURL(file);
+
+            setIsUploadingProductImage(true);
+
+            try {
+                const downloadUrl = await uploadAdminProductAsset(file, buildAdminImageStoragePath(file, slot));
+                setProductImages(prev => ({ ...prev, [slot]: downloadUrl }));
+            } catch (error) {
+                console.error('Product slot image upload failed:', error);
+                alert('Product image upload failed. Please check Firebase Storage permissions and try again.');
+            } finally {
+                setIsUploadingProductImage(false);
+            }
         };
         image.onerror = () => {
             URL.revokeObjectURL(objectUrl);
@@ -843,8 +998,9 @@ const ProductForm: React.FC<{
         setModules(prev => recursiveModuleUpdate(prev || [], parentId, module => ({ ...module, modules: [...(module.modules || []), child] })));
     };
 
-    const handleSubmit = (event: React.FormEvent) => {
+    const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (isSavingProduct) return;
         const resolvedPaymentLink = formData.paymentLink.trim() || product?.paymentLink?.trim() || DEFAULT_PRODUCT_PAYMENT_LINK;
 
         const features = ((formData.featuresText || '').split('\n') || []).map(item => item.trim()).filter(Boolean);
@@ -852,7 +1008,9 @@ const ProductForm: React.FC<{
         const formattedPrice = formData.price ? `₹${formData.price}` : '₹0';
         const formattedSalePrice = formData.salePrice ? `₹${formData.salePrice}` : undefined;
 
-        onSave({
+        setIsSavingProduct(true);
+
+        const saved = await onSave({
             imageSeed: formData.imageSeed || formData.title || `product-${Date.now()}`,
             images: images || [],
             productImages,
@@ -882,6 +1040,10 @@ const ProductForm: React.FC<{
             wishlistCount: product?.wishlistCount,
             viewCount: product?.viewCount,
         });
+
+        if (!saved) {
+            setIsSavingProduct(false);
+        }
     };
 
     return (
@@ -1008,7 +1170,7 @@ const ProductForm: React.FC<{
                                 </div>
                                 <div className="mt-4">
                                     {imageMode === 'upload' ? (
-                                        <button type="button" onClick={() => productImageInputRef.current?.click()} className="w-full rounded-3xl border border-dashed border-cyan-300/40 bg-cyan-400/5 p-8 text-center font-black text-cyan-700 hover:bg-cyan-400/10">Upload product images</button>
+                                        <button type="button" onClick={() => productImageInputRef.current?.click()} disabled={isUploadingProductImage} className="w-full rounded-3xl border border-dashed border-cyan-300/40 bg-cyan-400/5 p-8 text-center font-black text-cyan-700 hover:bg-cyan-400/10 disabled:opacity-60">{isUploadingProductImage ? 'Uploading images to Firebase...' : 'Upload product images'}</button>
                                     ) : (
                                         <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-3xl border border-dashed border-purple-300/40 bg-purple-400/5 p-8 text-center font-black text-purple-700 hover:bg-purple-400/10 disabled:opacity-60">{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</button>
                                     )}
@@ -1034,7 +1196,7 @@ const ProductForm: React.FC<{
                                                 <div className={`mt-3 ${config.aspectClass} overflow-hidden rounded-xl bg-slate-100`}>
                                                     {productImages[slot] ? <img src={productImages[slot]} alt={config.label} className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-xs font-black text-slate-400">No {config.ratio} image</div>}
                                                 </div>
-                                                <button type="button" onClick={() => slotInputRefs.current[slot]?.click()} className="mt-3 w-full rounded-xl border border-dashed border-cyan-300 px-3 py-2 text-xs font-black text-cyan-700">Upload / Replace {config.ratio}</button>
+                                                <button type="button" onClick={() => slotInputRefs.current[slot]?.click()} disabled={isUploadingProductImage} className="mt-3 w-full rounded-xl border border-dashed border-cyan-300 px-3 py-2 text-xs font-black text-cyan-700 disabled:opacity-60">Upload / Replace {config.ratio}</button>
                                                 <input ref={node => { slotInputRefs.current[slot] = node; }} type="file" accept="image/*" className="hidden" onChange={event => { handleSlotImageUpload(slot, event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />
                                             </div>;
                                         })}
@@ -1052,7 +1214,7 @@ const ProductForm: React.FC<{
                             <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-400">Ready to publish</p>
                             <p className="mt-1 text-sm font-semibold text-slate-600">Review all product details above, then save your changes.</p>
                         </div>
-                        <button type="submit" className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-400 px-7 py-4 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition hover:-translate-y-0.5 hover:shadow-sm sm:w-auto sm:min-w-48">{mode === 'add' ? 'Save Product' : 'Update Product'}</button>
+                        <button type="submit" disabled={isSavingProduct || isUploadingProductImage} className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-400 px-7 py-4 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition hover:-translate-y-0.5 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-48">{isSavingProduct ? 'Saving to Firebase...' : mode === 'add' ? 'Save Product' : 'Update Product'}</button>
                     </div>
                 </footer>
             </form>
@@ -1064,9 +1226,9 @@ const ProductManagement: React.FC<{
     products: ProductWithRating[];
     users: User[];
     coupons: Coupon[];
-    onAddProduct: (product: Omit<Product, 'id'>) => void;
-    onUpdateProduct: (product: Product) => void;
-    onDeleteProduct: (id: number) => void;
+    onAddProduct: (product: Omit<Product, 'id'>) => Promise<boolean>;
+    onUpdateProduct: (product: Product) => Promise<boolean>;
+    onDeleteProduct: (id: number) => Promise<boolean>;
 }> = ({ products, users, coupons, onAddProduct, onUpdateProduct, onDeleteProduct }) => {
     const [viewState, setViewState] = useState<ProductViewState>('list');
     const [editingProduct, setEditingProduct] = useState<ProductWithRating | null>(null);
@@ -1091,7 +1253,7 @@ const ProductManagement: React.FC<{
         setViewState('edit');
     };
 
-    const handleSave = (productData: Omit<Product, 'id'>) => {
+    const handleSave = async (productData: Omit<Product, 'id'>): Promise<boolean> => {
         const safeProductData: Omit<Product, 'id'> = {
             ...productData,
             ...emptyArrays,
@@ -1104,15 +1266,19 @@ const ProductManagement: React.FC<{
             priceHistory: productData.priceHistory || [],
         };
 
-        if (editingProduct && viewState === 'edit') {
-            onUpdateProduct({ ...safeProductData, id: editingProduct.id });
-        } else {
-            onAddProduct(safeProductData);
+        const saved = editingProduct && viewState === 'edit'
+            ? await onUpdateProduct({ ...safeProductData, id: editingProduct.id })
+            : await onAddProduct(safeProductData);
+
+        if (!saved) return false;
+
+        if (!editingProduct || viewState !== 'edit') {
             setNewProductForEmail({ ...safeProductData, id: Date.now(), rating: 0, reviewCount: 0, calculatedRating: 0 });
         }
 
         setEditingProduct(null);
         setViewState('list');
+        return true;
     };
 
     if (viewState !== 'list') {

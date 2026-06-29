@@ -6,25 +6,34 @@ service firebase.storage {
       return request.auth != null;
     }
 
+    function isAdmin() {
+      return signedIn()
+        && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'];
+    }
+
     function isPrivateChatParticipant(chatId) {
       return signedIn()
         && firestore.exists(/databases/(default)/documents/private_chats/$(chatId))
         && firestore.get(/databases/(default)/documents/private_chats/$(chatId)).data.participantMap[request.auth.uid] == true;
     }
 
+    match /adminProductContent/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.resource.size < 75 * 1024 * 1024;
+    }
+
+    match /adminProductImages/{allPaths=**} {
+      allow read: if true;
+      allow write: if request.resource.size < 10 * 1024 * 1024
+        && request.resource.contentType.matches('image/.*');
+    }
+
     match /privateChats/{chatId}/{messageId}/{fileName} {
       allow read: if isPrivateChatParticipant(chatId);
       allow write: if isPrivateChatParticipant(chatId)
-        && (
-          (
-            request.resource.size < 3 * 1024 * 1024
-            && request.resource.contentType.matches('image/.*')
-          )
-          || (
-            fileName == 'message.json'
-            && request.resource.size < 128 * 1024
-          )
-        );
+        && fileName == 'message.json'
+        && request.resource.size < 128 * 1024;
       allow delete: if isPrivateChatParticipant(chatId);
     }
 
@@ -33,7 +42,7 @@ service firebase.storage {
     }
 
     match /{allPaths=**} {
-      allow read, write: if signedIn();
+      allow read, write: if isAdmin();
     }
   }
 }
