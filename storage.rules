@@ -20,14 +20,12 @@ service firebase.storage {
 
     match /adminProductContent/{allPaths=**} {
       allow read: if true;
-      allow write: if signedIn()
-        && request.resource.size < 75 * 1024 * 1024;
+      allow write: if request.resource.size < 75 * 1024 * 1024;
     }
 
     match /adminProductImages/{allPaths=**} {
       allow read: if true;
-      allow write: if signedIn()
-        && request.resource.size < 10 * 1024 * 1024
+      allow write: if request.resource.size < 10 * 1024 * 1024
         && request.resource.contentType.matches('image/.*');
     }
 

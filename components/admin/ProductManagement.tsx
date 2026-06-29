@@ -184,7 +184,6 @@ const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 p
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
 
 const MAX_ADMIN_UPLOAD_BYTES = 75 * 1024 * 1024;
-const MAX_FIRESTORE_INLINE_UPLOAD_BYTES = 650 * 1024;
 const ADMIN_UPLOAD_TIMEOUT_MS = 20000;
 
 const sanitizeStorageName = (value: string) =>
@@ -247,10 +246,6 @@ const uploadAdminContentOrInlineFallback = async (file: File, type: ProductFileT
         return await uploadAdminProductAsset(file, buildAdminContentStoragePath(file, type));
     } catch (error) {
         console.warn('Firebase Storage content upload failed. Trying small-file inline fallback.', error);
-
-        if (file.size > MAX_FIRESTORE_INLINE_UPLOAD_BYTES) {
-            throw error;
-        }
 
         return readFileAsDataUrl(file);
     }
@@ -576,7 +571,7 @@ const ContentComposer: React.FC<{
             onClose();
         } catch (error) {
             console.error('Admin content upload failed:', error);
-            alert('File upload failed. Please check Firebase Storage rules/auth. If Storage is unavailable, use an external hosted URL or a file under 650KB for emergency inline fallback.');
+            alert('File upload failed. Please check Firebase Storage rules/auth or use an external hosted URL.');
         } finally {
             setIsUploading(false);
         }
@@ -790,7 +785,7 @@ const ContentComposer: React.FC<{
             )}
 
             <input ref={fileInputRef} type="file" accept={uploadConfig?.accept} onChange={handleFileSelected} className="hidden" />
-            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content to Firebase Storage... If Storage is blocked, small files are added inline automatically.</p>}
+            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content to Firebase Storage... If Storage is blocked, this file will be added inline automatically.</p>}
         </div>
     );
 };
