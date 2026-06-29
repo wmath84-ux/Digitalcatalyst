@@ -133,21 +133,7 @@ const safeSetItem = (key: string, value: any): boolean => {
             err?.code === 22;
 
         if (isQuotaError) {
-            console.warn(`Browser storage is full for "${key}". Firebase sync will still be attempted.`);
-
-            if (typeof window !== 'undefined' && !(window as any).__eduvoraStorageFullWarned) {
-                (window as any).__eduvoraStorageFullWarned = true;
-                alert(
-                    `⚠️ Browser storage is full.
-
-Your product changes will still be saved to Firebase when the Firebase write succeeds.
-
-To avoid this again:
-1. Do not store audio/video/PDF as base64.
-2. Upload files to Firebase Storage and save only their URLs.
-3. Use image URLs or compressed images for thumbnails.`
-                );
-            }
+            console.warn(`Browser storage is full for "${key}". Firebase sync will still be attempted. Large admin assets should use Firebase Storage URLs instead of base64.`);
         }
 
         return false;
@@ -3677,7 +3663,7 @@ const App: React.FC = () => {
   };
 
   // Product CRUD is Firebase-first. Local cache is only a fallback mirror.
-  const handleAddProduct = async (product: Omit<Product, 'id'>) => {
+  const handleAddProduct = async (product: Omit<Product, 'id'>): Promise<boolean> => {
       const productWithId = normalizeProductArrays({
           ...product,
           id: Date.now(),
@@ -3690,13 +3676,15 @@ const App: React.FC = () => {
 
           setProducts(updatedProducts);
           persistProductsLocalFallback(updatedProducts);
+          return true;
       } catch (e) {
           console.error('Firebase product add failed:', e);
           alert('Product was not saved to Firebase. Please check Firebase admin permission/rules and try again.');
+          return false;
       }
   };
 
-  const handleUpdateProduct = async (updatedProduct: Product) => {
+  const handleUpdateProduct = async (updatedProduct: Product): Promise<boolean> => {
       try {
           const savedProduct = await publishProductToFirebase(updatedProduct);
           const updatedProducts = upsertProductList(products, savedProduct);
@@ -3709,13 +3697,15 @@ const App: React.FC = () => {
                   ? { ...savedProduct, rating: current.rating, reviewCount: current.reviewCount, calculatedRating: current.calculatedRating }
                   : current
           );
+          return true;
       } catch (e) {
           console.error('Firebase product update failed:', e);
           alert('Product update was not saved to Firebase. Please check Firebase admin permission/rules and try again.');
+          return false;
       }
   };
 
-  const handleDeleteProduct = async (productId: number) => {
+  const handleDeleteProduct = async (productId: number): Promise<boolean> => {
       try {
           await deleteDoc(doc(db, GLOBAL_PRODUCTS_COLLECTION, String(productId)));
 
@@ -3730,9 +3720,11 @@ const App: React.FC = () => {
 
           void setDoc(doc(db, ...GLOBAL_REVIEWS_DOC), { reviews: stripUndefinedDeep(updatedReviews) }, { merge: true })
               .catch(error => logGlobalSyncWarning('Reviews cleanup', error));
+          return true;
       } catch (e) {
           console.error('Firebase product delete failed:', e);
           alert('Product was not deleted from Firebase. Please check Firebase admin permission/rules and try again.');
+          return false;
       }
   };
   

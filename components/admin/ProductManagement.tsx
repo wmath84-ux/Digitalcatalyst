@@ -199,6 +199,25 @@ const buildAdminContentStoragePath = (file: File, type: ProductFileType) => {
     return `adminProductContent/${type}/${Date.now()}-${safeName}.${extension}`;
 };
 
+const buildAdminImageStoragePath = (file: File, scope: string) => {
+    const extension = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
+    const safeName = sanitizeStorageName(file.name.replace(/\.[^/.]+$/, ''));
+    return `adminProductImages/${scope}/${Date.now()}-${safeName}.${extension}`;
+};
+
+const uploadAdminProductAsset = async (file: File, storagePath: string) => {
+    const fileRef = ref(storage, storagePath);
+
+    await uploadBytes(fileRef, file, {
+        contentType: file.type || undefined,
+        customMetadata: {
+            originalName: file.name,
+        },
+    });
+
+    return getDownloadURL(fileRef);
+};
+
 const editorCommands: Array<[string, string, string?]> = [
     ['bold', 'B'],
     ['italic', 'I'],
@@ -744,7 +763,7 @@ const ContentComposer: React.FC<{
             )}
 
             <input ref={fileInputRef} type="file" accept={uploadConfig?.accept} onChange={handleFileSelected} className="hidden" />
-            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content...</p>}
+            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content to Firebase Storage...</p>}
         </div>
     );
 };
@@ -858,7 +877,7 @@ const ProductForm: React.FC<{
     mode: 'add' | 'edit';
     product?: ProductWithRating | null;
     coupons: Coupon[];
-    onSave: (product: Omit<Product, 'id'>) => void;
+    onSave: (product: Omit<Product, 'id'>) => Promise<boolean>;
     onCancel: () => void;
 }> = ({ mode, product, coupons, onSave, onCancel }) => {
     const [formData, setFormData] = useState<ProductFormData>(() => createEmptyProductForm(product));
@@ -869,6 +888,8 @@ const ProductForm: React.FC<{
     const [imageMode, setImageMode] = useState<'upload' | 'ai'>('upload');
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [discountPercent, setDiscountPercent] = useState(0);
+    const [isSavingProduct, setIsSavingProduct] = useState(false);
+    const [isUploadingProductImage, setIsUploadingProductImage] = useState(false);
     const productImageInputRef = useRef<HTMLInputElement>(null);
 
     useEffect(() => {
@@ -883,14 +904,22 @@ const ProductForm: React.FC<{
         }
     }, [formData.isFree]);
 
-    const handleProductImagesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleProductImagesUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const files: File[] = event.currentTarget.files ? Array.from(event.currentTarget.files) as File[] : [];
-        files.forEach(file => {
-            const reader = new FileReader();
-            reader.onload = () => setImages(prev => [...(prev || []), reader.result as string]);
-            reader.readAsDataURL(file);
-        });
         event.target.value = '';
+        if (!files.length) return;
+
+        setIsUploadingProductImage(true);
+
+        try {
+            const uploadedUrls = await Promise.all(files.map(file => uploadAdminProductAsset(file, buildAdminImageStoragePath(file, 'gallery'))));
+            setImages(prev => [...(prev || []), ...uploadedUrls]);
+        } catch (error) {
+            console.error('Product image upload failed:', error);
+            alert('Product image upload failed. Please check Firebase Storage permissions and try again.');
+        } finally {
+            setIsUploadingProductImage(false);
+        }
     };
 
 
@@ -899,16 +928,25 @@ const ProductForm: React.FC<{
         const config = PRODUCT_IMAGE_SLOTS[slot];
         const objectUrl = URL.createObjectURL(file);
         const image = new Image();
-        image.onload = () => {
+        image.onload = async () => {
             URL.revokeObjectURL(objectUrl);
             const uploadedRatio = image.naturalWidth / image.naturalHeight;
             if (Math.abs(uploadedRatio - config.ratioValue) / config.ratioValue > 0.01) {
                 alert(`This image is not the required ${config.ratio} ratio. Upload ${config.recommendedSize} for best result.`);
                 return;
             }
-            const reader = new FileReader();
-            reader.onload = () => setProductImages(prev => ({ ...prev, [slot]: reader.result as string }));
-            reader.readAsDataURL(file);
+
+            setIsUploadingProductImage(true);
+
+            try {
+                const downloadUrl = await uploadAdminProductAsset(file, buildAdminImageStoragePath(file, slot));
+                setProductImages(prev => ({ ...prev, [slot]: downloadUrl }));
+            } catch (error) {
+                console.error('Product slot image upload failed:', error);
+                alert('Product image upload failed. Please check Firebase Storage permissions and try again.');
+            } finally {
+                setIsUploadingProductImage(false);
+            }
         };
         image.onerror = () => {
             URL.revokeObjectURL(objectUrl);
@@ -938,8 +976,9 @@ const ProductForm: React.FC<{
         setModules(prev => recursiveModuleUpdate(prev || [], parentId, module => ({ ...module, modules: [...(module.modules || []), child] })));
     };
 
-    const handleSubmit = (event: React.FormEvent) => {
+    const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (isSavingProduct) return;
         const resolvedPaymentLink = formData.paymentLink.trim() || product?.paymentLink?.trim() || DEFAULT_PRODUCT_PAYMENT_LINK;
 
         const features = ((formData.featuresText || '').split('\n') || []).map(item => item.trim()).filter(Boolean);
@@ -947,7 +986,9 @@ const ProductForm: React.FC<{
         const formattedPrice = formData.price ? `₹${formData.price}` : '₹0';
         const formattedSalePrice = formData.salePrice ? `₹${formData.salePrice}` : undefined;
 
-        onSave({
+        setIsSavingProduct(true);
+
+        const saved = await onSave({
             imageSeed: formData.imageSeed || formData.title || `product-${Date.now()}`,
             images: images || [],
             productImages,
@@ -977,6 +1018,10 @@ const ProductForm: React.FC<{
             wishlistCount: product?.wishlistCount,
             viewCount: product?.viewCount,
         });
+
+        if (!saved) {
+            setIsSavingProduct(false);
+        }
     };
 
     return (
@@ -1103,7 +1148,7 @@ const ProductForm: React.FC<{
                                 </div>
                                 <div className="mt-4">
                                     {imageMode === 'upload' ? (
-                                        <button type="button" onClick={() => productImageInputRef.current?.click()} className="w-full rounded-3xl border border-dashed border-cyan-300/40 bg-cyan-400/5 p-8 text-center font-black text-cyan-700 hover:bg-cyan-400/10">Upload product images</button>
+                                        <button type="button" onClick={() => productImageInputRef.current?.click()} disabled={isUploadingProductImage} className="w-full rounded-3xl border border-dashed border-cyan-300/40 bg-cyan-400/5 p-8 text-center font-black text-cyan-700 hover:bg-cyan-400/10 disabled:opacity-60">{isUploadingProductImage ? 'Uploading images to Firebase...' : 'Upload product images'}</button>
                                     ) : (
                                         <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-3xl border border-dashed border-purple-300/40 bg-purple-400/5 p-8 text-center font-black text-purple-700 hover:bg-purple-400/10 disabled:opacity-60">{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</button>
                                     )}
@@ -1129,7 +1174,7 @@ const ProductForm: React.FC<{
                                                 <div className={`mt-3 ${config.aspectClass} overflow-hidden rounded-xl bg-slate-100`}>
                                                     {productImages[slot] ? <img src={productImages[slot]} alt={config.label} className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-xs font-black text-slate-400">No {config.ratio} image</div>}
                                                 </div>
-                                                <button type="button" onClick={() => slotInputRefs.current[slot]?.click()} className="mt-3 w-full rounded-xl border border-dashed border-cyan-300 px-3 py-2 text-xs font-black text-cyan-700">Upload / Replace {config.ratio}</button>
+                                                <button type="button" onClick={() => slotInputRefs.current[slot]?.click()} disabled={isUploadingProductImage} className="mt-3 w-full rounded-xl border border-dashed border-cyan-300 px-3 py-2 text-xs font-black text-cyan-700 disabled:opacity-60">Upload / Replace {config.ratio}</button>
                                                 <input ref={node => { slotInputRefs.current[slot] = node; }} type="file" accept="image/*" className="hidden" onChange={event => { handleSlotImageUpload(slot, event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />
                                             </div>;
                                         })}
@@ -1147,7 +1192,7 @@ const ProductForm: React.FC<{
                             <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-400">Ready to publish</p>
                             <p className="mt-1 text-sm font-semibold text-slate-600">Review all product details above, then save your changes.</p>
                         </div>
-                        <button type="submit" className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-400 px-7 py-4 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition hover:-translate-y-0.5 hover:shadow-sm sm:w-auto sm:min-w-48">{mode === 'add' ? 'Save Product' : 'Update Product'}</button>
+                        <button type="submit" disabled={isSavingProduct || isUploadingProductImage} className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-400 px-7 py-4 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition hover:-translate-y-0.5 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-48">{isSavingProduct ? 'Saving to Firebase...' : mode === 'add' ? 'Save Product' : 'Update Product'}</button>
                     </div>
                 </footer>
             </form>
@@ -1159,9 +1204,9 @@ const ProductManagement: React.FC<{
     products: ProductWithRating[];
     users: User[];
     coupons: Coupon[];
-    onAddProduct: (product: Omit<Product, 'id'>) => void;
-    onUpdateProduct: (product: Product) => void;
-    onDeleteProduct: (id: number) => void;
+    onAddProduct: (product: Omit<Product, 'id'>) => Promise<boolean>;
+    onUpdateProduct: (product: Product) => Promise<boolean>;
+    onDeleteProduct: (id: number) => Promise<boolean>;
 }> = ({ products, users, coupons, onAddProduct, onUpdateProduct, onDeleteProduct }) => {
     const [viewState, setViewState] = useState<ProductViewState>('list');
     const [editingProduct, setEditingProduct] = useState<ProductWithRating | null>(null);
@@ -1186,7 +1231,7 @@ const ProductManagement: React.FC<{
         setViewState('edit');
     };
 
-    const handleSave = (productData: Omit<Product, 'id'>) => {
+    const handleSave = async (productData: Omit<Product, 'id'>): Promise<boolean> => {
         const safeProductData: Omit<Product, 'id'> = {
             ...productData,
             ...emptyArrays,
@@ -1199,15 +1244,19 @@ const ProductManagement: React.FC<{
             priceHistory: productData.priceHistory || [],
         };
 
-        if (editingProduct && viewState === 'edit') {
-            onUpdateProduct({ ...safeProductData, id: editingProduct.id });
-        } else {
-            onAddProduct(safeProductData);
+        const saved = editingProduct && viewState === 'edit'
+            ? await onUpdateProduct({ ...safeProductData, id: editingProduct.id })
+            : await onAddProduct(safeProductData);
+
+        if (!saved) return false;
+
+        if (!editingProduct || viewState !== 'edit') {
             setNewProductForEmail({ ...safeProductData, id: Date.now(), rating: 0, reviewCount: 0, calculatedRating: 0 });
         }
 
         setEditingProduct(null);
         setViewState('list');
+        return true;
     };
 
     if (viewState !== 'list') {
