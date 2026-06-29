@@ -190,7 +190,6 @@ const MAX_DOCUMENT_UPLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_SHEET_UPLOAD_BYTES = 10 * 1024 * 1024;
 const MAX_PRODUCT_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_FIRESTORE_INLINE_UPLOAD_BYTES = 700 * 1024;
-const ADMIN_UPLOAD_TIMEOUT_MS = 20000;
 
 const sanitizeStorageName = (value: string) =>
     value
@@ -210,21 +209,6 @@ const buildAdminImageStoragePath = (file: File, scope: string, productId: number
     const extension = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
     const safeName = sanitizeStorageName(file.name.replace(/\.[^/.]+$/, ''));
     return `adminProductImages/${productId}/${scope}/${Date.now()}-${safeName}.${extension}`;
-};
-
-const withAdminUploadTimeout = async <T,>(operation: Promise<T>, label: string): Promise<T> => {
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-
-    try {
-        return await Promise.race([
-            operation,
-            new Promise<T>((_, reject) => {
-                timeoutId = setTimeout(() => reject(new Error(`${label} timed out. Check Firebase Storage auth/rules and network.`)), ADMIN_UPLOAD_TIMEOUT_MS);
-            }),
-        ]);
-    } finally {
-        if (timeoutId) clearTimeout(timeoutId);
-    }
 };
 
 const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
@@ -266,48 +250,89 @@ const getAdminContentMaxBytes = (type: ProductFileType) => {
     return MAX_DOCUMENT_UPLOAD_BYTES;
 };
 
-const uploadAdminProductAsset = async (file: File, storagePath: string, logPrefix = 'ADMIN_CONTENT_UPLOAD') => {
+const isRetryableStorageError = (error: unknown) => {
+    const rawCode = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error || '').toLowerCase();
+
+    if (rawCode.includes('storage/unauthorized') || message.includes('permission')) return false;
+    if (rawCode.includes('storage/bucket-not-found') || rawCode.includes('storage/invalid-url') || message.includes('bucket')) return false;
+    if (rawCode.includes('storage/canceled')) return false;
+
+    return rawCode.includes('storage/retry-limit-exceeded')
+        || rawCode.includes('storage/unknown')
+        || message.includes('network')
+        || message.includes('timeout')
+        || message.includes('timed out')
+        || message.includes('offline')
+        || !rawCode;
+};
+
+const uploadAdminProductAsset = async (
+    file: File,
+    storagePath: string,
+    logPrefix = 'ADMIN_CONTENT_UPLOAD',
+    onProgress?: (percent: number) => void
+) => {
     const uploadUser = await ensureAdminUploadAuth();
     console.info('ADMIN_UPLOAD_AUTH_CHECK', { authenticated: Boolean(uploadUser), uid: uploadUser?.uid || null });
 
     const fileRef = ref(storage, storagePath);
-    const uploadTask = uploadBytesResumable(fileRef, file, {
-        contentType: file.type || undefined,
-        customMetadata: {
-            originalName: file.name,
-        },
-    });
+    const maxAttempts = 3;
+    let lastError: unknown = null;
 
-    await withAdminUploadTimeout(new Promise<void>((resolve, reject) => {
-        uploadTask.on('state_changed',
-            snapshot => {
-                const percent = snapshot.totalBytes ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
-                if (logPrefix === 'ADMIN_AUDIO_UPLOAD') {
-                    console.info('ADMIN_AUDIO_UPLOAD_PROGRESS', { storagePath, percent, bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
-                } else {
-                    console.info(`${logPrefix}_PROGRESS`, { storagePath, percent, bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
-                }
-            },
-            reject,
-            () => resolve()
-        );
-    }), 'Firebase Storage upload');
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+            const uploadTask = uploadBytesResumable(fileRef, file, {
+                contentType: file.type || undefined,
+                customMetadata: {
+                    originalName: file.name,
+                },
+            });
 
-    const downloadUrl = await withAdminUploadTimeout(getDownloadURL(fileRef), 'Firebase Storage URL lookup');
+            await new Promise<void>((resolve, reject) => {
+                uploadTask.on('state_changed',
+                    snapshot => {
+                        const percent = snapshot.totalBytes ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
+                        onProgress?.(percent);
+                        if (logPrefix === 'ADMIN_AUDIO_UPLOAD') {
+                            console.info('ADMIN_AUDIO_UPLOAD_PROGRESS', { storagePath, attempt, percent, bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
+                        } else {
+                            console.info(`${logPrefix}_PROGRESS`, { storagePath, attempt, percent, bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
+                        }
+                    },
+                    reject,
+                    () => resolve()
+                );
+            });
 
-    if (logPrefix === 'ADMIN_AUDIO_UPLOAD') {
-        console.info('ADMIN_AUDIO_DOWNLOAD_URL_SUCCESS', { storagePath, url: downloadUrl });
+            const downloadUrl = await getDownloadURL(fileRef);
+
+            if (logPrefix === 'ADMIN_AUDIO_UPLOAD') {
+                console.info('ADMIN_AUDIO_DOWNLOAD_URL_SUCCESS', { storagePath, url: downloadUrl });
+            } else {
+                console.info('ADMIN_DOWNLOAD_URL_SUCCESS', { storagePath, url: downloadUrl });
+            }
+
+            return {
+                url: downloadUrl,
+                storagePath,
+                size: file.size,
+                contentType: file.type || 'application/octet-stream',
+            };
+        } catch (error) {
+            lastError = error;
+            const retryable = isRetryableStorageError(error);
+            console.warn(`${logPrefix}_ATTEMPT_FAILED`, { storagePath, attempt, retryable, error });
+
+            if (!retryable || attempt === maxAttempts) break;
+            await new Promise(resolve => setTimeout(resolve, attempt * 1200));
+        }
     }
 
-    return {
-        url: downloadUrl,
-        storagePath,
-        size: file.size,
-        contentType: file.type || 'application/octet-stream',
-    };
+    throw lastError instanceof Error ? lastError : new Error(String(lastError || 'Unknown upload error'));
 };
 
-const uploadAdminContentFile = async (file: File, type: ProductFileType, productId: number | string) => {
+const uploadAdminContentFile = async (file: File, type: ProductFileType, productId: number | string, onProgress?: (percent: number) => void) => {
     const maxBytes = getAdminContentMaxBytes(type);
 
     if (file.size > maxBytes) {
@@ -331,7 +356,7 @@ const uploadAdminContentFile = async (file: File, type: ProductFileType, product
     }
 
     try {
-        const uploaded = await uploadAdminProductAsset(file, storagePath, isAudio ? 'ADMIN_AUDIO_UPLOAD' : 'ADMIN_CONTENT_UPLOAD');
+        const uploaded = await uploadAdminProductAsset(file, storagePath, isAudio ? 'ADMIN_AUDIO_UPLOAD' : 'ADMIN_CONTENT_UPLOAD', onProgress);
 
         if (isAudio) {
             console.info('ADMIN_AUDIO_UPLOAD_SUCCESS', { productId, storagePath, size: file.size, contentType: file.type });
@@ -598,6 +623,7 @@ const ContentComposer: React.FC<{
     const [docError, setDocError] = useState('');
     const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(() => initialFile?.quiz?.questions?.length ? normaliseQuizQuestions(initialFile.quiz.questions) : [{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
     const quizListRef = useRef<HTMLDivElement>(null);
     const previousQuizQuestionCountRef = useRef(quizQuestions.length);
 
@@ -661,9 +687,10 @@ const ContentComposer: React.FC<{
         }
 
         setIsUploading(true);
+        setUploadProgress(0);
 
         try {
-            const uploaded = await uploadAdminContentFile(file, selectedUploadConfig.type, productId);
+            const uploaded = await uploadAdminContentFile(file, selectedUploadConfig.type, productId, setUploadProgress);
             const now = Date.now();
 
             onAdd({
@@ -685,6 +712,7 @@ const ContentComposer: React.FC<{
             alert(error instanceof Error ? error.message : 'UNKNOWN_UPLOAD_ERROR: File upload failed.');
         } finally {
             setIsUploading(false);
+            setUploadProgress(0);
         }
     };
 
@@ -896,7 +924,7 @@ const ContentComposer: React.FC<{
             )}
 
             <input ref={fileInputRef} type="file" accept={uploadConfig?.accept} onChange={handleFileSelected} className="hidden" />
-            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content... Audio/video/PDF files are added only after Firebase Storage returns a download URL.</p>}
+            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content... {uploadProgress}% complete. Audio/video/PDF files are added only after Firebase Storage returns a download URL.</p>}
         </div>
     );
 };

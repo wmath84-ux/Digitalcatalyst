@@ -17,10 +17,12 @@
     - Audio max size is 50MB; video 75MB; PDF/e-book 25MB; spreadsheet 10MB; product image 8MB.
     - Uploads use stable product-scoped paths: `adminProductContent/{type}/{productId}/{timestamp}-{safeFileName}`.
     - Upload auth is checked and logged, but lack of anonymous auth no longer blocks uploads when deployed Storage rules allow the admin product paths.
+    - The custom 20-second Promise.race timeout was removed for content uploads. Firebase resumable upload now controls retry/progress.
+    - Retry logic was added for retryable Storage/network errors (up to 3 attempts), without retrying permission/bucket errors.
     - Upload progress and all required audio lifecycle logs were added.
     - Saved content metadata now includes `storagePath`, `size`, `contentType`, `createdAt`, and `updatedAt` before the item is added to product content.
     - App product save now logs Firestore save start/success/failure and refresh verification start/success.
-12. **Final status:** FAIL in this container network/auth test; code fixes are applied and build/tests pass, but the real browser + deployed Firebase rules must be used to confirm PASS.
+12. **Final status:** FAIL in this container network/auth test; code fixes are applied, forced timeout is removed, build/tests pass, but the real browser + deployed Firebase rules must be used to confirm PASS.
 
 ## Required production verification checklist
 
