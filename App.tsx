@@ -119,20 +119,38 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
 }
 
 // Safe LocalStorage Wrapper
-const safeSetItem = (key: string, value: any) => {
+const safeSetItem = (key: string, value: any): boolean => {
     try {
         const serializedState = JSON.stringify(value);
         localStorage.setItem(key, serializedState);
+        return true;
     } catch (err: any) {
         console.error(`Error saving state to localStorage for key "${key}":`, err);
-        // Check for quota exceeded error
-        if (
-            err.name === 'QuotaExceededError' || 
-            err.name === 'NS_ERROR_DOM_QUOTA_REACHED' || 
-            err.code === 22
-        ) {
-             alert(`⚠️ Storage Full!\n\nThe browser cannot save more data. \n1. Try deleting old products or images.\n2. Use Image URLs instead of pasting images directly to save space.`);
+
+        const isQuotaError =
+            err?.name === 'QuotaExceededError' ||
+            err?.name === 'NS_ERROR_DOM_QUOTA_REACHED' ||
+            err?.code === 22;
+
+        if (isQuotaError) {
+            console.warn(`Browser storage is full for "${key}". Firebase sync will still be attempted.`);
+
+            if (typeof window !== 'undefined' && !(window as any).__eduvoraStorageFullWarned) {
+                (window as any).__eduvoraStorageFullWarned = true;
+                alert(
+                    `⚠️ Browser storage is full.
+
+Your product changes will still be saved to Firebase when the Firebase write succeeds.
+
+To avoid this again:
+1. Do not store audio/video/PDF as base64.
+2. Upload files to Firebase Storage and save only their URLs.
+3. Use image URLs or compressed images for thumbnails.`
+                );
+            }
         }
+
+        return false;
     }
 };
 
@@ -1493,14 +1511,22 @@ const App: React.FC = () => {
   
   useEffect(() => {
     const unsubscribeProducts = onSnapshot(collection(db, GLOBAL_PRODUCTS_COLLECTION), (snapshot) => {
-      if (snapshot.empty) return;
       const remoteProducts = snapshot.docs
         .map(item => normalizeProductArrays(item.data() as Product))
+        .filter(product => Number.isFinite(Number(product.id)))
         .sort((a, b) => Number(a.id) - Number(b.id));
+
       setProducts(remoteProducts);
       safeSetItem('siteProducts', remoteProducts);
-      localStorage.setItem('legacyProductsPurged', 'true');
-    }, error => logGlobalSyncWarning('Products', error));
+
+      try {
+        localStorage.setItem('legacyProductsPurged', 'true');
+      } catch (error) {
+        console.warn('Could not mark product cache as synced.', error);
+      }
+    }, error => {
+      logGlobalSyncWarning('Products', error);
+    });
 
     const unsubscribeCoupons = onSnapshot(collection(db, GLOBAL_COUPONS_COLLECTION), (snapshot) => {
       if (snapshot.empty) return;
@@ -3623,55 +3649,90 @@ const App: React.FC = () => {
     setCurrentView('home');
   };
 
-  // Product CRUD keeps a local fallback and publishes admin changes through Firestore for all sessions.
-  const handleAddProduct = async (product: Omit<Product, 'id'>) => {
+  const persistProductsLocalFallback = (nextProducts: Product[]) => {
+      const normalizedProducts = nextProducts.map(normalizeProductArrays);
+      safeSetItem('siteProducts', normalizedProducts);
+
       try {
-          const newId = Date.now();
-          const productWithId = normalizeProductArrays({ ...product, id: newId, manualRating: product.manualRating !== undefined ? product.manualRating : null });
-          
-          const updatedProducts = [...products, productWithId];
+          localStorage.setItem('legacyProductsPurged', 'true');
+      } catch (error) {
+          console.warn('Could not update product cache marker.', error);
+      }
+  };
+
+  const upsertProductList = (currentProducts: Product[], product: Product) => {
+      const normalizedProduct = normalizeProductArrays(product);
+      const withoutCurrentProduct = currentProducts.filter(item => item.id !== normalizedProduct.id);
+      return [...withoutCurrentProduct, normalizedProduct].sort((a, b) => Number(a.id) - Number(b.id));
+  };
+
+  const publishProductToFirebase = async (product: Product): Promise<Product> => {
+      const normalizedProduct = normalizeProductArrays(product);
+      await setDoc(
+          doc(db, GLOBAL_PRODUCTS_COLLECTION, String(normalizedProduct.id)),
+          stripUndefinedDeep(normalizedProduct),
+          { merge: false }
+      );
+      return normalizedProduct;
+  };
+
+  // Product CRUD is Firebase-first. Local cache is only a fallback mirror.
+  const handleAddProduct = async (product: Omit<Product, 'id'>) => {
+      const productWithId = normalizeProductArrays({
+          ...product,
+          id: Date.now(),
+          manualRating: product.manualRating !== undefined ? product.manualRating : null,
+      });
+
+      try {
+          const savedProduct = await publishProductToFirebase(productWithId);
+          const updatedProducts = upsertProductList(products, savedProduct);
+
           setProducts(updatedProducts);
-          safeSetItem('siteProducts', updatedProducts); // Save to LocalStorage
-          void setDoc(doc(db, GLOBAL_PRODUCTS_COLLECTION, String(productWithId.id)), stripUndefinedDeep(productWithId))
-            .catch(error => logGlobalSyncWarning('Product add', error));
+          persistProductsLocalFallback(updatedProducts);
       } catch (e) {
-          console.error("Error adding product: ", e);
-          alert("Failed to add product locally.");
+          console.error('Firebase product add failed:', e);
+          alert('Product was not saved to Firebase. Please check Firebase admin permission/rules and try again.');
       }
   };
 
   const handleUpdateProduct = async (updatedProduct: Product) => {
       try {
-            const normalizedProduct = normalizeProductArrays(updatedProduct);
-            const updatedProducts = products.map(p => p.id === normalizedProduct.id ? normalizedProduct : p);
-            setProducts(updatedProducts);
-            safeSetItem('siteProducts', updatedProducts); // Save to LocalStorage
-            void setDoc(doc(db, GLOBAL_PRODUCTS_COLLECTION, String(normalizedProduct.id)), stripUndefinedDeep(normalizedProduct), { merge: false })
-              .catch(error => logGlobalSyncWarning('Product update', error));
+          const savedProduct = await publishProductToFirebase(updatedProduct);
+          const updatedProducts = upsertProductList(products, savedProduct);
+
+          setProducts(updatedProducts);
+          persistProductsLocalFallback(updatedProducts);
+
+          setSelectedProduct(current =>
+              current && current.id === savedProduct.id
+                  ? { ...savedProduct, rating: current.rating, reviewCount: current.reviewCount, calculatedRating: current.calculatedRating }
+                  : current
+          );
       } catch (e) {
-          console.error("Error updating product: ", e);
-          alert("Failed to update product.");
+          console.error('Firebase product update failed:', e);
+          alert('Product update was not saved to Firebase. Please check Firebase admin permission/rules and try again.');
       }
   };
 
   const handleDeleteProduct = async (productId: number) => {
       try {
-          const updatedProducts = products.filter(p => p.id !== productId);
+          await deleteDoc(doc(db, GLOBAL_PRODUCTS_COLLECTION, String(productId)));
+
+          const updatedProducts = products.filter(product => product.id !== productId);
           setProducts(updatedProducts);
-          safeSetItem('siteProducts', updatedProducts); // Save to LocalStorage
-          void deleteDoc(doc(db, GLOBAL_PRODUCTS_COLLECTION, String(productId)))
-            .catch(error => logGlobalSyncWarning('Product delete', error));
-          
-          // Also clean up local reviews
+          persistProductsLocalFallback(updatedProducts);
+
           const updatedReviews = { ...reviews };
           delete updatedReviews[productId];
           setReviews(updatedReviews);
           safeSetItem('productReviews', updatedReviews);
+
           void setDoc(doc(db, ...GLOBAL_REVIEWS_DOC), { reviews: stripUndefinedDeep(updatedReviews) }, { merge: true })
-            .catch(error => logGlobalSyncWarning('Reviews cleanup', error));
+              .catch(error => logGlobalSyncWarning('Reviews cleanup', error));
       } catch (e) {
-          console.error("Error deleting product: ", e);
-          alert("Failed to delete product.");
+          console.error('Firebase product delete failed:', e);
+          alert('Product was not deleted from Firebase. Please check Firebase admin permission/rules and try again.');
       }
   };
   
