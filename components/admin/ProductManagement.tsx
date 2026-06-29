@@ -184,6 +184,8 @@ const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 p
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
 
 const MAX_ADMIN_UPLOAD_BYTES = 75 * 1024 * 1024;
+const MAX_FIRESTORE_INLINE_UPLOAD_BYTES = 650 * 1024;
+const ADMIN_UPLOAD_TIMEOUT_MS = 20000;
 
 const sanitizeStorageName = (value: string) =>
     value
@@ -205,17 +207,53 @@ const buildAdminImageStoragePath = (file: File, scope: string) => {
     return `adminProductImages/${scope}/${Date.now()}-${safeName}.${extension}`;
 };
 
+const withAdminUploadTimeout = async <T,>(operation: Promise<T>, label: string): Promise<T> => {
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+
+    try {
+        return await Promise.race([
+            operation,
+            new Promise<T>((_, reject) => {
+                timeoutId = setTimeout(() => reject(new Error(`${label} timed out. Check Firebase Storage auth/rules and network.`)), ADMIN_UPLOAD_TIMEOUT_MS);
+            }),
+        ]);
+    } finally {
+        if (timeoutId) clearTimeout(timeoutId);
+    }
+};
+
+const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Could not read this file. Please try again.'));
+    reader.readAsDataURL(file);
+});
+
 const uploadAdminProductAsset = async (file: File, storagePath: string) => {
     const fileRef = ref(storage, storagePath);
 
-    await uploadBytes(fileRef, file, {
+    await withAdminUploadTimeout(uploadBytes(fileRef, file, {
         contentType: file.type || undefined,
         customMetadata: {
             originalName: file.name,
         },
-    });
+    }), 'Firebase Storage upload');
 
-    return getDownloadURL(fileRef);
+    return withAdminUploadTimeout(getDownloadURL(fileRef), 'Firebase Storage URL lookup');
+};
+
+const uploadAdminContentOrInlineFallback = async (file: File, type: ProductFileType) => {
+    try {
+        return await uploadAdminProductAsset(file, buildAdminContentStoragePath(file, type));
+    } catch (error) {
+        console.warn('Firebase Storage content upload failed. Trying small-file inline fallback.', error);
+
+        if (file.size > MAX_FIRESTORE_INLINE_UPLOAD_BYTES) {
+            throw error;
+        }
+
+        return readFileAsDataUrl(file);
+    }
 };
 
 const editorCommands: Array<[string, string, string?]> = [
@@ -525,18 +563,7 @@ const ContentComposer: React.FC<{
         setIsUploading(true);
 
         try {
-            const storagePath = buildAdminContentStoragePath(file, selectedUploadConfig.type);
-            const fileRef = ref(storage, storagePath);
-
-            await uploadBytes(fileRef, file, {
-                contentType: file.type || undefined,
-                customMetadata: {
-                    originalName: file.name,
-                    resourceType: selectedUploadConfig.type,
-                },
-            });
-
-            const downloadUrl = await getDownloadURL(fileRef);
+            const downloadUrl = await uploadAdminContentOrInlineFallback(file, selectedUploadConfig.type);
 
             onAdd({
                 name: file.name,
@@ -549,7 +576,7 @@ const ContentComposer: React.FC<{
             onClose();
         } catch (error) {
             console.error('Admin content upload failed:', error);
-            alert('File upload failed. Please check Firebase Storage rules and try again.');
+            alert('File upload failed. Please check Firebase Storage rules/auth. If Storage is unavailable, use an external hosted URL or a file under 650KB for emergency inline fallback.');
         } finally {
             setIsUploading(false);
         }
@@ -763,7 +790,7 @@ const ContentComposer: React.FC<{
             )}
 
             <input ref={fileInputRef} type="file" accept={uploadConfig?.accept} onChange={handleFileSelected} className="hidden" />
-            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content to Firebase Storage...</p>}
+            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content to Firebase Storage... If Storage is blocked, small files are added inline automatically.</p>}
         </div>
     );
 };
