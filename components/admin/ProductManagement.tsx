@@ -3,6 +3,9 @@ import { createPortal } from 'react-dom';
 import { Coupon, CourseModule, Product, ProductFile, ProductFileType, ProductWithRating, ProductDocPage, QuizQuestion, User } from '../../App';
 import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
 import { PRODUCT_IMAGE_SLOTS, ProductImageSlot } from '../../utils/productImages';
+import { getDownloadURL, ref, uploadBytes, uploadBytesResumable } from 'firebase/storage';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db, storage } from '../../firebase';
 
 type ProductViewState = 'list' | 'add' | 'edit';
 
@@ -180,6 +183,245 @@ const recursiveModuleUpdate = (
 const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
 const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
+
+const MAX_AUDIO_UPLOAD_BYTES = 50 * 1024 * 1024;
+const MAX_VIDEO_UPLOAD_BYTES = 75 * 1024 * 1024;
+const MAX_DOCUMENT_UPLOAD_BYTES = 25 * 1024 * 1024;
+const MAX_SHEET_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_PRODUCT_IMAGE_BYTES = 8 * 1024 * 1024;
+const MAX_FIRESTORE_INLINE_UPLOAD_BYTES = 700 * 1024;
+
+const sanitizeStorageName = (value: string) =>
+    value
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'file';
+
+const buildAdminContentStoragePath = (file: File, type: ProductFileType, productId: number | string) => {
+    const extension = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
+    const safeName = sanitizeStorageName(file.name.replace(/\.[^/.]+$/, ''));
+    return `adminProductContent/${type}/${productId}/${Date.now()}-${safeName}.${extension}`;
+};
+
+const buildAdminImageStoragePath = (file: File, scope: string, productId: number | string) => {
+    const extension = file.name.includes('.') ? file.name.split('.').pop() : 'jpg';
+    const safeName = sanitizeStorageName(file.name.replace(/\.[^/.]+$/, ''));
+    return `adminProductImages/${productId}/${scope}/${Date.now()}-${safeName}.${extension}`;
+};
+
+const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(String(reader.result || ''));
+    reader.onerror = () => reject(new Error('Could not read this file. Please try again.'));
+    reader.readAsDataURL(file);
+});
+
+const ensureAdminUploadAuth = async () => {
+    console.info('ADMIN_UPLOAD_AUTH_CHECK_STARTED');
+    const user = auth.currentUser;
+
+    if (!user) {
+        console.error('ADMIN_UPLOAD_AUTH_CHECK_FAILED', { reason: 'missing_firebase_auth_user' });
+        throw new Error('NOT_AUTHENTICATED: Firebase admin login required before uploading files.');
+    }
+
+    const userSnap = await getDoc(doc(db, 'users', user.uid));
+    const role = userSnap.exists() ? userSnap.data().role : undefined;
+    const isAdmin = role === 'admin' || role === 'super_admin';
+
+    if (!isAdmin) {
+        console.error('ADMIN_UPLOAD_AUTH_CHECK_FAILED', { uid: user.uid, role: role || null, reason: 'admin_role_missing' });
+        throw new Error('ADMIN_PERMISSION_MISSING: Firebase admin role required before uploading files. Set users/{uid}.role to admin or super_admin.');
+    }
+
+    console.info('ADMIN_UPLOAD_AUTH_CHECK_SUCCESS', { uid: user.uid, role });
+    return user;
+};
+
+const classifyAdminUploadError = (error: unknown) => {
+    const rawCode = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
+    const message = error instanceof Error ? error.message : String(error || 'Unknown upload error');
+
+    if (message.includes('NOT_AUTHENTICATED')) return message;
+    if (rawCode.includes('storage/unauthorized') || message.toLowerCase().includes('permission')) return `STORAGE_RULES_DENIED: Firebase Storage rules denied this upload. ${message}`;
+    if (rawCode.includes('storage/bucket-not-found') || rawCode.includes('storage/invalid-url') || message.toLowerCase().includes('bucket')) return `STORAGE_BUCKET_CONFIG_MISSING: Firebase Storage bucket/config is missing or invalid. ${message}`;
+    if (message.toLowerCase().includes('timed out')) return `NETWORK_TIMEOUT: ${message}`;
+    if (rawCode.includes('storage/retry-limit-exceeded') || rawCode.includes('storage/canceled')) return `NETWORK_TIMEOUT: Firebase Storage upload did not complete. ${message}`;
+    return `UNKNOWN_UPLOAD_ERROR: ${message}`;
+};
+
+const getAdminContentMaxBytes = (type: ProductFileType) => {
+    if (type === 'audio') return MAX_AUDIO_UPLOAD_BYTES;
+    if (type === 'video') return MAX_VIDEO_UPLOAD_BYTES;
+    if (type === 'pdf' || type === 'ebook') return MAX_DOCUMENT_UPLOAD_BYTES;
+    if (type === 'sheet') return MAX_SHEET_UPLOAD_BYTES;
+    return MAX_DOCUMENT_UPLOAD_BYTES;
+};
+
+const isRetryableStorageError = (error: unknown) => {
+    const rawCode = typeof error === 'object' && error && 'code' in error ? String((error as { code?: unknown }).code || '') : '';
+    const message = error instanceof Error ? error.message.toLowerCase() : String(error || '').toLowerCase();
+
+    if (rawCode.includes('storage/unauthorized') || message.includes('permission')) return false;
+    if (rawCode.includes('storage/bucket-not-found') || rawCode.includes('storage/invalid-url') || message.includes('bucket')) return false;
+    if (rawCode.includes('storage/canceled')) return false;
+
+    return rawCode.includes('storage/retry-limit-exceeded')
+        || rawCode.includes('storage/unknown')
+        || message.includes('network')
+        || message.includes('timeout')
+        || message.includes('timed out')
+        || message.includes('offline')
+        || !rawCode;
+};
+
+const createAdminUploadSession = async (file: File, storagePath: string) => {
+    console.info('ADMIN_UPLOAD_SESSION_CREATE_STARTED', {
+        fileName: file.name,
+        fileSize: file.size,
+        contentType: file.type,
+        storageBucket: storage.app.options.storageBucket,
+        storagePath,
+    });
+    const user = await ensureAdminUploadAuth();
+    console.info('ADMIN_UPLOAD_SESSION_CREATE_SUCCESS', { uid: user.uid, storageBucket: storage.app.options.storageBucket, storagePath });
+    return { user, storagePath };
+};
+
+
+const uploadAdminProductAsset = async (
+    file: File,
+    storagePath: string,
+    logPrefix = 'ADMIN_CONTENT_UPLOAD',
+    onProgress?: (percent: number) => void
+) => {
+    try {
+        await createAdminUploadSession(file, storagePath);
+    } catch (error) {
+        console.error('ADMIN_UPLOAD_SESSION_CREATE_FAILED', { storagePath, error });
+        throw error;
+    }
+
+    const fileRef = ref(storage, storagePath);
+    const maxAttempts = 3;
+    let lastError: unknown = null;
+
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+        try {
+            const uploadTask = uploadBytesResumable(fileRef, file, {
+                contentType: file.type || undefined,
+                customMetadata: {
+                    originalName: file.name,
+                },
+            });
+            console.info('ADMIN_UPLOAD_TASK_CREATED', { storagePath, attempt, storageBucket: storage.app.options.storageBucket });
+
+            await new Promise<void>((resolve, reject) => {
+                let firstByteReceived = false;
+                const firstByteTimer = setTimeout(() => {
+                    if (!firstByteReceived) {
+                        console.error('ADMIN_UPLOAD_FIRST_BYTE_TIMEOUT', { storagePath, attempt, storageBucket: storage.app.options.storageBucket });
+                        uploadTask.cancel();
+                        reject(new Error('NETWORK_TIMEOUT: Upload stayed at 0% for more than 15 seconds. Check Firebase Auth, Storage rules, bucket, CORS, endpoint, and network.'));
+                    }
+                }, 15000);
+
+                uploadTask.on('state_changed',
+                    snapshot => {
+                        if (snapshot.bytesTransferred > 0) {
+                            firstByteReceived = true;
+                            clearTimeout(firstByteTimer);
+                        }
+                        const percent = snapshot.totalBytes ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
+                        onProgress?.(percent);
+                        console.info('ADMIN_UPLOAD_PROGRESS', { storagePath, attempt, percent, bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
+                        if (logPrefix === 'ADMIN_AUDIO_UPLOAD') {
+                            console.info('ADMIN_AUDIO_UPLOAD_PROGRESS', { storagePath, attempt, percent, bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
+                        }
+                    },
+                    error => {
+                        clearTimeout(firstByteTimer);
+                        reject(error);
+                    },
+                    () => {
+                        clearTimeout(firstByteTimer);
+                        resolve();
+                    }
+                );
+            });
+
+            const downloadUrl = await getDownloadURL(fileRef);
+
+            console.info('ADMIN_DOWNLOAD_URL_SUCCESS', { storagePath, url: downloadUrl });
+            console.info('ADMIN_UPLOAD_SUCCESS', { storagePath, size: file.size, contentType: file.type });
+            console.info('ADMIN_UPLOAD_VERIFIED_IN_STORAGE', { storagePath, url: downloadUrl });
+            if (logPrefix === 'ADMIN_AUDIO_UPLOAD') {
+                console.info('ADMIN_AUDIO_DOWNLOAD_URL_SUCCESS', { storagePath, url: downloadUrl });
+            }
+
+            return {
+                url: downloadUrl,
+                storagePath,
+                size: file.size,
+                contentType: file.type || 'application/octet-stream',
+            };
+        } catch (error) {
+            lastError = error;
+            const retryable = isRetryableStorageError(error);
+            console.warn(`${logPrefix}_ATTEMPT_FAILED`, { storagePath, attempt, retryable, error });
+            console.error('ADMIN_UPLOAD_FAILED', { storagePath, attempt, retryable, error });
+
+            if (!retryable || attempt === maxAttempts) break;
+            await new Promise(resolve => setTimeout(resolve, attempt * 1200));
+        }
+    }
+
+    throw lastError instanceof Error ? lastError : new Error(String(lastError || 'Unknown upload error'));
+};
+
+const uploadAdminContentFile = async (file: File, type: ProductFileType, productId: number | string, onProgress?: (percent: number) => void) => {
+    const maxBytes = getAdminContentMaxBytes(type);
+
+    if (file.size > maxBytes) {
+        throw new Error(`FILE_TOO_LARGE: ${type} files must be ${Math.round(maxBytes / (1024 * 1024))}MB or smaller.`);
+    }
+
+    if (file.size <= MAX_FIRESTORE_INLINE_UPLOAD_BYTES && !['audio', 'video', 'pdf', 'ebook', 'sheet'].includes(type)) {
+        return {
+            url: await readFileAsDataUrl(file),
+            storagePath: undefined,
+            size: file.size,
+            contentType: file.type || 'application/octet-stream',
+        };
+    }
+
+    const storagePath = buildAdminContentStoragePath(file, type, productId);
+    const isAudio = type === 'audio';
+
+    if (isAudio) {
+        console.info('ADMIN_AUDIO_UPLOAD_STARTED', { productId, storagePath, fileName: file.name, size: file.size, contentType: file.type });
+    }
+
+    try {
+        const uploaded = await uploadAdminProductAsset(file, storagePath, isAudio ? 'ADMIN_AUDIO_UPLOAD' : 'ADMIN_CONTENT_UPLOAD', onProgress);
+
+        if (isAudio) {
+            console.info('ADMIN_AUDIO_UPLOAD_SUCCESS', { productId, storagePath, size: file.size, contentType: file.type });
+        }
+
+        return uploaded;
+    } catch (error) {
+        const preciseError = classifyAdminUploadError(error);
+
+        if (isAudio) {
+            console.error('ADMIN_AUDIO_UPLOAD_FAILED', { productId, storagePath, fileName: file.name, size: file.size, error: preciseError });
+        }
+
+        throw new Error(preciseError);
+    }
+};
 
 const editorCommands: Array<[string, string, string?]> = [
     ['bold', 'B'],
@@ -410,15 +652,29 @@ const AdminOpenDocsBuilder: React.FC<{
     );
 };
 
-const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void; onClose: () => void; }> = ({ onAdd, onClose }) => {
+const ContentComposer: React.FC<{
+    onAdd: (file: Omit<ProductFile, 'id'>) => void;
+    onClose: () => void;
+    initialFile?: ProductFile | null;
+    productId: number | string;
+}> = ({ onAdd, onClose, initialFile = null, productId }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const isEditing = Boolean(initialFile);
     const [uploadConfig, setUploadConfig] = useState<{ type: ProductFileType; accept: string } | null>(null);
-    const [formState, setFormState] = useState<{ type: ProductFileType; url: string; name: string; content: string } | null>(null);
-    const [docPages, setDocPages] = useState<ProductDocPage[]>([]);
-    const [activeDocPageId, setActiveDocPageId] = useState('');
+    const [formState, setFormState] = useState<{ type: ProductFileType; url: string; name: string; content: string } | null>(() => initialFile ? {
+        type: initialFile.type,
+        url: initialFile.url || '',
+        name: initialFile.name || 'Learning Resource',
+        content: initialFile.content || '',
+    } : null);
+    const [docPages, setDocPages] = useState<ProductDocPage[]>(() => initialFile?.type === 'doc' ? (normaliseDocPages(initialFile) || []) : []);
+    const [activeDocPageId, setActiveDocPageId] = useState(() => initialFile?.type === 'doc' ? (normaliseDocPages(initialFile)?.[0]?.id || '') : '');
     const [docError, setDocError] = useState('');
-    const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
+    const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(() => initialFile?.quiz?.questions?.length ? normaliseQuizQuestions(initialFile.quiz.questions) : [{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
     const [isUploading, setIsUploading] = useState(false);
+    const [uploadProgress, setUploadProgress] = useState(0);
+    const [lastUploadRequest, setLastUploadRequest] = useState<{ file: File; config: { type: ProductFileType; accept: string } } | null>(null);
+    const [uploadError, setUploadError] = useState('');
     const quizListRef = useRef<HTMLDivElement>(null);
     const previousQuizQuestionCountRef = useRef(quizQuestions.length);
 
@@ -461,30 +717,65 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
         }
     };
 
-    const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file || !uploadConfig) return;
+    const runFileUpload = async (file: File, selectedUploadConfig: { type: ProductFileType; accept: string }) => {
+        const maxBytes = getAdminContentMaxBytes(selectedUploadConfig.type);
+        setLastUploadRequest({ file, config: selectedUploadConfig });
+        setUploadError('');
+
+        console.info('ADMIN_UPLOAD_FILE_SELECTED', { productId, fileName: file.name, size: file.size, contentType: file.type, type: selectedUploadConfig.type });
+        if (selectedUploadConfig.type === 'audio') {
+            console.info('ADMIN_AUDIO_UPLOAD_SELECTED', { productId, fileName: file.name, size: file.size, contentType: file.type });
+        }
+
+        if (file.size > maxBytes) {
+            const message = `${selectedUploadConfig.type} file is too large. Max allowed size is ${Math.round(maxBytes / (1024 * 1024))}MB.`;
+            setUploadError(message);
+            alert(message);
+            return;
+        }
 
         setIsUploading(true);
-        const reader = new FileReader();
+        setUploadProgress(0);
 
-        reader.onload = readerEvent => {
-            if (readerEvent.target?.result) {
-                onAdd({
-                    name: file.name,
-                    type: uploadConfig.type,
-                    url: readerEvent.target.result as string,
-                    content: '',
-                    quiz: { questions: [] },
-                });
-                setIsUploading(false);
-                onClose();
-            }
-        };
+        try {
+            const uploaded = await uploadAdminContentFile(file, selectedUploadConfig.type, productId, setUploadProgress);
+            const now = Date.now();
 
-        reader.readAsDataURL(file);
+            onAdd({
+                name: file.name,
+                type: selectedUploadConfig.type,
+                url: uploaded.url,
+                storagePath: uploaded.storagePath,
+                size: uploaded.size,
+                contentType: uploaded.contentType,
+                createdAt: now,
+                updatedAt: now,
+                content: '',
+                quiz: { questions: [] },
+            });
+
+            setLastUploadRequest(null);
+            onClose();
+        } catch (error) {
+            const message = error instanceof Error ? error.message : 'UNKNOWN_UPLOAD_ERROR: File upload failed.';
+            console.error('Admin content upload failed:', error);
+            setUploadError(message);
+            alert(message);
+        } finally {
+            setIsUploading(false);
+            setUploadProgress(0);
+        }
+    };
+
+    const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        const selectedUploadConfig = uploadConfig;
+
         event.target.value = '';
         setUploadConfig(null);
+
+        if (!file || !selectedUploadConfig) return;
+        void runFileUpload(file, selectedUploadConfig);
     };
 
     const updateQuizQuestion = (questionIndex: number, updater: (question: QuizQuestion) => QuizQuestion) => {
@@ -573,7 +864,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
             <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
                     <p className="text-xs font-black uppercase tracking-[0.24em] text-cyan-700">Content Studio</p>
-                    <h4 className="text-xl font-black text-slate-900">Add learning content</h4>
+                    <h4 className="text-xl font-black text-slate-900">{isEditing ? 'Edit learning content' : 'Add learning content'}</h4>
                 </div>
                 <button type="button" onClick={onClose} className="rounded-full border border-white/50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-white/80 hover:shadow-sm">
                     Close
@@ -687,7 +978,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                                 Back
                             </button>
                             <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-600 px-6 py-3 font-black text-white shadow-sm hover:bg-cyan-700">
-                                Add Content
+                                {isEditing ? 'Save Content' : 'Add Content'}
                             </button>
                         </div>
                     </div>
@@ -695,7 +986,13 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
             )}
 
             <input ref={fileInputRef} type="file" accept={uploadConfig?.accept} onChange={handleFileSelected} className="hidden" />
-            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content...</p>}
+            {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content... {uploadProgress}% complete. Audio/video/PDF files are added only after Firebase Storage returns a download URL.</p>}
+            {!isUploading && uploadError && lastUploadRequest ? (
+                <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-3">
+                    <p className="text-sm font-bold text-rose-700">{uploadError}</p>
+                    <button type="button" onClick={() => runFileUpload(lastUploadRequest.file, lastUploadRequest.config)} className="mt-3 rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white">Retry upload</button>
+                </div>
+            ) : null}
         </div>
     );
 };
@@ -706,8 +1003,10 @@ const ModuleEditor: React.FC<{
     level: number;
     onUpdate: (modules: CourseModule[]) => void;
     onAddChild: (parentId: string) => void;
-}> = ({ module, allModules, level, onUpdate, onAddChild }) => {
+    productId: number | string;
+}> = ({ module, allModules, level, onUpdate, onAddChild, productId }) => {
     const [isAddingContent, setIsAddingContent] = useState(false);
+    const [editingFile, setEditingFile] = useState<ProductFile | null>(null);
     const files = module.files || [];
     const childModules = module.modules || [];
 
@@ -715,10 +1014,40 @@ const ModuleEditor: React.FC<{
         onUpdate(recursiveModuleUpdate(allModules || [], module.id, updater));
     };
 
-    const handleAddContent = (fileData: Omit<ProductFile, 'id'>) => {
-        const newFile: ProductFile = { ...fileData, id: `file-${Date.now()}`, quiz: fileData.quiz || { questions: [] } };
-        onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles => [...(currentFiles || []), newFile]));
+    const closeContentComposer = () => {
         setIsAddingContent(false);
+        setEditingFile(null);
+    };
+
+    const handleAddContent = (fileData: Omit<ProductFile, 'id'>) => {
+        const now = Date.now();
+        const newFile: ProductFile = { ...fileData, id: `file-${now}`, createdAt: fileData.createdAt || now, updatedAt: now, quiz: fileData.quiz || { questions: [] } };
+        onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles => [...(currentFiles || []), newFile]));
+        closeContentComposer();
+    };
+
+    const handleUpdateContent = (fileData: Omit<ProductFile, 'id'>) => {
+        if (!editingFile) return;
+
+        const updatedFile: ProductFile = {
+            ...fileData,
+            id: editingFile.id,
+            createdAt: editingFile.createdAt || fileData.createdAt || Date.now(),
+            updatedAt: Date.now(),
+            quiz: fileData.quiz || { questions: [] },
+        };
+
+        onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles =>
+            (currentFiles || []).map(file => file.id === editingFile.id ? updatedFile : file)
+        ));
+
+        closeContentComposer();
+    };
+
+    const handleDeleteContent = (fileId: string) => {
+        onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles =>
+            (currentFiles || []).filter(file => file.id !== fileId)
+        ));
     };
 
     return (
@@ -741,17 +1070,36 @@ const ModuleEditor: React.FC<{
                             <p className="font-black text-slate-900">{file.name}</p>
                             <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">{file.type}{file.quiz?.questions?.length ? ` • ${file.quiz.questions.length} questions` : ''}</p>
                         </div>
-                        <button type="button" onClick={() => onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles => (currentFiles || []).filter(item => item.id !== file.id)))} className="self-start rounded-xl border border-red-400/30 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-500/10 sm:self-auto">Remove</button>
+                        <div className="flex gap-2 self-start sm:self-auto">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setEditingFile(file);
+                                    setIsAddingContent(false);
+                                }}
+                                className="rounded-xl border border-cyan-300/30 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-400/10"
+                            >
+                                Edit
+                            </button>
+                            <button type="button" onClick={() => handleDeleteContent(file.id)} className="rounded-xl border border-red-400/30 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-500/10">Remove</button>
+                        </div>
                     </div>
                 )) : <p className="rounded-2xl border border-dashed border-white/50 p-4 text-sm text-slate-600">No content yet. Add videos, PDFs, Open Docs, quizzes, and resource links here.</p>}
             </div>
 
-            {isAddingContent && <ContentComposer onAdd={handleAddContent} onClose={() => setIsAddingContent(false)} />}
+            {(isAddingContent || editingFile) && (
+                <ContentComposer
+                    onAdd={editingFile ? handleUpdateContent : handleAddContent}
+                    onClose={closeContentComposer}
+                    initialFile={editingFile}
+                    productId={productId}
+                />
+            )}
 
             {childModules.length > 0 && (
                 <div className="mt-5 space-y-4 border-l border-white/50 pl-4">
                     {(childModules || []).map(child => (
-                        <ModuleEditor key={child.id} module={child} allModules={allModules} level={level + 1} onUpdate={onUpdate} onAddChild={onAddChild} />
+                        <ModuleEditor key={child.id} module={child} allModules={allModules} level={level + 1} onUpdate={onUpdate} onAddChild={onAddChild} productId={productId} />
                     ))}
                 </div>
             )}
@@ -763,7 +1111,7 @@ const ProductForm: React.FC<{
     mode: 'add' | 'edit';
     product?: ProductWithRating | null;
     coupons: Coupon[];
-    onSave: (product: Omit<Product, 'id'>) => void;
+    onSave: (product: Omit<Product, 'id'>) => Promise<boolean>;
     onCancel: () => void;
 }> = ({ mode, product, coupons, onSave, onCancel }) => {
     const [formData, setFormData] = useState<ProductFormData>(() => createEmptyProductForm(product));
@@ -774,7 +1122,10 @@ const ProductForm: React.FC<{
     const [imageMode, setImageMode] = useState<'upload' | 'ai'>('upload');
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [discountPercent, setDiscountPercent] = useState(0);
+    const [isSavingProduct, setIsSavingProduct] = useState(false);
+    const [isUploadingProductImage, setIsUploadingProductImage] = useState(false);
     const productImageInputRef = useRef<HTMLInputElement>(null);
+    const draftProductIdRef = useRef<number | string>(product?.id || `draft-${Date.now()}`);
 
     useEffect(() => {
         const regular = parseFloat(formData.price) || 0;
@@ -788,14 +1139,31 @@ const ProductForm: React.FC<{
         }
     }, [formData.isFree]);
 
-    const handleProductImagesUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleProductImagesUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const files: File[] = event.currentTarget.files ? Array.from(event.currentTarget.files) as File[] : [];
-        files.forEach(file => {
-            const reader = new FileReader();
-            reader.onload = () => setImages(prev => [...(prev || []), reader.result as string]);
-            reader.readAsDataURL(file);
-        });
         event.target.value = '';
+        if (!files.length) return;
+
+        setIsUploadingProductImage(true);
+
+        const oversizedFile = files.find(file => file.size > MAX_PRODUCT_IMAGE_BYTES);
+        if (oversizedFile) {
+            alert('Product image is too large. Max allowed size is 8MB.');
+            return;
+        }
+
+        try {
+            const uploadedUrls = await Promise.all(files.map(async file => {
+                const uploaded = await uploadAdminProductAsset(file, buildAdminImageStoragePath(file, 'gallery', draftProductIdRef.current), 'ADMIN_PRODUCT_IMAGE_UPLOAD');
+                return uploaded.url;
+            }));
+            setImages(prev => [...(prev || []), ...uploadedUrls]);
+        } catch (error) {
+            console.error('Product image upload failed:', error);
+            alert('Product image upload failed. Please check Firebase Storage permissions and try again.');
+        } finally {
+            setIsUploadingProductImage(false);
+        }
     };
 
 
@@ -804,16 +1172,30 @@ const ProductForm: React.FC<{
         const config = PRODUCT_IMAGE_SLOTS[slot];
         const objectUrl = URL.createObjectURL(file);
         const image = new Image();
-        image.onload = () => {
+        image.onload = async () => {
             URL.revokeObjectURL(objectUrl);
             const uploadedRatio = image.naturalWidth / image.naturalHeight;
             if (Math.abs(uploadedRatio - config.ratioValue) / config.ratioValue > 0.01) {
                 alert(`This image is not the required ${config.ratio} ratio. Upload ${config.recommendedSize} for best result.`);
                 return;
             }
-            const reader = new FileReader();
-            reader.onload = () => setProductImages(prev => ({ ...prev, [slot]: reader.result as string }));
-            reader.readAsDataURL(file);
+
+            setIsUploadingProductImage(true);
+
+            if (file.size > MAX_PRODUCT_IMAGE_BYTES) {
+                alert('Product image is too large. Max allowed size is 8MB.');
+                return;
+            }
+
+            try {
+                const uploaded = await uploadAdminProductAsset(file, buildAdminImageStoragePath(file, slot, draftProductIdRef.current), 'ADMIN_PRODUCT_IMAGE_UPLOAD');
+                setProductImages(prev => ({ ...prev, [slot]: uploaded.url }));
+            } catch (error) {
+                console.error('Product slot image upload failed:', error);
+                alert('Product image upload failed. Please check Firebase Storage permissions and try again.');
+            } finally {
+                setIsUploadingProductImage(false);
+            }
         };
         image.onerror = () => {
             URL.revokeObjectURL(objectUrl);
@@ -843,8 +1225,9 @@ const ProductForm: React.FC<{
         setModules(prev => recursiveModuleUpdate(prev || [], parentId, module => ({ ...module, modules: [...(module.modules || []), child] })));
     };
 
-    const handleSubmit = (event: React.FormEvent) => {
+    const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
+        if (isSavingProduct) return;
         const resolvedPaymentLink = formData.paymentLink.trim() || product?.paymentLink?.trim() || DEFAULT_PRODUCT_PAYMENT_LINK;
 
         const features = ((formData.featuresText || '').split('\n') || []).map(item => item.trim()).filter(Boolean);
@@ -852,7 +1235,9 @@ const ProductForm: React.FC<{
         const formattedPrice = formData.price ? `₹${formData.price}` : '₹0';
         const formattedSalePrice = formData.salePrice ? `₹${formData.salePrice}` : undefined;
 
-        onSave({
+        setIsSavingProduct(true);
+
+        const saved = await onSave({
             imageSeed: formData.imageSeed || formData.title || `product-${Date.now()}`,
             images: images || [],
             productImages,
@@ -882,6 +1267,10 @@ const ProductForm: React.FC<{
             wishlistCount: product?.wishlistCount,
             viewCount: product?.viewCount,
         });
+
+        if (!saved) {
+            setIsSavingProduct(false);
+        }
     };
 
     return (
@@ -940,7 +1329,7 @@ const ProductForm: React.FC<{
                                 </div>
                                 <div className="space-y-5">
                                     {(modules || []).length > 0 ? (modules || []).map(module => (
-                                        <ModuleEditor key={module.id} module={module} allModules={modules || []} level={0} onUpdate={setModules} onAddChild={addChildModule} />
+                                        <ModuleEditor key={module.id} module={module} allModules={modules || []} level={0} onUpdate={setModules} onAddChild={addChildModule} productId={draftProductIdRef.current} />
                                     )) : (
                                         <button type="button" onClick={addRootModule} className="w-full rounded-[1.75rem] border border-dashed border-cyan-300/30 bg-cyan-400/5 p-10 text-center transition hover:bg-cyan-400/10">
                                             <span className="block text-4xl">🧱</span>
@@ -1008,7 +1397,7 @@ const ProductForm: React.FC<{
                                 </div>
                                 <div className="mt-4">
                                     {imageMode === 'upload' ? (
-                                        <button type="button" onClick={() => productImageInputRef.current?.click()} className="w-full rounded-3xl border border-dashed border-cyan-300/40 bg-cyan-400/5 p-8 text-center font-black text-cyan-700 hover:bg-cyan-400/10">Upload product images</button>
+                                        <button type="button" onClick={() => productImageInputRef.current?.click()} disabled={isUploadingProductImage} className="w-full rounded-3xl border border-dashed border-cyan-300/40 bg-cyan-400/5 p-8 text-center font-black text-cyan-700 hover:bg-cyan-400/10 disabled:opacity-60">{isUploadingProductImage ? 'Uploading images to Firebase...' : 'Upload product images'}</button>
                                     ) : (
                                         <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-3xl border border-dashed border-purple-300/40 bg-purple-400/5 p-8 text-center font-black text-purple-700 hover:bg-purple-400/10 disabled:opacity-60">{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</button>
                                     )}
@@ -1034,7 +1423,7 @@ const ProductForm: React.FC<{
                                                 <div className={`mt-3 ${config.aspectClass} overflow-hidden rounded-xl bg-slate-100`}>
                                                     {productImages[slot] ? <img src={productImages[slot]} alt={config.label} className="h-full w-full object-contain" /> : <div className="flex h-full w-full items-center justify-center text-xs font-black text-slate-400">No {config.ratio} image</div>}
                                                 </div>
-                                                <button type="button" onClick={() => slotInputRefs.current[slot]?.click()} className="mt-3 w-full rounded-xl border border-dashed border-cyan-300 px-3 py-2 text-xs font-black text-cyan-700">Upload / Replace {config.ratio}</button>
+                                                <button type="button" onClick={() => slotInputRefs.current[slot]?.click()} disabled={isUploadingProductImage} className="mt-3 w-full rounded-xl border border-dashed border-cyan-300 px-3 py-2 text-xs font-black text-cyan-700 disabled:opacity-60">Upload / Replace {config.ratio}</button>
                                                 <input ref={node => { slotInputRefs.current[slot] = node; }} type="file" accept="image/*" className="hidden" onChange={event => { handleSlotImageUpload(slot, event.currentTarget.files?.[0]); event.currentTarget.value = ''; }} />
                                             </div>;
                                         })}
@@ -1052,7 +1441,7 @@ const ProductForm: React.FC<{
                             <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-400">Ready to publish</p>
                             <p className="mt-1 text-sm font-semibold text-slate-600">Review all product details above, then save your changes.</p>
                         </div>
-                        <button type="submit" className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-400 px-7 py-4 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition hover:-translate-y-0.5 hover:shadow-sm sm:w-auto sm:min-w-48">{mode === 'add' ? 'Save Product' : 'Update Product'}</button>
+                        <button type="submit" disabled={isSavingProduct || isUploadingProductImage} className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-400 px-7 py-4 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition hover:-translate-y-0.5 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-48">{isSavingProduct ? 'Saving to Firebase...' : mode === 'add' ? 'Save Product' : 'Update Product'}</button>
                     </div>
                 </footer>
             </form>
@@ -1064,9 +1453,9 @@ const ProductManagement: React.FC<{
     products: ProductWithRating[];
     users: User[];
     coupons: Coupon[];
-    onAddProduct: (product: Omit<Product, 'id'>) => void;
-    onUpdateProduct: (product: Product) => void;
-    onDeleteProduct: (id: number) => void;
+    onAddProduct: (product: Omit<Product, 'id'>) => Promise<boolean>;
+    onUpdateProduct: (product: Product) => Promise<boolean>;
+    onDeleteProduct: (id: number) => Promise<boolean>;
 }> = ({ products, users, coupons, onAddProduct, onUpdateProduct, onDeleteProduct }) => {
     const [viewState, setViewState] = useState<ProductViewState>('list');
     const [editingProduct, setEditingProduct] = useState<ProductWithRating | null>(null);
@@ -1091,7 +1480,7 @@ const ProductManagement: React.FC<{
         setViewState('edit');
     };
 
-    const handleSave = (productData: Omit<Product, 'id'>) => {
+    const handleSave = async (productData: Omit<Product, 'id'>): Promise<boolean> => {
         const safeProductData: Omit<Product, 'id'> = {
             ...productData,
             ...emptyArrays,
@@ -1104,15 +1493,19 @@ const ProductManagement: React.FC<{
             priceHistory: productData.priceHistory || [],
         };
 
-        if (editingProduct && viewState === 'edit') {
-            onUpdateProduct({ ...safeProductData, id: editingProduct.id });
-        } else {
-            onAddProduct(safeProductData);
+        const saved = editingProduct && viewState === 'edit'
+            ? await onUpdateProduct({ ...safeProductData, id: editingProduct.id })
+            : await onAddProduct(safeProductData);
+
+        if (!saved) return false;
+
+        if (!editingProduct || viewState !== 'edit') {
             setNewProductForEmail({ ...safeProductData, id: Date.now(), rating: 0, reviewCount: 0, calculatedRating: 0 });
         }
 
         setEditingProduct(null);
         setViewState('list');
+        return true;
     };
 
     if (viewState !== 'list') {
