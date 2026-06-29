@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom';
 import { Coupon, CourseModule, Product, ProductFile, ProductFileType, ProductWithRating, ProductDocPage, QuizQuestion, User } from '../../App';
 import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
 import { PRODUCT_IMAGE_SLOTS, ProductImageSlot } from '../../utils/productImages';
+import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
+import { storage } from '../../firebase';
 
 type ProductViewState = 'list' | 'add' | 'edit';
 
@@ -180,6 +182,22 @@ const recursiveModuleUpdate = (
 const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
 const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
+
+const MAX_ADMIN_UPLOAD_BYTES = 75 * 1024 * 1024;
+
+const sanitizeStorageName = (value: string) =>
+    value
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9._-]+/g, '-')
+        .replace(/-+/g, '-')
+        .replace(/^-|-$/g, '') || 'file';
+
+const buildAdminContentStoragePath = (file: File, type: ProductFileType) => {
+    const extension = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
+    const safeName = sanitizeStorageName(file.name.replace(/\.[^/.]+$/, ''));
+    return `adminProductContent/${type}/${Date.now()}-${safeName}.${extension}`;
+};
 
 const editorCommands: Array<[string, string, string?]> = [
     ['bold', 'B'],
@@ -410,14 +428,24 @@ const AdminOpenDocsBuilder: React.FC<{
     );
 };
 
-const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void; onClose: () => void; }> = ({ onAdd, onClose }) => {
+const ContentComposer: React.FC<{
+    onAdd: (file: Omit<ProductFile, 'id'>) => void;
+    onClose: () => void;
+    initialFile?: ProductFile | null;
+}> = ({ onAdd, onClose, initialFile = null }) => {
     const fileInputRef = useRef<HTMLInputElement>(null);
+    const isEditing = Boolean(initialFile);
     const [uploadConfig, setUploadConfig] = useState<{ type: ProductFileType; accept: string } | null>(null);
-    const [formState, setFormState] = useState<{ type: ProductFileType; url: string; name: string; content: string } | null>(null);
-    const [docPages, setDocPages] = useState<ProductDocPage[]>([]);
-    const [activeDocPageId, setActiveDocPageId] = useState('');
+    const [formState, setFormState] = useState<{ type: ProductFileType; url: string; name: string; content: string } | null>(() => initialFile ? {
+        type: initialFile.type,
+        url: initialFile.url || '',
+        name: initialFile.name || 'Learning Resource',
+        content: initialFile.content || '',
+    } : null);
+    const [docPages, setDocPages] = useState<ProductDocPage[]>(() => initialFile?.type === 'doc' ? (normaliseDocPages(initialFile) || []) : []);
+    const [activeDocPageId, setActiveDocPageId] = useState(() => initialFile?.type === 'doc' ? (normaliseDocPages(initialFile)?.[0]?.id || '') : '');
     const [docError, setDocError] = useState('');
-    const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>([{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
+    const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(() => initialFile?.quiz?.questions?.length ? normaliseQuizQuestions(initialFile.quiz.questions) : [{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
     const [isUploading, setIsUploading] = useState(false);
     const quizListRef = useRef<HTMLDivElement>(null);
     const previousQuizQuestionCountRef = useRef(quizQuestions.length);
@@ -461,30 +489,51 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
         }
     };
 
-    const handleFileSelected = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
-        if (!file || !uploadConfig) return;
+        const selectedUploadConfig = uploadConfig;
 
-        setIsUploading(true);
-        const reader = new FileReader();
-
-        reader.onload = readerEvent => {
-            if (readerEvent.target?.result) {
-                onAdd({
-                    name: file.name,
-                    type: uploadConfig.type,
-                    url: readerEvent.target.result as string,
-                    content: '',
-                    quiz: { questions: [] },
-                });
-                setIsUploading(false);
-                onClose();
-            }
-        };
-
-        reader.readAsDataURL(file);
         event.target.value = '';
         setUploadConfig(null);
+
+        if (!file || !selectedUploadConfig) return;
+
+        if (file.size > MAX_ADMIN_UPLOAD_BYTES) {
+            alert('This file is too large. Upload a file under 75MB or use an external hosted URL.');
+            return;
+        }
+
+        setIsUploading(true);
+
+        try {
+            const storagePath = buildAdminContentStoragePath(file, selectedUploadConfig.type);
+            const fileRef = ref(storage, storagePath);
+
+            await uploadBytes(fileRef, file, {
+                contentType: file.type || undefined,
+                customMetadata: {
+                    originalName: file.name,
+                    resourceType: selectedUploadConfig.type,
+                },
+            });
+
+            const downloadUrl = await getDownloadURL(fileRef);
+
+            onAdd({
+                name: file.name,
+                type: selectedUploadConfig.type,
+                url: downloadUrl,
+                content: '',
+                quiz: { questions: [] },
+            });
+
+            onClose();
+        } catch (error) {
+            console.error('Admin content upload failed:', error);
+            alert('File upload failed. Please check Firebase Storage rules and try again.');
+        } finally {
+            setIsUploading(false);
+        }
     };
 
     const updateQuizQuestion = (questionIndex: number, updater: (question: QuizQuestion) => QuizQuestion) => {
@@ -573,7 +622,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
             <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
                     <p className="text-xs font-black uppercase tracking-[0.24em] text-cyan-700">Content Studio</p>
-                    <h4 className="text-xl font-black text-slate-900">Add learning content</h4>
+                    <h4 className="text-xl font-black text-slate-900">{isEditing ? 'Edit learning content' : 'Add learning content'}</h4>
                 </div>
                 <button type="button" onClick={onClose} className="rounded-full border border-white/50 px-4 py-2 text-sm font-bold text-slate-600 hover:bg-white/80 hover:shadow-sm">
                     Close
@@ -687,7 +736,7 @@ const ContentComposer: React.FC<{ onAdd: (file: Omit<ProductFile, 'id'>) => void
                                 Back
                             </button>
                             <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-600 px-6 py-3 font-black text-white shadow-sm hover:bg-cyan-700">
-                                Add Content
+                                {isEditing ? 'Save Content' : 'Add Content'}
                             </button>
                         </div>
                     </div>
@@ -708,6 +757,7 @@ const ModuleEditor: React.FC<{
     onAddChild: (parentId: string) => void;
 }> = ({ module, allModules, level, onUpdate, onAddChild }) => {
     const [isAddingContent, setIsAddingContent] = useState(false);
+    const [editingFile, setEditingFile] = useState<ProductFile | null>(null);
     const files = module.files || [];
     const childModules = module.modules || [];
 
@@ -715,10 +765,37 @@ const ModuleEditor: React.FC<{
         onUpdate(recursiveModuleUpdate(allModules || [], module.id, updater));
     };
 
+    const closeContentComposer = () => {
+        setIsAddingContent(false);
+        setEditingFile(null);
+    };
+
     const handleAddContent = (fileData: Omit<ProductFile, 'id'>) => {
         const newFile: ProductFile = { ...fileData, id: `file-${Date.now()}`, quiz: fileData.quiz || { questions: [] } };
         onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles => [...(currentFiles || []), newFile]));
-        setIsAddingContent(false);
+        closeContentComposer();
+    };
+
+    const handleUpdateContent = (fileData: Omit<ProductFile, 'id'>) => {
+        if (!editingFile) return;
+
+        const updatedFile: ProductFile = {
+            ...fileData,
+            id: editingFile.id,
+            quiz: fileData.quiz || { questions: [] },
+        };
+
+        onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles =>
+            (currentFiles || []).map(file => file.id === editingFile.id ? updatedFile : file)
+        ));
+
+        closeContentComposer();
+    };
+
+    const handleDeleteContent = (fileId: string) => {
+        onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles =>
+            (currentFiles || []).filter(file => file.id !== fileId)
+        ));
     };
 
     return (
@@ -741,12 +818,30 @@ const ModuleEditor: React.FC<{
                             <p className="font-black text-slate-900">{file.name}</p>
                             <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">{file.type}{file.quiz?.questions?.length ? ` • ${file.quiz.questions.length} questions` : ''}</p>
                         </div>
-                        <button type="button" onClick={() => onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles => (currentFiles || []).filter(item => item.id !== file.id)))} className="self-start rounded-xl border border-red-400/30 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-500/10 sm:self-auto">Remove</button>
+                        <div className="flex gap-2 self-start sm:self-auto">
+                            <button
+                                type="button"
+                                onClick={() => {
+                                    setEditingFile(file);
+                                    setIsAddingContent(false);
+                                }}
+                                className="rounded-xl border border-cyan-300/30 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-400/10"
+                            >
+                                Edit
+                            </button>
+                            <button type="button" onClick={() => handleDeleteContent(file.id)} className="rounded-xl border border-red-400/30 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-500/10">Remove</button>
+                        </div>
                     </div>
                 )) : <p className="rounded-2xl border border-dashed border-white/50 p-4 text-sm text-slate-600">No content yet. Add videos, PDFs, Open Docs, quizzes, and resource links here.</p>}
             </div>
 
-            {isAddingContent && <ContentComposer onAdd={handleAddContent} onClose={() => setIsAddingContent(false)} />}
+            {(isAddingContent || editingFile) && (
+                <ContentComposer
+                    onAdd={editingFile ? handleUpdateContent : handleAddContent}
+                    onClose={closeContentComposer}
+                    initialFile={editingFile}
+                />
+            )}
 
             {childModules.length > 0 && (
                 <div className="mt-5 space-y-4 border-l border-white/50 pl-4">
