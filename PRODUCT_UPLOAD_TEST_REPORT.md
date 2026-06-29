@@ -16,13 +16,14 @@
     - Audio/video/PDF/e-book/sheet uploads above 700KB now always use Firebase Storage and never base64 fallback.
     - Audio max size is 50MB; video 75MB; PDF/e-book 25MB; spreadsheet 10MB; product image 8MB.
     - Uploads use stable product-scoped paths: `adminProductContent/{type}/{productId}/{timestamp}-{safeFileName}`.
-    - Upload auth is checked and logged, but lack of anonymous auth no longer blocks uploads when deployed Storage rules allow the admin product paths.
+    - Upload auth now requires a real Firebase Auth user with `users/{uid}.role` set to `admin` or `super_admin`; localStorage-only admin sessions are blocked before upload.
     - The custom 20-second Promise.race timeout was removed for content uploads. Firebase resumable upload now controls retry/progress.
     - Retry logic was added for retryable Storage/network errors (up to 3 attempts), without retrying permission/bucket errors.
+    - A 15-second first-byte watchdog cancels uploads that stay at 0%, logs `ADMIN_UPLOAD_FIRST_BYTE_TIMEOUT`, and exposes a Retry button instead of leaving the UI stuck.
     - Upload progress and all required audio lifecycle logs were added.
     - Saved content metadata now includes `storagePath`, `size`, `contentType`, `createdAt`, and `updatedAt` before the item is added to product content.
     - App product save now logs Firestore save start/success/failure and refresh verification start/success.
-12. **Final status:** FAIL in this container network/auth test; code fixes are applied, forced timeout is removed, build/tests pass, but the real browser + deployed Firebase rules must be used to confirm PASS.
+12. **Final status:** FAIL in this container network/auth test; code fixes are applied, forced full-upload timeout is removed, first-byte stuck detection/retry UI is added, build/tests pass, but a real Firebase Auth admin in the browser plus deployed rules must be used to confirm PASS.
 
 ## Required production verification checklist
 

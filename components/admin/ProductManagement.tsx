@@ -4,8 +4,8 @@ import { Coupon, CourseModule, Product, ProductFile, ProductFileType, ProductWit
 import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
 import { PRODUCT_IMAGE_SLOTS, ProductImageSlot } from '../../utils/productImages';
 import { getDownloadURL, ref, uploadBytes, uploadBytesResumable } from 'firebase/storage';
-import { signInAnonymously } from 'firebase/auth';
-import { auth, storage } from '../../firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { auth, db, storage } from '../../firebase';
 
 type ProductViewState = 'list' | 'add' | 'edit';
 
@@ -219,15 +219,25 @@ const readFileAsDataUrl = (file: File) => new Promise<string>((resolve, reject) 
 });
 
 const ensureAdminUploadAuth = async () => {
-    if (auth.currentUser) return auth.currentUser;
+    console.info('ADMIN_UPLOAD_AUTH_CHECK_STARTED');
+    const user = auth.currentUser;
 
-    try {
-        const credential = await signInAnonymously(auth);
-        return credential.user;
-    } catch (error) {
-        console.warn('ADMIN_UPLOAD_AUTH_UNAVAILABLE', error);
-        return null;
+    if (!user) {
+        console.error('ADMIN_UPLOAD_AUTH_CHECK_FAILED', { reason: 'missing_firebase_auth_user' });
+        throw new Error('NOT_AUTHENTICATED: Firebase admin login required before uploading files.');
     }
+
+    const userSnap = await getDoc(doc(db, 'users', user.uid));
+    const role = userSnap.exists() ? userSnap.data().role : undefined;
+    const isAdmin = role === 'admin' || role === 'super_admin';
+
+    if (!isAdmin) {
+        console.error('ADMIN_UPLOAD_AUTH_CHECK_FAILED', { uid: user.uid, role: role || null, reason: 'admin_role_missing' });
+        throw new Error('ADMIN_PERMISSION_MISSING: Firebase admin role required before uploading files. Set users/{uid}.role to admin or super_admin.');
+    }
+
+    console.info('ADMIN_UPLOAD_AUTH_CHECK_SUCCESS', { uid: user.uid, role });
+    return user;
 };
 
 const classifyAdminUploadError = (error: unknown) => {
@@ -267,14 +277,32 @@ const isRetryableStorageError = (error: unknown) => {
         || !rawCode;
 };
 
+const createAdminUploadSession = async (file: File, storagePath: string) => {
+    console.info('ADMIN_UPLOAD_SESSION_CREATE_STARTED', {
+        fileName: file.name,
+        fileSize: file.size,
+        contentType: file.type,
+        storageBucket: storage.app.options.storageBucket,
+        storagePath,
+    });
+    const user = await ensureAdminUploadAuth();
+    console.info('ADMIN_UPLOAD_SESSION_CREATE_SUCCESS', { uid: user.uid, storageBucket: storage.app.options.storageBucket, storagePath });
+    return { user, storagePath };
+};
+
+
 const uploadAdminProductAsset = async (
     file: File,
     storagePath: string,
     logPrefix = 'ADMIN_CONTENT_UPLOAD',
     onProgress?: (percent: number) => void
 ) => {
-    const uploadUser = await ensureAdminUploadAuth();
-    console.info('ADMIN_UPLOAD_AUTH_CHECK', { authenticated: Boolean(uploadUser), uid: uploadUser?.uid || null });
+    try {
+        await createAdminUploadSession(file, storagePath);
+    } catch (error) {
+        console.error('ADMIN_UPLOAD_SESSION_CREATE_FAILED', { storagePath, error });
+        throw error;
+    }
 
     const fileRef = ref(storage, storagePath);
     const maxAttempts = 3;
@@ -288,29 +316,49 @@ const uploadAdminProductAsset = async (
                     originalName: file.name,
                 },
             });
+            console.info('ADMIN_UPLOAD_TASK_CREATED', { storagePath, attempt, storageBucket: storage.app.options.storageBucket });
 
             await new Promise<void>((resolve, reject) => {
+                let firstByteReceived = false;
+                const firstByteTimer = setTimeout(() => {
+                    if (!firstByteReceived) {
+                        console.error('ADMIN_UPLOAD_FIRST_BYTE_TIMEOUT', { storagePath, attempt, storageBucket: storage.app.options.storageBucket });
+                        uploadTask.cancel();
+                        reject(new Error('NETWORK_TIMEOUT: Upload stayed at 0% for more than 15 seconds. Check Firebase Auth, Storage rules, bucket, CORS, endpoint, and network.'));
+                    }
+                }, 15000);
+
                 uploadTask.on('state_changed',
                     snapshot => {
+                        if (snapshot.bytesTransferred > 0) {
+                            firstByteReceived = true;
+                            clearTimeout(firstByteTimer);
+                        }
                         const percent = snapshot.totalBytes ? Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100) : 0;
                         onProgress?.(percent);
+                        console.info('ADMIN_UPLOAD_PROGRESS', { storagePath, attempt, percent, bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
                         if (logPrefix === 'ADMIN_AUDIO_UPLOAD') {
                             console.info('ADMIN_AUDIO_UPLOAD_PROGRESS', { storagePath, attempt, percent, bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
-                        } else {
-                            console.info(`${logPrefix}_PROGRESS`, { storagePath, attempt, percent, bytesTransferred: snapshot.bytesTransferred, totalBytes: snapshot.totalBytes });
                         }
                     },
-                    reject,
-                    () => resolve()
+                    error => {
+                        clearTimeout(firstByteTimer);
+                        reject(error);
+                    },
+                    () => {
+                        clearTimeout(firstByteTimer);
+                        resolve();
+                    }
                 );
             });
 
             const downloadUrl = await getDownloadURL(fileRef);
 
+            console.info('ADMIN_DOWNLOAD_URL_SUCCESS', { storagePath, url: downloadUrl });
+            console.info('ADMIN_UPLOAD_SUCCESS', { storagePath, size: file.size, contentType: file.type });
+            console.info('ADMIN_UPLOAD_VERIFIED_IN_STORAGE', { storagePath, url: downloadUrl });
             if (logPrefix === 'ADMIN_AUDIO_UPLOAD') {
                 console.info('ADMIN_AUDIO_DOWNLOAD_URL_SUCCESS', { storagePath, url: downloadUrl });
-            } else {
-                console.info('ADMIN_DOWNLOAD_URL_SUCCESS', { storagePath, url: downloadUrl });
             }
 
             return {
@@ -323,6 +371,7 @@ const uploadAdminProductAsset = async (
             lastError = error;
             const retryable = isRetryableStorageError(error);
             console.warn(`${logPrefix}_ATTEMPT_FAILED`, { storagePath, attempt, retryable, error });
+            console.error('ADMIN_UPLOAD_FAILED', { storagePath, attempt, retryable, error });
 
             if (!retryable || attempt === maxAttempts) break;
             await new Promise(resolve => setTimeout(resolve, attempt * 1200));
@@ -624,6 +673,8 @@ const ContentComposer: React.FC<{
     const [quizQuestions, setQuizQuestions] = useState<QuizQuestion[]>(() => initialFile?.quiz?.questions?.length ? normaliseQuizQuestions(initialFile.quiz.questions) : [{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
     const [isUploading, setIsUploading] = useState(false);
     const [uploadProgress, setUploadProgress] = useState(0);
+    const [lastUploadRequest, setLastUploadRequest] = useState<{ file: File; config: { type: ProductFileType; accept: string } } | null>(null);
+    const [uploadError, setUploadError] = useState('');
     const quizListRef = useRef<HTMLDivElement>(null);
     const previousQuizQuestionCountRef = useRef(quizQuestions.length);
 
@@ -666,23 +717,20 @@ const ContentComposer: React.FC<{
         }
     };
 
-    const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        const selectedUploadConfig = uploadConfig;
-
-        event.target.value = '';
-        setUploadConfig(null);
-
-        if (!file || !selectedUploadConfig) return;
-
+    const runFileUpload = async (file: File, selectedUploadConfig: { type: ProductFileType; accept: string }) => {
         const maxBytes = getAdminContentMaxBytes(selectedUploadConfig.type);
+        setLastUploadRequest({ file, config: selectedUploadConfig });
+        setUploadError('');
 
+        console.info('ADMIN_UPLOAD_FILE_SELECTED', { productId, fileName: file.name, size: file.size, contentType: file.type, type: selectedUploadConfig.type });
         if (selectedUploadConfig.type === 'audio') {
             console.info('ADMIN_AUDIO_UPLOAD_SELECTED', { productId, fileName: file.name, size: file.size, contentType: file.type });
         }
 
         if (file.size > maxBytes) {
-            alert(`${selectedUploadConfig.type} file is too large. Max allowed size is ${Math.round(maxBytes / (1024 * 1024))}MB.`);
+            const message = `${selectedUploadConfig.type} file is too large. Max allowed size is ${Math.round(maxBytes / (1024 * 1024))}MB.`;
+            setUploadError(message);
+            alert(message);
             return;
         }
 
@@ -706,14 +754,28 @@ const ContentComposer: React.FC<{
                 quiz: { questions: [] },
             });
 
+            setLastUploadRequest(null);
             onClose();
         } catch (error) {
+            const message = error instanceof Error ? error.message : 'UNKNOWN_UPLOAD_ERROR: File upload failed.';
             console.error('Admin content upload failed:', error);
-            alert(error instanceof Error ? error.message : 'UNKNOWN_UPLOAD_ERROR: File upload failed.');
+            setUploadError(message);
+            alert(message);
         } finally {
             setIsUploading(false);
             setUploadProgress(0);
         }
+    };
+
+    const handleFileSelected = async (event: React.ChangeEvent<HTMLInputElement>) => {
+        const file = event.target.files?.[0];
+        const selectedUploadConfig = uploadConfig;
+
+        event.target.value = '';
+        setUploadConfig(null);
+
+        if (!file || !selectedUploadConfig) return;
+        void runFileUpload(file, selectedUploadConfig);
     };
 
     const updateQuizQuestion = (questionIndex: number, updater: (question: QuizQuestion) => QuizQuestion) => {
@@ -925,6 +987,12 @@ const ContentComposer: React.FC<{
 
             <input ref={fileInputRef} type="file" accept={uploadConfig?.accept} onChange={handleFileSelected} className="hidden" />
             {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content... {uploadProgress}% complete. Audio/video/PDF files are added only after Firebase Storage returns a download URL.</p>}
+            {!isUploading && uploadError && lastUploadRequest ? (
+                <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-3">
+                    <p className="text-sm font-bold text-rose-700">{uploadError}</p>
+                    <button type="button" onClick={() => runFileUpload(lastUploadRequest.file, lastUploadRequest.config)} className="mt-3 rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white">Retry upload</button>
+                </div>
+            ) : null}
         </div>
     );
 };
