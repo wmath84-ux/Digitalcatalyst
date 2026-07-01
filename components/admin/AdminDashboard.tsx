@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Product, ProductWithRating, Review, User, Coupon, WebsiteSettings, Order, AdminUser, SupportTicket, NewsletterSubscriber } from '../../App';
 import { EconomySettings } from '../../utils/economy';
 import Sidebar from './Sidebar';
@@ -18,6 +18,8 @@ import CoinEconomyManagement from './CoinEconomyManagement';
 import EduCoinRewardSettings from './EduCoinRewardSettings';
 import NewsletterSubscribers from './NewsletterSubscribers';
 import AdminPostManagement from './AdminPostManagement';
+import { auth, db } from '../../firebase';
+import { doc, getDoc } from 'firebase/firestore';
 
 interface AdminDashboardProps {
     products: ProductWithRating[];
@@ -31,9 +33,9 @@ interface AdminDashboardProps {
     newsletterSubscribers: NewsletterSubscriber[];
     websiteSettings: WebsiteSettings;
     economySettings: EconomySettings;
-    onAddProduct: (product: Omit<Product, 'id'>) => void;
-    onUpdateProduct: (product: Product) => void;
-    onDeleteProduct: (id: number) => void;
+    onAddProduct: (product: Omit<Product, 'id'>) => Promise<boolean>;
+    onUpdateProduct: (product: Product) => Promise<boolean>;
+    onDeleteProduct: (id: number) => Promise<boolean>;
     onDeleteUser: (id: number) => void;
     onAdminUsersUpdate: (users: AdminUser[]) => void;
     onCouponsUpdate: (coupons: Coupon[]) => void;
@@ -44,7 +46,7 @@ interface AdminDashboardProps {
     onSwitchToHome: () => void;
 }
 
-export type AdminView = 'dashboard' | 'adminPosts' | 'economy' | 'rewardSettings' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'subscribers' | 'analytics' | 'websiteSettings';
+export type AdminView = 'dashboard' | 'firebaseAdmin' | 'adminPosts' | 'economy' | 'rewardSettings' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'subscribers' | 'analytics' | 'websiteSettings';
 
 const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?: string; icon: React.ReactNode; gradient: string }> = ({ title, value, subtitle, icon, gradient }) => (
     <div className={`relative overflow-hidden rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-slate-900 sm:p-6 ${gradient} transform transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]`}>
@@ -60,12 +62,61 @@ const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?
     </div>
 );
 
+
+const FirebaseAdminSetup: React.FC = () => {
+    const [status, setStatus] = useState<{ uid: string; email: string; role: string; isAdmin: boolean; message: string }>({ uid: '', email: '', role: '', isAdmin: false, message: 'Checking Firebase admin session...' });
+
+    const refresh = async () => {
+        const user = auth.currentUser;
+
+        if (!user) {
+            setStatus({ uid: '', email: '', role: '', isAdmin: false, message: 'Firebase admin login required before uploading files.' });
+            return;
+        }
+
+        const userSnap = await getDoc(doc(db, 'users', user.uid));
+        const role = userSnap.exists() ? String(userSnap.data().role || '') : '';
+        const isAdmin = role === 'admin' || role === 'super_admin';
+
+        setStatus({
+            uid: user.uid,
+            email: user.email || 'No email found',
+            role: role || 'missing',
+            isAdmin,
+            message: isAdmin ? 'Firebase admin permission is ready for product uploads.' : `Your Firebase user is not marked as admin. Add role: admin in users/${user.uid}.`,
+        });
+    };
+
+    useEffect(() => {
+        void refresh();
+    }, []);
+
+    return (
+        <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
+            <div className="rounded-[2rem] border border-white/60 bg-white/80 p-6 shadow-sm backdrop-blur-xl">
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-blue-600">Firebase Admin Setup</p>
+                <h1 className="mt-2 text-3xl font-black text-slate-900">Upload permission check</h1>
+                <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">Product file uploads use Firebase Auth admin identity. Local admin login alone is not enough for Storage or Firestore writes.</p>
+                <div className="mt-6 grid gap-3 sm:grid-cols-2">
+                    <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Firebase UID</p><p className="mt-1 break-all font-bold text-slate-900">{status.uid || 'Not signed in'}</p></div>
+                    <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Firebase Email</p><p className="mt-1 break-all font-bold text-slate-900">{status.email || 'Not signed in'}</p></div>
+                    <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Firestore Role</p><p className="mt-1 break-all font-bold text-slate-900">{status.role || 'missing'}</p></div>
+                    <div className={`rounded-2xl p-4 ${status.isAdmin ? 'bg-emerald-50' : 'bg-rose-50'}`}><p className="text-xs font-black uppercase text-slate-500">Admin permission</p><p className={`mt-1 font-bold ${status.isAdmin ? 'text-emerald-700' : 'text-rose-700'}`}>{status.isAdmin ? 'PASS' : 'BLOCKED'}</p></div>
+                </div>
+                <div className={`mt-5 rounded-2xl p-4 text-sm font-bold ${status.isAdmin ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{status.message}</div>
+                <button type="button" onClick={refresh} className="mt-5 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white">Refresh Firebase admin status</button>
+            </div>
+        </div>
+    );
+};
+
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     const [currentView, setCurrentView] = useState<AdminView>('dashboard');
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
 
     const renderView = () => {
         switch (currentView) {
+            case 'firebaseAdmin': return <FirebaseAdminSetup />;
             case 'adminPosts': return <AdminPostManagement />;
             case 'economy': return <CoinEconomyManagement economySettings={props.economySettings} products={props.products} websiteSettings={props.websiteSettings} />;
             case 'rewardSettings': return <EduCoinRewardSettings economySettings={props.economySettings} />;

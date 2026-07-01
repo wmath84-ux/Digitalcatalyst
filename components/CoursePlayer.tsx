@@ -21,6 +21,49 @@ declare global {
   }
 }
 
+
+const hostedDocsProviders = ['direct_pdf', 'google_drive_pdf', 'google_drive_doc', 'external_docs_link'] as const;
+
+const extractGoogleDriveFileId = (value: string) => {
+  const trimmed = value.trim();
+  const patterns = [
+    /drive\.google\.com\/file\/d\/([^/?#]+)/i,
+    /drive\.google\.com\/open\?id=([^&#]+)/i,
+    /drive\.google\.com\/uc\?id=([^&#]+)/i,
+    /docs\.google\.com\/(?:document|spreadsheets|presentation)\/d\/([^/?#]+)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = trimmed.match(pattern);
+    if (match?.[1]) return decodeURIComponent(match[1]);
+  }
+
+  try {
+    const url = new URL(trimmed);
+    return url.searchParams.get('id') || '';
+  } catch {
+    return '';
+  }
+};
+
+const isGoogleDriveUrl = (value: string) => /https:\/\/(?:drive|docs)\.google\.com\//i.test(value.trim());
+const toGoogleDrivePreviewUrl = (value: string) => {
+  const fileId = extractGoogleDriveFileId(value);
+  return fileId ? `https://drive.google.com/file/d/${fileId}/preview` : value.trim();
+};
+const isHostedDocsFile = (file: ProductFile) => {
+  if (hostedDocsProviders.includes(file.provider as typeof hostedDocsProviders[number])) return true;
+  if (file.type === 'pdf' && Boolean(file.url)) return true;
+  return file.type === 'link' && Boolean(file.url) && (isGoogleDriveUrl(file.url) || /\.(pdf|doc|docx)(?:$|[?#])/i.test(file.url));
+};
+
+const getHostedDocsPreviewUrl = (file: ProductFile) => {
+  if ((file.provider === 'google_drive_pdf' || file.provider === 'google_drive_doc' || isGoogleDriveUrl(file.url)) && extractGoogleDriveFileId(file.url)) {
+    return toGoogleDrivePreviewUrl(file.url);
+  }
+  return file.url;
+};
+
 const FileIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
     <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5A3.375 3.375 0 0010.125 2.25H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
@@ -598,6 +641,41 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   );
 };
 
+
+const HostedDocumentViewer: React.FC<{ file: ProductFile }> = ({ file }) => {
+  const previewUrl = getHostedDocsPreviewUrl(file);
+  const isDrive = file.provider === 'google_drive_pdf' || file.provider === 'google_drive_doc' || isGoogleDriveUrl(file.url);
+  const fallbackLabel = isDrive ? 'Open in Google Drive' : file.type === 'pdf' || file.provider === 'direct_pdf' ? 'Open PDF' : 'Open in new tab';
+  const badge = isDrive ? 'Google Drive Preview' : file.type === 'pdf' || file.provider === 'direct_pdf' ? 'PDF Viewer' : 'Hosted Docs';
+
+  return (
+    <div className="flex h-full min-h-0 w-full flex-col bg-white/70 text-slate-900">
+      <div className="flex shrink-0 flex-col gap-3 border-b border-white/60 bg-white/80 p-3 backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:p-4">
+        <div className="min-w-0">
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-cyan-700">{badge}</p>
+          <h2 className="truncate text-lg font-black text-slate-900 sm:text-2xl">{file.name}</h2>
+          {isDrive && <p className="mt-1 text-xs font-bold text-amber-700">If preview is blocked, make sure Google Drive sharing is set to Anyone with the link.</p>}
+        </div>
+        <a href={file.url || previewUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-2xl bg-cyan-100 px-5 py-3 text-sm font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50">
+          {fallbackLabel}
+        </a>
+      </div>
+      <div className="min-h-0 flex-1 bg-slate-100/70 p-2 sm:p-4">
+        {previewUrl ? (
+          <iframe
+            title={file.name || 'Document preview'}
+            src={previewUrl}
+            className="h-full w-full rounded-[1.5rem] border border-white/70 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
+            allow="fullscreen"
+          />
+        ) : (
+          <GlassDownloadCard file={file} headline="Document preview unavailable" />
+        )}
+      </div>
+    </div>
+  );
+};
+
 const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
   <div className="flex h-full min-h-0 items-center justify-center overflow-auto p-3 text-slate-900 sm:p-6 custom-scrollbar">
     <div className="w-full max-w-2xl rounded-[1.5rem] border border-white/50 bg-white/70 p-5 text-center shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl sm:rounded-[2rem] sm:p-8">
@@ -1011,11 +1089,11 @@ const CoursePlayer: React.FC<{
           </div>
         );
       }
-      case 'pdf': return <GlassDownloadCard file={activeFile} onDownloadRequest={requestPdfDownload} />;
+      case 'pdf': return activeFile.url ? <HostedDocumentViewer file={activeFile} /> : <GlassDownloadCard file={activeFile} onDownloadRequest={requestPdfDownload} />;
       case 'sheet': return <GlassDownloadCard file={activeFile} />;
       case 'doc':
       case 'ebook': return <SmartDocsWorkspace file={activeFile} productId={product.id} />;
-      case 'link': return <ExternalResourceCard file={activeFile} />;
+      case 'link': return isHostedDocsFile(activeFile) ? <HostedDocumentViewer file={activeFile} /> : <ExternalResourceCard file={activeFile} />;
       case 'quiz': return <QuizPlayer file={activeFile} economySettings={economySettings} onQuizReward={onQuizReward} />;
       default: return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
     }
