@@ -184,6 +184,64 @@ const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-
 const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
 
+
+type HostedDocsProvider = 'direct_pdf' | 'google_drive_pdf' | 'google_drive_doc' | 'external_docs_link' | 'open_docs';
+
+type ContentComposerFormState = {
+    type: ProductFileType;
+    url: string;
+    name: string;
+    content: string;
+    provider?: HostedDocsProvider | 'upload' | 'external_url';
+};
+
+const hostedDocsProviderLabels: Record<HostedDocsProvider, string> = {
+    direct_pdf: 'PDF',
+    google_drive_pdf: 'Google Drive PDF',
+    google_drive_doc: 'Google Drive Doc',
+    open_docs: 'Open Docs',
+    external_docs_link: 'External Docs Link',
+};
+
+const hostedDocsProviders: HostedDocsProvider[] = ['direct_pdf', 'google_drive_pdf', 'google_drive_doc', 'open_docs', 'external_docs_link'];
+
+const extractGoogleDriveFileId = (value: string) => {
+    const trimmed = value.trim();
+    const patterns = [
+        /drive\.google\.com\/file\/d\/([^/?#]+)/i,
+        /drive\.google\.com\/open\?id=([^&#]+)/i,
+        /drive\.google\.com\/uc\?id=([^&#]+)/i,
+        /docs\.google\.com\/(?:document|spreadsheets|presentation)\/d\/([^/?#]+)/i,
+    ];
+
+    for (const pattern of patterns) {
+        const match = trimmed.match(pattern);
+        if (match?.[1]) return decodeURIComponent(match[1]);
+    }
+
+    try {
+        const url = new URL(trimmed);
+        return url.searchParams.get('id') || '';
+    } catch {
+        return '';
+    }
+};
+
+const isGoogleDriveUrl = (value: string) => /https:\/\/(?:drive|docs)\.google\.com\//i.test(value.trim());
+
+const toGoogleDrivePreviewUrl = (value: string) => {
+    const fileId = extractGoogleDriveFileId(value);
+    return fileId ? `https://drive.google.com/file/d/${fileId}/preview` : value.trim();
+};
+
+const inferHostedDocsType = (provider: HostedDocsProvider): ProductFileType => {
+    if (provider === 'direct_pdf' || provider === 'google_drive_pdf') return 'pdf';
+    if (provider === 'open_docs') return 'doc';
+    return 'link';
+};
+
+const isHostedDocsProvider = (provider?: string): provider is HostedDocsProvider => Boolean(provider && hostedDocsProviders.includes(provider as HostedDocsProvider));
+
 const MAX_AUDIO_UPLOAD_BYTES = 50 * 1024 * 1024;
 const MAX_VIDEO_UPLOAD_BYTES = 75 * 1024 * 1024;
 const MAX_DOCUMENT_UPLOAD_BYTES = 25 * 1024 * 1024;
@@ -666,11 +724,12 @@ const ContentComposer: React.FC<{
     const fileInputRef = useRef<HTMLInputElement>(null);
     const isEditing = Boolean(initialFile);
     const [uploadConfig, setUploadConfig] = useState<{ type: ProductFileType; accept: string } | null>(null);
-    const [formState, setFormState] = useState<{ type: ProductFileType; url: string; name: string; content: string } | null>(() => initialFile ? {
+    const [formState, setFormState] = useState<ContentComposerFormState | null>(() => initialFile ? {
         type: initialFile.type,
         url: initialFile.url || '',
         name: initialFile.name || 'Learning Resource',
         content: initialFile.content || '',
+        provider: initialFile.provider as ContentComposerFormState['provider'],
     } : null);
     const [docPages, setDocPages] = useState<ProductDocPage[]>(() => initialFile?.type === 'doc' ? (normaliseDocPages(initialFile) || []) : []);
     const [activeDocPageId, setActiveDocPageId] = useState(() => initialFile?.type === 'doc' ? (normaliseDocPages(initialFile)?.[0]?.id || '') : '');
@@ -683,11 +742,12 @@ const ContentComposer: React.FC<{
     const quizListRef = useRef<HTMLDivElement>(null);
     const previousQuizQuestionCountRef = useRef(quizQuestions.length);
 
-    const contentTypes: Array<{ type: ProductFileType; title: string; description: string; icon: string; accept?: string }> = [
+    const contentTypes: Array<{ type: ProductFileType; title: string; description: string; icon: string; accept?: string; action?: 'docsUrl' }> = [
         { type: 'video', title: 'Video Upload', description: 'Upload MP4/WebM lesson files.', icon: '🎬', accept: 'video/*' },
         { type: 'youtube', title: 'YouTube Video', description: 'Embed a hosted YouTube lesson.', icon: '▶️' },
         { type: 'pdf', title: 'PDF', description: 'Attach worksheets, notes, or guides.', icon: '📄', accept: 'application/pdf' },
         { type: 'doc', title: 'Open Docs', description: 'Open a full-page builder for multi-page lesson notes.', icon: '🧠' },
+        { type: 'pdf', title: 'PDF / Docs URL', description: 'Use Google Drive, hosted PDF, DOC/DOCX, or external docs links without Storage.', icon: '🌐', action: 'docsUrl' },
         { type: 'quiz', title: 'Quiz', description: 'Create interactive assessment questions.', icon: '✅' },
         { type: 'link', title: 'External Link', description: 'Reference any hosted resource.', icon: '🔗' },
         { type: 'sheet', title: 'Spreadsheet', description: 'Upload CSV/XLS study material.', icon: '📊', accept: '.csv,.xls,.xlsx' },
@@ -722,6 +782,34 @@ const ContentComposer: React.FC<{
         }
     };
 
+    const showDocsUrlForm = () => {
+        setFormState({
+            type: 'pdf',
+            provider: 'direct_pdf',
+            url: '',
+            name: 'PDF / Docs Resource',
+            content: '',
+        });
+        setDocError('');
+    };
+
+    const updateHostedDocsProvider = (provider: HostedDocsProvider) => {
+        setDocError('');
+        setFormState(prev => prev ? {
+            ...prev,
+            provider,
+            type: inferHostedDocsType(provider),
+            url: provider === 'open_docs' ? '' : prev.url,
+            name: prev.name === 'PDF / Docs Resource' ? hostedDocsProviderLabels[provider] : prev.name,
+        } : prev);
+
+        if (provider === 'open_docs') {
+            const firstPage = createAdminDocPage('Page 1', '<h1>Open Docs Workspace</h1><p>Start building your lesson here.</p>');
+            setDocPages([firstPage]);
+            setActiveDocPageId(firstPage.id);
+        }
+    };
+
     const runFileUpload = async (file: File, selectedUploadConfig: { type: ProductFileType; accept: string }) => {
         const maxBytes = getAdminContentMaxBytes(selectedUploadConfig.type);
         setLastUploadRequest({ file, config: selectedUploadConfig });
@@ -753,6 +841,7 @@ const ContentComposer: React.FC<{
                 storagePath: uploaded.storagePath,
                 size: uploaded.size,
                 contentType: uploaded.contentType,
+                provider: 'upload',
                 createdAt: now,
                 updatedAt: now,
                 content: '',
@@ -840,10 +929,14 @@ const ContentComposer: React.FC<{
                 updatedAt: page.updatedAt || Date.now(),
             }));
 
+            const now = Date.now();
             onAdd({
                 name: trimmedName,
                 type: 'doc',
                 url: '',
+                provider: formState.provider === 'open_docs' ? 'open_docs' : undefined,
+                createdAt: initialFile?.createdAt || now,
+                updatedAt: now,
                 content: cleanPages[0]?.content || '',
                 docPages: cleanPages,
                 quiz: { questions: [] },
@@ -853,10 +946,40 @@ const ContentComposer: React.FC<{
             return;
         }
 
+        const trimmedUrl = formState.url.trim();
+        const provider = formState.provider;
+        const isHostedDocs = isHostedDocsProvider(provider);
+
+        if (trimmedUrl && !trimmedUrl.startsWith('https://')) {
+            setDocError('Resource URL must start with https://');
+            return;
+        }
+
+        if (isHostedDocs && provider !== 'open_docs') {
+            if (!trimmedUrl) {
+                setDocError('Enter a hosted PDF/docs URL before saving.');
+                return;
+            }
+
+            if ((provider === 'google_drive_pdf' || provider === 'google_drive_doc') && (!isGoogleDriveUrl(trimmedUrl) || !extractGoogleDriveFileId(trimmedUrl))) {
+                setDocError('Enter a valid Google Drive share link. Make sure sharing is set to Anyone with the link.');
+                return;
+            }
+        }
+
+        const now = Date.now();
+        const normalizedUrl = provider === 'google_drive_pdf' || provider === 'google_drive_doc'
+            ? toGoogleDrivePreviewUrl(trimmedUrl)
+            : trimmedUrl;
+
         onAdd({
             name: trimmedName,
             type: formState.type,
-            url: formState.url,
+            url: normalizedUrl,
+            provider: provider || (formState.type === 'link' ? 'external_url' : undefined),
+            contentType: provider === 'direct_pdf' || provider === 'google_drive_pdf' ? 'application/pdf' : undefined,
+            createdAt: initialFile?.createdAt || now,
+            updatedAt: now,
             content: '',
             quiz: { questions: [] },
         });
@@ -880,9 +1003,9 @@ const ContentComposer: React.FC<{
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
                     {(contentTypes || []).map(item => (
                         <button
-                            key={item.type}
+                            key={`${item.type}-${item.title}`}
                             type="button"
-                            onClick={() => item.accept ? triggerFileUpload(item.type, item.accept) : showForm(item.type)}
+                            onClick={() => item.action === 'docsUrl' ? showDocsUrlForm() : item.accept ? triggerFileUpload(item.type, item.accept) : showForm(item.type)}
                             className="rounded-2xl border border-white/50 bg-white/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/50 hover:bg-white/80 hover:shadow-sm"
                         >
                             <span className="text-2xl">{item.icon}</span>
@@ -970,9 +1093,35 @@ const ContentComposer: React.FC<{
                                 </button>
                             </div>
                         ) : (
-                            <div>
-                                <label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : 'Resource URL'}</label>
-                                <input value={formState.url} onChange={event => setFormState(prev => prev ? { ...prev, url: event.target.value } : prev)} className={fieldClass} placeholder="https://example.com/resource" />
+                            <div className="space-y-4">
+                                {isHostedDocsProvider(formState.provider) && (
+                                    <div>
+                                        <label className={labelClass}>Content Type</label>
+                                        <select
+                                            value={formState.provider}
+                                            onChange={event => updateHostedDocsProvider(event.target.value as HostedDocsProvider)}
+                                            className={fieldClass}
+                                        >
+                                            <option value="direct_pdf">PDF</option>
+                                            <option value="google_drive_pdf">Google Drive PDF</option>
+                                            <option value="google_drive_doc">Google Drive Doc</option>
+                                            <option value="open_docs">Open Docs</option>
+                                            <option value="external_docs_link">External Docs Link</option>
+                                        </select>
+                                    </div>
+                                )}
+                                {formState.provider !== 'open_docs' && (
+                                    <div>
+                                        <label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : 'Resource URL'}</label>
+                                        <input value={formState.url} onChange={event => setFormState(prev => prev ? { ...prev, url: event.target.value } : prev)} className={fieldClass} placeholder="https://example.com/resource" />
+                                    </div>
+                                )}
+                                {isHostedDocsProvider(formState.provider) && formState.provider !== 'open_docs' && (
+                                    <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
+                                        For Google Drive files, set sharing to Anyone with the link. URL-based PDFs/docs do not use Firebase Storage and only save metadata to the product.
+                                    </p>
+                                )}
+                                {docError && <p className="rounded-2xl bg-rose-50 p-3 text-sm font-bold text-rose-700">{docError}</p>}
                             </div>
                         )}
                     </div>
