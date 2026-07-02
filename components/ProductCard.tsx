@@ -15,9 +15,10 @@ interface ProductCardProps {
   animationDelay: number;
   displayMode?: 'showcase' | 'wishlist';
   coupons: Coupon[];
+  isPurchased?: boolean;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDetails, isWishlisted, onToggleWishlist, onAddToCart, onQuickView, animationDelay, displayMode = 'showcase', coupons }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDetails, isWishlisted, onToggleWishlist, onAddToCart, onQuickView, animationDelay, displayMode = 'showcase', coupons, isPurchased = false }) => {
     // Use 'animate-child' class to hook into the parent's stagger logic.
     // The 'animate-delay-X' class comes from index.html CSS
     const animationClass = settings.animations.enabled 
@@ -73,6 +74,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
 
                 {/* Badges */}
                 <div className="absolute left-2 top-2 flex flex-col gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
+                    {isPurchased && (
+                        <span className="rounded-md bg-emerald-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] animate-fade-in sm:px-3 sm:text-xs">
+                            Purchased
+                        </span>
+                    )}
                     {product.isFree && (
                         <span className="rounded-md bg-gradient-to-r from-indigo-600 to-purple-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] animate-fade-in sm:px-3 sm:text-xs">
                             Free
@@ -149,16 +155,17 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                             )}
                         </div>
                         <button onClick={() => onViewDetails()} className="flex shrink-0 items-center rounded-full border border-indigo-200/70 bg-white/85 px-3 py-2 text-xs font-black text-primary shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 sm:px-4 sm:text-sm">
-                            Details <span className="ml-1">&rarr;</span>
+                            {isPurchased ? 'Purchased' : 'Details'} <span className="ml-1">&rarr;</span>
                         </button>
                     </div>
                 ) : (
                     <div className="mt-4 flex gap-2">
                         <button 
+                            disabled={isPurchased}
                             onClick={() => onAddToCart(product.id, 1)} 
-                            className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-2 rounded-lg hover:bg-opacity-90 transition-colors text-sm shadow-sm active:scale-95"
+                            className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-2 rounded-lg hover:bg-opacity-90 transition-colors text-sm shadow-sm active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            Move to Cart
+                            {isPurchased ? 'Purchased' : 'Move to Cart'}
                         </button>
                         <button 
                             onClick={() => onToggleWishlist(product.id)}

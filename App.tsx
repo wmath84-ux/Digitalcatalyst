@@ -140,6 +140,16 @@ const safeSetItem = (key: string, value: any): boolean => {
     }
 };
 
+const safeGetItem = <T,>(key: string, fallback: T): T => {
+    try {
+        const stored = localStorage.getItem(key);
+        return stored ? JSON.parse(stored) as T : fallback;
+    } catch (err) {
+        console.warn(`Error reading state from localStorage for key "${key}":`, err);
+        return fallback;
+    }
+};
+
 // Interface for uploaded product files with specific types
 export type ProductFileType = 'youtube' | 'video' | 'audio' | 'pdf' | 'doc' | 'sheet' | 'link' | 'ebook' | 'quiz';
 export interface QuizQuestion {
@@ -158,7 +168,26 @@ export interface ProductDocPage {
   updatedAt?: number;
 }
 export type QuizAnswerState = Record<number, number>;
-export interface ProductFile {
+export type CourseAccessLevel = 'included' | 'paidUpdate' | 'hidden';
+
+export interface CourseAccessMeta {
+  accessLevel?: CourseAccessLevel;
+  paidUpdateId?: string;
+  paidUpdateTitle?: string;
+  paidUpdatePrice?: string;
+  paidUpdateCoinPrice?: number;
+}
+
+export interface ProductAccessState {
+  productId: number;
+  hasBaseAccess: boolean;
+  ownedUpdateIds: string[];
+  lockedPaidUpdateIds: string[];
+  hasPaidLockedUpdates: boolean;
+  lockedPaidUpdateCount: number;
+}
+
+export interface ProductFile extends CourseAccessMeta {
   id: string;
   name: string;
   type: ProductFileType;
@@ -175,7 +204,7 @@ export interface ProductFile {
 }
 
 // Interface for a course module, now supporting nested modules
-export interface CourseModule {
+export interface CourseModule extends CourseAccessMeta {
   id: string;
   title: string;
   files: ProductFile[];
@@ -288,6 +317,8 @@ export interface User {
     claimedRewardIds?: Array<string>;
     profileStreakClaims?: Record<string, string>;
     coinTransactions?: CoinTransaction[];
+    purchasedProductIds?: number[];
+    purchasedProductUpdateIds?: Record<string, string[]>;
 }
 
 // New Admin User structure for multi-user admin management
@@ -1015,6 +1046,8 @@ const App: React.FC = () => {
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
   const [wishlist, setWishlist] = useState<number[]>([]);
   const [purchasedProductIds, setPurchasedProductIds] = useState<number[]>([]);
+  const [purchasedProductUpdateIds, setPurchasedProductUpdateIds] = useState<Record<string, string[]>>({});
+  const [latestUpdateCheckoutProduct, setLatestUpdateCheckoutProduct] = useState<ProductWithRating | null>(null);
   const [isAuthRestoring, setIsAuthRestoring] = useState(false);
   const [authRestoreError, setAuthRestoreError] = useState<string | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>('booting');
@@ -1072,6 +1105,34 @@ const App: React.FC = () => {
     Math.max(0, Math.floor(Number(user?.coinBalance ?? user?.eduCoins ?? 0)));
 
   const liveWalletBalance = liveEduCoinBalance ?? readEduCoinBalance(effectiveAppUser);
+
+  const normalizePurchasedProductUpdateIds = (value: unknown): Record<string, string[]> => {
+    if (!value || typeof value !== 'object') return {};
+
+    return Object.entries(value as Record<string, unknown>).reduce<Record<string, string[]>>((acc, [productId, updateIds]) => {
+      const cleanProductId = String(productId);
+      const cleanUpdateIds = Array.isArray(updateIds)
+        ? [...new Set(updateIds.map(item => String(item || '').trim()).filter(Boolean))]
+        : [];
+
+      if (cleanProductId && cleanUpdateIds.length > 0) {
+        acc[cleanProductId] = cleanUpdateIds;
+      }
+
+      return acc;
+    }, {});
+  };
+
+  const getCourseAccessLevel = (item?: Partial<CourseAccessMeta> | null): CourseAccessLevel => {
+    if (item?.accessLevel === 'paidUpdate' || item?.accessLevel === 'hidden') return item.accessLevel;
+    return 'included';
+  };
+
+  const getCourseItemUpdateId = (productId: number, item: Partial<CourseAccessMeta> & { id?: string }) =>
+    String(item.paidUpdateId || `product-${productId}-update-${item.id || 'content'}`).trim();
+
+  const mergeUpdateIds = (current: string[] = [], next: string[] = []) =>
+    [...new Set([...current, ...next].map(item => String(item || '').trim()).filter(Boolean))];
 
   useEffect(() => {
     const uid = effectiveFirebaseUser?.uid || auth.currentUser?.uid;
@@ -1187,8 +1248,18 @@ const App: React.FC = () => {
 
   const normalizeCourseModules = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
     ...module,
+    accessLevel: getCourseAccessLevel(module),
+    paidUpdateId: module.paidUpdateId || '',
+    paidUpdateTitle: module.paidUpdateTitle || '',
+    paidUpdatePrice: module.paidUpdatePrice || '',
+    paidUpdateCoinPrice: Number(module.paidUpdateCoinPrice || 0),
     files: (module.files || []).map(file => ({
       ...file,
+      accessLevel: getCourseAccessLevel(file),
+      paidUpdateId: file.paidUpdateId || '',
+      paidUpdateTitle: file.paidUpdateTitle || '',
+      paidUpdatePrice: file.paidUpdatePrice || '',
+      paidUpdateCoinPrice: Number(file.paidUpdateCoinPrice || 0),
       quiz: file.quiz
         ? { questions: (file.quiz.questions || []).map(question => ({ ...question, options: question.options || [] })) }
         : file.type === 'quiz' ? { questions: [] } : file.quiz,
@@ -1728,6 +1799,73 @@ const App: React.FC = () => {
   const wishlistProducts = visibleProducts.filter(p => wishlist.includes(p.id));
   const freeProducts = visibleProducts.filter(p => p.isFree);
 
+  const collectPaidUpdateIdsFromModules = (productId: number, modules: CourseModule[] = []): string[] => {
+    const updateIds: string[] = [];
+
+    modules.forEach(module => {
+      if (getCourseAccessLevel(module) === 'paidUpdate') {
+        updateIds.push(getCourseItemUpdateId(productId, module));
+      }
+
+      (module.files || []).forEach(file => {
+        if (getCourseAccessLevel(file) === 'paidUpdate') {
+          updateIds.push(getCourseItemUpdateId(productId, file));
+        }
+      });
+
+      updateIds.push(...collectPaidUpdateIdsFromModules(productId, module.modules || []));
+    });
+
+    return [...new Set(updateIds.filter(Boolean))];
+  };
+
+  const findFirstLockedPaidUpdateMeta = (product: ProductWithRating): CourseAccessMeta | null => {
+    const ownedUpdateIds = purchasedProductUpdateIds[String(product.id)] || [];
+
+    const scanModules = (modules: CourseModule[] = []): CourseAccessMeta | null => {
+      for (const module of modules) {
+        if (getCourseAccessLevel(module) === 'paidUpdate') {
+          const updateId = getCourseItemUpdateId(product.id, module);
+          if (!ownedUpdateIds.includes(updateId)) return module;
+        }
+
+        for (const file of module.files || []) {
+          if (getCourseAccessLevel(file) === 'paidUpdate') {
+            const updateId = getCourseItemUpdateId(product.id, file);
+            if (!ownedUpdateIds.includes(updateId)) return file;
+          }
+        }
+
+        const childMatch = scanModules(module.modules || []);
+        if (childMatch) return childMatch;
+      }
+
+      return null;
+    };
+
+    return scanModules(product.courseContent || []);
+  };
+
+  const getProductAccessState = (product: ProductWithRating): ProductAccessState => {
+    const ownedUpdateIds = purchasedProductUpdateIds[String(product.id)] || [];
+    const paidUpdateIds = collectPaidUpdateIdsFromModules(product.id, product.courseContent || []);
+    const lockedPaidUpdateIds = paidUpdateIds.filter(updateId => !ownedUpdateIds.includes(updateId));
+
+    return {
+      productId: product.id,
+      hasBaseAccess: purchasedProductIds.includes(product.id),
+      ownedUpdateIds,
+      lockedPaidUpdateIds,
+      hasPaidLockedUpdates: lockedPaidUpdateIds.length > 0,
+      lockedPaidUpdateCount: lockedPaidUpdateIds.length,
+    };
+  };
+
+  const productAccessById = productsWithRatings.reduce<Record<number, ProductAccessState>>((acc, product) => {
+    acc[product.id] = getProductAccessState(product);
+    return acc;
+  }, {});
+
   // --- Real-time Metrics for Hero ---
   // Calculate total revenue from orders that are not cancelled
   const totalRevenueValue = orders
@@ -1770,6 +1908,20 @@ const App: React.FC = () => {
   };
 
   const handleAddToCart = (productId: number, quantity: number = 1) => {
+      const product = productsWithRatings.find(p => p.id === productId);
+      const access = product ? getProductAccessState(product) : null;
+
+      if (access?.hasBaseAccess) {
+          setInfoModal({
+              title: 'Already purchased',
+              message: access.hasPaidLockedUpdates
+                  ? 'You already own the base course. Open the course player and use Purchase the latest update to unlock newly added paid content.'
+                  : 'This product is already available in My Purchases.',
+              icon: '✅',
+          });
+          return;
+      }
+
       setCart(prevCart => {
           const existingItem = prevCart.find(item => item.productId === productId);
           if (existingItem) {
@@ -1780,11 +1932,12 @@ const App: React.FC = () => {
               return [...prevCart, { productId, quantity }];
           }
       });
-      const product = products.find(p => p.id === productId);
+
       if (product) {
           setCartToastMessage(`'${product.title}' added to cart!`);
           setTimeout(() => setCartToastMessage(''), 3000);
       }
+
       openCartSidebar();
   };
   
@@ -2332,11 +2485,14 @@ const App: React.FC = () => {
           console.info('PURCHASE_RESTORE_START', { uid: firebaseUser.uid });
           setPurchaseStatus('loading');
           const profilePurchasedIds = normalizePurchaseIds((nextUser as any).purchasedProductIds);
+          const storedPurchasedUpdates = normalizePurchasedProductUpdateIds((nextUser as any).purchasedProductUpdateIds || safeGetItem(`purchasedProductUpdates:${firebaseUser.uid}`, {}));
           const restoredPurchasedIds = await restoreUserEntitlements(firebaseUser.uid);
           const initialPurchasedIds = mergePurchasedProductIds(profilePurchasedIds, restoredPurchasedIds);
-          nextUser = { ...(nextUser as any), purchasedProductIds: initialPurchasedIds } as User;
+          nextUser = { ...(nextUser as any), purchasedProductIds: initialPurchasedIds, purchasedProductUpdateIds: storedPurchasedUpdates } as User;
           setPurchasedProductIds(initialPurchasedIds);
+          setPurchasedProductUpdateIds(storedPurchasedUpdates);
           safeSetItem(`purchasedProducts:${firebaseUser.uid}`, initialPurchasedIds);
+          safeSetItem(`purchasedProductUpdates:${firebaseUser.uid}`, storedPurchasedUpdates);
           rememberAndStoreUser(nextUser, firebaseUser);
           setPurchaseStatus('ready');
           console.info('PURCHASE_RESTORE_DONE', { uid: firebaseUser.uid, count: initialPurchasedIds.length });
@@ -2736,6 +2892,7 @@ const App: React.FC = () => {
       setMobileCompletionInput('');
       setMobileCompletionError('');
       setPurchasedProductIds([]);
+      setPurchasedProductUpdateIds({});
       setIsAuthRestoring(false);
       setAuthRestoreError(null);
       setProfileStatus('idle');
@@ -3106,6 +3263,15 @@ const App: React.FC = () => {
   const handleBuyNowProduct = (product: ProductWithRating) => {
     setQuickViewProduct(null);
     setIsFreeModalOpen(false);
+    if (purchasedProductIds.includes(product.id)) {
+      setSelectedProduct(product);
+      setActiveCoinDiscount(null);
+      setScrollToProductSection(null);
+      setAutoOpenPaymentModalFor(null);
+      setCurrentView('product');
+      window.scrollTo(0, 0);
+      return;
+    }
     if (!hasFirebaseUser) {
       handleLoginRequired(product);
       return;
@@ -3389,6 +3555,141 @@ const App: React.FC = () => {
     setIsCartPaymentModalOpen(false);
     setCurrentView('eduCoinGuide');
     window.scrollTo(0, 0);
+  };
+
+  const persistUserPurchasedProductUpdates = (nextUpdates: Record<string, string[]>) => {
+    const uid = auth.currentUser?.uid || currentUser?.id || effectiveAppUser?.id;
+    if (!uid) return;
+
+    const cleanUpdates = normalizePurchasedProductUpdateIds(nextUpdates);
+    setPurchasedProductUpdateIds(cleanUpdates);
+    safeSetItem(`purchasedProductUpdates:${uid}`, cleanUpdates);
+
+    setCurrentUser(current => {
+      if (!current) return current;
+      const updatedUser = { ...(current as any), purchasedProductUpdateIds: cleanUpdates } as User;
+      safeSetItem('currentUser', updatedUser);
+      return updatedUser;
+    });
+
+    setUsers(currentUsers => {
+      const nextUsers = currentUsers.map(user =>
+        String(user.id) === String(uid)
+          ? ({ ...(user as any), purchasedProductUpdateIds: cleanUpdates } as User)
+          : user
+      );
+
+      safeSetItem('siteUsers', nextUsers);
+      return nextUsers;
+    });
+
+    void setDoc(doc(db, 'users', String(uid)), { purchasedProductUpdateIds: cleanUpdates, updatedAt: serverTimestamp() }, { merge: true })
+      .catch(error => console.warn('Paid update entitlement sync failed; local unlock remains available.', error));
+  };
+
+  const getLatestUpdateCheckoutSummary = (product: ProductWithRating) => {
+    const access = getProductAccessState(product);
+    const firstLockedMeta = findFirstLockedPaidUpdateMeta(product);
+    const fallbackPrice = product.salePrice || product.price;
+    const rawPrice = firstLockedMeta?.paidUpdatePrice || fallbackPrice;
+    const updatePrice = Math.max(0, parseCurrency(rawPrice));
+    const updateTitle = firstLockedMeta?.paidUpdateTitle || 'Latest course update';
+
+    return {
+      updateIds: access.lockedPaidUpdateIds,
+      title: updateTitle,
+      price: updatePrice,
+      priceLabel: updatePrice > 0 ? `₹${updatePrice.toFixed(2)}` : '₹0.00',
+    };
+  };
+
+  const handleOpenLatestUpdateCheckout = (product: ProductWithRating) => {
+    if (!hasFirebaseUser) {
+      handleLoginRequired(product);
+      return;
+    }
+
+    if (requiresMobileCompletion()) {
+      promptForMobileCompletion();
+      return;
+    }
+
+    const access = getProductAccessState(product);
+
+    if (!access.hasBaseAccess) {
+      handleBuyNowProduct(product);
+      return;
+    }
+
+    if (!access.hasPaidLockedUpdates) {
+      setInfoModal({
+        title: 'No locked update',
+        message: 'You already have access to all available course content.',
+        icon: '✅',
+      });
+      return;
+    }
+
+    setLatestUpdateCheckoutProduct(product);
+    window.scrollTo(0, 0);
+  };
+
+  const handleConfirmLatestUpdatePurchase = async (product: ProductWithRating) => {
+    if (!hasFirebaseUser || !auth.currentUser) {
+      openAuthPage('login');
+      return;
+    }
+
+    const summary = getLatestUpdateCheckoutSummary(product);
+
+    if (!summary.updateIds.length) {
+      setLatestUpdateCheckoutProduct(null);
+      return;
+    }
+
+    const productKey = String(product.id);
+    const nextUpdates = {
+      ...purchasedProductUpdateIds,
+      [productKey]: mergeUpdateIds(purchasedProductUpdateIds[productKey], summary.updateIds),
+    };
+
+    persistUserPurchasedProductUpdates(nextUpdates);
+
+    addGlobalOrder({
+      id: `DC-UPD-${Date.now()}`,
+      customerName: effectiveAppUser?.name || effectiveAppUser?.email?.split('@')[0] || 'Valued Customer',
+      customerEmail: effectiveAppUser?.email || 'customer@example.com',
+      date: new Date().toISOString().split('T')[0],
+      total: summary.priceLabel,
+      status: 'Completed',
+      items: [{
+        id: product.id,
+        name: `${product.title} · ${summary.title}`,
+        quantity: 1,
+        price: summary.priceLabel,
+      }],
+      shippingAddress: 'N/A (Digital Product Update)',
+      billingAddress: 'Latest Update Checkout',
+      paymentBreakdown: {
+        purchaseKind: 'product',
+        baseTotal: summary.price,
+        finalPrice: summary.price,
+        paymentLabel: 'Latest course update',
+        unlockedProductIds: [product.id],
+        unlockedUpdateIds: summary.updateIds,
+      } as any,
+    });
+
+    setLatestUpdateCheckoutProduct(null);
+    setSelectedProduct(product);
+    setCurrentView('coursePlayer');
+    window.scrollTo(0, 0);
+
+    setInfoModal({
+      title: 'Latest update unlocked',
+      message: `${summary.title} is now available inside your course player.`,
+      icon: '✅',
+    });
   };
 
   const handleBackFromEduCoinGuide = () => {
@@ -3819,7 +4120,7 @@ const App: React.FC = () => {
                   case 'hero': return <React.Fragment key={section.id}><div className="mobile-home-secondary"><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></div></React.Fragment>;
                   case 'purchased': return purchasedProducts.length > 0 && <PurchasedProducts settings={websiteSettings} key={section.id} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
                   case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} subtitle="A quick look at the courses learners rate highest right now." products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} variant="mobileHome" />;
-                  case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
+                  case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
                   case 'services': return <div className="mobile-home-secondary"><Services settings={websiteSettings} key={section.id} services={websiteSettings.content.services} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} /></div>;
                   case 'news': return <div className="mobile-home-secondary"><LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Daily Reading Hub'} articles={websiteSettings.content.newsArticles.filter(article => article.type === 'news')} onReadMoreClick={handleViewBlogArticle} onOpenHub={() => openReadingHub('news')} /></div>;
                   case 'about': return <div className="mobile-home-secondary"><AboutUs settings={websiteSettings} key={section.id} title={websiteSettings.content.aboutUsTitle} text={websiteSettings.content.aboutUsText} imageSeed={websiteSettings.content.aboutUsImageSeed} /></div>;
@@ -3835,13 +4136,13 @@ const App: React.FC = () => {
 
   const renderContent = (appUser: User | null = currentUser) => {
     switch (currentView) {
-      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} onCoinPurchase={(product, quantity, options) => handleProductCoinPurchase(product, quantity, options)} />;
+      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onCoinPurchase={(product, quantity, options) => handleProductCoinPurchase(product, quantity, options)} />;
       case 'coursePlayer':
         if (isAuthRestoring || authRestoreError) return renderAuthRestoreStatus();
-        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} currentUser={appUser} onBack={() => handleNavigateBack('myPurchases')} onQuizReward={handleQuizReward} /> : renderAuthRestoreStatus();
+        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} currentUser={appUser} onBack={() => handleNavigateBack('myPurchases')} onQuizReward={handleQuizReward} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} /> : renderAuthRestoreStatus();
       case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={appUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
-      case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts.filter(p => !purchasedProductIds.includes(p.id))} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} />;
+      case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
       case 'myPurchases':
         if (!isAuthStateReady) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
         return isLoggedIn ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
@@ -3967,6 +4268,30 @@ const App: React.FC = () => {
             <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={shouldHideMainDockOnMobile ? 'max-md:hidden' : ''}>
+                {latestUpdateCheckoutProduct && (() => {
+                  const summary = getLatestUpdateCheckoutSummary(latestUpdateCheckoutProduct);
+
+                  return (
+                    <PaymentModal
+                      settings={websiteSettings}
+                      economySettings={economySettings}
+                      productTitle={`${latestUpdateCheckoutProduct.title} · ${summary.title}`}
+                      originalPrice={summary.price}
+                      salePrice={null}
+                      couponDiscount={0}
+                      finalPrice={summary.price}
+                      eduCoinDiscount={0}
+                      appliedEduCoins={0}
+                      coinRedeemRate={eduCoinRedeemRate}
+                      onClose={() => setLatestUpdateCheckoutProduct(null)}
+                      onConfirm={() => void handleConfirmLatestUpdatePurchase(latestUpdateCheckoutProduct)}
+                      paymentLink={latestUpdateCheckoutProduct.paymentLink}
+                      currentUser={effectiveAppUser}
+                      coinPrice={0}
+                      presentation="page"
+                    />
+                  );
+                })()}
                 <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>
             )}

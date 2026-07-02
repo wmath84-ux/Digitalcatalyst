@@ -1,7 +1,7 @@
 
 // FIX: Imported useState, useEffect, and useRef hooks from React to resolve 'Cannot find name' errors.
 import React, { useState, useEffect, useRef } from 'react';
-import { ActiveCoinDiscount, ProductWithRating, Review, Coupon, WebsiteSettings, PriceHistoryEntry, User } from '../App';
+import { ActiveCoinDiscount, ProductWithRating, Review, Coupon, WebsiteSettings, PriceHistoryEntry, User, ProductAccessState } from '../App';
 import { EconomySettings, resolveCoinPrice } from '../utils/economy';
 import { getProductCoinPrice, redeemProductWithEduCoins, watchUserCoinWallet } from '../utils/coinWallet';
 import PaymentModal from './PaymentModal';
@@ -113,6 +113,8 @@ interface ProductDetailPageProps {
   onInsufficientCoins?: (details: { requiredCoins: number; balance: number; missingCoins: number; productTitle?: string }) => void;
   isPurchased?: boolean;
   currentUser?: User | null;
+  productAccess?: ProductAccessState | null;
+  onPurchaseLatestUpdate?: (product: ProductWithRating) => void;
   onCoinPurchase?: (
   product: ProductWithRating,
   quantity: number,
@@ -131,7 +133,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     settings, economySettings, activeCoinDiscount = null, onConsumeCoinDiscount, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews, 
     onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, onModalOpened, coupons,
     scrollToSection, onSectionScrolled, allProducts, onViewProduct, onBuyNow, wishlist, onQuickView, onGoHome, onStartEarning, onInsufficientCoins,
-    isPurchased = false, currentUser = null, onCoinPurchase
+    isPurchased = false, currentUser = null, productAccess = null, onPurchaseLatestUpdate, onCoinPurchase
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [isCoinButtonChecking, setIsCoinButtonChecking] = useState(false);
@@ -335,6 +337,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const userCoinBalance = liveUserCoinBalance || ((currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0);
   const requiredProductCoins = Math.max(0, productCoinPrice * quantity);
   const missingProductCoins = Math.max(0, requiredProductCoins - userCoinBalance);
+  const hasLockedPaidUpdates = Boolean(isPurchased && productAccess?.hasPaidLockedUpdates && onPurchaseLatestUpdate);
   const coinCheckoutDisabled =
     isCoinButtonChecking ||
     isRedeemingWithCoins ||
@@ -666,8 +669,16 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                       )}
                     </button>
                   )}
-                  <button onClick={() => onAddToCart(product.id, 1)} className="w-full rounded-2xl border border-indigo-200/70 bg-white/85 px-6 py-3.5 text-base font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 sm:px-8 sm:py-4">
-                    Add to Cart
+                  {hasLockedPaidUpdates && (
+                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className="w-full rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-6 py-3.5 text-base font-black text-white shadow-[0_16px_40px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 active:scale-95 sm:px-8 sm:py-4 sm:text-lg">
+                      Purchase the latest update
+                      <span className="mt-2 block text-xs font-bold text-white/85">
+                        {productAccess?.lockedPaidUpdateCount || 0} new paid content item{(productAccess?.lockedPaidUpdateCount || 0) === 1 ? '' : 's'} available
+                      </span>
+                    </button>
+                  )}
+                  <button disabled={isPurchased} onClick={() => onAddToCart(product.id, 1)} className="w-full rounded-2xl border border-indigo-200/70 bg-white/85 px-6 py-3.5 text-base font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4">
+                    {isPurchased ? 'Already in My Purchases' : 'Add to Cart'}
                   </button>
                 </div>
 
