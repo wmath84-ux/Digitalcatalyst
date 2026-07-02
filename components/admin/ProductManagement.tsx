@@ -660,17 +660,101 @@ const AdminDocsEditor: React.FC<{ value: string; onChange: (value: string) => vo
     );
 };
 
+type CourseAccessDraft = {
+    accessLevel?: CourseAccessLevel;
+    paidUpdateId?: string;
+    paidUpdateTitle?: string;
+    paidUpdatePrice?: string;
+    paidUpdateCoinPrice?: string | number;
+};
+
+const CourseAccessControls: React.FC<{
+    value: CourseAccessDraft;
+    onChange: (patch: Partial<CourseAccessDraft>) => void;
+    compact?: boolean;
+}> = ({ value, onChange, compact = false }) => {
+    const accessLevel = normaliseCourseAccessLevel(value.accessLevel);
+    const isPaidUpdate = accessLevel === 'paidUpdate';
+
+    return (
+        <div className={`rounded-2xl border border-blue-100 bg-blue-50/70 ${compact ? 'p-3' : 'p-4'}`}>
+            <label className={labelClass}>Course Player Access</label>
+            <select
+                value={accessLevel}
+                onChange={event => onChange({ accessLevel: event.target.value as CourseAccessLevel })}
+                className={fieldClass}
+            >
+                <option value="included">Included after base course purchase</option>
+                <option value="paidUpdate">Locked paid content / latest update</option>
+                <option value="hidden">Hidden from course player</option>
+            </select>
+
+            <p className="mt-2 text-xs font-bold leading-5 text-slate-600">
+                Included = base course ke sath milega. Paid = user ko course player me locked dikhega aur purchase update button se unlock hoga. Hidden = admin me save rahega par user ko nahi dikhega.
+            </p>
+
+            {isPaidUpdate && (
+                <div className={`mt-4 grid grid-cols-1 gap-3 ${compact ? '' : 'md:grid-cols-2'}`}>
+                    <label>
+                        <span className={labelClass}>Paid Content ID</span>
+                        <input
+                            value={value.paidUpdateId || ''}
+                            onChange={event => onChange({ paidUpdateId: event.target.value })}
+                            className={fieldClass}
+                            placeholder="chapter-1-extra-notes"
+                        />
+                    </label>
+
+                    <label>
+                        <span className={labelClass}>Button Title</span>
+                        <input
+                            value={value.paidUpdateTitle || ''}
+                            onChange={event => onChange({ paidUpdateTitle: event.target.value })}
+                            className={fieldClass}
+                            placeholder="Purchase this update"
+                        />
+                    </label>
+
+                    <label>
+                        <span className={labelClass}>Update Price ₹</span>
+                        <input
+                            value={String(value.paidUpdatePrice || '').replace('₹', '')}
+                            onChange={event => onChange({ paidUpdatePrice: event.target.value })}
+                            className={fieldClass}
+                            inputMode="decimal"
+                            placeholder="49"
+                        />
+                    </label>
+
+                    <label>
+                        <span className={labelClass}>Update EduCoin Price</span>
+                        <input
+                            value={String(value.paidUpdateCoinPrice || '')}
+                            onChange={event => onChange({ paidUpdateCoinPrice: event.target.value })}
+                            className={fieldClass}
+                            inputMode="numeric"
+                            placeholder="250"
+                        />
+                    </label>
+                </div>
+            )}
+        </div>
+    );
+};
+
 const AdminOpenDocsBuilder: React.FC<{
     resourceName: string;
     pages: ProductDocPage[];
     activePageId: string;
     error: string;
+    accessMeta: CourseAccessDraft;
+    onAccessMetaChange: (patch: Partial<CourseAccessDraft>) => void;
     onResourceNameChange: (value: string) => void;
     onPagesChange: (pages: ProductDocPage[]) => void;
     onActivePageChange: (pageId: string) => void;
     onBack: () => void;
     onSave: () => void;
-}> = ({ resourceName, pages, activePageId, error, onResourceNameChange, onPagesChange, onActivePageChange, onBack, onSave }) => {
+}> = ({ resourceName, pages, activePageId, error, accessMeta, onAccessMetaChange, onResourceNameChange, onPagesChange, onActivePageChange, onBack, onSave }) => {
     const activePage = pages.find(page => page.id === activePageId) || pages[0];
 
     const addPage = () => {
@@ -710,6 +794,13 @@ const AdminOpenDocsBuilder: React.FC<{
                     </div>
                     <label className={`${labelClass} mt-4`}>Open Docs Name</label>
                     <input value={resourceName} onChange={event => onResourceNameChange(event.target.value)} className={fieldClass} placeholder="Chapter notes, workbook..." />
+                    <div className="mt-4">
+                        <CourseAccessControls
+                            value={accessMeta}
+                            onChange={onAccessMetaChange}
+                            compact
+                        />
+                    </div>
                     {error && <p className="mt-3 rounded-2xl bg-rose-50 p-3 text-xs font-bold text-rose-700">{error}</p>}
                     <div className="mt-5 flex-1 overflow-y-auto custom-scrollbar">
                         <p className="mb-2 text-xs font-black uppercase tracking-[0.24em] text-slate-500">Docs tabs</p>
@@ -1066,6 +1157,8 @@ const ContentComposer: React.FC<{
                         pages={docPages}
                         activePageId={activeDocPageId}
                         error={docError}
+                        accessMeta={formState}
+                        onAccessMetaChange={patch => setFormState(prev => prev ? { ...prev, ...patch } : prev)}
                         onResourceNameChange={value => setFormState(prev => prev ? { ...prev, name: value } : prev)}
                         onPagesChange={setDocPages}
                         onActivePageChange={setActiveDocPageId}
@@ -1082,6 +1175,8 @@ const ContentComposer: React.FC<{
                         pages={docPages}
                         activePageId={activeDocPageId}
                         error={docError}
+                        accessMeta={formState}
+                        onAccessMetaChange={patch => setFormState(prev => prev ? { ...prev, ...patch } : prev)}
                         onResourceNameChange={value => setFormState(prev => prev ? { ...prev, name: value } : prev)}
                         onPagesChange={setDocPages}
                         onActivePageChange={setActiveDocPageId}
@@ -1293,6 +1388,13 @@ const ModuleEditor: React.FC<{
                 <div className="flex-1">
                     <label className={labelClass}>Module Title</label>
                     <input value={module.title} onChange={event => updateModule(current => ({ ...current, title: event.target.value }))} className={fieldClass} placeholder="Module title" />
+                    <div className="mt-3">
+                        <CourseAccessControls
+                            value={module}
+                            compact
+                            onChange={patch => updateModule(current => ({ ...current, ...patch }))}
+                        />
+                    </div>
                 </div>
                 <div className="flex gap-2 pt-6">
                     <button type="button" onClick={() => setIsAddingContent(true)} className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-900 hover:bg-cyan-100">+ Content</button>
@@ -1301,27 +1403,59 @@ const ModuleEditor: React.FC<{
             </div>
 
             <div className="mt-5 space-y-3">
-                {files.length > 0 ? (files || []).map(file => (
-                    <div key={file.id} className="flex flex-col gap-2 rounded-2xl border border-white/50 bg-white/80 p-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                            <p className="font-black text-slate-900">{file.name}</p>
-                            <p className="text-xs uppercase tracking-[0.2em] text-cyan-300">{file.type}{file.quiz?.questions?.length ? ` • ${file.quiz.questions.length} questions` : ''}</p>
+                {files.length > 0 ? (files || []).map(file => {
+                    const accessLevel = normaliseCourseAccessLevel(file.accessLevel);
+                    const badgeClass = accessLevel === 'paidUpdate'
+                        ? 'bg-amber-100 text-amber-800 border-amber-200'
+                        : accessLevel === 'hidden'
+                            ? 'bg-slate-200 text-slate-700 border-slate-300'
+                            : 'bg-emerald-100 text-emerald-800 border-emerald-200';
+
+                    return (
+                        <div key={file.id} className="rounded-2xl border border-white/50 bg-white/80 p-4">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0">
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <p className="font-black text-slate-900">{file.name}</p>
+                                        <span className={`rounded-full border px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${badgeClass}`}>
+                                            {accessLevel === 'paidUpdate' ? 'Paid Update' : accessLevel === 'hidden' ? 'Hidden' : 'Included'}
+                                        </span>
+                                    </div>
+                                    <p className="mt-1 text-xs uppercase tracking-[0.2em] text-cyan-600">{file.type}{file.quiz?.questions?.length ? ` • ${file.quiz.questions.length} questions` : ''}</p>
+                                    {accessLevel === 'paidUpdate' && (
+                                        <p className="mt-1 text-xs font-bold text-amber-700">
+                                            ID: {file.paidUpdateId || file.id} · Price: {file.paidUpdatePrice || 'Product price'}
+                                        </p>
+                                    )}
+                                </div>
+
+                                <div className="flex gap-2 self-start sm:self-auto">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setEditingFile(file);
+                                            setIsAddingContent(false);
+                                        }}
+                                        className="rounded-xl border border-cyan-300/30 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-400/10"
+                                    >
+                                        Edit
+                                    </button>
+                                    <button type="button" onClick={() => handleDeleteContent(file.id)} className="rounded-xl border border-red-400/30 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-500/10">Remove</button>
+                                </div>
+                            </div>
+
+                            <div className="mt-3">
+                                <CourseAccessControls
+                                    value={file}
+                                    compact
+                                    onChange={patch => onUpdate(recursiveFileUpdate(allModules || [], module.id, currentFiles =>
+                                        (currentFiles || []).map(currentFile => currentFile.id === file.id ? { ...currentFile, ...patch, updatedAt: Date.now() } : currentFile)
+                                    ))}
+                                />
+                            </div>
                         </div>
-                        <div className="flex gap-2 self-start sm:self-auto">
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    setEditingFile(file);
-                                    setIsAddingContent(false);
-                                }}
-                                className="rounded-xl border border-cyan-300/30 px-3 py-2 text-xs font-black text-cyan-700 hover:bg-cyan-400/10"
-                            >
-                                Edit
-                            </button>
-                            <button type="button" onClick={() => handleDeleteContent(file.id)} className="rounded-xl border border-red-400/30 px-3 py-2 text-xs font-black text-red-700 hover:bg-red-500/10">Remove</button>
-                        </div>
-                    </div>
-                )) : <p className="rounded-2xl border border-dashed border-white/50 p-4 text-sm text-slate-600">No content yet. Add videos, PDFs, Open Docs, quizzes, and resource links here.</p>}
+                    );
+                }) : <p className="rounded-2xl border border-dashed border-white/50 p-4 text-sm text-slate-600">No content yet. Add videos, PDFs, Open Docs, quizzes, and resource links here.</p>}
             </div>
 
             {(isAddingContent || editingFile) && (

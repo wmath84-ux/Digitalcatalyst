@@ -73,28 +73,28 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                 )}
 
                 {/* Badges */}
-                <div className="absolute left-2 top-2 flex flex-col gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
+                <div className="absolute left-2 top-2 z-20 flex max-w-[72%] flex-col items-start gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
                     {isPurchased && (
-                        <span className="rounded-md bg-emerald-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] animate-fade-in sm:px-3 sm:text-xs">
+                        <span className="w-fit rounded-full bg-emerald-600 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(15,23,42,0.20)] ring-1 ring-white/80 backdrop-blur sm:px-3.5 sm:text-xs">
                             Purchased
                         </span>
                     )}
                     {product.isFree && (
-                        <span className="rounded-md bg-gradient-to-r from-indigo-600 to-purple-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] animate-fade-in sm:px-3 sm:text-xs">
+                        <span className="w-fit rounded-full bg-gradient-to-r from-blue-700 to-violet-700 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(15,23,42,0.20)] ring-1 ring-white/80 backdrop-blur sm:px-3.5 sm:text-xs">
                             Free
                         </span>
                     )}
                     {isCouponAvailable && product.couponCode && !product.isFree && settings.features.showSaleBadges && (
                         <button 
                             onClick={(e) => { e.stopPropagation(); onViewDetails('price-section'); }} 
-                            className="rounded-md bg-purple-600 px-2.5 py-1 font-mono text-[10px] font-bold tracking-wider text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-transform hover:scale-105 sm:px-3 sm:text-xs"
+                            className="w-fit rounded-full bg-violet-700 px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(15,23,42,0.20)] ring-1 ring-white/80 backdrop-blur transition-transform hover:scale-105 sm:px-3.5 sm:text-xs"
                             title={`Use coupon ${product.couponCode}`}
                         >
                             {product.couponCode}
                         </button>
                     )}
                     {!product.isFree && product.salePrice && settings.features.showSaleBadges && (
-                        <span className="rounded-md bg-red-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:px-3 sm:text-xs">
+                        <span className="w-fit rounded-full bg-rose-600 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(15,23,42,0.20)] ring-1 ring-white/80 backdrop-blur sm:px-3.5 sm:text-xs">
                             Sale
                         </span>
                     )}

@@ -1047,7 +1047,7 @@ const App: React.FC = () => {
   const [wishlist, setWishlist] = useState<number[]>([]);
   const [purchasedProductIds, setPurchasedProductIds] = useState<number[]>([]);
   const [purchasedProductUpdateIds, setPurchasedProductUpdateIds] = useState<Record<string, string[]>>({});
-  const [latestUpdateCheckoutProduct, setLatestUpdateCheckoutProduct] = useState<ProductWithRating | null>(null);
+  const [latestUpdateCheckout, setLatestUpdateCheckout] = useState<{ product: ProductWithRating; updateId?: string } | null>(null);
   const [isAuthRestoring, setIsAuthRestoring] = useState(false);
   const [authRestoreError, setAuthRestoreError] = useState<string | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>('booting');
@@ -1819,20 +1819,20 @@ const App: React.FC = () => {
     return [...new Set(updateIds.filter(Boolean))];
   };
 
-  const findFirstLockedPaidUpdateMeta = (product: ProductWithRating): CourseAccessMeta | null => {
+  const findLockedPaidUpdateMeta = (product: ProductWithRating, targetUpdateId?: string): CourseAccessMeta | null => {
     const ownedUpdateIds = purchasedProductUpdateIds[String(product.id)] || [];
 
     const scanModules = (modules: CourseModule[] = []): CourseAccessMeta | null => {
       for (const module of modules) {
         if (getCourseAccessLevel(module) === 'paidUpdate') {
           const updateId = getCourseItemUpdateId(product.id, module);
-          if (!ownedUpdateIds.includes(updateId)) return module;
+          if (!ownedUpdateIds.includes(updateId) && (!targetUpdateId || targetUpdateId === updateId)) return module;
         }
 
         for (const file of module.files || []) {
           if (getCourseAccessLevel(file) === 'paidUpdate') {
             const updateId = getCourseItemUpdateId(product.id, file);
-            if (!ownedUpdateIds.includes(updateId)) return file;
+            if (!ownedUpdateIds.includes(updateId) && (!targetUpdateId || targetUpdateId === updateId)) return file;
           }
         }
 
@@ -3587,23 +3587,27 @@ const App: React.FC = () => {
       .catch(error => console.warn('Paid update entitlement sync failed; local unlock remains available.', error));
   };
 
-  const getLatestUpdateCheckoutSummary = (product: ProductWithRating) => {
+  const getLatestUpdateCheckoutSummary = (product: ProductWithRating, targetUpdateId?: string) => {
     const access = getProductAccessState(product);
-    const firstLockedMeta = findFirstLockedPaidUpdateMeta(product);
+    const selectedUpdateIds = targetUpdateId
+      ? access.lockedPaidUpdateIds.filter(updateId => updateId === targetUpdateId)
+      : access.lockedPaidUpdateIds;
+
+    const firstLockedMeta = findLockedPaidUpdateMeta(product, targetUpdateId);
     const fallbackPrice = product.salePrice || product.price;
     const rawPrice = firstLockedMeta?.paidUpdatePrice || fallbackPrice;
     const updatePrice = Math.max(0, parseCurrency(rawPrice));
     const updateTitle = firstLockedMeta?.paidUpdateTitle || 'Latest course update';
 
     return {
-      updateIds: access.lockedPaidUpdateIds,
+      updateIds: selectedUpdateIds,
       title: updateTitle,
       price: updatePrice,
       priceLabel: updatePrice > 0 ? `₹${updatePrice.toFixed(2)}` : '₹0.00',
     };
   };
 
-  const handleOpenLatestUpdateCheckout = (product: ProductWithRating) => {
+  const handleOpenLatestUpdateCheckout = (product: ProductWithRating, updateId?: string) => {
     if (!hasFirebaseUser) {
       handleLoginRequired(product);
       return;
@@ -3630,20 +3634,31 @@ const App: React.FC = () => {
       return;
     }
 
-    setLatestUpdateCheckoutProduct(product);
+    const summary = getLatestUpdateCheckoutSummary(product, updateId);
+
+    if (!summary.updateIds.length) {
+      setInfoModal({
+        title: 'Already unlocked',
+        message: 'This paid content is already available in your course player.',
+        icon: '✅',
+      });
+      return;
+    }
+
+    setLatestUpdateCheckout({ product, updateId });
     window.scrollTo(0, 0);
   };
 
-  const handleConfirmLatestUpdatePurchase = async (product: ProductWithRating) => {
+  const handleConfirmLatestUpdatePurchase = async (product: ProductWithRating, updateId?: string) => {
     if (!hasFirebaseUser || !auth.currentUser) {
       openAuthPage('login');
       return;
     }
 
-    const summary = getLatestUpdateCheckoutSummary(product);
+    const summary = getLatestUpdateCheckoutSummary(product, updateId);
 
     if (!summary.updateIds.length) {
-      setLatestUpdateCheckoutProduct(null);
+      setLatestUpdateCheckout(null);
       return;
     }
 
@@ -3680,13 +3695,13 @@ const App: React.FC = () => {
       } as any,
     });
 
-    setLatestUpdateCheckoutProduct(null);
+    setLatestUpdateCheckout(null);
     setSelectedProduct(product);
     setCurrentView('coursePlayer');
     window.scrollTo(0, 0);
 
     setInfoModal({
-      title: 'Latest update unlocked',
+      title: 'Paid content unlocked',
       message: `${summary.title} is now available inside your course player.`,
       icon: '✅',
     });
@@ -4342,6 +4357,30 @@ const App: React.FC = () => {
                 </div>
               </div>
             )}
+            {latestUpdateCheckout && (() => {
+              const summary = getLatestUpdateCheckoutSummary(latestUpdateCheckout.product, latestUpdateCheckout.updateId);
+
+              return (
+                <PaymentModal
+                  settings={websiteSettings}
+                  economySettings={economySettings}
+                  productTitle={`${latestUpdateCheckout.product.title} · ${summary.title}`}
+                  originalPrice={summary.price}
+                  salePrice={null}
+                  couponDiscount={0}
+                  finalPrice={summary.price}
+                  eduCoinDiscount={0}
+                  appliedEduCoins={0}
+                  coinRedeemRate={eduCoinRedeemRate}
+                  onClose={() => setLatestUpdateCheckout(null)}
+                  onConfirm={() => void handleConfirmLatestUpdatePurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId)}
+                  paymentLink={latestUpdateCheckout.product.paymentLink}
+                  currentUser={effectiveAppUser}
+                  coinPrice={0}
+                  presentation="page"
+                />
+              );
+            })()}
             <main key={currentView} className={`${websiteSettings.animations.enabled ? appleOpenClass : ''} ${currentView === 'home' ? 'mobile-app-home' : ''}`}>{renderContent(effectiveAppUser)}</main>
             <div className="mobile-app-chrome"><InstallAppButton enabled={canShowInstallPrompt} /></div>
             {currentView === 'home' && (

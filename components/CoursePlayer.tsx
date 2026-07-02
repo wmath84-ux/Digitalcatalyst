@@ -204,12 +204,16 @@ const ModuleItem: React.FC<{
   productAccess?: ProductAccessState | null;
   activeFile: ProductFile | null;
   onSelectFile: (file: ProductFile) => void;
-  onPurchaseLatestUpdate?: () => void;
+  onPurchaseLatestUpdate?: (updateId?: string) => void;
   level?: number;
-}> = ({ module, productId, productAccess, activeFile, onSelectFile, onPurchaseLatestUpdate, level = 0 }) => {
+  parentLocked?: boolean;
+}> = ({ module, productId, productAccess, activeFile, onSelectFile, onPurchaseLatestUpdate, level = 0, parentLocked = false }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const moduleHidden = isCoursePlayerItemHidden(module);
-  const moduleUnlocked = hasCoursePlayerItemAccess(productId, module, productAccess);
+  const moduleUpdateId = resolveCoursePlayerUpdateId(productId, module);
+  const moduleUnlocked = !parentLocked && hasCoursePlayerItemAccess(productId, module, productAccess);
+  const visibleFiles = (module.files || []).filter(file => !isCoursePlayerItemHidden(file));
+  const visibleModules = (module.modules || []).filter(subModule => !isCoursePlayerItemHidden(subModule));
 
   if (moduleHidden) return null;
 
@@ -218,58 +222,71 @@ const ModuleItem: React.FC<{
       <button onClick={() => setIsExpanded(!isExpanded)} className="module-item-button flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-slate-900 transition hover:bg-[#f7f5ff] sm:py-4" aria-expanded={isExpanded}>
         <ModuleIcon className="h-5 w-5 shrink-0" />
         <span className="min-w-0 flex-1 text-[15px] font-black leading-tight">{module.title}</span>
-        {!moduleUnlocked && <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-amber-700">Locked</span>}
+        {!moduleUnlocked && (
+          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-amber-800 ring-1 ring-amber-200">
+            Locked
+          </span>
+        )}
       </button>
 
       {isExpanded && (
         <div className="space-y-1 pb-2">
-          {!moduleUnlocked ? (
+          {!moduleUnlocked && (
             <div className="mx-2 mb-2 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-              <p className="text-xs font-bold leading-5 text-amber-800">This module is part of the latest paid update.</p>
+              <p className="text-xs font-bold leading-5 text-amber-900">This module has paid locked content. Purchase this update to unlock it instantly.</p>
               {onPurchaseLatestUpdate && (
-                <button type="button" onClick={onPurchaseLatestUpdate} className="mt-2 w-full rounded-xl bg-amber-500 px-3 py-2 text-xs font-black text-white shadow-sm">
-                  Purchase the latest update
+                <button type="button" onClick={() => onPurchaseLatestUpdate(moduleUpdateId)} className="mt-2 w-full rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white shadow-sm">
+                  Purchase this update
                 </button>
               )}
             </div>
-          ) : (
-            <>
-              {(module.files || []).filter(file => !isCoursePlayerItemHidden(file)).map((file) => {
-                const fileUnlocked = hasCoursePlayerItemAccess(productId, file, productAccess);
-
-                return (
-                  <button
-                    key={file.id}
-                    disabled={!fileUnlocked}
-                    onClick={() => fileUnlocked ? onSelectFile(file) : onPurchaseLatestUpdate?.()}
-                    className={`module-item-button flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition sm:py-3 ${
-                      activeFile?.id === file.id
-                        ? "bg-white border border-[#ded8ff] font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)]"
-                        : fileUnlocked
-                          ? "font-medium text-slate-900/90 hover:bg-[#f7f5ff]"
-                          : "cursor-pointer border border-amber-200 bg-amber-50 font-black text-amber-800 hover:bg-amber-100"
-                    }`}
-                  >
-                    <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                    {!fileUnlocked ? <span className="shrink-0 text-xs">🔒 Update</span> : file.type === 'quiz' ? <QuizIcon className="h-5 w-5 shrink-0" /> : <FileIcon className="h-5 w-5 shrink-0" />}
-                  </button>
-                );
-              })}
-
-              {(module.modules || []).map((subModule) => (
-                <ModuleItem
-                  key={subModule.id}
-                  module={subModule}
-                  productId={productId}
-                  productAccess={productAccess}
-                  activeFile={activeFile}
-                  onSelectFile={onSelectFile}
-                  onPurchaseLatestUpdate={onPurchaseLatestUpdate}
-                  level={level + 1}
-                />
-              ))}
-            </>
           )}
+
+          {visibleFiles.map((file) => {
+            const fileUpdateId = resolveCoursePlayerUpdateId(productId, file);
+            const fileUnlocked = moduleUnlocked && hasCoursePlayerItemAccess(productId, file, productAccess);
+
+            return (
+              <button
+                key={file.id}
+                type="button"
+                aria-disabled={!fileUnlocked}
+                onClick={() => fileUnlocked ? onSelectFile(file) : onPurchaseLatestUpdate?.(fileUpdateId)}
+                className={`module-item-button flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition sm:py-3 ${
+                  activeFile?.id === file.id
+                    ? "bg-white border border-[#ded8ff] font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)]"
+                    : fileUnlocked
+                      ? "font-medium text-slate-900/90 hover:bg-[#f7f5ff]"
+                      : "cursor-pointer border border-amber-200 bg-amber-50 font-black text-amber-900 hover:bg-amber-100"
+                }`}
+              >
+                <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                {!fileUnlocked ? (
+                  <span className="shrink-0 rounded-full bg-amber-200 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-amber-900">
+                    🔒 Buy
+                  </span>
+                ) : file.type === 'quiz' ? (
+                  <QuizIcon className="h-5 w-5 shrink-0" />
+                ) : (
+                  <FileIcon className="h-5 w-5 shrink-0" />
+                )}
+              </button>
+            );
+          })}
+
+          {visibleModules.map((subModule) => (
+            <ModuleItem
+              key={subModule.id}
+              module={subModule}
+              productId={productId}
+              productAccess={productAccess}
+              activeFile={activeFile}
+              onSelectFile={onSelectFile}
+              onPurchaseLatestUpdate={onPurchaseLatestUpdate}
+              level={level + 1}
+              parentLocked={!moduleUnlocked}
+            />
+          ))}
         </div>
       )}
     </div>
@@ -879,7 +896,7 @@ const CoursePlayer: React.FC<{
   onBack: () => void;
   onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean;
   productAccess?: ProductAccessState | null;
-  onPurchaseLatestUpdate?: (product: ProductWithRating) => void;
+  onPurchaseLatestUpdate?: (product: ProductWithRating, updateId?: string) => void;
 }> = ({ settings, economySettings, product, currentUser = null, onBack, onQuizReward, productAccess = null, onPurchaseLatestUpdate }) => {
   const viewport = useViewportSize();
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
@@ -1259,7 +1276,7 @@ const CoursePlayer: React.FC<{
                     productAccess={productAccess}
                     activeFile={activeFile}
                     onSelectFile={onSelectFile}
-                    onPurchaseLatestUpdate={onPurchaseLatestUpdate ? () => onPurchaseLatestUpdate(product) : undefined}
+                    onPurchaseLatestUpdate={onPurchaseLatestUpdate ? (updateId?: string) => onPurchaseLatestUpdate(product, updateId) : undefined}
                   />
                 )) : <p className="p-4 text-center font-semibold text-[#50527a]/70">No content added yet.</p>}
               </nav>
