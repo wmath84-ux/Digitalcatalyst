@@ -4283,6 +4283,30 @@ const App: React.FC = () => {
             <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={shouldHideMainDockOnMobile ? 'max-md:hidden' : ''}>
+                {latestUpdateCheckoutProduct && (() => {
+                  const summary = getLatestUpdateCheckoutSummary(latestUpdateCheckoutProduct);
+
+                  return (
+                    <PaymentModal
+                      settings={websiteSettings}
+                      economySettings={economySettings}
+                      productTitle={`${latestUpdateCheckoutProduct.title} · ${summary.title}`}
+                      originalPrice={summary.price}
+                      salePrice={null}
+                      couponDiscount={0}
+                      finalPrice={summary.price}
+                      eduCoinDiscount={0}
+                      appliedEduCoins={0}
+                      coinRedeemRate={eduCoinRedeemRate}
+                      onClose={() => setLatestUpdateCheckoutProduct(null)}
+                      onConfirm={() => void handleConfirmLatestUpdatePurchase(latestUpdateCheckoutProduct)}
+                      paymentLink={latestUpdateCheckoutProduct.paymentLink}
+                      currentUser={effectiveAppUser}
+                      coinPrice={0}
+                      presentation="page"
+                    />
+                  );
+                })()}
                 <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>
             )}
