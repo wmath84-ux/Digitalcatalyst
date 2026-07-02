@@ -15,9 +15,10 @@ interface ProductCardProps {
   animationDelay: number;
   displayMode?: 'showcase' | 'wishlist';
   coupons: Coupon[];
+  isPurchased?: boolean;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDetails, isWishlisted, onToggleWishlist, onAddToCart, onQuickView, animationDelay, displayMode = 'showcase', coupons }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDetails, isWishlisted, onToggleWishlist, onAddToCart, onQuickView, animationDelay, displayMode = 'showcase', coupons, isPurchased = false }) => {
     // Use 'animate-child' class to hook into the parent's stagger logic.
     // The 'animate-delay-X' class comes from index.html CSS
     const animationClass = settings.animations.enabled 
@@ -72,23 +73,28 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                 )}
 
                 {/* Badges */}
-                <div className="absolute left-2 top-2 flex flex-col gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
+                <div className="absolute left-2 top-2 z-20 flex max-w-[72%] flex-col items-start gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
+                    {isPurchased && (
+                        <span className="w-fit rounded-full bg-emerald-600 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(15,23,42,0.20)] ring-1 ring-white/80 backdrop-blur sm:px-3.5 sm:text-xs">
+                            Purchased
+                        </span>
+                    )}
                     {product.isFree && (
-                        <span className="rounded-md bg-gradient-to-r from-indigo-600 to-purple-600 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] animate-fade-in sm:px-3 sm:text-xs">
+                        <span className="w-fit rounded-full bg-gradient-to-r from-blue-700 to-violet-700 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(15,23,42,0.20)] ring-1 ring-white/80 backdrop-blur sm:px-3.5 sm:text-xs">
                             Free
                         </span>
                     )}
                     {isCouponAvailable && product.couponCode && !product.isFree && settings.features.showSaleBadges && (
                         <button 
                             onClick={(e) => { e.stopPropagation(); onViewDetails('price-section'); }} 
-                            className="rounded-md bg-purple-600 px-2.5 py-1 font-mono text-[10px] font-bold tracking-wider text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] transition-transform hover:scale-105 sm:px-3 sm:text-xs"
+                            className="w-fit rounded-full bg-violet-700 px-3 py-1 font-mono text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(15,23,42,0.20)] ring-1 ring-white/80 backdrop-blur transition-transform hover:scale-105 sm:px-3.5 sm:text-xs"
                             title={`Use coupon ${product.couponCode}`}
                         >
                             {product.couponCode}
                         </button>
                     )}
                     {!product.isFree && product.salePrice && settings.features.showSaleBadges && (
-                        <span className="rounded-md bg-red-500 px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:px-3 sm:text-xs">
+                        <span className="w-fit rounded-full bg-rose-600 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(15,23,42,0.20)] ring-1 ring-white/80 backdrop-blur sm:px-3.5 sm:text-xs">
                             Sale
                         </span>
                     )}
@@ -149,16 +155,17 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                             )}
                         </div>
                         <button onClick={() => onViewDetails()} className="flex shrink-0 items-center rounded-full border border-indigo-200/70 bg-white/85 px-3 py-2 text-xs font-black text-primary shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 sm:px-4 sm:text-sm">
-                            Details <span className="ml-1">&rarr;</span>
+                            {isPurchased ? 'Purchased' : 'Details'} <span className="ml-1">&rarr;</span>
                         </button>
                     </div>
                 ) : (
                     <div className="mt-4 flex gap-2">
                         <button 
+                            disabled={isPurchased}
                             onClick={() => onAddToCart(product.id, 1)} 
-                            className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-2 rounded-lg hover:bg-opacity-90 transition-colors text-sm shadow-sm active:scale-95"
+                            className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-2 rounded-lg hover:bg-opacity-90 transition-colors text-sm shadow-sm active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                         >
-                            Move to Cart
+                            {isPurchased ? 'Purchased' : 'Move to Cart'}
                         </button>
                         <button 
                             onClick={() => onToggleWishlist(product.id)}

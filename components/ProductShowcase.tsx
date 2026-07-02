@@ -13,12 +13,13 @@ interface ProductShowcaseProps {
   onBuyNow: (product: ProductWithRating) => void;
   onQuickView: (product: ProductWithRating) => void;
   coupons: Coupon[];
+  purchasedProductIds?: number[];
   variant?: 'default' | 'mobileHome';
   externalSearchQuery?: string;
   hideInternalSearch?: boolean;
 }
 
-const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, onQuickView, coupons, variant = 'default', externalSearchQuery = '', hideInternalSearch = false }) => {
+const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, onQuickView, coupons, purchasedProductIds = [], variant = 'default', externalSearchQuery = '', hideInternalSearch = false }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('default');
   const [activeFilter, setActiveFilter] = useState<string>('All');
@@ -174,6 +175,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
                 onQuickView={onQuickView}
                 animationDelay={index}
                 coupons={coupons}
+                isPurchased={purchasedProductIds.includes(product.id)}
               />
             ))
           ) : (
