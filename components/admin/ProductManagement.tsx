@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
-import { Coupon, CourseModule, Product, ProductFile, ProductFileType, ProductWithRating, ProductDocPage, QuizQuestion, User } from '../../App';
+import { Coupon, CourseModule, Product, ProductFile, ProductFileType, ProductWithRating, ProductDocPage, QuizQuestion, User, CourseAccessLevel } from '../../App';
 import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
 import { PRODUCT_IMAGE_SLOTS, ProductImageSlot } from '../../utils/productImages';
 import { getDownloadURL, ref, uploadBytes, uploadBytesResumable } from 'firebase/storage';
@@ -140,8 +140,18 @@ const normaliseDocPages = (file: ProductFile): ProductDocPage[] | undefined => {
     }];
 };
 
+const normaliseCourseAccessLevel = (value?: string): CourseAccessLevel => {
+    if (value === 'paidUpdate' || value === 'hidden') return value;
+    return 'included';
+};
+
 const normaliseFiles = (files?: ProductFile[]): ProductFile[] => (files || []).map(file => ({
     ...file,
+    accessLevel: normaliseCourseAccessLevel(file.accessLevel),
+    paidUpdateId: file.paidUpdateId || '',
+    paidUpdateTitle: file.paidUpdateTitle || '',
+    paidUpdatePrice: file.paidUpdatePrice || '',
+    paidUpdateCoinPrice: Number(file.paidUpdateCoinPrice || 0),
     content: file.content || '',
     docPages: normaliseDocPages(file),
     quiz: file.quiz ? { questions: normaliseQuizQuestions(file.quiz.questions || []) } : file.type === 'quiz' ? { questions: [] } : undefined,
@@ -149,6 +159,11 @@ const normaliseFiles = (files?: ProductFile[]): ProductFile[] => (files || []).m
 
 const normaliseModules = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
     ...module,
+    accessLevel: normaliseCourseAccessLevel(module.accessLevel),
+    paidUpdateId: module.paidUpdateId || '',
+    paidUpdateTitle: module.paidUpdateTitle || '',
+    paidUpdatePrice: module.paidUpdatePrice || '',
+    paidUpdateCoinPrice: Number(module.paidUpdateCoinPrice || 0),
     title: module.title || 'Untitled Module',
     files: normaliseFiles(module.files || []),
     modules: normaliseModules(module.modules || []),
@@ -193,6 +208,11 @@ type ContentComposerFormState = {
     name: string;
     content: string;
     provider?: HostedDocsProvider | 'upload' | 'external_url';
+    accessLevel?: CourseAccessLevel;
+    paidUpdateId?: string;
+    paidUpdateTitle?: string;
+    paidUpdatePrice?: string;
+    paidUpdateCoinPrice?: string;
 };
 
 const hostedDocsProviderLabels: Record<HostedDocsProvider, string> = {
@@ -730,6 +750,11 @@ const ContentComposer: React.FC<{
         name: initialFile.name || 'Learning Resource',
         content: initialFile.content || '',
         provider: initialFile.provider as ContentComposerFormState['provider'],
+        accessLevel: normaliseCourseAccessLevel(initialFile.accessLevel),
+        paidUpdateId: initialFile.paidUpdateId || '',
+        paidUpdateTitle: initialFile.paidUpdateTitle || '',
+        paidUpdatePrice: initialFile.paidUpdatePrice ? initialFile.paidUpdatePrice.replace('₹', '') : '',
+        paidUpdateCoinPrice: initialFile.paidUpdateCoinPrice ? String(initialFile.paidUpdateCoinPrice) : '',
     } : null);
     const [docPages, setDocPages] = useState<ProductDocPage[]>(() => initialFile?.type === 'doc' ? (normaliseDocPages(initialFile) || []) : []);
     const [activeDocPageId, setActiveDocPageId] = useState(() => initialFile?.type === 'doc' ? (normaliseDocPages(initialFile)?.[0]?.id || '') : '');
@@ -741,6 +766,22 @@ const ContentComposer: React.FC<{
     const [uploadError, setUploadError] = useState('');
     const quizListRef = useRef<HTMLDivElement>(null);
     const previousQuizQuestionCountRef = useRef(quizQuestions.length);
+
+    const buildContentAccessMeta = (state: ContentComposerFormState) => {
+        const accessLevel = normaliseCourseAccessLevel(state.accessLevel);
+        const updateId = String(state.paidUpdateId || '').trim();
+        const updateTitle = String(state.paidUpdateTitle || '').trim();
+        const updatePrice = String(state.paidUpdatePrice || '').trim();
+        const updateCoinPrice = Math.max(0, Math.floor(Number(state.paidUpdateCoinPrice || 0)));
+
+        return {
+            accessLevel,
+            paidUpdateId: accessLevel === 'paidUpdate' ? updateId : '',
+            paidUpdateTitle: accessLevel === 'paidUpdate' ? updateTitle : '',
+            paidUpdatePrice: accessLevel === 'paidUpdate' && updatePrice ? `₹${updatePrice.replace(/[^\d.]/g, '')}` : '',
+            paidUpdateCoinPrice: accessLevel === 'paidUpdate' ? updateCoinPrice : 0,
+        };
+    };
 
     const contentTypes: Array<{ type: ProductFileType; title: string; description: string; icon: string; accept?: string; action?: 'docsUrl' }> = [
         { type: 'video', title: 'Video Upload', description: 'Upload MP4/WebM lesson files.', icon: '🎬', accept: 'video/*' },
@@ -845,6 +886,7 @@ const ContentComposer: React.FC<{
                 createdAt: now,
                 updatedAt: now,
                 content: '',
+                ...buildContentAccessMeta(formState),
                 quiz: { questions: [] },
             });
 
@@ -908,6 +950,7 @@ const ContentComposer: React.FC<{
                 type: 'quiz',
                 url: '',
                 content: '',
+                ...buildContentAccessMeta(formState),
                 quiz: { questions: quizQuestions || [] },
             });
             onClose();
@@ -939,6 +982,7 @@ const ContentComposer: React.FC<{
                 updatedAt: now,
                 content: cleanPages[0]?.content || '',
                 docPages: cleanPages,
+                ...buildContentAccessMeta(formState),
                 quiz: { questions: [] },
             });
 
@@ -981,6 +1025,7 @@ const ContentComposer: React.FC<{
             createdAt: initialFile?.createdAt || now,
             updatedAt: now,
             content: '',
+            ...buildContentAccessMeta(formState),
             quiz: { questions: [] },
         });
 
@@ -1054,6 +1099,44 @@ const ContentComposer: React.FC<{
                             <label className={labelClass}>Resource Name</label>
                             <input value={formState.name} onChange={event => setFormState(prev => prev ? { ...prev, name: event.target.value } : prev)} className={fieldClass} />
                         </div>
+                        <div className="rounded-2xl border border-cyan-100 bg-cyan-50/70 p-4">
+                            <label className={labelClass}>Course Player Access</label>
+                            <select
+                                value={formState.accessLevel || 'included'}
+                                onChange={event => setFormState(prev => prev ? { ...prev, accessLevel: event.target.value as CourseAccessLevel } : prev)}
+                                className={fieldClass}
+                            >
+                                <option value="included">Included after base purchase</option>
+                                <option value="paidUpdate">Locked paid latest update</option>
+                                <option value="hidden">Hidden from course player</option>
+                            </select>
+
+                            <p className="mt-2 text-xs font-bold leading-5 text-slate-600">
+                                Included content opens after normal product purchase. Paid update content stays locked until user buys the latest update. Hidden content is saved for admin but not shown to users.
+                            </p>
+
+                            {(formState.accessLevel || 'included') === 'paidUpdate' && (
+                                <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <label>
+                                        <span className={labelClass}>Update Group ID</span>
+                                        <input value={formState.paidUpdateId || ''} onChange={event => setFormState(prev => prev ? { ...prev, paidUpdateId: event.target.value } : prev)} className={fieldClass} placeholder="chapter-2-update" />
+                                    </label>
+                                    <label>
+                                        <span className={labelClass}>Update Button Title</span>
+                                        <input value={formState.paidUpdateTitle || ''} onChange={event => setFormState(prev => prev ? { ...prev, paidUpdateTitle: event.target.value } : prev)} className={fieldClass} placeholder="Purchase the latest update" />
+                                    </label>
+                                    <label>
+                                        <span className={labelClass}>Update Price ₹</span>
+                                        <input value={formState.paidUpdatePrice || ''} onChange={event => setFormState(prev => prev ? { ...prev, paidUpdatePrice: event.target.value } : prev)} className={fieldClass} inputMode="decimal" placeholder="99" />
+                                    </label>
+                                    <label>
+                                        <span className={labelClass}>Update Coin Price</span>
+                                        <input value={formState.paidUpdateCoinPrice || ''} onChange={event => setFormState(prev => prev ? { ...prev, paidUpdateCoinPrice: event.target.value } : prev)} className={fieldClass} inputMode="numeric" placeholder="500" />
+                                    </label>
+                                </div>
+                            )}
+                        </div>
+
 
                         {formState.type === 'quiz' && (
                             <p className="rounded-2xl border border-cyan-300/20 bg-cyan-600/10 px-4 py-3 text-sm font-bold text-cyan-700">
