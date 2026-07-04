@@ -10,7 +10,7 @@ import {
 } from '../utils/coinWallet';
 import AiMentor from './AiMentor';
 import ProductMusicPlayer, { type AudioTrack } from './ProductMusicPlayer';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebase';
 
@@ -183,6 +183,14 @@ const resolveCoursePlayerUpdateId = (productId: number, item: Partial<CourseAcce
 const isCoursePlayerItemHidden = (item: Partial<CourseAccessMeta>) =>
   getCoursePlayerAccessLevel(item) === 'hidden';
 
+export const getRequiredEducoins = (content?: Partial<CourseAccessMeta> & { updateEducoinPrice?: number | string; educoinPrice?: number | string; coinPrice?: number | string } | null) => {
+  const raw = content?.updateEducoinPrice ?? content?.educoinPrice ?? content?.coinPrice ?? content?.paidUpdateCoinPrice ?? 0;
+  return Math.max(0, Math.floor(Number(raw) || 0));
+};
+
+export const getEducoinBalance = (user?: Partial<User> | null) =>
+  Math.max(0, Math.floor(Number(user?.coinBalance ?? user?.eduCoins ?? 0) || 0));
+
 const hasCoursePlayerItemAccess = (
   productId: number,
   item: Partial<CourseAccessMeta> & { id?: string },
@@ -205,9 +213,11 @@ const ModuleItem: React.FC<{
   activeFile: ProductFile | null;
   onSelectFile: (file: ProductFile) => void;
   onPurchaseLatestUpdate?: (updateId?: string) => void;
+  onUnlockWithEducoins?: (item: CourseModule | ProductFile) => Promise<void> | void;
+  educoinBalance?: number;
   level?: number;
   parentLocked?: boolean;
-}> = ({ module, productId, productAccess, activeFile, onSelectFile, onPurchaseLatestUpdate, level = 0, parentLocked = false }) => {
+}> = ({ module, productId, productAccess, activeFile, onSelectFile, onPurchaseLatestUpdate, onUnlockWithEducoins, educoinBalance = 0, level = 0, parentLocked = false }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const moduleHidden = isCoursePlayerItemHidden(module);
   const moduleUpdateId = resolveCoursePlayerUpdateId(productId, module);
@@ -254,7 +264,7 @@ const ModuleItem: React.FC<{
               <button
                 type="button"
                 aria-disabled={!fileUnlocked}
-                onClick={() => fileUnlocked ? onSelectFile(file) : onPurchaseLatestUpdate?.(fileUpdateId)}
+                onClick={() => fileUnlocked ? onSelectFile(file) : undefined}
                 className={`module-item-button flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition sm:py-3 ${
                   activeFile?.id === file.id
                     ? "bg-white border border-[#ded8ff] font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)]"
@@ -287,6 +297,8 @@ const ModuleItem: React.FC<{
               activeFile={activeFile}
               onSelectFile={onSelectFile}
               onPurchaseLatestUpdate={onPurchaseLatestUpdate}
+              onUnlockWithEducoins={onUnlockWithEducoins}
+              educoinBalance={educoinBalance}
               level={level + 1}
               parentLocked={!moduleUnlocked}
             />
@@ -926,6 +938,8 @@ const CoursePlayer: React.FC<{
     isFlushing: boolean;
   } | null>(null);
   const [youtubeRewardNotice, setYoutubeRewardNotice] = useState('');
+  const [educoinBalance, setEducoinBalance] = useState(getEducoinBalance(currentUser));
+  const [educoinNotice, setEducoinNotice] = useState('');
   const [youtubeWatchSeconds, setYoutubeWatchSeconds] = useState(0);
 
   const currentUserId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
@@ -1110,6 +1124,37 @@ const CoursePlayer: React.FC<{
     };
   }, [activeFile, currentUserId, flushYoutubeCoins, product.id, showWelcome, stopYoutubeTickTimer, youtubeFrameId]);
 
+  const unlockContentWithEducoins = async (item: CourseModule | ProductFile) => {
+    const requiredCoins = getRequiredEducoins(item);
+    if (!currentUserId || !requiredCoins) return;
+    const updateId = resolveCoursePlayerUpdateId(product.id, item);
+    if (productAccess?.ownedUpdateIds.includes(updateId)) { setEducoinNotice('This content is already unlocked.'); return; }
+    if (educoinBalance < requiredCoins) { setEducoinNotice(`You need ${requiredCoins} Educoin. Your balance is ${educoinBalance}.`); return; }
+    try {
+      const result = await runTransaction(db, async transaction => {
+        const userRef = doc(db, 'users', currentUserId);
+        const userSnap = await transaction.get(userRef);
+        const data = userSnap.data() || {};
+        const balance = Math.max(0, Number(data.coinBalance ?? data.eduCoins ?? educoinBalance) || 0);
+        const purchasedProductUpdateIds = { ...((data as any).purchasedProductUpdateIds || {}) };
+        const productKey = String(product.id);
+        const ownedIds = Array.isArray(purchasedProductUpdateIds[productKey]) ? purchasedProductUpdateIds[productKey].map(String) : [];
+        if (ownedIds.includes(updateId)) return { balance, alreadyUnlocked: true, updates: ownedIds };
+        if (balance < requiredCoins) throw new Error(`You need ${requiredCoins} Educoin. Your balance is ${balance}.`);
+        const nextBalance = balance - requiredCoins;
+        const nextUpdates = [...new Set([...ownedIds, updateId])];
+        purchasedProductUpdateIds[productKey] = nextUpdates;
+        transaction.set(userRef, { coinBalance: nextBalance, eduCoins: nextBalance, purchasedProductUpdateIds, updatedAt: serverTimestamp() }, { merge: true });
+        return { balance: nextBalance, alreadyUnlocked: false, updates: nextUpdates };
+      });
+      setEducoinBalance(result.balance);
+      if (!result.alreadyUnlocked) onEducoinUnlockComplete?.(product, result.updates);
+      setEducoinNotice(result.alreadyUnlocked ? 'This content is already unlocked.' : 'Content unlocked with Educoin.');
+    } catch (error: any) {
+      setEducoinNotice(error?.message || 'Educoin unlock failed. Please try again.');
+    }
+  };
+
   const onSelectFile = (file: ProductFile) => {
     void flushYoutubeCoins('closed');
     setActiveFile(file);
@@ -1286,6 +1331,8 @@ const CoursePlayer: React.FC<{
                     activeFile={activeFile}
                     onSelectFile={onSelectFile}
                     onPurchaseLatestUpdate={onPurchaseLatestUpdate ? (updateId?: string) => onPurchaseLatestUpdate(product, updateId) : undefined}
+                    onUnlockWithEducoins={unlockContentWithEducoins}
+                    educoinBalance={educoinBalance}
                   />
                 )) : <p className="p-4 text-center font-semibold text-[#50527a]/70">No content added yet.</p>}
               </nav>
@@ -1295,6 +1342,7 @@ const CoursePlayer: React.FC<{
           <div className={`relative min-h-0 min-w-0 overflow-hidden backdrop-blur-2xl ${isAudioExperience ? 'rounded-none border-0 bg-transparent shadow-none' : 'rounded-2xl border border-[#ded8ff] bg-white/72 shadow-[0_20px_60px_rgba(0,0,0,0.05)] sm:rounded-3xl'}`}>
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
+          {educoinNotice && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-900">{educoinNotice}</div>}
           <YoutubeRewardMeter />
         </section>
       </main>
