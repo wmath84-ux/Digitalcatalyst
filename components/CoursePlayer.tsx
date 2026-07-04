@@ -219,36 +219,39 @@ const ModuleItem: React.FC<{
 
   return (
     <div className={`${level > 0 ? "ml-4 border-l border-white/50 pl-3" : ""}`}>
-      <button onClick={() => setIsExpanded(!isExpanded)} className="module-item-button flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-slate-900 transition hover:bg-[#f7f5ff] sm:py-4" aria-expanded={isExpanded}>
+      <button
+        onClick={() => {
+          if (moduleUnlocked) {
+            setIsExpanded(!isExpanded);
+            return;
+          }
+          onPurchaseLatestUpdate?.(moduleUpdateId);
+        }}
+        className={`module-item-button flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left transition sm:py-4 ${
+          moduleUnlocked
+            ? 'text-slate-900 hover:bg-[#f7f5ff]'
+            : 'border border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100'
+        }`}
+        aria-expanded={isExpanded}
+      >
         <ModuleIcon className="h-5 w-5 shrink-0" />
         <span className="min-w-0 flex-1 text-[15px] font-black leading-tight">{module.title}</span>
         {!moduleUnlocked && (
-          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-amber-800 ring-1 ring-amber-200">
-            Locked
+          <span className="shrink-0 rounded-full bg-amber-300 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-950 ring-1 ring-amber-400">
+            🔒 Buy
           </span>
         )}
       </button>
 
       {isExpanded && (
         <div className="space-y-1 pb-2">
-          {!moduleUnlocked && (
-            <div className="mx-2 mb-2 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-              <p className="text-xs font-bold leading-5 text-amber-900">This module has paid locked content. Purchase this update to unlock it instantly.</p>
-              {onPurchaseLatestUpdate && (
-                <button type="button" onClick={() => onPurchaseLatestUpdate(moduleUpdateId)} className="mt-2 w-full rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white shadow-sm">
-                  Purchase this update
-                </button>
-              )}
-            </div>
-          )}
-
           {visibleFiles.map((file) => {
             const fileUpdateId = resolveCoursePlayerUpdateId(productId, file);
             const fileUnlocked = moduleUnlocked && hasCoursePlayerItemAccess(productId, file, productAccess);
 
             return (
+              <React.Fragment key={file.id}>
               <button
-                key={file.id}
                 type="button"
                 aria-disabled={!fileUnlocked}
                 onClick={() => fileUnlocked ? onSelectFile(file) : onPurchaseLatestUpdate?.(fileUpdateId)}
@@ -257,12 +260,12 @@ const ModuleItem: React.FC<{
                     ? "bg-white border border-[#ded8ff] font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)]"
                     : fileUnlocked
                       ? "font-medium text-slate-900/90 hover:bg-[#f7f5ff]"
-                      : "cursor-pointer border border-amber-200 bg-amber-50 font-black text-amber-900 hover:bg-amber-100"
+                      : "cursor-pointer border border-amber-200 bg-amber-50 font-black text-amber-950 hover:bg-amber-100"
                 }`}
               >
                 <span className="min-w-0 flex-1 truncate">{file.name}</span>
                 {!fileUnlocked ? (
-                  <span className="shrink-0 rounded-full bg-amber-200 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-amber-900">
+                  <span className="shrink-0 rounded-full bg-amber-300 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-950 ring-1 ring-amber-400">
                     🔒 Buy
                   </span>
                 ) : file.type === 'quiz' ? (
@@ -271,6 +274,7 @@ const ModuleItem: React.FC<{
                   <FileIcon className="h-5 w-5 shrink-0" />
                 )}
               </button>
+              </React.Fragment>
             );
           })}
 
@@ -787,7 +791,7 @@ const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
 );
 
 const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ file, economySettings, onQuizReward }) => {
-  const questions = file.quiz?.questions || [];
+  const questions = useMemo(() => (Array.isArray(file.quiz?.questions) ? file.quiz?.questions : []).filter(Boolean).map((q: any) => ({ ...q, prompt: String(q.prompt || q.question || q.title || q.text || '').trim(), options: Array.isArray(q.options) ? q.options : Array.isArray(q.choices) ? q.choices : Array.isArray(q.answers) ? q.answers : [] })).filter(q => q.prompt && q.options.length), [file.id, file.quiz]);
   const [answers, setAnswers] = useState<QuizAnswerState>({});
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [submitted, setSubmitted] = useState(false);
@@ -796,11 +800,14 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
   const quizViewport = useViewportSize();
   const compactQuiz = quizViewport.isShortHeight || quizViewport.isTinyPlayer || quizViewport.isLandscapeCompact || quizViewport.width < 640;
   const veryCompactQuiz = quizViewport.isTinyPlayer || quizViewport.height < 620;
+  useEffect(() => { setAnswers({}); setCurrentQuestion(0); setSubmitted(false); setRewardClaimed(false); setRewardCoins(0); }, [file.id]);
+  const safeQuestionIndex = Math.min(currentQuestion, Math.max(0, questions.length - 1));
+  useEffect(() => { if (currentQuestion !== safeQuestionIndex) setCurrentQuestion(safeQuestionIndex); }, [currentQuestion, safeQuestionIndex]);
   const score = questions.reduce((total, q, index) => total + (answers[index] === q.correctAnswer ? 1 : 0), 0);
-  if (!questions.length) return <GlassDownloadCard file={file} headline="Quiz unavailable" />;
+  if (!questions.length) return <div className="flex h-full items-center justify-center bg-white/70 p-6 text-center text-lg font-black text-slate-800">No questions available for this quiz.</div>;
 
-  const question = questions[currentQuestion];
-  const selected = answers[currentQuestion];
+  const question = questions[safeQuestionIndex];
+  const selected = answers[safeQuestionIndex];
   const answered = selected !== undefined;
   const isLastQuestion = currentQuestion === questions.length - 1;
   const allAnswered = questions.every((_, index) => answers[index] !== undefined);
@@ -850,7 +857,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
         )}
 
         <div className={`${compactQuiz ? 'rounded-[1.15rem] p-3' : desktopQuizLayout ? 'col-start-2 row-span-5 row-start-1 rounded-[1.75rem] p-6 xl:p-8 2xl:p-10' : 'rounded-[1.5rem] p-3 sm:rounded-3xl sm:p-5 md:p-7'} min-h-0 overflow-y-auto border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] custom-scrollbar`}>
-          <p className={`${compactQuiz ? 'mb-1.5 text-[10px]' : 'mb-3 text-sm'} font-black uppercase tracking-[0.24em] text-slate-600`}>Question {currentQuestion + 1} of {questions.length}</p>
+          <p className={`${compactQuiz ? 'mb-1.5 text-[10px]' : 'mb-3 text-sm'} font-black uppercase tracking-[0.24em] text-slate-600`}>Question {safeQuestionIndex + 1} of {questions.length}</p>
           <h3 className={`${compactQuiz ? 'text-base' : 'text-xl sm:text-2xl'} font-black leading-tight text-slate-900`}>{question.prompt}</h3>
           <div className={`${compactQuiz ? 'mt-3 gap-2' : 'mt-5 gap-3'} grid md:grid-cols-2`}>
             {(question.options || []).map((option, oIndex) => {
@@ -863,7 +870,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
                   : isSelected
                     ? 'border-rose-300/80 bg-rose-400/25 text-rose-700 shadow-sm'
                     : 'border-white/50 bg-white/70 text-slate-600/70';
-              return <button key={`${option}-${oIndex}`} type="button" onClick={() => !answered && setAnswers(prev => ({ ...prev, [currentQuestion]: oIndex }))} className={`${compactQuiz ? 'rounded-xl px-3 py-3 text-sm' : 'rounded-2xl px-4 py-4 sm:px-5'} border text-left font-bold transition ${stateClass}`}>{option}</button>;
+              return <button key={`${option}-${oIndex}`} type="button" onClick={() => !answered && setAnswers(prev => ({ ...prev, [safeQuestionIndex]: oIndex }))} className={`${compactQuiz ? 'rounded-xl px-3 py-3 text-sm' : 'rounded-2xl px-4 py-4 sm:px-5'} border text-left font-bold transition ${stateClass}`}>{option}</button>;
             })}
           </div>
           {answered && <div className={`${compactQuiz ? 'mt-3 rounded-xl p-3 text-sm' : 'mt-6 rounded-2xl p-4'} border font-black ${selected === question.correctAnswer ? 'border-emerald-300/50 bg-emerald-400/15 text-emerald-700' : 'border-rose-300/50 bg-rose-400/15 text-rose-100'}`}>{selected === question.correctAnswer ? 'Correct! Great work.' : `Incorrect. Correct answer: ${question.options[question.correctAnswer]}`}</div>}
@@ -897,6 +904,7 @@ const CoursePlayer: React.FC<{
   onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean;
   productAccess?: ProductAccessState | null;
   onPurchaseLatestUpdate?: (product: ProductWithRating, updateId?: string) => void;
+  onEducoinUnlockComplete?: (product: ProductWithRating, updateIds: string[]) => void;
 }> = ({ settings, economySettings, product, currentUser = null, onBack, onQuizReward, productAccess = null, onPurchaseLatestUpdate }) => {
   const viewport = useViewportSize();
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
@@ -921,6 +929,7 @@ const CoursePlayer: React.FC<{
   const [youtubeWatchSeconds, setYoutubeWatchSeconds] = useState(0);
 
   const currentUserId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
+
 
   const stopYoutubeTickTimer = useCallback(() => {
     if (youtubeTickTimerRef.current !== null) {
