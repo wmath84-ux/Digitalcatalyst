@@ -91,7 +91,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h1>
-            <p className="text-gray-600 mb-6">The application encountered an unexpected error. This is likely due to storage limits or a temporary glitch.</p>
+            <p className="text-gray-600 mb-6">The application hit an unexpected error. Please reload the page; if the problem continues, share the error details with support.</p>
             
             {this.state.error?.message && (
                 <div className="bg-gray-100 p-3 rounded text-left mb-6 overflow-auto max-h-32 text-xs font-mono text-gray-700 border border-gray-200">
@@ -103,11 +103,14 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
                 <button onClick={() => window.location.reload()} className="w-full bg-white/70 text-slate-900 px-4 py-3 rounded-lg hover:bg-white/80 hover:shadow-sm font-semibold transition-colors">
                 Reload Page
                 </button>
-                <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full bg-white/70 backdrop-blur-xl border border-red-200 text-red-600 px-4 py-3 rounded-lg hover:bg-red-50 font-semibold transition-colors">
-                Reset App Data (Fixes Storage Issues)
-                </button>
+                <details className="rounded-lg border border-red-100 bg-red-50/40 p-3 text-left">
+                  <summary className="cursor-pointer text-sm font-bold text-red-700">Advanced troubleshooting</summary>
+                  <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="mt-3 w-full bg-white/70 backdrop-blur-xl border border-red-200 text-red-600 px-4 py-3 rounded-lg hover:bg-red-50 font-semibold transition-colors">
+                  Reset App Data
+                  </button>
+                  <p className="text-xs text-slate-600 mt-3">Warning: Resetting app data clears browser-only cache/settings. It should not be the first fix for content bugs.</p>
+                </details>
             </div>
-            <p className="text-xs text-slate-600 mt-4">Warning: Resetting app data will clear all products and settings saved in your browser.</p>
           </div>
         </div>
       );
@@ -1025,6 +1028,7 @@ const App: React.FC = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>(initialSupportTickets);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [currentView, setCurrentView] = useState('home'); 
+  const [networkBanner, setNetworkBanner] = useState(() => (typeof navigator !== 'undefined' && !navigator.onLine ? 'You are offline. Some features may not work until internet is back.' : ''));
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup'>('login');
   const [isAuthStateReady, setIsAuthStateReady] = useState(false);
   const [isRedirectResultPending, setIsRedirectResultPending] = useState(false);
@@ -1037,6 +1041,19 @@ const App: React.FC = () => {
   const [mobileAuthFlowState, setMobileAuthFlowState] = useState<MobileAuthFlowState>('checking');
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<FirebaseUser | null>(null);
   const [mobileWelcomeMessage, setMobileWelcomeMessage] = useState('');
+
+  useEffect(() => {
+    const goOffline = () => setNetworkBanner('You are offline. Some features may not work until internet is back.');
+    const goOnline = () => {
+      setNetworkBanner('You are back online.');
+      window.setTimeout(() => setNetworkBanner(''), 3500);
+    };
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    if (typeof navigator !== 'undefined' && !navigator.onLine) goOffline();
+    return () => { window.removeEventListener('offline', goOffline); window.removeEventListener('online', goOnline); };
+  }, []);
+
   const currentViewRef = React.useRef(currentView);
   const historyNavigationRef = React.useRef(false);
   const lastHistoryViewRef = React.useRef(currentView);
@@ -3607,6 +3624,14 @@ const App: React.FC = () => {
     };
   };
 
+  const handleEducoinUpdateUnlockComplete = (product: ProductWithRating, updateIds: string[]) => {
+    const productKey = String(product.id);
+    persistUserPurchasedProductUpdates({
+      ...purchasedProductUpdateIds,
+      [productKey]: mergeUpdateIds(purchasedProductUpdateIds[productKey], updateIds),
+    });
+  };
+
   const handleOpenLatestUpdateCheckout = (product: ProductWithRating, updateId?: string) => {
     if (!hasFirebaseUser) {
       handleLoginRequired(product);
@@ -3645,6 +3670,12 @@ const App: React.FC = () => {
       return;
     }
 
+    const paymentUrl = product.paymentLink?.trim();
+    if (!paymentUrl) {
+      setInfoModal({ title: 'Payment link missing', message: 'Payment link is not available for this content.', icon: '⚠️' });
+      return;
+    }
+    window.open(paymentUrl, '_blank', 'noopener,noreferrer');
     setLatestUpdateCheckout({ product, updateId });
     window.scrollTo(0, 0);
   };
@@ -4154,7 +4185,7 @@ const App: React.FC = () => {
       case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onQuickView={setQuickViewProduct} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onCoinPurchase={(product, quantity, options) => handleProductCoinPurchase(product, quantity, options)} />;
       case 'coursePlayer':
         if (isAuthRestoring || authRestoreError) return renderAuthRestoreStatus();
-        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} currentUser={appUser} onBack={() => handleNavigateBack('myPurchases')} onQuizReward={handleQuizReward} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} /> : renderAuthRestoreStatus();
+        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} currentUser={appUser} onBack={() => handleNavigateBack('myPurchases')} onQuizReward={handleQuizReward} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onEducoinUnlockComplete={handleEducoinUpdateUnlockComplete} /> : renderAuthRestoreStatus();
       case 'eduCoinGuide': return <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={appUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onQuickView={setQuickViewProduct} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
@@ -4381,6 +4412,7 @@ const App: React.FC = () => {
   return (
       <ErrorBoundary>
         <style>{`.animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *), .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *)::before, .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *)::after { animation: none !important; scroll-behavior: auto !important; } .animations-off .animate-child, .animations-off .scroll-animate, .animations-off .hub-animate { opacity: 1 !important; transform: none !important; } .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *) { transition-duration: 0.01ms !important; }`}</style>
+        {networkBanner && <div className={`fixed left-1/2 top-3 z-[9999] w-[min(92vw,42rem)] -translate-x-1/2 rounded-2xl px-4 py-3 text-center text-sm font-black shadow-[0_18px_50px_rgba(15,23,42,0.22)] ${networkBanner.includes('back online') ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-slate-950'}`}>{networkBanner}</div>}
         {renderPage()}
         <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
       </ErrorBoundary>

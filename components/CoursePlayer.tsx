@@ -10,7 +10,7 @@ import {
 } from '../utils/coinWallet';
 import AiMentor from './AiMentor';
 import ProductMusicPlayer, { type AudioTrack } from './ProductMusicPlayer';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebase';
 
@@ -183,6 +183,14 @@ const resolveCoursePlayerUpdateId = (productId: number, item: Partial<CourseAcce
 const isCoursePlayerItemHidden = (item: Partial<CourseAccessMeta>) =>
   getCoursePlayerAccessLevel(item) === 'hidden';
 
+export const getRequiredEducoins = (content?: Partial<CourseAccessMeta> & { updateEducoinPrice?: number | string; educoinPrice?: number | string; coinPrice?: number | string } | null) => {
+  const raw = content?.updateEducoinPrice ?? content?.educoinPrice ?? content?.coinPrice ?? content?.paidUpdateCoinPrice ?? 0;
+  return Math.max(0, Math.floor(Number(raw) || 0));
+};
+
+export const getEducoinBalance = (user?: Partial<User> | null) =>
+  Math.max(0, Math.floor(Number(user?.coinBalance ?? user?.eduCoins ?? 0) || 0));
+
 const hasCoursePlayerItemAccess = (
   productId: number,
   item: Partial<CourseAccessMeta> & { id?: string },
@@ -205,9 +213,11 @@ const ModuleItem: React.FC<{
   activeFile: ProductFile | null;
   onSelectFile: (file: ProductFile) => void;
   onPurchaseLatestUpdate?: (updateId?: string) => void;
+  onUnlockWithEducoins?: (item: CourseModule | ProductFile) => Promise<void> | void;
+  educoinBalance?: number;
   level?: number;
   parentLocked?: boolean;
-}> = ({ module, productId, productAccess, activeFile, onSelectFile, onPurchaseLatestUpdate, level = 0, parentLocked = false }) => {
+}> = ({ module, productId, productAccess, activeFile, onSelectFile, onPurchaseLatestUpdate, onUnlockWithEducoins, educoinBalance = 0, level = 0, parentLocked = false }) => {
   const [isExpanded, setIsExpanded] = useState(true);
   const moduleHidden = isCoursePlayerItemHidden(module);
   const moduleUpdateId = resolveCoursePlayerUpdateId(productId, module);
@@ -233,12 +243,16 @@ const ModuleItem: React.FC<{
         <div className="space-y-1 pb-2">
           {!moduleUnlocked && (
             <div className="mx-2 mb-2 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-              <p className="text-xs font-bold leading-5 text-amber-900">This module has paid locked content. Purchase this update to unlock it instantly.</p>
-              {onPurchaseLatestUpdate && (
-                <button type="button" onClick={() => onPurchaseLatestUpdate(moduleUpdateId)} className="mt-2 w-full rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white shadow-sm">
-                  Purchase this update
-                </button>
-              )}
+              <p className="text-xs font-bold leading-5 text-amber-900">This module has paid locked content. Purchase this update or unlock with Educoin.</p>
+              <div className="mt-2 grid gap-2">
+                {onPurchaseLatestUpdate && (
+                  <button type="button" onClick={() => onPurchaseLatestUpdate(moduleUpdateId)} className="w-full rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white shadow-sm">Purchase this update</button>
+                )}
+                {onUnlockWithEducoins && getRequiredEducoins(module) > 0 && (
+                  <button type="button" disabled={educoinBalance < getRequiredEducoins(module)} onClick={() => onUnlockWithEducoins(module)} className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-amber-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60">Unlock with {getRequiredEducoins(module)} Educoin · Balance: {educoinBalance}</button>
+                )}
+                {getRequiredEducoins(module) > educoinBalance && <p className="text-xs font-bold text-amber-900">You need {getRequiredEducoins(module)} Educoin. Your balance is {educoinBalance}.</p>}
+              </div>
             </div>
           )}
 
@@ -247,11 +261,11 @@ const ModuleItem: React.FC<{
             const fileUnlocked = moduleUnlocked && hasCoursePlayerItemAccess(productId, file, productAccess);
 
             return (
+              <React.Fragment key={file.id}>
               <button
-                key={file.id}
                 type="button"
                 aria-disabled={!fileUnlocked}
-                onClick={() => fileUnlocked ? onSelectFile(file) : onPurchaseLatestUpdate?.(fileUpdateId)}
+                onClick={() => fileUnlocked ? onSelectFile(file) : undefined}
                 className={`module-item-button flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition sm:py-3 ${
                   activeFile?.id === file.id
                     ? "bg-white border border-[#ded8ff] font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)]"
@@ -263,7 +277,7 @@ const ModuleItem: React.FC<{
                 <span className="min-w-0 flex-1 truncate">{file.name}</span>
                 {!fileUnlocked ? (
                   <span className="shrink-0 rounded-full bg-amber-200 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-amber-900">
-                    🔒 Buy
+                    🔒 Locked
                   </span>
                 ) : file.type === 'quiz' ? (
                   <QuizIcon className="h-5 w-5 shrink-0" />
@@ -271,6 +285,14 @@ const ModuleItem: React.FC<{
                   <FileIcon className="h-5 w-5 shrink-0" />
                 )}
               </button>
+              {!fileUnlocked && (
+                <div className="mx-2 mb-2 grid gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-2">
+                  {onPurchaseLatestUpdate && <button type="button" onClick={() => onPurchaseLatestUpdate(fileUpdateId)} className="rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white">Buy / purchase with money</button>}
+                  {onUnlockWithEducoins && getRequiredEducoins(file) > 0 && <button type="button" disabled={educoinBalance < getRequiredEducoins(file)} onClick={() => onUnlockWithEducoins(file)} className="rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-amber-800 disabled:cursor-not-allowed disabled:opacity-60">Unlock with {getRequiredEducoins(file)} Educoin · Balance: {educoinBalance}</button>}
+                  {getRequiredEducoins(file) > educoinBalance && <p className="text-xs font-bold text-amber-900">You need {getRequiredEducoins(file)} Educoin. Your balance is {educoinBalance}.</p>}
+                </div>
+              )}
+              </React.Fragment>
             );
           })}
 
@@ -283,6 +305,8 @@ const ModuleItem: React.FC<{
               activeFile={activeFile}
               onSelectFile={onSelectFile}
               onPurchaseLatestUpdate={onPurchaseLatestUpdate}
+              onUnlockWithEducoins={onUnlockWithEducoins}
+              educoinBalance={educoinBalance}
               level={level + 1}
               parentLocked={!moduleUnlocked}
             />
@@ -787,7 +811,7 @@ const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
 );
 
 const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ file, economySettings, onQuizReward }) => {
-  const questions = file.quiz?.questions || [];
+  const questions = useMemo(() => (Array.isArray(file.quiz?.questions) ? file.quiz?.questions : []).filter(Boolean).map((q: any) => ({ ...q, prompt: String(q.prompt || q.question || q.title || q.text || '').trim(), options: Array.isArray(q.options) ? q.options : Array.isArray(q.choices) ? q.choices : Array.isArray(q.answers) ? q.answers : [] })).filter(q => q.prompt && q.options.length), [file.id, file.quiz]);
   const [answers, setAnswers] = useState<QuizAnswerState>({});
   const [currentQuestion, setCurrentQuestion] = useState(0);
   const [submitted, setSubmitted] = useState(false);
@@ -796,11 +820,14 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
   const quizViewport = useViewportSize();
   const compactQuiz = quizViewport.isShortHeight || quizViewport.isTinyPlayer || quizViewport.isLandscapeCompact || quizViewport.width < 640;
   const veryCompactQuiz = quizViewport.isTinyPlayer || quizViewport.height < 620;
+  useEffect(() => { setAnswers({}); setCurrentQuestion(0); setSubmitted(false); setRewardClaimed(false); setRewardCoins(0); }, [file.id]);
+  const safeQuestionIndex = Math.min(currentQuestion, Math.max(0, questions.length - 1));
+  useEffect(() => { if (currentQuestion !== safeQuestionIndex) setCurrentQuestion(safeQuestionIndex); }, [currentQuestion, safeQuestionIndex]);
   const score = questions.reduce((total, q, index) => total + (answers[index] === q.correctAnswer ? 1 : 0), 0);
-  if (!questions.length) return <GlassDownloadCard file={file} headline="Quiz unavailable" />;
+  if (!questions.length) return <div className="flex h-full items-center justify-center bg-white/70 p-6 text-center text-lg font-black text-slate-800">No questions available for this quiz.</div>;
 
-  const question = questions[currentQuestion];
-  const selected = answers[currentQuestion];
+  const question = questions[safeQuestionIndex];
+  const selected = answers[safeQuestionIndex];
   const answered = selected !== undefined;
   const isLastQuestion = currentQuestion === questions.length - 1;
   const allAnswered = questions.every((_, index) => answers[index] !== undefined);
@@ -850,7 +877,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
         )}
 
         <div className={`${compactQuiz ? 'rounded-[1.15rem] p-3' : desktopQuizLayout ? 'col-start-2 row-span-5 row-start-1 rounded-[1.75rem] p-6 xl:p-8 2xl:p-10' : 'rounded-[1.5rem] p-3 sm:rounded-3xl sm:p-5 md:p-7'} min-h-0 overflow-y-auto border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] custom-scrollbar`}>
-          <p className={`${compactQuiz ? 'mb-1.5 text-[10px]' : 'mb-3 text-sm'} font-black uppercase tracking-[0.24em] text-slate-600`}>Question {currentQuestion + 1} of {questions.length}</p>
+          <p className={`${compactQuiz ? 'mb-1.5 text-[10px]' : 'mb-3 text-sm'} font-black uppercase tracking-[0.24em] text-slate-600`}>Question {safeQuestionIndex + 1} of {questions.length}</p>
           <h3 className={`${compactQuiz ? 'text-base' : 'text-xl sm:text-2xl'} font-black leading-tight text-slate-900`}>{question.prompt}</h3>
           <div className={`${compactQuiz ? 'mt-3 gap-2' : 'mt-5 gap-3'} grid md:grid-cols-2`}>
             {(question.options || []).map((option, oIndex) => {
@@ -863,7 +890,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
                   : isSelected
                     ? 'border-rose-300/80 bg-rose-400/25 text-rose-700 shadow-sm'
                     : 'border-white/50 bg-white/70 text-slate-600/70';
-              return <button key={`${option}-${oIndex}`} type="button" onClick={() => !answered && setAnswers(prev => ({ ...prev, [currentQuestion]: oIndex }))} className={`${compactQuiz ? 'rounded-xl px-3 py-3 text-sm' : 'rounded-2xl px-4 py-4 sm:px-5'} border text-left font-bold transition ${stateClass}`}>{option}</button>;
+              return <button key={`${option}-${oIndex}`} type="button" onClick={() => !answered && setAnswers(prev => ({ ...prev, [safeQuestionIndex]: oIndex }))} className={`${compactQuiz ? 'rounded-xl px-3 py-3 text-sm' : 'rounded-2xl px-4 py-4 sm:px-5'} border text-left font-bold transition ${stateClass}`}>{option}</button>;
             })}
           </div>
           {answered && <div className={`${compactQuiz ? 'mt-3 rounded-xl p-3 text-sm' : 'mt-6 rounded-2xl p-4'} border font-black ${selected === question.correctAnswer ? 'border-emerald-300/50 bg-emerald-400/15 text-emerald-700' : 'border-rose-300/50 bg-rose-400/15 text-rose-100'}`}>{selected === question.correctAnswer ? 'Correct! Great work.' : `Incorrect. Correct answer: ${question.options[question.correctAnswer]}`}</div>}
@@ -897,7 +924,8 @@ const CoursePlayer: React.FC<{
   onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean;
   productAccess?: ProductAccessState | null;
   onPurchaseLatestUpdate?: (product: ProductWithRating, updateId?: string) => void;
-}> = ({ settings, economySettings, product, currentUser = null, onBack, onQuizReward, productAccess = null, onPurchaseLatestUpdate }) => {
+  onEducoinUnlockComplete?: (product: ProductWithRating, updateIds: string[]) => void;
+}> = ({ settings, economySettings, product, currentUser = null, onBack, onQuizReward, productAccess = null, onPurchaseLatestUpdate, onEducoinUnlockComplete }) => {
   const viewport = useViewportSize();
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
@@ -918,9 +946,13 @@ const CoursePlayer: React.FC<{
     isFlushing: boolean;
   } | null>(null);
   const [youtubeRewardNotice, setYoutubeRewardNotice] = useState('');
+  const [educoinBalance, setEducoinBalance] = useState(getEducoinBalance(currentUser));
+  const [educoinNotice, setEducoinNotice] = useState('');
   const [youtubeWatchSeconds, setYoutubeWatchSeconds] = useState(0);
 
   const currentUserId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
+
+  useEffect(() => { setEducoinBalance(getEducoinBalance(currentUser)); }, [currentUser]);
 
   const stopYoutubeTickTimer = useCallback(() => {
     if (youtubeTickTimerRef.current !== null) {
@@ -1101,6 +1133,37 @@ const CoursePlayer: React.FC<{
     };
   }, [activeFile, currentUserId, flushYoutubeCoins, product.id, showWelcome, stopYoutubeTickTimer, youtubeFrameId]);
 
+  const unlockContentWithEducoins = async (item: CourseModule | ProductFile) => {
+    const requiredCoins = getRequiredEducoins(item);
+    if (!currentUserId || !requiredCoins) return;
+    const updateId = resolveCoursePlayerUpdateId(product.id, item);
+    if (productAccess?.ownedUpdateIds.includes(updateId)) { setEducoinNotice('This content is already unlocked.'); return; }
+    if (educoinBalance < requiredCoins) { setEducoinNotice(`You need ${requiredCoins} Educoin. Your balance is ${educoinBalance}.`); return; }
+    try {
+      const result = await runTransaction(db, async transaction => {
+        const userRef = doc(db, 'users', currentUserId);
+        const userSnap = await transaction.get(userRef);
+        const data = userSnap.data() || {};
+        const balance = Math.max(0, Number(data.coinBalance ?? data.eduCoins ?? educoinBalance) || 0);
+        const purchasedProductUpdateIds = { ...((data as any).purchasedProductUpdateIds || {}) };
+        const productKey = String(product.id);
+        const ownedIds = Array.isArray(purchasedProductUpdateIds[productKey]) ? purchasedProductUpdateIds[productKey].map(String) : [];
+        if (ownedIds.includes(updateId)) return { balance, alreadyUnlocked: true, updates: ownedIds };
+        if (balance < requiredCoins) throw new Error(`You need ${requiredCoins} Educoin. Your balance is ${balance}.`);
+        const nextBalance = balance - requiredCoins;
+        const nextUpdates = [...new Set([...ownedIds, updateId])];
+        purchasedProductUpdateIds[productKey] = nextUpdates;
+        transaction.set(userRef, { coinBalance: nextBalance, eduCoins: nextBalance, purchasedProductUpdateIds, updatedAt: serverTimestamp() }, { merge: true });
+        return { balance: nextBalance, alreadyUnlocked: false, updates: nextUpdates };
+      });
+      setEducoinBalance(result.balance);
+      if (!result.alreadyUnlocked) onEducoinUnlockComplete?.(product, result.updates);
+      setEducoinNotice(result.alreadyUnlocked ? 'This content is already unlocked.' : 'Content unlocked with Educoin.');
+    } catch (error: any) {
+      setEducoinNotice(error?.message || 'Educoin unlock failed. Please try again.');
+    }
+  };
+
   const onSelectFile = (file: ProductFile) => {
     void flushYoutubeCoins('closed');
     setActiveFile(file);
@@ -1277,6 +1340,8 @@ const CoursePlayer: React.FC<{
                     activeFile={activeFile}
                     onSelectFile={onSelectFile}
                     onPurchaseLatestUpdate={onPurchaseLatestUpdate ? (updateId?: string) => onPurchaseLatestUpdate(product, updateId) : undefined}
+                    onUnlockWithEducoins={unlockContentWithEducoins}
+                    educoinBalance={educoinBalance}
                   />
                 )) : <p className="p-4 text-center font-semibold text-[#50527a]/70">No content added yet.</p>}
               </nav>
@@ -1286,6 +1351,7 @@ const CoursePlayer: React.FC<{
           <div className={`relative min-h-0 min-w-0 overflow-hidden backdrop-blur-2xl ${isAudioExperience ? 'rounded-none border-0 bg-transparent shadow-none' : 'rounded-2xl border border-[#ded8ff] bg-white/72 shadow-[0_20px_60px_rgba(0,0,0,0.05)] sm:rounded-3xl'}`}>
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
+          {educoinNotice && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-900">{educoinNotice}</div>}
           <YoutubeRewardMeter />
         </section>
       </main>

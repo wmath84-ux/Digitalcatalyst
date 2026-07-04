@@ -19,7 +19,7 @@ const PurchasedProductCard: React.FC<{
             <div className="aspect-[4/3] overflow-hidden relative bg-gray-100">
                 <img src={getProductImage(product, 'purchaseCard')} alt={product.title} className="w-full h-full object-contain" />
                 <div className="absolute inset-0 bg-white/20"></div>
-                <div className="absolute top-3 right-3 bg-green-500 text-white text-xs font-bold px-2 py-1 rounded shadow-sm">
+                <div className="absolute top-3 right-3 rounded-full bg-emerald-600 px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(15,23,42,0.20)] ring-1 ring-white/80">
                     PURCHASED
                 </div>
             </div>
