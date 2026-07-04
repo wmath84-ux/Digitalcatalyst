@@ -2,23 +2,17 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
 
-const clearStaleServiceWorkers = async () => {
+const registerAppShellServiceWorker = async () => {
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
 
   try {
-    const registrations = await navigator.serviceWorker.getRegistrations();
-    await Promise.all(registrations.map((registration) => registration.unregister()));
-
-    if ('caches' in window) {
-      const cacheNames = await window.caches.keys();
-      await Promise.all(cacheNames.map((cacheName) => window.caches.delete(cacheName)));
-    }
+    await navigator.serviceWorker.register('/sw.js');
   } catch (error) {
-    console.warn('Service worker cleanup failed; continuing with live app render.', error);
+    console.warn('Service worker registration failed; continuing with live app render.', error);
   }
 };
 
-void clearStaleServiceWorkers();
+void registerAppShellServiceWorker();
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {

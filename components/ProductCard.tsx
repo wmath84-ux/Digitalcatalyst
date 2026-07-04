@@ -104,7 +104,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                 {settings.features.showFavourites && (
                     <button 
                         onClick={(e) => { e.stopPropagation(); onToggleWishlist(product.id); }}
-                        className="absolute right-2 top-2 z-10 rounded-full bg-white/90 p-2 text-slate-600 shadow-sm backdrop-blur transition-all duration-200 hover:scale-110 hover:bg-white hover:text-red-500 sm:right-3 sm:top-3"
+                        className="absolute right-2 top-2 z-30 rounded-full bg-white/90 p-2 text-slate-600 shadow-sm backdrop-blur transition-all duration-200 hover:scale-110 hover:bg-white hover:text-red-500 sm:right-3 sm:top-3"
                         aria-label={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill={isWishlisted ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isWishlisted ? 0 : 2}>
@@ -123,7 +123,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                             {product.rating.toFixed(1)} <span className="text-slate-600">({product.reviewCount})</span>
                         </div>
                     )}
-                    {product.category && <span className="text-xs text-slate-600 font-medium uppercase tracking-wide">{product.category}</span>}
+                    {product.category && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-800 ring-1 ring-slate-200">{product.category}</span>}
                 </div>
 
                 <h3 className="mb-2 line-clamp-2 text-base font-bold leading-tight text-gray-900 transition-colors group-hover:text-primary sm:text-lg" title={product.title}>
