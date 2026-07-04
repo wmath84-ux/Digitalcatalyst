@@ -3615,11 +3615,20 @@ const App: React.FC = () => {
     const rawPrice = firstLockedMeta?.paidUpdatePrice || fallbackPrice;
     const updatePrice = Math.max(0, parseCurrency(rawPrice));
     const updateTitle = firstLockedMeta?.paidUpdateTitle || 'Latest course update';
+    const rawCoinPrice = Number(
+      firstLockedMeta?.paidUpdateCoinPrice ??
+      (firstLockedMeta as any)?.updateEducoinPrice ??
+      (firstLockedMeta as any)?.educoinPrice ??
+      (firstLockedMeta as any)?.coinPrice ??
+      0
+    );
+    const coinPrice = Math.max(0, Math.floor(rawCoinPrice || 0));
 
     return {
       updateIds: selectedUpdateIds,
       title: updateTitle,
       price: updatePrice,
+      coinPrice,
       priceLabel: updatePrice > 0 ? `₹${updatePrice.toFixed(2)}` : '₹0.00',
     };
   };
@@ -3736,6 +3745,149 @@ const App: React.FC = () => {
       message: `${summary.title} is now available inside your course player.`,
       icon: '✅',
     });
+  };
+
+
+  const handleConfirmLatestUpdateCoinPurchase = async (product: ProductWithRating, updateId?: string): Promise<boolean> => {
+    if (!hasFirebaseUser || !auth.currentUser) {
+      openAuthPage('login');
+      return false;
+    }
+
+    const summary = getLatestUpdateCheckoutSummary(product, updateId);
+
+    if (!summary.updateIds.length) {
+      setLatestUpdateCheckout(null);
+      return true;
+    }
+
+    if (summary.coinPrice <= 0) {
+      setInfoModal({
+        title: 'EduCoin price missing',
+        message: 'This paid update does not have an EduCoin price configured yet. Please set Update EduCoin Price from admin.',
+        icon: '🪙',
+      });
+      return false;
+    }
+
+    const uid = auth.currentUser.uid;
+    const productKey = String(product.id);
+
+    try {
+      const result = await runTransaction(db, async transaction => {
+        const userRef = doc(db, 'users', uid);
+        const userSnap = await transaction.get(userRef);
+        const userData = userSnap.data() || {};
+
+        const liveBalance = Math.max(
+          0,
+          Math.floor(Number((userData as any).coinBalance ?? (userData as any).eduCoins ?? liveWalletBalance ?? 0) || 0)
+        );
+
+        const remoteUpdates = normalizePurchasedProductUpdateIds((userData as any).purchasedProductUpdateIds || purchasedProductUpdateIds);
+        const ownedUpdateIds = remoteUpdates[productKey] || [];
+        const lockedUpdateIds = summary.updateIds.filter(updateIdValue => !ownedUpdateIds.includes(updateIdValue));
+
+        if (!lockedUpdateIds.length) {
+          return {
+            success: true,
+            alreadyUnlocked: true,
+            balance: liveBalance,
+            nextUpdates: remoteUpdates,
+          };
+        }
+
+        if (liveBalance < summary.coinPrice) {
+          return {
+            success: false,
+            alreadyUnlocked: false,
+            balance: liveBalance,
+            nextUpdates: remoteUpdates,
+          };
+        }
+
+        const nextBalance = liveBalance - summary.coinPrice;
+        const nextUpdates = {
+          ...remoteUpdates,
+          [productKey]: mergeUpdateIds(ownedUpdateIds, lockedUpdateIds),
+        };
+
+        transaction.set(userRef, {
+          coinBalance: nextBalance,
+          eduCoins: nextBalance,
+          purchasedProductUpdateIds: nextUpdates,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+
+        return {
+          success: true,
+          alreadyUnlocked: false,
+          balance: nextBalance,
+          nextUpdates,
+        };
+      });
+
+      if (!result.success) {
+        handleInsufficientEduCoins({
+          requiredCoins: summary.coinPrice,
+          balance: result.balance,
+          missingCoins: Math.max(0, summary.coinPrice - result.balance),
+          productTitle: `${product.title} · ${summary.title}`,
+        });
+        return false;
+      }
+
+      persistUserPurchasedProductUpdates(result.nextUpdates);
+
+      addGlobalOrder({
+        id: `DC-UPD-COIN-${Date.now()}`,
+        customerName: effectiveAppUser?.name || effectiveAppUser?.email?.split('@')[0] || 'Valued Customer',
+        customerEmail: effectiveAppUser?.email || 'customer@example.com',
+        date: new Date().toISOString().split('T')[0],
+        total: `${summary.coinPrice} EduCoins`,
+        status: 'Completed',
+        items: [{
+          id: product.id,
+          name: `${product.title} · ${summary.title}`,
+          quantity: 1,
+          price: `${summary.coinPrice} EduCoins`,
+        }],
+        shippingAddress: 'N/A (Digital Product Update)',
+        billingAddress: 'EduCoin Latest Update Checkout',
+        paymentBreakdown: {
+          purchaseKind: 'product',
+          baseTotal: summary.price,
+          finalPrice: 0,
+          paymentLabel: 'EduCoin latest update',
+          unlockedProductIds: [product.id],
+          unlockedUpdateIds: summary.updateIds,
+          coinsCharged: result.alreadyUnlocked ? 0 : summary.coinPrice,
+        } as any,
+      });
+
+      setLatestUpdateCheckout(null);
+      setSelectedProduct(product);
+      setCurrentView('coursePlayer');
+      window.scrollTo(0, 0);
+
+      setInfoModal({
+        title: result.alreadyUnlocked ? 'Already unlocked' : 'Paid content unlocked',
+        message: result.alreadyUnlocked
+          ? `${summary.title} is already available inside your course player.`
+          : `${summary.title} is now unlocked with EduCoins.`,
+        icon: '✅',
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Latest update EduCoin unlock failed:', error);
+      setInfoModal({
+        title: 'EduCoin unlock failed',
+        message: 'Could not unlock this paid update with EduCoins. Please try again.',
+        icon: '⚠️',
+      });
+      return false;
+    }
   };
 
   const handleBackFromEduCoinGuide = () => {
@@ -4382,8 +4534,10 @@ const App: React.FC = () => {
                   onClose={() => setLatestUpdateCheckout(null)}
                   onConfirm={() => void handleConfirmLatestUpdatePurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId)}
                   paymentLink={latestUpdateCheckout.product.paymentLink}
-                  currentUser={effectiveAppUser}
-                  coinPrice={0}
+                  currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser}
+                  coinPrice={summary.coinPrice}
+                  onConfirmWithCoins={() => handleConfirmLatestUpdateCoinPurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId)}
+                  onInsufficientCoins={(details) => handleInsufficientEduCoins({ ...details, productTitle: `${latestUpdateCheckout.product.title} · ${summary.title}` })}
                   presentation="page"
                 />
               );

@@ -229,33 +229,32 @@ const ModuleItem: React.FC<{
 
   return (
     <div className={`${level > 0 ? "ml-4 border-l border-white/50 pl-3" : ""}`}>
-      <button onClick={() => setIsExpanded(!isExpanded)} className="module-item-button flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left text-slate-900 transition hover:bg-[#f7f5ff] sm:py-4" aria-expanded={isExpanded}>
+      <button
+        onClick={() => {
+          if (moduleUnlocked) {
+            setIsExpanded(!isExpanded);
+            return;
+          }
+          onPurchaseLatestUpdate?.(moduleUpdateId);
+        }}
+        className={`module-item-button flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left transition sm:py-4 ${
+          moduleUnlocked
+            ? 'text-slate-900 hover:bg-[#f7f5ff]'
+            : 'border border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100'
+        }`}
+        aria-expanded={isExpanded}
+      >
         <ModuleIcon className="h-5 w-5 shrink-0" />
         <span className="min-w-0 flex-1 text-[15px] font-black leading-tight">{module.title}</span>
         {!moduleUnlocked && (
-          <span className="shrink-0 rounded-full bg-amber-100 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-amber-800 ring-1 ring-amber-200">
-            Locked
+          <span className="shrink-0 rounded-full bg-amber-300 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-950 ring-1 ring-amber-400">
+            🔒 Buy
           </span>
         )}
       </button>
 
       {isExpanded && (
         <div className="space-y-1 pb-2">
-          {!moduleUnlocked && (
-            <div className="mx-2 mb-2 rounded-2xl border border-amber-200 bg-amber-50 p-3">
-              <p className="text-xs font-bold leading-5 text-amber-900">This module has paid locked content. Purchase this update or unlock with Educoin.</p>
-              <div className="mt-2 grid gap-2">
-                {onPurchaseLatestUpdate && (
-                  <button type="button" onClick={() => onPurchaseLatestUpdate(moduleUpdateId)} className="w-full rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white shadow-sm">Purchase this update</button>
-                )}
-                {onUnlockWithEducoins && getRequiredEducoins(module) > 0 && (
-                  <button type="button" disabled={educoinBalance < getRequiredEducoins(module)} onClick={() => onUnlockWithEducoins(module)} className="w-full rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-amber-800 shadow-sm disabled:cursor-not-allowed disabled:opacity-60">Unlock with {getRequiredEducoins(module)} Educoin · Balance: {educoinBalance}</button>
-                )}
-                {getRequiredEducoins(module) > educoinBalance && <p className="text-xs font-bold text-amber-900">You need {getRequiredEducoins(module)} Educoin. Your balance is {educoinBalance}.</p>}
-              </div>
-            </div>
-          )}
-
           {visibleFiles.map((file) => {
             const fileUpdateId = resolveCoursePlayerUpdateId(productId, file);
             const fileUnlocked = moduleUnlocked && hasCoursePlayerItemAccess(productId, file, productAccess);
@@ -271,13 +270,13 @@ const ModuleItem: React.FC<{
                     ? "bg-white border border-[#ded8ff] font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)]"
                     : fileUnlocked
                       ? "font-medium text-slate-900/90 hover:bg-[#f7f5ff]"
-                      : "cursor-pointer border border-amber-200 bg-amber-50 font-black text-amber-900 hover:bg-amber-100"
+                      : "cursor-pointer border border-amber-200 bg-amber-50 font-black text-amber-950 hover:bg-amber-100"
                 }`}
               >
                 <span className="min-w-0 flex-1 truncate">{file.name}</span>
                 {!fileUnlocked ? (
-                  <span className="shrink-0 rounded-full bg-amber-200 px-2 py-1 text-[10px] font-black uppercase tracking-widest text-amber-900">
-                    🔒 Locked
+                  <span className="shrink-0 rounded-full bg-amber-300 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-950 ring-1 ring-amber-400">
+                    🔒 Buy
                   </span>
                 ) : file.type === 'quiz' ? (
                   <QuizIcon className="h-5 w-5 shrink-0" />
@@ -285,13 +284,6 @@ const ModuleItem: React.FC<{
                   <FileIcon className="h-5 w-5 shrink-0" />
                 )}
               </button>
-              {!fileUnlocked && (
-                <div className="mx-2 mb-2 grid gap-2 rounded-2xl border border-amber-200 bg-amber-50 p-2">
-                  {onPurchaseLatestUpdate && <button type="button" onClick={() => onPurchaseLatestUpdate(fileUpdateId)} className="rounded-xl bg-amber-600 px-3 py-2 text-xs font-black text-white">Buy / purchase with money</button>}
-                  {onUnlockWithEducoins && getRequiredEducoins(file) > 0 && <button type="button" disabled={educoinBalance < getRequiredEducoins(file)} onClick={() => onUnlockWithEducoins(file)} className="rounded-xl border border-amber-300 bg-white px-3 py-2 text-xs font-black text-amber-800 disabled:cursor-not-allowed disabled:opacity-60">Unlock with {getRequiredEducoins(file)} Educoin · Balance: {educoinBalance}</button>}
-                  {getRequiredEducoins(file) > educoinBalance && <p className="text-xs font-bold text-amber-900">You need {getRequiredEducoins(file)} Educoin. Your balance is {educoinBalance}.</p>}
-                </div>
-              )}
               </React.Fragment>
             );
           })}
@@ -925,7 +917,7 @@ const CoursePlayer: React.FC<{
   productAccess?: ProductAccessState | null;
   onPurchaseLatestUpdate?: (product: ProductWithRating, updateId?: string) => void;
   onEducoinUnlockComplete?: (product: ProductWithRating, updateIds: string[]) => void;
-}> = ({ settings, economySettings, product, currentUser = null, onBack, onQuizReward, productAccess = null, onPurchaseLatestUpdate, onEducoinUnlockComplete }) => {
+}> = ({ settings, economySettings, product, currentUser = null, onBack, onQuizReward, productAccess = null, onPurchaseLatestUpdate }) => {
   const viewport = useViewportSize();
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
@@ -952,7 +944,6 @@ const CoursePlayer: React.FC<{
 
   const currentUserId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
 
-  useEffect(() => { setEducoinBalance(getEducoinBalance(currentUser)); }, [currentUser]);
 
   const stopYoutubeTickTimer = useCallback(() => {
     if (youtubeTickTimerRef.current !== null) {
