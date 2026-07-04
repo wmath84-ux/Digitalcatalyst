@@ -195,6 +195,11 @@ const recursiveModuleUpdate = (
     return { ...module, modules: recursiveModuleUpdate(module.modules || [], moduleId, updateCallback) };
 });
 
+const recursiveModuleDelete = (modules: CourseModule[], moduleId: string): CourseModule[] =>
+    (modules || [])
+        .filter(module => module.id !== moduleId)
+        .map(module => ({ ...module, modules: recursiveModuleDelete(module.modules || [], moduleId) }));
+
 const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
 const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
@@ -1335,8 +1340,9 @@ const ModuleEditor: React.FC<{
     level: number;
     onUpdate: (modules: CourseModule[]) => void;
     onAddChild: (parentId: string) => void;
+    onDelete: (moduleId: string) => void;
     productId: number | string;
-}> = ({ module, allModules, level, onUpdate, onAddChild, productId }) => {
+}> = ({ module, allModules, level, onUpdate, onAddChild, onDelete, productId }) => {
     const [isAddingContent, setIsAddingContent] = useState(false);
     const [editingFile, setEditingFile] = useState<ProductFile | null>(null);
     const files = module.files || [];
@@ -1399,6 +1405,7 @@ const ModuleEditor: React.FC<{
                 <div className="flex gap-2 pt-6">
                     <button type="button" onClick={() => setIsAddingContent(true)} className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-900 hover:bg-cyan-100">+ Content</button>
                     <button type="button" onClick={() => onAddChild(module.id)} className="rounded-2xl border border-white/50 px-4 py-3 text-sm font-black text-slate-600 hover:bg-white/80 hover:shadow-sm">+ Submodule</button>
+                    <button type="button" onClick={() => onDelete(module.id)} aria-label={`Delete module ${module.title || ''}`} className="rounded-2xl border border-red-300/70 bg-red-50 px-4 py-3 text-sm font-black text-red-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-red-100 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-red-200">🗑 Delete</button>
                 </div>
             </div>
 
@@ -1470,7 +1477,7 @@ const ModuleEditor: React.FC<{
             {childModules.length > 0 && (
                 <div className="mt-5 space-y-4 border-l border-white/50 pl-4">
                     {(childModules || []).map(child => (
-                        <ModuleEditor key={child.id} module={child} allModules={allModules} level={level + 1} onUpdate={onUpdate} onAddChild={onAddChild} productId={productId} />
+                        <ModuleEditor key={child.id} module={child} allModules={allModules} level={level + 1} onUpdate={onUpdate} onAddChild={onAddChild} onDelete={onDelete} productId={productId} />
                     ))}
                 </div>
             )}
@@ -1596,6 +1603,11 @@ const ProductForm: React.FC<{
         setModules(prev => recursiveModuleUpdate(prev || [], parentId, module => ({ ...module, modules: [...(module.modules || []), child] })));
     };
 
+    const deleteModule = (moduleId: string) => {
+        if (!window.confirm('Delete this module and all its content?')) return;
+        setModules(prev => recursiveModuleDelete(prev || [], moduleId));
+    };
+
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
         if (isSavingProduct) return;
@@ -1700,7 +1712,7 @@ const ProductForm: React.FC<{
                                 </div>
                                 <div className="space-y-5">
                                     {(modules || []).length > 0 ? (modules || []).map(module => (
-                                        <ModuleEditor key={module.id} module={module} allModules={modules || []} level={0} onUpdate={setModules} onAddChild={addChildModule} productId={draftProductIdRef.current} />
+                                        <ModuleEditor key={module.id} module={module} allModules={modules || []} level={0} onUpdate={setModules} onAddChild={addChildModule} onDelete={deleteModule} productId={draftProductIdRef.current} />
                                     )) : (
                                         <button type="button" onClick={addRootModule} className="w-full rounded-[1.75rem] border border-dashed border-cyan-300/30 bg-cyan-400/5 p-10 text-center transition hover:bg-cyan-400/10">
                                             <span className="block text-4xl">🧱</span>
