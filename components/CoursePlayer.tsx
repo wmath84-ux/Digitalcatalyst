@@ -257,6 +257,7 @@ const ModuleItem: React.FC<{
         <div className="space-y-1 pb-2">
           {visibleFiles.map((file) => {
             const fileUpdateId = resolveCoursePlayerUpdateId(productId, file);
+            const filePurchaseUpdateId = productAccess?.lockedPaidUpdateIds.includes(fileUpdateId) ? fileUpdateId : moduleUpdateId;
             const fileUnlocked = moduleUnlocked && hasCoursePlayerItemAccess(productId, file, productAccess);
 
             return (
@@ -264,7 +265,7 @@ const ModuleItem: React.FC<{
               <button
                 type="button"
                 aria-disabled={!fileUnlocked}
-                onClick={() => fileUnlocked ? onSelectFile(file) : undefined}
+                onClick={() => fileUnlocked ? onSelectFile(file) : onPurchaseLatestUpdate?.(filePurchaseUpdateId)}
                 className={`module-item-button flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition sm:py-3 ${
                   activeFile?.id === file.id
                     ? "bg-white border border-[#ded8ff] font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)]"

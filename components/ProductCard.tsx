@@ -11,14 +11,13 @@ interface ProductCardProps {
   onToggleWishlist: (id: number) => void;
   onAddToCart: (productId: number, quantity?: number) => void;
   onBuyNow: (product: ProductWithRating) => void;
-  onQuickView: (product: ProductWithRating) => void;
   animationDelay: number;
   displayMode?: 'showcase' | 'wishlist';
   coupons: Coupon[];
   isPurchased?: boolean;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDetails, isWishlisted, onToggleWishlist, onAddToCart, onQuickView, animationDelay, displayMode = 'showcase', coupons, isPurchased = false }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDetails, isWishlisted, onToggleWishlist, onAddToCart, animationDelay, displayMode = 'showcase', coupons, isPurchased = false }) => {
     // Use 'animate-child' class to hook into the parent's stagger logic.
     // The 'animate-delay-X' class comes from index.html CSS
     const animationClass = settings.animations.enabled 
@@ -26,12 +25,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
         : '';
     
     const displayImage = getProductImage(product, 'card');
-    const handleQuickViewClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-        event.preventDefault();
-        event.stopPropagation();
-        onQuickView(product);
-    };
-    
     // Coupon availability logic
     const associatedCoupon = product.couponCode ? coupons.find(c => c.code === product.couponCode) : null;
     let isCouponAvailable = false;
@@ -63,15 +56,6 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                     loading="lazy"
                 />
                 
-                {/* Overlay on Hover (Desktop) */}
-                {displayMode === 'showcase' && (
-                    <div className="absolute inset-x-0 bottom-0 flex translate-y-0 items-end justify-center bg-gradient-to-t from-slate-50/80 via-indigo-50/30/40 to-transparent p-3 pb-4 transition-transform duration-300 ease-in-out sm:translate-y-full sm:p-4 sm:pb-6 sm:group-hover:translate-y-0">
-                         <button onClick={handleQuickViewClick} className="w-full max-w-[13rem] rounded-xl border border-white/60 bg-white/30 px-4 py-2.5 text-sm font-bold text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-md transition-colors hover:bg-white/45 active:scale-95 sm:px-5 sm:py-3">
-                             Quick View
-                         </button>
-                    </div>
-                )}
-
                 {/* Badges */}
                 <div className="absolute left-2 top-2 z-20 flex max-w-[72%] flex-col items-start gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
                     {isPurchased && (
