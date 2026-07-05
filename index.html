@@ -133,6 +133,101 @@
         --mobile-page-gradient: radial-gradient(circle at 12% 8%, rgba(191, 215, 255, 0.72), transparent 32%), radial-gradient(circle at 88% 10%, rgba(123, 97, 255, 0.18), transparent 28%), linear-gradient(180deg, var(--mobile-bg) 0%, var(--mobile-bg-soft) 100%);
       }
 
+      /* Course player YouTube fullscreen safety */
+      .course-player-content-frame {
+        isolation: isolate;
+      }
+
+      .course-youtube-frame,
+      .course-youtube-player-shell {
+        background: #000;
+      }
+
+      .course-youtube-player-shell {
+        min-height: 100%;
+        width: 100%;
+      }
+
+      .course-youtube-fullscreen-button {
+        -webkit-tap-highlight-color: transparent;
+      }
+
+      .course-youtube-iframe {
+        display: block;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none;
+        max-height: none;
+        background: #000;
+      }
+
+      .course-youtube-player-shell iframe,
+      .course-youtube-player-shell iframe[style] {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+      }
+
+      .course-youtube-player-shell:fullscreen {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-width: 100% !important;
+        min-height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: #000 !important;
+        object-fit: contain !important;
+        overflow: hidden !important;
+      }
+
+      .course-youtube-player-shell:fullscreen .course-youtube-iframe,
+      .course-youtube-player-shell:fullscreen iframe,
+      .course-youtube-player-shell:-webkit-full-screen .course-youtube-iframe,
+      .course-youtube-player-shell:-webkit-full-screen iframe {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-width: 100% !important;
+        min-height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+      }
+
+      .course-youtube-player-shell:fullscreen .course-youtube-fullscreen-button,
+      .course-youtube-player-shell:-webkit-full-screen .course-youtube-fullscreen-button {
+        bottom: max(5rem, env(safe-area-inset-bottom)) !important;
+        right: max(1rem, env(safe-area-inset-right)) !important;
+        z-index: 2147483647 !important;
+      }
+
+      .course-youtube-player-shell:-webkit-full-screen {
+        position: fixed !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-width: 100% !important;
+        min-height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+        background: #000 !important;
+        object-fit: contain !important;
+        overflow: hidden !important;
+      }
+
       @keyframes apple-app-open {
         from {
           opacity: 0;
