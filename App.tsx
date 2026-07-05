@@ -3679,14 +3679,8 @@ const App: React.FC = () => {
       return;
     }
 
-    const paymentUrl = product.paymentLink?.trim();
-    if (!paymentUrl) {
-      setInfoModal({ title: 'Payment link missing', message: 'Payment link is not available for this content.', icon: '⚠️' });
-      return;
-    }
-    window.open(paymentUrl, '_blank', 'noopener,noreferrer');
     setLatestUpdateCheckout({ product, updateId });
-    window.scrollTo(0, 0);
+    window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
   };
 
   const handleConfirmLatestUpdatePurchase = async (product: ProductWithRating, updateId?: string) => {
