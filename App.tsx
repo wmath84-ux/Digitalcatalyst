@@ -1519,29 +1519,30 @@ const App: React.FC = () => {
     const storedUsers = localStorage.getItem('siteUsers');
     const parsedUsers: User[] = storedUsers ? JSON.parse(storedUsers) : [];
     const loadedUsers: User[] = parsedUsers.map(user => {
-      const existingBalance = user.coinBalance ?? user.eduCoins ?? 0;
-      const totalCoinsEarned = user.totalCoinsEarned ?? user.totalLifetimeCoins ?? existingBalance;
+        const walletBalance = user.coinBalance ?? user.eduCoins ?? 0;
+        const totalCoinsEarned = user.totalCoinsEarned ?? user.totalLifetimeCoins ?? user.eduCoins ?? 0;
 
-      return {
-        ...user,
-        name: user.name || user.email?.split('@')[0] || 'Learner',
-        mobile: user.mobile || '',
-        coinBalance: existingBalance,
-        eduCoins: existingBalance,
-        totalCoinsEarned,
-        totalCoinsSpent: user.totalCoinsSpent ?? 0,
-        totalLifetimeCoins: totalCoinsEarned,
-        studyMinutes: user.studyMinutes ?? 0,
-        totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0,
-        rewardedArticleIds: user.rewardedArticleIds || [],
-        readArticles: user.readArticles || user.rewardedArticleIds || [],
-        rewardedQuizIds: user.rewardedQuizIds || [],
-        claimedRewardIds: user.claimedRewardIds || [],
-        profileStreakClaims: user.profileStreakClaims || {},
-        coinTransactions: user.coinTransactions || [],
-      };
+        return {
+            ...user,
+            name: user.name || user.email?.split('@')[0] || 'Learner',
+            mobile: user.mobile || '',
+            coinBalance: walletBalance,
+            totalCoinsEarned,
+            totalCoinsSpent: user.totalCoinsSpent ?? 0,
+            eduCoins: walletBalance,
+            studyMinutes: user.studyMinutes ?? 0,
+            totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0,
+            totalLifetimeCoins: totalCoinsEarned,
+            rewardedArticleIds: user.rewardedArticleIds || [],
+            readArticles: user.readArticles || user.rewardedArticleIds || [],
+            rewardedQuizIds: user.rewardedQuizIds || [],
+            claimedRewardIds: user.claimedRewardIds || [],
+            profileStreakClaims: user.profileStreakClaims || {},
+            coinTransactions: user.coinTransactions || [],
+        };
     });
     setUsers(loadedUsers);
+    safeSetItem('siteUsers', loadedUsers);
     
     const storedAdminUsers = localStorage.getItem('adminUsers');
     if (storedAdminUsers) setAdminUsers(JSON.parse(storedAdminUsers)); else setAdminUsers(initialAdminUsers);
