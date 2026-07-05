@@ -307,7 +307,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   if (presentation === 'page') {
     return (
-      <div ref={pageRef} className="fixed inset-0 z-[90] overflow-y-auto bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 px-3 pb-10 pt-4 text-slate-900 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
+      <div ref={pageRef} className="fixed inset-0 z-[9999] overflow-y-auto bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 px-3 pb-10 pt-4 text-slate-900 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
         <div className="pointer-events-none absolute -left-24 top-16 h-72 w-72 rounded-full bg-indigo-400/30 blur-3xl" />
         <div className="pointer-events-none absolute -right-20 bottom-10 h-80 w-80 rounded-full bg-cyan-600/25 blur-3xl" />
         <div className="relative mx-auto w-full max-w-6xl">

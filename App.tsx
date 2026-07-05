@@ -4504,6 +4504,7 @@ const App: React.FC = () => {
                 </div>
               </div>
             )}
+            <main key={currentView} className={`${websiteSettings.animations.enabled ? appleOpenClass : ''} ${currentView === 'home' ? 'mobile-app-home' : ''}`}>{renderContent(effectiveAppUser)}</main>
             {latestUpdateCheckout && (() => {
               const summary = getLatestUpdateCheckoutSummary(latestUpdateCheckout.product, latestUpdateCheckout.updateId);
 
@@ -4530,7 +4531,6 @@ const App: React.FC = () => {
                 />
               );
             })()}
-            <main key={currentView} className={`${websiteSettings.animations.enabled ? appleOpenClass : ''} ${currentView === 'home' ? 'mobile-app-home' : ''}`}>{renderContent(effectiveAppUser)}</main>
             <div className="mobile-app-chrome"><InstallAppButton enabled={canShowInstallPrompt} /></div>
             {currentView === 'home' && (
               <div className={shouldHideFooterOnMobile ? 'max-md:hidden' : ''}>
