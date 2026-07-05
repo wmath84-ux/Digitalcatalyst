@@ -198,6 +198,10 @@ export interface ProductFile extends CourseAccessMeta {
   size?: number;
   contentType?: string;
   provider?: string;
+  sourceType?: string;
+  youtubeUrl?: string;
+  youtubeVideoId?: string;
+  embedUrl?: string;
   createdAt?: number;
   updatedAt?: number;
   content?: string; // Backward-compatible first page for Open Docs / e-book HTML content.

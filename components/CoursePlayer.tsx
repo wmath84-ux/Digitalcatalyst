@@ -310,34 +310,101 @@ const ModuleItem: React.FC<{
   );
 };
 
-const extractYouTubeID = (url: string): string | null => {
-  if (!url) return null;
-  const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|watch\?v=|\&v=)([^#\&\?]*).*/;
-  const match = url.match(regExp);
-  if (match && match[2].length === 11) return match[2];
-  const matchIframe = url.match(/youtube\.com\/embed\/([^"?]+)/);
-  return matchIframe?.[1] || null;
+const extractYouTubeID = (value?: string): string | null => {
+  const raw = String(value || '').trim();
+  if (!raw) return null;
+
+  const idPattern = /^[a-zA-Z0-9_-]{11}$/;
+  if (idPattern.test(raw)) return raw;
+
+  try {
+    const normalizedRaw = raw.startsWith('http://')
+      ? raw.replace(/^http:\/\//i, 'https://')
+      : raw;
+    const parsedUrl = new URL(normalizedRaw);
+    const host = parsedUrl.hostname.replace(/^www\./i, '').toLowerCase();
+    const parts = parsedUrl.pathname.split('/').filter(Boolean);
+    const queryId = parsedUrl.searchParams.get('v') || parsedUrl.searchParams.get('video_id');
+
+    if (queryId && idPattern.test(queryId)) return queryId;
+
+    if (host === 'youtu.be') {
+      const shortId = parts[0] || '';
+      if (idPattern.test(shortId)) return shortId;
+    }
+
+    if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
+      const route = parts[0] || '';
+      const routeId = ['embed', 'shorts', 'live', 'v'].includes(route) ? parts[1] || '' : '';
+      if (idPattern.test(routeId)) return routeId;
+    }
+  } catch {
+    // Fallback regex below handles pasted iframe/src fragments or partial URLs.
+  }
+
+  const fallbackMatch = raw.match(/(?:youtube(?:-nocookie)?\.com\/(?:watch\?v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+  return fallbackMatch?.[1] || null;
 };
+
+const getYouTubeVideoIdFromFile = (file?: Partial<ProductFile> | null): string | null => {
+  if (!file) return null;
+
+  return extractYouTubeID(
+    file.youtubeVideoId ||
+    file.youtubeUrl ||
+    file.embedUrl ||
+    (file as any).videoUrl ||
+    file.url ||
+    ''
+  );
+};
+
+let youtubeIframeApiPromise: Promise<void> | null = null;
 
 const ensureYouTubeIframeApi = (): Promise<void> => {
   if (typeof window === 'undefined' || typeof document === 'undefined') return Promise.resolve();
   if (window.YT?.Player) return Promise.resolve();
+  if (youtubeIframeApiPromise) return youtubeIframeApiPromise;
 
-  return new Promise((resolve) => {
-    const previousReady = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      previousReady?.();
+  youtubeIframeApiPromise = new Promise((resolve) => {
+    let resolved = false;
+
+    const finish = () => {
+      if (resolved) return;
+      resolved = true;
       resolve();
     };
 
-    const existingScript = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
-    if (existingScript) return;
+    const previousReady = window.onYouTubeIframeAPIReady;
+    window.onYouTubeIframeAPIReady = () => {
+      previousReady?.();
+      finish();
+    };
 
-    const script = document.createElement('script');
-    script.src = 'https://www.youtube.com/iframe_api';
-    script.async = true;
-    document.body.appendChild(script);
+    const existingScript = document.querySelector('script[src="https://www.youtube.com/iframe_api"]');
+
+    if (!existingScript) {
+      const script = document.createElement('script');
+      script.src = 'https://www.youtube.com/iframe_api';
+      script.async = true;
+      script.onerror = finish;
+      document.body.appendChild(script);
+    }
+
+    const pollTimer = window.setInterval(() => {
+      if (window.YT?.Player) {
+        window.clearInterval(pollTimer);
+        finish();
+      }
+    }, 100);
+
+    window.setTimeout(() => {
+      window.clearInterval(pollTimer);
+      finish();
+    }, 5000);
   });
+
+  return youtubeIframeApiPromise;
 };
 
 const getCourseBackground = (product: ProductWithRating, activeFile: ProductFile | null) => {
@@ -998,24 +1065,50 @@ const CoursePlayer: React.FC<{
   };
 
   useEffect(() => {
-    const findFirst = (modules?: CourseModule[]): ProductFile | null => {
+    const findFirstAccessibleFile = (modules?: CourseModule[]): ProductFile | null => {
       if (!modules) return null;
 
-      for (const m of modules) {
-        if (!hasCoursePlayerItemAccess(product.id, m, productAccess)) continue;
+      for (const moduleItem of modules) {
+        if (!hasCoursePlayerItemAccess(product.id, moduleItem, productAccess)) continue;
 
-        const firstUnlockedFile = (m.files || []).find(file => hasCoursePlayerItemAccess(product.id, file, productAccess));
+        const firstUnlockedFile = (moduleItem.files || []).find(file => hasCoursePlayerItemAccess(product.id, file, productAccess));
         if (firstUnlockedFile) return firstUnlockedFile;
 
-        const found = findFirst(m.modules || []);
+        const found = findFirstAccessibleFile(moduleItem.modules || []);
         if (found) return found;
       }
 
       return null;
     };
 
-    setActiveFile(findFirst(product.courseContent || []));
-  }, [product, productAccess]);
+    const findAccessibleFileById = (modules: CourseModule[] | undefined, fileId: string): ProductFile | null => {
+      if (!modules || !fileId) return null;
+
+      for (const moduleItem of modules) {
+        if (!hasCoursePlayerItemAccess(product.id, moduleItem, productAccess)) continue;
+
+        const matchedFile = (moduleItem.files || []).find(file =>
+          file.id === fileId && hasCoursePlayerItemAccess(product.id, file, productAccess)
+        );
+
+        if (matchedFile) return matchedFile;
+
+        const nestedMatch = findAccessibleFileById(moduleItem.modules || [], fileId);
+        if (nestedMatch) return nestedMatch;
+      }
+
+      return null;
+    };
+
+    setActiveFile(previousFile => {
+      if (previousFile?.id) {
+        const preservedFile = findAccessibleFileById(product.courseContent || [], previousFile.id);
+        if (preservedFile) return preservedFile;
+      }
+
+      return findFirstAccessibleFile(product.courseContent || []);
+    });
+  }, [product.courseContent, product.id, productAccess]);
 
   useEffect(() => {
     setMediaHasError(false);
@@ -1036,7 +1129,7 @@ const CoursePlayer: React.FC<{
   useEffect(() => {
     if (showWelcome || activeFile?.type !== 'youtube') return undefined;
 
-    const youtubeVideoId = extractYouTubeID(activeFile.url);
+    const youtubeVideoId = getYouTubeVideoIdFromFile(activeFile);
     if (!youtubeVideoId || !currentUserId || !youtubeFrameId) return undefined;
 
     let cancelled = false;
@@ -1220,17 +1313,22 @@ const CoursePlayer: React.FC<{
     if (mediaHasError) return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
     switch (activeFile.type) {
       case 'youtube': {
-        const videoId = extractYouTubeID(activeFile.url);
+        const videoId = getYouTubeVideoIdFromFile(activeFile);
+        const originParam = typeof window !== 'undefined'
+          ? `&origin=${encodeURIComponent(window.location.origin)}`
+          : '';
+
         return videoId ? (
           <iframe
-            key={activeFile.id}
+            key={`${activeFile.id}-${videoId}`}
             id={youtubeFrameId}
-            className="h-full w-full bg-white/70"
-            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&enablejsapi=1&origin=${encodeURIComponent(window.location.origin)}`}
-            title={activeFile.name}
+            className="h-full w-full bg-black"
+            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1${originParam}`}
+            title={activeFile.name || 'YouTube lesson'}
             frameBorder="0"
-            allow="accelerometer; autoplay; encrypted-media; gyroscope; picture-in-picture"
+            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
             allowFullScreen
+            onLoad={() => setMediaHasError(false)}
             onError={() => setMediaHasError(true)}
           />
         ) : <VideoUnavailablePlaceholder />;

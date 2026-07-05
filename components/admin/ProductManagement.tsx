@@ -144,17 +144,75 @@ const normaliseCourseAccessLevel = (value?: string): CourseAccessLevel => {
     return 'included';
 };
 
-const normaliseFiles = (files?: ProductFile[]): ProductFile[] => (files || []).map(file => ({
-    ...file,
-    accessLevel: normaliseCourseAccessLevel(file.accessLevel),
-    paidUpdateId: file.paidUpdateId || '',
-    paidUpdateTitle: file.paidUpdateTitle || '',
-    paidUpdatePrice: file.paidUpdatePrice || '',
-    paidUpdateCoinPrice: Number(file.paidUpdateCoinPrice || 0),
-    content: file.content || '',
-    docPages: normaliseDocPages(file),
-    quiz: file.quiz ? { questions: normaliseQuizQuestions(file.quiz.questions || []) } : file.type === 'quiz' ? { questions: [] } : undefined,
-}));
+
+const extractYouTubeVideoId = (value?: string): string => {
+    const raw = String(value || '').trim();
+    if (!raw) return '';
+
+    const idPattern = /^[a-zA-Z0-9_-]{11}$/;
+    if (idPattern.test(raw)) return raw;
+
+    try {
+        const normalizedRaw = raw.startsWith('http://')
+            ? raw.replace(/^http:\/\//i, 'https://')
+            : raw;
+        const parsedUrl = new URL(normalizedRaw);
+        const host = parsedUrl.hostname.replace(/^www\./i, '').toLowerCase();
+        const parts = parsedUrl.pathname.split('/').filter(Boolean);
+        const queryId = parsedUrl.searchParams.get('v') || parsedUrl.searchParams.get('video_id');
+
+        if (queryId && idPattern.test(queryId)) return queryId;
+
+        if (host === 'youtu.be') {
+            const shortId = parts[0] || '';
+            if (idPattern.test(shortId)) return shortId;
+        }
+
+        if (host.endsWith('youtube.com') || host.endsWith('youtube-nocookie.com')) {
+            const route = parts[0] || '';
+            const routeId = ['embed', 'shorts', 'live', 'v'].includes(route) ? parts[1] || '' : '';
+            if (idPattern.test(routeId)) return routeId;
+        }
+    } catch {
+        // Fallback regex below handles pasted iframe/src fragments or partial URLs.
+    }
+
+    const fallbackMatch = raw.match(/(?:youtube(?:-nocookie)?\.com\/(?:watch\?v=|embed\/|shorts\/|live\/|v\/)|youtu\.be\/)([a-zA-Z0-9_-]{11})/i);
+    return fallbackMatch?.[1] || '';
+};
+
+const normaliseYouTubeUrl = (value: string) => {
+    const videoId = extractYouTubeVideoId(value);
+    return videoId ? `https://www.youtube.com/watch?v=${videoId}` : value.trim();
+};
+
+const normaliseFiles = (files?: ProductFile[]): ProductFile[] => (files || []).map(file => {
+    const legacyYoutubeSource = String(
+        (file as any).youtubeVideoId ||
+        file.youtubeUrl ||
+        (file as any).videoUrl ||
+        file.embedUrl ||
+        file.url ||
+        ''
+    );
+    const youtubeVideoId = file.type === 'youtube' ? extractYouTubeVideoId(legacyYoutubeSource) : '';
+
+    return {
+        ...file,
+        url: file.type === 'youtube' ? normaliseYouTubeUrl(legacyYoutubeSource) : file.url,
+        sourceType: file.type === 'youtube' ? 'external_url' : file.sourceType,
+        youtubeUrl: file.type === 'youtube' ? normaliseYouTubeUrl(legacyYoutubeSource) : file.youtubeUrl,
+        youtubeVideoId: file.type === 'youtube' ? youtubeVideoId : file.youtubeVideoId,
+        accessLevel: normaliseCourseAccessLevel(file.accessLevel),
+        paidUpdateId: file.paidUpdateId || '',
+        paidUpdateTitle: file.paidUpdateTitle || '',
+        paidUpdatePrice: file.paidUpdatePrice || '',
+        paidUpdateCoinPrice: Number(file.paidUpdateCoinPrice || 0),
+        content: file.content || '',
+        docPages: normaliseDocPages(file),
+        quiz: file.quiz ? { questions: normaliseQuizQuestions(file.quiz.questions || []) } : file.type === 'quiz' ? { questions: [] } : undefined,
+    };
+});
 
 const normaliseModules = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
     ...module,
@@ -1089,6 +1147,42 @@ const ContentComposer: React.FC<{
         const provider = formState.provider;
         const isHostedDocs = isHostedDocsProvider(provider);
 
+        if (formState.type === 'youtube') {
+            const youtubeVideoId = extractYouTubeVideoId(trimmedUrl);
+
+            if (!trimmedUrl) {
+                setDocError('Enter a YouTube video URL before saving.');
+                return;
+            }
+
+            if (!youtubeVideoId) {
+                setDocError('Enter a valid YouTube video URL. Supported formats: watch, youtu.be, embed, shorts, live, or a valid 11-character video ID.');
+                return;
+            }
+
+            const now = Date.now();
+            const normalizedYouTubeUrl = normaliseYouTubeUrl(trimmedUrl);
+
+            onAdd({
+                name: trimmedName,
+                type: 'youtube',
+                url: normalizedYouTubeUrl,
+                provider: 'external_url',
+                sourceType: 'external_url',
+                youtubeUrl: normalizedYouTubeUrl,
+                youtubeVideoId,
+                contentType: 'video/youtube',
+                createdAt: initialFile?.createdAt || now,
+                updatedAt: now,
+                content: '',
+                ...buildContentAccessMeta(formState),
+                quiz: { questions: [] },
+            });
+
+            onClose();
+            return;
+        }
+
         if (trimmedUrl && !trimmedUrl.startsWith('https://')) {
             setDocError('Resource URL must start with https://');
             return;
@@ -1125,7 +1219,6 @@ const ContentComposer: React.FC<{
         });
 
         onClose();
-    };
 
     return (
         <div className="mt-5 rounded-[1.75rem] border border-cyan-400/20 bg-cyan-400/5 p-5 backdrop-blur-xl">
@@ -1295,7 +1388,20 @@ const ContentComposer: React.FC<{
                                 {formState.provider !== 'open_docs' && (
                                     <div>
                                         <label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : 'Resource URL'}</label>
-                                        <input value={formState.url} onChange={event => setFormState(prev => prev ? { ...prev, url: event.target.value } : prev)} className={fieldClass} placeholder="https://example.com/resource" />
+                                        <input
+                                            value={formState.url}
+                                            onChange={event => {
+                                                setDocError('');
+                                                setFormState(prev => prev ? { ...prev, url: event.target.value } : prev);
+                                            }}
+                                            className={fieldClass}
+                                            placeholder={formState.type === 'youtube' ? 'https://www.youtube.com/watch?v=VIDEO_ID' : 'https://example.com/resource'}
+                                        />
+                                        {formState.type === 'youtube' && (
+                                            <p className="mt-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
+                                                Paste a public YouTube video link. Watch, youtu.be, embed, shorts, live, and raw video ID formats are supported.
+                                            </p>
+                                        )}
                                     </div>
                                 )}
                                 {isHostedDocsProvider(formState.provider) && formState.provider !== 'open_docs' && (
