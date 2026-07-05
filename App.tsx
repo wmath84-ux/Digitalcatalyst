@@ -91,7 +91,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" /></svg>
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h1>
-            <p className="text-gray-600 mb-6">The application encountered an unexpected error. This is likely due to storage limits or a temporary glitch.</p>
+            <p className="text-gray-600 mb-6">The application hit an unexpected error. Please reload the page; if the problem continues, share the error details with support.</p>
             
             {this.state.error?.message && (
                 <div className="bg-gray-100 p-3 rounded text-left mb-6 overflow-auto max-h-32 text-xs font-mono text-gray-700 border border-gray-200">
@@ -103,11 +103,14 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
                 <button onClick={() => window.location.reload()} className="w-full bg-white/70 text-slate-900 px-4 py-3 rounded-lg hover:bg-white/80 hover:shadow-sm font-semibold transition-colors">
                 Reload Page
                 </button>
-                <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="w-full bg-white/70 backdrop-blur-xl border border-red-200 text-red-600 px-4 py-3 rounded-lg hover:bg-red-50 font-semibold transition-colors">
-                Reset App Data (Fixes Storage Issues)
-                </button>
+                <details className="rounded-lg border border-red-100 bg-red-50/40 p-3 text-left">
+                  <summary className="cursor-pointer text-sm font-bold text-red-700">Advanced troubleshooting</summary>
+                  <button onClick={() => { localStorage.clear(); window.location.reload(); }} className="mt-3 w-full bg-white/70 backdrop-blur-xl border border-red-200 text-red-600 px-4 py-3 rounded-lg hover:bg-red-50 font-semibold transition-colors">
+                  Reset App Data
+                  </button>
+                  <p className="text-xs text-slate-600 mt-3">Warning: Resetting app data clears browser-only cache/settings. It should not be the first fix for content bugs.</p>
+                </details>
             </div>
-            <p className="text-xs text-slate-600 mt-4">Warning: Resetting app data will clear all products and settings saved in your browser.</p>
           </div>
         </div>
       );
@@ -1025,6 +1028,7 @@ const App: React.FC = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>(initialSupportTickets);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [currentView, setCurrentView] = useState('home'); 
+  const [networkBanner, setNetworkBanner] = useState(() => (typeof navigator !== 'undefined' && !navigator.onLine ? 'You are offline. Some features may not work until internet is back.' : ''));
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup'>('login');
   const [isAuthStateReady, setIsAuthStateReady] = useState(false);
   const [isRedirectResultPending, setIsRedirectResultPending] = useState(false);
@@ -1037,6 +1041,19 @@ const App: React.FC = () => {
   const [mobileAuthFlowState, setMobileAuthFlowState] = useState<MobileAuthFlowState>('checking');
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<FirebaseUser | null>(null);
   const [mobileWelcomeMessage, setMobileWelcomeMessage] = useState('');
+
+  useEffect(() => {
+    const goOffline = () => setNetworkBanner('You are offline. Some features may not work until internet is back.');
+    const goOnline = () => {
+      setNetworkBanner('You are back online.');
+      window.setTimeout(() => setNetworkBanner(''), 3500);
+    };
+    window.addEventListener('offline', goOffline);
+    window.addEventListener('online', goOnline);
+    if (typeof navigator !== 'undefined' && !navigator.onLine) goOffline();
+    return () => { window.removeEventListener('offline', goOffline); window.removeEventListener('online', goOnline); };
+  }, []);
+
   const currentViewRef = React.useRef(currentView);
   const historyNavigationRef = React.useRef(false);
   const lastHistoryViewRef = React.useRef(currentView);
@@ -3598,11 +3615,20 @@ const App: React.FC = () => {
     const rawPrice = firstLockedMeta?.paidUpdatePrice || fallbackPrice;
     const updatePrice = Math.max(0, parseCurrency(rawPrice));
     const updateTitle = firstLockedMeta?.paidUpdateTitle || 'Latest course update';
+    const rawCoinPrice = Number(
+      firstLockedMeta?.paidUpdateCoinPrice ??
+      (firstLockedMeta as any)?.updateEducoinPrice ??
+      (firstLockedMeta as any)?.educoinPrice ??
+      (firstLockedMeta as any)?.coinPrice ??
+      0
+    );
+    const coinPrice = Math.max(0, Math.floor(rawCoinPrice || 0));
 
     return {
       updateIds: selectedUpdateIds,
       title: updateTitle,
       price: updatePrice,
+      coinPrice,
       priceLabel: updatePrice > 0 ? `₹${updatePrice.toFixed(2)}` : '₹0.00',
     };
   };
@@ -3705,6 +3731,149 @@ const App: React.FC = () => {
       message: `${summary.title} is now available inside your course player.`,
       icon: '✅',
     });
+  };
+
+
+  const handleConfirmLatestUpdateCoinPurchase = async (product: ProductWithRating, updateId?: string): Promise<boolean> => {
+    if (!hasFirebaseUser || !auth.currentUser) {
+      openAuthPage('login');
+      return false;
+    }
+
+    const summary = getLatestUpdateCheckoutSummary(product, updateId);
+
+    if (!summary.updateIds.length) {
+      setLatestUpdateCheckout(null);
+      return true;
+    }
+
+    if (summary.coinPrice <= 0) {
+      setInfoModal({
+        title: 'EduCoin price missing',
+        message: 'This paid update does not have an EduCoin price configured yet. Please set Update EduCoin Price from admin.',
+        icon: '🪙',
+      });
+      return false;
+    }
+
+    const uid = auth.currentUser.uid;
+    const productKey = String(product.id);
+
+    try {
+      const result = await runTransaction(db, async transaction => {
+        const userRef = doc(db, 'users', uid);
+        const userSnap = await transaction.get(userRef);
+        const userData = userSnap.data() || {};
+
+        const liveBalance = Math.max(
+          0,
+          Math.floor(Number((userData as any).coinBalance ?? (userData as any).eduCoins ?? liveWalletBalance ?? 0) || 0)
+        );
+
+        const remoteUpdates = normalizePurchasedProductUpdateIds((userData as any).purchasedProductUpdateIds || purchasedProductUpdateIds);
+        const ownedUpdateIds = remoteUpdates[productKey] || [];
+        const lockedUpdateIds = summary.updateIds.filter(updateIdValue => !ownedUpdateIds.includes(updateIdValue));
+
+        if (!lockedUpdateIds.length) {
+          return {
+            success: true,
+            alreadyUnlocked: true,
+            balance: liveBalance,
+            nextUpdates: remoteUpdates,
+          };
+        }
+
+        if (liveBalance < summary.coinPrice) {
+          return {
+            success: false,
+            alreadyUnlocked: false,
+            balance: liveBalance,
+            nextUpdates: remoteUpdates,
+          };
+        }
+
+        const nextBalance = liveBalance - summary.coinPrice;
+        const nextUpdates = {
+          ...remoteUpdates,
+          [productKey]: mergeUpdateIds(ownedUpdateIds, lockedUpdateIds),
+        };
+
+        transaction.set(userRef, {
+          coinBalance: nextBalance,
+          eduCoins: nextBalance,
+          purchasedProductUpdateIds: nextUpdates,
+          updatedAt: serverTimestamp(),
+        }, { merge: true });
+
+        return {
+          success: true,
+          alreadyUnlocked: false,
+          balance: nextBalance,
+          nextUpdates,
+        };
+      });
+
+      if (!result.success) {
+        handleInsufficientEduCoins({
+          requiredCoins: summary.coinPrice,
+          balance: result.balance,
+          missingCoins: Math.max(0, summary.coinPrice - result.balance),
+          productTitle: `${product.title} · ${summary.title}`,
+        });
+        return false;
+      }
+
+      persistUserPurchasedProductUpdates(result.nextUpdates);
+
+      addGlobalOrder({
+        id: `DC-UPD-COIN-${Date.now()}`,
+        customerName: effectiveAppUser?.name || effectiveAppUser?.email?.split('@')[0] || 'Valued Customer',
+        customerEmail: effectiveAppUser?.email || 'customer@example.com',
+        date: new Date().toISOString().split('T')[0],
+        total: `${summary.coinPrice} EduCoins`,
+        status: 'Completed',
+        items: [{
+          id: product.id,
+          name: `${product.title} · ${summary.title}`,
+          quantity: 1,
+          price: `${summary.coinPrice} EduCoins`,
+        }],
+        shippingAddress: 'N/A (Digital Product Update)',
+        billingAddress: 'EduCoin Latest Update Checkout',
+        paymentBreakdown: {
+          purchaseKind: 'product',
+          baseTotal: summary.price,
+          finalPrice: 0,
+          paymentLabel: 'EduCoin latest update',
+          unlockedProductIds: [product.id],
+          unlockedUpdateIds: summary.updateIds,
+          coinsCharged: result.alreadyUnlocked ? 0 : summary.coinPrice,
+        } as any,
+      });
+
+      setLatestUpdateCheckout(null);
+      setSelectedProduct(product);
+      setCurrentView('coursePlayer');
+      window.scrollTo(0, 0);
+
+      setInfoModal({
+        title: result.alreadyUnlocked ? 'Already unlocked' : 'Paid content unlocked',
+        message: result.alreadyUnlocked
+          ? `${summary.title} is already available inside your course player.`
+          : `${summary.title} is now unlocked with EduCoins.`,
+        icon: '✅',
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Latest update EduCoin unlock failed:', error);
+      setInfoModal({
+        title: 'EduCoin unlock failed',
+        message: 'Could not unlock this paid update with EduCoins. Please try again.',
+        icon: '⚠️',
+      });
+      return false;
+    }
   };
 
   const handleBackFromEduCoinGuide = () => {
@@ -4351,8 +4520,10 @@ const App: React.FC = () => {
                   onClose={() => setLatestUpdateCheckout(null)}
                   onConfirm={() => void handleConfirmLatestUpdatePurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId)}
                   paymentLink={latestUpdateCheckout.product.paymentLink}
-                  currentUser={effectiveAppUser}
-                  coinPrice={0}
+                  currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser}
+                  coinPrice={summary.coinPrice}
+                  onConfirmWithCoins={() => handleConfirmLatestUpdateCoinPurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId)}
+                  onInsufficientCoins={(details) => handleInsufficientEduCoins({ ...details, productTitle: `${latestUpdateCheckout.product.title} · ${summary.title}` })}
                   presentation="page"
                 />
               );
@@ -4381,6 +4552,7 @@ const App: React.FC = () => {
   return (
       <ErrorBoundary>
         <style>{`.animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *), .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *)::before, .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *)::after { animation: none !important; scroll-behavior: auto !important; } .animations-off .animate-child, .animations-off .scroll-animate, .animations-off .hub-animate { opacity: 1 !important; transform: none !important; } .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *) { transition-duration: 0.01ms !important; }`}</style>
+        {networkBanner && <div className={`fixed left-1/2 top-3 z-[9999] w-[min(92vw,42rem)] -translate-x-1/2 rounded-2xl px-4 py-3 text-center text-sm font-black shadow-[0_18px_50px_rgba(15,23,42,0.22)] ${networkBanner.includes('back online') ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-slate-950'}`}>{networkBanner}</div>}
         {renderPage()}
         <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
       </ErrorBoundary>
