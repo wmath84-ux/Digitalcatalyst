@@ -57,8 +57,7 @@ export const FreeProductsModal: React.FC<FreeProductsModalProps> = ({ isOpen, on
                                 onToggleWishlist={() => {}} // No-op
                                 onAddToCart={onAddToCart}
                                 onBuyNow={onBuyNow}
-                                onQuickView={() => {}} // No quick view from this modal
-                                animationDelay={0} // Stagger animation is disabled here
+                                                  animationDelay={0} // Stagger animation is disabled here
                                 coupons={[]} // Empty coupons for free products
                             />
                         </div>
@@ -104,7 +103,6 @@ export const FreeProductsPage: React.FC<FreeProductsPageProps> = ({ settings, pr
               onToggleWishlist={() => {}}
               onAddToCart={onAddToCart}
               onBuyNow={onBuyNow}
-              onQuickView={() => {}}
               animationDelay={index}
               coupons={[]}
             />
