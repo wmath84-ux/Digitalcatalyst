@@ -1576,9 +1576,11 @@ const ProductForm: React.FC<{
 
         setIsSavingProduct(true);
 
+        const primaryImage = (images || []).find(Boolean);
+
         const saved = await onSave({
             imageSeed: formData.imageSeed || formData.title || `product-${Date.now()}`,
-            images: images || [],
+            images: primaryImage ? [primaryImage] : [],
             productImages: {},
             title: formData.title,
             description: formData.description,
@@ -1742,13 +1744,17 @@ const ProductForm: React.FC<{
                                     )}
                                     <input ref={productImageInputRef} type="file" accept="image/*" onChange={handleProductImagesUpload} className="hidden" />
                                 </div>
-                                <div className="mt-4 grid grid-cols-2 gap-3">
-                                    {((images || []).filter(Boolean) || []).map((image, index) => (
-                                        <div key={`${image}-${index}`} className="group relative aspect-square overflow-hidden rounded-2xl border border-white/50 bg-white/80">
-                                            <img src={image} alt={`Product ${index + 1}`} className="h-full w-full object-contain" />
-                                            <button type="button" onClick={() => setImages(prev => (prev || []).filter((_, currentIndex) => currentIndex !== index))} className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-sm font-black text-white opacity-90">×</button>
+                                <div className="mt-4">
+                                    {(images || []).find(Boolean) ? (
+                                        <div className="group relative aspect-square overflow-hidden rounded-2xl border border-white/50 bg-white/80">
+                                            <img src={(images || []).find(Boolean)} alt="Primary product" className="h-full w-full object-contain" />
+                                            <button type="button" onClick={() => setImages([])} className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-sm font-black text-white opacity-90">×</button>
                                         </div>
-                                    ))}
+                                    ) : (
+                                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-center text-sm font-bold text-slate-500">
+                                            No product image selected. Upload or generate one primary image.
+                                        </div>
+                                    )}
                                 </div>
                                 <div className="mt-4"><label className={labelClass}>Image Seed</label><input value={formData.imageSeed} onChange={event => setFormData(prev => ({ ...prev, imageSeed: event.target.value }))} className={fieldClass} placeholder="Fallback image seed" /></div>
                                 <div className="mt-4 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm font-bold text-emerald-700">

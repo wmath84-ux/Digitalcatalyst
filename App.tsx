@@ -2946,6 +2946,11 @@ const App: React.FC = () => {
   };
 
   const handleNavigateBack = (fallbackView: string = 'home') => {
+    if (latestUpdateCheckout) {
+      setLatestUpdateCheckout(null);
+      return;
+    }
+
     const stack = appViewStackRef.current.filter(Boolean);
     const currentIndex = stack.lastIndexOf(currentView);
     const previousView = currentIndex > 0 ? stack[currentIndex - 1] : fallbackView;
@@ -3700,6 +3705,7 @@ const App: React.FC = () => {
       return;
     }
 
+    setSelectedProduct(product);
     setLatestUpdateCheckout({ product, updateId });
     window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
   };
