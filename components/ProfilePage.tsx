@@ -4,7 +4,7 @@ import { ActiveCoinDiscount, CoinTransaction, Coupon, ProductWithRating, Profile
 import { EconomySettings, resolveCoinPrice, resolveMaxDiscountPercentage } from '../utils/economy';
 import { db } from '../firebase';
 import UserAvatar from './common/UserAvatar';
-import { ensureUserCoinWallet, watchUserCoinWallet } from '../utils/coinWallet';
+import { creditUserCoinWallet, ensureUserCoinWallet, watchUserCoinWallet } from '../utils/coinWallet';
 
 interface ProfilePageProps {
   settings: WebsiteSettings;
@@ -430,25 +430,49 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     } : undefined);
   };
 
-  const handleStreakClaim = (streak: typeof streakCards[number]) => {
+  const handleStreakClaim = async (streak: typeof streakCards[number]) => {
     if (!currentUser || !streak.claimable) return;
     const coinReward = Math.max(0, Number(streak.coinReward || 0));
-    const entry: CoinTransaction = {
-      id: `streak-${streak.id}-${Date.now()}`,
-      amount: coinReward,
-      type: 'credit',
-      source: `Streak: ${streak.title}`,
-      title: `🔥 ${streak.title}`,
-      description: `Claimed ${coinReward} EduCoins for ${streak.title}`,
-      createdAt: new Date().toISOString(),
-    };
-    const updated: User = {
-      ...currentUser,
-      eduCoins: (currentUser.eduCoins || 0) + coinReward,
-      totalLifetimeCoins: (currentUser.totalLifetimeCoins || 0) + coinReward,
-      profileStreakClaims: { ...(currentUser.profileStreakClaims || {}), [streak.id]: streak.claimKey },
-    };
-    syncProfileUser(updated, entry);
+    const userId = currentUser.uid || (currentUser.id ? String(currentUser.id) : '');
+    if (!userId || coinReward <= 0) return;
+
+    try {
+      const result = await creditUserCoinWallet({
+        userId,
+        amount: coinReward,
+        source: 'profile_streak',
+        title: `🔥 ${streak.title}`,
+        description: `Claimed ${coinReward} EduCoins for ${streak.title}`,
+        profileStreakClaim: {
+          streakId: streak.id,
+          claimKey: streak.claimKey,
+        },
+      });
+
+      if (!result.success) return;
+
+      const entry: CoinTransaction = {
+        id: `streak-${streak.id}-${Date.now()}`,
+        amount: coinReward,
+        type: 'credit',
+        source: 'profile_streak',
+        title: `🔥 ${streak.title}`,
+        description: `Claimed ${coinReward} EduCoins for ${streak.title}`,
+        createdAt: new Date().toISOString(),
+      };
+      const updated: User = {
+        ...currentUser,
+        coinBalance: result.balanceAfter,
+        eduCoins: result.balanceAfter,
+        totalCoinsEarned: result.totalCoinsEarned,
+        totalLifetimeCoins: result.totalLifetimeCoins,
+        profileStreakClaims: { ...(currentUser.profileStreakClaims || {}), [streak.id]: streak.claimKey },
+      };
+      syncProfileUser(updated, entry);
+    } catch (error) {
+      console.error('Profile streak claim failed:', error);
+      setProfileCoinError('Unable to claim streak coins. Please try again.');
+    }
   };
 
   const redeem = (reward: any) => {
