@@ -1219,6 +1219,7 @@ const ContentComposer: React.FC<{
         });
 
         onClose();
+    };
 
     return (
         <div className="mt-5 rounded-[1.75rem] border border-cyan-400/20 bg-cyan-400/5 p-5 backdrop-blur-xl">
