@@ -3036,7 +3036,32 @@ const App: React.FC = () => {
 
   const syncCurrentUser = (updater: (user: User) => User, transaction?: Omit<CoinTransaction, 'id' | 'createdAt'>) => {
     if (!currentUser || !auth.currentUser || auth.currentUser.uid !== String(currentUser.id)) return null;
-    const updatedUser = updater(currentUser);
+
+    const rawUpdatedUser = updater(currentUser);
+    const currentBalance = readEduCoinBalance(currentUser);
+    const rawEduCoins = Math.max(0, Math.floor(Number(rawUpdatedUser.eduCoins ?? currentBalance) || 0));
+    const rawCoinBalance = Math.max(0, Math.floor(Number(rawUpdatedUser.coinBalance ?? currentBalance) || 0));
+    const balanceChangedViaEduCoins = rawUpdatedUser.eduCoins !== currentUser.eduCoins;
+    const nextBalance = balanceChangedViaEduCoins ? rawEduCoins : rawCoinBalance;
+    const transactionAmount = Math.floor(Number(transaction?.amount || 0));
+    const creditAmount = transactionAmount > 0 ? transactionAmount : 0;
+    const previousTotalEarned = Math.max(0, Math.floor(Number(currentUser.totalCoinsEarned ?? currentUser.totalLifetimeCoins ?? currentBalance) || 0));
+    const nextTotalEarned = Math.max(
+      Math.floor(Number(rawUpdatedUser.totalCoinsEarned ?? 0) || 0),
+      previousTotalEarned + creditAmount
+    );
+    const nextTotalLifetimeCoins = Math.max(
+      Math.floor(Number(rawUpdatedUser.totalLifetimeCoins ?? 0) || 0),
+      nextTotalEarned
+    );
+    const updatedUser: User = {
+      ...rawUpdatedUser,
+      coinBalance: nextBalance,
+      eduCoins: nextBalance,
+      totalCoinsEarned: nextTotalEarned,
+      totalLifetimeCoins: nextTotalLifetimeCoins,
+    };
+
     const entry = transaction ? recordCoinTransaction(updatedUser, transaction) : null;
     const userWithLedger = entry ? { ...updatedUser, coinTransactions: [entry, ...(updatedUser.coinTransactions || [])].slice(0, 25) } : updatedUser;
     setCurrentUser(userWithLedger);
