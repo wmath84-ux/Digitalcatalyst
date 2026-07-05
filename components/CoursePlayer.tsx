@@ -1161,6 +1161,15 @@ const CoursePlayer: React.FC<{
   useEffect(() => {
     if (activeFile?.type !== 'youtube' || !youtubeFrameId) return undefined;
 
+    const getElementSize = (element?: Element | null) => {
+      const bounds = element?.getBoundingClientRect();
+      if (!bounds?.width || !bounds?.height) return null;
+      return {
+        width: Math.ceil(bounds.width),
+        height: Math.ceil(bounds.height),
+      };
+    };
+
     const resizeYouTubePlayer = () => {
       const player = youtubePlayerRef.current;
       if (!player?.setSize) return;
@@ -1170,19 +1179,23 @@ const CoursePlayer: React.FC<{
       const shell = youtubeShellId ? document.getElementById(youtubeShellId) : frame?.parentElement;
       const isYoutubeFullscreen = !!fullscreenElement && (fullscreenElement === frame || fullscreenElement === shell || shell?.contains(fullscreenElement));
 
-      if (isYoutubeFullscreen) {
-        const viewport = window.visualViewport;
-        player.setSize(Math.ceil(viewport?.width || window.innerWidth), Math.ceil(viewport?.height || window.innerHeight));
-        return;
-      }
+      const fullscreenSize = isYoutubeFullscreen
+        ? getElementSize(fullscreenElement) || getElementSize(frame) || getElementSize(shell)
+        : null;
+      const shellSize = getElementSize(shell);
+      const viewport = window.visualViewport;
+      const fallbackSize = {
+        width: Math.ceil(viewport?.width || window.innerWidth || screen.width),
+        height: Math.ceil(viewport?.height || window.innerHeight || screen.height),
+      };
+      const nextSize = fullscreenSize || shellSize || fallbackSize;
 
-      const bounds = shell?.getBoundingClientRect();
-      if (bounds?.width && bounds?.height) {
-        player.setSize(Math.ceil(bounds.width), Math.ceil(bounds.height));
-      }
+      player.setSize(nextSize.width, nextSize.height);
     };
 
-    const scheduleResize = () => window.setTimeout(resizeYouTubePlayer, 120);
+    const scheduleResize = () => {
+      [0, 120, 350, 800].forEach((delay) => window.setTimeout(resizeYouTubePlayer, delay));
+    };
 
     scheduleResize();
     document.addEventListener('fullscreenchange', scheduleResize);
