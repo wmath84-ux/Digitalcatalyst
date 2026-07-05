@@ -18,7 +18,8 @@ export type CoinTransactionSource =
   | 'youtube_watch'
   | 'product_redeem'
   | 'admin_adjustment'
-  | 'migration';
+  | 'migration'
+  | 'profile_streak';
 
 export type WatchSessionStatus =
   | 'active'
@@ -305,6 +306,173 @@ export const getProductCoinPrice = async (productId: string): Promise<{
     isCoinRedeemEnabled: product?.isCoinRedeemEnabled !== false,
     status: String(product?.status || 'active'),
   };
+};
+
+
+export interface CreditUserCoinWalletInput {
+  userId: string;
+  amount: number;
+  source?: string;
+  description?: string;
+  title?: string;
+  profileStreakClaim?: {
+    streakId: string;
+    claimKey: string;
+  };
+}
+
+export interface CreditUserCoinWalletResult {
+  success: boolean;
+  reason?: 'login_required' | 'invalid_amount' | 'already_claimed';
+  currentBalance: number;
+  balanceBefore: number;
+  balanceAfter: number;
+  totalCoinsEarned: number;
+  totalLifetimeCoins: number;
+}
+
+export const creditUserCoinWallet = async ({
+  userId,
+  amount,
+  source = 'profile_streak',
+  description,
+  title,
+  profileStreakClaim,
+}: CreditUserCoinWalletInput): Promise<CreditUserCoinWalletResult> => {
+  if (!userId) {
+    return {
+      success: false,
+      reason: 'login_required',
+      currentBalance: 0,
+      balanceBefore: 0,
+      balanceAfter: 0,
+      totalCoinsEarned: 0,
+      totalLifetimeCoins: 0,
+    };
+  }
+
+  const coinsToCredit = normalizeCoinPrice(amount);
+
+  if (coinsToCredit <= 0) {
+    return {
+      success: false,
+      reason: 'invalid_amount',
+      currentBalance: 0,
+      balanceBefore: 0,
+      balanceAfter: 0,
+      totalCoinsEarned: 0,
+      totalLifetimeCoins: 0,
+    };
+  }
+
+  const userRef = doc(db, 'users', userId);
+  const analyticsTransactionRef = doc(collection(db, 'coinTransactions'));
+  const userTransactionRef = doc(collection(db, 'users', userId, 'coinTransactions'));
+
+  return runTransaction(db, async (transaction) => {
+    const userSnap = await transaction.get(userRef);
+    const userData = userSnap.exists() ? userSnap.data() : {};
+    const existingStreakClaims = (userData.profileStreakClaims || {}) as Record<string, string>;
+
+    const balanceBefore = safeNumber(
+      userData.coinBalance,
+      safeNumber(userData.eduCoins, 0)
+    );
+    const totalCoinsEarned = safeNumber(
+      userData.totalCoinsEarned,
+      safeNumber(userData.totalLifetimeCoins, safeNumber(userData.eduCoins, balanceBefore))
+    );
+    const totalCoinsSpent = safeNumber(userData.totalCoinsSpent, 0);
+    const totalLifetimeCoins = safeNumber(userData.totalLifetimeCoins, totalCoinsEarned);
+
+    if (
+      profileStreakClaim &&
+      existingStreakClaims[profileStreakClaim.streakId] === profileStreakClaim.claimKey
+    ) {
+      return {
+        success: false,
+        reason: 'already_claimed' as const,
+        currentBalance: balanceBefore,
+        balanceBefore,
+        balanceAfter: balanceBefore,
+        totalCoinsEarned,
+        totalLifetimeCoins,
+      };
+    }
+
+    const balanceAfter = balanceBefore + coinsToCredit;
+    const nextTotalCoinsEarned = totalCoinsEarned + coinsToCredit;
+    const nextTotalLifetimeCoins = totalLifetimeCoins + coinsToCredit;
+    const resolvedDescription = description || `${coinsToCredit} EduCoins credited`;
+    const resolvedTitle = title || source;
+    const optionalPayload = {
+      ...(profileStreakClaim
+        ? {
+            streakId: profileStreakClaim.streakId,
+            claimKey: profileStreakClaim.claimKey,
+          }
+        : {}),
+    };
+
+    transaction.set(analyticsTransactionRef, {
+      userId,
+      type: 'earned',
+      source,
+      amount: coinsToCredit,
+      balanceBefore,
+      balanceAfter,
+      description: resolvedDescription,
+      status: 'success',
+      createdAt: serverTimestamp(),
+      ...optionalPayload,
+    });
+
+    transaction.set(userTransactionRef, {
+      id: userTransactionRef.id,
+      userId,
+      amount: coinsToCredit,
+      type: 'credit',
+      source,
+      title: resolvedTitle,
+      description: resolvedDescription,
+      balanceBefore,
+      balanceAfter,
+      status: 'success',
+      createdAt: serverTimestamp(),
+      timestamp: serverTimestamp(),
+      ...optionalPayload,
+    });
+
+    transaction.set(
+      userRef,
+      {
+        coinBalance: balanceAfter,
+        eduCoins: balanceAfter,
+        totalCoinsEarned: nextTotalCoinsEarned,
+        totalCoinsSpent,
+        totalLifetimeCoins: nextTotalLifetimeCoins,
+        ...(profileStreakClaim
+          ? {
+              profileStreakClaims: {
+                ...existingStreakClaims,
+                [profileStreakClaim.streakId]: profileStreakClaim.claimKey,
+              },
+            }
+          : {}),
+        updatedAt: serverTimestamp(),
+      },
+      { merge: true }
+    );
+
+    return {
+      success: true,
+      currentBalance: balanceAfter,
+      balanceBefore,
+      balanceAfter,
+      totalCoinsEarned: nextTotalCoinsEarned,
+      totalLifetimeCoins: nextTotalLifetimeCoins,
+    };
+  });
 };
 
 export interface SpendUserCoinWalletInput {

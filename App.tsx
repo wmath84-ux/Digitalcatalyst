@@ -1518,21 +1518,31 @@ const App: React.FC = () => {
 
     const storedUsers = localStorage.getItem('siteUsers');
     const parsedUsers: User[] = storedUsers ? JSON.parse(storedUsers) : [];
-    const loadedUsers: User[] = parsedUsers.map(user => ({
-        ...user,
-        name: user.name || user.email?.split('@')[0] || 'Learner',
-        mobile: user.mobile || '',
-        eduCoins: user.eduCoins ?? 0,
-        studyMinutes: user.studyMinutes ?? 0,
-        totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0,
-        rewardedArticleIds: user.rewardedArticleIds || [],
-        readArticles: user.readArticles || user.rewardedArticleIds || [],
-        rewardedQuizIds: user.rewardedQuizIds || [],
-        claimedRewardIds: user.claimedRewardIds || [],
-        profileStreakClaims: user.profileStreakClaims || {},
-        coinTransactions: user.coinTransactions || [],
-    }));
+    const loadedUsers: User[] = parsedUsers.map(user => {
+        const walletBalance = user.coinBalance ?? user.eduCoins ?? 0;
+        const totalCoinsEarned = user.totalCoinsEarned ?? user.totalLifetimeCoins ?? user.eduCoins ?? 0;
+
+        return {
+            ...user,
+            name: user.name || user.email?.split('@')[0] || 'Learner',
+            mobile: user.mobile || '',
+            coinBalance: walletBalance,
+            totalCoinsEarned,
+            totalCoinsSpent: user.totalCoinsSpent ?? 0,
+            eduCoins: walletBalance,
+            studyMinutes: user.studyMinutes ?? 0,
+            totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0,
+            totalLifetimeCoins: totalCoinsEarned,
+            rewardedArticleIds: user.rewardedArticleIds || [],
+            readArticles: user.readArticles || user.rewardedArticleIds || [],
+            rewardedQuizIds: user.rewardedQuizIds || [],
+            claimedRewardIds: user.claimedRewardIds || [],
+            profileStreakClaims: user.profileStreakClaims || {},
+            coinTransactions: user.coinTransactions || [],
+        };
+    });
     setUsers(loadedUsers);
+    safeSetItem('siteUsers', loadedUsers);
     
     const storedAdminUsers = localStorage.getItem('adminUsers');
     if (storedAdminUsers) setAdminUsers(JSON.parse(storedAdminUsers)); else setAdminUsers(initialAdminUsers);
@@ -2237,36 +2247,41 @@ const App: React.FC = () => {
       return existingPhoto.includes('googleusercontent.com') || existingPhoto === nextPhotoURL;
   };
 
-  const toUserProfile = (firebaseUser: FirebaseUser, data: any = {}): User => ({
-      id: firebaseUser.uid,
-      uid: firebaseUser.uid,
-      name: data.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
-      email: data.email || firebaseUser.email || '',
-      mobile: data.mobile || firebaseUser.phoneNumber || '',
-      photoURL: data.photoURL || getFirebaseUserPhotoURL(firebaseUser),
-      authProvider: data.authProvider || getFirebaseAuthProvider(firebaseUser),
-      providerIds: data.providerIds || getProviderIds(firebaseUser),
-      emailVerified: data.emailVerified ?? firebaseUser.emailVerified,
-      role: data.role === 'admin' ? 'admin' : 'user',
-      status: data.status === 'blocked' ? 'blocked' : 'active',
-      blocked: data.blocked === true,
-      suspended: data.suspended === true,
-      createdAt: data.createdAt || new Date().toISOString(),
-      lastLoginAt: new Date().toISOString(),
-      coinBalance: data.coinBalance ?? data.eduCoins ?? 0,
-      totalCoinsEarned: data.totalCoinsEarned ?? data.totalLifetimeCoins ?? data.eduCoins ?? 0,
-      totalCoinsSpent: data.totalCoinsSpent ?? 0,
-      eduCoins: data.coinBalance ?? data.eduCoins ?? 0,
-      studyMinutes: data.studyMinutes ?? 0,
-      totalWatchTimeMinutes: data.totalWatchTimeMinutes ?? data.studyMinutes ?? 0,
-      totalLifetimeCoins: data.totalCoinsEarned ?? data.totalLifetimeCoins ?? data.eduCoins ?? 0,
-      rewardedArticleIds: data.rewardedArticleIds || [],
-      readArticles: data.readArticles || data.rewardedArticleIds || [],
-      rewardedQuizIds: data.rewardedQuizIds || [],
-      claimedRewardIds: data.claimedRewardIds || [],
-      profileStreakClaims: data.profileStreakClaims || {},
-      coinTransactions: data.coinTransactions || [],
-  });
+  const toUserProfile = (firebaseUser: FirebaseUser, data: any = {}): User => {
+      const existingBalance = data.coinBalance ?? data.eduCoins ?? 0;
+      const totalCoinsEarned = data.totalCoinsEarned ?? data.totalLifetimeCoins ?? existingBalance;
+
+      return {
+          id: firebaseUser.uid,
+          uid: firebaseUser.uid,
+          name: data.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
+          email: data.email || firebaseUser.email || '',
+          mobile: data.mobile || firebaseUser.phoneNumber || '',
+          photoURL: data.photoURL || getFirebaseUserPhotoURL(firebaseUser),
+          authProvider: data.authProvider || getFirebaseAuthProvider(firebaseUser),
+          providerIds: data.providerIds || getProviderIds(firebaseUser),
+          emailVerified: data.emailVerified ?? firebaseUser.emailVerified,
+          role: data.role === 'admin' ? 'admin' : 'user',
+          status: data.status === 'blocked' ? 'blocked' : 'active',
+          blocked: data.blocked === true,
+          suspended: data.suspended === true,
+          createdAt: data.createdAt || new Date().toISOString(),
+          lastLoginAt: new Date().toISOString(),
+          coinBalance: existingBalance,
+          totalCoinsEarned,
+          totalCoinsSpent: data.totalCoinsSpent ?? 0,
+          eduCoins: existingBalance,
+          studyMinutes: data.studyMinutes ?? 0,
+          totalWatchTimeMinutes: data.totalWatchTimeMinutes ?? data.studyMinutes ?? 0,
+          totalLifetimeCoins: totalCoinsEarned,
+          rewardedArticleIds: data.rewardedArticleIds || [],
+          readArticles: data.readArticles || data.rewardedArticleIds || [],
+          rewardedQuizIds: data.rewardedQuizIds || [],
+          claimedRewardIds: data.claimedRewardIds || [],
+          profileStreakClaims: data.profileStreakClaims || {},
+          coinTransactions: data.coinTransactions || [],
+      };
+  };
 
   function createFallbackUserFromFirebase(firebaseUser: FirebaseUser): User {
       const fallbackDisplayName = firebaseUser.displayName || firebaseUser.email || 'Student';
@@ -2312,6 +2327,8 @@ const App: React.FC = () => {
       const nextMobile = profile?.mobile || existing.mobile || firebaseUser.phoneNumber || '';
       const firebasePhotoURL = getFirebaseUserPhotoURL(firebaseUser);
       const nextPhotoURL = shouldReplaceProfilePhoto(existing.photoURL, firebasePhotoURL) ? firebasePhotoURL : existing.photoURL || '';
+      const existingBalance = existing.coinBalance ?? existing.eduCoins ?? 0;
+      const totalCoinsEarned = existing.totalCoinsEarned ?? existing.totalLifetimeCoins ?? existingBalance;
       const safeProfileFields = {
           uid: firebaseUser.uid,
           name: nextName,
@@ -2326,10 +2343,13 @@ const App: React.FC = () => {
           providerIds,
           emailVerified: firebaseUser.emailVerified,
           purchasedProductIds: normalizePurchaseIds(existing.purchasedProductIds),
-          eduCoins: existing.eduCoins ?? 0,
+          coinBalance: existingBalance,
+          eduCoins: existingBalance,
+          totalCoinsEarned,
+          totalCoinsSpent: existing.totalCoinsSpent ?? 0,
           studyMinutes: existing.studyMinutes ?? 0,
           totalWatchTimeMinutes: existing.totalWatchTimeMinutes ?? existing.studyMinutes ?? 0,
-          totalLifetimeCoins: existing.totalLifetimeCoins ?? existing.eduCoins ?? 0,
+          totalLifetimeCoins: totalCoinsEarned,
           rewardedArticleIds: existing.rewardedArticleIds || [],
           readArticles: existing.readArticles || existing.rewardedArticleIds || [],
           rewardedQuizIds: existing.rewardedQuizIds || [],
@@ -3093,22 +3113,38 @@ const App: React.FC = () => {
     window.setTimeout(() => setCoinToast(null), 3000);
   };
 
+  const showRewardSyncError = () => {
+    setInfoModal({
+      title: 'Please refresh/login again',
+      message: 'Please refresh/login again before claiming rewards',
+      icon: '⚠️',
+    });
+  };
+
   const creditEduCoins = (amount: number, message?: string, metadata?: Partial<Omit<CoinTransaction, 'amount' | 'type' | 'createdAt'>>) => {
     if (!currentUser || amount <= 0) return false;
-    syncCurrentUser(
+    const synced = syncCurrentUser(
       user => ({ ...user, eduCoins: (user.eduCoins || 0) + amount, totalLifetimeCoins: (user.totalLifetimeCoins || 0) + amount }),
       { amount, type: 'credit', source: metadata?.source || 'EduCoin reward', description: metadata?.description || message || `+${amount} EduCoins earned`, articleId: metadata?.articleId, productId: metadata?.productId },
     );
+    if (synced === null) {
+      showRewardSyncError();
+      return false;
+    }
     showCoinToast(message || `✦ +${amount} EduCoins Earned`);
     return true;
   };
 
   const deductEduCoins = (amount: number, metadata?: Partial<Omit<CoinTransaction, 'amount' | 'type' | 'createdAt'>>) => {
     if (!currentUser || amount <= 0 || (currentUser.eduCoins || 0) < amount) return false;
-    syncCurrentUser(
+    const synced = syncCurrentUser(
       user => ({ ...user, eduCoins: (user.eduCoins || 0) - amount }),
       { amount: -amount, type: 'debit', source: metadata?.source || 'EduCoin redemption', description: metadata?.description || `${amount} EduCoins redeemed`, productId: metadata?.productId, articleId: metadata?.articleId },
     );
+    if (synced === null) {
+      showRewardSyncError();
+      return false;
+    }
     return true;
   };
 
@@ -3210,7 +3246,7 @@ const App: React.FC = () => {
     const articleId = article.id;
     const alreadyRead = [...(currentUser.rewardedArticleIds || []), ...(currentUser.readArticles || [])].includes(articleId);
     if (alreadyRead) return false;
-    syncCurrentUser(
+    const synced = syncCurrentUser(
       user => ({
         ...user,
         eduCoins: (user.eduCoins || 0) + rewardCoins,
@@ -3220,6 +3256,10 @@ const App: React.FC = () => {
       }),
       { amount: rewardCoins, type: 'credit', source: 'Article reading reward', description: `Read: ${article.title}`, articleId },
     );
+    if (synced === null) {
+      showRewardSyncError();
+      return false;
+    }
     showCoinToast(`✦ +${rewardCoins} EduCoins Earned`);
     return true;
   };
@@ -3227,7 +3267,7 @@ const App: React.FC = () => {
   const handleQuizReward = (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => {
     if (!currentUser || coins <= 0) return false;
     if ((currentUser.rewardedQuizIds || []).includes(quizId)) return false;
-    syncCurrentUser(
+    const synced = syncCurrentUser(
       user => ({
         ...user,
         eduCoins: (user.eduCoins || 0) + coins,
@@ -3236,6 +3276,10 @@ const App: React.FC = () => {
       }),
       { amount: coins, type: 'credit', source: `Quiz: ${quizTitle}`, description: `${correctAnswers} correct answer${correctAnswers === 1 ? '' : 's'} in ${quizTitle}` },
     );
+    if (synced === null) {
+      showRewardSyncError();
+      return false;
+    }
     showCoinToast(`✦ +${coins} EduCoins Quiz Reward`);
     return true;
   };
@@ -3244,7 +3288,7 @@ const App: React.FC = () => {
     if (!currentUser) return false;
     if ((reward.currentValue ?? currentUser.totalLifetimeCoins ?? 0) < reward.requirement || (currentUser.claimedRewardIds || []).includes(reward.id)) return false;
     const coinReward = Math.max(0, Number(reward.coinReward || 0));
-    syncCurrentUser(
+    const synced = syncCurrentUser(
       user => ({
         ...user,
         claimedRewardIds: [...new Set([...(user.claimedRewardIds || []), reward.id])],
@@ -3253,6 +3297,10 @@ const App: React.FC = () => {
       }),
       { amount: coinReward, type: 'credit', source: 'Milestone unlocked', description: `Unlocked: ${reward.title}${coinReward ? ` (+${coinReward} EduCoins)` : ''}` },
     );
+    if (synced === null) {
+      showRewardSyncError();
+      return false;
+    }
     if (reward.unlockProductIds?.length) {
       const nextPurchasedIds = mergePurchasedProductIds(purchasedProductIds, reward.unlockProductIds);
       setPurchasedProductIds(nextPurchasedIds);
