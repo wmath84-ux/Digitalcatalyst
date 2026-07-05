@@ -4420,6 +4420,35 @@ const App: React.FC = () => {
 
   const appleOpenClass = "animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]";
 
+  const renderLatestUpdateCheckoutOverlay = () => {
+    if (!latestUpdateCheckout) return null;
+
+    const summary = getLatestUpdateCheckoutSummary(latestUpdateCheckout.product, latestUpdateCheckout.updateId);
+
+    return (
+      <PaymentModal
+        settings={websiteSettings}
+        economySettings={economySettings}
+        productTitle={`${latestUpdateCheckout.product.title} · ${summary.title}`}
+        originalPrice={summary.price}
+        salePrice={null}
+        couponDiscount={0}
+        finalPrice={summary.price}
+        eduCoinDiscount={0}
+        appliedEduCoins={0}
+        coinRedeemRate={eduCoinRedeemRate}
+        onClose={() => setLatestUpdateCheckout(null)}
+        onConfirm={() => void handleConfirmLatestUpdatePurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId)}
+        paymentLink={latestUpdateCheckout.product.paymentLink}
+        currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser}
+        coinPrice={summary.coinPrice}
+        onConfirmWithCoins={() => handleConfirmLatestUpdateCoinPurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId)}
+        onInsufficientCoins={(details) => handleInsufficientEduCoins({ ...details, productTitle: `${latestUpdateCheckout.product.title} · ${summary.title}` })}
+        presentation="page"
+      />
+    );
+  };
+
   const renderPage = () => {
     const isAuthChecking = isAuthBooting && !isAuthStateReady;
     const isSignedIn = !isAuthChecking && hasFirebaseUser;
@@ -4536,32 +4565,6 @@ const App: React.FC = () => {
               </div>
             )}
             <main key={currentView} className={`${websiteSettings.animations.enabled ? appleOpenClass : ''} ${currentView === 'home' ? 'mobile-app-home' : ''}`}>{renderContent(effectiveAppUser)}</main>
-            {latestUpdateCheckout && (() => {
-              const summary = getLatestUpdateCheckoutSummary(latestUpdateCheckout.product, latestUpdateCheckout.updateId);
-
-              return (
-                <PaymentModal
-                  settings={websiteSettings}
-                  economySettings={economySettings}
-                  productTitle={`${latestUpdateCheckout.product.title} · ${summary.title}`}
-                  originalPrice={summary.price}
-                  salePrice={null}
-                  couponDiscount={0}
-                  finalPrice={summary.price}
-                  eduCoinDiscount={0}
-                  appliedEduCoins={0}
-                  coinRedeemRate={eduCoinRedeemRate}
-                  onClose={() => setLatestUpdateCheckout(null)}
-                  onConfirm={() => void handleConfirmLatestUpdatePurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId)}
-                  paymentLink={latestUpdateCheckout.product.paymentLink}
-                  currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser}
-                  coinPrice={summary.coinPrice}
-                  onConfirmWithCoins={() => handleConfirmLatestUpdateCoinPurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId)}
-                  onInsufficientCoins={(details) => handleInsufficientEduCoins({ ...details, productTitle: `${latestUpdateCheckout.product.title} · ${summary.title}` })}
-                  presentation="page"
-                />
-              );
-            })()}
             <div className="mobile-app-chrome"><InstallAppButton enabled={canShowInstallPrompt} /></div>
             {currentView === 'home' && (
               <div className={shouldHideFooterOnMobile ? 'max-md:hidden' : ''}>
@@ -4587,6 +4590,7 @@ const App: React.FC = () => {
         <style>{`.animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *), .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *)::before, .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *)::after { animation: none !important; scroll-behavior: auto !important; } .animations-off .animate-child, .animations-off .scroll-animate, .animations-off .hub-animate { opacity: 1 !important; transform: none !important; } .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *) { transition-duration: 0.01ms !important; }`}</style>
         {networkBanner && <div className={`fixed left-1/2 top-3 z-[9999] w-[min(92vw,42rem)] -translate-x-1/2 rounded-2xl px-4 py-3 text-center text-sm font-black shadow-[0_18px_50px_rgba(15,23,42,0.22)] ${networkBanner.includes('back online') ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-slate-950'}`}>{networkBanner}</div>}
         {renderPage()}
+        {renderLatestUpdateCheckoutOverlay()}
         <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
       </ErrorBoundary>
   );
