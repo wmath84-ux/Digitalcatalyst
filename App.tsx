@@ -1096,6 +1096,7 @@ const App: React.FC = () => {
   const [isCartPaymentModalOpen, setIsCartPaymentModalOpen] = useState(false);
   const isCartOpenRef = useRef(false);
   const isCartPaymentModalOpenRef = useRef(false);
+  const latestUpdateCheckoutRef = useRef<typeof latestUpdateCheckout>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   const activeSessionUidRef = useRef<string | null>(null);
   const sessionUnsubscribeRef = useRef<(() => void) | null>(null);
@@ -1300,6 +1301,10 @@ const App: React.FC = () => {
     lastHistoryViewRef.current = currentView;
 
     const onPopState = (event: PopStateEvent) => {
+      if (latestUpdateCheckoutRef.current) {
+        setLatestUpdateCheckout(null);
+        return;
+      }
       if (isCartPaymentModalOpenRef.current) {
         setIsCartPaymentModalOpen(false);
         return;
@@ -1341,6 +1346,10 @@ const App: React.FC = () => {
   useEffect(() => {
     isCartPaymentModalOpenRef.current = isCartPaymentModalOpen;
   }, [isCartPaymentModalOpen]);
+
+  useEffect(() => {
+    latestUpdateCheckoutRef.current = latestUpdateCheckout;
+  }, [latestUpdateCheckout]);
 
   useEffect(() => {
     currentViewRef.current = currentView;
