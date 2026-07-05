@@ -142,21 +142,21 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     totalCoinsSpent: 0,
   });
   const [profileCoinError, setProfileCoinError] = React.useState('');
+  const profileUid = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
 
   React.useEffect(() => {
-    const userId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
-    if (!userId) {
+    if (!profileUid) {
       setProfileCoinWallet({ coinBalance: 0, totalCoinsEarned: 0, totalCoinsSpent: 0 });
       return;
     }
 
-    ensureUserCoinWallet(userId).catch((error) => {
+    ensureUserCoinWallet(profileUid).catch((error) => {
       console.error('Profile coin wallet setup failed:', error);
       setProfileCoinError('Unable to load profile coins. Please refresh.');
     });
 
     const unsubscribe = watchUserCoinWallet(
-      userId,
+      profileUid,
       (wallet) => {
         setProfileCoinWallet(wallet);
         setProfileCoinError('');
@@ -168,7 +168,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     );
 
     return () => unsubscribe();
-  }, [currentUser?.uid, currentUser?.id]);
+  }, [profileUid]);
 
   React.useEffect(() => {
     const storedCover = localStorage.getItem(getStorageKey(currentUser?.id));
@@ -176,16 +176,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   }, [currentUser?.id]);
 
   React.useEffect(() => {
-    if (!currentUser?.id) {
+    if (!profileUid) {
       setCoinTransactions([]);
       return;
     }
 
-    const storageKey = `coinTransactions-${currentUser.id}`;
+    const storageKey = `coinTransactions-${profileUid}`;
     const localLedger = JSON.parse(localStorage.getItem(storageKey) || '[]') as CoinTransaction[];
     setCoinTransactions([...(currentUser.coinTransactions || []), ...localLedger].slice(0, 12));
 
-    const ledgerQuery = query(collection(db, 'users', String(currentUser.id), 'coinTransactions'), orderBy('createdAt', 'desc'));
+    const ledgerQuery = query(collection(db, 'users', profileUid, 'coinTransactions'), orderBy('createdAt', 'desc'));
     const unsubscribe = onSnapshot(ledgerQuery, (snapshot) => {
       const remoteLedger = snapshot.docs.map((entry) => {
         const data = entry.data() as Omit<CoinTransaction, 'id' | 'createdAt'> & { createdAt?: any };
@@ -201,17 +201,17 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     });
 
     return unsubscribe;
-  }, [currentUser?.id, currentUser?.coinTransactions]);
+  }, [profileUid, currentUser?.coinTransactions]);
 
 
   React.useEffect(() => {
-    if (!currentUser?.id) {
+    if (!profileUid) {
       setDailyActivity({ lastActiveDate: '', streakDays: 0 });
       return;
     }
     const today = new Date().toISOString().slice(0, 10);
     const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const key = `profileDailyActivity-${currentUser.id}`;
+    const key = `profileDailyActivity-${profileUid}`;
     const stored = JSON.parse(localStorage.getItem(key) || 'null') as DailyActivityState | null;
     const next = !stored
       ? { lastActiveDate: today, streakDays: 1 }
@@ -220,7 +220,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         : { lastActiveDate: today, streakDays: stored.lastActiveDate === yesterday ? stored.streakDays + 1 : 1 };
     setDailyActivity(next);
     localStorage.setItem(key, JSON.stringify(next));
-  }, [currentUser?.id]);
+  }, [profileUid]);
 
   const profileCoupons = React.useMemo(() => coupons, [coupons]);
   const coinRedeemRate = Math.max(1, Number(economySettings.coinToFiatRatio));
@@ -430,8 +430,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     } : undefined);
   };
 
-  const handleStreakClaim = async (streak: typeof streakCards[number]) => {
-    if (!currentUser || !streak.claimable) return;
+  const handleStreakClaim = (streak: typeof streakCards[number]) => {
+    if (!currentUser || !profileUid || !streak.claimable) return;
     const coinReward = Math.max(0, Number(streak.coinReward || 0));
     const userId = currentUser.uid || (currentUser.id ? String(currentUser.id) : '');
     if (!userId || coinReward <= 0) return;
@@ -476,7 +476,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   };
 
   const redeem = (reward: any) => {
-    if (!currentUser || redeeming || (currentUser.eduCoins || 0) < reward.cost) return;
+    if (!currentUser || !profileUid || redeeming || (currentUser.eduCoins || 0) < reward.cost) return;
 
     setRedeeming(reward.id);
     const updated = { ...currentUser, eduCoins: (currentUser.eduCoins || 0) - reward.cost };
