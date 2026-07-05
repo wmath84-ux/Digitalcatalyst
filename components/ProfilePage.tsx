@@ -430,7 +430,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     } : undefined);
   };
 
-  const handleStreakClaim = (streak: typeof streakCards[number]) => {
+  const handleStreakClaim = async (streak: typeof streakCards[number]) => {
     if (!currentUser || !profileUid || !streak.claimable) return;
     const coinReward = Math.max(0, Number(streak.coinReward || 0));
     const userId = currentUser.uid || (currentUser.id ? String(currentUser.id) : '');
