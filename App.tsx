@@ -1518,11 +1518,19 @@ const App: React.FC = () => {
 
     const storedUsers = localStorage.getItem('siteUsers');
     const parsedUsers: User[] = storedUsers ? JSON.parse(storedUsers) : [];
-    const loadedUsers: User[] = parsedUsers.map(user => ({
+    const loadedUsers: User[] = parsedUsers.map(user => {
+      const existingBalance = user.coinBalance ?? user.eduCoins ?? 0;
+      const totalCoinsEarned = user.totalCoinsEarned ?? user.totalLifetimeCoins ?? existingBalance;
+
+      return {
         ...user,
         name: user.name || user.email?.split('@')[0] || 'Learner',
         mobile: user.mobile || '',
-        eduCoins: user.eduCoins ?? 0,
+        coinBalance: existingBalance,
+        eduCoins: existingBalance,
+        totalCoinsEarned,
+        totalCoinsSpent: user.totalCoinsSpent ?? 0,
+        totalLifetimeCoins: totalCoinsEarned,
         studyMinutes: user.studyMinutes ?? 0,
         totalWatchTimeMinutes: user.totalWatchTimeMinutes ?? user.studyMinutes ?? 0,
         rewardedArticleIds: user.rewardedArticleIds || [],
@@ -1531,7 +1539,8 @@ const App: React.FC = () => {
         claimedRewardIds: user.claimedRewardIds || [],
         profileStreakClaims: user.profileStreakClaims || {},
         coinTransactions: user.coinTransactions || [],
-    }));
+      };
+    });
     setUsers(loadedUsers);
     
     const storedAdminUsers = localStorage.getItem('adminUsers');
@@ -2237,36 +2246,41 @@ const App: React.FC = () => {
       return existingPhoto.includes('googleusercontent.com') || existingPhoto === nextPhotoURL;
   };
 
-  const toUserProfile = (firebaseUser: FirebaseUser, data: any = {}): User => ({
-      id: firebaseUser.uid,
-      uid: firebaseUser.uid,
-      name: data.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
-      email: data.email || firebaseUser.email || '',
-      mobile: data.mobile || firebaseUser.phoneNumber || '',
-      photoURL: data.photoURL || getFirebaseUserPhotoURL(firebaseUser),
-      authProvider: data.authProvider || getFirebaseAuthProvider(firebaseUser),
-      providerIds: data.providerIds || getProviderIds(firebaseUser),
-      emailVerified: data.emailVerified ?? firebaseUser.emailVerified,
-      role: data.role === 'admin' ? 'admin' : 'user',
-      status: data.status === 'blocked' ? 'blocked' : 'active',
-      blocked: data.blocked === true,
-      suspended: data.suspended === true,
-      createdAt: data.createdAt || new Date().toISOString(),
-      lastLoginAt: new Date().toISOString(),
-      coinBalance: data.coinBalance ?? data.eduCoins ?? 0,
-      totalCoinsEarned: data.totalCoinsEarned ?? data.totalLifetimeCoins ?? data.eduCoins ?? 0,
-      totalCoinsSpent: data.totalCoinsSpent ?? 0,
-      eduCoins: data.coinBalance ?? data.eduCoins ?? 0,
-      studyMinutes: data.studyMinutes ?? 0,
-      totalWatchTimeMinutes: data.totalWatchTimeMinutes ?? data.studyMinutes ?? 0,
-      totalLifetimeCoins: data.totalCoinsEarned ?? data.totalLifetimeCoins ?? data.eduCoins ?? 0,
-      rewardedArticleIds: data.rewardedArticleIds || [],
-      readArticles: data.readArticles || data.rewardedArticleIds || [],
-      rewardedQuizIds: data.rewardedQuizIds || [],
-      claimedRewardIds: data.claimedRewardIds || [],
-      profileStreakClaims: data.profileStreakClaims || {},
-      coinTransactions: data.coinTransactions || [],
-  });
+  const toUserProfile = (firebaseUser: FirebaseUser, data: any = {}): User => {
+      const existingBalance = data.coinBalance ?? data.eduCoins ?? 0;
+      const totalCoinsEarned = data.totalCoinsEarned ?? data.totalLifetimeCoins ?? existingBalance;
+
+      return {
+          id: firebaseUser.uid,
+          uid: firebaseUser.uid,
+          name: data.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
+          email: data.email || firebaseUser.email || '',
+          mobile: data.mobile || firebaseUser.phoneNumber || '',
+          photoURL: data.photoURL || getFirebaseUserPhotoURL(firebaseUser),
+          authProvider: data.authProvider || getFirebaseAuthProvider(firebaseUser),
+          providerIds: data.providerIds || getProviderIds(firebaseUser),
+          emailVerified: data.emailVerified ?? firebaseUser.emailVerified,
+          role: data.role === 'admin' ? 'admin' : 'user',
+          status: data.status === 'blocked' ? 'blocked' : 'active',
+          blocked: data.blocked === true,
+          suspended: data.suspended === true,
+          createdAt: data.createdAt || new Date().toISOString(),
+          lastLoginAt: new Date().toISOString(),
+          coinBalance: existingBalance,
+          totalCoinsEarned,
+          totalCoinsSpent: data.totalCoinsSpent ?? 0,
+          eduCoins: existingBalance,
+          studyMinutes: data.studyMinutes ?? 0,
+          totalWatchTimeMinutes: data.totalWatchTimeMinutes ?? data.studyMinutes ?? 0,
+          totalLifetimeCoins: totalCoinsEarned,
+          rewardedArticleIds: data.rewardedArticleIds || [],
+          readArticles: data.readArticles || data.rewardedArticleIds || [],
+          rewardedQuizIds: data.rewardedQuizIds || [],
+          claimedRewardIds: data.claimedRewardIds || [],
+          profileStreakClaims: data.profileStreakClaims || {},
+          coinTransactions: data.coinTransactions || [],
+      };
+  };
 
   function createFallbackUserFromFirebase(firebaseUser: FirebaseUser): User {
       const fallbackDisplayName = firebaseUser.displayName || firebaseUser.email || 'Student';
@@ -2312,6 +2326,8 @@ const App: React.FC = () => {
       const nextMobile = profile?.mobile || existing.mobile || firebaseUser.phoneNumber || '';
       const firebasePhotoURL = getFirebaseUserPhotoURL(firebaseUser);
       const nextPhotoURL = shouldReplaceProfilePhoto(existing.photoURL, firebasePhotoURL) ? firebasePhotoURL : existing.photoURL || '';
+      const existingBalance = existing.coinBalance ?? existing.eduCoins ?? 0;
+      const totalCoinsEarned = existing.totalCoinsEarned ?? existing.totalLifetimeCoins ?? existingBalance;
       const safeProfileFields = {
           uid: firebaseUser.uid,
           name: nextName,
@@ -2326,10 +2342,13 @@ const App: React.FC = () => {
           providerIds,
           emailVerified: firebaseUser.emailVerified,
           purchasedProductIds: normalizePurchaseIds(existing.purchasedProductIds),
-          eduCoins: existing.eduCoins ?? 0,
+          coinBalance: existingBalance,
+          eduCoins: existingBalance,
+          totalCoinsEarned,
+          totalCoinsSpent: existing.totalCoinsSpent ?? 0,
           studyMinutes: existing.studyMinutes ?? 0,
           totalWatchTimeMinutes: existing.totalWatchTimeMinutes ?? existing.studyMinutes ?? 0,
-          totalLifetimeCoins: existing.totalLifetimeCoins ?? existing.eduCoins ?? 0,
+          totalLifetimeCoins: totalCoinsEarned,
           rewardedArticleIds: existing.rewardedArticleIds || [],
           readArticles: existing.readArticles || existing.rewardedArticleIds || [],
           rewardedQuizIds: existing.rewardedQuizIds || [],
