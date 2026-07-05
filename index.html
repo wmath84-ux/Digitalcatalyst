@@ -148,6 +148,10 @@
         width: 100%;
       }
 
+      .course-youtube-fullscreen-button {
+        -webkit-tap-highlight-color: transparent;
+      }
+
       .course-youtube-iframe {
         display: block;
         width: 100% !important;
@@ -165,7 +169,6 @@
         max-height: none !important;
       }
 
-      .course-youtube-iframe:fullscreen,
       .course-youtube-player-shell:fullscreen {
         position: fixed !important;
         inset: 0 !important;
@@ -184,7 +187,29 @@
         overflow: hidden !important;
       }
 
-      .course-youtube-iframe:-webkit-full-screen,
+      .course-youtube-player-shell:fullscreen .course-youtube-iframe,
+      .course-youtube-player-shell:fullscreen iframe,
+      .course-youtube-player-shell:-webkit-full-screen .course-youtube-iframe,
+      .course-youtube-player-shell:-webkit-full-screen iframe {
+        position: absolute !important;
+        inset: 0 !important;
+        width: 100% !important;
+        height: 100% !important;
+        min-width: 100% !important;
+        min-height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
+        border: 0 !important;
+        border-radius: 0 !important;
+      }
+
+      .course-youtube-player-shell:fullscreen .course-youtube-fullscreen-button,
+      .course-youtube-player-shell:-webkit-full-screen .course-youtube-fullscreen-button {
+        bottom: max(5rem, env(safe-area-inset-bottom)) !important;
+        right: max(1rem, env(safe-area-inset-right)) !important;
+        z-index: 2147483647 !important;
+      }
+
       .course-youtube-player-shell:-webkit-full-screen {
         position: fixed !important;
         inset: 0 !important;

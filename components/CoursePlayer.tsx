@@ -1033,6 +1033,7 @@ const CoursePlayer: React.FC<{
     isFlushing: boolean;
   } | null>(null);
   const [youtubeRewardNotice, setYoutubeRewardNotice] = useState('');
+  const [isYoutubeShellFullscreen, setIsYoutubeShellFullscreen] = useState(false);
   const [educoinBalance, setEducoinBalance] = useState(getEducoinBalance(currentUser));
   const [educoinNotice, setEducoinNotice] = useState('');
   const [youtubeWatchSeconds, setYoutubeWatchSeconds] = useState(0);
@@ -1180,20 +1181,32 @@ const CoursePlayer: React.FC<{
       const isYoutubeFullscreen = !!fullscreenElement && (fullscreenElement === frame || fullscreenElement === shell || shell?.contains(fullscreenElement));
 
       const fullscreenSize = isYoutubeFullscreen
-        ? getElementSize(fullscreenElement) || getElementSize(frame) || getElementSize(shell)
+        ? getElementSize(fullscreenElement) || getElementSize(shell) || getElementSize(frame)
         : null;
       const shellSize = getElementSize(shell);
       const viewport = window.visualViewport;
-      const fallbackSize = {
-        width: Math.ceil(viewport?.width || window.innerWidth || screen.width),
-        height: Math.ceil(viewport?.height || window.innerHeight || screen.height),
-      };
+      const fallbackSize = isYoutubeFullscreen
+        ? {
+            width: Math.ceil(screen.width || window.innerWidth || viewport?.width || 0),
+            height: Math.ceil(screen.height || window.innerHeight || viewport?.height || 0),
+          }
+        : {
+            width: Math.ceil(viewport?.width || window.innerWidth || screen.width),
+            height: Math.ceil(viewport?.height || window.innerHeight || screen.height),
+          };
       const nextSize = fullscreenSize || shellSize || fallbackSize;
 
       player.setSize(nextSize.width, nextSize.height);
     };
 
+    const syncFullscreenState = () => {
+      const fullscreenElement = document.fullscreenElement || (document as any).webkitFullscreenElement;
+      const shell = youtubeShellId ? document.getElementById(youtubeShellId) : null;
+      setIsYoutubeShellFullscreen(!!fullscreenElement && fullscreenElement === shell);
+    };
+
     const scheduleResize = () => {
+      syncFullscreenState();
       [0, 120, 350, 800].forEach((delay) => window.setTimeout(resizeYouTubePlayer, delay));
     };
 
@@ -1210,6 +1223,28 @@ const CoursePlayer: React.FC<{
       window.visualViewport?.removeEventListener('resize', scheduleResize);
     };
   }, [activeFile?.type, youtubeFrameId, youtubeShellId]);
+
+  const toggleYoutubeShellFullscreen = useCallback(async () => {
+    if (activeFile?.type !== 'youtube' || !youtubeShellId) return;
+
+    const shell = document.getElementById(youtubeShellId) as (HTMLElement & { webkitRequestFullscreen?: () => Promise<void> | void }) | null;
+    if (!shell) return;
+
+    const fullscreenElement = document.fullscreenElement || (document as any).webkitFullscreenElement;
+    const exitFullscreen = document.exitFullscreen?.bind(document) || (document as any).webkitExitFullscreen?.bind(document);
+
+    try {
+      if (fullscreenElement === shell) {
+        await exitFullscreen?.();
+        return;
+      }
+
+      const requestFullscreen = shell.requestFullscreen?.bind(shell) || shell.webkitRequestFullscreen?.bind(shell);
+      await requestFullscreen?.();
+    } catch (error) {
+      console.warn('Course YouTube fullscreen toggle failed:', error);
+    }
+  }, [activeFile?.type, youtubeShellId]);
 
   useEffect(() => {
     if (showWelcome || activeFile?.type !== 'youtube') return undefined;
@@ -1414,15 +1449,23 @@ const CoursePlayer: React.FC<{
               width="100%"
               height="100%"
               style={{ width: '100%', height: '100%' }}
-              src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&fs=1${originParam}`}
+              src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&fs=0${originParam}`}
               title={activeFile.name || 'YouTube lesson'}
               frameBorder="0"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
-              allowFullScreen
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
               referrerPolicy="strict-origin-when-cross-origin"
               onLoad={() => setMediaHasError(false)}
               onError={() => setMediaHasError(true)}
             />
+            <button
+              type="button"
+              onClick={toggleYoutubeShellFullscreen}
+              className="course-youtube-fullscreen-button absolute bottom-20 right-4 z-20 flex items-center gap-2 rounded-full border border-white/25 bg-black/75 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white shadow-[0_12px_30px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:bg-black focus:outline-none focus:ring-2 focus:ring-white/80"
+              aria-label={isYoutubeShellFullscreen ? 'Exit lesson fullscreen' : 'Enter lesson fullscreen'}
+            >
+              <span aria-hidden="true">{isYoutubeShellFullscreen ? '⤢' : '⛶'}</span>
+              <span>{isYoutubeShellFullscreen ? 'Exit' : 'Fullscreen'}</span>
+            </button>
           </div>
         ) : <VideoUnavailablePlaceholder />;
       }
