@@ -1153,6 +1153,51 @@ const CoursePlayer: React.FC<{
     return `youtube-player-${product.id}-${activeFile.id}`.replace(/[^a-zA-Z0-9_-]/g, '-');
   }, [activeFile?.id, activeFile?.type, product.id]);
 
+  const youtubeShellId = useMemo(() => {
+    if (activeFile?.type !== 'youtube') return '';
+    return `${youtubeFrameId}-shell`;
+  }, [activeFile?.type, youtubeFrameId]);
+
+  useEffect(() => {
+    if (activeFile?.type !== 'youtube' || !youtubeFrameId) return undefined;
+
+    const resizeYouTubePlayer = () => {
+      const player = youtubePlayerRef.current;
+      if (!player?.setSize) return;
+
+      const fullscreenElement = document.fullscreenElement || (document as any).webkitFullscreenElement;
+      const frame = document.getElementById(youtubeFrameId);
+      const shell = youtubeShellId ? document.getElementById(youtubeShellId) : frame?.parentElement;
+      const isYoutubeFullscreen = !!fullscreenElement && (fullscreenElement === frame || fullscreenElement === shell || shell?.contains(fullscreenElement));
+
+      if (isYoutubeFullscreen) {
+        const viewport = window.visualViewport;
+        player.setSize(Math.ceil(viewport?.width || window.innerWidth), Math.ceil(viewport?.height || window.innerHeight));
+        return;
+      }
+
+      const bounds = shell?.getBoundingClientRect();
+      if (bounds?.width && bounds?.height) {
+        player.setSize(Math.ceil(bounds.width), Math.ceil(bounds.height));
+      }
+    };
+
+    const scheduleResize = () => window.setTimeout(resizeYouTubePlayer, 120);
+
+    scheduleResize();
+    document.addEventListener('fullscreenchange', scheduleResize);
+    document.addEventListener('webkitfullscreenchange', scheduleResize as EventListener);
+    window.addEventListener('resize', scheduleResize);
+    window.visualViewport?.addEventListener('resize', scheduleResize);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', scheduleResize);
+      document.removeEventListener('webkitfullscreenchange', scheduleResize as EventListener);
+      window.removeEventListener('resize', scheduleResize);
+      window.visualViewport?.removeEventListener('resize', scheduleResize);
+    };
+  }, [activeFile?.type, youtubeFrameId, youtubeShellId]);
+
   useEffect(() => {
     if (showWelcome || activeFile?.type !== 'youtube') return undefined;
 
@@ -1187,6 +1232,8 @@ const CoursePlayer: React.FC<{
       if (cancelled || !window.YT?.Player) return;
 
       youtubePlayerRef.current = new window.YT.Player(youtubeFrameId, {
+        width: '100%',
+        height: '100%',
         events: {
           onStateChange: (event: any) => {
             const playerState = event?.data;
@@ -1346,11 +1393,14 @@ const CoursePlayer: React.FC<{
           : '';
 
         return videoId ? (
-          <div className="course-youtube-player-shell relative h-full w-full overflow-hidden bg-black">
+          <div id={youtubeShellId} className="course-youtube-player-shell relative h-full w-full overflow-hidden bg-black">
             <iframe
               key={`${activeFile.id}-${videoId}`}
               id={youtubeFrameId}
               className="course-youtube-iframe absolute inset-0 h-full w-full border-0 bg-black"
+              width="100%"
+              height="100%"
+              style={{ width: '100%', height: '100%' }}
               src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&fs=1${originParam}`}
               title={activeFile.name || 'YouTube lesson'}
               frameBorder="0"

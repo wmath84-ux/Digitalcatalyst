@@ -150,11 +150,19 @@
 
       .course-youtube-iframe {
         display: block;
-        width: 100%;
-        height: 100%;
+        width: 100% !important;
+        height: 100% !important;
         max-width: none;
         max-height: none;
         background: #000;
+      }
+
+      .course-youtube-player-shell iframe,
+      .course-youtube-player-shell iframe[style] {
+        width: 100% !important;
+        height: 100% !important;
+        max-width: none !important;
+        max-height: none !important;
       }
 
       .course-youtube-iframe:fullscreen,
