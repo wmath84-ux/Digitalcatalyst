@@ -11,7 +11,6 @@ interface ProductShowcaseProps {
   onToggleWishlist: (id: number) => void;
   onAddToCart: (productId: number, quantity?: number) => void;
   onBuyNow: (product: ProductWithRating) => void;
-  onQuickView: (product: ProductWithRating) => void;
   coupons: Coupon[];
   purchasedProductIds?: number[];
   variant?: 'default' | 'mobileHome';
@@ -19,7 +18,7 @@ interface ProductShowcaseProps {
   hideInternalSearch?: boolean;
 }
 
-const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, onQuickView, coupons, purchasedProductIds = [], variant = 'default', externalSearchQuery = '', hideInternalSearch = false }) => {
+const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, coupons, purchasedProductIds = [], variant = 'default', externalSearchQuery = '', hideInternalSearch = false }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('default');
   const [activeFilter, setActiveFilter] = useState<string>('All');
@@ -172,7 +171,6 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
                 onToggleWishlist={onToggleWishlist}
                 onAddToCart={onAddToCart}
                 onBuyNow={onBuyNow}
-                onQuickView={onQuickView}
                 animationDelay={index}
                 coupons={coupons}
                 isPurchased={purchasedProductIds.includes(product.id)}

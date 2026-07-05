@@ -107,7 +107,6 @@ interface ProductDetailPageProps {
   onViewProduct: (product: ProductWithRating, sectionId?: string) => void;
   onBuyNow: (product: ProductWithRating) => void;
   wishlist: number[];
-  onQuickView: (product: ProductWithRating) => void;
   onGoHome: () => void;
   onStartEarning?: () => void;
   onInsufficientCoins?: (details: { requiredCoins: number; balance: number; missingCoins: number; productTitle?: string }) => void;
@@ -132,7 +131,7 @@ const ShareIcon = () => (
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ 
     settings, economySettings, activeCoinDiscount = null, onConsumeCoinDiscount, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews, 
     onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, onModalOpened, coupons,
-    scrollToSection, onSectionScrolled, allProducts, onViewProduct, onBuyNow, wishlist, onQuickView, onGoHome, onStartEarning, onInsufficientCoins,
+    scrollToSection, onSectionScrolled, allProducts, onViewProduct, onBuyNow, wishlist, onGoHome, onStartEarning, onInsufficientCoins,
     isPurchased = false, currentUser = null, productAccess = null, onPurchaseLatestUpdate, onCoinPurchase
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
@@ -716,7 +715,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 onToggleWishlist={onToggleWishlist}
                 onAddToCart={onAddToCart}
                 onBuyNow={onBuyNow}
-                onQuickView={onQuickView}
                 bgColor="bg-transparent"
                 coupons={coupons}
             />
