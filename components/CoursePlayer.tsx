@@ -228,7 +228,7 @@ const ModuleItem: React.FC<{
   if (moduleHidden) return null;
 
   return (
-    <div className={`${level > 0 ? "ml-4 border-l border-white/50 pl-3" : ""}`}>
+    <div className={`${level > 0 ? "ml-4 border-l border-[#E3E8F5] pl-3" : ""}`}>
       <button
         onClick={() => {
           if (moduleUnlocked) {
@@ -237,54 +237,81 @@ const ModuleItem: React.FC<{
           }
           onPurchaseLatestUpdate?.(moduleUpdateId);
         }}
-        className={`module-item-button flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left transition sm:py-4 ${
+        className={`module-item-button group flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition sm:py-4 ${
           moduleUnlocked
-            ? 'text-slate-900 hover:bg-[#f7f5ff]'
-            : 'border border-amber-200 bg-amber-50 text-amber-950 hover:bg-amber-100'
+            ? 'border border-transparent bg-white/65 text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.04)] hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]'
+            : 'border border-amber-200 bg-[#FFF7E0] text-amber-950 shadow-[0_8px_24px_rgba(245,184,46,0.10)] hover:bg-amber-100'
         }`}
         aria-expanded={isExpanded}
       >
-        <ModuleIcon className="h-5 w-5 shrink-0" />
-        <span className="min-w-0 flex-1 text-[15px] font-black leading-tight">{module.title}</span>
-        {!moduleUnlocked && (
-          <span className="shrink-0 rounded-full bg-amber-300 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-950 ring-1 ring-amber-400">
+        <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl ${
+          moduleUnlocked
+            ? 'bg-[#F1EEFF] text-[#5B4BFF] ring-1 ring-[#C9C2FF]/70'
+            : 'bg-amber-100 text-amber-700 ring-1 ring-amber-200'
+        }`}>
+          <ModuleIcon className="h-5 w-5" />
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[15px] font-black leading-tight">{module.title}</span>
+          <span className="mt-1 block text-xs font-bold text-[#667085]">
+            {visibleFiles.length} lessons • {visibleModules.length} sections
+          </span>
+        </span>
+        {!moduleUnlocked ? (
+          <span className="shrink-0 rounded-full bg-[#F5B82E] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-950 ring-1 ring-amber-300">
             🔒 Buy
+          </span>
+        ) : (
+          <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-black text-[#5B4BFF] shadow-sm">
+            {isExpanded ? '−' : '+'}
           </span>
         )}
       </button>
 
       {isExpanded && (
-        <div className="space-y-1 pb-2">
+        <div className="mt-2 space-y-1.5 pb-2">
           {visibleFiles.map((file) => {
             const fileUpdateId = resolveCoursePlayerUpdateId(productId, file);
             const filePurchaseUpdateId = productAccess?.lockedPaidUpdateIds.includes(fileUpdateId) ? fileUpdateId : moduleUpdateId;
             const fileUnlocked = moduleUnlocked && hasCoursePlayerItemAccess(productId, file, productAccess);
+            const isActive = activeFile?.id === file.id;
 
             return (
               <React.Fragment key={file.id}>
-              <button
-                type="button"
-                aria-disabled={!fileUnlocked}
-                onClick={() => fileUnlocked ? onSelectFile(file) : onPurchaseLatestUpdate?.(filePurchaseUpdateId)}
-                className={`module-item-button flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm transition sm:py-3 ${
-                  activeFile?.id === file.id
-                    ? "bg-white border border-[#ded8ff] font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)]"
-                    : fileUnlocked
-                      ? "font-medium text-slate-900/90 hover:bg-[#f7f5ff]"
-                      : "cursor-pointer border border-amber-200 bg-amber-50 font-black text-amber-950 hover:bg-amber-100"
-                }`}
-              >
-                <span className="min-w-0 flex-1 truncate">{file.name}</span>
-                {!fileUnlocked ? (
-                  <span className="shrink-0 rounded-full bg-amber-300 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-950 ring-1 ring-amber-400">
-                    🔒 Buy
+                <button
+                  type="button"
+                  aria-disabled={!fileUnlocked}
+                  onClick={() => fileUnlocked ? onSelectFile(file) : onPurchaseLatestUpdate?.(filePurchaseUpdateId)}
+                  className={`module-item-button flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left text-sm transition sm:py-3 ${
+                    isActive
+                      ? "border-[#C9C2FF] bg-white font-black text-[#5B4BFF] shadow-[0_14px_34px_rgba(91,75,255,0.16)]"
+                      : fileUnlocked
+                        ? "border-transparent bg-white/45 font-semibold text-[#344054] hover:border-[#E3E8F5] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]"
+                        : "cursor-pointer border-amber-200 bg-[#FFF7E0] font-black text-amber-950 hover:bg-amber-100"
+                  }`}
+                >
+                  <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
+                    !fileUnlocked
+                      ? 'bg-amber-100 text-amber-700'
+                      : isActive
+                        ? 'bg-[#F1EEFF] text-[#5B4BFF]'
+                        : 'bg-[#F8FBFF] text-[#6D5DFC]'
+                  }`}>
+                    {!fileUnlocked ? (
+                      <span className="text-sm">🔒</span>
+                    ) : file.type === 'quiz' ? (
+                      <QuizIcon className="h-5 w-5" />
+                    ) : (
+                      <FileIcon className="h-5 w-5" />
+                    )}
                   </span>
-                ) : file.type === 'quiz' ? (
-                  <QuizIcon className="h-5 w-5 shrink-0" />
-                ) : (
-                  <FileIcon className="h-5 w-5 shrink-0" />
-                )}
-              </button>
+                  <span className="min-w-0 flex-1 truncate">{file.name}</span>
+                  {!fileUnlocked && (
+                    <span className="shrink-0 rounded-full bg-[#F5B82E] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-950 ring-1 ring-amber-300">
+                      Buy
+                    </span>
+                  )}
+                </button>
               </React.Fragment>
             );
           })}
@@ -1126,6 +1153,51 @@ const CoursePlayer: React.FC<{
     return `youtube-player-${product.id}-${activeFile.id}`.replace(/[^a-zA-Z0-9_-]/g, '-');
   }, [activeFile?.id, activeFile?.type, product.id]);
 
+  const youtubeShellId = useMemo(() => {
+    if (activeFile?.type !== 'youtube') return '';
+    return `${youtubeFrameId}-shell`;
+  }, [activeFile?.type, youtubeFrameId]);
+
+  useEffect(() => {
+    if (activeFile?.type !== 'youtube' || !youtubeFrameId) return undefined;
+
+    const resizeYouTubePlayer = () => {
+      const player = youtubePlayerRef.current;
+      if (!player?.setSize) return;
+
+      const fullscreenElement = document.fullscreenElement || (document as any).webkitFullscreenElement;
+      const frame = document.getElementById(youtubeFrameId);
+      const shell = youtubeShellId ? document.getElementById(youtubeShellId) : frame?.parentElement;
+      const isYoutubeFullscreen = !!fullscreenElement && (fullscreenElement === frame || fullscreenElement === shell || shell?.contains(fullscreenElement));
+
+      if (isYoutubeFullscreen) {
+        const viewport = window.visualViewport;
+        player.setSize(Math.ceil(viewport?.width || window.innerWidth), Math.ceil(viewport?.height || window.innerHeight));
+        return;
+      }
+
+      const bounds = shell?.getBoundingClientRect();
+      if (bounds?.width && bounds?.height) {
+        player.setSize(Math.ceil(bounds.width), Math.ceil(bounds.height));
+      }
+    };
+
+    const scheduleResize = () => window.setTimeout(resizeYouTubePlayer, 120);
+
+    scheduleResize();
+    document.addEventListener('fullscreenchange', scheduleResize);
+    document.addEventListener('webkitfullscreenchange', scheduleResize as EventListener);
+    window.addEventListener('resize', scheduleResize);
+    window.visualViewport?.addEventListener('resize', scheduleResize);
+
+    return () => {
+      document.removeEventListener('fullscreenchange', scheduleResize);
+      document.removeEventListener('webkitfullscreenchange', scheduleResize as EventListener);
+      window.removeEventListener('resize', scheduleResize);
+      window.visualViewport?.removeEventListener('resize', scheduleResize);
+    };
+  }, [activeFile?.type, youtubeFrameId, youtubeShellId]);
+
   useEffect(() => {
     if (showWelcome || activeFile?.type !== 'youtube') return undefined;
 
@@ -1160,6 +1232,8 @@ const CoursePlayer: React.FC<{
       if (cancelled || !window.YT?.Player) return;
 
       youtubePlayerRef.current = new window.YT.Player(youtubeFrameId, {
+        width: '100%',
+        height: '100%',
         events: {
           onStateChange: (event: any) => {
             const playerState = event?.data;
@@ -1319,18 +1393,24 @@ const CoursePlayer: React.FC<{
           : '';
 
         return videoId ? (
-          <iframe
-            key={`${activeFile.id}-${videoId}`}
-            id={youtubeFrameId}
-            className="h-full w-full bg-black"
-            src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1${originParam}`}
-            title={activeFile.name || 'YouTube lesson'}
-            frameBorder="0"
-            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-            allowFullScreen
-            onLoad={() => setMediaHasError(false)}
-            onError={() => setMediaHasError(true)}
-          />
+          <div id={youtubeShellId} className="course-youtube-player-shell relative h-full w-full overflow-hidden bg-black">
+            <iframe
+              key={`${activeFile.id}-${videoId}`}
+              id={youtubeFrameId}
+              className="course-youtube-iframe absolute inset-0 h-full w-full border-0 bg-black"
+              width="100%"
+              height="100%"
+              style={{ width: '100%', height: '100%' }}
+              src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1&playsinline=1&enablejsapi=1&fs=1${originParam}`}
+              title={activeFile.name || 'YouTube lesson'}
+              frameBorder="0"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share; fullscreen"
+              allowFullScreen
+              referrerPolicy="strict-origin-when-cross-origin"
+              onLoad={() => setMediaHasError(false)}
+              onError={() => setMediaHasError(true)}
+            />
+          </div>
         ) : <VideoUnavailablePlaceholder />;
       }
       case 'video': return <video key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onError={() => setMediaHasError(true)} />;
@@ -1402,23 +1482,56 @@ const CoursePlayer: React.FC<{
       <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition ${useDesktopSidebar ? 'lg:hidden' : ''} ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
       <main className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${compactPlayerChrome ? 'gap-1 p-1.5' : 'gap-2 p-2 sm:gap-3 sm:p-3 lg:p-3'}`} style={{ paddingLeft: 'max(0.375rem, env(safe-area-inset-left))', paddingRight: 'max(0.375rem, env(safe-area-inset-right))', paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}>
-        <div className={`${forceOverlaySidebar ? 'hidden' : 'hidden lg:grid'} shrink-0 grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-3 rounded-xl border px-4 py-3 text-[22px] font-black leading-none shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl ${'border-[#ded8ff] bg-white/85'}`}>
-          <div className="flex min-w-0 items-center gap-3">
-            <button onClick={handlePlayerBack} className="shrink-0 rounded-2xl border border-[#ded8ff] bg-white px-5 py-3 text-base font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]" aria-label="Back to course details">← Back</button>
-            <span className="truncate">{activeFile?.name || product.title}</span>
+        <div className={`${forceOverlaySidebar ? 'hidden' : 'hidden lg:grid'} shrink-0 grid-cols-[minmax(18rem,1fr)_auto_minmax(18rem,1fr)] items-center gap-4 rounded-[1.75rem] border border-[#E3E8F5] bg-white/90 px-5 py-4 text-[#071735] shadow-[0_18px_45px_rgba(8,26,69,0.08)] backdrop-blur-2xl`}>
+          <div className="flex min-w-0 items-center gap-4">
+            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-[#5B4BFF] to-[#7B61FF] text-white shadow-[0_14px_34px_rgba(91,75,255,0.22)]">
+              <ModuleIcon className="h-7 w-7" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#5B4BFF]">Welcome to the Course</p>
+              <h1 className="mt-1 truncate text-2xl font-black leading-tight text-[#071735]">{product.title}</h1>
+              <p className="mt-1 truncate text-sm font-bold text-[#667085]">
+                {activeFile?.name ? `Now learning: ${activeFile.name}` : 'Continue your learning journey'}
+              </p>
+            </div>
           </div>
+
           <div className="flex items-center justify-center gap-3">
-            <button onClick={() => setIsDesktopSidebarCollapsed(value => !value)} className="rounded-2xl border border-[#ded8ff] bg-white px-5 py-3 text-base font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5">{isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize modules'}</button><button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-[#ded8ff] bg-white/85 px-6 py-3 text-base font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.12)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]">🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}</button>
+            <button onClick={() => setIsDesktopSidebarCollapsed(value => !value)} className="rounded-2xl border border-[#D9E7F8] bg-white px-5 py-3 text-base font-black text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.06)] transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]">
+              {isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize modules'}
+            </button>
+            <button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-[#C9C2FF] bg-[#F1EEFF] px-6 py-3 text-base font-black text-[#5B4BFF] shadow-[0_14px_34px_rgba(91,75,255,0.14)] transition hover:-translate-y-0.5 hover:bg-white">
+              🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}
+            </button>
           </div>
-          <span className="truncate text-right text-sm font-bold text-[#50527a]/70">Welcome to the Course</span>
+
+          <div className="flex min-w-0 items-center justify-end gap-3">
+            <div className="min-w-0 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-3 text-right shadow-[0_8px_24px_rgba(8,26,69,0.04)]">
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#7C879A]">Learning Mode</p>
+              <p className="mt-1 truncate text-sm font-black text-[#22A06B]">In Progress</p>
+            </div>
+            <button onClick={handlePlayerBack} className="shrink-0 rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-black text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.06)] transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF]" aria-label="Back to course details">
+              ← Course details
+            </button>
+          </div>
         </div>
 
         <section className={`${useDesktopSidebar ? 'lg:grid-cols-[var(--course-sidebar-width)_minmax(0,1fr)]' : 'grid-cols-1'} grid min-h-0 min-w-0 flex-1 overflow-hidden gap-2 sm:gap-3`} style={{ ['--course-sidebar-width' as any]: 'clamp(18rem, 28vw, 28rem)' }}>
           <aside className={`${useDesktopSidebar ? 'lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl' : ''} fixed inset-y-0 left-0 z-40 w-[min(88svw,20rem)] max-w-full transform transition sm:w-80 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col border-r border-[#ded8ff] bg-white/85 shadow-sm backdrop-blur-xl lg:rounded-2xl lg:border lg:border-[#ded8ff] lg:bg-white/85 lg:shadow-sm">
-              <div className="shrink-0 border-b border-[#ded8ff] bg-white/85 px-4 py-4 shadow-sm lg:border-[#ded8ff] lg:py-5">
-                <button onClick={handlePlayerBack} className="mb-3 flex items-center gap-2 text-lg font-medium text-slate-900 hover:opacity-70 sm:mb-4 sm:text-[22px]">← <span>Back</span></button>
-                <h2 className="text-xl font-black leading-tight text-slate-900 sm:text-[25px]">{product.title}</h2>
+              <div className="shrink-0 border-b border-[#E3E8F5] bg-white/90 px-4 py-4 shadow-sm lg:border-[#E3E8F5] lg:py-5">
+                <div className="rounded-[1.5rem] border border-[#D9E7F8] bg-gradient-to-br from-white via-[#F8FBFF] to-[#F1EEFF] p-4 shadow-[0_8px_24px_rgba(8,26,69,0.06)]">
+                  <div className="mb-3 flex items-center gap-3">
+                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5B4BFF] to-[#7B61FF] text-white shadow-[0_14px_34px_rgba(91,75,255,0.20)]">
+                      <ModuleIcon className="h-6 w-6" />
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#5B4BFF]">Course Panel</p>
+                      <p className="truncate text-sm font-bold text-[#667085]">Modules, lessons, docs & quizzes</p>
+                    </div>
+                  </div>
+                  <h2 className="line-clamp-2 text-xl font-black leading-tight text-[#071735] sm:text-[25px]">{product.title}</h2>
+                </div>
               </div>
               <nav className="flex-1 overflow-y-auto p-2 sm:p-3">
                 {(product.courseContent || []).length > 0 ? (product.courseContent || []).map(m => (
@@ -1438,7 +1551,13 @@ const CoursePlayer: React.FC<{
             </div>
           </aside>
 
-          <div className={`relative min-h-0 min-w-0 overflow-hidden backdrop-blur-2xl ${isAudioExperience ? 'rounded-none border-0 bg-transparent shadow-none' : 'rounded-2xl border border-[#ded8ff] bg-white/72 shadow-[0_20px_60px_rgba(0,0,0,0.05)] sm:rounded-3xl'}`}>
+          <div className={`course-player-content-frame relative min-h-0 min-w-0 overflow-hidden backdrop-blur-2xl ${
+            isAudioExperience
+              ? 'rounded-none border-0 bg-transparent shadow-none'
+              : activeFile?.type === 'youtube'
+                ? 'course-youtube-frame rounded-2xl border border-[#111827]/10 bg-black shadow-[0_20px_60px_rgba(8,26,69,0.10)] sm:rounded-3xl'
+                : 'rounded-2xl border border-[#E3E8F5] bg-white/76 shadow-[0_20px_60px_rgba(8,26,69,0.06)] sm:rounded-3xl'
+          }`}>
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
           {educoinNotice && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-900">{educoinNotice}</div>}
