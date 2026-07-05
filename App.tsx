@@ -3093,22 +3093,38 @@ const App: React.FC = () => {
     window.setTimeout(() => setCoinToast(null), 3000);
   };
 
+  const showRewardSyncError = () => {
+    setInfoModal({
+      title: 'Please refresh/login again',
+      message: 'Please refresh/login again before claiming rewards',
+      icon: '⚠️',
+    });
+  };
+
   const creditEduCoins = (amount: number, message?: string, metadata?: Partial<Omit<CoinTransaction, 'amount' | 'type' | 'createdAt'>>) => {
     if (!currentUser || amount <= 0) return false;
-    syncCurrentUser(
+    const synced = syncCurrentUser(
       user => ({ ...user, eduCoins: (user.eduCoins || 0) + amount, totalLifetimeCoins: (user.totalLifetimeCoins || 0) + amount }),
       { amount, type: 'credit', source: metadata?.source || 'EduCoin reward', description: metadata?.description || message || `+${amount} EduCoins earned`, articleId: metadata?.articleId, productId: metadata?.productId },
     );
+    if (synced === null) {
+      showRewardSyncError();
+      return false;
+    }
     showCoinToast(message || `✦ +${amount} EduCoins Earned`);
     return true;
   };
 
   const deductEduCoins = (amount: number, metadata?: Partial<Omit<CoinTransaction, 'amount' | 'type' | 'createdAt'>>) => {
     if (!currentUser || amount <= 0 || (currentUser.eduCoins || 0) < amount) return false;
-    syncCurrentUser(
+    const synced = syncCurrentUser(
       user => ({ ...user, eduCoins: (user.eduCoins || 0) - amount }),
       { amount: -amount, type: 'debit', source: metadata?.source || 'EduCoin redemption', description: metadata?.description || `${amount} EduCoins redeemed`, productId: metadata?.productId, articleId: metadata?.articleId },
     );
+    if (synced === null) {
+      showRewardSyncError();
+      return false;
+    }
     return true;
   };
 
@@ -3210,7 +3226,7 @@ const App: React.FC = () => {
     const articleId = article.id;
     const alreadyRead = [...(currentUser.rewardedArticleIds || []), ...(currentUser.readArticles || [])].includes(articleId);
     if (alreadyRead) return false;
-    syncCurrentUser(
+    const synced = syncCurrentUser(
       user => ({
         ...user,
         eduCoins: (user.eduCoins || 0) + rewardCoins,
@@ -3220,6 +3236,10 @@ const App: React.FC = () => {
       }),
       { amount: rewardCoins, type: 'credit', source: 'Article reading reward', description: `Read: ${article.title}`, articleId },
     );
+    if (synced === null) {
+      showRewardSyncError();
+      return false;
+    }
     showCoinToast(`✦ +${rewardCoins} EduCoins Earned`);
     return true;
   };
@@ -3227,7 +3247,7 @@ const App: React.FC = () => {
   const handleQuizReward = (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => {
     if (!currentUser || coins <= 0) return false;
     if ((currentUser.rewardedQuizIds || []).includes(quizId)) return false;
-    syncCurrentUser(
+    const synced = syncCurrentUser(
       user => ({
         ...user,
         eduCoins: (user.eduCoins || 0) + coins,
@@ -3236,6 +3256,10 @@ const App: React.FC = () => {
       }),
       { amount: coins, type: 'credit', source: `Quiz: ${quizTitle}`, description: `${correctAnswers} correct answer${correctAnswers === 1 ? '' : 's'} in ${quizTitle}` },
     );
+    if (synced === null) {
+      showRewardSyncError();
+      return false;
+    }
     showCoinToast(`✦ +${coins} EduCoins Quiz Reward`);
     return true;
   };
@@ -3244,7 +3268,7 @@ const App: React.FC = () => {
     if (!currentUser) return false;
     if ((reward.currentValue ?? currentUser.totalLifetimeCoins ?? 0) < reward.requirement || (currentUser.claimedRewardIds || []).includes(reward.id)) return false;
     const coinReward = Math.max(0, Number(reward.coinReward || 0));
-    syncCurrentUser(
+    const synced = syncCurrentUser(
       user => ({
         ...user,
         claimedRewardIds: [...new Set([...(user.claimedRewardIds || []), reward.id])],
@@ -3253,6 +3277,10 @@ const App: React.FC = () => {
       }),
       { amount: coinReward, type: 'credit', source: 'Milestone unlocked', description: `Unlocked: ${reward.title}${coinReward ? ` (+${coinReward} EduCoins)` : ''}` },
     );
+    if (synced === null) {
+      showRewardSyncError();
+      return false;
+    }
     if (reward.unlockProductIds?.length) {
       const nextPurchasedIds = mergePurchasedProductIds(purchasedProductIds, reward.unlockProductIds);
       setPurchasedProductIds(nextPurchasedIds);
