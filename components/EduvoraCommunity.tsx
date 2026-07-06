@@ -6,6 +6,7 @@ import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { db, storage } from '../firebase';
 import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storage';
 import type { WebsiteSettings } from '../App';
+import CommunityAiMentor from './CommunityAiMentor';
 
 interface EduvoraCommunityProps {
   onClose?: () => void;
@@ -641,6 +642,7 @@ const dataUrlBytes = (value = '') => {
 };
 
 const storagePercent = (bytes: number) => Math.min(100, Math.round((bytes / STORAGE_LOCK_BYTES) * 100));
+const safeText = (value: string, maxLength = 240) => value.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, maxLength);
 
 const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenticated = false, settings }) => {
   const navigate = useNavigate();
@@ -754,7 +756,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [firebaseNotifications, setFirebaseNotifications] = useState<CommunityNotification[]>([]);
   const [notificationFilter, setNotificationFilter] = useState<NotificationFilter>('all');
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
-  const [isCommunityAiNoticeOpen, setIsCommunityAiNoticeOpen] = useState(false);
+  const [isCommunityAiOpen, setIsCommunityAiOpen] = useState(false);
   const [storageUsedBytes, setStorageUsedBytes] = useState(0);
   const [limitMessage, setLimitMessage] = useState('');
   const [adminPosts, setAdminPosts] = useState<FeedMessage[]>([]);
@@ -3392,12 +3394,37 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const activeNavItem = navItems.find((item) => item.active) || navItems[0];
   const showCreateCta = page === 'creators' || (page === 'chat' && activeView === 'status') || page === 'statusUpload';
-  const openCommunityAiMentor = () => setIsCommunityAiNoticeOpen(true);
+  const communityAiButtonRef = useRef<HTMLButtonElement>(null);
+  const openCommunityAiMentor = () => setIsCommunityAiOpen(true);
   const handleHeaderCreate = () => {
     if (page === 'creators') return undefined;
     if (activeView === 'status' || page === 'statusUpload') return openStatusUploadFromTop();
     return pushPage('creators');
   };
+
+  const communityAiContext = useMemo(() => {
+    const activeLabel = activeNavItem.label;
+    const visibleSnippet = page === 'thread'
+      ? `${selectedMessage.title}: ${selectedMessage.body}`
+      : page === 'masterTagDetail'
+        ? `${selectedMasterTag?.targetMasterName || selectedMasterTag?.title || 'Master Tag'}: ${selectedMasterTag?.detail || ''}`
+        : page === 'directChatThread'
+          ? `Direct chat with ${(allCreators.find((creator) => creator.id === activeConversationId)?.name || 'selected member')}`
+          : page === 'chat' && activeView === 'feed'
+            ? `${selectedMessage.title}: ${selectedMessage.body}`
+            : page === 'chat' && activeView === 'status'
+              ? selectedStatus.caption
+              : '';
+
+    return {
+      tab: activeLabel,
+      page,
+      title: activeLabel === 'Feed' ? 'Community Feed' : activeLabel,
+      helperText: `${activeLabel === 'Feed' ? 'Feed' : activeLabel} support for safe writing, summaries, and learning ideas.`,
+      visibleSnippet: visibleSnippet ? safeText(visibleSnippet, 260) : '',
+      userDisplayName: profile.name || 'Eduvora Member',
+    };
+  }, [activeConversationId, activeNavItem.label, activeView, allCreators, page, profile.name, selectedMasterTag, selectedMessage.body, selectedMessage.title, selectedStatus.caption]);
 
   const CommunityHeader = () => (
     <header className="sticky top-0 z-[1200] shrink-0 border-b border-[#D9E7F8] bg-white/90 px-3 py-2.5 backdrop-blur-2xl sm:px-5 lg:px-6 lg:py-3">
@@ -3413,6 +3440,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <div className="hidden min-w-0 items-center justify-center gap-2 lg:flex">
           <button
             type="button"
+            ref={communityAiButtonRef}
             onClick={openCommunityAiMentor}
             aria-label="Open Community AI Mentor"
             className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-[1.35rem] border border-[#BFD7FF]/80 bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 py-2.5 text-xs font-black text-white shadow-[0_16px_38px_rgba(123,97,255,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(123,97,255,0.30)] focus:outline-none focus:ring-4 focus:ring-[#7B61FF]/20 active:scale-95"
@@ -3706,7 +3734,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       `}</style>
       {notificationDropdownPortal}
       {imageLightbox ? <div className="fixed inset-0 z-[1800] flex items-center justify-center bg-[#081B5C]/80 p-4 backdrop-blur-xl"><button type="button" onClick={() => setImageLightbox(null)} className="absolute right-4 top-4 rounded-full bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Close</button><div className="flex max-h-[90dvh] max-w-[94vw] items-center justify-center overflow-hidden rounded-[2rem] bg-white p-3 shadow-2xl">{renderUploadedImage(imageLightbox.src, imageLightbox.alt, 'original')}</div></div> : null}
-      {isCommunityAiNoticeOpen ? <div className="fixed right-4 top-[calc(env(safe-area-inset-top)+5rem)] z-[1700] max-w-sm rounded-[1.5rem] border border-[#D9E7F8] bg-white/95 p-4 text-[#081A45] shadow-[0_24px_70px_rgba(23,105,255,0.18)] backdrop-blur-2xl" role="status"><div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-white" aria-hidden="true">✦</span><div className="min-w-0 flex-1"><p className="text-sm font-black">Community AI Mentor</p><p className="mt-1 text-xs font-bold leading-5 text-[#536178]">Community AI Mentor is being prepared.</p></div><button type="button" onClick={() => setIsCommunityAiNoticeOpen(false)} aria-label="Close Community AI Mentor notice" className="rounded-full bg-[#EEF6FF] px-2 py-1 text-xs font-black text-[#1769FF]">×</button></div></div> : null}
+      <CommunityAiMentor
+        isOpen={isCommunityAiOpen}
+        userId={guardedAuth.currentUser?.uid || ''}
+        context={communityAiContext}
+        onClose={() => setIsCommunityAiOpen(false)}
+        returnFocusRef={communityAiButtonRef}
+      />
       {page === 'statusReel' ? renderStatusReel() : null}
       <ShareComposerModal />
       <div className="mx-auto flex h-full min-w-0 max-w-[1720px] overflow-hidden border border-[var(--community-border)] bg-[var(--community-surface)]/55 shadow-[var(--community-shadow)] backdrop-blur-2xl sm:rounded-[2rem] lg:rounded-[2.5rem]">
