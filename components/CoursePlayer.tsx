@@ -1540,16 +1540,27 @@ const CoursePlayer: React.FC<{
     return () => window.removeEventListener('keydown', handleEscape);
   }, [isSidebarOpen, useDesktopSidebar]);
 
-  const YoutubeRewardMeter = () => {
+  const YoutubeRewardChip = ({ compact = false }: { compact?: boolean }) => {
     if (activeFile?.type !== 'youtube') return null;
 
+    const mobileProgressLabel = `${completedYoutubeCoins}/${EDUCOIN_SECONDS_PER_COIN}s`;
+
     return (
-      <div className="mx-2 mt-2 rounded-2xl border border-[#ded8ff] bg-white/85 px-4 py-3 text-sm font-bold text-slate-800 shadow-sm">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <span>Valid YouTube watch: {youtubeWatchSeconds}s</span>
-          <span>Earned blocks: {completedYoutubeCoins} / every {EDUCOIN_SECONDS_PER_COIN}s</span>
-        </div>
-        {youtubeRewardNotice && <p className="mt-2 text-emerald-700">{youtubeRewardNotice}</p>}
+      <div
+        className={`${compact ? 'max-w-[42vw] px-2.5 py-1.5 text-[11px] sm:max-w-[16rem] sm:px-3 sm:text-xs' : 'max-w-full px-4 py-3 text-sm'} inline-flex min-w-0 shrink items-center gap-2 rounded-full border border-[#D8D2FF] bg-white/88 font-black text-[#4F46E5] shadow-[0_12px_30px_rgba(91,75,255,0.12)] backdrop-blur-xl`}
+        aria-label="Valid YouTube watch time and EduCoin earning progress"
+        aria-live="polite"
+      >
+        <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-[#F1EEFF] text-[11px] text-[#5B4BFF] shadow-inner" aria-hidden="true">▶</span>
+        {youtubeRewardNotice ? (
+          <span className="min-w-0 truncate text-emerald-700">+{completedYoutubeCoins || 1} EduCoin credited</span>
+        ) : (
+          <>
+            <span className="min-w-0 truncate sm:hidden">{youtubeWatchSeconds}s · 🪙 {mobileProgressLabel}</span>
+            <span className="hidden min-w-0 truncate sm:inline lg:hidden">YT {youtubeWatchSeconds}s · {mobileProgressLabel}</span>
+            <span className="hidden min-w-0 truncate lg:inline">Valid YouTube watch: {youtubeWatchSeconds}s · Earned blocks: {completedYoutubeCoins} / every {EDUCOIN_SECONDS_PER_COIN}s</span>
+          </>
+        )}
       </div>
     );
   };
@@ -1638,6 +1649,7 @@ const CoursePlayer: React.FC<{
             <p className="truncate text-[10px] font-black uppercase tracking-[0.22em] text-[#6b5cff]/80 sm:text-[11px]">Now learning</p>
             <h1 className="truncate text-sm font-black leading-tight text-[#071735] sm:text-lg" title={activeFile?.name || product.title}>{activeFile?.name || product.title}</h1>
           </div>
+          <YoutubeRewardChip compact />
           <button onClick={() => setIsMentorOpen(value => !value)} className={`${viewport.isTinyPlayer ? 'h-10 px-2 text-xs' : 'h-11 px-3 text-xs sm:text-sm'} shrink-0 rounded-2xl border border-[#ded8ff] bg-white/85 font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff] focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50`}>🧠 AI</button>
           {productAccess?.hasPaidLockedUpdates && onPurchaseLatestUpdate && !viewport.isTinyPlayer && (
             <button onClick={() => onPurchaseLatestUpdate(product)} className="hidden h-11 shrink-0 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-black text-emerald-700 shadow-[0_10px_30px_rgba(16,185,129,0.10)] transition hover:-translate-y-0.5 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 sm:inline-flex sm:items-center">
@@ -1675,8 +1687,9 @@ const CoursePlayer: React.FC<{
             </div>
           </div>
 
-          <div className="flex items-center justify-center gap-3">
-            <button onClick={() => setIsDesktopSidebarCollapsed(value => !value)} className="rounded-2xl border border-[#D9E7F8] bg-white px-5 py-3 text-base font-black text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.06)] transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]">
+          <div className="flex min-w-0 items-center justify-center gap-3">
+            <YoutubeRewardChip />
+            <button onClick={() => setIsDesktopSidebarCollapsed(value => !value)} className="shrink-0 rounded-2xl border border-[#D9E7F8] bg-white px-5 py-3 text-base font-black text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.06)] transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]">
               {isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize modules'}
             </button>
             <button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-[#C9C2FF] bg-[#F1EEFF] px-6 py-3 text-base font-black text-[#5B4BFF] shadow-[0_14px_34px_rgba(91,75,255,0.14)] transition hover:-translate-y-0.5 hover:bg-white">
@@ -1743,7 +1756,6 @@ const CoursePlayer: React.FC<{
             {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
           </div>
           {educoinNotice && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-900">{educoinNotice}</div>}
-          <YoutubeRewardMeter />
         </section>
       </main>
 
