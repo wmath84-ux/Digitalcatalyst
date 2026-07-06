@@ -34,18 +34,14 @@ interface LearningProgress {
   totalLessons: number;
 }
 
-interface QuizScore {
-  title: string;
-  score: number;
-  accent: string;
-}
-
 interface Badge {
   id: string;
   label: string;
   icon: string;
   unlocked: boolean;
   description: string;
+  currentValue: number;
+  goal: number;
 }
 
 interface MilestoneReward extends ProfileMilestoneConfig {
@@ -53,14 +49,6 @@ interface MilestoneReward extends ProfileMilestoneConfig {
   progress: number;
   reached: boolean;
 }
-
-interface DailyActivityState {
-  lastActiveDate: string;
-  streakDays: number;
-}
-
-const defaultCoverImage =
-  'https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1800&q=80';
 
 const glassCard =
   'profile-glass-card border border-[#D2E3FC] backdrop-blur-2xl shadow-[0_18px_55px_rgba(26,115,232,0.12)] transition-all duration-300 hover:-translate-y-1 hover:border-[#C2E7FF] hover:shadow-[0_22px_65px_rgba(26,115,232,0.16)]';
@@ -94,8 +82,6 @@ const fallbackMilestoneConfigs: ProfileMilestoneConfig[] = [
   { id: 'premium-unlocker', title: 'Premium Unlocker', icon: '🎓', metric: 'coursesOwned', requirement: 2, description: 'Own two premium learning products.', actionLabel: 'Unlock Bonus Access', coinReward: 80, unlockProductIds: [], active: true },
 ];
 
-const getStorageKey = (userId?: number) => `studentAchievementHubCover-${userId ?? 'guest'}`;
-
 const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
 
 const formatLedgerTime = (value: string) => {
@@ -128,13 +114,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   onClaimMilestoneReward,
   onOpenVerifiedCourse,
 }) => {
-  const coverInputRef = React.useRef<HTMLInputElement | null>(null);
-  const [coverImage, setCoverImage] = React.useState(defaultCoverImage);
   const [redeeming, setRedeeming] = React.useState<string | null>(null);
   const [redeemedCouponCode, setRedeemedCouponCode] = React.useState<string | null>(null);
   const [coinTransactions, setCoinTransactions] = React.useState<CoinTransaction[]>([]);
   const [locallyRedeemedRewardIds, setLocallyRedeemedRewardIds] = React.useState<string[]>([]);
-  const [dailyActivity, setDailyActivity] = React.useState<DailyActivityState>({ lastActiveDate: '', streakDays: 0 });
   const [courseAccessError, setCourseAccessError] = React.useState('');
   const [profileCoinWallet, setProfileCoinWallet] = React.useState({
     coinBalance: 0,
@@ -171,11 +154,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   }, [profileUid]);
 
   React.useEffect(() => {
-    const storedCover = localStorage.getItem(getStorageKey(currentUser?.id));
-    setCoverImage(storedCover || defaultCoverImage);
-  }, [currentUser?.id]);
-
-  React.useEffect(() => {
     if (!profileUid) {
       setCoinTransactions([]);
       return;
@@ -204,24 +182,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   }, [profileUid, currentUser?.coinTransactions]);
 
 
-  React.useEffect(() => {
-    if (!profileUid) {
-      setDailyActivity({ lastActiveDate: '', streakDays: 0 });
-      return;
-    }
-    const today = new Date().toISOString().slice(0, 10);
-    const yesterday = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-    const key = `profileDailyActivity-${profileUid}`;
-    const stored = JSON.parse(localStorage.getItem(key) || 'null') as DailyActivityState | null;
-    const next = !stored
-      ? { lastActiveDate: today, streakDays: 1 }
-      : stored.lastActiveDate === today
-        ? stored
-        : { lastActiveDate: today, streakDays: stored.lastActiveDate === yesterday ? stored.streakDays + 1 : 1 };
-    setDailyActivity(next);
-    localStorage.setItem(key, JSON.stringify(next));
-  }, [profileUid]);
-
   const profileCoupons = React.useMemo(() => coupons, [coupons]);
   const coinRedeemRate = Math.max(1, Number(economySettings.coinToFiatRatio));
   const studyMinutes = currentUser?.studyMinutes ?? 0;
@@ -229,7 +189,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const eduPoints = profileCoinWallet.coinBalance;
   const totalLifetimeCoins = profileCoinWallet.totalCoinsEarned || eduPoints;
   const profileStyle = { ...fallbackProfileStyle, ...((settings.content as any).profileStyle || {}) };
-  const profileStreakConfigs = (((settings.content as any).profileStreaks || fallbackStreakConfigs) as ProfileStreakConfig[]).filter(streak => streak.active !== false).slice(0, 12);
+  const profileStreakConfigs = (((settings.content as any).profileStreaks || fallbackStreakConfigs) as ProfileStreakConfig[]).filter(streak => streak.active !== false).slice(0, 4);
   const profileMilestoneConfigs = (((settings.content as any).profileMilestones || fallbackMilestoneConfigs) as ProfileMilestoneConfig[]).filter(milestone => milestone.active !== false).slice(0, 12);
   const purchasedProductIdSet = React.useMemo(() => new Set(purchasedProducts.map(product => String(product.id))), [purchasedProducts]);
   const readArticleCount = new Set([...(currentUser?.rewardedArticleIds || []), ...(currentUser?.readArticles || [])]).size;
@@ -276,6 +236,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
   const getCourseFileCount = (modules: any[] = []): number => modules.reduce((total, module) => total + (module.files || []).length + getCourseFileCount(module.modules || []), 0);
   const getStoredCompletion = (productId: number | string) => {
+    const progressRecord = (currentUser as any)?.courseProgress?.[String(productId)] || (currentUser as any)?.courseProgress?.[productId];
+    const backendCompletion = Number(progressRecord?.completionPercentage ?? progressRecord?.completion ?? 0);
+    if (Number.isFinite(backendCompletion) && backendCompletion > 0) return clamp(backendCompletion);
+
+    // Read-only legacy fallback: old browser progress can display continuity, but it never awards coins.
     if (!currentUser?.id) return 0;
     const stored = Number(localStorage.getItem(`courseProgress-${currentUser.id}-${productId}`) || localStorage.getItem(`courseCompletion-${currentUser.id}-${productId}`) || 0);
     return Number.isFinite(stored) ? clamp(stored) : 0;
@@ -283,11 +248,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
   const learningProgress: LearningProgress[] = purchasedProducts.length
     ? purchasedProducts.slice(0, 5).map((product, index) => {
-        const explicitCompletion = getStoredCompletion(product.id);
-        const requiredMinutes = Math.max(30, getCourseFileCount(product.courseContent || []) * 15 || 60);
-        const allocatedWatchMinutes = Math.max(0, watchTimeMinutes - index * requiredMinutes);
-        const watchCompletion = clamp((allocatedWatchMinutes / requiredMinutes) * 100);
-        const completion = explicitCompletion > 0 ? explicitCompletion : watchCompletion;
+        const completion = getStoredCompletion(product.id);
         return {
           id: product.id,
           title: product.title,
@@ -321,9 +282,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const pointsForNextLevel = 500;
   const nextLevelProgress = clamp((pointsIntoLevel / pointsForNextLevel) * 100);
   const pointsRemaining = Math.max(0, pointsForNextLevel - pointsIntoLevel);
-  const streakDays = dailyActivity.streakDays || (currentUser?.lastLoginAt ? 1 : 0);
-  const continuousLearningDays = Math.max(streakDays, Math.min(90, Math.floor(watchTimeMinutes / 35) + completedCourses));
-  const badgesUnlockedCount = [quizWinCount >= 1, Boolean(currentUser?.createdAt), completedCourses >= 1, streakDays >= 5, purchasedProducts.length >= 3, level >= 5].filter(Boolean).length;
+  const lastActiveDate = String((currentUser as any)?.lastActiveDate || currentUser?.lastLoginAt || '').slice(0, 10);
+  const streakDays = Math.max(0, Number((currentUser as any)?.currentStreakDays || 0));
+  const badgesUnlockedCount = [quizWinCount >= 1, completedCourses >= 1, streakDays >= 5, purchasedProducts.length >= 3, totalLifetimeCoins >= 500, watchTimeMinutes >= 60].filter(Boolean).length;
 
   const getMetricValue = (metric: ProfileStreakMetric | ProfileMilestoneMetric) => {
     switch (metric) {
@@ -344,15 +305,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     }
   };
 
-  const quizScores: QuizScore[] = (currentUser?.rewardedQuizIds || []).slice(0, 6).map((quizId, index) => ({
-    title: String(quizId).replace(/[-_]/g, ' ').replace(/\b\w/g, char => char.toUpperCase()),
-    score: 100,
-    accent: ['from-[#1A73E8] to-[#174EA6]', 'from-[#D3E3FD] to-[#1A73E8]', 'from-[#FEF7E0] to-[#1A73E8]', 'from-[#E6F4EA] to-[#1A73E8]'][index % 4],
-  }));
-
   const streakCards = profileStreakConfigs.map(streak => {
     const value = getMetricValue(streak.metric);
-    const claimKey = `${streak.id}:${dailyActivity.lastActiveDate || new Date().toISOString().slice(0, 10)}`;
+    const claimKey = `${streak.id}:${lastActiveDate || 'server-active-date'}`;
     const claimedToday = currentUser?.profileStreakClaims?.[streak.id] === claimKey;
     return {
       ...streak,
@@ -360,7 +315,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
       progress: clamp((value / Math.max(1, Number(streak.goal))) * 100),
       claimKey,
       claimedToday,
-      claimable: value >= Number(streak.goal) && !claimedToday && Number(streak.coinReward || 0) > 0,
+      claimable: Boolean(lastActiveDate) && value >= Number(streak.goal) && !claimedToday && Number(streak.coinReward || 0) > 0,
     };
   });
 
@@ -376,48 +331,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
 
   const badges: Badge[] = [
-    {
-      id: 'quiz-master',
-      label: 'Quiz Master',
-      icon: '🎯',
-      unlocked: quizWinCount >= 1,
-      description: 'Claim one quiz reward',
-    },
-    {
-      id: 'early-adopter',
-      label: 'Early Adopter',
-      icon: '🚀',
-      unlocked: Boolean(currentUser?.createdAt),
-      description: 'Joined the learning hub',
-    },
-    {
-      id: 'first-course',
-      label: 'First Course Completed',
-      icon: '🏆',
-      unlocked: completedCourses >= 1,
-      description: 'Reach 100% course progress',
-    },
-    {
-      id: 'streak-flame',
-      label: 'Streak Flame',
-      icon: '🔥',
-      unlocked: streakDays >= 5,
-      description: 'Stay active for 5 days',
-    },
-    {
-      id: 'collector',
-      label: 'Course Collector',
-      icon: '💎',
-      unlocked: purchasedProducts.length >= 3,
-      description: 'Own 3 premium courses',
-    },
-    {
-      id: 'scholar',
-      label: 'Level 5 Scholar',
-      icon: '🧠',
-      unlocked: level >= 5,
-      description: 'Reach learner level 5',
-    },
+    { id: 'quiz-master', label: 'Quiz Starter', icon: '🎯', unlocked: quizWinCount >= 1, description: 'Complete 1 verified quiz', currentValue: quizWinCount, goal: 1 },
+    { id: 'watch-hour', label: 'Video Learner', icon: '🎬', unlocked: watchTimeMinutes >= 60, description: 'Watch 60 verified minutes', currentValue: watchTimeMinutes, goal: 60 },
+    { id: 'first-course', label: 'Course Finisher', icon: '🏆', unlocked: completedCourses >= 1, description: 'Reach 100% course progress', currentValue: completedCourses, goal: 1 },
+    { id: 'streak-flame', label: 'Streak Flame', icon: '🔥', unlocked: streakDays >= 5, description: 'Keep a 5-day backend streak', currentValue: streakDays, goal: 5 },
+    { id: 'collector', label: 'Course Collector', icon: '💎', unlocked: purchasedProducts.length >= 3, description: 'Own 3 premium courses', currentValue: purchasedProducts.length, goal: 3 },
+    { id: 'coin-builder', label: 'Coin Builder', icon: '🪙', unlocked: totalLifetimeCoins >= 500, description: 'Earn 500 lifetime EduCoins', currentValue: totalLifetimeCoins, goal: 500 },
   ];
 
   const syncProfileUser = (updated: User, entry?: CoinTransaction) => {
@@ -482,20 +401,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     const updated = { ...currentUser, eduCoins: (currentUser.eduCoins || 0) - reward.cost };
     syncProfileUser(updated);
     setTimeout(() => setRedeeming(null), 500);
-  };
-
-  const handleCoverUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    const reader = new FileReader();
-    reader.onload = () => {
-      const image = String(reader.result || defaultCoverImage);
-      setCoverImage(image);
-      localStorage.setItem(getStorageKey(currentUser?.id), image);
-    };
-    reader.readAsDataURL(file);
-    event.target.value = '';
   };
 
 
@@ -602,20 +507,14 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         </button>
 
         <section className={`hub-animate w-full max-w-full overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] ${glassCard}`} style={{ animationDelay: '80ms' }}>
-          <div className="relative min-h-[min(430px,calc(100dvh-9rem))] w-full max-w-full sm:aspect-video sm:min-h-[420px]">
-            <img src={coverImage} alt="Student achievement cover" className="h-full w-full object-cover" />
+          <div className="relative min-h-[min(360px,calc(100dvh-9rem))] w-full max-w-full overflow-hidden bg-gradient-to-br from-[#174EA6] via-[#1A73E8] to-[#C2E7FF] sm:min-h-[340px]">
+
             <div className="absolute inset-0 bg-gradient-to-t from-[#202124] via-[#202124]/35 to-[#174EA6]/18" style={{ opacity: Number(profileStyle.heroOverlayOpacity) / 100 }} />
             <div className="absolute inset-x-0 top-0 flex min-w-0 flex-wrap items-start justify-between gap-2 p-3 sm:items-center sm:p-6">
               <div className="max-w-[min(100%,9.5rem)] shrink rounded-full border border-[#D2E3FC] bg-white/95 px-3 py-1.5 text-[9px] font-black uppercase leading-4 tracking-[0.18em] text-[#1967D2] backdrop-blur-xl sm:max-w-none sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.28em]">
-                Student Achievement Hub
+                Verified Learning Profile
               </div>
-              <input ref={coverInputRef} type="file" accept="image/*" className="hidden" onChange={handleCoverUpload} />
-              <button
-                onClick={() => coverInputRef.current?.click()}
-                className="shrink-0 rounded-full border border-[#D2E3FC] bg-white/95 px-3 py-1.5 text-xs font-bold text-[#202124] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-[#E8F0FE] hover:shadow-sm hover:shadow-sm sm:px-4 sm:py-2 sm:text-sm"
-              >
-                📷 Upload Cover
-              </button>
+
             </div>
             <div className="absolute -bottom-1 left-0 right-0 p-4 sm:p-8 lg:p-10">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
@@ -630,9 +529,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                   </div>
                 </div>
                 <div className="w-fit rounded-2xl border border-[#D2E3FC]/70 bg-[#202124]/55 px-4 py-3 text-left text-white backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.22)] sm:rounded-3xl sm:px-5 sm:py-4 sm:text-right">
-                  <p className="text-sm font-bold text-[#E8F0FE]">Activity Streak</p>
+                  <p className="text-sm font-bold text-[#E8F0FE]">Backend Streak</p>
                   <p className="mt-1 text-2xl font-black sm:text-3xl">🔥 {streakDays} Days</p>
-                  <p className="text-xs uppercase tracking-[0.2em] text-[#C2E7FF]/90">Active streak</p>
+                  <p className="text-xs uppercase tracking-[0.2em] text-[#C2E7FF]/90">server tracked</p>
                 </div>
               </div>
             </div>
@@ -656,11 +555,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         <section className={`hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '320ms' }}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Gamification / Streaks</p>
-              <h2 className="mt-2 text-2xl font-black sm:text-4xl">12 Daily Coin Strips</h2>
-              <p className="mt-2 text-xs font-bold leading-5 text-[#5F6368] sm:text-sm">Every strip uses real profile activity. Complete the target, claim coins, and come back tomorrow for the next claim.</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Verified Reward Progress</p>
+              <h2 className="mt-2 text-2xl font-black sm:text-4xl">Backend-Connected Reward Goals</h2>
+              <p className="mt-2 text-xs font-bold leading-5 text-[#5F6368] sm:text-sm">Goals are shown from wallet, course, quiz, watch, and backend streak data only. Browser-only activity does not unlock rewards.</p>
             </div>
-            <div className="w-fit rounded-full border border-[#D2E3FC] bg-[#E8F0FE] px-3 py-2 text-xs font-black text-[#1967D2] shadow-sm sm:px-4 sm:text-sm">🔥 {streakCards.filter(streak => streak.claimable).length} ready now</div>
+            <div className="w-fit rounded-full border border-[#D2E3FC] bg-[#E8F0FE] px-3 py-2 text-xs font-black text-[#1967D2] shadow-sm sm:px-4 sm:text-sm">🔥 {streakCards.filter(streak => streak.claimable).length} claimable</div>
           </div>
           <div className="mt-4 grid gap-3 sm:mt-6 xl:grid-cols-2">
             {streakCards.map((streak, index) => (
@@ -768,33 +667,35 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           <div className={`hub-animate overflow-hidden rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '440ms' }}>
             <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#C2E7FF]/35 blur-3xl" />
             <div className="relative">
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Recent Quiz Scores</p>
-              <h2 className="mt-2 text-2xl font-black sm:text-3xl">Performance Pulse</h2>
-              <div className="mt-4 rounded-[1.5rem] border border-[#E0E3EB] bg-white/95 p-3 shadow-inner backdrop-blur-xl sm:mt-6 sm:rounded-[1.75rem] sm:p-4">
-                <div className="flex h-32 items-end gap-2 sm:h-40 sm:gap-3">
-                  {quizScores.length ? quizScores.map(score => (
-                    <div key={score.title} className="flex flex-1 flex-col items-center gap-2">
-                      <div className="flex h-full w-full items-end rounded-2xl bg-[#F8FAFD] p-1">
-                        <div className={`w-full rounded-2xl bg-gradient-to-t ${score.accent} shadow-[0_14px_32px_rgba(15,23,42,0.16)] transition-all duration-500 hover:scale-[1.03]`} style={{ height: `${score.score}%` }} />
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Verified Badges</p>
+              <h2 className="mt-2 text-2xl font-black sm:text-3xl">Achievement Progress</h2>
+              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+                {badges.map((badge) => {
+                  const progress = clamp((badge.currentValue / Math.max(1, badge.goal)) * 100);
+                  return (
+                    <article key={badge.id} className={`rounded-2xl border p-4 transition ${badge.unlocked ? 'border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_12px_30px_rgba(52,168,83,0.14)]' : 'border-[#D2E3FC] bg-white/80 opacity-85'}`}>
+                      <div className="flex items-start gap-3">
+                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl ${badge.unlocked ? 'bg-white shadow-sm' : 'bg-[#F8FAFD] grayscale'}`}>{badge.icon}</div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <h3 className="truncate text-sm font-black text-[#202124] sm:text-base">{badge.label}</h3>
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] ${badge.unlocked ? 'bg-[#CEEAD6] text-[#137333]' : 'bg-[#DADCE0] text-[#5F6368]'}`}>{badge.unlocked ? 'Unlocked' : 'Locked'}</span>
+                          </div>
+                          <p className="mt-1 text-xs font-bold leading-5 text-[#5F6368]">{badge.description}</p>
+                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#E8F0FE]">
+                            <div className="h-full rounded-full bg-gradient-to-r from-[#1A73E8] to-[#174EA6]" style={{ width: `${progress}%` }} />
+                          </div>
+                          <div className="mt-2 flex justify-between text-[11px] font-black uppercase tracking-[0.14em] text-[#5F6368]">
+                            <span>{badge.currentValue} / {badge.goal}</span>
+                            <span>{Math.round(progress)}%</span>
+                          </div>
+                        </div>
                       </div>
-                      <span className="text-xs font-black text-[#5F6368]">{score.score}%</span>
-                    </div>
-                  )) : <div className="flex h-full w-full items-center justify-center text-center text-sm font-bold text-[#5F6368]">Complete quizzes to generate real performance pulse bars.</div>}
-                </div>
+                    </article>
+                  );
+                })}
               </div>
-              <div className="mt-5 space-y-3">
-                {quizScores.length ? quizScores.map(score => (
-                  <div key={score.title} className="rounded-2xl border border-[#E0E3EB] bg-white/95 p-3 shadow-sm backdrop-blur-xl">
-                    <div className="flex items-center justify-between gap-3 text-sm font-bold">
-                      <span className="truncate">{score.title}</span>
-                      <span className="rounded-full bg-[#E8F0FE] px-3 py-1 text-[#1967D2]">{score.score}%</span>
-                    </div>
-                    <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#E8F0FE]">
-                      <div className={`h-full rounded-full bg-gradient-to-r ${score.accent}`} style={{ width: `${score.score}%` }} />
-                    </div>
-                  </div>
-                )) : <div className="rounded-2xl border border-dashed border-[#D2E3FC] bg-white/95 p-3 text-xs font-bold text-[#5F6368] sm:p-4 sm:text-sm">No quiz rewards claimed yet.</div>}
-              </div>
+              {!badges.some(badge => badge.unlocked) && <div className="mt-4 rounded-2xl border border-dashed border-[#D2E3FC] bg-white/95 p-3 text-xs font-bold text-[#5F6368] sm:p-4 sm:text-sm">No verified badges unlocked yet. Start watching eligible course videos or complete a quiz to begin.</div>}
             </div>
           </div>
         </section>
