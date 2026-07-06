@@ -142,6 +142,7 @@ const COMMUNITY_PRIVACY_STORAGE_KEY = 'eduvoraCommunityPrivacySettings';
 const COMMUNITY_NOTIFICATION_PREFS_KEY = 'eduvoraCommunityNotificationPreferences';
 const COMMUNITY_CREATOR_QUOTA_KEY = 'eduvoraCommunityCreatorQuota';
 const COMMUNITY_STATUS_QUOTA_KEY = 'eduvoraCommunityStatusQuota';
+const COMMUNITY_DESKTOP_SIDEBAR_COLLAPSED_KEY = 'eduvoraCommunityDesktopSidebarCollapsed';
 const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 const DAILY_UPLOAD_LOCK_MS = 24 * 60 * 60 * 1000;
 const PROFILE_BIO_MAX_LENGTH = 180;
@@ -675,8 +676,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const isPrivateChatSending = pendingPrivateChatSends > 0;
   const [privateChatError, setPrivateChatError] = useState('');
   const [chatMenuOpen, setChatMenuOpen] = useState(false);
-  const [isDesktopSidebarPinned, setIsDesktopSidebarPinned] = useState(false);
-  const [isDesktopSidebarHovering, setIsDesktopSidebarHovering] = useState(false);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(COMMUNITY_DESKTOP_SIDEBAR_COLLAPSED_KEY) === 'true';
+  });
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [expandedReplyId, setExpandedReplyId] = useState<number | null>(null);
   const [loadedReplyDocIds, setLoadedReplyDocIds] = useState<Record<string, boolean>>({});
@@ -711,6 +714,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const timer = window.setTimeout(() => setDebouncedNetworkSearch(networkSearch), 300);
     return () => window.clearTimeout(timer);
   }, [networkSearch]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(COMMUNITY_DESKTOP_SIDEBAR_COLLAPSED_KEY, String(isDesktopSidebarCollapsed));
+  }, [isDesktopSidebarCollapsed]);
 
   const [supportTickets, setSupportTickets] = useState<CommunitySupportTicket[]>(() => {
     const storedTickets = readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []);
@@ -3424,50 +3432,74 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   );
 
   const CommunitySidebar = () => {
-    const sidebarExpanded = isDesktopSidebarPinned || isDesktopSidebarHovering;
+    const sidebarExpanded = !isDesktopSidebarCollapsed;
+    const memberName = profile.name?.trim() || 'Eduvora Member';
+    const memberUsername = normalizeUsername(profile.username || memberName) || 'eduvora_member';
 
     return (
       <aside
-        onMouseEnter={() => setIsDesktopSidebarHovering(true)}
-        onMouseLeave={() => setIsDesktopSidebarHovering(false)}
-        className={`hidden min-h-0 shrink-0 flex-col overflow-y-auto border-r border-[var(--community-border)] bg-[var(--community-surface)]/78 p-3 transition-all duration-300 custom-scrollbar lg:flex ${sidebarExpanded ? 'w-[clamp(13rem,17vw,16rem)] xl:p-4' : 'w-[5.35rem]'}`}
+        aria-label="Community sidebar"
+        className={`hidden min-h-0 shrink-0 flex-col overflow-hidden border-r border-[#D9E7F8] bg-white/88 shadow-[18px_0_60px_rgba(23,105,255,0.08)] backdrop-blur-2xl transition-[width,padding] duration-300 ease-out lg:flex ${sidebarExpanded ? 'w-[clamp(16.5rem,20vw,18.5rem)] p-4 xl:p-5' : 'w-[5.5rem] p-3'}`}
       >
-        <div className="mb-3 flex items-center justify-between gap-2">
-          {sidebarExpanded ? <div className="relative overflow-hidden rounded-2xl border border-[#BFD7FF] bg-gradient-to-r from-[#E8F2FF] via-white to-[#EEF6FF] px-3 py-2 shadow-[0_12px_34px_rgba(23,105,255,0.14)]">
-            <span className="absolute inset-y-0 -left-10 w-10 animate-[eduvoraBondShine_2.8s_linear_infinite] bg-white/70 blur-md" />
-            <p className="relative truncate text-xs font-black uppercase tracking-[0.22em] text-[#1769FF]">Eduvora Bond</p>
-          </div> : null}
+        <div className={`mb-4 flex items-center gap-2 ${sidebarExpanded ? 'justify-between' : 'justify-center'}`}>
+          {sidebarExpanded ? (
+            <div className="group relative min-w-0 flex-1 overflow-hidden rounded-[1.55rem] border border-[#D9E7F8] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EEF6FF] p-2 shadow-[0_18px_42px_rgba(23,105,255,0.12)]">
+              <span className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-[#7B61FF]/14 blur-2xl" />
+              <span className="pointer-events-none absolute inset-y-2 left-0 w-1 rounded-r-full bg-gradient-to-b from-[#1769FF] to-[#7B61FF]" />
+              <div className="relative flex min-w-0 items-center gap-3 pl-1">
+                <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.15rem] bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-lg text-white shadow-[0_14px_30px_rgba(23,105,255,0.28)]" aria-hidden="true">✦</span>
+                <span className="min-w-0">
+                  <span className="block truncate text-[0.7rem] font-black uppercase tracking-[0.32em] text-[#081A45]">EDUVORA</span>
+                  <span className="mt-0.5 inline-flex rounded-full bg-gradient-to-r from-[#1769FF]/10 to-[#7B61FF]/10 px-2 py-0.5 text-[0.64rem] font-black uppercase tracking-[0.22em] text-[#1769FF]">Bond</span>
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex h-12 w-12 items-center justify-center rounded-[1.25rem] border border-[#D9E7F8] bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-lg text-white shadow-[0_14px_32px_rgba(23,105,255,0.22)]" title="EDUVORA BOND" aria-label="EDUVORA BOND">✦</div>
+          )}
           <button
             type="button"
-            onClick={() => setIsDesktopSidebarPinned((pinned) => !pinned)}
-            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#E3ECF8] bg-white text-sm font-black text-[#081B5C] shadow-sm"
-            title={isDesktopSidebarPinned ? 'Auto-collapse sidebar' : 'Pin sidebar open'}
+            onClick={() => setIsDesktopSidebarCollapsed((collapsed) => !collapsed)}
+            aria-label={sidebarExpanded ? 'Collapse community sidebar' : 'Expand community sidebar'}
+            aria-expanded={sidebarExpanded}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.1rem] border border-[#D9E7F8] bg-white/92 text-base font-black text-[#1769FF] shadow-[0_10px_28px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:text-[#7B61FF] hover:shadow-[0_16px_34px_rgba(23,105,255,0.16)] focus:outline-none focus:ring-4 focus:ring-[#1769FF]/18 active:scale-95"
+            title={sidebarExpanded ? 'Collapse community sidebar' : 'Expand community sidebar'}
           >
-            {isDesktopSidebarPinned ? '⟨' : '☰'}
+            <span aria-hidden="true">{sidebarExpanded ? '‹' : '›'}</span>
           </button>
         </div>
 
-        <nav className="space-y-1.5 xl:space-y-2">
+        <nav aria-label="Community sections" className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
           {navItems.map((item) => (
             <button
               key={item.label}
               type="button"
               onClick={item.action}
               title={item.label}
-              className={`flex w-full items-center gap-2 rounded-[1.15rem] px-2.5 py-2.5 text-left text-sm font-black transition xl:gap-3 xl:rounded-[1.35rem] xl:py-3 ${item.active ? 'bg-[#EEF2FF] text-[#4F46E5] shadow-[0_12px_34px_rgba(79,70,229,0.12)]' : 'text-[#64748B] hover:bg-white hover:text-[#081B5C]'}`}
+              aria-label={item.label}
+              aria-current={item.active ? 'page' : undefined}
+              className={`group relative flex min-h-[52px] w-full items-center gap-3 overflow-hidden rounded-[1.35rem] px-2.5 text-left text-sm font-black transition duration-200 focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 ${sidebarExpanded ? 'justify-start' : 'justify-center'} ${item.active ? 'bg-gradient-to-r from-[#E8F2FF] to-[#F1EEFF] text-[#1769FF] shadow-[0_16px_38px_rgba(23,105,255,0.13)]' : 'text-[#536178] hover:bg-[#F8FBFF] hover:text-[#081A45]'}`}
             >
-              <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl xl:h-10 xl:w-10 xl:rounded-2xl ${item.active ? 'bg-gradient-to-br from-[#6C4CF6] to-[#4F7BFF] text-white' : 'bg-[#F3F7FF]'}`}>{item.icon}</span>
-              {sidebarExpanded ? <span className="truncate">{item.label}</span> : null}
+              {item.active ? <span className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-gradient-to-b from-[#1769FF] to-[#7B61FF]" aria-hidden="true" /> : null}
+              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[1.05rem] text-lg transition ${item.active ? 'bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-white shadow-[0_10px_24px_rgba(23,105,255,0.24)]' : 'bg-[#EEF6FF] text-[#1769FF] group-hover:bg-white group-hover:text-[#7B61FF] group-hover:shadow-sm'}`} aria-hidden="true">{item.icon}</span>
+              {sidebarExpanded ? <span className="min-w-0 flex-1 truncate">{item.label}</span> : null}
             </button>
           ))}
         </nav>
 
-        <button type="button" onClick={() => pushPage('profile')} className="mt-auto flex w-full items-center gap-3 rounded-[1.6rem] border border-[#E3ECF8] bg-white p-3 text-left">
-          <Avatar value={profile.avatar} size="h-11 w-11" />
+        <button
+          type="button"
+          onClick={() => pushPage('profile')}
+          aria-label={`Open profile for ${memberName}`}
+          className={`mt-4 flex w-full items-center gap-3 rounded-[1.6rem] border border-[#D9E7F8] bg-gradient-to-br from-white to-[#F8FBFF] p-3 text-left shadow-[0_16px_38px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_46px_rgba(123,97,255,0.13)] focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 ${sidebarExpanded ? 'justify-start' : 'justify-center'}`}
+          title={memberName}
+        >
+          <Avatar value={profile.avatar || '🧑‍🎓'} size="h-11 w-11" />
           {sidebarExpanded ? (
-            <span className="min-w-0">
-              <span className="block truncate text-sm font-black text-[#081B5C]">{profile.name}</span>
-              <span className="block truncate text-xs font-bold text-[#64748B]">@{profile.username}</span>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-sm font-black text-[#081A45]">{memberName}</span>
+              <span className="block truncate text-xs font-bold text-[#7C879A]">@{memberUsername}</span>
+              <span className="mt-2 inline-flex rounded-full bg-[#EEF6FF] px-2 py-1 text-[0.65rem] font-black uppercase tracking-[0.14em] text-[#1769FF]">Member</span>
             </span>
           ) : null}
         </button>
