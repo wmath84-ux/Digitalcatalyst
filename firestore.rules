@@ -49,6 +49,33 @@ service cloud.firestore {
           && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds']);
         allow delete: if sessionId == 'current' && isOwner(uid);
       }
+
+
+      match /aiMentorChats/{chatId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create: if isOwner(uid)
+          && request.resource.data.ownerId == uid
+          && request.resource.data.userId == uid
+          && request.resource.data.source == 'course_player_ai_mentor'
+          && request.resource.data.expiresAt is string
+          && request.resource.data.expiresAtMs is number
+          && request.resource.data.expiresAtMs > request.time.toMillis()
+          && request.resource.data.messageCount is number
+          && request.resource.data.messageCount <= 100
+          && !request.resource.data.keys().hasAny(['apiKey', 'authorization', 'secret', 'rawApiKey']);
+        allow update: if isOwner(uid)
+          && resource.data.ownerId == uid
+          && request.resource.data.ownerId == uid
+          && request.resource.data.userId == uid
+          && request.resource.data.source == 'course_player_ai_mentor'
+          && request.resource.data.expiresAt is string
+          && request.resource.data.expiresAtMs is number
+          && request.resource.data.expiresAtMs > request.time.toMillis()
+          && request.resource.data.messageCount is number
+          && request.resource.data.messageCount <= 100
+          && !request.resource.data.keys().hasAny(['apiKey', 'authorization', 'secret', 'rawApiKey']);
+        allow delete: if isOwner(uid) || isAdmin() || resource.data.expiresAtMs <= request.time.toMillis();
+      }
     }
 
     match /siteProducts/{productId} {

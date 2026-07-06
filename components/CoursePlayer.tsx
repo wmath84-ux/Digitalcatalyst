@@ -1753,7 +1753,23 @@ const CoursePlayer: React.FC<{
                 ? 'course-youtube-frame rounded-2xl border border-[#111827]/10 bg-black shadow-[0_20px_60px_rgba(8,26,69,0.10)] sm:rounded-3xl'
                 : 'rounded-2xl border border-[#E3E8F5] bg-white/76 shadow-[0_20px_60px_rgba(8,26,69,0.06)] sm:rounded-3xl'
           }`}>
-            {isMentorOpen ? <AiMentor productTitle={product.title} activeContentName={activeFile?.name || null} onClose={() => setIsMentorOpen(false)} /> : renderMedia()}
+            {renderMedia()}
+            {isMentorOpen && (
+              <div className="absolute inset-0 z-50 flex items-stretch justify-end bg-slate-950/20 p-2 backdrop-blur-[2px] sm:p-3" aria-label="AI Mentor overlay">
+                <div className="h-full w-full max-w-full sm:max-w-[34rem] lg:max-w-[40rem]">
+                  <AiMentor
+                    productTitle={product.title}
+                    productId={product.id}
+                    courseId={product.id}
+                    activeFileId={activeFile?.id || null}
+                    activeFileType={activeFile?.type || null}
+                    activeContentName={activeFile?.name || null}
+                    userId={currentUserId}
+                    onClose={() => setIsMentorOpen(false)}
+                  />
+                </div>
+              </div>
+            )}
           </div>
           {educoinNotice && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-900">{educoinNotice}</div>}
         </section>
