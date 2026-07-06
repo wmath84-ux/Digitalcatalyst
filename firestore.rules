@@ -102,8 +102,21 @@ service cloud.firestore {
 
       match /replies/{replyId} {
         allow read: if signedIn();
-        allow create: if signedIn();
-        allow update, delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid);
+        allow create: if signedIn()
+          && request.resource.data.ownerId == request.auth.uid
+          && request.resource.data.senderId == request.auth.uid
+          && request.resource.data.text is string
+          && request.resource.data.text.size() > 0
+          && request.resource.data.text.size() <= 1000
+          && request.resource.data.status in ['active', 'sent']
+          && !request.resource.data.keys().hasAny(['email', 'phone', 'apiKey', 'authorization', 'secret', 'rawHtml']);
+        allow update: if isAdmin()
+          || (signedIn()
+            && resource.data.ownerId == request.auth.uid
+            && request.resource.data.ownerId == resource.data.ownerId
+            && request.resource.data.senderId == resource.data.senderId
+            && !request.resource.data.keys().hasAny(['email', 'phone', 'apiKey', 'authorization', 'secret', 'rawHtml']));
+        allow delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid);
       }
     }
 
@@ -145,10 +158,10 @@ service cloud.firestore {
           'uid', 'id', 'userId', 'ownerId', 'username', 'displayName', 'name', 'photoURL', 'avatar', 'role', 'bio',
           'subjects', 'masterTags', 'creatorCategory', 'searchableText', 'searchTokens',
           'followers', 'followerCount', 'followingCount', 'postCount', 'mutual',
-          'verified', 'isVerified', 'isCreator', 'isPublic', 'isSuspended', 'source', 'isOnline', 'lastActiveAt', 'createdAt', 'updatedAt'
+          'verified', 'isVerified', 'isCreator', 'isPublic', 'isSuspended', 'source', 'isOnline', 'lastActiveAt', 'lastFollowedAt', 'lastFollowerAt', 'createdAt', 'updatedAt'
         ]);
       allow update: if signedIn()
-        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['followerCount', 'followingCount', 'updatedAt'])
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['followerCount', 'followingCount', 'updatedAt', 'lastFollowedAt', 'lastFollowerAt'])
         && (!request.resource.data.diff(resource.data).changedKeys().hasAny(['followerCount']) || request.resource.data.followerCount in [resource.data.followerCount + 1, resource.data.followerCount - 1])
         && (!request.resource.data.diff(resource.data).changedKeys().hasAny(['followingCount']) || request.resource.data.followingCount in [resource.data.followingCount + 1, resource.data.followingCount - 1])
         && (!('followerCount' in request.resource.data) || request.resource.data.followerCount >= 0)
@@ -166,10 +179,10 @@ service cloud.firestore {
           'uid', 'id', 'userId', 'ownerId', 'username', 'displayName', 'name', 'photoURL', 'avatar', 'role', 'bio',
           'subjects', 'masterTags', 'creatorCategory', 'searchableText', 'searchTokens',
           'followerCount', 'followingCount', 'postCount', 'isCreator', 'isVerified', 'verified', 'isPublic', 'isSuspended',
-          'isOnline', 'lastActiveAt', 'createdAt', 'updatedAt'
+          'isOnline', 'lastActiveAt', 'lastFollowedAt', 'lastFollowerAt', 'createdAt', 'updatedAt'
         ]);
       allow update: if signedIn()
-        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['followerCount', 'followingCount', 'updatedAt'])
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['followerCount', 'followingCount', 'updatedAt', 'lastFollowedAt', 'lastFollowerAt'])
         && (!request.resource.data.diff(resource.data).changedKeys().hasAny(['followerCount']) || request.resource.data.followerCount in [resource.data.followerCount + 1, resource.data.followerCount - 1])
         && (!request.resource.data.diff(resource.data).changedKeys().hasAny(['followingCount']) || request.resource.data.followingCount in [resource.data.followingCount + 1, resource.data.followingCount - 1])
         && (!('followerCount' in request.resource.data) || request.resource.data.followerCount >= 0)

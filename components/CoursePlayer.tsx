@@ -19,6 +19,7 @@ declare global {
     YT?: any;
     onYouTubeIframeAPIReady?: () => void;
   }
+
 }
 
 
@@ -1183,6 +1184,15 @@ const CoursePlayer: React.FC<{
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
   const youtubePlayerRef = useRef<any>(null);
+  const nativeVideoRef = useRef<HTMLVideoElement | null>(null);
+  const videoFullscreenSnapshotRef = useRef<{
+    activeFileId: string;
+    activeFileType: ProductFile['type'];
+    currentTime?: number;
+    wasPlaying?: boolean;
+    requestedMobileLandscape: boolean;
+    timestamp: number;
+  } | null>(null);
   const youtubeTickTimerRef = useRef<number | null>(null);
   const youtubeSessionRef = useRef<{
     sessionId: string;
@@ -1311,6 +1321,59 @@ const CoursePlayer: React.FC<{
   const forceOverlaySidebar = viewport.width < 900 || viewport.height < 560 || viewport.isTinyPlayer || viewport.isLandscapeCompact;
   const useDesktopSidebar = !forceOverlaySidebar && !isDesktopSidebarCollapsed;
   const compactPlayerChrome = viewport.isShortHeight || viewport.isTinyPlayer || viewport.isLandscapeCompact;
+  const shouldUseMobileVideoFullscreen = viewport.width < 1024 || viewport.isLandscapeCompact;
+
+  const captureVideoFullscreenSnapshot = useCallback((requestedMobileLandscape = false) => {
+    if (!activeFile || (activeFile.type !== 'youtube' && activeFile.type !== 'video')) return;
+
+    let currentTime: number | undefined;
+    let wasPlaying: boolean | undefined;
+
+    if (activeFile.type === 'youtube') {
+      const player = youtubePlayerRef.current;
+      currentTime = Number(player?.getCurrentTime?.() || 0);
+      wasPlaying = player?.getPlayerState?.() === window.YT?.PlayerState?.PLAYING;
+    } else {
+      const video = nativeVideoRef.current;
+      currentTime = video?.currentTime;
+      wasPlaying = video ? !video.paused : undefined;
+    }
+
+    videoFullscreenSnapshotRef.current = {
+      activeFileId: activeFile.id,
+      activeFileType: activeFile.type,
+      currentTime,
+      wasPlaying,
+      requestedMobileLandscape,
+      timestamp: Date.now(),
+    };
+  }, [activeFile]);
+
+  const tryLockMobileVideoOrientation = useCallback(async () => {
+    if (!shouldUseMobileVideoFullscreen) return;
+
+    const orientation = screen.orientation as (ScreenOrientation & { lock?: (orientation: string) => Promise<void> }) | undefined;
+    if (!orientation?.lock) return;
+
+    try {
+      await orientation.lock('landscape');
+    } catch (error) {
+      console.warn('Course video landscape orientation lock unavailable. Continuing fullscreen playback.', error);
+    }
+  }, [shouldUseMobileVideoFullscreen]);
+
+  const tryUnlockMobileVideoOrientation = useCallback(() => {
+    const snapshot = videoFullscreenSnapshotRef.current;
+    if (!snapshot?.requestedMobileLandscape) return;
+
+    try {
+      screen.orientation?.unlock?.();
+    } catch (error) {
+      console.warn('Course video orientation unlock unavailable.', error);
+    } finally {
+      videoFullscreenSnapshotRef.current = null;
+    }
+  }, []);
 
   const youtubeFrameId = useMemo(() => {
     if (activeFile?.type !== 'youtube') return '';
@@ -1350,8 +1413,8 @@ const CoursePlayer: React.FC<{
       const viewport = window.visualViewport;
       const fallbackSize = isYoutubeFullscreen
         ? {
-            width: Math.ceil(screen.width || window.innerWidth || viewport?.width || 0),
-            height: Math.ceil(screen.height || window.innerHeight || viewport?.height || 0),
+            width: Math.ceil(viewport?.width || window.innerWidth || screen.width || 0),
+            height: Math.ceil(viewport?.height || window.innerHeight || screen.height || 0),
           }
         : {
             width: Math.ceil(viewport?.width || window.innerWidth || screen.width),
@@ -1365,7 +1428,9 @@ const CoursePlayer: React.FC<{
     const syncFullscreenState = () => {
       const fullscreenElement = document.fullscreenElement || (document as any).webkitFullscreenElement;
       const shell = youtubeShellId ? document.getElementById(youtubeShellId) : null;
-      setIsYoutubeShellFullscreen(!!fullscreenElement && fullscreenElement === shell);
+      const isYoutubeFullscreen = !!fullscreenElement && fullscreenElement === shell;
+      setIsYoutubeShellFullscreen(isYoutubeFullscreen);
+      if (!isYoutubeFullscreen) tryUnlockMobileVideoOrientation();
     };
 
     const scheduleResize = () => {
@@ -1385,7 +1450,7 @@ const CoursePlayer: React.FC<{
       window.removeEventListener('resize', scheduleResize);
       window.visualViewport?.removeEventListener('resize', scheduleResize);
     };
-  }, [activeFile?.type, youtubeFrameId, youtubeShellId]);
+  }, [activeFile?.type, tryUnlockMobileVideoOrientation, youtubeFrameId, youtubeShellId]);
 
   const toggleYoutubeShellFullscreen = useCallback(async () => {
     if (activeFile?.type !== 'youtube' || !youtubeShellId) return;
@@ -1402,12 +1467,68 @@ const CoursePlayer: React.FC<{
         return;
       }
 
+      captureVideoFullscreenSnapshot(shouldUseMobileVideoFullscreen);
       const requestFullscreen = shell.requestFullscreen?.bind(shell) || shell.webkitRequestFullscreen?.bind(shell);
-      await requestFullscreen?.();
+      if (!requestFullscreen) return;
+      await requestFullscreen();
+      await tryLockMobileVideoOrientation();
     } catch (error) {
       console.warn('Course YouTube fullscreen toggle failed:', error);
     }
-  }, [activeFile?.type, youtubeShellId]);
+  }, [activeFile?.type, captureVideoFullscreenSnapshot, shouldUseMobileVideoFullscreen, tryLockMobileVideoOrientation, youtubeShellId]);
+
+
+  useEffect(() => {
+    const handleFullscreenExit = () => {
+      const fullscreenElement = document.fullscreenElement || (document as any).webkitFullscreenElement;
+      if (!fullscreenElement) tryUnlockMobileVideoOrientation();
+    };
+
+    document.addEventListener('fullscreenchange', handleFullscreenExit);
+    document.addEventListener('webkitfullscreenchange', handleFullscreenExit as EventListener);
+    return () => {
+      document.removeEventListener('fullscreenchange', handleFullscreenExit);
+      document.removeEventListener('webkitfullscreenchange', handleFullscreenExit as EventListener);
+    };
+  }, [tryUnlockMobileVideoOrientation]);
+
+  const enterNativeVideoFullscreen = useCallback(async () => {
+    if (activeFile?.type !== 'video') return;
+
+    const video = nativeVideoRef.current as (HTMLVideoElement & {
+      webkitRequestFullscreen?: () => Promise<void> | void;
+      webkitEnterFullscreen?: () => void;
+    }) | null;
+    if (!video) return;
+
+    const wasPlaying = !video.paused;
+    const currentTime = video.currentTime;
+    captureVideoFullscreenSnapshot(shouldUseMobileVideoFullscreen);
+
+    try {
+      const requestFullscreen = video.requestFullscreen?.bind(video) || video.webkitRequestFullscreen?.bind(video);
+      if (requestFullscreen) {
+        await requestFullscreen();
+        await tryLockMobileVideoOrientation();
+      } else if (video.webkitEnterFullscreen) {
+        video.addEventListener('webkitendfullscreen', tryUnlockMobileVideoOrientation, { once: true });
+        video.webkitEnterFullscreen();
+        await tryLockMobileVideoOrientation();
+      } else {
+        return;
+      }
+
+      if (Number.isFinite(currentTime) && Math.abs(video.currentTime - currentTime) > 1) {
+        video.currentTime = currentTime;
+      }
+      if (wasPlaying && video.paused) {
+        await video.play().catch(() => undefined);
+      }
+    } catch (error) {
+      videoFullscreenSnapshotRef.current = null;
+      console.warn('Course native video fullscreen request failed:', error);
+    }
+  }, [activeFile?.type, captureVideoFullscreenSnapshot, shouldUseMobileVideoFullscreen, tryLockMobileVideoOrientation, tryUnlockMobileVideoOrientation]);
 
   useEffect(() => {
     if (activeFile?.type !== 'youtube') return undefined;
@@ -1659,7 +1780,30 @@ const CoursePlayer: React.FC<{
           </div>
         ) : <VideoUnavailablePlaceholder />;
       }
-      case 'video': return <video key={activeFile.id} src={activeFile.url} controls className="h-full w-full bg-white/70 object-contain" onError={() => setMediaHasError(true)} />;
+      case 'video': return (
+        <div className="course-native-video-shell relative h-full w-full overflow-hidden bg-black">
+          <video
+            key={activeFile.id}
+            ref={nativeVideoRef}
+            src={activeFile.url}
+            controls
+            playsInline
+            className="course-native-video h-full w-full bg-black object-contain"
+            onError={() => setMediaHasError(true)}
+          />
+          {shouldUseMobileVideoFullscreen && (
+            <button
+              type="button"
+              onClick={enterNativeVideoFullscreen}
+              className="course-native-video-fullscreen-button absolute bottom-4 right-4 z-20 flex items-center gap-2 rounded-full border border-white/25 bg-black/75 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white shadow-[0_12px_30px_rgba(0,0,0,0.35)] backdrop-blur-md transition hover:bg-black focus:outline-none focus:ring-2 focus:ring-white/80"
+              aria-label="Enter video fullscreen"
+            >
+              <span aria-hidden="true">⛶</span>
+              <span>Fullscreen</span>
+            </button>
+          )}
+        </div>
+      );
       case 'audio': {
         return (
           <div className="flex h-full min-h-0 w-full bg-[#d5fbff]/70 text-slate-900">
