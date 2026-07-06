@@ -142,10 +142,38 @@ service cloud.firestore {
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.keys().hasOnly([
-          'id', 'userId', 'ownerId', 'username', 'name', 'avatar', 'role', 'bio',
-          'followers', 'followerCount', 'followingCount', 'mutual',
-          'verified', 'source', 'createdAt', 'updatedAt'
+          'uid', 'id', 'userId', 'ownerId', 'username', 'displayName', 'name', 'photoURL', 'avatar', 'role', 'bio',
+          'subjects', 'masterTags', 'creatorCategory', 'searchableText', 'searchTokens',
+          'followers', 'followerCount', 'followingCount', 'postCount', 'mutual',
+          'verified', 'isVerified', 'isCreator', 'isPublic', 'isSuspended', 'source', 'isOnline', 'lastActiveAt', 'createdAt', 'updatedAt'
         ]);
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['followerCount', 'followingCount', 'updatedAt'])
+        && (!request.resource.data.diff(resource.data).changedKeys().hasAny(['followerCount']) || request.resource.data.followerCount in [resource.data.followerCount + 1, resource.data.followerCount - 1])
+        && (!request.resource.data.diff(resource.data).changedKeys().hasAny(['followingCount']) || request.resource.data.followingCount in [resource.data.followingCount + 1, resource.data.followingCount - 1])
+        && (!('followerCount' in request.resource.data) || request.resource.data.followerCount >= 0)
+        && (!('followingCount' in request.resource.data) || request.resource.data.followingCount >= 0);
+      allow delete: if isOwner(uid) || isAdmin();
+    }
+
+    match /publicProfiles/{uid} {
+      allow read: if signedIn() && resource.data.isPublic != false && resource.data.isSuspended != true && resource.data.hidden != true && resource.data.blocked != true;
+      allow create, update: if isOwner(uid)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.keys().hasOnly([
+          'uid', 'id', 'userId', 'ownerId', 'username', 'displayName', 'name', 'photoURL', 'avatar', 'role', 'bio',
+          'subjects', 'masterTags', 'creatorCategory', 'searchableText', 'searchTokens',
+          'followerCount', 'followingCount', 'postCount', 'isCreator', 'isVerified', 'verified', 'isPublic', 'isSuspended',
+          'isOnline', 'lastActiveAt', 'createdAt', 'updatedAt'
+        ]);
+      allow update: if signedIn()
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['followerCount', 'followingCount', 'updatedAt'])
+        && (!request.resource.data.diff(resource.data).changedKeys().hasAny(['followerCount']) || request.resource.data.followerCount in [resource.data.followerCount + 1, resource.data.followerCount - 1])
+        && (!request.resource.data.diff(resource.data).changedKeys().hasAny(['followingCount']) || request.resource.data.followingCount in [resource.data.followingCount + 1, resource.data.followingCount - 1])
+        && (!('followerCount' in request.resource.data) || request.resource.data.followerCount >= 0)
+        && (!('followingCount' in request.resource.data) || request.resource.data.followingCount >= 0);
       allow delete: if isOwner(uid) || isAdmin();
     }
 
@@ -156,9 +184,14 @@ service cloud.firestore {
         && request.resource.data.followerId == request.auth.uid
         && request.resource.data.followingId is string
         && request.resource.data.followingId != request.auth.uid
-        && followId == request.auth.uid + '_' + request.resource.data.followingId;
+        && followId == request.auth.uid + '_' + request.resource.data.followingId
+        && request.resource.data.status == 'active';
 
-      allow update: if false;
+      allow update: if signedIn()
+        && resource.data.followerId == request.auth.uid
+        && request.resource.data.followerId == resource.data.followerId
+        && request.resource.data.followingId == resource.data.followingId
+        && request.resource.data.status in ['active', 'removed'];
 
       allow delete: if isAdmin()
         || (signedIn() && resource.data.followerId == request.auth.uid);
