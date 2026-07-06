@@ -278,23 +278,22 @@ const ensureCourseIntroModule = (product: ProductWithRating): CourseModule[] => 
   const sourceModules = product.courseContent || [];
   const cleanedModules = removeDuplicateCourseIntroFiles(sourceModules);
   const existingIntro = findCourseIntroFile(cleanedModules);
-  const hasLessons = countCourseFiles(cleanedModules) > (existingIntro ? 1 : 0);
-  const introFile = existingIntro || buildCourseIntroContent(product, hasLessons);
+  const modulesWithoutIntro = stripCourseIntroFiles(cleanedModules)
+    .filter(module => module.id !== COURSE_INTRO_MODULE_ID || (module.files || []).length > 0 || (module.modules || []).length > 0);
+
+  if (!existingIntro) return modulesWithoutIntro;
 
   const introModule: CourseModule = {
     id: COURSE_INTRO_MODULE_ID,
-    title: 'Welcome / Course Intro',
+    title: 'Course Intro',
     accessLevel: 'included',
     paidUpdateId: '',
     paidUpdateTitle: '',
     paidUpdatePrice: '',
     paidUpdateCoinPrice: 0,
-    files: [{ ...introFile, accessLevel: 'included', paidUpdateId: '', paidUpdateTitle: '', paidUpdatePrice: '', paidUpdateCoinPrice: 0 }],
+    files: [{ ...existingIntro, accessLevel: 'included', paidUpdateId: '', paidUpdateTitle: '', paidUpdatePrice: '', paidUpdateCoinPrice: 0 }],
     modules: [],
   };
-
-  const modulesWithoutIntro = stripCourseIntroFiles(cleanedModules)
-    .filter(module => module.id !== COURSE_INTRO_MODULE_ID || (module.files || []).length > 0 || (module.modules || []).length > 0);
 
   return [introModule, ...modulesWithoutIntro];
 };
@@ -715,6 +714,7 @@ const runBrowserRichTextCommand = (
 
 const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = ({ file, productId }) => {
   const editorRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
   const selectionRef = useRef<Range | null>(null);
 
   const legacyStorageKey = `smart-docs-workspace-${productId}-${file.id}`;
@@ -739,11 +739,13 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   const docsViewport = useViewportSize();
   const isCompactDocs = docsViewport.width < 768;
   const editorShellClass = isSidebarOpen && !isCompactDocs
-    ? 'pl-[19.75rem]'
+    ? 'lg:pl-[22.5rem]'
     : '';
   const editorPageWidthClass = isSidebarOpen && !isCompactDocs
-    ? 'max-w-4xl'
+    ? 'max-w-5xl'
     : 'max-w-[min(96rem,calc(100vw-2rem))] xl:max-w-[104rem]';
+  const panelTitleId = `open-docs-panel-title-${sanitizeOpenDocsDocIdPart(file.id)}`;
+  const panelDescriptionId = `open-docs-panel-description-${sanitizeOpenDocsDocIdPart(file.id)}`;
 
   const activePage = pages.find(page => page.id === activePageId) || pages[0];
   const activeContent = activePage?.content || OPEN_DOCS_DEFAULT_HTML;
@@ -774,6 +776,8 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
       cancelled = true;
     };
 
+    setSavedAt('Loading account sync…');
+
     getDoc(doc(db, OPEN_DOCS_NOTES_COLLECTION, cloudDocId))
       .then(snapshot => {
         if (cancelled || !snapshot.exists()) return;
@@ -787,7 +791,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
         setSavedAt('Synced from your account');
       })
       .catch(() => {
-        if (!cancelled) setSavedAt('Local mode · cloud sync unavailable');
+        if (!cancelled) setSavedAt('Saved on this device · cloud sync unavailable');
       });
 
     return () => {
@@ -824,7 +828,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
         updatedAt: Date.now(),
       }, { merge: true })
         .then(() => setSavedAt('Saved to your account'))
-        .catch(() => setSavedAt('Saved on this device · cloud sync failed'));
+        .catch(() => setSavedAt('Saved on this device · cloud sync unavailable'));
     }, 700);
   };
 
@@ -889,6 +893,22 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
     setActivePageId(nextPages[0]?.id || 'page-1');
   };
 
+
+  useEffect(() => {
+    if (!isSidebarOpen) return;
+
+    panelRef.current?.focus({ preventScroll: true });
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [isSidebarOpen]);
+
   const runCommand = (command: string, value?: string) => {
     const ok = runBrowserRichTextCommand(editorRef.current, selectionRef, command, value);
     if (!ok) {
@@ -906,9 +926,9 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
 
   return (
     <div className="relative flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-white/70 text-slate-900 backdrop-blur-xl">
-      <div className="flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-b border-white/50 bg-white/70 p-2 shadow-sm backdrop-blur-xl sm:gap-2 sm:p-3 custom-scrollbar">
-        <button type="button" onClick={() => setIsSidebarOpen(value => !value)} className="shrink-0 rounded-full border border-cyan-200 bg-white/90 px-3 py-2 text-xs font-black uppercase tracking-widest text-cyan-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-cyan-50 hover:shadow-md" aria-expanded={isSidebarOpen}>Open Docs</button>
-        <button type="button" onClick={() => { saveCurrentPage(); setIsReadingMode(true); }} className="shrink-0 rounded-full border border-cyan-200/60 bg-cyan-200/20 px-3 py-2 text-xs font-black uppercase tracking-widest text-cyan-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-cyan-200/30 hover:shadow-md">Reading Mode</button>
+      <div className="open-docs-toolbar flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-b border-[#D9E7F8] bg-white/82 p-2 shadow-sm backdrop-blur-xl sm:gap-2 sm:p-3 custom-scrollbar">
+        <button type="button" onClick={() => setIsSidebarOpen(value => !value)} className={`min-h-11 shrink-0 rounded-2xl border px-4 py-2 text-xs font-black uppercase tracking-widest shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/45 ${isSidebarOpen ? 'border-[#7B61FF] bg-gradient-to-r from-[#5B4BFF] to-[#7B61FF] text-white' : 'border-[#D9E7F8] bg-white/90 text-[#5B4BFF] hover:bg-[#F7F5FF]'}`} aria-label={isSidebarOpen ? 'Close Open Docs panel' : 'Open Open Docs panel'} aria-expanded={isSidebarOpen} aria-controls="open-docs-panel">Open Docs</button>
+        <button type="button" onClick={() => { saveCurrentPage(); setIsReadingMode(true); }} className="min-h-11 shrink-0 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-2 text-xs font-black uppercase tracking-widest text-[#536178] shadow-sm transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF] hover:shadow-md">Reading Mode</button>
         {(smartDocToolbarCommands || []).map(([cmd, label]) => (<button key={cmd} type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand(cmd)} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 shadow-sm transition active:scale-95 hover:bg-white/90 hover:shadow-sm">{label}</button>))}
         <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('formatBlock', '<h1>')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">H1</button>
         <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('formatBlock', '<h2>')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">H2</button>
@@ -920,23 +940,52 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
       </div>
 
       <div className="relative min-h-0 flex-1 overflow-hidden">
+        {isSidebarOpen && isCompactDocs && (<button type="button" aria-label="Close Open Docs panel" onClick={() => setIsSidebarOpen(false)} className="absolute inset-0 z-10 bg-[#081A45]/35 backdrop-blur-[2px]" />)}
         {isSidebarOpen && (
-          <div className={`${isCompactDocs ? 'absolute inset-x-2 top-2 z-20 max-h-[70vh] rounded-[1.5rem] border border-cyan-100 bg-white/95 shadow-[0_24px_70px_rgba(15,23,42,0.18)] backdrop-blur-2xl' : 'absolute left-3 top-3 z-20 h-[calc(100%-1.5rem)] w-72 rounded-[1.5rem] border border-white/60 bg-white/85 shadow-[0_24px_70px_rgba(15,23,42,0.14)] backdrop-blur-2xl'} flex min-h-0 flex-col overflow-hidden`}>
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-slate-200/70 p-3">
-              <button type="button" onClick={() => setIsSidebarOpen(false)} className="rounded-full border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 shadow-sm hover:bg-slate-50">← Back</button>
-              <p className="min-w-0 flex-1 truncate text-right text-xs font-black uppercase tracking-[0.2em] text-cyan-700">Open Docs</p>
+          <div
+            id="open-docs-panel"
+            ref={panelRef}
+            role="dialog"
+            aria-modal={isCompactDocs}
+            aria-labelledby={panelTitleId}
+            aria-describedby={panelDescriptionId}
+            tabIndex={-1}
+            className={`${isCompactDocs ? 'fixed inset-y-0 left-0 z-20 w-[min(92svw,24rem)] max-w-full rounded-r-[2rem] border-r border-[#D9E7F8] bg-white/96 shadow-[0_24px_70px_rgba(8,26,69,0.24)]' : 'absolute left-4 top-4 z-20 h-[calc(100%-2rem)] w-[21rem] rounded-[1.75rem] border border-[#D9E7F8] bg-white/88 shadow-[0_24px_70px_rgba(91,75,255,0.16)]'} flex min-h-0 flex-col overflow-hidden outline-none backdrop-blur-2xl transition-transform duration-300`}
+            style={isCompactDocs ? { paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' } : undefined}
+          >
+            <div className="shrink-0 border-b border-[#E3E8F5] bg-gradient-to-br from-white via-[#F8FBFF] to-[#F1EEFF] p-4">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#7B61FF]">Workspace drawer</p>
+                  <h2 id={panelTitleId} className="mt-1 text-2xl font-black text-[#081A45]">Open Docs</h2>
+                  <p id={panelDescriptionId} className="mt-1 text-sm font-bold text-[#7C879A]">Pages saved for this course file.</p>
+                </div>
+                <button type="button" onClick={() => setIsSidebarOpen(false)} className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-xl font-black text-[#081A45] shadow-sm transition hover:bg-[#F7F5FF] focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/45" aria-label="Close Open Docs panel">×</button>
+              </div>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-3 custom-scrollbar">
-              <p className="mb-2 text-xs font-black uppercase tracking-widest text-slate-500">Pages on this device</p>
-              <div className="space-y-2">{pages.map(page => (<button key={page.id} type="button" onClick={() => { selectPage(page.id); if (isCompactDocs) setIsSidebarOpen(false); }} className={`w-full rounded-xl px-3 py-3 text-left text-sm font-bold transition ${page.id === activePageId ? 'bg-cyan-100 text-cyan-800 shadow-sm' : 'bg-white/80 text-slate-700 hover:bg-white'}`}><span className="block truncate">{page.title}</span><span className="mt-1 block text-[10px] font-bold uppercase tracking-widest text-slate-400">{getMeaningfulDocText(page.content).slice(0, 42) || 'Empty page'}</span></button>))}</div>
-              <button type="button" onClick={addPage} className="mt-4 w-full rounded-xl bg-cyan-600 px-3 py-2 text-sm font-black text-white shadow-sm hover:bg-cyan-700">+ New page</button>
-              <button type="button" onClick={renamePage} className="mt-2 w-full rounded-xl bg-white/90 px-3 py-2 text-sm font-black text-slate-700 hover:bg-white">Rename page</button>
-              {pages.length > 1 && (<button type="button" onClick={deletePage} className="mt-2 w-full rounded-xl bg-rose-100 px-3 py-2 text-sm font-black text-rose-700 hover:bg-rose-200">Delete page</button>)}
-              <p className="mt-4 rounded-xl bg-cyan-50 px-3 py-2 text-xs font-bold text-cyan-800">Learner-created pages are saved locally in this browser for this product file.</p>
+            <div className="min-h-0 flex-1 overflow-y-auto p-4 custom-scrollbar">
+              <p className="mb-3 text-xs font-black uppercase tracking-widest text-[#536178]">Pages on this device</p>
+              {pages.length === 0 ? <div className="rounded-2xl border border-dashed border-[#C9C2FF] bg-[#F7F5FF] p-4 text-sm font-bold text-[#536178]">No pages yet. Create your first note page.</div> : (
+                <div className="space-y-2.5">{pages.map(page => {
+                  const selected = page.id === activePageId;
+                  return (
+                    <button key={page.id} type="button" onClick={() => { selectPage(page.id); if (isCompactDocs) setIsSidebarOpen(false); }} aria-current={selected ? 'page' : undefined} className={`min-h-16 w-full rounded-2xl border px-4 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/45 ${selected ? 'border-[#B7E7FF] bg-gradient-to-br from-[#F1EEFF] via-white to-[#EAFBFF] text-[#081A45] shadow-[0_14px_34px_rgba(91,75,255,0.12)]' : 'border-[#E3E8F5] bg-white/82 text-[#536178] hover:border-[#C9C2FF] hover:bg-[#F8FBFF]'}`}>
+                      <span className="block truncate text-sm font-black">{page.title}</span>
+                      <span className="mt-1 block truncate text-xs font-bold text-[#7C879A]">{getMeaningfulDocText(page.content).slice(0, 64) || 'Empty page'}</span>
+                      <span className="mt-1 block text-[10px] font-black uppercase tracking-widest text-[#9AA4B5]">Updated {new Date(page.updatedAt || Date.now()).toLocaleDateString()}</span>
+                    </button>
+                  );
+                })}</div>
+              )}
+              <div className="mt-4 grid gap-2">
+                <button type="button" onClick={addPage} className="min-h-11 w-full rounded-2xl bg-gradient-to-r from-[#5B4BFF] to-[#7B61FF] px-4 py-3 text-sm font-black text-white shadow-[0_14px_34px_rgba(91,75,255,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_rgba(91,75,255,0.28)]">+ New Page</button>
+                <button type="button" onClick={renamePage} className="min-h-11 w-full rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-black text-[#536178] transition hover:border-[#C9C2FF] hover:bg-[#F7F5FF] hover:text-[#5B4BFF]">Rename Page</button>
+                {pages.length > 1 && (<button type="button" onClick={deletePage} className="min-h-11 w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700 transition hover:bg-rose-100">Delete Page</button>)}
+              </div>
+              <p className="mt-4 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-3 text-xs font-bold leading-5 text-[#536178]">{savedAt.includes('cloud') ? savedAt : `${savedAt} · saved locally and synced when available`}</p>
             </div>
           </div>
         )}
-        {isSidebarOpen && isCompactDocs && (<button type="button" aria-label="Close Open Docs panel" onClick={() => setIsSidebarOpen(false)} className="absolute inset-0 z-10 bg-slate-950/20 backdrop-blur-[1px]" />)}
         <div className={`h-full min-h-0 overflow-y-auto p-3 transition-[padding] duration-300 sm:p-4 md:p-8 custom-scrollbar ${editorShellClass}`}>
           <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={saveCurrentPage} onBlur={saveCurrentPage} onKeyUp={() => saveEditorSelection(editorRef.current, selectionRef)} onMouseUp={() => saveEditorSelection(editorRef.current, selectionRef)} onTouchEnd={() => saveEditorSelection(editorRef.current, selectionRef)} onFocus={() => saveEditorSelection(editorRef.current, selectionRef)} className={`open-docs-page mx-auto min-h-full w-full ${editorPageWidthClass} rounded-[1.25rem] border border-white/50 bg-white/80 px-4 py-6 text-base leading-7 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl transition-[max-width] duration-300 sm:rounded-[1.5rem] sm:px-8 sm:py-10 sm:text-lg sm:leading-8 md:px-14 [&_h1]:text-3xl sm:[&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-2xl sm:[&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6`} />
         </div>
@@ -1679,7 +1728,7 @@ const CoursePlayer: React.FC<{
               <ModuleIcon className="h-7 w-7" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#5B4BFF]">Welcome to the Course</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#5B4BFF]">Course Player</p>
               <h1 className="mt-1 truncate text-2xl font-black leading-tight text-[#071735]">{product.title}</h1>
               <p className="mt-1 truncate text-sm font-bold text-[#667085]">
                 {activeFile?.name ? `Now learning: ${activeFile.name}` : 'Continue your learning journey'}
