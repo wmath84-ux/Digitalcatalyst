@@ -10,6 +10,7 @@ import {
   type Unsubscribe,
 } from 'firebase/firestore';
 import { db } from '../firebase';
+import { normalizeCoinPrice as normalizeCoinPriceEligibility } from './economy';
 
 export const EDUCOIN_SECONDS_PER_COIN = 120;
 
@@ -63,10 +64,7 @@ const completedCoinsFromSeconds = (seconds: number): number => {
   return Math.max(0, Math.floor(seconds / EDUCOIN_SECONDS_PER_COIN));
 };
 
-export const normalizeCoinPrice = (value: unknown): number => {
-  const price = safeNumber(value, 0);
-  return Math.max(0, Math.floor(price));
-};
+export const normalizeCoinPrice = (value: unknown): number => normalizeCoinPriceEligibility(value).normalizedCoinPrice;
 
 export const ensureUserCoinWallet = async (userId: string): Promise<void> => {
   if (!userId) return;
@@ -651,14 +649,23 @@ export const redeemProductWithEduCoins = async ({
 
     const product = productSnap.exists() ? productSnap.data() : null;
     const explicitCoinPrice = normalizeCoinPrice(requiredCoins);
-    const coinPrice = explicitCoinPrice > 0 ? explicitCoinPrice : normalizeCoinPrice(product?.coinPrice);
-    const isCoinRedeemEnabled = product ? product.isCoinRedeemEnabled !== false : coinPrice > 0;
+    const productCoinEligibility = normalizeCoinPriceEligibility(product?.coinPrice);
+    const coinPrice = product ? productCoinEligibility.normalizedCoinPrice : explicitCoinPrice;
+    const isCoinRedeemEnabled = product ? product.isCoinRedeemEnabled !== false && productCoinEligibility.isCoinPurchaseEnabled : coinPrice > 0;
     const productStatus = String(product?.status || 'active');
 
-    if (!productSnap.exists() && coinPrice <= 0) {
+    if (!productSnap.exists()) {
       return {
         success: false,
         reason: 'product_not_found' as const,
+      };
+    }
+
+    if (coinPrice <= 0) {
+      return {
+        success: false,
+        reason: 'redeem_disabled' as const,
+        requiredCoins: 0,
       };
     }
 
