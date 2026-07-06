@@ -2,7 +2,7 @@
 // FIX: Imported useState, useEffect, and useRef hooks from React to resolve 'Cannot find name' errors.
 import React, { useState, useEffect, useRef } from 'react';
 import { ActiveCoinDiscount, ProductWithRating, Review, Coupon, WebsiteSettings, PriceHistoryEntry, User, ProductAccessState } from '../App';
-import { EconomySettings, resolveCoinPrice } from '../utils/economy';
+import { EconomySettings, normalizeCoinPrice, shouldShowCoinButton } from '../utils/economy';
 import { getProductCoinPrice, redeemProductWithEduCoins, watchUserCoinWallet } from '../utils/coinWallet';
 import PaymentModal from './PaymentModal';
 import RatingsAndReviews from './RatingsAndReviews';
@@ -331,8 +331,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     setModalOpen(true);
   };
 
-  const adminConfiguredCoinPrice = resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id);
-  const productCoinPrice = adminConfiguredCoinPrice > 0 ? adminConfiguredCoinPrice : (liveCoinPrice ?? 0);
+  const productCoinEligibility = normalizeCoinPrice(product.coinPrice);
+  const productCoinPrice = productCoinEligibility.normalizedCoinPrice;
+  const canShowProductCoinCheckout = Boolean(onCoinPurchase) && !isPurchased && shouldShowCoinButton(productCoinPrice, isCoinRedeemEnabled);
   const userCoinBalance = liveUserCoinBalance || ((currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0);
   const requiredProductCoins = Math.max(0, productCoinPrice * quantity);
   const missingProductCoins = Math.max(0, requiredProductCoins - userCoinBalance);
@@ -340,8 +341,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const coinCheckoutDisabled =
     isCoinButtonChecking ||
     isRedeemingWithCoins ||
-    !isCoinRedeemEnabled ||
-    isPurchased ||
+    !canShowProductCoinCheckout ||
     requiredProductCoins <= 0;
 
   const coinCheckoutLabel = isPurchased
@@ -350,9 +350,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       ? 'Unlocking...'
       : !isCoinRedeemEnabled
         ? 'EduCoin checkout disabled'
-        : requiredProductCoins <= 0
-          ? 'Coin checkout unavailable'
-          : userCoinBalance < requiredProductCoins
+        : userCoinBalance < requiredProductCoins
             ? `Earn ${missingProductCoins} more coins`
             : `Pay with ${requiredProductCoins} coins`;
 
@@ -370,15 +368,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     }
     if (!productId || isRedeemingWithCoins) return;
 
-    if (requiredProductCoins <= 0) {
-      setCoinRedeemModal({
-        open: true,
-        title: 'EduCoin checkout unavailable',
-        message: 'This product does not have an EduCoin price configured yet. Please check the admin Product Management coin setting.',
-        showProfileButton: false,
-      });
-      return;
-    }
+    if (!canShowProductCoinCheckout || requiredProductCoins <= 0) return;
 
     if (userCoinBalance < requiredProductCoins) {
       onInsufficientCoins?.({
@@ -458,6 +448,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const handleModalConfirmWithCoins = async () => {
     setIsCoinButtonChecking(true);
     try {
+      if (!canShowProductCoinCheckout || requiredProductCoins <= 0) return false;
       const wasPurchased = await (onCoinPurchase?.(product, quantity) || false);
       if (!wasPurchased) {
         setIsCoinButtonChecking(false);
@@ -501,8 +492,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         onConfirm={handleModalConfirm}
         paymentLink={product.paymentLink}
         currentUser={currentUser}
-        coinPrice={productCoinPrice * quantity}
-        onConfirmWithCoins={onCoinPurchase ? handleModalConfirmWithCoins : undefined}
+        coinPrice={canShowProductCoinCheckout ? productCoinPrice * quantity : 0}
+        onConfirmWithCoins={canShowProductCoinCheckout ? handleModalConfirmWithCoins : undefined}
         onStartEarning={onStartEarning}
         onInsufficientCoins={(details) => onInsufficientCoins?.({ ...details, productTitle: product.title })}
         initialShowCoinGuide={openCoinGuideOnMount}
@@ -560,7 +551,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
               <div className="mt-4 grid grid-cols-3 gap-2 sm:mt-5 sm:gap-3">
                 <div className="rounded-2xl border border-white/70 bg-white/70 p-3 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl sm:rounded-3xl sm:p-4"><p className="text-xl sm:text-2xl">⚡</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Instant</p><p className="text-sm font-black text-slate-900">Unlock</p></div>
-                <div className="rounded-2xl border border-white/70 bg-white/70 p-3 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl sm:rounded-3xl sm:p-4"><p className="text-xl sm:text-2xl">🪙</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Wallet</p><p className="text-sm font-black text-slate-900">{productCoinPrice > 0 ? `${productCoinPrice} Coins` : 'Razorpay'}</p></div>
+                <div className="rounded-2xl border border-white/70 bg-white/70 p-3 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl sm:rounded-3xl sm:p-4"><p className="text-xl sm:text-2xl">🪙</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Wallet</p><p className="text-sm font-black text-slate-900">{canShowProductCoinCheckout ? `${productCoinPrice} Coins` : 'Razorpay'}</p></div>
                 <div className="rounded-2xl border border-white/70 bg-white/70 p-3 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl sm:rounded-3xl sm:p-4"><p className="text-xl sm:text-2xl">⭐</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Rating</p><p className="text-sm font-black text-slate-900">{product.rating.toFixed(1)} / 5</p></div>
               </div>
 
@@ -657,7 +648,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   <button disabled={isPurchased} onClick={handleBuyClick} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3.5 text-base font-black text-white shadow-[0_16px_40px_rgba(79,70,229,0.25)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
                     {isPurchased ? 'Purchased' : 'Pay with Razorpay'}
                   </button>
-                  {onCoinPurchase && productCoinPrice > 0 && (
+                  {canShowProductCoinCheckout && (
                     <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
                       🪙 {coinCheckoutLabel}
                       {requiredProductCoins > 0 && (

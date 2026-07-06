@@ -5,6 +5,7 @@ import NewProductEmailPreviewModal from './NewProductEmailPreviewModal';
 import { getDownloadURL, ref, uploadBytes, uploadBytesResumable } from 'firebase/storage';
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db, storage } from '../../firebase';
+import { normalizeCoinPrice } from '../../utils/economy';
 
 type ProductViewState = 'list' | 'add' | 'edit';
 
@@ -925,7 +926,7 @@ const ContentComposer: React.FC<{
         const updateId = String(state.paidUpdateId || '').trim();
         const updateTitle = String(state.paidUpdateTitle || '').trim();
         const updatePrice = String(state.paidUpdatePrice || '').trim();
-        const updateCoinPrice = Math.max(0, Math.floor(Number(state.paidUpdateCoinPrice || 0)));
+        const updateCoinPrice = normalizeCoinPrice(state.paidUpdateCoinPrice).normalizedCoinPrice;
 
         return {
             accessLevel,
@@ -1323,8 +1324,9 @@ const ContentComposer: React.FC<{
                                         <input value={formState.paidUpdatePrice || ''} onChange={event => setFormState(prev => prev ? { ...prev, paidUpdatePrice: event.target.value } : prev)} className={fieldClass} inputMode="decimal" placeholder="99" />
                                     </label>
                                     <label>
-                                        <span className={labelClass}>Update Coin Price</span>
+                                        <span className={labelClass}>EduCoin Price</span>
                                         <input value={formState.paidUpdateCoinPrice || ''} onChange={event => setFormState(prev => prev ? { ...prev, paidUpdateCoinPrice: event.target.value } : prev)} className={fieldClass} inputMode="numeric" placeholder="500" />
+                                        <span className="mt-1 block text-xs font-bold text-slate-500">Leave empty or set 0 to disable EduCoin purchase. Empty/0 makes this content money only.</span>
                                     </label>
                                 </div>
                             )}
@@ -1696,7 +1698,7 @@ const ProductForm: React.FC<{
             tags,
             price: formattedPrice,
             salePrice: formattedSalePrice,
-            coinPrice: Math.max(0, Number(formData.coinPrice || 0)),
+            coinPrice: normalizeCoinPrice(formData.coinPrice).normalizedCoinPrice,
             isCoinRedeemEnabled: formData.isCoinRedeemEnabled !== false,
             category: formData.category,
             department: formData.department,
@@ -1814,10 +1816,11 @@ const ProductForm: React.FC<{
                                 <div className="mt-5 space-y-4">
                                     <div><label className={labelClass}>Regular Price</label><input required type="number" value={formData.price} onChange={event => setFormData(prev => ({ ...prev, price: event.target.value }))} className={fieldClass} placeholder="999" /></div>
                                     <div><label className={labelClass}>Sale Price</label><input type="number" value={formData.salePrice} onChange={event => setFormData(prev => ({ ...prev, salePrice: event.target.value }))} className={fieldClass} placeholder="499" /></div>
-                                    <div><label className={labelClass}>EduCoin Price (Leave 0 to disable coin purchase)</label><input type="number" min="0" value={formData.coinPrice} onChange={event => setFormData(prev => ({ ...prev, coinPrice: event.target.value }))} className={fieldClass} placeholder="1200" /></div>
+                                    <div><label className={labelClass}>EduCoin Price</label><input type="number" min="0" value={formData.coinPrice} onChange={event => setFormData(prev => ({ ...prev, coinPrice: event.target.value }))} className={fieldClass} placeholder="1200" /><p className="mt-1 text-xs font-bold text-slate-500">Leave empty or set 0 to disable EduCoin purchase.</p></div>
                                     <div className="mt-4">
-                                      <label className="mb-2 block text-sm font-semibold text-slate-700">EduCoin Redeem Price</label>
-                                      <input type="number" min="0" value={formData.coinPrice || 0} onChange={(event) => setFormData((previous) => ({ ...previous, coinPrice: String(Math.max(0, Number(event.target.value || 0))) }))} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="Example: 299" />
+                                      <label className="mb-2 block text-sm font-semibold text-slate-700">EduCoin Price</label>
+                                      <input type="number" min="0" value={formData.coinPrice} onChange={(event) => setFormData((previous) => ({ ...previous, coinPrice: event.target.value }))} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="Example: 299" />
+                                      <p className="mt-1 text-xs font-bold text-slate-500">Leave empty or set 0 to disable EduCoin purchase.</p>
                                       <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={formData.isCoinRedeemEnabled !== false} onChange={(event) => setFormData((previous) => ({ ...previous, isCoinRedeemEnabled: event.target.checked }))} />Enable Pay with EduCoin</label>
                                     </div>
                                     <div><label className={labelClass}>Coupon Code</label><select value={formData.couponCode} onChange={event => setFormData(prev => ({ ...prev, couponCode: event.target.value }))} className={fieldClass}><option value="">No coupon</option>{(coupons || []).map(coupon => <option key={coupon.id} value={coupon.code}>{coupon.code}</option>)}</select></div>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { WebsiteSettings, ProductWithRating, CartItem, User } from '../App';
-import { DEFAULT_ECONOMY_SETTINGS, EconomySettings } from '../utils/economy';
+import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, normalizeCoinPrice } from '../utils/economy';
 import MacWindowModal from './ui/MacWindowModal';
 
 interface PaymentModalProps {
@@ -64,8 +64,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const razorpayUrl = paymentLink || 'https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view';
   const isCartMode = !!cartItems && cartItems.length > 0;
   const eduCoinBalance = Math.max(0, Math.floor(Number((currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0)));
-  const canPayWithCoins = !!onConfirmWithCoins && coinPrice > 0 && eduCoinBalance >= coinPrice;
-  const missingCoins = Math.max(0, coinPrice - eduCoinBalance);
+  const coinEligibility = normalizeCoinPrice(coinPrice);
+  const normalizedCoinPrice = coinEligibility.normalizedCoinPrice;
+  const isCoinCheckoutEnabled = !!onConfirmWithCoins && coinEligibility.isCoinPurchaseEnabled;
+  const canPayWithCoins = isCoinCheckoutEnabled && eduCoinBalance >= normalizedCoinPrice;
+  const missingCoins = Math.max(0, normalizedCoinPrice - eduCoinBalance);
 
   const earnMethods = useMemo(() => [
     { icon: '🎬', title: 'Watch purchased video lessons', text: `${economySettings.coinPerVideoMinute} EduCoin${economySettings.coinPerVideoMinute === 1 ? '' : 's'} per focused video minute`, detail: 'Open an unlocked course/video from My Purchases. Coins are credited only while the video is playing and the tab is focused.' },
@@ -133,12 +136,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const handleCoinCheckout = async () => {
     const user = currentUser as (User & { coinBalance?: number }) | null | undefined;
     const userCoinBalance = Math.max(0, Math.floor(Number(user?.coinBalance ?? user?.eduCoins ?? 0)));
-    if (userCoinBalance < coinPrice || !onConfirmWithCoins) {
-      const shortfall = Math.max(0, coinPrice - userCoinBalance);
-      setCoinStatus(`You have ${userCoinBalance} EduCoins and need ${coinPrice}. Earn ${shortfall} more.`);
+    if (!isCoinCheckoutEnabled || userCoinBalance < normalizedCoinPrice || !onConfirmWithCoins) {
+      const shortfall = Math.max(0, normalizedCoinPrice - userCoinBalance);
+      setCoinStatus(`You have ${userCoinBalance} EduCoins and need ${normalizedCoinPrice}. Earn ${shortfall} more.`);
       if (onInsufficientCoins) {
         onClose();
-        window.setTimeout(() => onInsufficientCoins({ requiredCoins: coinPrice, balance: userCoinBalance, missingCoins: shortfall }), 0);
+        window.setTimeout(() => onInsufficientCoins({ requiredCoins: normalizedCoinPrice, balance: userCoinBalance, missingCoins: shortfall }), 0);
       } else {
         setShowCoinGuide(true);
       }
@@ -156,12 +159,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     }
     if (!unlocked) {
       const latestBalance = (currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0;
-      const shortfall = Math.max(0, coinPrice - latestBalance);
+      const shortfall = Math.max(0, normalizedCoinPrice - latestBalance);
       setCoinStatus('Your wallet balance could not complete this EduCoin checkout. Follow the earning guide below.');
       setIsCompleting(false);
       if (onInsufficientCoins) {
         onClose();
-        window.setTimeout(() => onInsufficientCoins({ requiredCoins: coinPrice, balance: latestBalance, missingCoins: shortfall }), 0);
+        window.setTimeout(() => onInsufficientCoins({ requiredCoins: normalizedCoinPrice, balance: latestBalance, missingCoins: shortfall }), 0);
       } else {
         setShowCoinGuide(true);
       }
@@ -179,7 +182,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-amber-200 bg-amber-100/80 text-2xl shadow-inner sm:h-16 sm:w-16 sm:text-3xl">🪙</div>
           <p className="mt-4 text-xs font-black uppercase tracking-[0.28em] text-amber-600">EduCoin balance low</p>
           <h3 className="mt-2 text-2xl font-black text-slate-950 sm:text-3xl">Earn more EduCoins</h3>
-          <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-600">Your live wallet shows {eduCoinBalance} EduCoins. This checkout needs {coinPrice} EduCoins, so you need {missingCoins} more. These are the exact earning routes already connected in Digital Catalyst.</p>
+          <p className="mx-auto mt-3 max-w-2xl text-sm font-semibold leading-6 text-slate-600">Your live wallet shows {eduCoinBalance} EduCoins. This checkout needs {normalizedCoinPrice} EduCoins, so you need {missingCoins} more. These are the exact earning routes already connected in Digital Catalyst.</p>
         </div>
       </div>
 
@@ -231,9 +234,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           <div className="mt-3 rounded-2xl bg-emerald-50/90 px-4 py-3 text-sm font-black text-emerald-700">
             Wallet discount selected: 🪙 {appliedEduCoins} applied • Live balance: 🪙 {eduCoinBalance}
           </div>
-        ) : coinPrice > 0 ? (
+        ) : isCoinCheckoutEnabled ? (
           <div className="mt-3 rounded-2xl bg-amber-50/90 px-4 py-3 text-sm font-black text-amber-700">
-            EduCoin price: 🪙 {coinPrice} • Your balance: 🪙 {eduCoinBalance}
+            EduCoin price: 🪙 {normalizedCoinPrice} • Your balance: 🪙 {eduCoinBalance}
           </div>
         ) : null}
       </div>
@@ -288,13 +291,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
         <div className="space-y-3">
           <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-500 px-5 py-3.5 text-base font-black text-white shadow-[0_16px_45px_rgba(79,70,229,0.24)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg">{finalPrice <= 0 ? 'Complete ₹0 Checkout' : 'Pay with Razorpay'}</button>
-          {onConfirmWithCoins && coinPrice > 0 && appliedEduCoins <= 0 && (
+          {isCoinCheckoutEnabled && appliedEduCoins <= 0 && (
             <button disabled={isCompleting} onClick={handleCoinCheckout} className={`w-full rounded-2xl border px-5 py-3.5 text-base font-black shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg ${canPayWithCoins ? 'border-amber-200/60 bg-white/80 text-amber-700' : 'border-amber-200 bg-amber-50/90 text-amber-800'}`}>
               <span className="block">
                 {isCompleting ? 'Checking live DB balance...' : canPayWithCoins ? 'Pay with EduCoins' : `Need ${missingCoins} more EduCoins`}
               </span>
               <span className="mt-1 block text-[11px] font-bold text-slate-600">
-                Required: {coinPrice} EduCoins · Balance: {eduCoinBalance} EduCoins
+                Required: {normalizedCoinPrice} EduCoins · Balance: {eduCoinBalance} EduCoins
               </span>
             </button>
           )}

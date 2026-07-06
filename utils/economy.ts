@@ -53,6 +53,35 @@ export const normalizeEconomySettings = (value?: Partial<EconomySettings> | null
   updatedAt: value?.updatedAt,
 });
 
+
+export interface NormalizedCoinPrice {
+  normalizedCoinPrice: number;
+  isCoinPurchaseEnabled: boolean;
+}
+
+export const normalizeCoinPrice = (value: unknown): NormalizedCoinPrice => {
+  if (value === null || value === undefined) {
+    return { normalizedCoinPrice: 0, isCoinPurchaseEnabled: false };
+  }
+
+  if (typeof value === 'string' && value.trim() === '') {
+    return { normalizedCoinPrice: 0, isCoinPurchaseEnabled: false };
+  }
+
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return { normalizedCoinPrice: 0, isCoinPurchaseEnabled: false };
+  }
+
+  const normalizedCoinPrice = Math.floor(numeric);
+  return normalizedCoinPrice > 0
+    ? { normalizedCoinPrice, isCoinPurchaseEnabled: true }
+    : { normalizedCoinPrice: 0, isCoinPurchaseEnabled: false };
+};
+
+export const isCoinPurchaseEnabled = (value: unknown): boolean => normalizeCoinPrice(value).isCoinPurchaseEnabled;
+export const shouldShowCoinButton = (value: unknown, redeemEnabled = true): boolean => redeemEnabled && normalizeCoinPrice(value).isCoinPurchaseEnabled;
+
 export const economySettingsRef = () => doc(db, 'settings', 'economy');
 
 export const subscribeEconomySettings = (onChange: (settings: EconomySettings) => void, onError?: (error: Error) => void) => {
@@ -81,9 +110,9 @@ export const getOverrideForTarget = (settings: EconomySettings, targetType: 'pro
   return overrides[String(targetId)] || null;
 };
 
-export const resolveCoinPrice = (fallbackCoinPrice: number | undefined, settings: EconomySettings, targetType: 'product' | 'subscription', targetId: string | number) => {
+export const resolveCoinPrice = (fallbackCoinPrice: number | string | undefined | null, settings: EconomySettings, targetType: 'product' | 'subscription', targetId: string | number) => {
   const override = getOverrideForTarget(settings, targetType, targetId);
-  return Number(override?.coinPrice ?? fallbackCoinPrice ?? 0);
+  return normalizeCoinPrice(override?.coinPrice ?? fallbackCoinPrice).normalizedCoinPrice;
 };
 
 export const resolveMaxDiscountPercentage = (settings: EconomySettings, targetType: 'product' | 'subscription', targetId: string | number) => {

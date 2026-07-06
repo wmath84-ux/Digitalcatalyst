@@ -39,7 +39,7 @@ import InstallAppButton from './components/InstallAppButton';
 import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { browserLocalPersistence, createUserWithEmailAndPassword, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
-import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
+import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, normalizeCoinPrice, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
 import { ensureUserCoinWallet, spendUserCoinWallet } from './utils/coinWallet';
 import { clearRememberedAuthAccount, getRememberedAuthAccount, RememberedAuthAccount, saveRememberedAuthAccount } from './utils/rememberedAuth';
 import { isMobileViewport as getIsMobileViewport } from './utils/device';
@@ -3574,7 +3574,7 @@ const App: React.FC = () => {
 
     const totalCoinPrice = Math.max(
       0,
-      Math.floor(options.totalCoinsCharged ?? (resolveCoinPrice(product.coinPrice, economySettings, 'product', product.id) * quantity))
+      Math.floor(options.totalCoinsCharged ?? (normalizeCoinPrice(product.coinPrice).normalizedCoinPrice * quantity))
     );
 
     if (!totalCoinPrice) {
@@ -3710,14 +3710,11 @@ const App: React.FC = () => {
     const rawPrice = firstLockedMeta?.paidUpdatePrice || fallbackPrice;
     const updatePrice = Math.max(0, parseCurrency(rawPrice));
     const updateTitle = firstLockedMeta?.paidUpdateTitle || 'Latest course update';
-    const rawCoinPrice = Number(
-      firstLockedMeta?.paidUpdateCoinPrice ??
+    const rawCoinPrice = firstLockedMeta?.paidUpdateCoinPrice ??
       (firstLockedMeta as any)?.updateEducoinPrice ??
       (firstLockedMeta as any)?.educoinPrice ??
-      (firstLockedMeta as any)?.coinPrice ??
-      0
-    );
-    const coinPrice = Math.max(0, Math.floor(rawCoinPrice || 0));
+      (firstLockedMeta as any)?.coinPrice;
+    const coinPrice = normalizeCoinPrice(rawCoinPrice).normalizedCoinPrice;
 
     return {
       updateIds: selectedUpdateIds,
@@ -4511,7 +4508,7 @@ const App: React.FC = () => {
         paymentLink={latestUpdateCheckout.product.paymentLink}
         currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser}
         coinPrice={summary.coinPrice}
-        onConfirmWithCoins={() => handleConfirmLatestUpdateCoinPurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId)}
+        onConfirmWithCoins={summary.coinPrice > 0 ? () => handleConfirmLatestUpdateCoinPurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId) : undefined}
         onInsufficientCoins={(details) => handleInsufficientEduCoins({ ...details, productTitle: `${latestUpdateCheckout.product.title} · ${summary.title}` })}
         presentation="page"
       />
