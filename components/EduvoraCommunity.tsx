@@ -743,6 +743,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [isSubmittingMasterTag, setIsSubmittingMasterTag] = useState(false);
   const [masterTagSuccess, setMasterTagSuccess] = useState<MasterTagRequest | null>(null);
   const [selectedMasterTagId, setSelectedMasterTagId] = useState(initialMasterTagRequests[0].id);
+  const [isMasterTagDetailOpen, setIsMasterTagDetailOpen] = useState(false);
+  const [masterTagDetailFeedback, setMasterTagDetailFeedback] = useState('');
+  const masterTagDetailPanelRef = useRef<HTMLDivElement>(null);
+  const masterTagViewReturnRef = useRef<HTMLButtonElement | null>(null);
   const [likedMasterTagIds, setLikedMasterTagIds] = useState<number[]>([]);
   const [profile, setProfile] = useState<CommunityProfile>(() => readJsonObject(COMMUNITY_PROFILE_STORAGE_KEY, defaultCommunityProfile));
   const [profileDraft, setProfileDraft] = useState<CommunityProfile>(() => readJsonObject(COMMUNITY_PROFILE_STORAGE_KEY, defaultCommunityProfile));
@@ -2660,7 +2664,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     .filter((request) => masterTagFilter === 'All' || request.category === masterTagFilter)
     .filter((request) => !normalizedMasterTagQuery || normalizeSearchText([request.targetMasterName, request.targetMasterUsername, request.targetMasterRole, request.targetMasterSubject, request.author, request.category, request.detail, request.normalizedSearchText, ...(request.searchTokens || [])].join(' ')).includes(normalizedMasterTagQuery))
     .sort((a, b) => masterTagSort === 'appreciated' ? b.likes - a.likes : masterTagSort === 'trending' ? (b.likes + Object.values(b.reactions || {}).reduce((x, y) => Number(x) + Number(y), 0)) - (a.likes + Object.values(a.reactions || {}).reduce((x, y) => Number(x) + Number(y), 0)) : (b.createdAt || b.id) - (a.createdAt || a.id));
-  const selectedMasterTag = masterTagRequests.find((request) => request.id === selectedMasterTagId) || masterTagRequests[0];
+  const selectedMasterTag = masterTagRequests.find((request) => request.id === selectedMasterTagId) || null;
   const masterTagAdminReplies = useMemo(() => supportTickets.reduce<Record<number, CommunitySupportTicket>>((replyMap, ticket) => {
     if (ticket.source === 'masterTag' && ticket.communityThreadId && ticket.adminReply) replyMap[ticket.communityThreadId] = ticket;
     return replyMap;
@@ -2671,6 +2675,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     requests: filteredMasterTagRequests.filter((request) => request.category === category),
   })).filter((group) => group.requests.length);
   const trendingMasterTags = [...masterTagRequests].filter((request) => !request.status || request.status === 'active').sort((a, b) => b.likes - a.likes).slice(0, 5);
+  const relatedMasterTags = selectedMasterTag ? masterTagRequests
+    .filter((request) => request.id !== selectedMasterTag.id && (!request.status || request.status === 'active') && (
+      (selectedMasterTag.targetMasterId && request.targetMasterId === selectedMasterTag.targetMasterId) ||
+      (selectedMasterTag.targetMasterName && request.targetMasterName === selectedMasterTag.targetMasterName) ||
+      request.category === selectedMasterTag.category
+    ))
+    .slice(0, 4) : [];
 
   const renderMasterTagCard = (request: MasterTagRequest, compact = false) => (
     <article key={request.id || 'preview'} className={`group rounded-[1.75rem] border border-[#D9E7F8] bg-white p-4 shadow-[0_18px_54px_rgba(23,105,255,0.10)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(123,97,255,0.16)] ${masterTagSuccess?.id === request.id ? 'ring-4 ring-[#F5B82E]/25' : ''} ${compact ? 'p-4' : 'sm:p-5'}`}>
@@ -2685,36 +2696,128 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       <p className="mt-4 whitespace-pre-wrap text-sm font-semibold leading-7 text-[#536178] sm:text-base">“{request.detail}”</p>
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#EEF6FF] pt-4">
         <div className="flex min-w-0 items-center gap-2"><Avatar value={request.avatar} size="h-8 w-8" /><p className="truncate text-xs font-bold text-[#7C879A]">Tagged by <span className="text-[#081A45]">{request.author}</span> · {request.time}</p></div>
-        <div className="flex shrink-0 items-center gap-2"><button type="button" onClick={(event) => { event.stopPropagation(); if (request.id) likeMasterTag(request.id); }} className={`rounded-full px-3 py-1.5 text-xs font-black transition ${(request.likedByUsers?.[currentUserKey] || likedMasterTagIds.includes(request.id)) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#EEF6FF] text-[#1769FF] hover:bg-[#E8F2FF]'}`}>💛 {request.likes}</button>{!compact && <button type="button" onClick={() => request.id && openMasterTagDetail(request.id)} className="rounded-full bg-[#081A45] px-3 py-1.5 text-xs font-black text-white">View</button>}</div>
+        <div className="flex shrink-0 items-center gap-2"><button type="button" onClick={(event) => { event.stopPropagation(); if (request.id) likeMasterTag(request.id); }} className={`rounded-full px-3 py-1.5 text-xs font-black transition ${(request.likedByUsers?.[currentUserKey] || likedMasterTagIds.includes(request.id)) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#EEF6FF] text-[#1769FF] hover:bg-[#E8F2FF]'}`}>💛 {request.likes}</button>{!compact && <button type="button" ref={selectedMasterTagId === request.id ? masterTagViewReturnRef : undefined} onClick={(event) => { event.stopPropagation(); if (request.id) openMasterTagDetail(request.id, event.currentTarget); }} aria-label={`View master tag from ${request.targetMasterName || request.title || request.author}`} className="rounded-full bg-[#081A45] px-3 py-1.5 text-xs font-black text-white transition hover:-translate-y-0.5 hover:bg-[#1769FF] focus:outline-none focus:ring-4 focus:ring-[#1769FF]/20">View</button>}</div>
       </div>
     </article>
   );
 
-  const openMasterTagDetail = (requestId: number) => {
+  const openMasterTagDetail = (requestId: number, returnButton?: HTMLButtonElement | null) => {
+    const target = masterTagRequests.find((request) => request.id === requestId);
     setSelectedMasterTagId(requestId);
-    if (window.matchMedia('(max-width: 767px)').matches) pushPage('masterTagDetail');
+    setMasterTagDetailFeedback(target && target.status && target.status !== 'active' ? 'This master tag is no longer available.' : '');
+    setIsMasterTagDetailOpen(true);
+    if (returnButton) masterTagViewReturnRef.current = returnButton;
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.set('masterTagId', String(requestId));
+      window.history.pushState({ ...(window.history.state || {}), dcView: 'community', dcCommunityMasterTagId: requestId }, '', url.toString());
+    }
+    requestAnimationFrame(() => masterTagDetailPanelRef.current?.focus());
   };
 
-  const renderMasterTagDetailPage = (showBackButton = true) => selectedMasterTag ? (
-    <div className="space-y-4 pb-28 md:pb-0">
-      {showBackButton ? <button type="button" onClick={() => setPage('masterTags')} className="rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-black text-[#536178] shadow-sm transition hover:bg-[#EEF6FF]">← Back to Master Tags</button> : null}
-      {renderMasterTagCard(selectedMasterTag)}
-      <section className="rounded-[1.75rem] border border-[#D9E7F8] bg-[#F8FBFF] p-5">
-        <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Community response</p>
-        <p className="mt-2 text-sm font-semibold leading-7 text-[#536178]">{selectedMasterTagReply?.adminReply || 'No master reply yet. Community members can still appreciate and react respectfully.'}</p>
-        <div className="mt-4 flex flex-wrap gap-2">{REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMasterTag(selectedMasterTag.id, emoji)} className="rounded-full border border-[#D9E7F8] bg-white px-4 py-2 text-sm font-black text-[#081A45] transition hover:border-[#1769FF]">{emoji} {selectedMasterTag.reactions[emoji] || 0}</button>)}</div>
-      </section>
-    </div>
-  ) : null;
+  const closeMasterTagDetail = () => {
+    setIsMasterTagDetailOpen(false);
+    setMasterTagDetailFeedback('');
+    if (typeof window !== 'undefined') {
+      const url = new URL(window.location.href);
+      url.searchParams.delete('masterTagId');
+      window.history.replaceState({ ...(window.history.state || {}), dcView: 'community' }, '', url.toString());
+    }
+    requestAnimationFrame(() => masterTagViewReturnRef.current?.focus());
+  };
 
-  const renderMasterTagDock = () => (
-    <div className="fixed inset-x-0 bottom-[calc(env(safe-area-inset-bottom)+1rem)] z-[1350] flex justify-center px-3 pointer-events-none md:bottom-5">
-      <nav className="pointer-events-auto flex max-w-[94vw] items-center gap-2 overflow-x-auto rounded-[2rem] border border-[#D9E7F8] bg-white/95 p-2 shadow-[0_18px_60px_rgba(23,105,255,0.22)] backdrop-blur-2xl custom-scrollbar" aria-label="Master tag dock">
-        <button type="button" onClick={() => setPage('tagMaster')} className={`min-w-[120px] rounded-2xl px-4 py-3 text-center transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'tagMaster' ? 'bg-[#1769FF] text-white shadow-lg' : 'bg-white text-[#081A45] hover:bg-[#EEF6FF]'}`}><span className="block text-2xl">🏷️</span><span className="text-[11px] font-black">Tag your master</span></button>
-        <button type="button" onClick={() => setPage('masterTags')} className={`min-w-[120px] rounded-2xl px-4 py-3 text-center transition duration-300 hover:-translate-y-1 active:scale-95 ${page === 'masterTags' || page === 'masterTagDetail' ? 'bg-[#1769FF] text-white shadow-lg' : 'bg-white text-[#081A45] hover:bg-[#EEF6FF]'}`}><span className="block text-2xl">📚</span><span className="text-[11px] font-black">Master Tags</span></button>
-      </nav>
+  useEffect(() => {
+    if (typeof window === 'undefined' || !masterTagRequests.length) return;
+    const rawTagId = new URL(window.location.href).searchParams.get('masterTagId');
+    const tagId = rawTagId ? Number(rawTagId) : 0;
+    if (!tagId || Number.isNaN(tagId) || isMasterTagDetailOpen) return;
+    setPage('masterTags');
+    setSelectedMasterTagId(tagId);
+    setIsMasterTagDetailOpen(true);
+    const target = masterTagRequests.find((request) => request.id === tagId);
+    setMasterTagDetailFeedback(target && target.status && target.status !== 'active' ? 'This master tag is no longer available.' : '');
+  }, [isMasterTagDetailOpen, masterTagRequests]);
+
+  useEffect(() => {
+    if (!isMasterTagDetailOpen) return;
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === 'Escape') closeMasterTagDetail(); };
+    window.addEventListener('keydown', onKeyDown);
+    requestAnimationFrame(() => masterTagDetailPanelRef.current?.focus());
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [isMasterTagDetailOpen]);
+
+  const renderMasterTagUnavailable = () => (
+    <div className="rounded-[2rem] border border-dashed border-[#D9E7F8] bg-white p-8 text-center shadow-[0_20px_60px_rgba(23,105,255,0.10)]">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF6FF] text-2xl">🏷️</div>
+      <h3 className="mt-4 text-2xl font-black text-[#081A45]">This master tag is no longer available.</h3>
+      <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">It may have been deleted, hidden, or it is not visible to your account.</p>
+      <button type="button" onClick={closeMasterTagDetail} className="mt-5 rounded-2xl bg-[#1769FF] px-5 py-3 text-sm font-black text-white">Back to Master Tags</button>
     </div>
   );
+
+  const renderMasterTagDetailContent = () => {
+    if (!selectedMasterTag || (selectedMasterTag.status && selectedMasterTag.status !== 'active')) return renderMasterTagUnavailable();
+
+    const appreciated = Boolean(selectedMasterTag.likedByUsers?.[currentUserKey] || likedMasterTagIds.includes(selectedMasterTag.id));
+    const related = relatedMasterTags.filter((tag) => !tag.status || tag.status === 'active');
+    const masterName = selectedMasterTag.targetMasterName || selectedMasterTag.title || 'Community Master';
+
+    return (
+      <div className="space-y-4">
+        {masterTagDetailFeedback ? <div className="rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{masterTagDetailFeedback}</div> : null}
+        <section className="relative overflow-hidden rounded-[2rem] border border-[#D9E7F8] bg-gradient-to-br from-[#EEF6FF] via-white to-[#F1EEFF] p-5 shadow-[0_24px_70px_rgba(23,105,255,0.14)] sm:p-6">
+          <span className="pointer-events-none absolute -right-16 -top-16 h-40 w-40 rounded-full bg-[#7B61FF]/12 blur-3xl" />
+          <div className="relative flex items-start gap-4">
+            <Avatar value={selectedMasterTag.targetMasterAvatar || selectedMasterTag.avatar || '🌟'} size="h-16 w-16" />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2"><h2 className="min-w-0 truncate text-2xl font-black text-[#081A45] sm:text-3xl">{masterName}</h2>{selectedMasterTag.verifiedMaster ? <span className="rounded-full bg-[#E8F2FF] px-2 py-1 text-[10px] font-black text-[#1769FF]">✓ Verified</span> : null}{selectedMasterTag.isExternalMaster ? <span className="rounded-full bg-[#FEF7E0] px-2 py-1 text-[10px] font-black text-[#9A6500]">External</span> : null}</div>
+              <p className="mt-1 text-sm font-bold text-[#536178]">{selectedMasterTag.targetMasterRole || selectedMasterTag.tagType || 'Community Master'}{selectedMasterTag.targetMasterUsername ? ` · @${selectedMasterTag.targetMasterUsername}` : ''}</p>
+              <div className="mt-3 flex flex-wrap gap-2"><span className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-[#1769FF] shadow-sm">{selectedMasterTag.category}</span><span className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-[#7B61FF] shadow-sm">{selectedMasterTag.tagType || 'Appreciation'}</span>{selectedMasterTag.targetMasterSubject ? <span className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-[#536178] shadow-sm">{selectedMasterTag.targetMasterSubject}</span> : null}</div>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-[2rem] border border-[#D9E7F8] bg-white p-5 shadow-[0_20px_60px_rgba(23,105,255,0.10)] sm:p-6">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-[#7B61FF]">Appreciation message</p>
+          <p className="mt-4 whitespace-pre-wrap text-lg font-semibold leading-8 text-[#081A45] sm:text-xl sm:leading-9">“{selectedMasterTag.detail}”</p>
+          <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-[#EEF6FF] pt-4">
+            <div className="flex min-w-0 items-center gap-3"><Avatar value={selectedMasterTag.avatar || '🧑‍🎓'} size="h-10 w-10" /><div className="min-w-0"><p className="truncate text-sm font-black text-[#081A45]">Tagged by {selectedMasterTag.author || 'Eduvora Member'}</p><p className="truncate text-xs font-bold text-[#7C879A]">{selectedMasterTag.time || (selectedMasterTag.createdAt ? new Date(selectedMasterTag.createdAt).toLocaleString() : 'Recently')}</p></div></div>
+            <div className="flex flex-wrap gap-2"><button type="button" onClick={() => likeMasterTag(selectedMasterTag.id)} className={`min-h-11 rounded-full px-4 text-sm font-black transition ${appreciated ? 'bg-[#FEF7E0] text-[#9A6500]' : 'bg-[#EEF6FF] text-[#1769FF] hover:bg-[#E8F2FF]'}`}>💛 {appreciated ? 'Appreciated' : 'Appreciate'} · {selectedMasterTag.likes}</button><button type="button" onClick={() => { const shareUrl = new URL(window.location.href); shareUrl.searchParams.set('masterTagId', String(selectedMasterTag.id)); navigator.clipboard?.writeText(shareUrl.toString()).then(() => setMasterTagDetailFeedback('Link copied.')).catch(() => setMasterTagDetailFeedback('Share link is ready, but copy failed.')); }} className="min-h-11 rounded-full border border-[#D9E7F8] bg-white px-4 text-sm font-black text-[#536178]">Share</button></div>
+          </div>
+        </section>
+
+        <section className="rounded-[2rem] border border-[#D9E7F8] bg-[#F8FBFF] p-5">
+          <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Community response</p>
+          <p className="mt-2 text-sm font-semibold leading-7 text-[#536178]">{selectedMasterTagReply?.adminReply || 'No master reply yet. Community members can still appreciate and react respectfully.'}</p>
+          <div className="mt-4 flex flex-wrap gap-2">{REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMasterTag(selectedMasterTag.id, emoji)} className="min-h-11 rounded-full border border-[#D9E7F8] bg-white px-4 text-sm font-black text-[#081A45] transition hover:border-[#1769FF]">{emoji} {selectedMasterTag.reactions[emoji] || 0}</button>)}</div>
+        </section>
+
+        {related.length ? <section className="rounded-[2rem] border border-[#D9E7F8] bg-white p-5 shadow-sm"><h3 className="text-lg font-black text-[#081A45]">Related appreciation</h3><div className="mt-3 grid gap-3 sm:grid-cols-2">{related.map((tag) => <button key={tag.id} type="button" onClick={() => openMasterTagDetail(tag.id)} className="rounded-2xl bg-[#F8FBFF] p-3 text-left transition hover:bg-[#EEF6FF]"><p className="truncate text-sm font-black text-[#081A45]">{tag.targetMasterName || tag.title}</p><p className="mt-1 line-clamp-2 text-xs font-bold leading-5 text-[#536178]">{tag.detail}</p><span className="mt-2 inline-flex rounded-full bg-white px-2 py-1 text-[11px] font-black text-[#1769FF]">💛 {tag.likes}</span></button>)}</div></section> : null}
+      </div>
+    );
+  };
+
+  const renderMasterTagDetailPage = (showBackButton = true) => (
+    <div className="space-y-4 pb-28 md:pb-0">
+      {showBackButton ? <button type="button" onClick={() => setPage('masterTags')} className="rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-black text-[#536178] shadow-sm transition hover:bg-[#EEF6FF]">← Back to Master Tags</button> : null}
+      {renderMasterTagDetailContent()}
+    </div>
+  );
+
+  const renderMasterTagDetailOverlay = () => isMasterTagDetailOpen ? (
+    <div className="fixed inset-0 z-[1700] flex justify-end bg-[#081A45]/35 p-0 backdrop-blur-[3px] md:p-3" role="dialog" aria-modal="true" aria-label="Master Tag detail">
+      <div ref={masterTagDetailPanelRef} tabIndex={-1} className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[#F8FBFF] text-[#081A45] shadow-[0_30px_90px_rgba(8,26,69,0.22)] outline-none md:h-[calc(100dvh-1.5rem)] md:max-w-[560px] md:rounded-[2rem] md:border md:border-[#D9E7F8]">
+        <header className="flex shrink-0 items-center gap-3 border-b border-[#D9E7F8] bg-white/94 px-4 py-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-2xl md:pt-3">
+          <button type="button" onClick={closeMasterTagDetail} aria-label="Close master tag detail" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-sm">←</button>
+          <div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Master Tag</p><h2 className="truncate text-lg font-black">{selectedMasterTag?.targetMasterName || selectedMasterTag?.title || 'Master Tag'}</h2></div>
+          <button type="button" onClick={closeMasterTagDetail} aria-label="Close master tag detail" className="hidden h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-sm md:flex">×</button>
+        </header>
+        <main className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] custom-scrollbar md:px-5">
+          {renderMasterTagDetailContent()}
+        </main>
+      </div>
+    </div>
+  ) : null;
 
   const renderTagMasterPage = () => (
     <div className="mx-auto max-w-7xl space-y-5 pb-28 md:pb-6">
@@ -3733,6 +3836,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         }
       `}</style>
       {notificationDropdownPortal}
+      {renderMasterTagDetailOverlay()}
       {imageLightbox ? <div className="fixed inset-0 z-[1800] flex items-center justify-center bg-[#081B5C]/80 p-4 backdrop-blur-xl"><button type="button" onClick={() => setImageLightbox(null)} className="absolute right-4 top-4 rounded-full bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Close</button><div className="flex max-h-[90dvh] max-w-[94vw] items-center justify-center overflow-hidden rounded-[2rem] bg-white p-3 shadow-2xl">{renderUploadedImage(imageLightbox.src, imageLightbox.alt, 'original')}</div></div> : null}
       <CommunityAiMentor
         isOpen={isCommunityAiOpen}
