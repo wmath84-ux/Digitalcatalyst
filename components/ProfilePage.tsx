@@ -189,8 +189,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const eduPoints = profileCoinWallet.coinBalance;
   const totalLifetimeCoins = profileCoinWallet.totalCoinsEarned || eduPoints;
   const profileStyle = { ...fallbackProfileStyle, ...((settings.content as any).profileStyle || {}) };
-  const profileStreakConfigs = (((settings.content as any).profileStreaks || fallbackStreakConfigs) as ProfileStreakConfig[]).filter(streak => streak.active !== false).slice(0, 4);
-  const profileMilestoneConfigs = (((settings.content as any).profileMilestones || fallbackMilestoneConfigs) as ProfileMilestoneConfig[]).filter(milestone => milestone.active !== false).slice(0, 12);
+  const profileStreakConfigs = (((settings.content as any).profileStreaks || fallbackStreakConfigs) as ProfileStreakConfig[])
+    .filter(streak => streak.active !== false && !streak.draft && !streak.archived && Number(streak.goal) > 0)
+    .slice(0, 4);
+  const profileMilestoneConfigs = (((settings.content as any).profileMilestones || fallbackMilestoneConfigs) as ProfileMilestoneConfig[])
+    .filter(milestone => milestone.active !== false && !milestone.draft && !milestone.archived && Number(milestone.requirement) > 0)
+    .slice(0, 12);
   const purchasedProductIdSet = React.useMemo(() => new Set(purchasedProducts.map(product => String(product.id))), [purchasedProducts]);
   const readArticleCount = new Set([...(currentUser?.rewardedArticleIds || []), ...(currentUser?.readArticles || [])]).size;
   const quizWinCount = new Set(currentUser?.rewardedQuizIds || []).size;

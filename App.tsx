@@ -356,6 +356,7 @@ export interface ProfileStreakConfig {
     id: string;
     title: string;
     icon: string;
+    category?: string;
     metric: ProfileStreakMetric;
     goal: number;
     unit: string;
@@ -363,12 +364,16 @@ export interface ProfileStreakConfig {
     accent: string;
     note: string;
     active?: boolean;
+    draft?: boolean;
+    archived?: boolean;
+    updatedAt?: string;
 }
 export type ProfileMilestoneMetric = 'lifetimeCoins' | 'studyMinutes' | 'watchMinutes' | 'coursesOwned' | 'completedCourses' | 'quizWins' | 'articlesRead' | 'pdfsRead' | 'streakClaims' | 'badgesUnlocked';
 export interface ProfileMilestoneConfig {
     id: string;
     title: string;
     icon: string;
+    category?: string;
     metric: ProfileMilestoneMetric;
     requirement: number;
     description: string;
@@ -377,6 +382,9 @@ export interface ProfileMilestoneConfig {
     unlockProductIds?: number[];
     downloadContent?: string;
     active?: boolean;
+    draft?: boolean;
+    archived?: boolean;
+    updatedAt?: string;
 }
 export interface ProfileStyleSettings {
     backgroundColor: string;
