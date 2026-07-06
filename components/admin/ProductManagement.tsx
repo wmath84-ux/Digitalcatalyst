@@ -6,6 +6,7 @@ import { getDownloadURL, ref, uploadBytes, uploadBytesResumable } from 'firebase
 import { doc, getDoc } from 'firebase/firestore';
 import { auth, db, storage } from '../../firebase';
 import { normalizeCoinPrice } from '../../utils/economy';
+import { parseKeywordList, withProductSearchIndex } from '../../utils/productSearch';
 
 type ProductViewState = 'list' | 'add' | 'edit';
 
@@ -40,6 +41,7 @@ type ProductFormData = {
     paymentLink: string;
     featuresText: string;
     tagsText: string;
+    searchKeywordsText: string;
 };
 
 const initialProductState: ProductAdminInitialState = {
@@ -61,6 +63,7 @@ const initialProductState: ProductAdminInitialState = {
     manualRating: null,
     sku: '',
     tags: [],
+    keywords: [],
     dimensions: '',
     fileFormat: '',
     courseContent: [],
@@ -109,6 +112,7 @@ const createEmptyProductForm = (product?: ProductWithRating | null): ProductForm
         paymentLink: source.paymentLink || '',
         featuresText: (source.features || []).join('\n'),
         tagsText: (source.tags || []).join(', '),
+        searchKeywordsText: ((source as any).keywords || []).join(', '),
     };
 };
 
@@ -1747,6 +1751,7 @@ const ProductForm: React.FC<{
 
         const features = ((formData.featuresText || '').split('\n') || []).map(item => item.trim()).filter(Boolean);
         const tags = ((formData.tagsText || '').split(',') || []).map(item => item.trim()).filter(Boolean);
+        const keywords = parseKeywordList(formData.searchKeywordsText);
         const formattedPrice = formData.price ? `₹${formData.price}` : '₹0';
         const formattedSalePrice = formData.salePrice ? `₹${formData.salePrice}` : undefined;
 
@@ -1763,6 +1768,8 @@ const ProductForm: React.FC<{
             longDescription: formData.longDescription,
             features,
             tags,
+            keywords,
+            ...withProductSearchIndex({ title: formData.title, description: formData.description, longDescription: formData.longDescription, category: formData.category, tags, keywords, features, fileFormat: formData.fileFormat, dimensions: formData.dimensions, sku: formData.sku, courseContent: ensureEditableCourseIntroModule(modules || [], formData.title) }),
             price: formattedPrice,
             salePrice: formattedSalePrice,
             coinPrice: normalizeCoinPrice(formData.coinPrice).normalizedCoinPrice,
@@ -1904,6 +1911,7 @@ const ProductForm: React.FC<{
                                     <div><label className={labelClass}>File Format</label><input value={formData.fileFormat} onChange={event => setFormData(prev => ({ ...prev, fileFormat: event.target.value }))} className={fieldClass} placeholder="PDF + MP4 + Docs" /></div>
                                     <div><label className={labelClass}>Features (one per line)</label><textarea rows={4} value={formData.featuresText} onChange={event => setFormData(prev => ({ ...prev, featuresText: event.target.value }))} className={fieldClass} /></div>
                                     <div><label className={labelClass}>Tags (comma separated)</label><input value={formData.tagsText} onChange={event => setFormData(prev => ({ ...prev, tagsText: event.target.value }))} className={fieldClass} placeholder="premium, beginner, template" /></div>
+                                    <div><label className={labelClass}>Search Keywords</label><textarea rows={3} value={formData.searchKeywordsText} onChange={event => setFormData(prev => ({ ...prev, searchKeywordsText: event.target.value }))} className={fieldClass} placeholder="class 10, physics, pcm, neet, pdf, notes" /><p className="mt-2 text-xs font-bold text-slate-500">Add words students may search for, like class 10, physics, pcm, neet, pdf, notes.</p></div>
                                 </div>
                             </div>
 
@@ -1982,6 +1990,7 @@ const ProductManagement: React.FC<{
             productImages: product.productImages || {},
             features: product.features || [],
             tags: product.tags || [],
+            keywords: product.keywords || [],
             courseContent: normaliseModules(product.courseContent || []),
             priceHistory: product.priceHistory || [],
         });
@@ -1997,6 +2006,7 @@ const ProductManagement: React.FC<{
             productImages: productData.productImages || {},
             features: productData.features || [],
             tags: productData.tags || [],
+            keywords: productData.keywords || [],
             courseContent: normaliseModules(productData.courseContent || []),
             priceHistory: productData.priceHistory || [],
         };

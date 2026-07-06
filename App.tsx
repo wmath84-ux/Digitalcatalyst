@@ -5,6 +5,7 @@ import Header from './components/Header';
 import MobileAppHome from './components/MobileAppHome';
 import Hero from './components/Hero';
 import ProductShowcase from './components/ProductShowcase';
+import { isProductSearchVisible, withProductSearchIndex } from './utils/productSearch';
 import Services, { ServiceItem } from './components/Services';
 import AboutUs from './components/AboutUs';
 import Faq, { FaqItem } from './components/Faq';
@@ -262,7 +263,16 @@ export interface Product {
   wishlistCount?: number; // Analytics: How many people added to wishlist
   viewCount?: number; // Analytics: How many people viewed the details
   coinPrice?: number; // Optional EduCoin price. 0 disables coin checkout.
+  keywords?: string[];
+  normalizedTitle?: string;
+  normalizedCategory?: string;
+  normalizedTags?: string[];
+  normalizedKeywords?: string[];
+  searchableText?: string;
+  normalizedSearchText?: string;
+  searchTokens?: string[];
 }
+
 
 // Review structure
 export interface Review {
@@ -1295,11 +1305,12 @@ const App: React.FC = () => {
     modules: normalizeCourseModules(module.modules || []),
   }));
 
-  const normalizeProductArrays = (product: Product): Product => ({
+  const normalizeProductArrays = (product: Product): Product => withProductSearchIndex({
     ...product,
     images: product.images || [],
     features: product.features || [],
     tags: product.tags || [],
+    keywords: product.keywords || [],
     courseContent: normalizeCourseModules(product.courseContent || []),
     priceHistory: product.priceHistory || [],
   });
@@ -1839,7 +1850,7 @@ const App: React.FC = () => {
     return { ...p, rating: displayRating, reviewCount, calculatedRating };
   });
 
-  const visibleProducts = productsWithRatings.filter(p => p.isVisible !== false);
+  const visibleProducts = productsWithRatings.filter(isProductSearchVisible);
   const topRatedProducts = [...visibleProducts].sort((a, b) => b.rating - a.rating).slice(0, 3);
   const purchasedProducts = productsWithRatings.filter(p => purchasedProductIds.includes(p.id));
   const wishlistProducts = visibleProducts.filter(p => wishlist.includes(p.id));
