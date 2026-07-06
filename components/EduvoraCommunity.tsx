@@ -652,6 +652,66 @@ const dataUrlBytes = (value = '') => {
 const storagePercent = (bytes: number) => Math.min(100, Math.round((bytes / STORAGE_LOCK_BYTES) * 100));
 const safeText = (value: string, maxLength = 240) => value.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim().slice(0, maxLength);
 
+const communityPolishCss = `
+  .eduvora-community-polish {
+    background:
+      radial-gradient(circle at top left, rgba(23,105,255,0.14), transparent 30rem),
+      radial-gradient(circle at 86% 8%, rgba(123,97,255,0.12), transparent 28rem),
+      linear-gradient(135deg, #F8FBFF 0%, #EEF6FF 48%, #F8FBFF 100%);
+  }
+  .eduvora-community-app {
+    position: relative;
+    isolation: isolate;
+  }
+  .eduvora-community-app::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    border-radius: inherit;
+    background: linear-gradient(135deg, rgba(255,255,255,0.78), rgba(255,255,255,0.18) 42%, rgba(23,105,255,0.08));
+    opacity: 0.82;
+    z-index: -1;
+  }
+  .eduvora-community-main {
+    background:
+      radial-gradient(circle at 50% 0%, rgba(23,105,255,0.08), transparent 32rem),
+      linear-gradient(180deg, rgba(248,251,255,0.88), rgba(248,251,255,0.98));
+  }
+  .community-content-stage > * {
+    scroll-margin-top: 7rem;
+  }
+  .eduvora-community-polish :is(button, a, input, textarea, select):focus-visible {
+    outline: 3px solid rgba(23,105,255,0.22);
+    outline-offset: 3px;
+  }
+  .eduvora-community-polish :is(input, textarea, select)::placeholder {
+    color: #7C879A;
+  }
+  .eduvora-community-polish button:disabled {
+    box-shadow: none !important;
+  }
+  @media (max-width: 767px) {
+    .eduvora-community-app {
+      border: 0 !important;
+      border-radius: 0 !important;
+      box-shadow: none !important;
+    }
+    .eduvora-community-main {
+      padding-left: clamp(0.875rem, 4vw, 1rem) !important;
+      padding-right: clamp(0.875rem, 4vw, 1rem) !important;
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .eduvora-community-polish *, .eduvora-community-polish *::before, .eduvora-community-polish *::after {
+      transition-duration: 0.01ms !important;
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      scroll-behavior: auto !important;
+    }
+  }
+`;
+
 const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenticated = false, settings }) => {
   const navigate = useNavigate();
   const guardedAuth = getAuth();
@@ -3704,7 +3764,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [activeConversationId, activeNavItem.label, activeView, allCreators, page, profile.name, selectedMasterTag, selectedMessage.body, selectedMessage.title, selectedStatus.caption]);
 
   const CommunityHeader = () => (
-    <header className="sticky top-0 z-[1200] shrink-0 border-b border-[#D9E7F8] bg-white/90 px-3 py-2.5 backdrop-blur-2xl sm:px-5 lg:px-6 lg:py-3">
+    <header className="sticky top-0 z-[1200] shrink-0 border-b border-[#D9E7F8] bg-white/92 px-3 py-2.5 shadow-[0_14px_36px_rgba(23,105,255,0.08)] backdrop-blur-2xl sm:px-5 lg:px-6 lg:py-3">
       <div className="mx-auto grid max-w-[1500px] items-center gap-3 lg:grid-cols-[minmax(13rem,0.78fr)_minmax(28rem,1.35fr)_minmax(15rem,0.78fr)]">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={goBack} aria-label="Back from Community" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-[0_12px_30px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16">←</button>
@@ -3784,7 +3844,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return (
       <aside
         aria-label="Community sidebar"
-        className={`hidden min-h-0 shrink-0 flex-col overflow-hidden border-r border-[#D9E7F8] bg-white/88 shadow-[18px_0_60px_rgba(23,105,255,0.08)] backdrop-blur-2xl transition-[width,padding] duration-300 ease-out lg:flex ${sidebarExpanded ? 'w-[clamp(16.5rem,20vw,18.5rem)] p-4 xl:p-5' : 'w-[5.5rem] p-3'}`}
+        className={`hidden min-h-0 shrink-0 flex-col overflow-hidden border-r border-[#D9E7F8] bg-gradient-to-b from-white/94 via-[#FBFDFF]/92 to-[#EEF6FF]/78 shadow-[18px_0_60px_rgba(23,105,255,0.08)] backdrop-blur-2xl transition-[width,padding] duration-300 ease-out lg:flex ${sidebarExpanded ? 'w-[clamp(16.5rem,20vw,18.5rem)] p-4 xl:p-5' : 'w-[5.5rem] p-3'}`}
       >
         <div className={`mb-4 flex items-center gap-2 ${sidebarExpanded ? 'justify-between' : 'justify-center'}`}>
           {sidebarExpanded ? (
@@ -3896,13 +3956,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const ProfileSummaryCard = () => {
     const items = [
-      ['Coin Balance', String(profileStats.coinBalance)],
-      ['Followers', String(profileStats.followers)],
-      ['Following', String(profileStats.following)],
-      ['Creator Posts', String(profileStats.creatorPosts)],
-      ['My Statuses', String(profileStats.myStatuses)],
-      ['Master Tags', String(profileStats.masterTags)],
-      ['Replies Given', String(profileStats.repliesGiven)],
+      ['Coin Balance', compactCount(profileStats.coinBalance)],
+      ['Followers', compactCount(profileStats.followers)],
+      ['Following', compactCount(profileStats.following)],
+      ['Creator Posts', compactCount(profileStats.creatorPosts)],
+      ['My Statuses', compactCount(profileStats.myStatuses)],
+      ['Master Tags', compactCount(profileStats.masterTags)],
+      ['Replies Given', compactCount(profileStats.repliesGiven)],
       ['Sample Level', `Builder ${Math.max(1, Math.min(99, profileStats.creatorPosts + profileStats.myStatuses + 1)).toString().padStart(2, '0')}`],
     ];
     const accountButtons: Array<[ProfilePanel, string]> = [['privacy', 'Privacy Settings'], ['notifications', 'Notification Preferences'], ['connected', 'Connected Accounts'], ['logout', 'Log Out']];
@@ -3994,7 +4054,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   );
 
   const renderMainContent = () => (
-    <div className="animate-in fade-in slide-in-from-bottom-3 duration-500">
+    <div className="community-content-stage animate-in fade-in slide-in-from-bottom-3 duration-500">
       {page === 'chat' && activeView === 'feed' && renderFeedLayout(messages, 'Chat Feed', 'Fresh community prompts, replies, and streak ideas are shown here.')}
       {page === 'thread' && <div className="space-y-3"><button type="button" onClick={() => { goBack(); requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: feedScrollPositionsRef.current.chatFeed || 0, behavior: 'auto' })); }} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-sm font-black text-[#64748B] shadow-sm">← Back to posts</button>{renderMessageDetails(selectedMessage, true)}</div>}
       {page === 'profile' && renderProfilePage()}
@@ -4015,7 +4075,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }
 
   return (
-    <section style={communityCssVars} className="relative h-[100dvh] overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-4 lg:p-6">
+    <section style={communityCssVars} className="eduvora-community-polish relative h-[100dvh] overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-4 lg:p-6">
       <style>{`
         @keyframes eduvoraBondShine {
           0% { transform: translateX(0); opacity: 0; }
@@ -4023,6 +4083,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           55% { transform: translateX(220px); opacity: 0.75; }
           100% { transform: translateX(320px); opacity: 0; }
         }
+        ${communityPolishCss}
       `}</style>
       {notificationDropdownPortal}
       {renderMasterTagDetailOverlay()}
@@ -4036,11 +4097,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       />
       {page === 'statusReel' ? renderStatusReel() : null}
       <ShareComposerModal />
-      <div className="mx-auto flex h-full min-w-0 max-w-[1720px] overflow-hidden border border-[var(--community-border)] bg-[var(--community-surface)]/55 shadow-[var(--community-shadow)] backdrop-blur-2xl sm:rounded-[2rem] lg:rounded-[2.5rem]">
+      <div className="eduvora-community-app mx-auto flex h-full min-w-0 max-w-[1720px] overflow-hidden border border-[var(--community-border)] bg-[var(--community-surface)]/62 shadow-[var(--community-shadow)] backdrop-blur-2xl sm:rounded-[2rem] lg:rounded-[2.5rem]">
         <CommunitySidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <CommunityHeader />
-          <main ref={scrollContainerRef} className={`min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-4 custom-scrollbar sm:px-5 lg:px-7 lg:pb-7 ${
+          <main ref={scrollContainerRef} className={`eduvora-community-main min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-4 custom-scrollbar sm:px-5 lg:px-7 lg:pb-7 ${
             shouldHideCommunityDockOnMobile
               ? 'pb-32 max-md:pb-0 max-md:overscroll-contain'
               : 'pb-32 max-md:pb-32 max-md:overscroll-contain'
