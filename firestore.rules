@@ -242,9 +242,27 @@ service cloud.firestore {
     }
 
     match /community_master_tags/{tagId} {
-      allow read: if signedIn();
-      allow create: if signedIn();
-      allow update: if signedIn();
+      allow read: if !('visibility' in resource.data) || resource.data.visibility == 'public' || (signedIn() && resource.data.ownerId == request.auth.uid) || isAdmin();
+      allow create: if signedIn()
+        && request.resource.data.ownerId == request.auth.uid
+        && request.resource.data.authorId == request.auth.uid
+        && request.resource.data.visibility in ['public', 'followers', 'private']
+        && request.resource.data.status == 'active'
+        && request.resource.data.message is string
+        && request.resource.data.message.size() >= 20
+        && request.resource.data.message.size() <= 500
+        && request.resource.data.category is string
+        && request.resource.data.normalizedSearchText is string
+        && !('authorEmail' in request.resource.data)
+        && !('targetMasterEmail' in request.resource.data)
+        && !('phone' in request.resource.data);
+      allow update: if isAdmin()
+        || (signedIn()
+          && resource.data.ownerId == request.auth.uid
+          && request.resource.data.ownerId == resource.data.ownerId
+          && request.resource.data.authorId == resource.data.authorId)
+        || (signedIn()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['likes', 'likedByUsers', 'reactions', 'reactionUsers', 'updatedAt']));
       allow delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid);
     }
 
