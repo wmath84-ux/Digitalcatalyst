@@ -227,6 +227,73 @@ const normaliseModules = (modules?: CourseModule[]): CourseModule[] => (modules 
     modules: normaliseModules(module.modules || []),
 }));
 
+
+const COURSE_INTRO_MODULE_ID = 'course-intro-module';
+const COURSE_INTRO_FILE_ID = 'course-intro';
+
+const isCourseIntroFile = (file?: Partial<ProductFile> | null) => {
+    const id = String(file?.id || '').toLowerCase();
+    const name = String(file?.name || '').toLowerCase();
+    return id.includes('course-intro') || id.includes('welcome-intro') || /\b(welcome|course intro|introduction)\b/.test(name);
+};
+
+const buildDefaultCourseIntroFile = (title?: string): ProductFile => {
+    const courseTitle = title?.trim() || 'this course';
+    const content = `<h1>Welcome to ${courseTitle}</h1><p>This is the course intro page. Use the module panel to browse lessons, documents, quizzes, and resources.</p><p>Start here, then select the first lesson in the list when you are ready to continue.</p><p>You can edit this welcome content from the admin course content editor.</p>`;
+
+    return {
+        id: COURSE_INTRO_FILE_ID,
+        name: 'Welcome / Course Intro',
+        type: 'doc',
+        url: '',
+        accessLevel: 'included',
+        paidUpdateId: '',
+        paidUpdateTitle: '',
+        paidUpdatePrice: '',
+        paidUpdateCoinPrice: 0,
+        content,
+        docPages: [{ id: 'course-intro-page', title: 'Welcome / Course Intro', content, createdAt: Date.now(), updatedAt: Date.now() }],
+    };
+};
+
+const findCourseIntroFile = (modules?: CourseModule[]): ProductFile | null => {
+    for (const module of modules || []) {
+        const intro = (module.files || []).find(isCourseIntroFile);
+        if (intro) return intro;
+        const nestedIntro = findCourseIntroFile(module.modules || []);
+        if (nestedIntro) return nestedIntro;
+    }
+    return null;
+};
+
+const stripCourseIntroFiles = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
+    ...module,
+    files: (module.files || []).filter(file => !isCourseIntroFile(file)),
+    modules: stripCourseIntroFiles(module.modules || []),
+}));
+
+const ensureEditableCourseIntroModule = (modules?: CourseModule[], title?: string): CourseModule[] => {
+    const normalizedModules = normaliseModules(modules || []);
+    const existingIntro = findCourseIntroFile(normalizedModules);
+    const introFile = existingIntro || buildDefaultCourseIntroFile(title);
+    const introModule: CourseModule = {
+        id: COURSE_INTRO_MODULE_ID,
+        title: 'Welcome / Course Intro',
+        accessLevel: 'included',
+        paidUpdateId: '',
+        paidUpdateTitle: '',
+        paidUpdatePrice: '',
+        paidUpdateCoinPrice: 0,
+        files: [{ ...introFile, accessLevel: 'included', paidUpdateId: '', paidUpdateTitle: '', paidUpdatePrice: '', paidUpdateCoinPrice: 0 }],
+        modules: [],
+    };
+
+    const modulesWithoutIntro = stripCourseIntroFiles(normalizedModules)
+        .filter(module => module.id !== COURSE_INTRO_MODULE_ID || (module.files || []).length > 0 || (module.modules || []).length > 0);
+
+    return [introModule, ...modulesWithoutIntro];
+};
+
 const countModuleContent = (modules?: CourseModule[]): number => (modules || []).reduce(
     (count, module) => count + (module.files || []).length + countModuleContent(module.modules || []),
     0
@@ -1601,7 +1668,7 @@ const ProductForm: React.FC<{
     onCancel: () => void;
 }> = ({ mode, product, coupons, onSave, onCancel }) => {
     const [formData, setFormData] = useState<ProductFormData>(() => createEmptyProductForm(product));
-    const [modules, setModules] = useState<CourseModule[]>(() => normaliseModules(product?.courseContent || initialProductState.courseContent || []));
+    const [modules, setModules] = useState<CourseModule[]>(() => ensureEditableCourseIntroModule(product?.courseContent || initialProductState.courseContent || [], product?.title || formData.title));
     const [images, setImages] = useState<string[]>(() => product?.images || initialProductState.images || []);
     const [imageMode, setImageMode] = useState<'upload' | 'ai'>('upload');
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
@@ -1712,7 +1779,7 @@ const ProductForm: React.FC<{
             isFree: formData.isFree,
             couponCode: formData.couponCode,
             paymentLink: resolvedPaymentLink,
-            courseContent: normaliseModules(modules || []),
+            courseContent: ensureEditableCourseIntroModule(modules || [], formData.title),
             priceHistory: product?.priceHistory || [],
             wishlistCount: product?.wishlistCount,
             viewCount: product?.viewCount,

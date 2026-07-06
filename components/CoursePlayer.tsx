@@ -206,6 +206,99 @@ const hasCoursePlayerItemAccess = (
   return productAccess.ownedUpdateIds.includes(updateId);
 };
 
+
+const COURSE_INTRO_MODULE_ID = 'course-intro-module';
+const COURSE_INTRO_FILE_ID = 'course-intro';
+
+const isCourseIntroFile = (file?: Partial<ProductFile> | null) => {
+  const id = String(file?.id || '').toLowerCase();
+  const name = String(file?.name || '').toLowerCase();
+  return id.includes('course-intro') || id.includes('welcome-intro') || /\b(welcome|course intro|introduction)\b/.test(name);
+};
+
+const buildCourseIntroContent = (product: Pick<ProductWithRating, 'title'>, hasLessons: boolean): ProductFile => {
+  const emptyCourseNote = hasLessons ? '' : '<p><strong>No lessons added yet.</strong> Your course content will appear in the module panel as soon as lessons are published.</p>';
+
+  return {
+    id: COURSE_INTRO_FILE_ID,
+    name: 'Welcome / Course Intro',
+    type: 'doc',
+    url: '',
+    accessLevel: 'included',
+    paidUpdateId: '',
+    paidUpdateTitle: '',
+    paidUpdatePrice: '',
+    paidUpdateCoinPrice: 0,
+    content: `<h1>Welcome to ${product.title}</h1><p>You are inside the course player. Use the module panel to browse lessons, documents, quizzes, and resources.</p><p>Start with this course intro, then select the first lesson in the module list when you are ready to continue.</p><p>If you are on mobile, the module panel opens first so you can immediately see the course structure. You can close it after choosing a lesson.</p>${emptyCourseNote}`,
+    docPages: [{
+      id: 'course-intro-page',
+      title: 'Welcome / Course Intro',
+      content: `<h1>Welcome to ${product.title}</h1><p>You are inside the course player. Use the module panel to browse lessons, documents, quizzes, and resources.</p><p>Start with this course intro, then select the first lesson in the module list when you are ready to continue.</p><p>If you are on mobile, the module panel opens first so you can immediately see the course structure. You can close it after choosing a lesson.</p>${emptyCourseNote}`,
+      createdAt: 0,
+      updatedAt: 0,
+    }],
+  };
+};
+
+const countCourseFiles = (modules?: CourseModule[]): number => (modules || []).reduce(
+  (count, module) => count + (module.files || []).length + countCourseFiles(module.modules || []),
+  0
+);
+
+const removeDuplicateCourseIntroFiles = (modules?: CourseModule[], keepFirst = { kept: false }): CourseModule[] => (modules || []).map(module => ({
+  ...module,
+  files: (module.files || []).filter(file => {
+    if (!isCourseIntroFile(file)) return true;
+    if (!keepFirst.kept) {
+      keepFirst.kept = true;
+      return true;
+    }
+    return false;
+  }),
+  modules: removeDuplicateCourseIntroFiles(module.modules || [], keepFirst),
+}));
+
+const findCourseIntroFile = (modules?: CourseModule[]): ProductFile | null => {
+  for (const module of modules || []) {
+    const intro = (module.files || []).find(isCourseIntroFile);
+    if (intro) return intro;
+    const nestedIntro = findCourseIntroFile(module.modules || []);
+    if (nestedIntro) return nestedIntro;
+  }
+  return null;
+};
+
+const stripCourseIntroFiles = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
+  ...module,
+  files: (module.files || []).filter(file => !isCourseIntroFile(file)),
+  modules: stripCourseIntroFiles(module.modules || []),
+}));
+
+const ensureCourseIntroModule = (product: ProductWithRating): CourseModule[] => {
+  const sourceModules = product.courseContent || [];
+  const cleanedModules = removeDuplicateCourseIntroFiles(sourceModules);
+  const existingIntro = findCourseIntroFile(cleanedModules);
+  const hasLessons = countCourseFiles(cleanedModules) > (existingIntro ? 1 : 0);
+  const introFile = existingIntro || buildCourseIntroContent(product, hasLessons);
+
+  const introModule: CourseModule = {
+    id: COURSE_INTRO_MODULE_ID,
+    title: 'Welcome / Course Intro',
+    accessLevel: 'included',
+    paidUpdateId: '',
+    paidUpdateTitle: '',
+    paidUpdatePrice: '',
+    paidUpdateCoinPrice: 0,
+    files: [{ ...introFile, accessLevel: 'included', paidUpdateId: '', paidUpdateTitle: '', paidUpdatePrice: '', paidUpdateCoinPrice: 0 }],
+    modules: [],
+  };
+
+  const modulesWithoutIntro = stripCourseIntroFiles(cleanedModules)
+    .filter(module => module.id !== COURSE_INTRO_MODULE_ID || (module.files || []).length > 0 || (module.modules || []).length > 0);
+
+  return [introModule, ...modulesWithoutIntro];
+};
+
 const ModuleItem: React.FC<{
   module: CourseModule;
   productId: number;
@@ -1037,10 +1130,9 @@ const CoursePlayer: React.FC<{
   const viewport = useViewportSize();
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => getViewportMetrics().width < 900);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
-  const [showWelcome, setShowWelcome] = useState(true);
   const youtubePlayerRef = useRef<any>(null);
   const youtubeTickTimerRef = useRef<number | null>(null);
   const youtubeSessionRef = useRef<{
@@ -1060,6 +1152,7 @@ const CoursePlayer: React.FC<{
   const [youtubeWatchSeconds, setYoutubeWatchSeconds] = useState(0);
 
   const currentUserId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
+  const courseContent = useMemo(() => ensureCourseIntroModule(product), [product]);
 
 
   const stopYoutubeTickTimer = useCallback(() => {
@@ -1151,13 +1244,13 @@ const CoursePlayer: React.FC<{
 
     setActiveFile(previousFile => {
       if (previousFile?.id) {
-        const preservedFile = findAccessibleFileById(product.courseContent || [], previousFile.id);
+        const preservedFile = findAccessibleFileById(courseContent, previousFile.id);
         if (preservedFile) return preservedFile;
       }
 
-      return findFirstAccessibleFile(product.courseContent || []);
+      return findFirstAccessibleFile(courseContent);
     });
-  }, [product.courseContent, product.id, productAccess]);
+  }, [courseContent, product.id, productAccess]);
 
   useEffect(() => {
     setMediaHasError(false);
@@ -1268,7 +1361,7 @@ const CoursePlayer: React.FC<{
   }, [activeFile?.type, youtubeShellId]);
 
   useEffect(() => {
-    if (showWelcome || activeFile?.type !== 'youtube') return undefined;
+    if (activeFile?.type !== 'youtube') return undefined;
 
     const youtubeVideoId = getYouTubeVideoIdFromFile(activeFile);
     if (!youtubeVideoId || !currentUserId || !youtubeFrameId) return undefined;
@@ -1359,7 +1452,7 @@ const CoursePlayer: React.FC<{
       youtubeSessionRef.current = null;
       stopYoutubeTickTimer();
     };
-  }, [activeFile, currentUserId, flushYoutubeCoins, product.id, showWelcome, stopYoutubeTickTimer, youtubeFrameId]);
+  }, [activeFile, currentUserId, flushYoutubeCoins, product.id, stopYoutubeTickTimer, youtubeFrameId]);
 
   const unlockContentWithEducoins = async (item: CourseModule | ProductFile) => {
     const requiredCoins = getRequiredEducoins(item);
@@ -1517,25 +1610,6 @@ const CoursePlayer: React.FC<{
     }
   };
 
-  if (showWelcome) {
-    return (
-      <div className="course-player-mobile-scope relative flex min-h-[100dvh] w-full items-center justify-center overflow-hidden bg-[#f3f0ff] p-4 text-slate-950">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(89,71,242,0.18),transparent_30%),radial-gradient(circle_at_85%_20%,rgba(125,211,252,0.22),transparent_28%),linear-gradient(135deg,rgba(255,255,255,0.95),rgba(238,233,255,0.95))]" />
-        <div className="relative w-full max-w-3xl rounded-[2rem] border border-white/70 bg-white/80 p-6 text-center shadow-[0_30px_90px_rgba(15,23,42,0.16)] backdrop-blur-2xl sm:p-10">
-          <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-[1.75rem] bg-white shadow-sm"><ThreeDotMenuIcon /></div>
-          <p className="text-sm font-black uppercase tracking-[0.32em] text-[#5947f2]">Welcome to {product.title}</p>
-          <h1 className="mt-3 text-4xl font-black tracking-tight text-slate-950 sm:text-6xl">Now start your learning</h1>
-          <p className="mx-auto mt-5 max-w-2xl text-base font-semibold leading-8 text-slate-700 sm:text-lg">You are entering a focused learning space. Move step by step, take notes, and give every lesson your full attention so today’s session turns into practical progress.</p>
-          <div className="mx-auto mt-6 flex max-w-xl items-center gap-4 rounded-3xl border border-[#ded8ff] bg-[#f7f5ff] p-4 text-left">
-            <ThreeDotMenuIcon />
-            <p className="text-sm font-bold leading-6 text-slate-700 sm:text-base">Open the three-line menu in the course player header to choose modules and start studying your content in order.</p>
-          </div>
-          <button type="button" onClick={() => setShowWelcome(false)} className="mt-8 w-full rounded-2xl bg-[#5947f2] px-7 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(89,71,242,0.28)] transition hover:-translate-y-0.5 sm:w-auto">Start learning</button>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="course-player-mobile-scope relative flex h-[100dvh] min-h-[100dvh] w-full max-w-full min-w-0 flex-col overflow-hidden text-slate-900 bg-[#f3f0ff]">
       <div className={`absolute inset-0 scale-110 bg-cover bg-center blur-2xl ${isAudioExperience ? 'opacity-[0.08]' : 'opacity-10'}`} style={{ backgroundImage: `url(${backgroundImage})` }} />
@@ -1612,7 +1686,7 @@ const CoursePlayer: React.FC<{
                 </div>
               </div>
               <nav className="flex-1 overflow-y-auto p-2 sm:p-3">
-                {(product.courseContent || []).length > 0 ? (product.courseContent || []).map(m => (
+                {courseContent.length > 0 ? courseContent.map(m => (
                   <ModuleItem
                     key={m.id}
                     module={m}
