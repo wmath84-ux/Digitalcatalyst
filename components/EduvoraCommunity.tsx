@@ -754,6 +754,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [firebaseNotifications, setFirebaseNotifications] = useState<CommunityNotification[]>([]);
   const [notificationFilter, setNotificationFilter] = useState<NotificationFilter>('all');
   const [isNotificationPanelOpen, setIsNotificationPanelOpen] = useState(false);
+  const [isCommunityAiNoticeOpen, setIsCommunityAiNoticeOpen] = useState(false);
   const [storageUsedBytes, setStorageUsedBytes] = useState(0);
   const [limitMessage, setLimitMessage] = useState('');
   const [adminPosts, setAdminPosts] = useState<FeedMessage[]>([]);
@@ -3391,6 +3392,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const activeNavItem = navItems.find((item) => item.active) || navItems[0];
   const showCreateCta = page === 'creators' || (page === 'chat' && activeView === 'status') || page === 'statusUpload';
+  const openCommunityAiMentor = () => setIsCommunityAiNoticeOpen(true);
   const handleHeaderCreate = () => {
     if (page === 'creators') return undefined;
     if (activeView === 'status' || page === 'statusUpload') return openStatusUploadFromTop();
@@ -3398,35 +3400,73 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const CommunityHeader = () => (
-    <header className="sticky top-0 z-[1200] shrink-0 border-b border-[var(--community-border)] bg-[var(--community-surface)]/88 px-3 py-2 backdrop-blur-2xl sm:px-5 lg:px-7 lg:py-3">
-      <div className="mx-auto flex max-w-[1500px] items-center justify-between gap-3">
+    <header className="sticky top-0 z-[1200] shrink-0 border-b border-[#D9E7F8] bg-white/90 px-3 py-2.5 backdrop-blur-2xl sm:px-5 lg:px-6 lg:py-3">
+      <div className="mx-auto grid max-w-[1500px] items-center gap-3 lg:grid-cols-[minmax(13rem,0.78fr)_minmax(28rem,1.35fr)_minmax(15rem,0.78fr)]">
         <div className="flex min-w-0 items-center gap-3">
-          <button type="button" onClick={goBack} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[var(--community-border)] bg-white text-lg font-black text-[var(--community-heading)] shadow-[0_12px_30px_rgba(23,105,255,0.10)]">←</button>
+          <button type="button" onClick={goBack} aria-label="Back from Community" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-[0_12px_30px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16">←</button>
           <div className="min-w-0">
-            <p className="hidden text-xs font-black uppercase tracking-[0.24em] text-[var(--community-primary)] sm:block">Eduvora Community</p>
-            <h1 className="truncate text-lg font-black tracking-tight text-[var(--community-heading)] sm:text-3xl">{activeNavItem.label === 'Feed' ? 'Community Feed' : activeNavItem.label}</h1>
-            <p className="hidden truncate text-xs font-bold text-[var(--community-muted)] md:block">Premium study circles, creators, stories, master tags, and safe member discovery.</p>
+            <p className="hidden text-[0.68rem] font-black uppercase tracking-[0.24em] text-[#1769FF] sm:block">Eduvora Community</p>
+            <h1 className="truncate text-lg font-black tracking-tight text-[#081A45] sm:text-2xl lg:text-3xl">{activeNavItem.label === 'Feed' ? 'Community Feed' : activeNavItem.label}</h1>
           </div>
         </div>
 
-        <nav className="hidden max-w-[48rem] flex-1 items-center justify-center gap-1 overflow-x-auto rounded-[1.5rem] border border-[var(--community-border)] bg-[#F8FBFF]/80 p-1 lg:flex custom-scrollbar">
-          {navItems.slice(0, 7).map((item) => (
-            <button key={item.label} type="button" onClick={item.action} className={`shrink-0 rounded-[1.15rem] px-3 py-2 text-xs font-black transition ${item.active ? 'bg-[var(--community-active-bg)] text-[var(--community-active-text)] shadow-sm' : 'text-[var(--community-body)] hover:bg-white hover:text-[var(--community-heading)]'}`}>
-              <span className="mr-1">{item.icon}</span>{item.label}
+        <div className="hidden min-w-0 items-center justify-center gap-2 lg:flex">
+          <button
+            type="button"
+            onClick={openCommunityAiMentor}
+            aria-label="Open Community AI Mentor"
+            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-[1.35rem] border border-[#BFD7FF]/80 bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 py-2.5 text-xs font-black text-white shadow-[0_16px_38px_rgba(123,97,255,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(123,97,255,0.30)] focus:outline-none focus:ring-4 focus:ring-[#7B61FF]/20 active:scale-95"
+          >
+            <span aria-hidden="true">✦</span>
+            <span>AI Mentor</span>
+          </button>
+          <nav aria-label="Community shortcut sections" className="flex min-w-0 max-w-[48rem] flex-1 items-center justify-center gap-1 overflow-x-auto rounded-[1.55rem] border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 shadow-[0_14px_36px_rgba(23,105,255,0.08)] custom-scrollbar">
+            {navItems.slice(0, 7).map((item) => (
+              <button
+                key={item.label}
+                type="button"
+                onClick={item.action}
+                aria-label={item.label}
+                aria-current={item.active ? 'page' : undefined}
+                className={`inline-flex min-h-10 shrink-0 items-center rounded-[1.15rem] px-3 py-2 text-xs font-black transition focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 ${item.active ? 'bg-white text-[#1769FF] shadow-[0_10px_24px_rgba(23,105,255,0.13)] ring-1 ring-[#D9E7F8]' : 'text-[#536178] hover:bg-white hover:text-[#081A45] hover:shadow-sm'}`}
+              >
+                <span className="mr-1.5" aria-hidden="true">{item.icon}</span>{item.label}
+              </button>
+            ))}
+          </nav>
+        </div>
+
+        <div className="flex min-w-0 shrink-0 items-center justify-end gap-2">
+          {showCreateCta ? <button type="button" onClick={handleHeaderCreate} className="hidden rounded-2xl bg-gradient-to-r from-[#7B61FF] to-[#1769FF] px-4 py-3 text-xs font-black text-white shadow-[0_16px_38px_rgba(23,105,255,0.22)] transition hover:-translate-y-0.5 sm:inline-flex">Create</button> : null}
+          <button type="button" onClick={() => pushPage('network')} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-3 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] md:flex">⌕ Search</button>
+          <button type="button" onClick={() => pushPage('profile')} className="flex min-w-0 items-center gap-2 rounded-full border border-[#D9E7F8] bg-white px-2 py-2 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] sm:px-3"><Avatar value={profile.avatar || '🧑‍🎓'} size="h-8 w-8" /><span className="hidden max-w-[8rem] truncate sm:inline">{profile.name || 'Eduvora Member'}</span></button>
+          <span className="hidden rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400] sm:inline-flex">🪙 {eduCoins}</span>
+          <div ref={notificationPanelRef} className="relative"><button type="button" onClick={() => setIsNotificationPanelOpen((open) => !open)} aria-expanded={isNotificationPanelOpen} aria-label="Community notifications" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16"><span aria-hidden="true">🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button></div>
+        </div>
+      </div>
+      <div className="mt-2 flex min-w-0 items-center gap-2 overflow-hidden lg:hidden">
+        <button
+          type="button"
+          onClick={openCommunityAiMentor}
+          aria-label="Open Community AI Mentor"
+          className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-3 text-xs font-black text-white shadow-[0_14px_32px_rgba(123,97,255,0.24)] focus:outline-none focus:ring-4 focus:ring-[#7B61FF]/20 active:scale-95"
+        >
+          <span aria-hidden="true">✦</span><span>AI</span>
+        </button>
+        <nav aria-label="Community shortcut sections" className="flex min-w-0 flex-1 gap-2 overflow-x-auto rounded-[1.45rem] border border-[#D9E7F8] bg-[#F8FBFF]/85 p-1 custom-scrollbar">
+          {navItems.map((item) => (
+            <button
+              key={item.label}
+              type="button"
+              onClick={item.action}
+              aria-label={item.label}
+              aria-current={item.active ? 'page' : undefined}
+              className={`min-h-10 shrink-0 rounded-[1.15rem] px-3 text-xs font-black transition focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 ${item.active ? 'bg-white text-[#1769FF] shadow-sm ring-1 ring-[#D9E7F8]' : 'text-[#536178] hover:bg-white hover:text-[#081A45]'}`}
+            >
+              <span aria-hidden="true">{item.icon}</span> {item.label}
             </button>
           ))}
         </nav>
-
-        <div className="flex shrink-0 items-center gap-2">
-          {showCreateCta ? <button type="button" onClick={handleHeaderCreate} className="hidden rounded-2xl bg-gradient-to-r from-[#7B61FF] to-[#1769FF] px-4 py-3 text-xs font-black text-white shadow-[0_16px_38px_rgba(23,105,255,0.22)] sm:inline-flex">Create</button> : null}
-          <button type="button" onClick={() => pushPage('network')} className="hidden h-11 items-center gap-2 rounded-2xl border border-[var(--community-border)] bg-white px-3 text-xs font-black text-[var(--community-heading)] shadow-sm md:flex">⌕ Search</button>
-          <button type="button" onClick={() => pushPage('profile')} className="flex items-center gap-2 rounded-full border border-[var(--community-border)] bg-white px-2 py-2 text-xs font-black text-[var(--community-heading)] shadow-sm sm:px-3"><Avatar value={profile.avatar} size="h-8 w-8" /><span className="hidden sm:inline">{profile.name}</span></button>
-          <span className="hidden rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400] sm:inline-flex">🪙 {eduCoins}</span>
-          <div ref={notificationPanelRef} className="relative"><button type="button" onClick={() => setIsNotificationPanelOpen((open) => !open)} aria-expanded={isNotificationPanelOpen} aria-label="Community notifications" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[var(--community-border)] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"><span>🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button></div>
-        </div>
-      </div>
-      <div className="mt-2 flex gap-2 overflow-x-auto pb-1 lg:hidden custom-scrollbar">
-        {navItems.map((item) => <button key={item.label} type="button" onClick={item.action} className={`min-h-11 shrink-0 rounded-2xl px-3 text-xs font-black transition ${item.active ? 'bg-[var(--community-active-bg)] text-[var(--community-active-text)] shadow-sm' : 'bg-white text-[var(--community-body)]'}`}>{item.icon} {item.label}</button>)}
       </div>
     </header>
   );
@@ -3666,6 +3706,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       `}</style>
       {notificationDropdownPortal}
       {imageLightbox ? <div className="fixed inset-0 z-[1800] flex items-center justify-center bg-[#081B5C]/80 p-4 backdrop-blur-xl"><button type="button" onClick={() => setImageLightbox(null)} className="absolute right-4 top-4 rounded-full bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Close</button><div className="flex max-h-[90dvh] max-w-[94vw] items-center justify-center overflow-hidden rounded-[2rem] bg-white p-3 shadow-2xl">{renderUploadedImage(imageLightbox.src, imageLightbox.alt, 'original')}</div></div> : null}
+      {isCommunityAiNoticeOpen ? <div className="fixed right-4 top-[calc(env(safe-area-inset-top)+5rem)] z-[1700] max-w-sm rounded-[1.5rem] border border-[#D9E7F8] bg-white/95 p-4 text-[#081A45] shadow-[0_24px_70px_rgba(23,105,255,0.18)] backdrop-blur-2xl" role="status"><div className="flex items-start gap-3"><span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-white" aria-hidden="true">✦</span><div className="min-w-0 flex-1"><p className="text-sm font-black">Community AI Mentor</p><p className="mt-1 text-xs font-bold leading-5 text-[#536178]">Community AI Mentor is being prepared.</p></div><button type="button" onClick={() => setIsCommunityAiNoticeOpen(false)} aria-label="Close Community AI Mentor notice" className="rounded-full bg-[#EEF6FF] px-2 py-1 text-xs font-black text-[#1769FF]">×</button></div></div> : null}
       {page === 'statusReel' ? renderStatusReel() : null}
       <ShareComposerModal />
       <div className="mx-auto flex h-full min-w-0 max-w-[1720px] overflow-hidden border border-[var(--community-border)] bg-[var(--community-surface)]/55 shadow-[var(--community-shadow)] backdrop-blur-2xl sm:rounded-[2rem] lg:rounded-[2.5rem]">
