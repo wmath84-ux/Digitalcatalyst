@@ -322,6 +322,12 @@ const getPrivateConversationParticipants = (firstUid: string, secondUid: string)
 const getPrivateParticipantMap = (participants: string[]) =>
   participants.reduce<Record<string, boolean>>((map, participantId) => ({ ...map, [participantId]: true }), {});
 const getFollowDocId = (followerId: string, followingId: string) => `${followerId}_${followingId}`;
+const compactCount = (value: unknown) => {
+  const count = Math.max(0, Number(value) || 0);
+  if (count >= 1000000) return `${(count / 1000000).toFixed(count >= 10000000 ? 0 : 1).replace(/\.0$/, '')}M`;
+  if (count >= 1000) return `${(count / 1000).toFixed(count >= 10000 ? 0 : 1).replace(/\.0$/, '')}K`;
+  return String(count);
+};
 
 const normalizeSearchText = (value: unknown) => String(value || '')
   .toLowerCase()
@@ -1687,12 +1693,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       const nextFollowerCounts: Record<string, number> = {};
       const nextFollowingCounts: Record<string, number> = {};
 
+      const seenActiveEdges = new Set<string>();
       snapshot.docs.forEach((item) => {
         const data = item.data() as Record<string, unknown>;
         const followerId = typeof data.followerId === 'string' ? data.followerId : '';
         const followingId = typeof data.followingId === 'string' ? data.followingId : '';
+        const status = typeof data.status === 'string' ? data.status : 'active';
+        const edgeKey = getFollowDocId(followerId, followingId);
 
-        if (!followerId || !followingId || followerId === followingId || data.status === 'removed' || data.status === 'blocked') return;
+        if (!followerId || !followingId || followerId === followingId || status !== 'active' || seenActiveEdges.has(edgeKey)) return;
+        seenActiveEdges.add(edgeKey);
 
         nextFollowerCounts[followingId] = (nextFollowerCounts[followingId] || 0) + 1;
         nextFollowingCounts[followerId] = (nextFollowingCounts[followerId] || 0) + 1;
@@ -2007,6 +2017,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       return;
     }
 
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      setProfileFeedback({ type: 'error', message: 'You appear to be offline. Reconnect to update follows.' });
+      return;
+    }
+
     const followerId = currentUserKey;
     const followingId = creator.id;
 
@@ -2021,32 +2036,81 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
     setFollowLoadingIds((current) => ({ ...current, [followingId]: true }));
     setFollowedByCreatorIds((current) => ({ ...current, [followingId]: !isAlreadyFollowing }));
+    setFollowedIds((current) => isAlreadyFollowing ? current.filter((id) => id !== followingId) : Array.from(new Set([...current, followingId])));
+    setFollowerCounts((current) => ({ ...current, [followingId]: Math.max(0, (current[followingId] || creator.followerCount || creator.followers || 0) + (isAlreadyFollowing ? -1 : 1)) }));
+    setFollowingCounts((current) => ({ ...current, [followerId]: Math.max(0, (current[followerId] || followedIds.length) + (isAlreadyFollowing ? -1 : 1)) }));
 
     try {
       await runTransaction(db, async (transaction) => {
-        const [followSnap, targetSnap] = await Promise.all([
+        const [followSnap, targetSnap, followerPublicSnap, followingLegacySnap, followerLegacySnap] = await Promise.all([
           transaction.get(followRef),
           transaction.get(followingPublicRef),
+          transaction.get(followerPublicRef),
+          transaction.get(followingLegacyRef),
+          transaction.get(followerLegacyRef),
         ]);
         const targetData = targetSnap.data() as Record<string, unknown> | undefined;
-        if (!targetSnap.exists() || targetData?.isPublic === false || targetData?.isSuspended || targetData?.blocked || targetData?.hidden) {
+        if (targetSnap.exists() && (targetData?.isPublic === false || targetData?.isSuspended || targetData?.blocked || targetData?.hidden)) {
           throw new Error('This profile is unavailable.');
         }
 
-        const activeEdge = followSnap.exists() && followSnap.data()?.status !== 'removed' && followSnap.data()?.status !== 'blocked';
+        const activeEdge = followSnap.exists() && followSnap.data()?.status === 'active';
+        const now = Date.now();
+        const targetFollowerCount = Math.max(0, Number(targetSnap.data()?.followerCount ?? followingLegacySnap.data()?.followerCount ?? creator.followerCount ?? creator.followers ?? 0) || 0);
+        const currentFollowingCount = Math.max(0, Number(followerPublicSnap.data()?.followingCount ?? followerLegacySnap.data()?.followingCount ?? followedIds.length) || 0);
+
+        const safeTargetProfile = stripUndefinedDeep({
+          uid: followingId,
+          id: followingId,
+          userId: followingId,
+          ownerId: followingId,
+          displayName: creator.name || 'Eduvora Member',
+          name: creator.name || 'Eduvora Member',
+          username: normalizeUsername(creator.username || creator.name) || `member_${followingId.slice(0, 6)}`,
+          avatar: creator.avatar || '🧑‍🎓',
+          role: creator.role || 'student',
+          bio: creator.bio || '',
+          subjects: creator.subjects || [],
+          masterTags: creator.masterTags || [],
+          followerCount: targetFollowerCount,
+          followingCount: Math.max(0, Number(targetSnap.data()?.followingCount ?? followingLegacySnap.data()?.followingCount ?? creator.followingCount ?? 0) || 0),
+          isPublic: creator.isPublic !== false,
+          isSuspended: Boolean(creator.isSuspended),
+          updatedAt: now,
+          createdAt: targetSnap.data()?.createdAt || now,
+        });
+
+        const safeFollowerProfile = stripUndefinedDeep({
+          uid: followerId,
+          id: followerId,
+          userId: followerId,
+          ownerId: followerId,
+          displayName: profile.name || 'Eduvora Member',
+          name: profile.name || 'Eduvora Member',
+          username: normalizeUsername(profile.username || profile.name) || `member_${followerId.slice(0, 6)}`,
+          avatar: profile.avatar || '🧑‍🎓',
+          role: 'student',
+          followerCount: Math.max(0, Number(followerPublicSnap.data()?.followerCount ?? followerLegacySnap.data()?.followerCount ?? followerIds.length) || 0),
+          followingCount: currentFollowingCount,
+          isPublic: privacySettings.profileVisible,
+          isSuspended: false,
+          updatedAt: now,
+          createdAt: followerPublicSnap.data()?.createdAt || now,
+        });
 
         if (isAlreadyFollowing) {
           if (!activeEdge) return;
-          transaction.update(followRef, { status: 'removed', updatedAt: Date.now() });
-          transaction.set(followingPublicRef, { followerCount: increment(-1), updatedAt: Date.now() }, { merge: true });
-          transaction.set(followerPublicRef, { followingCount: increment(-1), updatedAt: Date.now() }, { merge: true });
-          transaction.set(followingLegacyRef, { followerCount: increment(-1), updatedAt: Date.now() }, { merge: true });
-          transaction.set(followerLegacyRef, { followingCount: increment(-1), updatedAt: Date.now() }, { merge: true });
+          transaction.set(followRef, { status: 'removed', updatedAt: now, removedAt: now }, { merge: true });
+          transaction.set(followingPublicRef, { ...safeTargetProfile, followerCount: Math.max(0, targetFollowerCount - 1), updatedAt: now, lastFollowerAt: now }, { merge: true });
+          transaction.set(followerPublicRef, { ...safeFollowerProfile, followingCount: Math.max(0, currentFollowingCount - 1), updatedAt: now, lastFollowedAt: now }, { merge: true });
+          transaction.set(followingLegacyRef, { followerCount: Math.max(0, targetFollowerCount - 1), updatedAt: now }, { merge: true });
+          transaction.set(followerLegacyRef, { followingCount: Math.max(0, currentFollowingCount - 1), updatedAt: now }, { merge: true });
           return;
         }
 
         if (activeEdge) return;
         transaction.set(followRef, stripUndefinedDeep({
+          followId: getFollowDocId(followerId, followingId),
           followerId,
           followingId,
           status: 'active',
@@ -2056,13 +2120,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           followingName: creator.name,
           followingUsername: creator.username,
           followingAvatar: creator.avatar,
-          createdAt: followSnap.exists() ? followSnap.data()?.createdAt || Date.now() : Date.now(),
-          updatedAt: Date.now(),
+          createdAt: followSnap.exists() ? followSnap.data()?.createdAt || now : now,
+          updatedAt: now,
         }), { merge: true });
-        transaction.set(followingPublicRef, { followerCount: increment(1), updatedAt: Date.now() }, { merge: true });
-        transaction.set(followerPublicRef, { followingCount: increment(1), updatedAt: Date.now() }, { merge: true });
-        transaction.set(followingLegacyRef, { followerCount: increment(1), updatedAt: Date.now() }, { merge: true });
-        transaction.set(followerLegacyRef, { followingCount: increment(1), updatedAt: Date.now() }, { merge: true });
+        transaction.set(followingPublicRef, { ...safeTargetProfile, followerCount: targetFollowerCount + 1, updatedAt: now, lastFollowerAt: now }, { merge: true });
+        transaction.set(followerPublicRef, { ...safeFollowerProfile, followingCount: currentFollowingCount + 1, updatedAt: now, lastFollowedAt: now }, { merge: true });
+        transaction.set(followingLegacyRef, { followerCount: targetFollowerCount + 1, updatedAt: now }, { merge: true });
+        transaction.set(followerLegacyRef, { followingCount: currentFollowingCount + 1, updatedAt: now }, { merge: true });
       });
 
       if (!isAlreadyFollowing) {
@@ -2084,8 +2148,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       setProfileFeedback({ type: 'success', message: isAlreadyFollowing ? `Unfollowed ${creator.name}.` : `You are now following ${creator.name}.` });
     } catch (error) {
       setFollowedByCreatorIds((current) => ({ ...current, [followingId]: isAlreadyFollowing }));
+      setFollowedIds((current) => isAlreadyFollowing ? Array.from(new Set([...current, followingId])) : current.filter((id) => id !== followingId));
+      setFollowerCounts((current) => ({ ...current, [followingId]: Math.max(0, (current[followingId] || creator.followerCount || creator.followers || 0) + (isAlreadyFollowing ? 1 : -1)) }));
+      setFollowingCounts((current) => ({ ...current, [followerId]: Math.max(0, (current[followerId] || followedIds.length) + (isAlreadyFollowing ? 1 : -1)) }));
       console.warn('Follow update failed', error);
-      setProfileFeedback({ type: 'error', message: 'Follow update failed. Please try again.' });
+      setProfileFeedback({ type: 'error', message: isAlreadyFollowing ? 'Could not unfollow. Try again.' : 'Could not follow. Try again.' });
     } finally {
       setFollowLoadingIds((current) => {
         const next = { ...current };
@@ -3768,15 +3835,30 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             {creator.verified ? <span className="rounded-full bg-[#E8F2FF] px-2 py-0.5 text-xs font-black text-[#1769FF]">✓ Verified</span> : null}
             <span className="rounded-full bg-[#EEF6FF] px-2 py-0.5 text-xs font-black capitalize text-[var(--community-body)]">{creator.role}</span>
           </div>
-          <p className="mt-1 truncate text-sm font-bold text-[var(--community-muted)]">@{creator.username} · {(followerCounts[creator.id] || creator.followerCount || creator.followers || 0).toLocaleString()} followers</p>
+          <p className="mt-1 truncate text-sm font-bold text-[var(--community-muted)]">@{creator.username}</p>
+          <div className="mt-2 flex flex-wrap gap-2 text-xs font-black"><span className="rounded-full bg-[#EEF6FF] px-3 py-1.5 text-[#1769FF]">{compactCount(followerCounts[creator.id] ?? creator.followerCount ?? creator.followers)} Followers</span><span className="rounded-full bg-[#F1EEFF] px-3 py-1.5 text-[#7B61FF]">{compactCount(followingCounts[creator.id] ?? creator.followingCount)} Following</span></div>
           {creator.bio ? <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-[var(--community-body)]">{creator.bio}</p> : null}
           {tags.length ? <div className="mt-3 flex flex-wrap gap-1.5">{tags.map((tag) => <span key={tag} className="rounded-full border border-[var(--community-border)] bg-[#F8FBFF] px-2.5 py-1 text-[11px] font-black text-[var(--community-primary)]">#{tag}</span>)}</div> : null}
         </div>
         <div className="flex shrink-0 gap-2 sm:flex-col">
           <button type="button" onClick={() => openChatCreator(creator.id)} className="min-h-11 rounded-2xl border border-[var(--community-border)] bg-[#F8FBFF] px-4 text-sm font-black text-[var(--community-heading)]">Message</button>
-          <button type="button" onClick={() => toggleFollowCreator(creator)} disabled={Boolean(followLoadingIds[creator.id]) || self || creator.isSuspended || creator.isPublic === false} className={`min-h-11 rounded-2xl px-5 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${followed ? 'border border-[var(--community-border)] bg-[var(--community-active-bg)] text-[var(--community-active-text)]' : 'bg-[var(--community-primary)] text-white shadow-[0_14px_32px_rgba(23,105,255,0.22)]'}`}>{self ? 'You' : followLoadingIds[creator.id] ? 'Saving…' : followed ? 'Following' : 'Follow'}</button>
+          <button type="button" onClick={() => toggleFollowCreator(creator)} disabled={Boolean(followLoadingIds[creator.id]) || self || creator.isSuspended || creator.isPublic === false} className={`min-h-11 rounded-2xl px-5 text-sm font-black transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 ${followed ? 'border border-[#D9E7F8] bg-white text-[#1769FF] shadow-sm hover:bg-[#EEF6FF]' : 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-[0_14px_32px_rgba(23,105,255,0.22)]'}`}>{self ? 'You' : followLoadingIds[creator.id] ? 'Saving…' : followed ? '✓ Following' : 'Follow'}</button>
         </div>
       </article>
+    );
+  };
+
+  const renderFollowingPage = () => {
+    const followedCreators = allCreators.filter((creator) => followedIds.includes(creator.id) && !isOwnCommunityId(creator.id));
+    return (
+      <div className="mx-auto max-w-5xl space-y-5">
+        <section className="rounded-[2rem] border border-[var(--community-border)] bg-gradient-to-br from-[#EEF6FF] via-white to-[#F1EEFF] p-5 shadow-[0_24px_70px_rgba(23,105,255,0.12)] sm:p-7">
+          <p className="text-xs font-black uppercase tracking-[0.28em] text-[#1769FF]">Following</p>
+          <h2 className="mt-2 text-3xl font-black text-[#081A45]">People you follow</h2>
+          <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">{compactCount(followedCreators.length)} active community profiles from your backend follow graph.</p>
+        </section>
+        {followedCreators.length ? <div className="grid gap-3">{followedCreators.map(renderFollowCard)}</div> : <div className="rounded-[2rem] border border-dashed border-[#D9E7F8] bg-white p-10 text-center shadow-sm"><h3 className="text-2xl font-black text-[#081A45]">You are not following anyone yet.</h3><p className="mt-2 text-sm font-bold text-[#7C879A]">Find creators, teachers, and learning partners to personalize your community feed.</p><button type="button" onClick={() => pushPage('network')} className="mt-5 rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-3 text-sm font-black text-white">Find people to follow</button></div>}
+      </div>
     );
   };
 
@@ -3798,7 +3880,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <div className="space-y-3 p-3 sm:p-5">{networkVisibleCreators.length ? networkVisibleCreators.map(renderFollowCard) : <div className="rounded-[1.7rem] border border-dashed border-[#BFD7FF] bg-[#F8FBFF] p-10 text-center"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#E8F2FF] text-2xl">🔎</div><h3 className="mt-4 text-xl font-black text-[var(--community-heading)]">No users found</h3><p className="mt-2 text-sm font-semibold text-[var(--community-body)]">Try a subject, role, creator category, or suggested chip.</p><button type="button" onClick={() => setNetworkSearch('')} className="mt-4 rounded-2xl bg-[var(--community-primary)] px-5 py-3 text-sm font-black text-white">Clear search</button></div>}</div>
       </section>
       <aside className="hidden space-y-4 xl:block">
-        <div className="rounded-[2rem] border border-[var(--community-border)] bg-white p-5 shadow-[0_18px_54px_rgba(23,105,255,0.10)]"><h3 className="text-xl font-black text-[var(--community-heading)]">Your follow stats</h3><div className="mt-4 grid grid-cols-2 gap-3">{[['Followers', followerIds.length], ['Following', followedIds.length]].map(([label, value]) => <div key={label} className="rounded-2xl bg-[#F8FBFF] p-4"><p className="text-xs font-black uppercase text-[var(--community-muted)]">{label}</p><p className="mt-1 text-2xl font-black text-[var(--community-heading)]">{value}</p></div>)}</div></div>
+        <div className="rounded-[2rem] border border-[var(--community-border)] bg-white p-5 shadow-[0_18px_54px_rgba(23,105,255,0.10)]"><h3 className="text-xl font-black text-[var(--community-heading)]">Your follow stats</h3><div className="mt-4 grid grid-cols-2 gap-3">{[['Followers', followerIds.length], ['Following', followedIds.length]].map(([label, value]) => <div key={label} className="rounded-2xl bg-[#F8FBFF] p-4"><p className="text-xs font-black uppercase text-[var(--community-muted)]">{label}</p><p className="mt-1 text-2xl font-black text-[var(--community-heading)]">{compactCount(value)}</p></div>)}</div></div>
         <div className="rounded-[2rem] border border-[var(--community-border)] bg-[#EEF6FF] p-5"><h3 className="font-black text-[var(--community-heading)]">Trending master tags</h3><div className="mt-3 flex flex-wrap gap-2">{['Math', 'Physics', 'Class 10', 'Funnels', 'Automation'].map((tag) => <button key={tag} type="button" onClick={() => setNetworkSearch(tag)} className="rounded-full bg-white px-3 py-2 text-xs font-black text-[var(--community-primary)]">#{tag}</button>)}</div></div>
       </aside>
     </div>
@@ -3811,7 +3893,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {page === 'profile' && renderProfilePage()}
       {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_28px_90px_rgba(79,123,255,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.28em] text-[#4F7BFF]">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Post once per type daily with 15-day community visibility.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">Each user can publish one text, one image, and one poll creator post per day. The used type locks immediately, syncs through Firebase for all users, and auto-deletes after 15 days.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EAF5FF] p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || isCreatorTypeUsedToday || !postDraft.trim() || isStorageLocked || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.28)] disabled:opacity-45">{isPublishingCreator ? 'Publishing creator post...' : isCreatorTypeUsedToday ? `${postType} post used today` : isStorageLocked ? 'Storage limit reached' : 'Publish creator post'}</button></div></div>}
       {page === 'network' && renderFollowPage()}
-      {page === 'following' && renderFeedLayout(followingMessages, 'Your followers feed', 'Only posts from creators you follow are shown here.')}
+      {page === 'following' && renderFollowingPage()}
       {page === 'adminPosts' && renderFeedLayout(adminPosts, 'ADMIN POST', 'Official admin posts from Firebase. Like, react, vote, and reply here.')}
       {page === 'tagMaster' && renderTagMasterPage()}{page === 'masterTags' && renderMasterTagsPage()}{page === 'masterTagDetail' && renderMasterTagDetailPage()}
       {page === 'directChat' && renderChatPage()}{page === 'directChatThread' && renderChatThreadPage()}{page === 'statusDetail' && renderStatusDetailPage()}

@@ -145,10 +145,10 @@ service cloud.firestore {
           'uid', 'id', 'userId', 'ownerId', 'username', 'displayName', 'name', 'photoURL', 'avatar', 'role', 'bio',
           'subjects', 'masterTags', 'creatorCategory', 'searchableText', 'searchTokens',
           'followers', 'followerCount', 'followingCount', 'postCount', 'mutual',
-          'verified', 'isVerified', 'isCreator', 'isPublic', 'isSuspended', 'source', 'isOnline', 'lastActiveAt', 'createdAt', 'updatedAt'
+          'verified', 'isVerified', 'isCreator', 'isPublic', 'isSuspended', 'source', 'isOnline', 'lastActiveAt', 'lastFollowedAt', 'lastFollowerAt', 'createdAt', 'updatedAt'
         ]);
       allow update: if signedIn()
-        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['followerCount', 'followingCount', 'updatedAt'])
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['followerCount', 'followingCount', 'updatedAt', 'lastFollowedAt', 'lastFollowerAt'])
         && (!request.resource.data.diff(resource.data).changedKeys().hasAny(['followerCount']) || request.resource.data.followerCount in [resource.data.followerCount + 1, resource.data.followerCount - 1])
         && (!request.resource.data.diff(resource.data).changedKeys().hasAny(['followingCount']) || request.resource.data.followingCount in [resource.data.followingCount + 1, resource.data.followingCount - 1])
         && (!('followerCount' in request.resource.data) || request.resource.data.followerCount >= 0)
@@ -166,10 +166,10 @@ service cloud.firestore {
           'uid', 'id', 'userId', 'ownerId', 'username', 'displayName', 'name', 'photoURL', 'avatar', 'role', 'bio',
           'subjects', 'masterTags', 'creatorCategory', 'searchableText', 'searchTokens',
           'followerCount', 'followingCount', 'postCount', 'isCreator', 'isVerified', 'verified', 'isPublic', 'isSuspended',
-          'isOnline', 'lastActiveAt', 'createdAt', 'updatedAt'
+          'isOnline', 'lastActiveAt', 'lastFollowedAt', 'lastFollowerAt', 'createdAt', 'updatedAt'
         ]);
       allow update: if signedIn()
-        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['followerCount', 'followingCount', 'updatedAt'])
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['followerCount', 'followingCount', 'updatedAt', 'lastFollowedAt', 'lastFollowerAt'])
         && (!request.resource.data.diff(resource.data).changedKeys().hasAny(['followerCount']) || request.resource.data.followerCount in [resource.data.followerCount + 1, resource.data.followerCount - 1])
         && (!request.resource.data.diff(resource.data).changedKeys().hasAny(['followingCount']) || request.resource.data.followingCount in [resource.data.followingCount + 1, resource.data.followingCount - 1])
         && (!('followerCount' in request.resource.data) || request.resource.data.followerCount >= 0)
