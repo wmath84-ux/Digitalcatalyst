@@ -264,6 +264,23 @@ type EditableSubscriptionPlan = { id: string; name: string; price: number; coinP
 type EditableReward = { id: string; title: string; cost: number; };
 const streakMetricOptions: ProfileStreakMetric[] = ['dailyLogin', 'studyMinutes', 'watchMinutes', 'pdfsRead', 'coursesOwned', 'completedCourses', 'quizWins', 'articlesRead', 'lifetimeCoins', 'coinTransactions', 'milestonesClaimed', 'badgesUnlocked'];
 const milestoneMetricOptions: ProfileMilestoneMetric[] = ['lifetimeCoins', 'studyMinutes', 'watchMinutes', 'coursesOwned', 'completedCourses', 'quizWins', 'articlesRead', 'pdfsRead', 'streakClaims', 'badgesUnlocked'];
+const metricLabels: Record<string, string> = {
+    dailyLogin: 'Daily login',
+    studyMinutes: 'Valid study minutes',
+    watchMinutes: 'Valid YouTube watch minutes',
+    pdfsRead: 'PDF/docs read count',
+    coursesOwned: 'Owned courses',
+    completedCourses: 'Completed courses',
+    quizWins: 'Completed quiz rewards',
+    articlesRead: 'Articles read',
+    lifetimeCoins: 'Lifetime earned coins',
+    coinTransactions: 'Coin transaction count',
+    milestonesClaimed: 'Milestones claimed',
+    badgesUnlocked: 'Badges unlocked',
+    streakClaims: 'Daily streak claims',
+};
+const getRewardStatus = (reward: { active?: boolean; draft?: boolean; archived?: boolean }) => reward.archived ? 'Archived' : reward.draft ? 'Draft' : reward.active === false ? 'Disabled' : 'Active';
+const statusClass = (status: string) => status === 'Active' ? 'bg-emerald-100 text-emerald-700' : status === 'Draft' ? 'bg-amber-100 text-amber-700' : status === 'Archived' ? 'bg-slate-200 text-slate-600' : 'bg-rose-100 text-rose-700';
 
 const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, products = [], onSettingsChange }) => {
     const [activeTab, setActiveTab] = useState<'theme' | 'layout' | 'content' | 'reading' | 'profile' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
@@ -352,6 +369,18 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const profileStyle = { backgroundColor: '#e2e8f0', backgroundTint: '#e0e7ff', cardOpacity: 82, heroOverlayOpacity: 76, accentColor: '#f97316', ...((localSettings.content as any).profileStyle || {}) };
     const profileStreaks = (((localSettings.content as any).profileStreaks || []) as ProfileStreakConfig[]);
     const profileMilestones = (((localSettings.content as any).profileMilestones || []) as ProfileMilestoneConfig[]);
+    const rewardValidationIssues = [
+        ...profileStreaks.flatMap(streak => [
+            !String(streak.title || '').trim() ? `${streak.id || 'Streak'} is missing a title.` : '',
+            Number(streak.goal) <= 0 ? `${streak.title || streak.id} needs a goal greater than 0.` : '',
+            Number(streak.coinReward || 0) < 0 ? `${streak.title || streak.id} cannot have negative coins.` : '',
+        ].filter(Boolean)),
+        ...profileMilestones.flatMap(milestone => [
+            !String(milestone.title || '').trim() ? `${milestone.id || 'Milestone'} is missing a title.` : '',
+            Number(milestone.requirement) <= 0 ? `${milestone.title || milestone.id} needs a requirement greater than 0.` : '',
+            Number(milestone.coinReward || 0) < 0 ? `${milestone.title || milestone.id} cannot have negative coins.` : '',
+        ].filter(Boolean)),
+    ];
     const defaultDockItems = dockCustomizationItems;
     const selectedDockItems = dockItems.length ? dockItems : defaultDockItems;
 
@@ -415,27 +444,37 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     };
 
     const updateProfileStreak = (index: number, updates: Partial<ProfileStreakConfig>) => {
-        updateContentValue('profileStreaks', profileStreaks.map((streak, streakIndex) => streakIndex === index ? { ...streak, ...updates } : streak));
+        updateContentValue('profileStreaks', profileStreaks.map((streak, streakIndex) => streakIndex === index ? { ...streak, ...updates, updatedAt: new Date().toISOString() } : streak));
     };
 
     const addProfileStreak = () => {
-        updateContentValue('profileStreaks', [...profileStreaks, { id: `streak-${Date.now()}`, title: 'New Daily Strip', icon: '🔥', metric: 'dailyLogin', goal: 1, unit: 'day', coinReward: 10, accent: 'from-orange-400 via-amber-400 to-yellow-300', note: 'Describe the daily action users should complete.', active: true }]);
+        updateContentValue('profileStreaks', [...profileStreaks, { id: `streak-${Date.now()}`, title: 'New Daily Strip', icon: '🔥', category: 'Daily Streak', metric: 'dailyLogin', goal: 1, unit: 'day', coinReward: 10, accent: 'from-orange-400 via-amber-400 to-yellow-300', note: 'Describe the daily action users should complete.', active: false, draft: true, archived: false, updatedAt: new Date().toISOString() }]);
     };
 
-    const removeProfileStreak = (index: number) => {
-        updateContentValue('profileStreaks', profileStreaks.filter((_, streakIndex) => streakIndex !== index));
+    const duplicateProfileStreak = (index: number) => {
+        const streak = profileStreaks[index];
+        updateContentValue('profileStreaks', [...profileStreaks, { ...streak, id: `${streak.id}-copy-${Date.now()}`, title: `${streak.title} Copy`, active: false, draft: true, archived: false, updatedAt: new Date().toISOString() }]);
+    };
+
+    const archiveProfileStreak = (index: number) => {
+        updateProfileStreak(index, { active: false, draft: false, archived: true });
     };
 
     const updateProfileMilestone = (index: number, updates: Partial<ProfileMilestoneConfig>) => {
-        updateContentValue('profileMilestones', profileMilestones.map((milestone, milestoneIndex) => milestoneIndex === index ? { ...milestone, ...updates } : milestone));
+        updateContentValue('profileMilestones', profileMilestones.map((milestone, milestoneIndex) => milestoneIndex === index ? { ...milestone, ...updates, updatedAt: new Date().toISOString() } : milestone));
     };
 
     const addProfileMilestone = () => {
-        updateContentValue('profileMilestones', [...profileMilestones, { id: `milestone-${Date.now()}`, title: 'New Milestone', icon: '🏆', metric: 'lifetimeCoins', requirement: 500, description: 'Describe this real-data milestone.', actionLabel: 'Claim Reward', coinReward: 50, unlockProductIds: [], active: true }]);
+        updateContentValue('profileMilestones', [...profileMilestones, { id: `milestone-${Date.now()}`, title: 'New Milestone', icon: '🏆', category: 'Milestone', metric: 'lifetimeCoins', requirement: 500, description: 'Describe this real-data milestone.', actionLabel: 'Claim Reward', coinReward: 50, unlockProductIds: [], active: false, draft: true, archived: false, updatedAt: new Date().toISOString() }]);
     };
 
-    const removeProfileMilestone = (index: number) => {
-        updateContentValue('profileMilestones', profileMilestones.filter((_, milestoneIndex) => milestoneIndex !== index));
+    const duplicateProfileMilestone = (index: number) => {
+        const milestone = profileMilestones[index];
+        updateContentValue('profileMilestones', [...profileMilestones, { ...milestone, id: `${milestone.id}-copy-${Date.now()}`, title: `${milestone.title} Copy`, active: false, draft: true, archived: false, updatedAt: new Date().toISOString() }]);
+    };
+
+    const archiveProfileMilestone = (index: number) => {
+        updateProfileMilestone(index, { active: false, draft: false, archived: true });
     };
 
     const moveSection = (index: number, direction: 'up' | 'down') => {
@@ -678,6 +717,28 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                         </div>
                     </div>
 
+                    <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-cyan-50 p-4">
+                        <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">Reward Builder Overview</p>
+                                <h4 className="text-xl font-black text-slate-900">Global badge, streak, and milestone rules</h4>
+                                <p className="text-sm text-slate-600">Draft rewards stay hidden. Active rewards are evaluated from real profile progress and archived rewards remain safe for old claim history.</p>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-center sm:grid-cols-4">
+                                <div className="rounded-xl bg-white p-3 shadow-sm"><p className="text-xl font-black text-emerald-600">{[...profileStreaks, ...profileMilestones].filter(item => getRewardStatus(item) === 'Active').length}</p><p className="text-[10px] font-bold uppercase text-slate-500">Active</p></div>
+                                <div className="rounded-xl bg-white p-3 shadow-sm"><p className="text-xl font-black text-amber-600">{[...profileStreaks, ...profileMilestones].filter(item => getRewardStatus(item) === 'Draft').length}</p><p className="text-[10px] font-bold uppercase text-slate-500">Draft</p></div>
+                                <div className="rounded-xl bg-white p-3 shadow-sm"><p className="text-xl font-black text-indigo-600">{profileStreaks.length}</p><p className="text-[10px] font-bold uppercase text-slate-500">Streaks</p></div>
+                                <div className="rounded-xl bg-white p-3 shadow-sm"><p className="text-xl font-black text-purple-600">{profileMilestones.length}</p><p className="text-[10px] font-bold uppercase text-slate-500">Milestones</p></div>
+                            </div>
+                        </div>
+                        {rewardValidationIssues.length > 0 && (
+                            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">
+                                <p className="font-black">Validation summary before publish</p>
+                                <ul className="mt-1 list-disc pl-5">{rewardValidationIssues.slice(0, 5).map(issue => <li key={issue}>{issue}</li>)}</ul>
+                            </div>
+                        )}
+                    </div>
+
                     <div className="rounded-xl border bg-white p-4">
                         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div>
@@ -689,16 +750,23 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                         <div className="mt-4 space-y-4">
                             {profileStreaks.map((streak, index) => (
                                 <div key={streak.id || index} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                        <span className={`rounded-full px-3 py-1 text-xs font-black ${statusClass(getRewardStatus(streak))}`}>{getRewardStatus(streak)}</span>
+                                        <p className="text-xs font-semibold text-slate-500">Rule: unlock after {streak.goal} {streak.unit} of {metricLabels[streak.metric] || streak.metric}. Reward: {streak.coinReward || 0} coins.</p>
+                                    </div>
                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
                                         <input value={streak.title} onChange={e => updateProfileStreak(index, { title: e.target.value })} placeholder="Title" className="rounded border p-2 md:col-span-2" />
                                         <input value={streak.icon} onChange={e => updateProfileStreak(index, { icon: e.target.value })} placeholder="Icon" className="rounded border p-2" />
-                                        <select value={streak.metric} onChange={e => updateProfileStreak(index, { metric: e.target.value as ProfileStreakMetric })} className="rounded border p-2 md:col-span-2">{streakMetricOptions.map(metric => <option key={metric} value={metric}>{metric}</option>)}</select>
-                                        <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={streak.active !== false} onChange={e => updateProfileStreak(index, { active: e.target.checked })} /> Active</label>
+                                        <input value={streak.category || ''} onChange={e => updateProfileStreak(index, { category: e.target.value })} placeholder="Category" className="rounded border p-2" />
+                                        <select value={streak.metric} onChange={e => updateProfileStreak(index, { metric: e.target.value as ProfileStreakMetric })} className="rounded border p-2 md:col-span-2">{streakMetricOptions.map(metric => <option key={metric} value={metric}>{metricLabels[metric]}</option>)}</select>
+                                        <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={streak.active !== false && !streak.draft && !streak.archived} onChange={e => updateProfileStreak(index, { active: e.target.checked, draft: !e.target.checked, archived: false })} /> Publish active</label>
                                         <input type="number" min="1" value={streak.goal} onChange={e => updateProfileStreak(index, { goal: Number(e.target.value) || 1 })} placeholder="Goal" className="rounded border p-2" />
                                         <input value={streak.unit} onChange={e => updateProfileStreak(index, { unit: e.target.value })} placeholder="Unit" className="rounded border p-2" />
                                         <input type="number" min="0" value={streak.coinReward} onChange={e => updateProfileStreak(index, { coinReward: Number(e.target.value) || 0 })} placeholder="Coins" className="rounded border p-2" />
                                         <input value={streak.accent} onChange={e => updateProfileStreak(index, { accent: e.target.value })} placeholder="Tailwind gradient classes" className="rounded border p-2 md:col-span-2" />
-                                        <button type="button" onClick={() => removeProfileStreak(index)} className="rounded border border-red-200 px-3 py-2 text-sm font-bold text-red-600">Remove</button>
+                                        <button type="button" onClick={() => updateProfileStreak(index, { active: false, draft: true, archived: false })} className="rounded border border-amber-200 px-3 py-2 text-sm font-bold text-amber-700">Draft</button>
+                                        <button type="button" onClick={() => duplicateProfileStreak(index)} className="rounded border border-indigo-200 px-3 py-2 text-sm font-bold text-indigo-600">Duplicate</button>
+                                        <button type="button" onClick={() => archiveProfileStreak(index)} className="rounded border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600">Archive</button>
                                         <textarea value={streak.note} onChange={e => updateProfileStreak(index, { note: e.target.value })} placeholder="Motivation note" className="rounded border p-2 md:col-span-6" rows={2} />
                                     </div>
                                 </div>
@@ -717,16 +785,23 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                         <div className="mt-4 space-y-4">
                             {profileMilestones.map((milestone, index) => (
                                 <div key={milestone.id || index} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                                    <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                                        <span className={`rounded-full px-3 py-1 text-xs font-black ${statusClass(getRewardStatus(milestone))}`}>{getRewardStatus(milestone)}</span>
+                                        <p className="text-xs font-semibold text-slate-500">Rule: unlock after {milestone.requirement} {metricLabels[milestone.metric] || milestone.metric}. Reward: {milestone.coinReward || 0} coins.</p>
+                                    </div>
                                     <div className="grid grid-cols-1 gap-3 md:grid-cols-6">
                                         <input value={milestone.title} onChange={e => updateProfileMilestone(index, { title: e.target.value })} placeholder="Title" className="rounded border p-2 md:col-span-2" />
                                         <input value={milestone.icon} onChange={e => updateProfileMilestone(index, { icon: e.target.value })} placeholder="Icon" className="rounded border p-2" />
-                                        <select value={milestone.metric} onChange={e => updateProfileMilestone(index, { metric: e.target.value as ProfileMilestoneMetric })} className="rounded border p-2 md:col-span-2">{milestoneMetricOptions.map(metric => <option key={metric} value={metric}>{metric}</option>)}</select>
-                                        <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={milestone.active !== false} onChange={e => updateProfileMilestone(index, { active: e.target.checked })} /> Active</label>
+                                        <input value={milestone.category || ''} onChange={e => updateProfileMilestone(index, { category: e.target.value })} placeholder="Category" className="rounded border p-2" />
+                                        <select value={milestone.metric} onChange={e => updateProfileMilestone(index, { metric: e.target.value as ProfileMilestoneMetric })} className="rounded border p-2 md:col-span-2">{milestoneMetricOptions.map(metric => <option key={metric} value={metric}>{metricLabels[metric]}</option>)}</select>
+                                        <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={milestone.active !== false && !milestone.draft && !milestone.archived} onChange={e => updateProfileMilestone(index, { active: e.target.checked, draft: !e.target.checked, archived: false })} /> Publish active</label>
                                         <input type="number" min="1" value={milestone.requirement} onChange={e => updateProfileMilestone(index, { requirement: Number(e.target.value) || 1 })} placeholder="Requirement" className="rounded border p-2" />
                                         <input type="number" min="0" value={milestone.coinReward || 0} onChange={e => updateProfileMilestone(index, { coinReward: Number(e.target.value) || 0 })} placeholder="Coins" className="rounded border p-2" />
                                         <input value={milestone.actionLabel} onChange={e => updateProfileMilestone(index, { actionLabel: e.target.value })} placeholder="Button label" className="rounded border p-2 md:col-span-2" />
                                         <input value={(milestone.unlockProductIds || []).join(',')} onChange={e => updateProfileMilestone(index, { unlockProductIds: e.target.value.split(',').map(value => Number(value.trim())).filter(Boolean) })} placeholder="Unlock product IDs" className="rounded border p-2 md:col-span-2" />
-                                        <button type="button" onClick={() => removeProfileMilestone(index)} className="rounded border border-red-200 px-3 py-2 text-sm font-bold text-red-600">Remove</button>
+                                        <button type="button" onClick={() => updateProfileMilestone(index, { active: false, draft: true, archived: false })} className="rounded border border-amber-200 px-3 py-2 text-sm font-bold text-amber-700">Draft</button>
+                                        <button type="button" onClick={() => duplicateProfileMilestone(index)} className="rounded border border-indigo-200 px-3 py-2 text-sm font-bold text-indigo-600">Duplicate</button>
+                                        <button type="button" onClick={() => archiveProfileMilestone(index)} className="rounded border border-slate-300 px-3 py-2 text-sm font-bold text-slate-600">Archive</button>
                                         <textarea value={milestone.description} onChange={e => updateProfileMilestone(index, { description: e.target.value })} placeholder="Description" className="rounded border p-2 md:col-span-6" rows={2} />
                                         <textarea value={milestone.downloadContent || ''} onChange={e => updateProfileMilestone(index, { downloadContent: e.target.value })} placeholder="Optional download text content" className="rounded border p-2 md:col-span-6" rows={2} />
                                     </div>
