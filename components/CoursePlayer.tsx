@@ -1525,6 +1525,21 @@ const CoursePlayer: React.FC<{
     }];
   }, [activeFile, backgroundImage, product.title]);
 
+  const modulePanelId = `course-module-panel-${product.id}`;
+
+  useEffect(() => {
+    if (!isSidebarOpen || useDesktopSidebar || typeof window === 'undefined') return undefined;
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') {
+        setIsSidebarOpen(false);
+      }
+    };
+
+    window.addEventListener('keydown', handleEscape);
+    return () => window.removeEventListener('keydown', handleEscape);
+  }, [isSidebarOpen, useDesktopSidebar]);
+
   const YoutubeRewardMeter = () => {
     if (activeFile?.type !== 'youtube') return null;
 
@@ -1617,18 +1632,30 @@ const CoursePlayer: React.FC<{
       <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: isAudioExperience ? '#bdf7ff' : '#8b75ff' }} />
       <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-[#c9f8ff]/70' : 'bg-[#d9d2ff]/45'}`} />
 
-      <header className={`relative z-30 min-w-0 items-center gap-2 border-b shadow-sm backdrop-blur-xl ${forceOverlaySidebar ? 'flex' : 'flex lg:hidden'} ${compactPlayerChrome ? 'p-1.5' : 'p-2.5 sm:gap-3 sm:p-3'} ${'border-[#ded8ff] bg-white/85'}`} style={{ paddingLeft: 'max(0.375rem, env(safe-area-inset-left))', paddingRight: 'max(0.375rem, env(safe-area-inset-right))' }}>
-        <button onClick={handlePlayerBack} className={`${compactPlayerChrome ? 'px-2 py-1.5 text-xs' : 'px-3 py-2 text-sm'} shrink-0 rounded-lg border border-[#ded8ff] bg-white font-black text-[#080b22] shadow-[0_10px_30px_rgba(89,71,242,0.08)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff]`} aria-label="Back to course details">← {viewport.isTinyPlayer ? '' : 'Back'}</button>
-        <button onClick={() => setIsSidebarOpen(true)} className={`${compactPlayerChrome ? 'p-1.5' : 'p-2'} shrink-0 rounded-lg border border-[#ded8ff] bg-[#ece7ff]`} aria-label="Open modules"><svg className={`${compactPlayerChrome ? 'h-5 w-5' : 'h-6 w-6'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 6h16M4 12h16M4 18h7" /></svg></button>
-        <h1 className="min-w-0 flex-1 truncate text-base font-black sm:text-lg">{activeFile?.name || product.title}</h1>
-        <div className="ml-auto flex shrink-0 items-center gap-2">
-          <button onClick={() => setIsMentorOpen(value => !value)} className={`${viewport.isTinyPlayer ? 'px-2 py-1.5 text-xs' : 'px-2.5 py-2 text-xs sm:px-3 sm:text-sm'} rounded-xl border border-[#ded8ff] bg-white/80 font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)]`}>🧠 AI</button>
-          {productAccess?.hasPaidLockedUpdates && onPurchaseLatestUpdate && (
-            <button onClick={() => onPurchaseLatestUpdate(product)} className={`${viewport.isTinyPlayer ? 'px-2 py-1.5 text-xs' : 'px-2.5 py-2 text-xs sm:px-3 sm:text-sm'} rounded-xl border border-emerald-200 bg-emerald-50 font-black text-emerald-700 shadow-[0_10px_30px_rgba(16,185,129,0.10)]`}>
+      <header className={`relative z-30 flex min-h-[56px] min-w-0 items-center gap-2 border-b border-[#ded8ff] bg-white/88 shadow-sm backdrop-blur-xl ${forceOverlaySidebar ? '' : 'lg:hidden'} ${compactPlayerChrome ? 'px-2 py-1.5' : 'px-3 py-2.5 sm:px-3 sm:py-3'}`} style={{ paddingLeft: 'max(0.75rem, env(safe-area-inset-left))', paddingRight: 'max(0.75rem, env(safe-area-inset-right))', paddingTop: 'max(0.375rem, env(safe-area-inset-top))' }}>
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-[10px] font-black uppercase tracking-[0.22em] text-[#6b5cff]/80 sm:text-[11px]">Now learning</p>
+            <h1 className="truncate text-sm font-black leading-tight text-[#071735] sm:text-lg" title={activeFile?.name || product.title}>{activeFile?.name || product.title}</h1>
+          </div>
+          <button onClick={() => setIsMentorOpen(value => !value)} className={`${viewport.isTinyPlayer ? 'h-10 px-2 text-xs' : 'h-11 px-3 text-xs sm:text-sm'} shrink-0 rounded-2xl border border-[#ded8ff] bg-white/85 font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff] focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50`}>🧠 AI</button>
+          {productAccess?.hasPaidLockedUpdates && onPurchaseLatestUpdate && !viewport.isTinyPlayer && (
+            <button onClick={() => onPurchaseLatestUpdate(product)} className="hidden h-11 shrink-0 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-black text-emerald-700 shadow-[0_10px_30px_rgba(16,185,129,0.10)] transition hover:-translate-y-0.5 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 sm:inline-flex sm:items-center">
               Latest Update
             </button>
           )}
         </div>
+        <button
+          type="button"
+          onClick={() => setIsSidebarOpen(value => !value)}
+          className={`${isSidebarOpen ? 'border-[#5B4BFF] bg-[#5B4BFF] text-white shadow-[0_16px_34px_rgba(91,75,255,0.28)]' : 'border-[#C9C2FF] bg-[#F1EEFF] text-[#071735] shadow-[0_14px_30px_rgba(91,75,255,0.16)]'} inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-2xl px-3 font-black transition hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(91,75,255,0.22)] active:translate-y-0 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/60 focus:ring-offset-2 focus:ring-offset-white`}
+          aria-label={isSidebarOpen ? 'Close modules' : 'Open modules'}
+          aria-expanded={isSidebarOpen}
+          aria-controls={modulePanelId}
+        >
+          <ModuleIcon className="h-5 w-5" />
+          <span className="hidden text-sm sm:inline">Modules</span>
+        </button>
       </header>
 
       <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition ${useDesktopSidebar ? 'lg:hidden' : ''} ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
@@ -1669,7 +1696,7 @@ const CoursePlayer: React.FC<{
         </div>
 
         <section className={`${useDesktopSidebar ? 'lg:grid-cols-[var(--course-sidebar-width)_minmax(0,1fr)]' : 'grid-cols-1'} grid min-h-0 min-w-0 flex-1 overflow-hidden gap-2 sm:gap-3`} style={{ ['--course-sidebar-width' as any]: 'clamp(18rem, 28vw, 28rem)' }}>
-          <aside className={`${useDesktopSidebar ? 'lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl' : ''} fixed inset-y-0 left-0 z-40 w-[min(88svw,20rem)] max-w-full transform transition sm:w-80 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+          <aside id={modulePanelId} className={`${useDesktopSidebar ? 'lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl' : ''} fixed inset-y-0 left-0 z-40 w-[min(88svw,20rem)] max-w-full transform transition sm:w-80 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col border-r border-[#ded8ff] bg-white/85 shadow-sm backdrop-blur-xl lg:rounded-2xl lg:border lg:border-[#ded8ff] lg:bg-white/85 lg:shadow-sm">
               <div className="shrink-0 border-b border-[#E3E8F5] bg-white/90 px-4 py-4 shadow-sm lg:border-[#E3E8F5] lg:py-5">
                 <div className="rounded-[1.5rem] border border-[#D9E7F8] bg-gradient-to-br from-white via-[#F8FBFF] to-[#F1EEFF] p-4 shadow-[0_8px_24px_rgba(8,26,69,0.06)]">
@@ -1682,7 +1709,10 @@ const CoursePlayer: React.FC<{
                       <p className="truncate text-sm font-bold text-[#667085]">Modules, lessons, docs & quizzes</p>
                     </div>
                   </div>
-                  <h2 className="line-clamp-2 text-xl font-black leading-tight text-[#071735] sm:text-[25px]">{product.title}</h2>
+                  <div className="flex items-start gap-3">
+                    <h2 className="line-clamp-2 min-w-0 flex-1 text-xl font-black leading-tight text-[#071735] sm:text-[25px]">{product.title}</h2>
+                    <button type="button" onClick={() => setIsSidebarOpen(false)} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#071735] shadow-sm transition hover:bg-[#F1EEFF] focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50 lg:hidden" aria-label="Close modules">×</button>
+                  </div>
                 </div>
               </div>
               <nav className="flex-1 overflow-y-auto p-2 sm:p-3">
