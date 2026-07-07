@@ -148,7 +148,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 const now = new Date();
                 const currentMonth = now.getMonth();
                 const currentYear = now.getFullYear();
-                const previousMonthDate = new Date(currentYear, currentMonth - 1, 1);
 
                 const currentMonthRevenue = completedOrders.reduce((sum, order) => {
                     const orderDate = new Date(order.date);
@@ -156,20 +155,17 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                     return sum + parseCurrency(order.total);
                 }, 0);
 
-                const previousMonthRevenue = completedOrders.reduce((sum, order) => {
-                    const orderDate = new Date(order.date);
-                    if (Number.isNaN(orderDate.getTime()) || orderDate.getMonth() !== previousMonthDate.getMonth() || orderDate.getFullYear() !== previousMonthDate.getFullYear()) return sum;
-                    return sum + parseCurrency(order.total);
-                }, 0);
-
-                const revenueSubtitle = previousMonthRevenue > 0
-                    ? `${currentMonthRevenue >= previousMonthRevenue ? '+' : ''}${(((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) * 100).toFixed(1)}% from last month`
-                    : currentMonthRevenue > 0 ? 'No revenue data last month' : 'No revenue this month';
+                const revenueSubtitle = completedOrders.length === 0
+                    ? 'No completed orders yet'
+                    : currentMonthRevenue > 0
+                        ? `₹${currentMonthRevenue.toLocaleString('en-IN')} completed revenue this month`
+                        : 'No completed revenue this month';
 
                 const unavailableProducts = props.products.filter(product => product.inStock === false).length;
+                const availableProducts = props.products.length - unavailableProducts;
                 const productsSubtitle = props.products.length === 0
                     ? 'No products added'
-                    : unavailableProducts > 0 ? `${unavailableProducts} out of stock` : 'All products in stock';
+                    : `${availableProducts} available • ${unavailableProducts} out of stock`;
 
                 const weekStart = new Date(now);
                 weekStart.setDate(now.getDate() - 7);
@@ -177,7 +173,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                     const createdAt = new Date(user.createdAt);
                     return !Number.isNaN(createdAt.getTime()) && createdAt >= weekStart;
                 }).length;
-                const usersSubtitle = newUsersThisWeek > 0 ? `+${newUsersThisWeek} new this week` : 'No new users this week';
+                const usersSubtitle = props.users.length === 0
+                    ? 'No users yet'
+                    : newUsersThisWeek > 0 ? `${newUsersThisWeek} new users this week` : 'No new users this week';
 
                 const averageRating = reviewRatings.length > 0
                     ? reviewRatings.reduce((sum, rating) => sum + rating, 0) / reviewRatings.length
