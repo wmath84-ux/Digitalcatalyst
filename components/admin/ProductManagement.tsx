@@ -7,6 +7,7 @@ import { doc, getDoc } from 'firebase/firestore';
 import { auth, db, storage } from '../../firebase';
 import { normalizeCoinPrice } from '../../utils/economy';
 import { parseKeywordList, withProductSearchIndex } from '../../utils/productSearch';
+import { validateProductImageUpload } from '../../utils/productImageUpload.js';
 
 type ProductViewState = 'list' | 'add' | 'edit';
 
@@ -1679,6 +1680,8 @@ const ProductForm: React.FC<{
     const [discountPercent, setDiscountPercent] = useState(0);
     const [isSavingProduct, setIsSavingProduct] = useState(false);
     const [isUploadingProductImage, setIsUploadingProductImage] = useState(false);
+    const [productImageUploadError, setProductImageUploadError] = useState('');
+    const [productImageUploadProgress, setProductImageUploadProgress] = useState(0);
     const productImageInputRef = useRef<HTMLInputElement>(null);
     const draftProductIdRef = useRef<number | string>(product?.id || `draft-${Date.now()}`);
 
@@ -1694,26 +1697,51 @@ const ProductForm: React.FC<{
         }
     }, [formData.isFree]);
 
+    const buildProductImageMap = (imageUrl?: string) => {
+        if (!imageUrl) return {};
+        return {
+            card: imageUrl,
+            detailMobile: imageUrl,
+            detailDesktop: imageUrl,
+            homeTopRated: imageUrl,
+            homeList: imageUrl,
+            purchaseSquare: imageUrl,
+            purchaseCard: imageUrl,
+            galleryThumb: imageUrl,
+        };
+    };
+
     const handleProductImagesUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.currentTarget.files?.[0];
         event.target.value = '';
         if (!file) return;
 
-        if (file.size > MAX_PRODUCT_IMAGE_BYTES) {
-            alert('Product image is too large. Max allowed size is 8MB.');
+        const validation = validateProductImageUpload(file);
+        if (!validation.valid) {
+            setProductImageUploadError(validation.error || 'Please choose a valid image file.');
             return;
         }
 
+        setProductImageUploadError('');
+        setProductImageUploadProgress(0);
         setIsUploadingProductImage(true);
 
         try {
-            const uploaded = await uploadAdminProductAsset(file, buildAdminImageStoragePath(file, 'product', draftProductIdRef.current), 'ADMIN_PRODUCT_IMAGE_UPLOAD');
+            const uploaded = await uploadAdminProductAsset(
+                file,
+                buildAdminImageStoragePath(file, 'product', draftProductIdRef.current),
+                'ADMIN_PRODUCT_IMAGE_UPLOAD',
+                (percent) => setProductImageUploadProgress(percent)
+            );
             setImages([uploaded.url]);
+            setImageMode('upload');
+            setProductImageUploadError('');
         } catch (error) {
             console.error('Product image upload failed:', error);
-            alert('Product image upload failed. Please check Firebase Storage permissions and try again.');
+            setProductImageUploadError(error instanceof Error ? error.message : 'Product image upload failed. Please check Firebase Storage permissions and try again. Re-select the image to retry.');
         } finally {
             setIsUploadingProductImage(false);
+            setProductImageUploadProgress(0);
         }
     };
 
@@ -1723,6 +1751,8 @@ const ProductForm: React.FC<{
         setIsGeneratingImage(true);
         try {
             const aiImageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=768&nologo=true`;
+            setProductImageUploadError('');
+            setProductImageUploadProgress(0);
             setImages([aiImageUrl]);
             setImageMode('upload');
         } finally {
@@ -1758,11 +1788,12 @@ const ProductForm: React.FC<{
         setIsSavingProduct(true);
 
         const primaryImage = (images || []).find(Boolean);
+        const productImageMap = buildProductImageMap(primaryImage);
 
         const saved = await onSave({
             imageSeed: formData.imageSeed || formData.title || `product-${Date.now()}`,
             images: primaryImage ? [primaryImage] : [],
-            productImages: {},
+            productImages: productImageMap,
             title: formData.title,
             description: formData.description,
             longDescription: formData.longDescription,
@@ -1927,6 +1958,12 @@ const ProductForm: React.FC<{
                                         <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-3xl border border-dashed border-purple-300/40 bg-purple-400/5 p-8 text-center font-black text-purple-700 hover:bg-purple-400/10 disabled:opacity-60">{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</button>
                                     )}
                                     <input ref={productImageInputRef} type="file" accept="image/*" onChange={handleProductImagesUpload} className="hidden" />
+                                    {isUploadingProductImage && (
+                                        <p className="mt-3 text-sm font-bold text-cyan-700">Uploading image to Firebase... {productImageUploadProgress}% complete.</p>
+                                    )}
+                                    {productImageUploadError && (
+                                        <p className="mt-3 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{productImageUploadError}</p>
+                                    )}
                                 </div>
                                 <div className="mt-4">
                                     {(images || []).find(Boolean) ? (
