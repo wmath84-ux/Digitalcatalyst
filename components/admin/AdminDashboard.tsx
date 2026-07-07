@@ -134,8 +134,55 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             case 'websiteSettings': return <WebsiteSettingsComponent settings={props.websiteSettings} products={props.products} onSettingsChange={props.onWebsiteSettingsChange} />;
             case 'dashboard': default: 
                 const completedOrders = props.orders.filter(o => o.status === 'Completed');
-                const totalRevenue = completedOrders.reduce((sum, order) => sum + parseFloat(order.total.replace('₹', '').replace(/,/g, '') || '0'), 0);
-                const totalReviews = Object.values(props.reviews).flat().length;
+                const parseCurrency = (value: string) => parseFloat(value.replace('₹', '').replace(/,/g, '') || '0');
+                const totalRevenue = completedOrders.reduce((sum, order) => sum + parseCurrency(order.total), 0);
+                const allReviews = Object.values(props.reviews).flat();
+                const reviewRatings = allReviews
+                    .map((review) => {
+                        if (!review || typeof review !== 'object' || !('rating' in review)) return NaN;
+                        return Number((review as { rating?: unknown }).rating);
+                    })
+                    .filter((rating): rating is number => Number.isFinite(rating));
+                const totalReviews = allReviews.length;
+
+                const now = new Date();
+                const currentMonth = now.getMonth();
+                const currentYear = now.getFullYear();
+                const previousMonthDate = new Date(currentYear, currentMonth - 1, 1);
+
+                const currentMonthRevenue = completedOrders.reduce((sum, order) => {
+                    const orderDate = new Date(order.date);
+                    if (Number.isNaN(orderDate.getTime()) || orderDate.getMonth() !== currentMonth || orderDate.getFullYear() !== currentYear) return sum;
+                    return sum + parseCurrency(order.total);
+                }, 0);
+
+                const previousMonthRevenue = completedOrders.reduce((sum, order) => {
+                    const orderDate = new Date(order.date);
+                    if (Number.isNaN(orderDate.getTime()) || orderDate.getMonth() !== previousMonthDate.getMonth() || orderDate.getFullYear() !== previousMonthDate.getFullYear()) return sum;
+                    return sum + parseCurrency(order.total);
+                }, 0);
+
+                const revenueSubtitle = previousMonthRevenue > 0
+                    ? `${currentMonthRevenue >= previousMonthRevenue ? '+' : ''}${(((currentMonthRevenue - previousMonthRevenue) / previousMonthRevenue) * 100).toFixed(1)}% from last month`
+                    : currentMonthRevenue > 0 ? 'No revenue data last month' : 'No revenue this month';
+
+                const unavailableProducts = props.products.filter(product => product.inStock === false).length;
+                const productsSubtitle = props.products.length === 0
+                    ? 'No products added'
+                    : unavailableProducts > 0 ? `${unavailableProducts} out of stock` : 'All products in stock';
+
+                const weekStart = new Date(now);
+                weekStart.setDate(now.getDate() - 7);
+                const newUsersThisWeek = props.users.filter(user => {
+                    const createdAt = new Date(user.createdAt);
+                    return !Number.isNaN(createdAt.getTime()) && createdAt >= weekStart;
+                }).length;
+                const usersSubtitle = newUsersThisWeek > 0 ? `+${newUsersThisWeek} new this week` : 'No new users this week';
+
+                const averageRating = reviewRatings.length > 0
+                    ? reviewRatings.reduce((sum, rating) => sum + rating, 0) / reviewRatings.length
+                    : 0;
+                const reviewsSubtitle = reviewRatings.length > 0 ? `${averageRating.toFixed(1)} average rating` : 'No reviews yet';
                 
                 return (
                     <div className="space-y-6 animate-fade-in sm:space-y-10">
@@ -158,28 +205,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                             <DashboardCard 
                                 title="Total Revenue" 
                                 value={`₹${totalRevenue.toLocaleString('en-IN')}`} 
-                                subtitle="+12.5% from last month"
+                                subtitle={revenueSubtitle}
                                 gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
                                 icon={<svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.15-1.46-3.27-3.4h1.97c.1 1.05.95 1.83 2.63 1.83 1.76 0 2.69-.84 2.69-2.03 0-1.21-.75-1.9-2.61-2.36-2.25-.57-4.23-1.39-4.23-3.93 0-1.98 1.47-3.21 3.22-3.53V3h2.67v1.93c1.5.27 2.81 1.23 3.05 3.07h-1.97c-.15-.93-.98-1.53-2.37-1.53-1.58 0-2.38.81-2.38 1.83 0 1.1.75 1.7 2.61 2.19 2.28.59 4.25 1.45 4.25 4.05 0 2.1-1.56 3.36-3.4 3.55z"/></svg>}
                             />
                             <DashboardCard 
                                 title="Total Products" 
                                 value={props.products.length} 
-                                subtitle="4 low stock alerts"
+                                subtitle={productsSubtitle}
                                 gradient="bg-gradient-to-br from-blue-500 to-indigo-600"
                                 icon={<svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
                             />
                             <DashboardCard 
                                 title="Active Users" 
                                 value={props.users.length} 
-                                subtitle="+28 new this week"
+                                subtitle={usersSubtitle}
                                 gradient="bg-gradient-to-br from-violet-500 to-purple-600"
                                 icon={<svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>}
                             />
                             <DashboardCard 
                                 title="Total Reviews" 
                                 value={totalReviews} 
-                                subtitle="4.8 average rating"
+                                subtitle={reviewsSubtitle}
                                 gradient="bg-gradient-to-br from-amber-400 to-orange-500"
                                 icon={<svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>}
                             />
