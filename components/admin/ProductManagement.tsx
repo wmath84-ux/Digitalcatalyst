@@ -1996,6 +1996,13 @@ const ProductManagement: React.FC<{
         setViewState('edit');
     };
 
+    const handleDeleteProductClick = (product: ProductWithRating) => {
+        const productName = product.title || `product #${product.id}`;
+        const confirmed = window.confirm(`Delete product "${productName}"? This action cannot be undone.`);
+        if (!confirmed) return;
+        void onDeleteProduct(product.id);
+    };
+
     const handleSave = async (productData: Omit<Product, 'id'>): Promise<boolean> => {
         const safeProductData: Omit<Product, 'id'> = {
             ...productData,
@@ -2094,7 +2101,7 @@ const ProductManagement: React.FC<{
                                             <td className="p-5 text-right">
                                                 <div className="flex justify-end gap-2">
                                                     <button onClick={() => openEditView(product)} className="rounded-2xl border border-cyan-300/30 px-4 py-2 text-sm font-black text-cyan-700 transition hover:bg-cyan-400/10">Edit</button>
-                                                    <button onClick={() => onDeleteProduct(product.id)} className="rounded-2xl border border-red-300/30 px-4 py-2 text-sm font-black text-red-700 transition hover:bg-red-400/10">Delete</button>
+                                                    <button onClick={() => handleDeleteProductClick(product)} className="rounded-2xl border border-red-300/30 px-4 py-2 text-sm font-black text-red-700 transition hover:bg-red-400/10">Delete</button>
                                                 </div>
                                             </td>
                                         </tr>
