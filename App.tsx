@@ -1,11 +1,12 @@
 
 // FIX: Corrected the React import statement by removing the erroneous 'a' and fixing the destructuring syntax.
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+
+import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore';
 import Header from './components/Header';
 import MobileAppHome from './components/MobileAppHome';
 import Hero from './components/Hero';
 import ProductShowcase from './components/ProductShowcase';
-import { isProductSearchVisible, withProductSearchIndex } from './utils/productSearch';
 import Services, { ServiceItem } from './components/Services';
 import AboutUs from './components/AboutUs';
 import Faq, { FaqItem } from './components/Faq';
@@ -36,7 +37,6 @@ import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
 import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
-import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, onSnapshot, runTransaction, serverTimestamp, setDoc, writeBatch } from 'firebase/firestore';
 import { auth, db } from './firebase';
 import { browserLocalPersistence, createUserWithEmailAndPassword, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, normalizeCoinPrice, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
@@ -45,7 +45,7 @@ import { clearRememberedAuthAccount, getRememberedAuthAccount, RememberedAuthAcc
 import { isMobileViewport as getIsMobileViewport } from './utils/device';
 import { getFirebaseAuthErrorMessageFromCode, mergePurchasedProductIds, normalizePurchaseIds as normalizeSharedPurchaseIds, shouldRestoreEntitlementStatus } from './utils/authParity';
 import { isDemoMode } from './utils/runtimeMode';
-
+import { isProductSearchVisible, withProductSearchIndex } from './utils/productSearch';
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
 const GOOGLE_REDIRECT_ATTEMPT_KEY = 'digitalCatalyst.googleRedirectAttempt';
 
@@ -91,7 +91,7 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Something went wrong</h1>
             <p className="text-gray-600 mb-6">The application hit an unexpected error. Please reload the page; if the problem continues, share the error details with support.</p>
-            
+
             {this.state.error?.message && (
                 <div className="bg-gray-100 p-3 rounded text-left mb-6 overflow-auto max-h-32 text-xs font-mono text-gray-700 border border-gray-200">
                     Error: {this.state.error.message}
@@ -261,7 +261,7 @@ export interface Product {
   manualRating?: number | null;
   sku?: string;
   tags?: string[];
-  dimensions?: string; 
+  dimensions?: string;
   fileFormat?: string;
   courseContent?: CourseModule[];
   aspectRatio?: string;
@@ -282,7 +282,6 @@ export interface Product {
   normalizedSearchText?: string;
   searchTokens?: string[];
 }
-
 
 // Review structure
 export interface Review {
@@ -348,11 +347,13 @@ export interface User {
 }
 
 // New Admin User structure for multi-user admin management
+// Admin identity is backed by Firebase Auth + Firestore role checks.
+// Never store or compare admin passwords in client state/localStorage.
 export interface AdminUser {
-    id: number;
+    id: string;
     email: string;
-    password: string; // NOTE: In a real app, this should be hashed.
     role: 'Developer' | 'Admin';
+    firebaseRole?: 'admin' | 'super_admin';
 }
 
 // Cart Item Structure
@@ -369,7 +370,6 @@ export interface ActiveCoinDiscount {
     productId?: number;
     subscriptionId?: string;
 }
-
 
 export type ProfileStreakMetric = 'dailyLogin' | 'studyMinutes' | 'watchMinutes' | 'pdfsRead' | 'coursesOwned' | 'completedCourses' | 'quizWins' | 'articlesRead' | 'lifetimeCoins' | 'coinTransactions' | 'milestonesClaimed' | 'badgesUnlocked';
 export interface ProfileStreakConfig {
@@ -542,7 +542,6 @@ export interface NewsletterSubscriber {
     subscribedAt: string;
 }
 
-
 // --- Theme Customization ---
 export interface ThemePalette {
     primaryColor: string;
@@ -606,7 +605,6 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
         },
     },
 };
-
 
 // Comprehensive settings for the entire website, manageable from the admin panel
 export interface WebsiteSettings {
@@ -701,7 +699,7 @@ const initialProducts: Product[] = [
     id: 2,
     imageSeed: "dropshipping-course",
     images: [
-        "https://picsum.photos/seed/ecommerce-dashboard-course/800/600", 
+        "https://picsum.photos/seed/ecommerce-dashboard-course/800/600",
         "https://picsum.photos/seed/dropshipping-supply-chain/800/600",
         "https://picsum.photos/seed/shopify-store-builder/800/600",
         "https://picsum.photos/seed/successful-online-business/800/600"
@@ -753,19 +751,18 @@ const initialCoupons: Coupon[] = [
 ];
 
 const initialOrders: Order[] = [
-    { 
-        id: 'DC-1024', 
-        customerName: 'Rohan Sharma', 
-        customerEmail: 'rohan.s@example.com', 
-        date: '2024-07-21', 
-        total: '₹1999', 
-        status: 'Pending', 
+    {
+        id: 'DC-1024',
+        customerName: 'Rohan Sharma',
+        customerEmail: 'rohan.s@example.com',
+        date: '2024-07-21',
+        total: '₹1999',
+        status: 'Pending',
         items: [{ id: 2, name: 'Dropshipping Masterclass', quantity: 1, price: '₹1999' }],
         shippingAddress: 'N/A (Digital Product)',
         billingAddress: '123 Tech Park, Bangalore, KA 560001',
     },
 ];
-
 
 const initialNewsArticles: NewsArticle[] = [];
 
@@ -784,10 +781,7 @@ const initialAnnouncements: Announcement[] = [
     }
 ];
 
-const initialAdminUsers: AdminUser[] = [
-    { id: 1, email: 'developer@digitalcatalyst.com', password: 'admin', role: 'Developer' },
-];
-
+const initialAdminUsers: AdminUser[] = [];
 
 const defaultWebsiteSettings: WebsiteSettings = {
     theme: {
@@ -943,7 +937,6 @@ const defaultWebsiteSettings: WebsiteSettings = {
     },
 };
 
-
 const GLOBAL_PRODUCTS_COLLECTION = 'siteProducts';
 const GLOBAL_COUPONS_COLLECTION = 'siteCoupons';
 const GLOBAL_TICKETS_COLLECTION = 'siteSupportTickets';
@@ -997,7 +990,7 @@ const App: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>(() => ENABLE_DEMO_SEED_DATA ? initialOrders : []);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
-  const [currentView, setCurrentView] = useState('home'); 
+  const [currentView, setCurrentView] = useState('home');
   const [networkBanner, setNetworkBanner] = useState(() => (typeof navigator !== 'undefined' && !navigator.onLine ? 'You are offline. Some features may not work until internet is back.' : ''));
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup'>('login');
   const [isAuthStateReady, setIsAuthStateReady] = useState(false);
@@ -1055,10 +1048,10 @@ const App: React.FC = () => {
   const [autoOpenPaymentModalFor, setAutoOpenPaymentModalFor] = useState<number | null>(null);
   const [activeCoinDiscount, setActiveCoinDiscount] = useState<ActiveCoinDiscount | null>(null);
   const [eduCoinGuideRequest, setEduCoinGuideRequest] = useState<{ requiredCoins: number; balance: number; missingCoins: number; productTitle?: string } | null>(null);
-  
+
   const [websiteSettings, setWebsiteSettings] = useState<WebsiteSettings>(defaultWebsiteSettings);
   const [economySettings, setEconomySettings] = useState<EconomySettings>(DEFAULT_ECONOMY_SETTINGS);
-  
+
   // New E-commerce State
   const [cart, setCart] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
@@ -1188,7 +1181,6 @@ const App: React.FC = () => {
     });
   }, [effectiveFirebaseUser?.uid, isLocalLogoutPending]);
 
-
   useEffect(() => {
     const updateMobileViewport = () => setIsMobileViewport(getIsMobileViewport());
     updateMobileViewport();
@@ -1201,7 +1193,6 @@ const App: React.FC = () => {
       window.removeEventListener('resize', updateMobileViewport);
     };
   }, []);
-
 
   const normalizeCourseModules = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
     ...module,
@@ -1388,16 +1379,15 @@ const App: React.FC = () => {
 
   // Unified Info Modal State
   const [infoModal, setInfoModal] = useState<{ title: string; message: string; icon: string; } | null>(null);
-  
+
   // New Large Content Modal States
   const [isReadingDrawerOpen, setIsReadingDrawerOpen] = useState(false);
   const [readingDrawerView, setReadingDrawerView] = useState<ReadingView>('blog');
   const [readingListType, setReadingListType] = useState<ReadingListType>('blog');
   const [isFreeModalOpen, setIsFreeModalOpen] = useState(false);
-  
+
   // User Theme State
   const [activeTheme, setActiveTheme] = useState<ThemeName>('default');
-
 
   useEffect(() => {
     return subscribeEconomySettings(setEconomySettings, (error) => {
@@ -1406,7 +1396,7 @@ const App: React.FC = () => {
   }, []);
 
   // --- Data Loading and Persistence ---
-  
+
   // --- Firebase-first product loading with explicit demo fallback ---
   // Production mode starts empty and waits for Firestore.
   // Demo mode can still use localStorage/seeded products when VITE_DEMO_MODE=true.
@@ -1446,7 +1436,7 @@ const App: React.FC = () => {
 
     const storedReviews = localStorage.getItem('productReviews');
     if (storedReviews) setReviews(JSON.parse(storedReviews)); else setReviews({});
-    
+
     // Purchases are authenticated state. Never hydrate or clear global cached unlocks on startup;
     // Firestore entitlements are restored from Firebase Auth sessions only.
 
@@ -1480,9 +1470,8 @@ const App: React.FC = () => {
     });
     setUsers(loadedUsers);
     safeSetItem('siteUsers', loadedUsers);
-    
-    const storedAdminUsers = localStorage.getItem('adminUsers');
-    if (storedAdminUsers) setAdminUsers(JSON.parse(storedAdminUsers)); else setAdminUsers(initialAdminUsers);
+    setAdminUsers(initialAdminUsers);
+    localStorage.removeItem('adminUsers');
 
     const storedSettings = localStorage.getItem('websiteSettings');
     if (storedSettings) {
@@ -1505,10 +1494,10 @@ const App: React.FC = () => {
     },
 });
     }
-    
+
     const storedCoupons = localStorage.getItem('siteCoupons');
     if (ENABLE_DEMO_SEED_DATA && storedCoupons) setCoupons(JSON.parse(storedCoupons)); else setCoupons(ENABLE_DEMO_SEED_DATA ? initialCoupons : []);
-    
+
     const storedOrders = localStorage.getItem('siteOrders');
     if (ENABLE_DEMO_SEED_DATA && storedOrders) setOrders(JSON.parse(storedOrders)); else setOrders(ENABLE_DEMO_SEED_DATA ? initialOrders : []);
 
@@ -1523,25 +1512,15 @@ const App: React.FC = () => {
     const storedSubscribers = localStorage.getItem('newsletterSubscribers');
     if (storedSubscribers) setNewsletterSubscribers(JSON.parse(storedSubscribers));
 
-    const storedCurrentAdmin = localStorage.getItem('currentAdminUser');
-    if (storedCurrentAdmin) {
-      try {
-        const currentAdminData: AdminUser = JSON.parse(storedCurrentAdmin);
-        const adminIsValid = (storedAdminUsers ? JSON.parse(storedAdminUsers) : initialAdminUsers).some((u: AdminUser) => u.id === currentAdminData.id);
-        if (adminIsValid) setCurrentAdminUser(currentAdminData);
-        else localStorage.removeItem('currentAdminUser');
-      } catch (e) {
-        localStorage.removeItem('currentAdminUser');
-      }
-    }
-    
+    localStorage.removeItem('currentAdminUser');
+
     const storedTheme = localStorage.getItem('activeTheme') as ThemeName;
     if (storedTheme && themes[storedTheme]) {
         setActiveTheme(storedTheme);
     }
 
   }, []);
-  
+
   useEffect(() => {
     const unsubscribeProducts = onSnapshot(collection(db, GLOBAL_PRODUCTS_COLLECTION), (snapshot) => {
       const remoteProducts = snapshot.docs
@@ -1634,7 +1613,7 @@ const App: React.FC = () => {
   useEffect(() => {
     safeSetItem('shoppingCart', cart);
   }, [cart]);
-  
+
   useEffect(() => {
     safeSetItem('siteCoupons', coupons);
   }, [coupons]);
@@ -1642,7 +1621,7 @@ const App: React.FC = () => {
   useEffect(() => {
     safeSetItem('siteOrders', orders);
   }, [orders]);
-  
+
   useEffect(() => {
     safeSetItem('siteSupportTickets', tickets);
   }, [tickets]);
@@ -1672,25 +1651,24 @@ const App: React.FC = () => {
     };
   }, []);
 
-
   useEffect(() => {
     safeSetItem('activeTheme', activeTheme);
   }, [activeTheme]);
-  
+
   // --- Dynamic Theming ---
   useEffect(() => {
     const root = document.documentElement;
-    
+
     // User-selectable color palette
     const activePalette = themes[activeTheme]?.palette || themes.default.palette;
-    
+
     // Admin-controlled theme settings (structure, fonts, etc.)
     const adminTheme = websiteSettings.theme;
     const mergedPalette = {
         ...activePalette,
         ...adminTheme,
     };
-    
+
     // Apply colors from admin theme, falling back to the user's palette
     root.style.setProperty('--color-primary', mergedPalette.primaryColor);
     root.style.setProperty('--color-accent', mergedPalette.accentColor);
@@ -1751,7 +1729,7 @@ const App: React.FC = () => {
       .then(() => true)
       .catch(error => { logGlobalSyncWarning('Website settings', error); return false; });
   };
-  
+
   useEffect(() => {
     if (currentView === 'home' && scrollToSection) {
         const timer = setTimeout(() => {
@@ -1762,7 +1740,7 @@ const App: React.FC = () => {
         return () => clearTimeout(timer);
     }
   }, [currentView, scrollToSection]);
-  
+
   // --- Derived Data ---
   const calculateAverageRating = (productId: number): { rating: number, reviewCount: number } => {
     const pReviews = reviews[productId];
@@ -1859,7 +1837,7 @@ const App: React.FC = () => {
         const numericValue = order.paymentBreakdown?.finalPrice ?? (parseFloat(order.total.replace(/[^\d.]/g, '')) || 0);
         return acc + numericValue;
     }, 0);
-  
+
   const realMetrics = {
       revenue: totalRevenueValue,
       users: users.length
@@ -1924,7 +1902,7 @@ const App: React.FC = () => {
 
       openCartSidebar();
   };
-  
+
   const handleUpdateCartQuantity = (productId: number, newQuantity: number) => {
       setCart(prevCart => {
           if (newQuantity <= 0) {
@@ -2074,7 +2052,7 @@ const App: React.FC = () => {
       if (appliedCouponCode) {
         updateCouponUsage(appliedCouponCode);
       }
-      
+
       const newOrderItems: OrderItem[] = cartDetails.map(item => ({
         id: item.product.id,
         name: item.product.title,
@@ -2139,7 +2117,7 @@ const App: React.FC = () => {
     if (coupon.type === 'percentage') return Math.min(price, (price * coupon.value) / 100);
     return 0;
   };
-  
+
   const cartCouponDiscount = appliedCartCoupon ? calculateDiscount(appliedCartCoupon, cartSubtotal) : 0;
   const cartAfterCoupon = Math.max(0, cartSubtotal - cartCouponDiscount);
   const eduCoinRedeemRate = Math.max(1, Number(economySettings.coinToFiatRatio));
@@ -2151,8 +2129,8 @@ const App: React.FC = () => {
     setCartCouponError(null);
     const couponToApply = coupons.find(c => c.code.toUpperCase() === code.toUpperCase() && c.isActive);
     if (!couponToApply) { setCartCouponError("Invalid or inactive coupon."); setAppliedCartCoupon(null); return; }
-    
-    const today = new Date(); 
+
+    const today = new Date();
     today.setHours(0, 0, 0, 0);
 
     try {
@@ -2248,7 +2226,6 @@ const App: React.FC = () => {
           isFallbackProfile: true,
       } as unknown as User;
   }
-
 
   const rememberAndStoreUser = (user: User, firebaseUser: FirebaseUser) => {
       saveRememberedAuthAccount({ uid: user.id, email: user.email, name: user.name, photoURL: user.photoURL || getFirebaseUserPhotoURL(firebaseUser), providerIds: user.providerIds, authProvider: user.authProvider });
@@ -2366,8 +2343,6 @@ const App: React.FC = () => {
           }
       }, error => console.warn('Session listener failed; keeping Firebase Auth session active.', error));
   };
-
-
 
   const finishMobileAuthSuccess = (user: User | Pick<User, 'name' | 'email'>) => {
       if (!getIsMobileViewport()) return;
@@ -2663,14 +2638,12 @@ const App: React.FC = () => {
 
   }, [isMobileViewport, isAuthStateReady, isLoggedIn, effectiveFirebaseUser?.uid, currentUser?.id, currentView]);
 
-
   useEffect(() => {
       const effectiveFirebaseUser = isLocalLogoutPending ? null : (firebaseAuthUser || auth.currentUser);
       if (isLocalLogoutPending || !isAuthStateReady || isRedirectResultPending || !effectiveFirebaseUser || currentView !== 'auth') return;
       const effectiveAppUser = currentUser || createFallbackUserFromFirebase(effectiveFirebaseUser);
       redirectAfterSuccessfulAuth({ source: 'auth-page-existing-user', user: effectiveAppUser, force: true });
   }, [isLocalLogoutPending, isAuthStateReady, isRedirectResultPending, firebaseAuthUser?.uid, auth.currentUser?.uid, currentUser?.id, currentView]);
-
 
   const handleRetryAuthRestore = () => {
       const firebaseUser = auth.currentUser;
@@ -2683,8 +2656,6 @@ const App: React.FC = () => {
   };
 
   const getFirebaseAuthErrorMessage = (error: any) => getFirebaseAuthErrorMessageFromCode(error);
-
-
 
   const markGoogleRedirectAttempt = () => {
       try {
@@ -2906,7 +2877,7 @@ const App: React.FC = () => {
       setCurrentView('home');
       window.scrollTo(0, 0);
   };
-  
+
   const handleBackToHome = () => {
     if (currentView === 'home') window.scrollTo({ top: 0, behavior: 'smooth' });
     else {
@@ -2977,7 +2948,6 @@ const App: React.FC = () => {
     openAuthPage('login');
     window.scrollTo(0,0);
   };
-
 
   const persistUserToFirestore = (user: User) => {
     try {
@@ -3267,7 +3237,7 @@ const App: React.FC = () => {
         return p;
     }));
   };
-  
+
   const handleClearWishlist = () => {
     if (window.confirm("Are you sure you want to clear your entire wishlist?")) {
         // We don't decrement counts here because we don't know exactly which counts belong to this user session vs others in a real app simulation,
@@ -3293,10 +3263,10 @@ const App: React.FC = () => {
   const handleViewProduct = (product: ProductWithRating, sectionId?: string) => {
     // Increment view count
     const updatedProduct = { ...product, viewCount: (product.viewCount || 0) + 1 };
-    
+
     // Update state
     setProducts(prev => prev.map(p => p.id === product.id ? { ...p, viewCount: (p.viewCount || 0) + 1 } : p));
-    
+
     setSelectedProduct(updatedProduct);
     setCurrentView('product');
     setScrollToProductSection(sectionId || null);
@@ -3330,7 +3300,7 @@ const App: React.FC = () => {
     setCurrentView('product');
     window.scrollTo(0, 0);
   };
-  
+
   const handleViewProductFromModal = (product: ProductWithRating) => {
     setIsReadingDrawerOpen(false);
     setIsFreeModalOpen(false);
@@ -3355,7 +3325,7 @@ const App: React.FC = () => {
       window.scrollTo(0, 0);
     }
   };
-  
+
   const handleViewPurchasedProduct = (product: ProductWithRating) => {
     if (!hasFirebaseUser || !purchasedProductIds.includes(product.id)) {
       setSelectedProduct(null);
@@ -3452,7 +3422,7 @@ const App: React.FC = () => {
     setCurrentView('congratulations');
     window.scrollTo(0, 0);
   };
-  
+
   const completeProductUnlock = async (product: ProductWithRating, quantity: number, totalLabel: string, status: Order['status'] = 'Completed') => {
     if (!hasFirebaseUser || !auth.currentUser) { openAuthPage('login'); return false; }
     const orderId = `DC-${Date.now()}`;
@@ -3589,7 +3559,6 @@ const App: React.FC = () => {
     setScrollToPolicySection(sectionId || null);
     window.scrollTo(0, 0);
   };
-
 
   const handleInsufficientEduCoins = (details: { requiredCoins: number; balance: number; missingCoins: number; productTitle?: string }) => {
     setEduCoinGuideRequest(details);
@@ -3764,7 +3733,6 @@ const App: React.FC = () => {
     });
   };
 
-
   const handleConfirmLatestUpdateCoinPurchase = async (product: ProductWithRating, updateId?: string): Promise<boolean> => {
     if (!hasFirebaseUser || !auth.currentUser) {
       openAuthPage('login');
@@ -3929,13 +3897,12 @@ const App: React.FC = () => {
     setSelectedProduct(null);
     window.scrollTo(0, 0);
   };
-  
+
   const handleNavigateToPurchases = () => {
     setCurrentView('myPurchases');
     setSelectedProduct(null);
     window.scrollTo(0, 0);
   };
-
 
   const unlockSubscriptionPlan = (plan: any, paymentLabel = 'Fiat checkout') => {
     const newPurchasedIds = mergePurchasedProductIds(purchasedProductIds, plan.unlockProductIds || []);
@@ -4141,23 +4108,47 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAdminLogin = (email: string, password: string): boolean => {
-    const admin = adminUsers.find(u => u.email === email && u.password === password);
-    if (admin) {
-        setCurrentAdminUser(admin);
-        safeSetItem('currentAdminUser', admin);
-        setCurrentView('admin');
-        return true;
+  const handleAdminLogin = async (email: string, password: string): Promise<boolean> => {
+    try {
+      const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      const firebaseUser = credential.user;
+      const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
+      const firebaseRole = userSnap.exists() ? String(userSnap.data().role || '') : '';
+      const isFirebaseAdmin = firebaseRole === 'admin' || firebaseRole === 'super_admin';
+
+      if (!isFirebaseAdmin) {
+        await signOut(auth);
+        localStorage.removeItem('currentAdminUser');
+        setCurrentAdminUser(null);
+        return false;
+      }
+
+      const admin: AdminUser = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email || email.trim(),
+        role: firebaseRole === 'super_admin' ? 'Developer' : 'Admin',
+        firebaseRole: firebaseRole as 'admin' | 'super_admin',
+      };
+
+      setCurrentAdminUser(admin);
+      safeSetItem('currentAdminUser', admin);
+      setCurrentView('admin');
+      return true;
+    } catch (error) {
+      console.warn('Firebase admin login failed.', error);
+      localStorage.removeItem('currentAdminUser');
+      setCurrentAdminUser(null);
+      return false;
     }
-    return false;
   };
-  
+
   const handleAdminSwitchToHome = () => {
       // Does NOT clear currentAdminUser, just changes view
       setCurrentView('home');
   };
 
   const handleAdminLogout = () => {
+    void signOut(auth).catch(error => console.warn('Firebase admin logout failed.', error));
     setCurrentAdminUser(null);
     localStorage.removeItem('currentAdminUser');
     setCurrentView('home');
@@ -4274,7 +4265,7 @@ const App: React.FC = () => {
           return false;
       }
   };
-  
+
   const handleDeleteUser = (userId: number) => {
     if (window.confirm("Delete this user? This cannot be undone.")) {
         const updatedUsers = users.filter(u => u.id !== userId);
@@ -4314,7 +4305,6 @@ const App: React.FC = () => {
           </div>
       </div>
   );
-
 
   const renderMobileSessionStatus = (title: string, message: string, icon = '⏳') => (
       <div className="min-h-screen flex items-center justify-center bg-slate-50 px-4 py-16">
@@ -4462,7 +4452,7 @@ const App: React.FC = () => {
     if (currentView === 'auth' && !hasFirebaseUser) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (isSignedOut && requiresAuthForView) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={() => handleNavigateBack('home')} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
-    if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); safeSetItem('adminUsers', updatedUsers); }} /></div>;
+    if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent(effectiveAppUser)}</div>;
     if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity settings={websiteSettings} onClose={() => handleNavigateBack('home')}  isAuthenticated={isLoggedIn} /></div>;

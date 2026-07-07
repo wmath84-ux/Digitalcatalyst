@@ -4,7 +4,7 @@ import { WebsiteSettings } from '../../App';
 
 interface AdminLoginProps {
     settings: WebsiteSettings;
-    onLogin: (email: string, password: string) => boolean;
+    onLogin: (email: string, password: string) => Promise<boolean>;
     onBack: () => void;
 }
 
@@ -12,13 +12,20 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ settings, onLogin, onBack }) =>
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [error, setError] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
-    const handleSubmit = (e: React.FormEvent) => {
+      const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (onLogin(email, password)) {
-            setError('');
-        } else {
-            setError('Incorrect email or password. Please try again.');
+        setError('');
+        setIsSubmitting(true);
+
+        try {
+            const success = await onLogin(email, password);
+            if (!success) {
+                setError('Incorrect admin credentials or missing Firebase admin role.');
+            }
+        } finally {
+            setIsSubmitting(false);
         }
     };
 
@@ -66,8 +73,10 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ settings, onLogin, onBack }) =>
                         <button
                             type="submit"
                             className="w-full bg-gradient-to-r from-slate-950 via-blue-900 to-indigo-800 text-white font-black px-8 py-3 rounded-xl shadow-[0_14px_34px_rgba(30,64,175,0.22)] hover:opacity-90 transition-all duration-300"
+
+                            disabled={isSubmitting}
                         >
-                            Login
+                            {isSubmitting ? 'Checking…' : 'Login'}
                         </button>
                     </div>
                 </form>
