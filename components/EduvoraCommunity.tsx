@@ -3495,7 +3495,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
           <div className={`shrink-0 border-t border-[#D9E7F8] bg-white/95 p-3 backdrop-blur-xl ${mobile ? 'z-20 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] shadow-[0_-18px_45px_rgba(8,26,69,0.08)]' : 'sm:p-4'}`}>
             {privateChatError ? <div className="mb-3 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-xs font-black text-[#C5221F]">{privateChatError}</div> : null}
-            {isPrivateChatSending ? <div className="mb-3 rounded-2xl border border-[#BFD7FF] bg-[#EEF6FF] px-4 py-3 text-xs font-black text-[#1769FF]">Saving previous message to Firebase. You can continue typing the next message.</div> : null}
+            {isPrivateChatSending ? <div className="mb-3 rounded-2xl border border-[#BFD7FF] bg-[#EEF6FF] px-4 py-3 text-xs font-black text-[#1769FF]">Sending…</div> : null}
 
             {chatAttachmentMode === 'poll' ? (
               <div className="mb-3 space-y-2 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] p-3">
