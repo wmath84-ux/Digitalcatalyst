@@ -1740,13 +1740,17 @@ const App: React.FC = () => {
     
     // Admin-controlled theme settings (structure, fonts, etc.)
     const adminTheme = websiteSettings.theme;
+    const mergedPalette = {
+        ...activePalette,
+        ...adminTheme,
+    };
     
-    // Apply colors from user's choice
-    root.style.setProperty('--color-primary', activePalette.primaryColor);
-    root.style.setProperty('--color-accent', activePalette.accentColor);
-    root.style.setProperty('--color-background', activePalette.backgroundColor);
-    root.style.setProperty('--color-text', activePalette.textColor);
-    root.style.setProperty('--color-text-muted', activePalette.textMutedColor);
+    // Apply colors from admin theme, falling back to the user's palette
+    root.style.setProperty('--color-primary', mergedPalette.primaryColor);
+    root.style.setProperty('--color-accent', mergedPalette.accentColor);
+    root.style.setProperty('--color-background', mergedPalette.backgroundColor);
+    root.style.setProperty('--color-text', mergedPalette.textColor);
+    root.style.setProperty('--color-text-muted', mergedPalette.textMutedColor);
 
     // Apply structural styles from admin settings
     const fonts = {
@@ -1775,8 +1779,8 @@ const App: React.FC = () => {
     const mergedSettings = {
         ...newSettings,
         theme: {
+            ...defaultWebsiteSettings.theme,
             ...newSettings.theme,
-            ...themes.default.palette,
         },
         mobile: {
             ...defaultWebsiteSettings.mobile,
