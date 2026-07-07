@@ -2012,6 +2012,8 @@ const ProductManagement: React.FC<{
     const [viewState, setViewState] = useState<ProductViewState>('list');
     const [editingProduct, setEditingProduct] = useState<ProductWithRating | null>(null);
     const [newProductForEmail, setNewProductForEmail] = useState<ProductWithRating | null>(null);
+    const [productPendingDelete, setProductPendingDelete] = useState<ProductWithRating | null>(null);
+    const [isDeletingProduct, setIsDeletingProduct] = useState(false);
     const safeProducts = products || [];
 
     const openAddView = () => {
@@ -2034,10 +2036,22 @@ const ProductManagement: React.FC<{
     };
 
     const handleDeleteProductClick = (product: ProductWithRating) => {
-        const productName = product.title || `product #${product.id}`;
-        const confirmed = window.confirm(`Delete product "${productName}"? This action cannot be undone.`);
-        if (!confirmed) return;
-        void onDeleteProduct(product.id);
+        setProductPendingDelete(product);
+    };
+
+    const cancelDeleteProduct = () => {
+        if (isDeletingProduct) return;
+        setProductPendingDelete(null);
+    };
+
+    const confirmDeleteProduct = async () => {
+        if (!productPendingDelete) return;
+        setIsDeletingProduct(true);
+        const deleted = await onDeleteProduct(productPendingDelete.id);
+        setIsDeletingProduct(false);
+        if (deleted) {
+            setProductPendingDelete(null);
+        }
     };
 
     const handleSave = async (productData: Omit<Product, 'id'>): Promise<boolean> => {
@@ -2079,8 +2093,24 @@ const ProductManagement: React.FC<{
     }
 
     return (
-        <div className="min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_12%_8%,rgba(79,70,229,0.14),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(14,165,233,0.12),transparent_26%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] p-4 text-slate-900 animate-fade-in-up sm:p-6 lg:p-8">
-            <div className="mx-auto max-w-7xl">
+        <>
+            {productPendingDelete && (
+                <div className="fixed inset-0 z-[1200] flex items-center justify-center bg-slate-950/45 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="delete-product-title">
+                    <div className="w-full max-w-md rounded-[2rem] border border-red-200 bg-white p-6 shadow-2xl">
+                        <p className="text-xs font-black uppercase tracking-[0.28em] text-red-600">Confirm delete</p>
+                        <h2 id="delete-product-title" className="mt-2 text-2xl font-black text-slate-900">Delete product?</h2>
+                        <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">
+                            This will permanently delete “{productPendingDelete.title || `product #${productPendingDelete.id}`}”. This action cannot be undone.
+                        </p>
+                        <div className="mt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-end">
+                            <button type="button" onClick={cancelDeleteProduct} disabled={isDeletingProduct} className="rounded-2xl border border-slate-200 px-5 py-3 text-sm font-black text-slate-700 transition hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-60">Cancel</button>
+                            <button type="button" onClick={confirmDeleteProduct} disabled={isDeletingProduct} className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white transition hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-60">{isDeletingProduct ? 'Deleting…' : 'Delete product'}</button>
+                        </div>
+                    </div>
+                </div>
+            )}
+            <div className="min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_12%_8%,rgba(79,70,229,0.14),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(14,165,233,0.12),transparent_26%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] p-4 text-slate-900 animate-fade-in-up sm:p-6 lg:p-8">
+                <div className="mx-auto max-w-7xl">
                 <div className="mb-8 flex flex-col gap-5 lg:flex-row lg:items-end lg:justify-between">
                     <div>
                         <p className="text-xs font-black uppercase tracking-[0.3em] text-cyan-300">Admin Inventory</p>
@@ -2159,7 +2189,8 @@ const ProductManagement: React.FC<{
             </div>
 
             {newProductForEmail && <NewProductEmailPreviewModal product={newProductForEmail} relatedProducts={[]} users={users || []} onClose={() => setNewProductForEmail(null)} />}
-        </div>
+            </div>
+        </>
     );
 };
 
