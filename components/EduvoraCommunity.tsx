@@ -6,6 +6,7 @@ import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { db, storage } from '../firebase';
 import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storage';
 import type { WebsiteSettings } from '../App';
+import { mergeCommunitySupportTickets, isSupportTicketNeedsAttention } from '../utils/communitySupportBadge';
 import CommunityAiMentor from './CommunityAiMentor';
 
 interface EduvoraCommunityProps {
@@ -148,6 +149,10 @@ const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 const DAILY_UPLOAD_LOCK_MS = 24 * 60 * 60 * 1000;
 const PROFILE_BIO_MAX_LENGTH = 180;
 
+const mergeSeedSupportTickets = (tickets: CommunitySupportTicket[]) => mergeCommunitySupportTickets(
+  tickets,
+  initialMasterTagRequests.map(buildMasterTagTicket)
+);
 
 const readJsonObject = <T,>(key: string, fallback: T): T => {
   if (typeof window === 'undefined') return fallback;
@@ -793,10 +798,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [isDesktopSidebarCollapsed]);
 
   const [supportTickets, setSupportTickets] = useState<CommunitySupportTicket[]>(() => {
-    const storedTickets = readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []);
-    const seededTickets = initialMasterTagRequests.map(buildMasterTagTicket);
-    const mergedTickets = [...storedTickets];
-    seededTickets.forEach(ticket => { if (!mergedTickets.some(item => item.id === ticket.id)) mergedTickets.push(ticket); });
+    const mergedTickets = mergeSeedSupportTickets(readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []));
     if (typeof window !== 'undefined') localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(mergedTickets));
     return mergedTickets;
   });
@@ -951,16 +953,19 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       targetPage: 'thread' as CommunityPage,
       targetId: message.id,
     })));
-    const masterTagAlerts = supportTickets.filter((ticket) => ticket.source === 'masterTag' && (ticket.adminReply || ticket.inboxMessage)).slice(0, 6).map((ticket) => ({
-      id: `master-${ticket.id}-${ticket.repliedAt || ticket.date}`,
-      title: ticket.adminReply ? 'Master replied to your tag' : 'Master tag inbox update',
-      body: ticket.adminReply || ticket.inboxMessage || ticket.subject,
-      time: formatCommunityReplyTime(ticket.repliedAt || ticket.date),
-      read: Boolean(notificationReads[`master-${ticket.id}-${ticket.repliedAt || ticket.date}`]),
-      type: 'masterTag' as const,
-      targetPage: 'masterTagDetail' as CommunityPage,
-      targetId: ticket.communityThreadId,
-    }));
+    const masterTagAlerts = supportTickets
+      .filter((ticket) => ticket.source === 'masterTag' && (!ticket.customerUid || ticket.customerUid === currentUserKey) && isSupportTicketNeedsAttention(ticket))
+      .slice(0, 6)
+      .map((ticket) => ({
+        id: `master-${ticket.id}-${ticket.repliedAt || ticket.date}`,
+        title: ticket.adminReply ? 'Master replied to your tag' : 'Master tag inbox update',
+        body: ticket.adminReply || ticket.inboxMessage || ticket.subject,
+        time: formatCommunityReplyTime(ticket.repliedAt || ticket.date),
+        read: Boolean(notificationReads[`master-${ticket.id}-${ticket.repliedAt || ticket.date}`]) || !isSupportTicketNeedsAttention(ticket),
+        type: 'masterTag' as const,
+        targetPage: 'masterTagDetail' as CommunityPage,
+        targetId: ticket.communityThreadId,
+      }));
     const statusAlerts = statusCards.filter((status) => status.likedBy > 0 || (status.views > 0 && isOwnCommunityId(status.ownerId))).slice(0, 5).map((status) => ({
       id: `status-${status.id}-${status.likedBy}-${status.views}`,
       title: status.likedBy > 0 ? 'Your status is getting love' : 'Your status has new views',
@@ -988,9 +993,24 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       ...(notificationPreferences.statuses ? statusAlerts : []),
       ...(notificationPreferences.creatorPosts ? creatorAlerts : []),
     ].filter((notification) => notificationFilter === 'all' || notification.type === notificationFilter).slice(0, 30);
-  }, [firebaseNotifications, messages, notificationFilter, notificationPreferences, notificationReads, statusCards, supportTickets]);
-  const unreadNotificationCount = notifications.filter((notification) => !notification.read).length;
+  }, [currentUserKey, firebaseNotifications, messages, notificationFilter, notificationPreferences, notificationReads, statusCards, supportTickets]);
+  const unreadNotificationCount = supportTickets.filter((ticket) => {
+    if (ticket.source !== 'masterTag') return false;
+    if (ticket.customerUid && ticket.customerUid !== currentUserKey) return false;
+    return isSupportTicketNeedsAttention(ticket);
+  }).length;
 
+  const updateSupportTicketReadState = (ticketIds: string[], inboxRead: boolean) => {
+    if (!ticketIds.length) return;
+    setSupportTickets((current) => {
+      const updated = current.map((ticket) => ticketIds.includes(ticket.id) ? { ...ticket, inboxRead } : ticket);
+      localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(updated));
+      return updated;
+    });
+    ticketIds.forEach((ticketId) => {
+      updateDoc(doc(db, SUPPORT_TICKETS_COLLECTION, ticketId), { inboxRead }).catch((error) => console.warn('Support ticket read-state update failed', error));
+    });
+  };
 
   const deleteExpiredCommunityItem = (collectionName: string, itemId: string, storagePath?: string, uploadBytes = 0) => {
     deleteDoc(doc(db, collectionName, itemId)).catch((error) => console.warn('Expired community doc cleanup failed', error));
@@ -1517,21 +1537,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [masterTagRequests]);
 
   useEffect(() => {
-    const mergeSeedTickets = (tickets: CommunitySupportTicket[]) => {
-      const seededTickets = initialMasterTagRequests.map(buildMasterTagTicket);
-      const mergedTickets = [...tickets];
-      seededTickets.forEach(ticket => { if (!mergedTickets.some(item => item.id === ticket.id)) mergedTickets.push(ticket); });
-      return mergedTickets.sort((a, b) => String(b.repliedAt || b.date).localeCompare(String(a.repliedAt || a.date)));
-    };
-
-    const syncSupportTickets = () => setSupportTickets(mergeSeedTickets(readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, [])));
+    const syncSupportTickets = () => setSupportTickets(mergeSeedSupportTickets(readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, [])));
     const handleStorage = (event: StorageEvent) => {
       if (event.key === SUPPORT_TICKETS_STORAGE_KEY) syncSupportTickets();
     };
 
     const unsubscribeTickets = onSnapshot(collection(db, SUPPORT_TICKETS_COLLECTION), (snapshot) => {
       if (snapshot.empty) return;
-      const remoteTickets = mergeSeedTickets(snapshot.docs.map((item) => item.data() as CommunitySupportTicket));
+      const remoteTickets = mergeSeedSupportTickets(snapshot.docs.map((item) => item.data() as CommunitySupportTicket));
       localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(remoteTickets));
       setSupportTickets(remoteTickets);
     }, (error) => console.warn('Community support ticket sync failed; using local fallback', error));
@@ -1936,10 +1949,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return () => document.removeEventListener('pointerdown', handlePointerDown);
   }, [isNotificationPanelOpen]);
 
-  const markAllNotificationsRead = () => setNotificationReads((current) => ({ ...current, ...Object.fromEntries(notifications.map((notification) => [notification.id, true])) }));
+  const markAllNotificationsRead = () => {
+    setNotificationReads((current) => ({ ...current, ...Object.fromEntries(notifications.map((notification) => [notification.id, true])) }));
+    const ticketIds = supportTickets.filter((ticket) => isSupportTicketNeedsAttention(ticket)).map((ticket) => ticket.id);
+    updateSupportTicketReadState(ticketIds, true);
+  };
 
   const openNotification = (notification: CommunityNotification) => {
     setNotificationReads((current) => ({ ...current, [notification.id]: true }));
+    if (notification.type === 'masterTag') {
+      const matchingTicket = supportTickets.find((ticket) => notification.id.includes(`${ticket.id}-`) || notification.id === `master-${ticket.id}`);
+      if (matchingTicket) updateSupportTicketReadState([matchingTicket.id], true);
+    }
     setIsNotificationPanelOpen(false);
     if (!notification.targetPage) return;
     if ((notification.targetPage === 'thread' || notification.type === 'reply' || notification.type === 'creator') && typeof notification.targetId === 'number') {
@@ -2763,7 +2784,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       const docRef = await addDoc(collection(db, COMMUNITY_MASTER_TAGS), stripUndefinedDeep({ ...request, authorId: currentUserKey, authorName: profile.name, authorAvatar: profile.avatar, message: detail, subject: targetSubject, createdAt: Date.now(), updatedAt: Date.now(), likedByUsers: {}, reactionUsers: {} }));
       const publishedRequest = { ...request, docId: docRef.id };
       const supportTicket: CommunitySupportTicket = { ...buildMasterTagTicket(publishedRequest), customerUid: currentUserKey };
-      const updatedTickets = [supportTicket, ...readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []).filter((ticket) => ticket.id !== supportTicket.id)];
+      const updatedTickets = mergeSeedSupportTickets([supportTicket, ...readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []).filter((ticket) => ticket.id !== supportTicket.id)]);
       localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(updatedTickets));
       setDoc(doc(db, SUPPORT_TICKETS_COLLECTION, supportTicket.id), stripUndefinedDeep(supportTicket)).catch((error) => console.warn('Master tag ticket Firebase write failed', error));
       window.dispatchEvent(new Event('siteSupportTicketsUpdated'));
