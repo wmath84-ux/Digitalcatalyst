@@ -508,11 +508,28 @@ const createAdminUploadSession = async (file: File, storagePath: string) => {
 };
 
 
+const getProductImageContentType = (file: File) => {
+    if (file.type && file.type.startsWith('image/')) return file.type;
+
+    const extension = file.name.toLowerCase().split('.').pop() || '';
+    const contentTypeByExtension: Record<string, string> = {
+        png: 'image/png',
+        jpg: 'image/jpeg',
+        jpeg: 'image/jpeg',
+        gif: 'image/gif',
+        webp: 'image/webp',
+        svg: 'image/svg+xml',
+    };
+
+    return contentTypeByExtension[extension] || 'image/jpeg';
+};
+
 const uploadAdminProductAsset = async (
     file: File,
     storagePath: string,
     logPrefix = 'ADMIN_CONTENT_UPLOAD',
-    onProgress?: (percent: number) => void
+    onProgress?: (percent: number) => void,
+    contentTypeOverride?: string
 ) => {
     try {
         await createAdminUploadSession(file, storagePath);
@@ -524,11 +541,12 @@ const uploadAdminProductAsset = async (
     const fileRef = ref(storage, storagePath);
     const maxAttempts = 3;
     let lastError: unknown = null;
+    const resolvedContentType = contentTypeOverride || file.type || undefined;
 
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
         try {
             const uploadTask = uploadBytesResumable(fileRef, file, {
-                contentType: file.type || undefined,
+                contentType: resolvedContentType,
                 customMetadata: {
                     originalName: file.name,
                 },
@@ -583,7 +601,7 @@ const uploadAdminProductAsset = async (
                 url: downloadUrl,
                 storagePath,
                 size: file.size,
-                contentType: file.type || 'application/octet-stream',
+                contentType: resolvedContentType || 'application/octet-stream',
             };
         } catch (error) {
             lastError = error;
@@ -1731,14 +1749,16 @@ const ProductForm: React.FC<{
                 file,
                 buildAdminImageStoragePath(file, 'product', draftProductIdRef.current),
                 'ADMIN_PRODUCT_IMAGE_UPLOAD',
-                (percent) => setProductImageUploadProgress(percent)
+                (percent) => setProductImageUploadProgress(percent),
+                getProductImageContentType(file)
             );
             setImages([uploaded.url]);
             setImageMode('upload');
             setProductImageUploadError('');
         } catch (error) {
+            const message = classifyAdminUploadError(error);
             console.error('Product image upload failed:', error);
-            setProductImageUploadError(error instanceof Error ? error.message : 'Product image upload failed. Please check Firebase Storage permissions and try again. Re-select the image to retry.');
+            setProductImageUploadError(message);
         } finally {
             setIsUploadingProductImage(false);
             setProductImageUploadProgress(0);
