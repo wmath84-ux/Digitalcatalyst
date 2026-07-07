@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { addDoc, collection } from 'firebase/firestore';
 import { getDownloadURL, ref, uploadString } from 'firebase/storage';
-import { db, storage } from '../../firebase';
+import { auth, db, storage } from '../../firebase';
 
 const COMMUNITY_FEED = 'community_feed';
 const POST_TTL_MS = 15 * 24 * 60 * 60 * 1000;
@@ -63,45 +63,62 @@ const AdminPostManagement: React.FC = () => {
   const publish = async () => {
     const body = text.trim();
     const options = pollOptions.map((item) => item.trim()).filter(Boolean);
-    if (!body || (type === 'poll' && options.length < 2) || (type === 'image' && !image)) return;
+
+    if (!body || (type === 'poll' && options.length < 2) || (type === 'image' && !image)) {
+      setFeedback('Please complete the required admin post fields before publishing.');
+      return;
+    }
+
+    if (!auth.currentUser) {
+      setFeedback('Please sign in with a Firebase admin account before publishing admin posts.');
+      return;
+    }
+
+    const id = Date.now();
+    const imagePreview = type === 'image' ? image : '';
+    const payload: Record<string, unknown> = {
+      id,
+      admin: 'Digital Catalyst Admin',
+      avatar: '🛡️',
+      badge: 'ADMIN POST',
+      title: type === 'poll' ? 'Admin poll' : type === 'image' ? 'Admin image update' : 'Admin update',
+      body: link.trim() ? `${body}\n\nLink: ${link.trim()}` : body,
+      time: 'Just now',
+      creatorId: 'admin',
+      ownerId: 'admin',
+      postType: type,
+      type,
+      source: 'admin',
+      reactions: {},
+      reactionCounts: {},
+      likedByUsers: {},
+      reactionUsers: {},
+      pollVoters: {},
+      likeCount: 0,
+      replyCount: 0,
+      replies: [],
+      createdAt: Date.now(),
+      expiresAt: Date.now() + POST_TTL_MS,
+    };
+
+    if (type === 'image') Object.assign(payload, { imagePreview, imageLayout: 'thumbnail' });
+    if (type === 'poll') Object.assign(payload, { pollOptions: options, pollVotes: options.map(() => 0) });
+
     setIsSaving(true);
     setFeedback('');
+
     try {
-      const id = Date.now();
-      const imagePreview = type === 'image' ? image : '';
-      const payload: Record<string, unknown> = {
-        id,
-        admin: 'Digital Catalyst Admin',
-        avatar: '🛡️',
-        badge: 'ADMIN POST',
-        title: type === 'poll' ? 'Admin poll' : type === 'image' ? 'Admin image update' : 'Admin update',
-        body: link.trim() ? `${body}\n\nLink: ${link.trim()}` : body,
-        time: 'Just now',
-        creatorId: 'admin',
-        ownerId: 'admin',
-        postType: type,
-        type,
-        source: 'admin',
-        reactions: {},
-        reactionCounts: {},
-        likedByUsers: {},
-        reactionUsers: {},
-        pollVoters: {},
-        likeCount: 0,
-        replyCount: 0,
-        replies: [],
-        createdAt: Date.now(),
-        expiresAt: Date.now() + POST_TTL_MS,
-      };
-      if (type === 'image') Object.assign(payload, { imagePreview, imageLayout: 'thumbnail' });
-      if (type === 'poll') Object.assign(payload, { pollOptions: options, pollVotes: options.map(() => 0) });
-      persistLocalAdminPost(payload);
-      publishRemoteAdminPost(payload, image).catch((remoteError) => console.error('Admin post remote publish failed:', remoteError));
-      setText(''); setLink(''); setImage(''); setImageName(''); setPollOptions(['', '', '']);
-      setFeedback('Admin post published to the community ADMIN POST page and main feed. It will auto-delete after 15 days.');
+      await publishRemoteAdminPost(payload, image);
+      setText('');
+      setLink('');
+      setImage('');
+      setImageName('');
+      setPollOptions(['', '', '']);
+      setFeedback('Admin post published to Firebase community feed. It will auto-delete after 15 days.');
     } catch (error) {
       console.error('Admin post publish failed:', error);
-      setFeedback('Admin post publish failed. Please check the image/poll fields and try again.');
+      persistLocalAdminPost(payload);
+      setFeedback('Admin post was NOT published publicly. Firebase publish failed, so a local retry draft was saved only on this device. Please verify admin Firebase permissions and try again.');
     } finally {
       setIsSaving(false);
     }
