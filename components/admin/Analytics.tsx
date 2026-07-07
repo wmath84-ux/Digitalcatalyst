@@ -16,7 +16,11 @@ const StatCard: React.FC<{ title: string; value: string | number; change?: strin
                 <p className="text-3xl font-extrabold text-gray-800">{value}</p>
                 {change && (
                     <p className={`text-xs font-bold mt-2 uppercase tracking-wide ${changeColor}`}>
-                        {arrow} {change} <span className="text-slate-600 font-medium normal-case">vs last month</span>
+                        {change && changeType && (
+                            <>
+                                {arrow} {change} <span className="text-slate-600 font-medium normal-case">vs last month</span>
+                            </>
+                        )}
                     </p>
                 )}
             </div>
@@ -152,7 +156,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
 
     // Inventory Health
     const outOfStockProducts = products.filter(p => !p.inStock);
-    const lowStockProducts = products.filter(p => p.inStock && Math.random() > 0.8); // Mock low stock for demo
+    const isLowStockTrackingSupported = false;
 
     const productSales = new Map<number, { name: string; quantity: number }>();
     completedOrders.forEach(order => {
@@ -210,32 +214,24 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                 <StatCard 
                     title="Total Revenue" 
                     value={`₹${totalRevenue.toLocaleString('en-IN', { minimumFractionDigits: 0, maximumFractionDigits: 0 })}`} 
-                    change="12%" 
-                    changeType="increase"
                     icon={<svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>}
                     colorClass="bg-white/80 backdrop-blur-xl border-l-4 border-l-green-500"
                 />
                 <StatCard 
                     title="Total Orders" 
                     value={completedOrders.length} 
-                    change="5%"
-                    changeType="increase"
                     icon={<svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" /></svg>}
                     colorClass="bg-white/80 backdrop-blur-xl border-l-4 border-l-blue-500"
                 />
                 <StatCard 
                     title="Avg. Order Value" 
                     value={`₹${averageOrderValue.toLocaleString('en-IN', { maximumFractionDigits: 0 })}`}
-                    change="2%"
-                    changeType="decrease"
                     icon={<svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>}
                     colorClass="bg-white/80 backdrop-blur-xl border-l-4 border-l-purple-500"
                 />
                 <StatCard 
                     title="Customers" 
                     value={totalCustomersCount}
-                    change="8%"
-                    changeType="increase"
                     icon={<svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
                     colorClass="bg-white/80 backdrop-blur-xl border-l-4 border-l-orange-500"
                 />
@@ -297,6 +293,13 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                         ) : (
                             <div className="text-center py-8 text-slate-600">
                                 <p>No rated products yet.</p>
+                            </div>
+                        )}
+
+                        {!isLowStockTrackingSupported && (
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                                <p className="text-sm font-bold text-slate-700 mb-1">Low stock tracking unavailable</p>
+                                <p className="text-xs text-slate-600">Add a real stock quantity field before showing low-stock warnings.</p>
                             </div>
                         )}
                     </div>
@@ -386,15 +389,15 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                 <div className="bg-white/80 backdrop-blur-xl p-6 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/80 flex flex-col">
                     <h3 className="font-bold text-lg text-gray-800 mb-4 flex items-center gap-2">
                         Inventory Health
-                        {(outOfStockProducts.length > 0 || lowStockProducts.length > 0) && <span className="flex h-3 w-3 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>}
+                        {outOfStockProducts.length > 0 && <span className="flex h-3 w-3 relative"><span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span><span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span></span>}
                     </h3>
                     
                     <div className="flex-1 space-y-4">
-                        {outOfStockProducts.length === 0 && lowStockProducts.length === 0 ? (
+                        {outOfStockProducts.length === 0 ? (
                              <div className="flex flex-col items-center justify-center h-full text-green-600 bg-green-50 rounded-lg border border-green-100 p-6">
                                 <svg className="w-12 h-12 mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                                 <p className="font-bold">All Systems Go!</p>
-                                <p className="text-sm opacity-80">Inventory levels are healthy.</p>
+                                <p className="text-sm opacity-80">No products are marked out of stock.</p>
                             </div>
                         ) : (
                             <>
@@ -409,12 +412,6 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                                                 <li key={p.id} className="truncate">{p.title}</li>
                                             ))}
                                         </ul>
-                                    </div>
-                                )}
-                                {lowStockProducts.length > 0 && (
-                                    <div className="bg-orange-50 border border-orange-100 rounded-lg p-4">
-                                        <p className="text-sm font-bold text-orange-800 mb-2">Low Stock Warning ({lowStockProducts.length})</p>
-                                        <p className="text-xs text-orange-700">Consider restocking these items soon.</p>
                                     </div>
                                 )}
                             </>
