@@ -2,7 +2,33 @@ export const VALID_ENTITLEMENT_STATUSES = Object.freeze(['Completed', 'Verified'
 
 export const normalizePurchaseIds = (ids) => {
   if (!Array.isArray(ids)) return [];
-  return [...new Set(ids.filter(id => id !== null && id !== undefined && id !== '').map(id => Number(id)).filter(id => Number.isFinite(id)))];
+
+  const normalizedIds = [];
+  const seenIds = new Set();
+
+  for (const id of ids) {
+    if (id === null || id === undefined || id === '') continue;
+
+    if (typeof id === 'string') {
+      const trimmedId = id.trim();
+      if (!trimmedId) continue;
+      if (!/^\d+$/.test(trimmedId)) continue;
+      const normalizedId = Number(trimmedId);
+      if (!Number.isSafeInteger(normalizedId) || normalizedId <= 0) continue;
+      if (seenIds.has(normalizedId)) continue;
+      seenIds.add(normalizedId);
+      normalizedIds.push(normalizedId);
+      continue;
+    }
+
+    if (typeof id === 'number' && Number.isSafeInteger(id) && id > 0) {
+      if (seenIds.has(id)) continue;
+      seenIds.add(id);
+      normalizedIds.push(id);
+    }
+  }
+
+  return normalizedIds;
 };
 
 export const mergePurchasedProductIds = (...idGroups) => normalizePurchaseIds(idGroups.flat());

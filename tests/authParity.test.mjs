@@ -7,6 +7,11 @@ test('desktop and mobile purchase id unlocks normalize and de-duplicate identica
   assert.deepEqual(normalizePurchaseIds('not-an-array'), []);
 });
 
+test('purchase ids ignore blank, decimal, boolean, and non-positive values', () => {
+  assert.deepEqual(normalizePurchaseIds([1, '  ', '2', '3.5', true, false, 0, -1]), [1, 2]);
+  assert.deepEqual(mergePurchasedProductIds(['4', '  ', 4.8, false], [null, undefined, '5']), [4, 5]);
+});
+
 test('entitlement restore accepts only desktop-valid unlocked statuses', () => {
   assert.equal(shouldRestoreEntitlementStatus('Completed'), true);
   assert.equal(shouldRestoreEntitlementStatus('Verified'), true);
