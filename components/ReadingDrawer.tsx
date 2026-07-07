@@ -370,7 +370,18 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[1200] backdrop-blur-sm" style={{ backgroundColor: readingBackground }} role="dialog" aria-modal="true" aria-labelledby="reading-drawer-title" onMouseDown={onClose}>
+    <div
+      className="fixed inset-0 z-[1200] backdrop-blur-sm"
+      style={{ backgroundColor: readingBackground }}
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="reading-drawer-title"
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) {
+          onClose();
+        }
+      }}
+    >
       <div className="absolute inset-y-0 right-0 flex w-full justify-end">
         <section onMouseDown={(e) => e.stopPropagation()} className="relative h-full w-full overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw]" style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder }}>
           <div className="sticky top-0 z-30 h-1" style={{ backgroundColor: 'rgba(255,255,255,0.9)' }}>
