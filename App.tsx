@@ -44,6 +44,7 @@ import { ensureUserCoinWallet, spendUserCoinWallet } from './utils/coinWallet';
 import { clearRememberedAuthAccount, getRememberedAuthAccount, RememberedAuthAccount, saveRememberedAuthAccount } from './utils/rememberedAuth';
 import { isMobileViewport as getIsMobileViewport } from './utils/device';
 import { getFirebaseAuthErrorMessageFromCode, mergePurchasedProductIds, normalizePurchaseIds as normalizeSharedPurchaseIds, shouldRestoreEntitlementStatus } from './utils/authParity';
+import { isDemoMode } from './utils/runtimeMode';
 
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
 const GOOGLE_REDIRECT_ATTEMPT_KEY = 'digitalCatalyst.googleRedirectAttempt';
@@ -993,6 +994,7 @@ const GLOBAL_TICKETS_COLLECTION = 'siteSupportTickets';
 const GLOBAL_ORDERS_COLLECTION = 'siteOrders';
 const GLOBAL_REVIEWS_DOC = ['siteData', 'productReviews'] as const;
 const GLOBAL_WEBSITE_SETTINGS_DOC = ['settings', 'website'] as const;
+const ENABLE_DEMO_SEED_DATA = isDemoMode();
 
 const stripUndefinedDeep = <T,>(value: T): T => {
   if (Array.isArray(value)) return value.map(item => stripUndefinedDeep(item)) as T;
@@ -1035,8 +1037,8 @@ const App: React.FC = () => {
   const [products, setProducts] = useState<Product[]>([]);
   const [canShowInstallPrompt, setCanShowInstallPrompt] = useState(false);
   const [reviews, setReviews] = useState<{ [productId: number]: Review[] }>({});
-  const [coupons, setCoupons] = useState<Coupon[]>(initialCoupons);
-  const [orders, setOrders] = useState<Order[]>(initialOrders);
+  const [coupons, setCoupons] = useState<Coupon[]>(() => ENABLE_DEMO_SEED_DATA ? initialCoupons : []);
+  const [orders, setOrders] = useState<Order[]>(() => ENABLE_DEMO_SEED_DATA ? initialOrders : []);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [currentView, setCurrentView] = useState('home'); 
@@ -1449,24 +1451,28 @@ const App: React.FC = () => {
 
   // --- Data Loading and Persistence ---
   
-  // --- SWITCHED TO LOCAL STORAGE MODE ---
-  // Removed Firebase onSnapshot listener to prevent crashes.
-  // Now loading products from localStorage or falling back to initialProducts.
+  // --- Firebase-first product loading with explicit demo fallback ---
+  // Production mode starts empty and waits for Firestore.
+  // Demo mode can still use localStorage/seeded products when VITE_DEMO_MODE=true.
   useEffect(() => {
+    if (!ENABLE_DEMO_SEED_DATA) {
+      setProducts([]);
+      return;
+    }
+
     try {
       const storedProducts = localStorage.getItem('siteProducts');
       const hasPurgedLegacyProducts = localStorage.getItem('legacyProductsPurged') === 'true';
       if (storedProducts && hasPurgedLegacyProducts) {
-          
-          const parsedProducts = JSON.parse(storedProducts);
-          setProducts(Array.isArray(parsedProducts) ? parsedProducts.map(normalizeProductArrays) : initialProducts.map(normalizeProductArrays));
+        const parsedProducts = JSON.parse(storedProducts);
+        setProducts(Array.isArray(parsedProducts) ? parsedProducts.map(normalizeProductArrays) : initialProducts.map(normalizeProductArrays));
       } else {
-          setProducts(initialProducts.map(normalizeProductArrays));
-          safeSetItem('siteProducts', initialProducts.map(normalizeProductArrays));
-          localStorage.setItem('legacyProductsPurged', 'true');
+        setProducts(initialProducts.map(normalizeProductArrays));
+        safeSetItem('siteProducts', initialProducts.map(normalizeProductArrays));
+        localStorage.setItem('legacyProductsPurged', 'true');
       }
     } catch (err) {
-      console.error("Error loading products from localStorage:", err);
+      console.error("Error loading demo products from localStorage:", err);
       setProducts(initialProducts.map(normalizeProductArrays));
     }
   }, []);
@@ -1483,7 +1489,7 @@ const App: React.FC = () => {
     if (storedWishlist) setWishlist(JSON.parse(storedWishlist));
 
     const storedReviews = localStorage.getItem('productReviews');
-    if (storedReviews) setReviews(JSON.parse(storedReviews)); else setReviews(initialReviews);
+    if (ENABLE_DEMO_SEED_DATA && storedReviews) setReviews(JSON.parse(storedReviews)); else setReviews(ENABLE_DEMO_SEED_DATA ? initialReviews : {});
     
     // Purchases are authenticated state. Never hydrate or clear global cached unlocks on startup;
     // Firestore entitlements are restored from Firebase Auth sessions only.
@@ -1545,13 +1551,13 @@ const App: React.FC = () => {
     }
     
     const storedCoupons = localStorage.getItem('siteCoupons');
-    if (storedCoupons) setCoupons(JSON.parse(storedCoupons)); else setCoupons(initialCoupons);
+    if (ENABLE_DEMO_SEED_DATA && storedCoupons) setCoupons(JSON.parse(storedCoupons)); else setCoupons(ENABLE_DEMO_SEED_DATA ? initialCoupons : []);
     
     const storedOrders = localStorage.getItem('siteOrders');
-    if (storedOrders) setOrders(JSON.parse(storedOrders)); else setOrders(initialOrders);
+    if (ENABLE_DEMO_SEED_DATA && storedOrders) setOrders(JSON.parse(storedOrders)); else setOrders(ENABLE_DEMO_SEED_DATA ? initialOrders : []);
 
     const storedTickets = localStorage.getItem('siteSupportTickets');
-    if (storedTickets) {
+    if (ENABLE_DEMO_SEED_DATA && storedTickets) {
       const parsedTickets: SupportTicket[] = JSON.parse(storedTickets);
       setTickets(parsedTickets);
     } else {
@@ -1600,7 +1606,6 @@ const App: React.FC = () => {
     });
 
     const unsubscribeCoupons = onSnapshot(collection(db, GLOBAL_COUPONS_COLLECTION), (snapshot) => {
-      if (snapshot.empty) return;
       const remoteCoupons = snapshot.docs
         .map(item => item.data() as Coupon)
         .sort((a, b) => Number(b.id) - Number(a.id));
@@ -1617,7 +1622,6 @@ const App: React.FC = () => {
     }, error => logGlobalSyncWarning('Support tickets', error));
 
     const unsubscribeOrders = onSnapshot(collection(db, GLOBAL_ORDERS_COLLECTION), (snapshot) => {
-      if (snapshot.empty) return;
       const remoteOrders = snapshot.docs
         .map(item => item.data() as Order)
         .sort((a, b) => String(b.date).localeCompare(String(a.date)));
@@ -1626,7 +1630,12 @@ const App: React.FC = () => {
     }, error => logGlobalSyncWarning('Orders', error));
 
     const unsubscribeReviews = onSnapshot(doc(db, ...GLOBAL_REVIEWS_DOC), (snapshot) => {
-      if (!snapshot.exists()) return;
+      if (!snapshot.exists()) {
+        const fallbackReviews = ENABLE_DEMO_SEED_DATA ? initialReviews : {};
+        setReviews(fallbackReviews);
+        safeSetItem('productReviews', fallbackReviews);
+        return;
+      }
       const remoteReviews = (snapshot.data()?.reviews || {}) as { [productId: number]: Review[] };
       setReviews(remoteReviews);
       safeSetItem('productReviews', remoteReviews);
@@ -1683,6 +1692,8 @@ const App: React.FC = () => {
     safeSetItem('siteSupportTickets', tickets);
   }, [tickets]);
   useEffect(() => {
+    if (!ENABLE_DEMO_SEED_DATA) return undefined;
+
     const syncTicketsFromStorage = () => {
       const storedTickets = localStorage.getItem('siteSupportTickets');
       if (!storedTickets) return;

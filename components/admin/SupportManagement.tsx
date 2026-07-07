@@ -20,7 +20,6 @@ const replyToneOptions: Array<{ value: ReplyTone; label: string; hint: string }>
 ];
 
 const dispatchSupportTicketsUpdate = (updatedTickets: SupportTicket[]) => {
-  localStorage.setItem('siteSupportTickets', JSON.stringify(updatedTickets));
   window.dispatchEvent(new Event('siteSupportTicketsUpdated'));
 };
 

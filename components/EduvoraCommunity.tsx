@@ -8,6 +8,7 @@ import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storag
 import type { WebsiteSettings } from '../App';
 import { mergeCommunitySupportTickets, isSupportTicketNeedsAttention } from '../utils/communitySupportBadge';
 import CommunityAiMentor from './CommunityAiMentor';
+import { isDemoMode } from '../utils/runtimeMode';
 
 interface EduvoraCommunityProps {
   onClose?: () => void;
@@ -138,6 +139,7 @@ const stripUndefinedDeep = <T,>(value: T): T => {
 const MASTER_TAG_STORAGE_KEY = 'eduvoraMasterTagRequests';
 const SUPPORT_TICKETS_STORAGE_KEY = 'siteSupportTickets';
 const SUPPORT_TICKETS_COLLECTION = 'siteSupportTickets';
+const ENABLE_DEMO_SEED_DATA = isDemoMode();
 const COMMUNITY_NOTIFICATION_READ_KEY = 'eduvoraCommunityNotificationReads';
 const COMMUNITY_PROFILE_STORAGE_KEY = 'eduvoraCommunityProfile';
 const COMMUNITY_PRIVACY_STORAGE_KEY = 'eduvoraCommunityPrivacySettings';
@@ -152,6 +154,10 @@ const PROFILE_BIO_MAX_LENGTH = 180;
 const mergeSeedSupportTickets = (tickets: CommunitySupportTicket[]) => mergeCommunitySupportTickets(
   tickets,
   initialMasterTagRequests.map(buildMasterTagTicket)
+);
+
+const mergeRuntimeSupportTickets = (tickets: CommunitySupportTicket[]) => (
+  ENABLE_DEMO_SEED_DATA ? mergeSeedSupportTickets(tickets) : mergeCommunitySupportTickets(tickets, [])
 );
 
 const readJsonObject = <T,>(key: string, fallback: T): T => {
@@ -798,8 +804,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [isDesktopSidebarCollapsed]);
 
   const [supportTickets, setSupportTickets] = useState<CommunitySupportTicket[]>(() => {
-    const mergedTickets = mergeSeedSupportTickets(readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []));
-    if (typeof window !== 'undefined') localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(mergedTickets));
+    const localTickets = ENABLE_DEMO_SEED_DATA ? readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []) : [];
+    const mergedTickets = mergeRuntimeSupportTickets(localTickets);
+    if (ENABLE_DEMO_SEED_DATA && typeof window !== 'undefined') {
+      localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(mergedTickets));
+    }
     return mergedTickets;
   });
   const [masterTagTitle, setMasterTagTitle] = useState('');
@@ -1537,15 +1546,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [masterTagRequests]);
 
   useEffect(() => {
-    const syncSupportTickets = () => setSupportTickets(mergeSeedSupportTickets(readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, [])));
+    const syncSupportTickets = () => setSupportTickets(mergeRuntimeSupportTickets(ENABLE_DEMO_SEED_DATA ? readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []) : []));
     const handleStorage = (event: StorageEvent) => {
       if (event.key === SUPPORT_TICKETS_STORAGE_KEY) syncSupportTickets();
     };
 
     const unsubscribeTickets = onSnapshot(collection(db, SUPPORT_TICKETS_COLLECTION), (snapshot) => {
-      if (snapshot.empty) return;
-      const remoteTickets = mergeSeedSupportTickets(snapshot.docs.map((item) => item.data() as CommunitySupportTicket));
-      localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(remoteTickets));
+      const remoteTickets = mergeRuntimeSupportTickets(snapshot.docs.map((item) => item.data() as CommunitySupportTicket));
+      if (ENABLE_DEMO_SEED_DATA) localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(remoteTickets));
       setSupportTickets(remoteTickets);
     }, (error) => console.warn('Community support ticket sync failed; using local fallback', error));
 
@@ -1639,7 +1647,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const masterTagsQuery = query(collection(db, COMMUNITY_MASTER_TAGS), orderBy('createdAt', 'desc'), limit(150));
     return onSnapshot(masterTagsQuery, (snapshot) => {
       const firebaseMasterTags = snapshot.docs.map((item) => mapMasterTagDoc(item));
-      setMasterTagRequests(firebaseMasterTags.length ? firebaseMasterTags : readJsonArray(MASTER_TAG_STORAGE_KEY, initialMasterTagRequests));
+      setMasterTagRequests(firebaseMasterTags.length ? firebaseMasterTags : (ENABLE_DEMO_SEED_DATA ? readJsonArray(MASTER_TAG_STORAGE_KEY, initialMasterTagRequests) : []));
     }, (error) => console.warn('community_master_tags snapshot failed; using local fallback', error));
   }, [isCommunityAllowed]);
 
@@ -2784,8 +2792,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       const docRef = await addDoc(collection(db, COMMUNITY_MASTER_TAGS), stripUndefinedDeep({ ...request, authorId: currentUserKey, authorName: profile.name, authorAvatar: profile.avatar, message: detail, subject: targetSubject, createdAt: Date.now(), updatedAt: Date.now(), likedByUsers: {}, reactionUsers: {} }));
       const publishedRequest = { ...request, docId: docRef.id };
       const supportTicket: CommunitySupportTicket = { ...buildMasterTagTicket(publishedRequest), customerUid: currentUserKey };
-      const updatedTickets = mergeSeedSupportTickets([supportTicket, ...readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []).filter((ticket) => ticket.id !== supportTicket.id)]);
-      localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(updatedTickets));
+      const existingSupportTickets = ENABLE_DEMO_SEED_DATA ? readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []) : supportTickets;
+      const updatedTickets = mergeRuntimeSupportTickets([supportTicket, ...existingSupportTickets.filter((ticket) => ticket.id !== supportTicket.id)]);
+      if (ENABLE_DEMO_SEED_DATA) localStorage.setItem(SUPPORT_TICKETS_STORAGE_KEY, JSON.stringify(updatedTickets));
       setDoc(doc(db, SUPPORT_TICKETS_COLLECTION, supportTicket.id), stripUndefinedDeep(supportTicket)).catch((error) => console.warn('Master tag ticket Firebase write failed', error));
       window.dispatchEvent(new Event('siteSupportTicketsUpdated'));
       setSupportTickets(updatedTickets);
