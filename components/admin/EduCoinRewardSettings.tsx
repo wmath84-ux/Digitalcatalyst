@@ -1,5 +1,5 @@
 import React from 'react';
-import { EconomySettings, normalizeEconomySettings, saveEconomySettings } from '../../utils/economy';
+import { EconomySettings, normalizeEconomySettings, saveEconomySettingsPatch } from '../../utils/economy';
 
 interface EduCoinRewardSettingsProps {
   economySettings: EconomySettings;
@@ -24,7 +24,11 @@ const EduCoinRewardSettings: React.FC<EduCoinRewardSettingsProps> = ({ economySe
     setSaving(true);
     setStatus('Saving EduCoin reward logic...');
     try {
-      await saveEconomySettings(draft);
+      await saveEconomySettingsPatch({
+        coinPerArticleRead: draft.coinPerArticleRead,
+        articleReadTimeRequiredSec: draft.articleReadTimeRequiredSec,
+        articleReadScrollRequiredPercent: draft.articleReadScrollRequiredPercent,
+      });
       setStatus('Saved. Reading drawer reward tracking will use the updated minimum time and scroll percentage live.');
     } catch (error) {
       console.error(error);

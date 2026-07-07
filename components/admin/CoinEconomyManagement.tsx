@@ -1,6 +1,6 @@
 import React from 'react';
 import { ProductWithRating, WebsiteSettings } from '../../App';
-import { EconomySettings, normalizeEconomySettings, saveEconomySettings } from '../../utils/economy';
+import { EconomySettings, normalizeEconomySettings, saveEconomySettingsPatch } from '../../utils/economy';
 
 interface CoinEconomyManagementProps {
   economySettings: EconomySettings;
@@ -50,7 +50,17 @@ const CoinEconomyManagement: React.FC<CoinEconomyManagementProps> = ({ economySe
     setSaving(true);
     setStatus('Saving economy settings...');
     try {
-      await saveEconomySettings(draft);
+      await saveEconomySettingsPatch({
+        coinPerVideoMinute: draft.coinPerVideoMinute,
+        coinPerArticleRead: draft.coinPerArticleRead,
+        articleReadTimeRequiredSec: draft.articleReadTimeRequiredSec,
+        coinPerQuizCorrect: draft.coinPerQuizCorrect,
+        coinPerPurchase: draft.coinPerPurchase,
+        coinToFiatRatio: draft.coinToFiatRatio,
+        maxDiscountPercentage: draft.maxDiscountPercentage,
+        productOverrides: draft.productOverrides,
+        subscriptionOverrides: draft.subscriptionOverrides,
+      });
       setStatus('Saved. Every learner checkout and reward screen will receive the live update.');
     } catch (error) {
       console.error(error);

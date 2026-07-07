@@ -99,6 +99,21 @@ export const subscribeEconomySettings = (onChange: (settings: EconomySettings) =
   }
 };
 
+export const saveEconomySettingsPatch = async (settings: Partial<EconomySettings>) => {
+  const patch = Object.entries({
+    ...settings,
+    updatedAt: new Date().toISOString(),
+  }).reduce((next, [key, value]) => {
+    if (value !== undefined) {
+      (next as Record<string, unknown>)[key] = value;
+    }
+    return next;
+  }, {} as Partial<EconomySettings>);
+
+  await setDoc(economySettingsRef(), patch, { merge: true });
+  return patch;
+};
+
 export const saveEconomySettings = async (settings: EconomySettings) => {
   const normalized = normalizeEconomySettings({ ...settings, updatedAt: new Date().toISOString() });
   await setDoc(economySettingsRef(), normalized, { merge: true });
