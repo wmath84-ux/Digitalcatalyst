@@ -2,6 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { Product, ProductWithRating, Review, User, Coupon, WebsiteSettings, Order, AdminUser, SupportTicket, NewsletterSubscriber } from '../../App';
 import { EconomySettings } from '../../utils/economy';
+import { isSupportTicketNeedsAttention } from '../../utils/communitySupportBadge.js';
 import Sidebar from './Sidebar';
 import ProductManagement from './ProductManagement';
 import UserManagement from './UserManagement';
@@ -113,6 +114,7 @@ const FirebaseAdminSetup: React.FC = () => {
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     const [currentView, setCurrentView] = useState<AdminView>('dashboard');
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const supportUnreadCount = props.tickets.filter((ticket) => isSupportTicketNeedsAttention(ticket)).length;
 
     const renderView = () => {
         switch (currentView) {
@@ -258,6 +260,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 currentView={currentView} 
                 isOpen={isMobileSidebarOpen}
                 onClose={() => setIsMobileSidebarOpen(false)}
+                supportUnreadCount={supportUnreadCount}
             />
             
             <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
