@@ -32,7 +32,6 @@ import ReadingDrawer, { ReadingListType, ReadingView } from './components/Readin
 import BottomGlassDock from './components/BottomGlassDock';
 import ProfilePage from './components/ProfilePage';
 import PlatformExperience from './components/PlatformExperience';
-import WelcomeOverlay from './components/WelcomeOverlay';
 import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
 import EduvoraCommunity from './components/EduvoraCommunity';
@@ -1456,17 +1455,8 @@ const App: React.FC = () => {
 
   const playWelcomeVoice = useCallback(() => {
     setCanShowInstallPrompt(true);
-    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return;
-    const played = localStorage.getItem('welcomeVoicePlayed');
-    if (played) return;
-    const msg = new SpeechSynthesisUtterance('Hello students, warm welcome to your own distraction free app, Eduvora Omaa.');
-    msg.rate = 0.95;
-    msg.pitch = 1.2;
-    msg.volume = 0.9;
-    msg.onend = () => localStorage.setItem('welcomeVoicePlayed', '1');
-    window.speechSynthesis.cancel();
-    window.speechSynthesis.speak(msg);
   }, []);
+
   const [appliedCartCoupon, setAppliedCartCoupon] = useState<Coupon | null>(null);
   const [cartCouponError, setCartCouponError] = useState<string | null>(null);
   const [applyCartEduCoins, setApplyCartEduCoins] = useState(false);
@@ -4566,19 +4556,7 @@ const App: React.FC = () => {
                 }
               }
             `}</style>
-            <WelcomeOverlay
-              message={mobileWelcomeMessage}
-              onAnimationComplete={() => {
-                playWelcomeVoice();
-                if (mobileWelcomeMessage) {
-                  setMobileWelcomeMessage('');
-                }
-                if (mobileWelcomeTimeoutRef.current) {
-                  window.clearTimeout(mobileWelcomeTimeoutRef.current);
-                  mobileWelcomeTimeoutRef.current = null;
-                }
-              }}
-            />
+            {/* Startup welcome overlay disabled. */}
                         {shouldShowMainPageBackButtonOnMobile && (
               <button
                 type="button"
