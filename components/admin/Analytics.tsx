@@ -296,12 +296,6 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                             </div>
                         )}
 
-                        {!isLowStockTrackingSupported && (
-                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
-                                <p className="text-sm font-bold text-slate-700 mb-1">Low stock tracking unavailable</p>
-                                <p className="text-xs text-slate-600">Add a real stock quantity field before showing low-stock warnings.</p>
-                            </div>
-                        )}
                     </div>
                 </div>
 
@@ -415,6 +409,13 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                                     </div>
                                 )}
                             </>
+                        )}
+
+                        {!isLowStockTrackingSupported && (
+                            <div className="bg-slate-50 border border-slate-200 rounded-lg p-4">
+                                <p className="text-sm font-bold text-slate-700 mb-1">Low stock tracking unavailable</p>
+                                <p className="text-xs text-slate-600">Add a real stock quantity field before showing low-stock warnings.</p>
+                            </div>
                         )}
                     </div>
                 </div>
