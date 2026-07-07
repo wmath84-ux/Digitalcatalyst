@@ -770,24 +770,6 @@ const initialOrders: Order[] = [
 ];
 
 
-const initialMasterTagSupportTickets: SupportTicket[] = [
-  { id: 'MT-1', customerName: 'Nisha Verma', customerEmail: 'nisha.verma@eduvora.community', subject: '@Master Master, please add weekly live doubt room', message: 'Many students need one fixed slot for funnel review, offer doubts, and quick action feedback.', date: new Date().toISOString(), status: 'Open', source: 'masterTag', communityThreadId: 1, customerAvatar: '👩‍🎓', category: 'Feature request' },
-  { id: 'MT-2', customerName: 'Arjun Mehta', customerEmail: 'arjun.mehta@eduvora.community', subject: '@Master Video lesson notes are not opening on mobile', message: 'The PDF opens on desktop but keeps loading on my Android phone. Please check the download button.', date: new Date().toISOString(), status: 'Open', source: 'masterTag', communityThreadId: 2, customerAvatar: '🧑‍💼', category: 'Bug or issue' },
-  { id: 'MT-3', customerName: 'Riya Sharma', customerEmail: 'riya.sharma@eduvora.community', subject: '@Master Need an update on next automation template', message: 'Can master upload the promised WhatsApp automation template before the weekend sprint?', date: new Date().toISOString(), status: 'Open', source: 'masterTag', communityThreadId: 3, customerAvatar: '🧕', category: 'Update' },
-];
-
-const initialSupportTickets: SupportTicket[] = [
-    { 
-        id: 'TKT-780B', 
-        customerName: 'Amit Singh', 
-        customerEmail: 'amit.singh@example.com', 
-        subject: 'Question about Dropshipping Course', 
-        message: "Hi, I'm interested in the Dropshipping Masterclass. Does it cover international suppliers, specifically from Europe? Thanks!",
-        date: '2024-07-20T14:00:00Z', 
-        status: 'Open' 
-    },
-];
-
 const initialNewsArticles: NewsArticle[] = [
   {
     id: 1,
@@ -1055,7 +1037,7 @@ const App: React.FC = () => {
   const [reviews, setReviews] = useState<{ [productId: number]: Review[] }>({});
   const [coupons, setCoupons] = useState<Coupon[]>(initialCoupons);
   const [orders, setOrders] = useState<Order[]>(initialOrders);
-  const [tickets, setTickets] = useState<SupportTicket[]>(initialSupportTickets);
+  const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [currentView, setCurrentView] = useState('home'); 
   const [networkBanner, setNetworkBanner] = useState(() => (typeof navigator !== 'undefined' && !navigator.onLine ? 'You are offline. Some features may not work until internet is back.' : ''));
@@ -1571,11 +1553,10 @@ const App: React.FC = () => {
     const storedTickets = localStorage.getItem('siteSupportTickets');
     if (storedTickets) {
       const parsedTickets: SupportTicket[] = JSON.parse(storedTickets);
-      const mergedTickets = [...parsedTickets];
-      initialMasterTagSupportTickets.forEach(ticket => { if (!mergedTickets.some(item => item.id === ticket.id)) mergedTickets.push(ticket); });
-      setTickets(mergedTickets);
-      safeSetItem('siteSupportTickets', mergedTickets);
-    } else setTickets([...initialMasterTagSupportTickets, ...initialSupportTickets]);
+      setTickets(parsedTickets);
+    } else {
+      setTickets([]);
+    }
 
     const storedSubscribers = localStorage.getItem('newsletterSubscribers');
     if (storedSubscribers) setNewsletterSubscribers(JSON.parse(storedSubscribers));
@@ -1628,7 +1609,6 @@ const App: React.FC = () => {
     }, error => logGlobalSyncWarning('Coupons', error));
 
     const unsubscribeTickets = onSnapshot(collection(db, GLOBAL_TICKETS_COLLECTION), (snapshot) => {
-      if (snapshot.empty) return;
       const remoteTickets = snapshot.docs
         .map(item => item.data() as SupportTicket)
         .sort((a, b) => String(b.date).localeCompare(String(a.date)));
