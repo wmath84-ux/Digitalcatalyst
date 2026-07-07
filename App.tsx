@@ -771,47 +771,7 @@ const initialOrders: Order[] = [
 ];
 
 
-const initialNewsArticles: NewsArticle[] = [
-  {
-    id: 1,
-    imageSeed: "futuristic-seo-trends",
-    type: "blog",
-    thumbnailImage: "",
-    coverImage: "https://placehold.co/800x400/e0e7ff/312e81?text=SEO+Trends",
-    createdAt: "2024-07-28T09:00:00.000Z",
-    category: "SEO",
-    title: "Top 5 SEO Trends to Watch in 2025",
-    excerpt: "Google's algorithm is constantly evolving. Stay ahead of the competition by understanding the key trends that will shape search engine optimization next year.",
-    date: "2024-07-28",
-    content: "In the ever-shifting landscape of digital marketing, staying ahead of SEO trends is not just an advantage; it's a necessity. As we look towards 2025, several key developments are set to redefine how we approach search engine optimization.\n\nFirst, the rise of AI-driven search, like Google's Search Generative Experience (SGE), will continue to mature. This means a greater emphasis on providing direct, comprehensive answers within the search results themselves. Content creators will need to focus on creating authoritative, well-structured information that can be easily parsed and presented by AI.\n\nSecond, voice search and conversational queries are becoming more prevalent. Optimizing for natural language and long-tail keywords that mimic how people speak will be crucial. Think 'What are the best digital marketing strategies for a small business?' rather than just 'digital marketing small business'.\n\nThird, visual search is gaining traction. Tools like Google Lens are changing how users find information. This requires high-quality, well-tagged images and a solid image SEO strategy, including descriptive alt text and file names.\n\nFourth, Core Web Vitals and overall user experience (UX) remain a top priority for Google. A fast, mobile-friendly, and easy-to-navigate website is non-negotiable. Page speed, interactivity, and visual stability are direct ranking factors.\n\nFinally, building topical authority is more important than ever. Instead of focusing on single keywords, businesses should aim to create comprehensive content hubs that cover a subject in depth. This signals expertise and trustworthiness to both users and search engines, establishing your brand as a go-to resource in your niche."
-  },
-  {
-    id: 2,
-    imageSeed: "ecommerce-conversion-funnel",
-    type: "blog",
-    thumbnailImage: "",
-    coverImage: "https://placehold.co/800x400/e0e7ff/312e81?text=Ecommerce+Psychology",
-    createdAt: "2024-07-25T09:00:00.000Z",
-    category: "E-commerce",
-    title: "The Psychology of Online Shopping: How to Convert More Customers",
-    excerpt: "Discover the psychological triggers that motivate users to buy. We break down the science behind high-converting product pages and checkout processes.",
-    date: "2024-07-25",
-    content: "Full content for e-commerce psychology. This article would delve into concepts like social proof, scarcity, urgency, and the power of color and imagery in influencing purchasing decisions."
-  },
-  {
-    id: 3,
-    imageSeed: "ai-writing-robot",
-    type: "news",
-    thumbnailImage: "",
-    coverImage: "https://placehold.co/800x400/e0e7ff/312e81?text=AI+Content+Marketing",
-    createdAt: "2024-07-22T09:00:00.000Z",
-    category: "Marketing",
-    title: "AI in Content Marketing: A Practical Guide for Small Businesses",
-    excerpt: "Artificial intelligence is no longer just for large corporations. Learn how you can leverage AI tools to create better content, faster and more efficiently.",
-    date: "2024-07-22",
-    content: "Full content for AI in marketing. This guide would provide a list of useful AI tools, prompts for generating blog post ideas, and strategies for using AI to analyze content performance."
-  }
-];
+const initialNewsArticles: NewsArticle[] = [];
 
 const initialAnnouncements: Announcement[] = [
     {
@@ -1780,6 +1740,14 @@ const App: React.FC = () => {
         content: {
             ...defaultWebsiteSettings.content,
             ...newSettings.content,
+            dockStyle: {
+                ...defaultWebsiteSettings.content.dockStyle,
+                ...((newSettings.content as any)?.dockStyle || {}),
+            },
+            communityStyle: {
+                ...defaultWebsiteSettings.content.communityStyle,
+                ...((newSettings.content as any)?.communityStyle || {}),
+            },
         },
     };
     setWebsiteSettings(mergedSettings);
