@@ -317,8 +317,6 @@ const ModuleItem: React.FC<{
   const moduleUnlocked = !parentLocked && hasCoursePlayerItemAccess(productId, module, productAccess);
   const visibleFiles = (module.files || []).filter(file => !isCoursePlayerItemHidden(file));
   const visibleModules = (module.modules || []).filter(subModule => !isCoursePlayerItemHidden(subModule));
-  const moduleRequiredCoins = getRequiredEducoins(module);
-  const canUnlockModuleWithCoins = !moduleUnlocked && moduleRequiredCoins > 0 && Boolean(onUnlockWithEducoins);
 
   if (moduleHidden) return null;
 
@@ -362,16 +360,6 @@ const ModuleItem: React.FC<{
           </span>
         )}
       </button>
-
-      {!moduleUnlocked && (
-        <div className="mt-2 grid gap-2 rounded-2xl border border-amber-100 bg-white/70 p-2 sm:grid-cols-2">
-          <button type="button" onClick={() => onPurchaseLatestUpdate?.(moduleUpdateId)} className="rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-3 py-2 text-xs font-black text-white shadow-sm">Buy with money</button>
-          {canUnlockModuleWithCoins && (
-            <button type="button" onClick={() => onUnlockWithEducoins?.(module)} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800">Pay {moduleRequiredCoins} EduCoins</button>
-          )}
-        </div>
-      )}
-
       {isExpanded && (
         <div className="mt-2 space-y-1.5 pb-2">
           {visibleFiles.map((file) => {
@@ -379,8 +367,6 @@ const ModuleItem: React.FC<{
             const filePurchaseUpdateId = productAccess?.lockedPaidUpdateIds.includes(fileUpdateId) ? fileUpdateId : moduleUpdateId;
             const fileUnlocked = moduleUnlocked && hasCoursePlayerItemAccess(productId, file, productAccess);
             const isActive = activeFile?.id === file.id;
-            const fileRequiredCoins = getRequiredEducoins(file);
-            const canUnlockFileWithCoins = !fileUnlocked && fileRequiredCoins > 0 && Boolean(onUnlockWithEducoins);
 
             return (
               <React.Fragment key={file.id}>
@@ -417,16 +403,7 @@ const ModuleItem: React.FC<{
                       Buy
                     </span>
                   )}
-                </button>
-                {!fileUnlocked && (
-                  <div className="ml-12 mt-1 grid gap-2 rounded-2xl border border-amber-100 bg-white/70 p-2 sm:grid-cols-2">
-                    <button type="button" onClick={() => onPurchaseLatestUpdate?.(filePurchaseUpdateId)} className="rounded-xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-3 py-2 text-xs font-black text-white shadow-sm">Buy with money</button>
-                    {canUnlockFileWithCoins && (
-                      <button type="button" onClick={() => onUnlockWithEducoins?.(file)} className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-black text-amber-800">Pay {fileRequiredCoins} EduCoins</button>
-                    )}
-                  </div>
-                )}
-              </React.Fragment>
+                </button>              </React.Fragment>
             );
           })}
 
