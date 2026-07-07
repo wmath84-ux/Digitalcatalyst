@@ -743,11 +743,7 @@ const initialProducts: Product[] = [
   },
 ];
 
-const initialReviews: { [productId: number]: Review[] } = {
-    2: [
-        { name: 'Amit Singh', rating: 5, comment: 'Absolutely the best dropshipping course out there. Worth every penny!', date: '3 days ago' },
-    ],
-};
+const initialReviews: { [productId: number]: Review[] } = {};
 
 const initialCoupons: Coupon[] = [
     { id: 1, code: 'SUMMER25', type: 'percentage', value: 25, expiryDate: '2027-12-31', isActive: true, usageLimit: 100, timesUsed: 42 },
@@ -1449,7 +1445,7 @@ const App: React.FC = () => {
     if (storedWishlist) setWishlist(JSON.parse(storedWishlist));
 
     const storedReviews = localStorage.getItem('productReviews');
-    if (ENABLE_DEMO_SEED_DATA && storedReviews) setReviews(JSON.parse(storedReviews)); else setReviews(ENABLE_DEMO_SEED_DATA ? initialReviews : {});
+    if (storedReviews) setReviews(JSON.parse(storedReviews)); else setReviews({});
     
     // Purchases are authenticated state. Never hydrate or clear global cached unlocks on startup;
     // Firestore entitlements are restored from Firebase Auth sessions only.
@@ -1591,9 +1587,8 @@ const App: React.FC = () => {
 
     const unsubscribeReviews = onSnapshot(doc(db, ...GLOBAL_REVIEWS_DOC), (snapshot) => {
       if (!snapshot.exists()) {
-        const fallbackReviews = ENABLE_DEMO_SEED_DATA ? initialReviews : {};
-        setReviews(fallbackReviews);
-        safeSetItem('productReviews', fallbackReviews);
+        setReviews({});
+        safeSetItem('productReviews', {});
         return;
       }
       const remoteReviews = (snapshot.data()?.reviews || {}) as { [productId: number]: Review[] };
