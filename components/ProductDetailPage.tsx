@@ -1,7 +1,7 @@
 
 // FIX: Imported useState, useEffect, and useRef hooks from React to resolve 'Cannot find name' errors.
 import React, { useState, useEffect, useRef } from 'react';
-import { ActiveCoinDiscount, ProductWithRating, Review, Coupon, WebsiteSettings, User, ProductAccessState, ProductAnalyticsDay } from '../App';
+import { ActiveCoinDiscount, ProductWithRating, Review, Coupon, WebsiteSettings, User, ProductAccessState } from '../App';
 import { EconomySettings, normalizeCoinPrice, shouldShowCoinButton } from '../utils/economy';
 import { getProductCoinPrice, redeemProductWithEduCoins, watchUserCoinWallet } from '../utils/coinWallet';
 import PaymentModal from './PaymentModal';
@@ -10,106 +10,18 @@ import FeaturedProducts from './FeaturedProducts';
 import ShareModal from './ShareModal';
 import { PRODUCT_IMAGE_SLOTS, ProductImageSlot, getProductImage } from '../utils/productImages';
 
-type ProductAnalyticsMetric = 'views' | 'purchases' | 'cart' | 'wishlist' | 'access' | 'coinEvents';
-
-const ANALYTICS_METRICS: { key: ProductAnalyticsMetric; label: string; color: string }[] = [
-    { key: 'views', label: 'Views', color: '#2563eb' },
-    { key: 'purchases', label: 'Purchases', color: '#16a34a' },
-    { key: 'cart', label: 'Cart', color: '#f97316' },
-    { key: 'wishlist', label: 'Wishlist', color: '#e11d48' },
-    { key: 'access', label: 'Access', color: '#7c3aed' },
-    { key: 'coinEvents', label: 'Coin events', color: '#ca8a04' },
-];
-
-const ProductAnalyticsChart: React.FC<{ analytics?: ProductAnalyticsDay[] }> = ({ analytics }) => {
-    const data = (analytics || [])
-        .filter(entry => entry.date)
-        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
-        .slice(-30);
-
-    const totals = ANALYTICS_METRICS.reduce<Record<ProductAnalyticsMetric, number>>((acc, metric) => {
-        acc[metric.key] = data.reduce((sum, entry) => sum + Math.max(0, Number(entry[metric.key] || 0)), 0);
-        return acc;
-    }, {
-        views: 0,
-        purchases: 0,
-        cart: 0,
-        wishlist: 0,
-        access: 0,
-        coinEvents: 0,
-    });
-
-    const totalEvents = Object.values(totals).reduce((sum, value) => sum + value, 0);
-    const hasData = data.length > 0 && totalEvents > 0;
-    const subtitle = hasData
-        ? `${totalEvents.toLocaleString('en-IN')} real events in the last ${data.length} day${data.length === 1 ? '' : 's'}`
-        : 'No real 30-day analytics data available for this product yet.';
-
-    const svgWidth = 700;
-    const svgHeight = 260;
-    const margin = { top: 24, right: 24, bottom: 42, left: 52 };
-    const width = svgWidth - margin.left - margin.right;
-    const height = svgHeight - margin.top - margin.bottom;
-    const maxValue = Math.max(1, ...data.flatMap(entry => ANALYTICS_METRICS.map(metric => Number(entry[metric.key] || 0))));
-
-    const getX = (index: number) => data.length <= 1 ? width / 2 : (index / (data.length - 1)) * width;
-    const getY = (value: number) => height - (Math.max(0, value) / maxValue) * height;
-
-    const getLinePath = (metric: ProductAnalyticsMetric) => data
-        .map((entry, index) => `${index === 0 ? 'M' : 'L'} ${getX(index)} ${getY(Number(entry[metric] || 0))}`)
-        .join(' ');
-
+const ProductAnalyticsChart: React.FC = () => {
     return (
-        <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-6 shadow-sm">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                    <h3 className="text-xl font-bold text-primary">30-Day Product Analytics</h3>
-                    <p className="mt-1 text-sm font-semibold text-slate-600">{subtitle}</p>
-                </div>
-                {hasData && (
-                    <div className="flex flex-wrap gap-2 text-xs font-bold text-slate-600">
-                        {ANALYTICS_METRICS.map(metric => (
-                            <span key={metric.key} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
-                                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: metric.color }} />
-                                {metric.label}: {totals[metric.key].toLocaleString('en-IN')}
-                            </span>
-                        ))}
-                    </div>
-                )}
+        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6">
+            <h3 className="text-xl font-bold text-primary">30-Day Product Analytics</h3>
+            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-5 text-center">
+                <p className="text-3xl" aria-hidden="true">📊</p>
+                <p className="mt-3 text-base font-bold text-slate-800">No real 30-day analytics data connected yet.</p>
+                <p className="mt-2 text-sm leading-6 text-slate-600">
+                    This product page does not currently have a real daily analytics event source for views, purchases, or engagement.
+                    Connect a real analytics/event collection before showing a chart.
+                </p>
             </div>
-
-            {hasData ? (
-                <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="mt-5 h-auto w-full">
-                    <g transform={`translate(${margin.left}, ${margin.top})`}>
-                        <text x={-10} y={0} dy="0.32em" textAnchor="end" className="fill-current text-xs text-slate-600">{maxValue}</text>
-                        <text x={-10} y={height} dy="0.32em" textAnchor="end" className="fill-current text-xs text-slate-600">0</text>
-                        <line x1={0} y1={0} x2={0} y2={height} className="stroke-current text-slate-300" />
-                        <line x1={0} y1={height} x2={width} y2={height} className="stroke-current text-slate-300" />
-
-                        {data.map((entry, index) => (
-                            <text key={`${entry.date}-${index}`} x={getX(index)} y={height + 24} textAnchor="middle" className="fill-current text-[10px] text-slate-500">
-                                {new Date(entry.date).getDate()}
-                            </text>
-                        ))}
-
-                        {ANALYTICS_METRICS.map(metric => (
-                            <path
-                                key={metric.key}
-                                d={getLinePath(metric.key)}
-                                fill="none"
-                                stroke={metric.color}
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            />
-                        ))}
-                    </g>
-                </svg>
-            ) : (
-                <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm font-semibold text-slate-600">
-                    Connect a real 30-day analytics source for views, purchases, cart, wishlist, access, and coin events to display this graph.
-                </div>
-            )}
         </div>
     );
 };
@@ -638,7 +550,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 )}
 
                 <div className="mt-8">
-                  <ProductAnalyticsChart analytics={product.analytics30Days || []} />
+                  <ProductAnalyticsChart />
                 </div>
               </div>
             </div>
