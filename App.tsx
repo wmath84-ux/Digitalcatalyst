@@ -46,7 +46,6 @@ import { isMobileViewport as getIsMobileViewport } from './utils/device';
 import { getFirebaseAuthErrorMessageFromCode, mergePurchasedProductIds, normalizePurchaseIds as normalizeSharedPurchaseIds, shouldRestoreEntitlementStatus } from './utils/authParity';
 
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
-const MOBILE_WELCOME_SESSION_KEY = 'digitalCatalyst.mobileWelcomeShown';
 const GOOGLE_REDIRECT_ATTEMPT_KEY = 'digitalCatalyst.googleRedirectAttempt';
 
 type MobileAuthFlowState = 'checking' | 'logged-out' | 'completing-session' | 'authenticated';
@@ -1060,7 +1059,6 @@ const App: React.FC = () => {
   const [isMobileViewport, setIsMobileViewport] = useState(() => getIsMobileViewport());
   const [mobileAuthFlowState, setMobileAuthFlowState] = useState<MobileAuthFlowState>('checking');
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<FirebaseUser | null>(null);
-  const [mobileWelcomeMessage, setMobileWelcomeMessage] = useState('');
 
   useEffect(() => {
     const goOffline = () => setNetworkBanner('You are offline. Some features may not work until internet is back.');
@@ -1125,8 +1123,6 @@ const App: React.FC = () => {
   const sessionCompletionPromiseRef = useRef<Promise<User | null> | null>(null);
   const lastCompletedSessionRef = useRef<{ uid: string; at: number } | null>(null);
   const authRedirectHandledRef = useRef<{ uid: string; source?: string; at: number } | null>(null);
-  const hasShownMobileWelcomeThisSessionRef = useRef(false);
-  const mobileWelcomeTimeoutRef = useRef<ReturnType<typeof window.setTimeout> | null>(null);
   const [mobileCompletionInput, setMobileCompletionInput] = useState('');
   const [mobileCompletionError, setMobileCompletionError] = useState('');
   const [isSavingMobileCompletion, setIsSavingMobileCompletion] = useState(false);
@@ -1254,33 +1250,6 @@ const App: React.FC = () => {
       window.removeEventListener('resize', updateMobileViewport);
     };
   }, []);
-
-  const getHasShownMobileWelcomeThisSession = () => {
-    if (hasShownMobileWelcomeThisSessionRef.current) return true;
-    try {
-      return sessionStorage.getItem(MOBILE_WELCOME_SESSION_KEY) === 'true';
-    } catch {
-      return false;
-    }
-  };
-
-  const markMobileWelcomeShownThisSession = () => {
-    hasShownMobileWelcomeThisSessionRef.current = true;
-    try {
-      sessionStorage.setItem(MOBILE_WELCOME_SESSION_KEY, 'true');
-    } catch {
-      // Session welcome is only a UI nicety; in-memory ref remains the fallback.
-    }
-  };
-
-  const showMobileWelcomeAfterAuth = (user?: Pick<User, 'name' | 'email'> | null) => {
-    if (!isMobileViewport || !user || getHasShownMobileWelcomeThisSession()) return;
-    const displayName = (user.name || '').trim() || (user.email ? user.email.split('@')[0] : '');
-    setMobileWelcomeMessage(displayName ? `Welcome back, ${displayName}!` : 'Welcome to Eduvora!');
-    markMobileWelcomeShownThisSession();
-    if (mobileWelcomeTimeoutRef.current) window.clearTimeout(mobileWelcomeTimeoutRef.current);
-    mobileWelcomeTimeoutRef.current = window.setTimeout(() => setMobileWelcomeMessage(''), 3500);
-  };
 
 
   const normalizeCourseModules = (modules?: CourseModule[]): CourseModule[] => (modules || []).map(module => ({
@@ -2444,7 +2413,6 @@ const App: React.FC = () => {
       currentViewRef.current = 'home';
       setCurrentView('home');
       window.scrollTo(0, 0);
-      window.setTimeout(() => showMobileWelcomeAfterAuth(user), 0);
   };
 
   const redirectAfterSuccessfulAuth = (options: { source?: string; user?: User | Pick<User, 'name' | 'email'> | null; preserveCheckoutIntent?: boolean; force?: boolean } = {}) => {
@@ -2464,7 +2432,6 @@ const App: React.FC = () => {
 
       if (preserveCheckoutIntent && productToBuyAfterLogin) {
           console.info('AUTH_REDIRECT_AFTER_COMMIT', { uid, target: 'product' });
-          if (isMobileViewport && welcomeUser) showMobileWelcomeAfterAuth(welcomeUser);
           currentViewRef.current = 'product';
           setSelectedProduct(productToBuyAfterLogin);
           setCurrentView('product');
@@ -2476,7 +2443,6 @@ const App: React.FC = () => {
 
       if (preserveCheckoutIntent && resumeCartCheckoutAfterLogin && cart.length > 0) {
           console.info('AUTH_REDIRECT_AFTER_COMMIT', { uid, target: 'cart-checkout' });
-          if (isMobileViewport && welcomeUser) showMobileWelcomeAfterAuth(welcomeUser);
           currentViewRef.current = 'home';
           setCurrentView('home');
           setIsCartOpen(false);
@@ -2727,7 +2693,6 @@ const App: React.FC = () => {
           window.scrollTo(0, 0);
       }
 
-      showMobileWelcomeAfterAuth(currentUser);
   }, [isMobileViewport, isAuthStateReady, isLoggedIn, effectiveFirebaseUser?.uid, currentUser?.id, currentView]);
 
 
@@ -2955,10 +2920,6 @@ const App: React.FC = () => {
       setProfileStatus('idle');
       setPurchaseStatus('idle');
       setAuthStatus('unauthenticated');
-      setMobileWelcomeMessage('');
-      if (mobileWelcomeTimeoutRef.current) window.clearTimeout(mobileWelcomeTimeoutRef.current);
-      hasShownMobileWelcomeThisSessionRef.current = false;
-      try { sessionStorage.removeItem(MOBILE_WELCOME_SESSION_KEY); } catch {}
       setWishlist([]);
       setCart([]);
       setSelectedProduct(null);
