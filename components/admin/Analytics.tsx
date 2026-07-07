@@ -70,13 +70,12 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
         todayEnd.setHours(23, 59, 59, 999);
 
         if (dateRange === 'today') {
-            const todayStr = today.toISOString().split('T')[0];
-            const filteredOrders = orders.filter(o => o.date === todayStr);
-            const filteredUsers = users.filter(u => {
-                try {
-                    return new Date(u.createdAt).toISOString().split('T')[0] === todayStr;
-                } catch (e) { return false; }
-            });
+            const isSameDay = (value: string) => {
+                const date = new Date(value);
+                return !Number.isNaN(date.getTime()) && date >= today && date <= todayEnd;
+            };
+            const filteredOrders = orders.filter(o => isSameDay(o.date));
+            const filteredUsers = users.filter(u => isSameDay(u.createdAt));
             return { filteredOrders, filteredUsers };
         }
 
@@ -162,12 +161,16 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
     completedOrders.forEach(order => {
         order.items.forEach(item => {
             const productInfo = products.find(p => p.id === item.id);
-            if (!productInfo) return; 
+            const itemName = productInfo?.title || (() => {
+                const itemRecord = item as { name?: unknown; title?: unknown; productName?: unknown };
+                const fallbackName = itemRecord.name || itemRecord.title || itemRecord.productName;
+                return typeof fallbackName === 'string' && fallbackName.trim() ? fallbackName : `Product #${item.id}`;
+            })();
             const existing = productSales.get(item.id);
             if (existing) {
                 existing.quantity += item.quantity;
             } else {
-                productSales.set(item.id, { name: productInfo.title, quantity: item.quantity });
+                productSales.set(item.id, { name: itemName, quantity: item.quantity });
             }
         });
     });
@@ -230,7 +233,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                     colorClass="bg-white/80 backdrop-blur-xl border-l-4 border-l-purple-500"
                 />
                 <StatCard 
-                    title="Customers" 
+                    title="Unique Buyers" 
                     value={totalCustomersCount}
                     icon={<svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" /></svg>}
                     colorClass="bg-white/80 backdrop-blur-xl border-l-4 border-l-orange-500"
@@ -244,7 +247,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                 <div className="bg-white/80 backdrop-blur-xl p-6 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/80 lg:col-span-1 hover:border-pink-200 transition-colors">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-bold text-lg text-gray-800">❤️ Most Wishlisted</h3>
-                        <span className="text-xs bg-pink-100 text-pink-800 px-2 py-1 rounded-full font-bold">Hot</span>
+                        <span className="text-xs bg-pink-100 text-pink-800 px-2 py-1 rounded-full font-bold">Wishlist</span>
                     </div>
                     {visibleWishlist.length > 0 ? (
                         <div className="space-y-2">
@@ -270,7 +273,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                 <div className="bg-white/80 backdrop-blur-xl p-6 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/80 lg:col-span-1 hover:border-yellow-200 transition-colors">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-bold text-lg text-gray-800">⭐ Top Rated</h3>
-                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-bold">Quality</span>
+                        <span className="text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded-full font-bold">Rating</span>
                     </div>
                     <div className="space-y-4">
                         {sortedByRating.length > 0 ? (
@@ -303,7 +306,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                 <div className="bg-white/80 backdrop-blur-xl p-6 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/80 lg:col-span-1 hover:border-blue-200 transition-colors">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-bold text-lg text-gray-800">👀 Most Viewed</h3>
-                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-bold">Traffic</span>
+                        <span className="text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded-full font-bold">Views</span>
                     </div>
                     {visibleViews.length > 0 ? (
                         <div className="space-y-2">
@@ -329,7 +332,7 @@ const Analytics: React.FC<AnalyticsProps> = ({ orders, products, users, reviews 
                 <div className="bg-white/80 backdrop-blur-xl p-6 rounded-xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] border border-slate-200/80 lg:col-span-1 hover:border-purple-200 transition-colors">
                     <div className="flex items-center justify-between mb-6">
                         <h3 className="font-bold text-lg text-gray-800">💬 Most Reviewed</h3>
-                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full font-bold">Viral</span>
+                        <span className="text-xs bg-purple-100 text-purple-800 px-2 py-1 rounded-full font-bold">Reviews</span>
                     </div>
                     {visibleReviews.length > 0 ? (
                         <div className="space-y-2">
