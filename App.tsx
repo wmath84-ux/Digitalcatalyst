@@ -222,6 +222,16 @@ export interface PriceHistoryEntry {
     price: number;
 }
 
+export interface ProductAnalyticsDay {
+    date: string; // YYYY-MM-DD
+    views?: number;
+    purchases?: number;
+    cart?: number;
+    wishlist?: number;
+    access?: number;
+    coinEvents?: number;
+}
+
 // Core product structure without rating
 export interface Product {
   id: number;
@@ -255,6 +265,7 @@ export interface Product {
   courseContent?: CourseModule[];
   aspectRatio?: string;
   priceHistory?: PriceHistoryEntry[];
+  analytics30Days?: ProductAnalyticsDay[];
   isFree?: boolean;
   couponCode?: string;
   paymentLink: string; // Specific Razorpay Payment Page URL for this product (REQUIRED)

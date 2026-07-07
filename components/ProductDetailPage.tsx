@@ -1,7 +1,7 @@
 
 // FIX: Imported useState, useEffect, and useRef hooks from React to resolve 'Cannot find name' errors.
 import React, { useState, useEffect, useRef } from 'react';
-import { ActiveCoinDiscount, ProductWithRating, Review, Coupon, WebsiteSettings, PriceHistoryEntry, User, ProductAccessState } from '../App';
+import { ActiveCoinDiscount, ProductWithRating, Review, Coupon, WebsiteSettings, User, ProductAccessState, ProductAnalyticsDay } from '../App';
 import { EconomySettings, normalizeCoinPrice, shouldShowCoinButton } from '../utils/economy';
 import { getProductCoinPrice, redeemProductWithEduCoins, watchUserCoinWallet } from '../utils/coinWallet';
 import PaymentModal from './PaymentModal';
@@ -10,75 +10,106 @@ import FeaturedProducts from './FeaturedProducts';
 import ShareModal from './ShareModal';
 import { PRODUCT_IMAGE_SLOTS, ProductImageSlot, getProductImage } from '../utils/productImages';
 
-const PriceChart: React.FC<{ basePrice: number, priceHistory?: PriceHistoryEntry[] }> = ({ basePrice, priceHistory }) => {
-    const data: { date: Date; price: number; }[] = (() => {
-        if (priceHistory && priceHistory.length > 1) {
-            const sortedHistory = [...priceHistory].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
-            const last7DaysHistory = sortedHistory.slice(-7);
-            return last7DaysHistory.map(entry => ({ date: new Date(entry.date), price: entry.price }));
-        }
-        
-        // Generate flat data for the last 7 days if no history
-        return Array.from({ length: 7 }, (_, i) => {
-            const date = new Date();
-            date.setDate(date.getDate() - (6 - i));
-            return { date, price: basePrice };
-        });
-    })();
+type ProductAnalyticsMetric = 'views' | 'purchases' | 'cart' | 'wishlist' | 'access' | 'coinEvents';
 
-    const svgWidth = 500;
-    const svgHeight = 200;
-    const margin = { top: 20, right: 20, bottom: 30, left: 50 };
+const ANALYTICS_METRICS: { key: ProductAnalyticsMetric; label: string; color: string }[] = [
+    { key: 'views', label: 'Views', color: '#2563eb' },
+    { key: 'purchases', label: 'Purchases', color: '#16a34a' },
+    { key: 'cart', label: 'Cart', color: '#f97316' },
+    { key: 'wishlist', label: 'Wishlist', color: '#e11d48' },
+    { key: 'access', label: 'Access', color: '#7c3aed' },
+    { key: 'coinEvents', label: 'Coin events', color: '#ca8a04' },
+];
+
+const ProductAnalyticsChart: React.FC<{ analytics?: ProductAnalyticsDay[] }> = ({ analytics }) => {
+    const data = (analytics || [])
+        .filter(entry => entry.date)
+        .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+        .slice(-30);
+
+    const totals = ANALYTICS_METRICS.reduce<Record<ProductAnalyticsMetric, number>>((acc, metric) => {
+        acc[metric.key] = data.reduce((sum, entry) => sum + Math.max(0, Number(entry[metric.key] || 0)), 0);
+        return acc;
+    }, {
+        views: 0,
+        purchases: 0,
+        cart: 0,
+        wishlist: 0,
+        access: 0,
+        coinEvents: 0,
+    });
+
+    const totalEvents = Object.values(totals).reduce((sum, value) => sum + value, 0);
+    const hasData = data.length > 0 && totalEvents > 0;
+    const subtitle = hasData
+        ? `${totalEvents.toLocaleString('en-IN')} real events in the last ${data.length} day${data.length === 1 ? '' : 's'}`
+        : 'No real 30-day analytics data available for this product yet.';
+
+    const svgWidth = 700;
+    const svgHeight = 260;
+    const margin = { top: 24, right: 24, bottom: 42, left: 52 };
     const width = svgWidth - margin.left - margin.right;
     const height = svgHeight - margin.top - margin.bottom;
+    const maxValue = Math.max(1, ...data.flatMap(entry => ANALYTICS_METRICS.map(metric => Number(entry[metric.key] || 0))));
 
-    const prices = data.map(d => d.price);
-    const minPrice = Math.min(...prices);
-    const maxPrice = Math.max(...prices);
-    
-    const priceRange = maxPrice - minPrice;
-    const priceBuffer = priceRange < 1 ? Math.max(1, maxPrice * 0.1) : 0;
-    const yMin = Math.max(0, minPrice - priceBuffer);
-    const yMax = maxPrice + priceBuffer;
-    
-    const getX = (index: number) => (index / (Math.max(1, data.length - 1))) * width;
-    const getY = (price: number) => {
-        const totalRange = yMax - yMin;
-        if (totalRange === 0) return height / 2;
-        return height - ((price - yMin) / totalRange) * height;
-    }
+    const getX = (index: number) => data.length <= 1 ? width / 2 : (index / (data.length - 1)) * width;
+    const getY = (value: number) => height - (Math.max(0, value) / maxValue) * height;
 
-    const linePath = data.map((d, i) => `${i === 0 ? 'M' : 'L'} ${getX(i)} ${getY(d.price)}`).join(' ');
+    const getLinePath = (metric: ProductAnalyticsMetric) => data
+        .map((entry, index) => `${index === 0 ? 'M' : 'L'} ${getX(index)} ${getY(Number(entry[metric] || 0))}`)
+        .join(' ');
 
-    const last7Dates = Array.from({ length: 7 }, (_, i) => {
-        const d = new Date();
-        d.setDate(d.getDate() - (6 - i));
-        return d.getDate();
-    });
-    
-    const xLabels = data.length > 1 ? data.map(d => d.date.getDate()) : last7Dates;
-    
     return (
-        <div className="bg-gray-50 p-6 rounded-lg border">
-            <h3 className="text-xl font-bold text-primary mb-4">7-Day Price History</h3>
-            <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="w-full h-auto">
-                <g transform={`translate(${margin.left}, ${margin.top})`}>
-                    {/* Y-axis */}
-                    <text x={-10} y={0} dy="0.32em" textAnchor="end" className="text-xs fill-current text-slate-600">₹{yMax.toFixed(0)}</text>
-                    <text x={-10} y={height} dy="0.32em" textAnchor="end" className="text-xs fill-current text-slate-600">₹{yMin.toFixed(0)}</text>
-                    <line x1={0} y1={0} x2={0} y2={height} className="stroke-current text-slate-600" />
-                    {/* X-axis */}
-                    {xLabels.map((d, i) => (
-                         <text key={i} x={getX(i)} y={height + 20} textAnchor="middle" className="text-xs fill-current text-slate-600">{d}</text>
-                    ))}
-                    <line x1={0} y1={height} x2={width} y2={height} className="stroke-current text-slate-600" />
-                    {/* Chart */}
-                    <path d={linePath} fill="none" className="stroke-current text-primary" strokeWidth="2" />
-                    {data.map((d, i) => (
-                        <circle key={i} cx={getX(i)} cy={getY(d.price)} r="3" className="fill-current text-primary" />
-                    ))}
-                </g>
-            </svg>
+        <div className="rounded-3xl border border-slate-200/70 bg-white/85 p-6 shadow-sm">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                <div>
+                    <h3 className="text-xl font-bold text-primary">30-Day Product Analytics</h3>
+                    <p className="mt-1 text-sm font-semibold text-slate-600">{subtitle}</p>
+                </div>
+                {hasData && (
+                    <div className="flex flex-wrap gap-2 text-xs font-bold text-slate-600">
+                        {ANALYTICS_METRICS.map(metric => (
+                            <span key={metric.key} className="inline-flex items-center gap-1 rounded-full border border-slate-200 bg-slate-50 px-2.5 py-1">
+                                <span className="h-2 w-2 rounded-full" style={{ backgroundColor: metric.color }} />
+                                {metric.label}: {totals[metric.key].toLocaleString('en-IN')}
+                            </span>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            {hasData ? (
+                <svg viewBox={`0 0 ${svgWidth} ${svgHeight}`} className="mt-5 h-auto w-full">
+                    <g transform={`translate(${margin.left}, ${margin.top})`}>
+                        <text x={-10} y={0} dy="0.32em" textAnchor="end" className="fill-current text-xs text-slate-600">{maxValue}</text>
+                        <text x={-10} y={height} dy="0.32em" textAnchor="end" className="fill-current text-xs text-slate-600">0</text>
+                        <line x1={0} y1={0} x2={0} y2={height} className="stroke-current text-slate-300" />
+                        <line x1={0} y1={height} x2={width} y2={height} className="stroke-current text-slate-300" />
+
+                        {data.map((entry, index) => (
+                            <text key={`${entry.date}-${index}`} x={getX(index)} y={height + 24} textAnchor="middle" className="fill-current text-[10px] text-slate-500">
+                                {new Date(entry.date).getDate()}
+                            </text>
+                        ))}
+
+                        {ANALYTICS_METRICS.map(metric => (
+                            <path
+                                key={metric.key}
+                                d={getLinePath(metric.key)}
+                                fill="none"
+                                stroke={metric.color}
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            />
+                        ))}
+                    </g>
+                </svg>
+            ) : (
+                <div className="mt-5 rounded-2xl border border-dashed border-slate-300 bg-slate-50 p-6 text-center text-sm font-semibold text-slate-600">
+                    Connect a real 30-day analytics source for views, purchases, cart, wishlist, access, and coin events to display this graph.
+                </div>
+            )}
         </div>
     );
 };
@@ -607,7 +638,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 )}
 
                 <div className="mt-8">
-                  <PriceChart basePrice={currentPriceNum} priceHistory={product.priceHistory || []} />
+                  <ProductAnalyticsChart analytics={product.analytics30Days || []} />
                 </div>
               </div>
             </div>
