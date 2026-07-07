@@ -1852,12 +1852,11 @@ const App: React.FC = () => {
   }, {});
 
   // --- Real-time Metrics for Hero ---
-  // Calculate total revenue from orders that are not cancelled
+  // Calculate total revenue from completed orders only
   const totalRevenueValue = orders
-    .filter(o => o.status !== 'Cancelled')
+    .filter(o => o.status === 'Completed')
     .reduce((acc, order) => {
-        // Extract numeric value from string like "₹1,999"
-        const numericValue = parseFloat(order.total.replace(/[^\d.]/g, '')) || 0;
+        const numericValue = order.paymentBreakdown?.finalPrice ?? (parseFloat(order.total.replace(/[^\d.]/g, '')) || 0);
         return acc + numericValue;
     }, 0);
   
