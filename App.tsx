@@ -4131,7 +4131,6 @@ const App: React.FC = () => {
       };
 
       setCurrentAdminUser(admin);
-      safeSetItem('currentAdminUser', admin);
       setCurrentView('admin');
       return true;
     } catch (error) {

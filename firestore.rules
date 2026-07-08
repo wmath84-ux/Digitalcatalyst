@@ -80,7 +80,7 @@ service cloud.firestore {
 
     match /siteProducts/{productId} {
       allow read: if true;
-      allow write: if signedIn();
+      allow write: if isAdmin();
     }
 
     match /siteOrders/{orderId} {
