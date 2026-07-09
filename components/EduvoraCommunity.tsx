@@ -505,21 +505,26 @@ const normalizeFeedMessage = (message: FeedMessage): FeedMessage => ({
 });
 
 const getReplyMergeKey = (reply: Reply) => reply.clientMessageId ? `client:${reply.clientMessageId}` : reply.docId ? `doc:${reply.docId}` : `local:${reply.id}`;
+const replyIdentityKeys = (reply: Reply) => [
+  reply.clientMessageId ? `client:${reply.clientMessageId}` : '',
+  reply.docId ? `doc:${reply.docId}` : '',
+  `local:${reply.id}`,
+].filter(Boolean);
+const putStableReply = (merged: Map<string, Reply>, reply: Reply) => {
+  const keys = replyIdentityKeys(reply);
+  const existing = keys.map((key) => merged.get(key)).find(Boolean);
+  const next = { ...(existing || {}), ...reply, status: reply.status || existing?.status || 'sent' };
+  keys.forEach((key) => merged.delete(key));
+  merged.set(keys[0] || `local:${reply.id}`, next);
+};
 const mergeReplyLists = (remoteReplies: Reply[] = [], currentReplies: Reply[] = []) => {
   const merged = new Map<string, Reply>();
-  currentReplies.forEach((reply) => {
-    if (reply.status === 'sending' || reply.status === 'failed') merged.set(getReplyMergeKey(reply), reply);
-  });
-  remoteReplies.forEach((reply) => {
-    const key = getReplyMergeKey(reply);
-    const pending = reply.clientMessageId ? merged.get(`client:${reply.clientMessageId}`) : undefined;
-    merged.set(key, { ...(pending || {}), ...reply, status: reply.status || 'sent' });
-    if (reply.docId) merged.delete(`local:${reply.id}`);
-  });
-  currentReplies.forEach((reply) => {
-    const key = getReplyMergeKey(reply);
-    if (!merged.has(key) && reply.status === 'sent' && !reply.docId) merged.set(key, reply);
-  });
+  currentReplies
+    .filter((reply) => reply.status !== 'deleted' && reply.status !== 'hidden')
+    .forEach((reply) => putStableReply(merged, reply));
+  remoteReplies
+    .filter((reply) => reply.status !== 'deleted' && reply.status !== 'hidden')
+    .forEach((reply) => putStableReply(merged, { ...reply, status: reply.status || 'sent' }));
   return Array.from(merged.values()).sort((a, b) => (a.createdAt || a.id) - (b.createdAt || b.id));
 };
 
@@ -959,6 +964,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const directChatMessagesEndRef = useRef<HTMLDivElement>(null);
   const currentUserKey = guardedAuth.currentUser?.uid || currentUser?.id || currentUser?.uid || authEmail || `profile-${normalizeUsername(profile.username || profile.name) || 'local'}`;
   const isOwnCommunityId = (id?: string) => id === currentUserKey || id === 'me';
+  const getGoogleProfileAvatar = () => String(currentUser?.photoURL || guardedAuth.currentUser?.photoURL || (currentUser as any)?.avatarUrl || '').trim();
+  const getOwnDisplayAvatar = () => profile.avatar || getGoogleProfileAvatar();
   const selectedMessage = messages.find((message) => message.id === selectedMessageId) || messages[0];
   const selectedStatus = statusCards.find((status) => status.id === selectedStatusId) || statusCards[0];
   const currentProfileCreator = useMemo<Creator>(() => ({
@@ -966,7 +973,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     ownerId: currentUserKey,
     username: normalizeUsername(profile.username) || buildStableCommunityUsername(currentUserKey),
     name: profile.name || buildStableCommunityName(currentUserKey),
-    avatar: profile.avatar || '',
+    avatar: getOwnDisplayAvatar(),
     role: 'Community member',
     followers: followerIds.length,
     followerCount: followerIds.length,
@@ -2227,7 +2234,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const getIdentityForId = (profileId?: string) => {
     if (!profileId) return { name: '', avatar: '', username: '' };
-    if (isOwnCommunityId(profileId)) return { name: profile.name || buildStableCommunityName(currentUserKey), avatar: profile.avatar || '', username: profile.username || buildStableCommunityUsername(currentUserKey) };
+    if (isOwnCommunityId(profileId)) return { name: profile.name || buildStableCommunityName(currentUserKey), avatar: getOwnDisplayAvatar(), username: profile.username || buildStableCommunityUsername(currentUserKey) };
     const creator = allCreators.find((item) => item.id === profileId || item.ownerId === profileId);
     return { name: creator?.name || '', avatar: creator?.avatar || '', username: creator?.username || '' };
   };
@@ -2381,10 +2388,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
     try {
       if (!targetMessage.docId) {
-        setMessages((current) => current.map((message) => message.id === messageId ? {
-          ...message,
-          replies: message.replies.map((item) => item.clientMessageId === clientMessageId ? { ...item, status: 'sent', time: 'Saved locally' } : item),
-        } : message));
+        setMessages((current) => current.map((message) => {
+          if (message.id !== messageId) return message;
+          const replies = mergeReplyLists([{ ...reply, status: 'sent', time: 'Saved locally' }], message.replies);
+          return { ...message, replies, replyCount: Math.max(message.replyCount || 0, replies.length) };
+        }));
         setProfileFeedback({ type: 'success', message: 'Reply added locally. It will stay visible in this thread while the post syncs.' });
         return;
       }
@@ -2418,18 +2426,21 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         })).catch((error) => console.warn('Reply notification failed', error));
       }
 
-      setMessages((current) => current.map((message) => message.id === messageId ? {
-        ...message,
-        replies: message.replies.map((item) => item.clientMessageId === clientMessageId ? { ...reply, docId: replyRef.id, status: 'sent', time: 'Just now' } : item),
-      } : message));
-      setExpandedReplyId(null);
+      const sentReply = { ...reply, docId: replyRef.id, status: 'sent' as const, time: 'Just now', createdAt: reply.createdAt || Date.now() };
+      setMessages((current) => current.map((message) => {
+        if (message.id !== messageId) return message;
+        const replies = mergeReplyLists([sentReply], message.replies);
+        return { ...message, replies, replyCount: Math.max(message.replyCount || 0, replies.length) };
+      }));
+      setExpandedReplyId(messageId);
       focusReplyAfterRender(messageId, clientMessageId);
     } catch (error) {
       console.warn('Reply write failed', error);
-      setMessages((current) => current.map((message) => message.id === messageId ? {
-        ...message,
-        replies: message.replies.map((item) => item.clientMessageId === clientMessageId ? { ...item, status: 'failed', time: 'Failed to send' } : item),
-      } : message));
+      setMessages((current) => current.map((message) => {
+        if (message.id !== messageId) return message;
+        const replies = mergeReplyLists([{ ...reply, status: 'failed', time: 'Failed to send' }], message.replies);
+        return { ...message, replies, replyCount: Math.max(message.replyCount || 0, replies.length) };
+      }));
       setProfileFeedback({ type: 'error', message: 'Could not send reply. Use Retry from the failed bubble.' });
     } finally {
       setReplySendingIds((current) => {
@@ -3419,7 +3430,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <section className="rounded-[2rem] border border-[#D9E7F8] bg-[#F8FBFF] p-5">
           <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Community response</p>
           <p className="mt-2 text-sm font-semibold leading-7 text-[#536178]">{selectedMasterTagReply?.adminReply || 'No master reply yet. Community members can still appreciate and react respectfully.'}</p>
-          <div className="mt-4 flex flex-wrap gap-2">{REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMasterTag(selectedMasterTag.id, emoji)} className="min-h-11 rounded-full border border-[#D9E7F8] bg-white px-4 text-sm font-black text-[#081A45] transition hover:border-[#1769FF]">{emoji} {selectedMasterTag.reactions[emoji] || 0}</button>)}</div>
+          <div className="mt-4 grid grid-cols-2 gap-2">{REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMasterTag(selectedMasterTag.id, emoji)} className="min-h-11 rounded-full border border-[#D9E7F8] bg-white px-4 text-sm font-black text-[#081A45] transition hover:border-[#1769FF]">{emoji} {selectedMasterTag.reactions[emoji] || 0}</button>)}</div>
         </section>
 
         {related.length ? <section className="rounded-[2rem] border border-[#D9E7F8] bg-white p-5 shadow-sm"><h3 className="text-lg font-black text-[#081A45]">Related appreciation</h3><div className="mt-3 grid gap-3 sm:grid-cols-2">{related.map((tag) => <button key={tag.id} type="button" onClick={() => openMasterTagDetail(tag.id)} className="rounded-2xl bg-[#F8FBFF] p-3 text-left transition hover:bg-[#EEF6FF]"><p className="truncate text-sm font-black text-[#081A45]">{tag.targetMasterName || tag.title}</p><p className="mt-1 line-clamp-2 text-xs font-bold leading-5 text-[#536178]">{tag.detail}</p><span className="mt-2 inline-flex rounded-full bg-white px-2 py-1 text-[11px] font-black text-[#1769FF]">💛 {tag.likes}</span></button>)}</div></section> : null}
@@ -3693,9 +3704,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const renderStatusTile = (card: StatusCard) => {
     const owner = getStatusOwnerIdentity(card);
     return (
-      <article key={card.id} role="button" tabIndex={0} onClick={() => openStatusReel(card.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openStatusReel(card.id); }} className="group relative aspect-[9/14] cursor-pointer overflow-hidden rounded-[1.8rem] border border-white/80 bg-white p-3 text-left shadow-[0_18px_52px_rgba(15,23,42,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
-        <div className={`absolute inset-2 rounded-[1.35rem] bg-gradient-to-br ${card.gradient} transition duration-500 group-hover:scale-[1.04]`} />
-        <div className="absolute inset-2 rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.30),rgba(255,255,255,0.04)_38%,rgba(15,23,42,0.60))]" />
+      <article key={card.id} role="button" tabIndex={0} onClick={() => openStatusReel(card.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openStatusReel(card.id); }} className="group relative aspect-[9/14] cursor-pointer overflow-hidden rounded-[1.65rem] border border-[#D9E7F8] bg-white p-2.5 text-left shadow-[0_16px_44px_rgba(8,26,69,0.12)] ring-1 ring-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(23,105,255,0.18)]">
+        <div className={`absolute inset-2 rounded-[1.25rem] bg-gradient-to-br ${card.gradient} transition duration-500 group-hover:scale-[1.04]`} />
+        <div className="absolute inset-2 rounded-[1.25rem] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.48),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.22),rgba(8,26,69,0.12)_42%,rgba(8,26,69,0.72))]" />
         <div className="relative flex h-full flex-col justify-between p-2 text-white">
           <div className="flex items-center gap-2">
             <Avatar value={owner.avatar} size="h-9 w-9" className="ring-2 ring-white/70" />
@@ -4355,7 +4366,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           className={`mt-4 flex w-full items-center gap-3 rounded-[1.6rem] border border-[#D9E7F8] bg-gradient-to-br from-white to-[#F8FBFF] p-3 text-left shadow-[0_16px_38px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_46px_rgba(123,97,255,0.13)] focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 ${sidebarExpanded ? 'justify-start' : 'justify-center'}`}
           title={memberName}
         >
-          <Avatar value={profile.avatar} size="h-11 w-11" />
+          <Avatar value={getOwnDisplayAvatar()} size="h-11 w-11" />
           {sidebarExpanded ? (
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-black text-[#081A45]">{memberName}</span>
@@ -4368,13 +4379,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
-  const shouldHideCommunityDockOnMobile = !(page === 'chat' || page === 'creators' || page === 'network' || page === 'following' || page === 'masterTags' || page === 'profile');
+  const shouldHideCommunityDockOnMobile = !(activeView === 'status' && (page === 'chat' || page === 'statusMine'));
 
   const CommunityBottomNav = () => (
     <nav
       ref={communityDockScrollRef}
       id="community-bottom-dock"
-      className={`fixed inset-x-3 bottom-[calc(env(safe-area-inset-bottom)+0.75rem)] z-[1300] flex items-center gap-1 overflow-x-auto rounded-[1.65rem] border border-[var(--community-border)] bg-[var(--community-dock-bg)] p-2 shadow-[var(--community-shadow)] transition-all duration-300 custom-scrollbar lg:hidden ${
+      className={`fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+0.35rem)] z-[1300] flex items-center gap-1 overflow-x-auto rounded-[1.15rem] border border-[var(--community-border)] bg-white p-1 shadow-[0_12px_28px_rgba(8,26,69,0.12)] transition-all duration-300 custom-scrollbar lg:hidden ${
         shouldHideCommunityDockOnMobile
           ? 'max-md:pointer-events-none max-md:translate-y-[calc(100%+2rem)] max-md:opacity-0'
           : 'max-md:translate-y-0 max-md:opacity-100'
@@ -4395,14 +4406,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
               }
             });
           }}
-          className={`min-w-[68px] flex-1 rounded-[1.2rem] px-2 py-2 text-center transition ${
+          className={`min-w-[56px] flex-1 rounded-[0.95rem] px-1.5 py-1 text-center transition ${
             item.active
               ? 'bg-[var(--community-dock-active-bg)] text-[var(--community-dock-active-text)]'
               : 'bg-[var(--community-dock-item-bg)] text-[var(--community-dock-text)]'
           }`}
         >
-          <span className="block text-lg">{item.icon}</span>
-          <span className="text-[9px] font-black leading-tight">{item.label}</span>
+          <span className="block text-base leading-none">{item.icon}</span>
+          <span className="text-[8px] font-black leading-tight">{item.label}</span>
         </button>
       ))}
     </nav>
@@ -4426,24 +4437,24 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     }
 
     return profilePosts.length ? (
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-3">
         {profilePosts.slice(0, 30).map((message) => {
           const type = message.postType || message.type || 'text';
           const isPoll = type === 'poll';
           const isImage = Boolean(message.imagePreview);
           const liked = Boolean(message.likedByUsers?.[currentUserKey]) || likedMessages.includes(message.id);
           return (
-            <article key={message.id} className="overflow-hidden rounded-[1.65rem] border border-[#D9E7F8] bg-white shadow-[0_16px_44px_rgba(23,105,255,0.10)]">
+            <article key={message.id} className="group overflow-hidden rounded-[1.35rem] border border-[#D9E7F8] bg-white shadow-[0_12px_34px_rgba(8,26,69,0.08)] ring-1 ring-white transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-[0_18px_50px_rgba(23,105,255,0.14)]">
               <button type="button" onClick={() => openProfilePostDetail(message.id)} className="block w-full text-left">
-                <div className="relative bg-gradient-to-br from-[#EEF6FF] via-white to-[#F1EEFF]">
-                  {isImage ? <div className="aspect-[4/3] w-full overflow-hidden">{renderUploadedImage(message.imagePreview || '', message.title, message.imageLayout || 'original')}</div> : <div className="flex min-h-[11rem] flex-col justify-center gap-3 p-5"><h3 className="line-clamp-3 text-2xl font-black leading-tight text-[#081A45]">{message.title || (isPoll ? 'Poll post' : 'Text post')}</h3><p className="line-clamp-3 text-sm font-semibold leading-6 text-[#536178]">{message.body}</p></div>}
-
+                <div className="relative aspect-square overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(23,105,255,0.18),transparent_42%),linear-gradient(135deg,#FFFFFF_0%,#EEF6FF_48%,#F1EEFF_100%)]">
+                  {isImage ? renderUploadedImage(message.imagePreview || '', message.title, message.imageLayout || 'original') : <div className="flex h-full flex-col justify-between p-3 sm:p-4"><span className="w-max rounded-full border border-white/80 bg-white/92 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#1769FF] shadow-sm">{isPoll ? 'Poll' : 'Text'}</span><div><h3 className="line-clamp-3 text-base font-black leading-tight text-[#081A45] sm:text-xl">{message.title || (isPoll ? 'Poll post' : 'Text post')}</h3><p className="mt-2 line-clamp-3 text-xs font-semibold leading-5 text-[#536178] sm:text-sm">{message.body}</p></div></div>}
+                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#081A45]/16 to-transparent opacity-0 transition group-hover:opacity-100" />
                 </div>
-                <div className="p-4"><h3 className="line-clamp-2 text-base font-black text-[#081A45]">{message.title}</h3><p className="mt-1 line-clamp-2 text-sm font-semibold leading-6 text-[#536178]">{message.body}</p></div>
+                <div className="min-h-[5.25rem] p-3 sm:p-4"><h3 className="line-clamp-2 text-sm font-black leading-snug text-[#081A45] sm:text-base">{message.title}</h3><p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[#536178]">{message.body}</p></div>
               </button>
-              <div className="flex items-center justify-end gap-2 border-t border-[#EEF6FF] px-4 py-3">
-                <button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-3 py-1.5 text-xs font-black ${liked ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D9E7F8] bg-[#E8F2FF] text-[#1769FF]'}`}>❤️ {message.likeCount || 0}</button>
-                <button type="button" onClick={() => openProfilePostDetail(message.id, true)} className="rounded-full border border-[#D9E7F8] bg-white px-3 py-1.5 text-xs font-black text-[#1769FF]">💬 {message.replyCount || message.replies.length}</button>
+              <div className="flex items-center justify-end gap-1.5 border-t border-[#EEF6FF] bg-[#FBFDFF] px-2.5 py-2 sm:px-3">
+                <button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${liked ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D9E7F8] bg-white text-[#1769FF]'}`}>❤️ {message.likeCount || 0}</button>
+                <button type="button" onClick={() => openProfilePostDetail(message.id, true)} className="rounded-full border border-[#D9E7F8] bg-white px-2.5 py-1 text-[11px] font-black text-[#1769FF]">💬 {message.replyCount || message.replies.length}</button>
               </div>
             </article>
           );
@@ -4511,7 +4522,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (profileViewMode === 'relations') return renderProfileRelationsPage(profileId, display);
     if (profileViewMode === 'post') return renderProfilePostDetailPage(profileId, display);
 
-    return <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-[#D9E7F8] bg-[#FBFDFF] shadow-[0_18px_48px_rgba(8,26,69,0.08)]"><div className="sticky top-0 z-10 grid grid-cols-3 items-center border-b border-[#E3ECF8] bg-white px-4 py-3"><button type="button" onClick={() => options.own ? goBack() : setSelectedProfileId(null)} className="justify-self-start rounded-full px-3 py-2 text-sm font-black text-[#081B5C]">←</button><h2 className="truncate text-center text-base font-black text-[#081B5C]">@{display.username}</h2>{options.own ? <button type="button" onClick={() => setProfileViewMode('settings')} className="justify-self-end rounded-full border border-[#E3ECF8] bg-[#F8FBFF] px-3 py-2 text-lg" aria-label="Profile settings">⚙️</button> : <span />}</div><section className="p-4 sm:p-7"><div className="grid grid-cols-[auto_minmax(0,1fr)] gap-5 sm:gap-8"><Avatar value={display.avatar} size="h-24 w-24 sm:h-36 sm:w-36" className="text-5xl ring-4 ring-[#EEF6FF]" /><div className="min-w-0"><div className="flex flex-wrap items-center gap-3"><h1 className="truncate text-2xl font-black text-[#081B5C] sm:text-3xl">{display.name}</h1>{display.verified ? <span className="rounded-full bg-[#E8F2FF] px-2 py-1 text-xs font-black text-[#1769FF]">✓</span> : null}</div><div className="mt-4 grid max-w-md grid-cols-3 gap-2 text-center"><span><b className="block text-xl text-[#081B5C]">{compactCount(profilePosts.length)}</b><small className="font-bold text-[#64748B]">posts</small></span><button type="button" onClick={() => { setProfileRelationTab('followers'); setProfileViewMode('relations'); }} className="rounded-xl transition hover:bg-[#F8FBFF]"><b className="block text-xl text-[#081B5C]">{compactCount(followerCounts[profileId] || (options.creator?.followerCount ?? options.creator?.followers) || (options.own ? followerIds.length : 0))}</b><small className="font-bold text-[#64748B]">followers</small></button><button type="button" onClick={() => { setProfileRelationTab('following'); setProfileViewMode('relations'); }} className="rounded-xl transition hover:bg-[#F8FBFF]"><b className="block text-xl text-[#081B5C]">{compactCount(followingCounts[profileId] || options.creator?.followingCount || (options.own ? followedIds.length : 0))}</b><small className="font-bold text-[#64748B]">following</small></button></div><p className="mt-4 whitespace-pre-wrap text-sm font-semibold leading-6 text-[#536178]">{display.bio || 'No bio yet.'}</p><div className="mt-4 flex flex-wrap gap-2">{options.own ? <button type="button" onClick={() => { setProfileDraft(profile); setProfileViewMode('edit'); }} className="rounded-xl bg-[#EEF6FF] px-5 py-2.5 text-sm font-black text-[#081B5C]">Edit profile</button> : options.creator ? <button type="button" onClick={() => toggleFollowCreator(options.creator!)} disabled={Boolean(followLoadingIds[profileId]) || options.creator.isSuspended || options.creator.isPublic === false} className={`rounded-xl px-5 py-2.5 text-sm font-black ${options.followed ? 'border border-[#D9E7F8] bg-white text-[#1769FF]' : 'bg-[#1769FF] text-white'}`}>{followLoadingIds[profileId] ? 'Saving…' : options.followed ? 'Following' : 'Follow'}</button> : null}<button type="button" onClick={() => { setProfileRelationTab('followers'); setProfileViewMode('relations'); }} className="rounded-xl border border-[#D9E7F8] bg-white px-5 py-2.5 text-sm font-black text-[#081B5C]">Followers & Following</button></div></div></div><div className="mt-6">{renderStoryHighlights(profileStories)}</div><div className="mt-6 border-t border-[#E3ECF8] pt-3"><div className="mb-3 flex justify-center gap-4 text-xs font-black uppercase tracking-[0.18em]"><button type="button" onClick={() => setProfileContentTab('posts')} className={`rounded-full px-4 py-2 ${profileContentTab === 'posts' ? 'bg-[#EEF6FF] text-[#081B5C]' : 'text-[#7C879A]'}`}>▦ Posts</button><button type="button" onClick={() => setProfileContentTab('stories')} className={`rounded-full px-4 py-2 ${profileContentTab === 'stories' ? 'bg-[#EEF6FF] text-[#081B5C]' : 'text-[#7C879A]'}`}>○ Stories</button></div>{renderProfileGrid(profilePosts)}</div></section></div>;
+    return <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-[#D9E7F8] bg-[#FBFDFF] shadow-[0_18px_48px_rgba(8,26,69,0.08)]"><div className="sticky top-0 z-10 grid grid-cols-3 items-center border-b border-[#E3ECF8] bg-white px-4 py-3"><button type="button" onClick={() => options.own ? goBack() : setSelectedProfileId(null)} className="justify-self-start rounded-full px-3 py-2 text-sm font-black text-[#081B5C]">←</button><h2 className="truncate text-center text-base font-black text-[#081B5C]">@{display.username}</h2>{options.own ? <button type="button" onClick={() => setProfileViewMode('settings')} className="justify-self-end rounded-full border border-[#E3ECF8] bg-[#F8FBFF] px-3 py-2 text-lg" aria-label="Profile settings">⚙️</button> : <span />}</div><section className="p-4 sm:p-7"><div className="grid grid-cols-[auto_minmax(0,1fr)] gap-5 sm:gap-8"><Avatar value={display.avatar} size="h-24 w-24 sm:h-36 sm:w-36" className="text-5xl ring-4 ring-[#EEF6FF]" /><div className="min-w-0"><div className="flex flex-wrap items-center gap-3"><h1 className="truncate text-2xl font-black text-[#081B5C] sm:text-3xl">{display.name}</h1>{display.verified ? <span className="rounded-full bg-[#E8F2FF] px-2 py-1 text-xs font-black text-[#1769FF]">✓</span> : null}</div><div className="mt-4 grid max-w-md grid-cols-3 gap-2 text-center"><span><b className="block text-xl text-[#081B5C]">{compactCount(profilePosts.length)}</b><small className="font-bold text-[#64748B]">posts</small></span><button type="button" onClick={() => { setProfileRelationTab('followers'); setProfileViewMode('relations'); }} className="rounded-xl transition hover:bg-[#F8FBFF]"><b className="block text-xl text-[#081B5C]">{compactCount(followerCounts[profileId] || (options.creator?.followerCount ?? options.creator?.followers) || (options.own ? followerIds.length : 0))}</b><small className="font-bold text-[#64748B]">followers</small></button><button type="button" onClick={() => { setProfileRelationTab('following'); setProfileViewMode('relations'); }} className="rounded-xl transition hover:bg-[#F8FBFF]"><b className="block text-xl text-[#081B5C]">{compactCount(followingCounts[profileId] || options.creator?.followingCount || (options.own ? followedIds.length : 0))}</b><small className="font-bold text-[#64748B]">following</small></button></div><p className="mt-4 whitespace-pre-wrap text-sm font-semibold leading-6 text-[#536178]">{display.bio || 'No bio yet.'}</p><div className="mt-4 flex flex-wrap gap-2">{options.own ? <button type="button" onClick={() => { setProfileDraft(profile); setProfileViewMode('edit'); }} className="min-h-11 rounded-xl bg-[#EEF6FF] px-3 py-2.5 text-sm font-black text-[#081B5C]">Edit profile</button> : options.creator ? <button type="button" onClick={() => toggleFollowCreator(options.creator!)} disabled={Boolean(followLoadingIds[profileId]) || options.creator.isSuspended || options.creator.isPublic === false} className={`rounded-xl px-5 py-2.5 text-sm font-black ${options.followed ? 'border border-[#D9E7F8] bg-white text-[#1769FF]' : 'bg-[#1769FF] text-white'}`}>{followLoadingIds[profileId] ? 'Saving…' : options.followed ? 'Following' : 'Follow'}</button> : null}<button type="button" onClick={() => { setProfileRelationTab('followers'); setProfileViewMode('relations'); }} className="min-h-11 rounded-xl border border-[#D9E7F8] bg-white px-3 py-2.5 text-sm font-black text-[#081B5C]">Followers & Following</button></div></div></div><div className="mt-6">{renderStoryHighlights(profileStories)}</div><div className="mt-6 border-t border-[#E3ECF8] pt-3"><div className="mb-3 flex justify-center gap-4 text-xs font-black uppercase tracking-[0.18em]"><button type="button" onClick={() => setProfileContentTab('posts')} className={`rounded-full px-4 py-2 ${profileContentTab === 'posts' ? 'bg-[#EEF6FF] text-[#081B5C]' : 'text-[#7C879A]'}`}>▦ Posts</button><button type="button" onClick={() => setProfileContentTab('stories')} className={`rounded-full px-4 py-2 ${profileContentTab === 'stories' ? 'bg-[#EEF6FF] text-[#081B5C]' : 'text-[#7C879A]'}`}>○ Stories</button></div>{renderProfileGrid(profilePosts)}</div></section></div>;
   };
 
   const renderProfilePage = () => {
@@ -4627,7 +4638,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <CommunityHeader />
           <main ref={scrollContainerRef} className={`eduvora-community-main min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-3 custom-scrollbar sm:px-4 lg:px-5 lg:pb-4 ${
             shouldHideCommunityDockOnMobile
-              ? 'pb-3 max-md:pb-2 max-md:overscroll-contain'
+              ? 'pb-3 max-md:pb-4 max-md:overscroll-contain'
               : 'pb-[calc(env(safe-area-inset-bottom)+6rem)] max-md:pb-[calc(env(safe-area-inset-bottom)+5.75rem)] max-md:overscroll-contain'
           }`}>
             {renderMainContent()}
