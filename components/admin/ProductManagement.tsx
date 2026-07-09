@@ -8,6 +8,7 @@ import { auth, db, storage } from '../../firebase';
 import { normalizeCoinPrice } from '../../utils/economy';
 import { parseKeywordList, withProductSearchIndex } from '../../utils/productSearch';
 import { validateProductImageUpload } from '../../utils/productImageUpload.js';
+import PremiumImageUrlInput, { PremiumImageUrlStatus } from '../common/PremiumImageUrlInput';
 
 type ProductViewState = 'list' | 'add' | 'edit';
 
@@ -1693,13 +1694,14 @@ const ProductForm: React.FC<{
     const [formData, setFormData] = useState<ProductFormData>(() => createEmptyProductForm(product));
     const [modules, setModules] = useState<CourseModule[]>(() => ensureEditableCourseIntroModule(product?.courseContent || initialProductState.courseContent || [], product?.title || formData.title));
     const [images, setImages] = useState<string[]>(() => product?.images || initialProductState.images || []);
-    const [imageMode, setImageMode] = useState<'upload' | 'ai'>('upload');
+    const [imageMode, setImageMode] = useState<'url' | 'upload' | 'ai'>('url');
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [discountPercent, setDiscountPercent] = useState(0);
     const [isSavingProduct, setIsSavingProduct] = useState(false);
     const [isUploadingProductImage, setIsUploadingProductImage] = useState(false);
     const [productImageUploadError, setProductImageUploadError] = useState('');
     const [productImageUploadProgress, setProductImageUploadProgress] = useState(0);
+    const [productImageUrlStatus, setProductImageUrlStatus] = useState<PremiumImageUrlStatus>((product?.images || initialProductState.images || []).find(Boolean) ? 'checking' : 'empty');
     const productImageInputRef = useRef<HTMLInputElement>(null);
     const draftProductIdRef = useRef<number | string>(product?.id || `draft-${Date.now()}`);
 
@@ -1774,7 +1776,7 @@ const ProductForm: React.FC<{
             setProductImageUploadError('');
             setProductImageUploadProgress(0);
             setImages([aiImageUrl]);
-            setImageMode('upload');
+            setImageMode('url');
         } finally {
             setIsGeneratingImage(false);
         }
@@ -1804,6 +1806,12 @@ const ProductForm: React.FC<{
         const keywords = parseKeywordList(formData.searchKeywordsText);
         const formattedPrice = formData.price ? `₹${formData.price}` : '₹0';
         const formattedSalePrice = formData.salePrice ? `₹${formData.salePrice}` : undefined;
+
+        const primaryImageCandidate = (images || []).find(Boolean);
+        if (primaryImageCandidate && productImageUrlStatus !== 'valid' && imageMode === 'url') {
+            setProductImageUploadError('Please paste a valid https image URL.');
+            return;
+        }
 
         setIsSavingProduct(true);
 
@@ -1966,14 +1974,17 @@ const ProductForm: React.FC<{
                             </div>
 
                             <div className={glassCard}>
-                                <h2 className="text-xl font-black text-slate-900">Image Upload</h2>
-                                <div className="mt-5 grid grid-cols-2 gap-2">
-                                    <button type="button" onClick={() => setImageMode('upload')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'upload' ? 'bg-cyan-600 text-slate-900' : 'border border-white/50 text-slate-600'}`}>Upload</button>
+                                <h2 className="text-xl font-black text-slate-900">Image URL</h2>
+                                <div className="mt-5 grid grid-cols-3 gap-2">
+                                    <button type="button" onClick={() => setImageMode('url')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'url' ? 'bg-blue-600 text-white' : 'border border-white/50 text-slate-600'}`}>Image URL</button>
+                                    <button type="button" onClick={() => setImageMode('upload')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'upload' ? 'bg-cyan-100 text-cyan-800' : 'border border-white/50 text-slate-600'}`}>Future Upload</button>
                                     <button type="button" onClick={() => setImageMode('ai')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'ai' ? 'bg-purple-300 text-slate-900' : 'border border-white/50 text-slate-600'}`}>AI Image</button>
                                 </div>
                                 <div className="mt-4">
-                                    {imageMode === 'upload' ? (
-                                        <button type="button" onClick={() => productImageInputRef.current?.click()} disabled={isUploadingProductImage} className="w-full rounded-3xl border border-dashed border-cyan-300/40 bg-cyan-400/5 p-8 text-center font-black text-cyan-700 hover:bg-cyan-400/10 disabled:opacity-60">{isUploadingProductImage ? 'Uploading image to Firebase...' : 'Upload product image'}</button>
+                                    {imageMode === 'url' ? (
+                                        <PremiumImageUrlInput value={(images || []).find(Boolean) || ''} onChange={(url) => setImages(url ? [url] : [])} onStatusChange={setProductImageUrlStatus} label="Product image URL" previewAlt="Primary product image" aspect="square" compact helperText="One valid https image URL will be saved into images and every productImages display slot." />
+                                    ) : imageMode === 'upload' ? (
+                                        <div className="rounded-3xl border border-dashed border-cyan-300/60 bg-cyan-50/70 p-5 text-center"><p className="font-black text-cyan-800">Storage upload is currently disabled. Please use an image URL.</p><button type="button" onClick={() => productImageInputRef.current?.click()} disabled className="mt-3 w-full rounded-2xl bg-slate-200 p-4 font-black text-slate-500">Firebase upload kept for future use</button></div>
                                     ) : (
                                         <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-3xl border border-dashed border-purple-300/40 bg-purple-400/5 p-8 text-center font-black text-purple-700 hover:bg-purple-400/10 disabled:opacity-60">{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</button>
                                     )}
@@ -1993,13 +2004,13 @@ const ProductForm: React.FC<{
                                         </div>
                                     ) : (
                                         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-center text-sm font-bold text-slate-500">
-                                            No product image selected. Upload or generate one primary image.
+                                            No product image selected. Paste a valid https image URL or generate one primary image.
                                         </div>
                                     )}
                                 </div>
                                 <div className="mt-4"><label className={labelClass}>Image Seed</label><input value={formData.imageSeed} onChange={event => setFormData(prev => ({ ...prev, imageSeed: event.target.value }))} className={fieldClass} placeholder="Fallback image seed" /></div>
                                 <div className="mt-4 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm font-bold text-emerald-700">
-                                    Only one product image is used across product cards, detail pages, mobile home, and purchased-product previews.
+                                    Only one valid image URL is saved across images and all productImages slots for product cards, detail pages, home, gallery, and purchase previews.
                                 </div>
 
                             </div>
