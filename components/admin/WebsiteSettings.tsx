@@ -539,7 +539,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                         <FormRow label="Website Name"><input type="text" value={(localSettings.content as any).siteName || 'Digital Catalyst'} onChange={e => handleNestedChange('content', 'siteName', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="Hero Title"><input type="text" value={localSettings.content.heroTitle} onChange={e => handleNestedChange('content', 'heroTitle', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="Hero Subtitle"><textarea value={localSettings.content.heroSubtitle} onChange={e => handleNestedChange('content', 'heroSubtitle', e.target.value)} className="w-full p-2 border rounded" rows={3}></textarea></FormRow>
-                        <FormRow label="Hero Image URL" description="URL-first media mode. Paste a public hero image URL; file upload is preserved for future Storage setup.">
+                        <FormRow label="Hero Image URL" description="Upload a hero image to Cloudinary or paste a public hero image URL. The final URL is saved in Firestore settings.">
                             <PremiumImageUrlInput
                                 value={localSettings.content.heroImageUrl || ''}
                                 onChange={(url) => handleNestedChange('content', 'heroImageUrl', url)}
@@ -547,7 +547,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                 previewAlt="Hero preview"
                                 aspect="video"
                                 compact
-                                helperText="Paste a public https hero image URL. File upload requires Firebase Storage, so URL media is the active path for now."
+                                helperText="Upload to Cloudinary or paste a public https hero image URL. Save settings to store the generated URL."
                             />
                         </FormRow>
                     </div>

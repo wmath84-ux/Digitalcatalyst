@@ -8,6 +8,7 @@ import { auth, db, storage } from '../../firebase';
 import { normalizeCoinPrice } from '../../utils/economy';
 import { parseKeywordList, withProductSearchIndex } from '../../utils/productSearch';
 import { validateProductImageUpload } from '../../utils/productImageUpload.js';
+import { isCloudinaryImageUploadConfigured, uploadImageToCloudinary } from '../../utils/cloudinaryUpload';
 import PremiumImageUrlInput, { PremiumImageUrlStatus } from '../common/PremiumImageUrlInput';
 import PremiumMediaUrlInput from '../common/PremiumMediaUrlInput';
 import { buildUrlMediaSource, getFriendlyStorageErrorMessage, getStorageDisabledMessage, isStorageUploadEnabled } from '../../utils/mediaMode';
@@ -1868,6 +1869,7 @@ const ProductForm: React.FC<{
     const [productImageUrlStatus, setProductImageUrlStatus] = useState<PremiumImageUrlStatus>((product?.images || initialProductState.images || []).find(Boolean) ? 'checking' : 'empty');
     const productImageInputRef = useRef<HTMLInputElement>(null);
     const draftProductIdRef = useRef<number | string>(product?.id || `draft-${Date.now()}`);
+    const cloudinaryImageReady = isCloudinaryImageUploadConfigured();
 
     useEffect(() => {
         const regular = parseFloat(formData.price) || 0;
@@ -1900,8 +1902,8 @@ const ProductForm: React.FC<{
         event.target.value = '';
         if (!file) return;
 
-        if (!isStorageUploadEnabled()) {
-            setProductImageUploadError(getStorageDisabledMessage('Image'));
+        if (!cloudinaryImageReady) {
+            setProductImageUploadError('Cloudinary upload is not configured. Add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET, then restart the app. You can still paste a public image URL.');
             setImageMode('url');
             return;
         }
@@ -1913,27 +1915,22 @@ const ProductForm: React.FC<{
         }
 
         setProductImageUploadError('');
-        setProductImageUploadProgress(0);
+        setProductImageUploadProgress(15);
         setIsUploadingProductImage(true);
 
         try {
-            const uploaded = await uploadAdminProductAsset(
-                file,
-                buildAdminImageStoragePath(file, 'product', draftProductIdRef.current),
-                'ADMIN_PRODUCT_IMAGE_UPLOAD',
-                (percent) => setProductImageUploadProgress(percent),
-                getProductImageContentType(file)
-            );
-            setImages([uploaded.url]);
-            setImageMode('upload');
+            const hostedUrl = await uploadImageToCloudinary(file, { folder: 'products', tags: ['product-image'] });
+            setProductImageUploadProgress(100);
+            setImages([hostedUrl]);
+            setImageMode('url');
+            setProductImageUrlStatus('checking');
             setProductImageUploadError('');
         } catch (error) {
-            const message = getFriendlyStorageErrorMessage(error);
-            console.error('Product image upload failed:', error);
-            setProductImageUploadError(message);
+            console.error('Cloudinary product image upload failed:', error);
+            setProductImageUploadError(error instanceof Error ? error.message : 'Cloudinary image upload failed. Try again or paste a public image URL.');
         } finally {
             setIsUploadingProductImage(false);
-            setProductImageUploadProgress(0);
+            window.setTimeout(() => setProductImageUploadProgress(0), 800);
         }
     };
 
@@ -2147,20 +2144,20 @@ const ProductForm: React.FC<{
                                 <h2 className="text-xl font-black text-slate-900">Image URL</h2>
                                 <div className="mt-5 grid grid-cols-3 gap-2">
                                     <button type="button" onClick={() => setImageMode('url')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'url' ? 'bg-blue-600 text-white' : 'border border-white/50 text-slate-600'}`}>Image URL</button>
-                                    <button type="button" onClick={() => setImageMode('upload')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'upload' ? 'bg-cyan-100 text-cyan-800' : 'border border-white/50 text-slate-600'}`}>Future Upload</button>
+                                    <button type="button" onClick={() => setImageMode('upload')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'upload' ? 'bg-cyan-100 text-cyan-800' : 'border border-white/50 text-slate-600'}`}>Cloudinary</button>
                                     <button type="button" onClick={() => setImageMode('ai')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'ai' ? 'bg-purple-300 text-slate-900' : 'border border-white/50 text-slate-600'}`}>AI Image</button>
                                 </div>
                                 <div className="mt-4">
                                     {imageMode === 'url' ? (
                                         <PremiumImageUrlInput value={(images || []).find(Boolean) || ''} onChange={(url) => setImages(url ? [url] : [])} onStatusChange={setProductImageUrlStatus} label="Product image URL" previewAlt="Primary product image" aspect="square" compact helperText="One valid https image URL will be saved into images and every productImages display slot." />
                                     ) : imageMode === 'upload' ? (
-                                        <div className="rounded-3xl border border-dashed border-cyan-300/60 bg-cyan-50/70 p-5 text-center"><p className="font-black text-cyan-800">{getStorageDisabledMessage('Image')}</p><p className="mt-2 text-xs font-bold text-cyan-700">Current mode: URL media. File upload stays preserved for future Firebase Storage setup.</p><button type="button" onClick={() => productImageInputRef.current?.click()} disabled className="mt-3 w-full rounded-2xl bg-slate-200 p-4 font-black text-slate-500">Upload File — Future / Storage required</button></div>
+                                        <div className="rounded-3xl border border-dashed border-cyan-300/60 bg-cyan-50/70 p-5 text-center"><p className="font-black text-cyan-800">Cloudinary image URL generator</p><p className="mt-2 text-xs font-bold text-cyan-700">Select an image, upload it to Cloudinary, auto-generate the URL, then save it into Firestore with this product.</p><button type="button" onClick={() => productImageInputRef.current?.click()} disabled={!cloudinaryImageReady || isUploadingProductImage} className="mt-3 w-full rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 p-4 font-black text-slate-900 disabled:cursor-not-allowed disabled:bg-none disabled:bg-slate-200 disabled:text-slate-500">{cloudinaryImageReady ? (isUploadingProductImage ? 'Uploading to Cloudinary…' : 'Select image and generate URL') : 'Cloudinary env not configured'}</button>{!cloudinaryImageReady ? <p className="mt-3 text-xs font-bold text-rose-600">Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to enable upload.</p> : null}</div>
                                     ) : (
                                         <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-3xl border border-dashed border-purple-300/40 bg-purple-400/5 p-8 text-center font-black text-purple-700 hover:bg-purple-400/10 disabled:opacity-60">{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</button>
                                     )}
                                     <input ref={productImageInputRef} type="file" accept="image/*" onChange={handleProductImagesUpload} className="hidden" />
                                     {isUploadingProductImage && (
-                                        <p className="mt-3 text-sm font-bold text-cyan-700">Uploading image with future Storage mode... {productImageUploadProgress}% complete.</p>
+                                        <p className="mt-3 text-sm font-bold text-cyan-700">Uploading image to Cloudinary... {productImageUploadProgress}% complete.</p>
                                     )}
                                     {productImageUploadError && (
                                         <p className="mt-3 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{productImageUploadError}</p>

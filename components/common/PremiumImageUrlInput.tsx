@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { MEDIA_UPLOAD_FUTURE_MESSAGE, URL_FIRST_MEDIA_MODE_LABEL, getMediaModeHelperCopy, getStorageDisabledMessage } from '../../utils/mediaMode';
 import SafeImage from './SafeImage';
+import { isCloudinaryImageUploadConfigured, uploadImageToCloudinary } from '../../utils/cloudinaryUpload';
 
 export type PremiumImageUrlStatus = 'empty' | 'checking' | 'valid' | 'invalid';
 
@@ -45,7 +46,7 @@ const PremiumImageUrlInput: React.FC<PremiumImageUrlInputProps> = ({
   value,
   onChange,
   label = 'Image URL',
-  helperText = 'Paste a direct https image link. The URL is saved as text; Firebase Storage upload is not used.',
+  helperText = 'Upload an image to Cloudinary or paste a direct https image link. The final URL is saved as text in Firestore.',
   previewAlt = 'Image preview',
   aspect = 'square' as const,
   compact = false,
@@ -56,8 +57,12 @@ const PremiumImageUrlInput: React.FC<PremiumImageUrlInputProps> = ({
   const [message, setMessage] = useState(value.trim() ? 'Checking image…' : IMAGE_URL_MESSAGES.invalidHttps);
   const [helperOpen, setHelperOpen] = useState(false);
   const [providerBusy, setProviderBusy] = useState(false);
+  const [providerError, setProviderError] = useState('');
+  const [copyMessage, setCopyMessage] = useState('');
   const trimmed = value.trim();
-  const providerReady = Boolean(provider?.enabled && provider.upload);
+  const cloudinaryReady = isCloudinaryImageUploadConfigured();
+  const providerReady = Boolean((provider?.enabled && provider.upload) || cloudinaryReady);
+  const providerLabel = provider?.label || 'Cloudinary';
 
   useEffect(() => {
     let cancelled = false;
@@ -99,15 +104,31 @@ const PremiumImageUrlInput: React.FC<PremiumImageUrlInputProps> = ({
   const handleProviderFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     event.currentTarget.value = '';
-    if (!file || !provider?.upload) return;
+    const upload = provider?.enabled && provider.upload ? provider.upload : uploadImageToCloudinary;
+    if (!file || !providerReady) return;
     setProviderBusy(true);
+    setProviderError('');
     try {
-      const hostedUrl = await provider.upload(file);
+      const hostedUrl = await upload(file);
       onChange(hostedUrl);
+      setMessage('Image URL generated. Save to publish it.');
       setHelperOpen(false);
+    } catch (error) {
+      setProviderError(error instanceof Error ? error.message : 'Image upload failed. Try again or paste a direct image URL.');
     } finally {
       setProviderBusy(false);
     }
+  };
+
+  const handleCopyUrl = async () => {
+    if (!trimmed) return;
+    try {
+      await navigator.clipboard.writeText(trimmed);
+      setCopyMessage('URL copied.');
+    } catch {
+      setCopyMessage('Copy failed. Select the URL and copy it manually.');
+    }
+    window.setTimeout(() => setCopyMessage(''), 2500);
   };
 
   return (
@@ -129,10 +150,14 @@ const PremiumImageUrlInput: React.FC<PremiumImageUrlInputProps> = ({
               <h3 className="text-base font-black text-[#081A45]">Smart Image-to-URL Helper</h3>
               <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">{modeCopy.helper}</p>
               {providerReady ? (
-                <label className="mt-4 inline-flex cursor-pointer rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 py-3 text-sm font-black text-white shadow-lg"><input type="file" accept="image/*" onChange={handleProviderFile} className="hidden" />{providerBusy ? 'Generating URL…' : `Generate with ${provider?.label || 'connected provider'}`}</label>
+                <div className="mt-4 space-y-3">
+                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-[#BFD7FF] bg-white/85 px-4 py-5 text-center text-sm font-black text-[#1769FF] shadow-sm transition hover:-translate-y-0.5 hover:border-[#1769FF] hover:bg-[#EEF6FF]"><input type="file" accept="image/*" onChange={handleProviderFile} className="hidden" />{providerBusy ? 'Uploading to Cloudinary…' : `Upload image to ${providerLabel}`}</label>
+                  <p className="rounded-2xl bg-white/80 p-3 text-xs font-bold text-[#536178]">Image select karte hi upload hoga, URL auto-generate hoga, preview me dikhega, aur save karne par Firestore me URL text ke roop me store hoga.</p>
+                </div>
               ) : (
-                <div className="mt-4 space-y-3 text-sm font-bold text-[#081A45]"><p className="rounded-2xl bg-white/80 p-3">1. Image ko public hosting service par upload karo.<br />2. Direct image link copy karo.<br />3. Yahan paste karo, preview check karo, phir save karo.</p><div className="rounded-2xl bg-white/80 p-3 text-xs text-[#7C879A]">{MEDIA_UPLOAD_FUTURE_MESSAGE}</div><a href="https://postimages.org/" target="_blank" rel="noreferrer" className="inline-flex rounded-2xl border border-[#BFD7FF] bg-white px-4 py-3 text-sm font-black text-[#1769FF]">Open Image URL Generator</a><p className="text-xs text-[#C5221F]">{IMAGE_URL_MESSAGES.storageDisabled}</p></div>
+                <div className="mt-4 space-y-3 text-sm font-bold text-[#081A45]"><p className="rounded-2xl bg-white/80 p-3">Cloudinary upload enable karne ke liye <code>VITE_CLOUDINARY_CLOUD_NAME</code> aur <code>VITE_CLOUDINARY_UPLOAD_PRESET</code> set karo. Tab tak direct public image URL paste karke preview + save use kar sakte ho.</p><div className="rounded-2xl bg-white/80 p-3 text-xs text-[#7C879A]">{MEDIA_UPLOAD_FUTURE_MESSAGE}</div><a href="https://postimages.org/" target="_blank" rel="noreferrer" className="inline-flex rounded-2xl border border-[#BFD7FF] bg-white px-4 py-3 text-sm font-black text-[#1769FF]">Open fallback Image URL Generator</a><p className="text-xs text-[#C5221F]">{IMAGE_URL_MESSAGES.storageDisabled}</p></div>
               )}
+              {providerError ? <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-black text-rose-700">{providerError}</p> : null}
             </div>
           ) : null}
         </div>
@@ -140,7 +165,7 @@ const PremiumImageUrlInput: React.FC<PremiumImageUrlInputProps> = ({
           <div className={`${aspectClass(aspect)} flex w-full items-center justify-center overflow-hidden rounded-[1.15rem] bg-white/80`}>
             {status === 'checking' ? <div className="h-full w-full animate-pulse bg-gradient-to-r from-[#EEF6FF] via-white to-[#E8F2FF]" /> : status === 'valid' ? <SafeImage src={trimmed} alt={previewAlt} className="h-full w-full object-contain" fallbackTitle={label} fallbackBadge="Admin preview" fallbackIcon="🖼️" fallbackMessage="This image URL is not loading. Replace it with another public URL." aspect={aspect === 'square' ? 'square' : aspect === 'video' ? 'video' : 'auto'} /> : <div className="p-6 text-center"><div className="text-5xl">🖼️</div><p className="mt-3 text-sm font-black text-[#536178]">Preview Image</p></div>}
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className={`rounded-full px-3 py-1 text-[11px] font-black ${status === 'valid' ? 'bg-emerald-100 text-emerald-700' : status === 'invalid' && trimmed ? 'bg-rose-100 text-rose-700' : 'bg-[#EEF6FF] text-[#1769FF]'}`}>{badge}</span><div className="flex gap-2"><button type="button" onClick={() => onChange('')} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#EF4444]">Remove Image</button><button type="button" onClick={() => setHelperOpen(true)} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#1769FF]">Change URL</button></div></div>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className={`rounded-full px-3 py-1 text-[11px] font-black ${status === 'valid' ? 'bg-emerald-100 text-emerald-700' : status === 'invalid' && trimmed ? 'bg-rose-100 text-rose-700' : 'bg-[#EEF6FF] text-[#1769FF]'}`}>{badge}</span><div className="flex flex-wrap gap-2">{trimmed ? <button type="button" onClick={handleCopyUrl} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#22A06B]">Copy URL</button> : null}<button type="button" onClick={() => onChange('')} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#EF4444]">Remove Image</button><button type="button" onClick={() => setHelperOpen(true)} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#1769FF]">Upload / Change</button></div>{copyMessage ? <p className="basis-full text-right text-[11px] font-black text-[#22A06B]">{copyMessage}</p> : null}</div>
         </div>
       </div>
     </section>

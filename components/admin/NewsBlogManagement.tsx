@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NewsArticle, WebsiteSettings } from '../../App';
 import { ContentDatabaseAdapter, ContentPostRecord, ContentPostType, runContentAutomation } from '../../utils/contentAutomator';
 import PremiumImageUrlInput, { PremiumImageUrlStatus } from '../common/PremiumImageUrlInput';
+import { isCloudinaryImageUploadConfigured, uploadImageToCloudinary } from '../../utils/cloudinaryUpload';
 
 const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
 const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
@@ -126,8 +127,23 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
     setMode('form');
   };
 
-  const uploadCoverImage = async (_file: File) => {
-    setCoverUploadError('File upload requires Firebase Storage. Use Image URL for now.');
+  const uploadCoverImage = async (file: File) => {
+    setCoverUploadError('');
+    if (!isCloudinaryImageUploadConfigured()) {
+      setCoverUploadError('Cloudinary upload is not configured. Add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET, then restart the app. You can still paste a public image URL.');
+      return;
+    }
+
+    setIsUploadingCover(true);
+    try {
+      const hostedUrl = await uploadImageToCloudinary(file, { folder: 'news-blog', tags: ['news-blog-cover'] });
+      setEditingPost((post) => ({ ...post, coverImage: hostedUrl, thumbnailImage: hostedUrl }));
+      setCoverImageStatus('checking');
+    } catch (error) {
+      setCoverUploadError(error instanceof Error ? error.message : 'Cloudinary cover upload failed. Try again or paste a public image URL.');
+    } finally {
+      setIsUploadingCover(false);
+    }
   };
 
 
@@ -271,11 +287,11 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.3em] text-indigo-300/90">Cover Image</p>
                 <h2 className="mt-2 text-2xl font-black text-slate-900">Premium editorial cover</h2>
-                <p className="mt-3 text-sm leading-6 text-slate-600">Keep the AI-generated placeholder or paste a stock/public https image URL. Firebase Storage cover upload is currently disabled; this editor saves the URL as text.</p>
+                <p className="mt-3 text-sm leading-6 text-slate-600">Upload a cover to Cloudinary or paste a stock/public https image URL. The final URL is saved as coverImage and thumbnailImage.</p>
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <label className="inline-flex cursor-pointer items-center justify-center rounded-2xl border border-indigo-200/70 bg-white/80 px-5 py-3 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md">
                     <input type="file" accept="image/*" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadCoverImage(file); event.currentTarget.value = ''; }} />
-                    File upload requires Firebase Storage. Use Image URL for now.
+                    {isUploadingCover ? 'Uploading to Cloudinary…' : 'Upload image to Cloudinary'}
                   </label>
                   <button type="button" onClick={() => setEditingPost({ ...editingPost, coverImage: '', thumbnailImage: '' })} className="rounded-2xl border border-white/50 bg-white/80 px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-white/90 hover:shadow-sm">Clear Image</button>
                 </div>
