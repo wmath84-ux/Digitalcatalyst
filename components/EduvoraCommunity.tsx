@@ -320,6 +320,7 @@ const PUBLIC_PROFILES = 'publicProfiles';
 const COMMUNITY_FOLLOWS = 'community_follows';
 const COMMUNITY_NOTIFICATIONS = 'community_notifications';
 const PRIVATE_CHAT_ENABLED = false;
+const PRIVATE_CHAT_DISABLED_MESSAGE = 'Private chat is currently disabled. Use replies to continue the discussion.';
 const PRIVATE_CHATS = 'private_chats';
 const PRIVATE_CHAT_MESSAGES = 'messages';
 const PRIVATE_CHAT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -1074,6 +1075,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const uploadPrivateChatMessageArchive = async (conversationId: string, messageId: string, message: PrivateChatMessage) => {
+    if (!PRIVATE_CHAT_ENABLED) return '';
     const archiveStoragePath = `privateChats/${conversationId}/${messageId}/message.json`;
 
     try {
@@ -1094,6 +1096,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const ensurePrivateConversation = async (conversationId: string, receiver: Creator) => {
+    if (!PRIVATE_CHAT_ENABLED) throw new Error(PRIVATE_CHAT_DISABLED_MESSAGE);
     const existingConversation = privateConversations.find((conversation) => conversation.id === conversationId);
     const conversationRef = doc(db, PRIVATE_CHATS, conversationId);
     const participants = getPrivateConversationParticipants(currentUserKey, receiver.id);
@@ -1119,7 +1122,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const sendPrivateChatMessage = async (forcedType?: PrivateChatMessageType) => {
-    if (!PRIVATE_CHAT_ENABLED) { setPrivateChatError('Private chat is currently disabled. Use replies to continue the discussion.'); return; }
+    if (!PRIVATE_CHAT_ENABLED) { setPrivateChatError(PRIVATE_CHAT_DISABLED_MESSAGE); return; }
     if (!guardedAuth.currentUser || !currentUserKey) {
       redirectToAuth();
       return;
@@ -1256,6 +1259,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const votePrivatePoll = async (message: PrivateChatMessage, optionIndex: number) => {
+    if (!PRIVATE_CHAT_ENABLED) { setPrivateChatError(PRIVATE_CHAT_DISABLED_MESSAGE); return; }
     if (!message.poll || message.poll.voters?.[currentUserKey] !== undefined) return;
     const messageRef = doc(db, PRIVATE_CHATS, message.conversationId, PRIVATE_CHAT_MESSAGES, message.id);
 
@@ -1287,6 +1291,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const pinLatestPrivateMessage = () => {
+    if (!PRIVATE_CHAT_ENABLED) { setPrivateChatError(PRIVATE_CHAT_DISABLED_MESSAGE); setChatMenuOpen(false); return; }
     const latest = activePrivateMessages[activePrivateMessages.length - 1];
     if (!latest || !activeConversationId) return;
     updateDoc(doc(db, PRIVATE_CHATS, activeConversationId), {
@@ -1300,6 +1305,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const clearPinnedPrivateMessage = () => {
+    if (!PRIVATE_CHAT_ENABLED) { setPrivateChatError(PRIVATE_CHAT_DISABLED_MESSAGE); setChatMenuOpen(false); return; }
     if (!activeConversationId) return;
     updateDoc(doc(db, PRIVATE_CHATS, activeConversationId), {
       pinnedMessageId: deleteField(),
@@ -1312,6 +1318,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const cleanupExpiredPrivateChatMessages = (conversationIds: string[]) => {
+    if (!PRIVATE_CHAT_ENABLED) return;
     conversationIds.slice(0, 20).forEach((conversationId) => {
       getDocs(query(collection(db, PRIVATE_CHATS, conversationId, PRIVATE_CHAT_MESSAGES), where('expiresAt', '<=', Date.now()), limit(25)))
         .then((snapshot) => {
@@ -2663,7 +2670,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const sendSharedItemToPrivateChat = async (receiver: Creator) => {
-    if (!PRIVATE_CHAT_ENABLED) { setShareFeedback('Private chat is currently disabled. Use replies to continue the discussion.'); return; }
+    if (!PRIVATE_CHAT_ENABLED) { setShareFeedback(PRIVATE_CHAT_DISABLED_MESSAGE); return; }
     if (!shareTarget || !guardedAuth.currentUser || !currentUserKey) {
       redirectToAuth();
       return;
@@ -3102,7 +3109,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <div className="mt-2 flex flex-wrap items-center gap-1.5">
             <span className="rounded-full bg-[#FCE8E6] px-2 py-1 text-[11px] font-black text-[#C5221F]">❤️ {message.likeCount || 0}</span>
             <span className="rounded-full bg-[#E8F2FF] px-2 py-1 text-[11px] font-black text-[#1769FF]">💬 {message.replyCount || message.replies.length}</span>
-            <button type="button" onClick={(event) => { event.stopPropagation(); openShareComposer({ sourceType: 'feed_message', message }); }} className="rounded-full border border-[#D9E7F8] bg-white px-2 py-1 text-[11px] font-black text-[#081A45] transition hover:border-[#1769FF] hover:text-[#1769FF]">↗️ Share</button>
+            <button type="button" onClick={(event) => { event.stopPropagation(); openMessage(message.id); setExpandedReplyId(message.id); }} className="rounded-full border border-[#D9E7F8] bg-white px-2 py-1 text-[11px] font-black text-[#081A45] transition hover:border-[#1769FF] hover:text-[#1769FF]">💬 Reply</button>
             {REACTION_EMOJIS.slice(0, 3).map((emoji) => <button key={emoji} type="button" onClick={(event) => { event.stopPropagation(); reactToMessage(message, emoji); }} className="rounded-full border border-[#D9E7F8] bg-white px-2 py-1 text-[11px] font-black text-[#081A45]">{emoji} {(message.reactionCounts || {})[emoji] || 0}</button>)}
           </div>
         </div>
@@ -3150,7 +3157,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
               <div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-base font-black text-[#081A45] sm:text-lg">{resolveName(message)}</h2><span className="rounded-full bg-[#E8F2FF] px-2.5 py-1 text-[11px] font-black text-[#1769FF]">{message.badge}</span></div>
               <p className="truncate text-xs font-bold text-[#7C879A]">{message.time} · {message.replyCount || message.replies.length} replies</p>
             </div>
-            <button type="button" onClick={() => openShareComposer({ sourceType: 'feed_message', message })} className="min-h-11 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-xs font-black text-[#1769FF]">Share</button>
+            <button type="button" onClick={() => setExpandedReplyId(message.id)} className="min-h-11 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-xs font-black text-[#1769FF]">Reply</button>
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 pb-6 custom-scrollbar sm:px-5 lg:px-7">
@@ -3175,7 +3182,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
-  const renderFeedLayout = (feedMessages: FeedMessage[], title = 'Chats', subtitle = 'Thin updates. Click to expand on the right.') => {
+  const renderFeedLayout = (feedMessages: FeedMessage[], title = 'Community Feed', subtitle = 'Public discussions, replies, reactions, polls, and creator posts.') => {
     const activeMessage = feedMessages.find((message) => message.id === selectedMessageId) || feedMessages[0];
     const isFollowingFeed = title.toLowerCase().includes('followers');
     const isAdminFeed = title.toLowerCase().includes('admin');
@@ -3295,7 +3302,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 {renderStatusReelContent(card)}
                 <div className="flex items-center justify-between text-sm font-black text-white/80"><span>Swipe for next status</span><span>👁️ {card.views} views</span></div>
               </article>
-              <div className="mx-auto flex flex-row justify-center gap-3 md:flex-col"><button type="button" onClick={() => toggleStatusLike(card.id)} className={`flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 ${(card.likedByUsers?.[currentUserKey] || likedStatuses.includes(card.id)) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#202124]/20 text-white'} shadow-2xl backdrop-blur-xl transition hover:scale-105`}><span>❤️</span><span className="text-[11px] font-black">{card.likedBy}</span></button><button type="button" onClick={() => openShareComposer({ sourceType: 'status', status: card })} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#202124]/20 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>↗️</span><span className="text-[11px] font-black">Share</span></button></div>
+              <div className="mx-auto flex flex-row justify-center gap-3 md:flex-col"><button type="button" onClick={() => toggleStatusLike(card.id)} className={`flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 ${(card.likedByUsers?.[currentUserKey] || likedStatuses.includes(card.id)) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#202124]/20 text-white'} shadow-2xl backdrop-blur-xl transition hover:scale-105`}><span>❤️</span><span className="text-[11px] font-black">{card.likedBy}</span></button><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#202124]/20 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>💬</span><span className="text-[11px] font-black">Discuss</span></button></div>
             </div>
           </section>
         ))}
@@ -3305,19 +3312,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
-  const openChatCreator = (creatorId: string) => {
-    setSelectedChatId(creatorId);
+  const openChatCreator = (_creatorId: string) => {
+    setPrivateChatError(PRIVATE_CHAT_DISABLED_MESSAGE);
     setChatMenuOpen(false);
     resetPrivateChatComposer();
-
-    // Only mobile phones should open the nested full chat page.
-    // Tablet and desktop keep the normal split chat layout.
-    if (window.matchMedia('(max-width: 767px)').matches) {
-      pushPage('directChatThread');
-      return;
-    }
-
-    if (page !== 'directChat') pushPage('directChat');
+    pushPage('directChat');
   };
 
   const renderPrivateChatInbox = () => {
@@ -3665,16 +3664,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     <div className="mx-auto flex min-h-[60dvh] max-w-3xl items-center justify-center p-4"><div className="w-full rounded-[2.25rem] border border-[#D9E7F8] bg-white/90 p-8 text-center shadow-[0_28px_90px_rgba(23,105,255,0.14)] backdrop-blur-2xl"><div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[1.75rem] bg-gradient-to-br from-[#EEF6FF] to-[#F1EEFF] text-4xl">💬</div><h2 className="mt-5 text-3xl font-black text-[#081A45]">Private chat is currently disabled.</h2><p className="mx-auto mt-3 max-w-md text-sm font-bold leading-6 text-[#536178]">Use replies to continue the discussion. Join the conversation in the community feed.</p><div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row"><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-3 text-sm font-black text-white">Go to Feed</button><button type="button" onClick={() => pushPage('creators')} className="rounded-2xl border border-[#D9E7F8] bg-white px-5 py-3 text-sm font-black text-[#1769FF]">Create a Post</button></div></div></div>
   );
 
-  const renderChatPage = () => (
-    <>
-      <div className="md:hidden">
-        {renderPrivateChatInbox()}
-      </div>
-      <div className="hidden md:block">
-        {renderPrivateChatShell(false)}
-      </div>
-    </>
-  );
+  const renderChatPage = () => renderPrivateChatDisabledPage();
 
   const renderChatThreadPage = () => (
     <div className="fixed inset-0 z-[1450] flex h-[100svh] max-h-[100dvh] flex-col overflow-hidden overscroll-none bg-white pt-[env(safe-area-inset-top)] md:static md:z-auto md:h-auto md:max-h-none md:bg-transparent md:p-0">
@@ -3764,11 +3754,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     { label: 'Feed', icon: '📢', active: activeView === 'feed' && page === 'chat', action: () => switchView('feed') },
     { label: 'Status', icon: '⭕', active: activeView === 'status' && page === 'chat', action: () => { setActiveView('status'); setPage('chat'); setPageStack([]); setShowStatusActions((value) => window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches ? !value : false); } },
     { label: 'Creators', icon: '✍️', active: page === 'creators', action: () => pushPage('creators') },
-    { label: 'Admin Post', icon: '📣', active: page === 'adminPosts', action: () => pushPage('adminPosts') },
     { label: 'Follow', icon: '🤝', active: page === 'network', action: () => pushPage('network') },
     { label: 'Following', icon: '👥', active: page === 'following', action: () => pushPage('following') },
-    { label: 'Tag your master', icon: '🏷️', active: page === 'tagMaster', action: () => pushPage('tagMaster') },
-    { label: 'Master Tags', icon: '📚', active: page === 'masterTags' || page === 'masterTagDetail', action: () => pushPage('masterTags') },
+    { label: 'Master Tag', icon: '📚', active: page === 'tagMaster' || page === 'masterTags' || page === 'masterTagDetail', action: () => pushPage('masterTags') },
+    { label: 'Profile', icon: '👤', active: page === 'profile', action: () => pushPage('profile') },
   ];
 
   const activeNavItem = navItems.find((item) => item.active) || navItems[0];
@@ -3954,7 +3943,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
-  const shouldHideCommunityDockOnMobile = !(page === 'chat' && activeView === 'feed');
+  const shouldHideCommunityDockOnMobile = !(page === 'chat' || page === 'creators' || page === 'network' || page === 'following' || page === 'masterTags' || page === 'profile');
 
   const CommunityBottomNav = () => (
     <nav
@@ -3981,14 +3970,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
               }
             });
           }}
-          className={`min-w-[76px] rounded-[1.2rem] px-2 py-2 text-center transition ${
+          className={`min-w-[68px] flex-1 rounded-[1.2rem] px-2 py-2 text-center transition ${
             item.active
               ? 'bg-[var(--community-dock-active-bg)] text-[var(--community-dock-active-text)]'
               : 'bg-[var(--community-dock-item-bg)] text-[var(--community-dock-text)]'
           }`}
         >
-          <span className="block text-xl">{item.icon}</span>
-          <span className="text-[10px] font-black">{item.label}</span>
+          <span className="block text-lg">{item.icon}</span>
+          <span className="text-[9px] font-black leading-tight">{item.label}</span>
         </button>
       ))}
     </nav>
