@@ -1842,7 +1842,7 @@ const CoursePlayer: React.FC<{
           </div>
         ) : <VideoUnavailablePlaceholder />;
       }
-      case 'video': return activeFile.sourceType === 'url' || activeFile.provider === 'drive' || activeFile.provider === 'external' || activeFile.embedUrl ? <PremiumCourseMediaCard file={activeFile} onError={() => setMediaHasError(true)} onVideoFullscreen={enterNativeVideoFullscreen} showFullscreen={shouldUseMobileVideoFullscreen} /> : (
+      case 'video': return activeFile.sourceType === 'url' || activeFile.provider === 'drive' || activeFile.provider === 'external' || activeFile.embedUrl ? <PremiumCourseMediaCard file={activeFile} onError={() => setMediaHasError(true)} onVideoFullscreen={enterNativeVideoFullscreen} showFullscreen={!shouldUseMobileVideoFullscreen} /> : (
         <div className="course-native-video-shell relative h-full w-full overflow-hidden bg-black">
           <video
             key={activeFile.id}
