@@ -1022,6 +1022,34 @@ const App: React.FC = () => {
   const historyNavigationRef = React.useRef(false);
   const lastHistoryViewRef = React.useRef(currentView);
   const appViewStackRef = React.useRef<string[]>([currentView]);
+
+  const normalizeHistoryView = (value: unknown) =>
+    typeof value === 'string' && value.trim() ? value.trim() : '';
+
+  const getPreviousAppView = useCallback((fallbackView: string = 'home') => {
+    const stack = appViewStackRef.current.filter(Boolean);
+    const current = currentViewRef.current;
+
+    if (stack.length === 0) return fallbackView;
+    if (stack[stack.length - 1] !== current) return stack[stack.length - 1] || fallbackView;
+
+    const previousStack = stack.slice(0, -1);
+    return previousStack[previousStack.length - 1] || fallbackView;
+  }, []);
+
+  const syncStackForHistoryView = useCallback((nextView: string) => {
+    if (!nextView) return;
+
+    const stack = appViewStackRef.current.filter(Boolean);
+    const existingIndex = stack.lastIndexOf(nextView);
+
+    if (existingIndex >= 0) {
+      appViewStackRef.current = stack.slice(0, existingIndex + 1);
+      return;
+    }
+
+    appViewStackRef.current = [...stack, nextView].slice(-24);
+  }, []);
   const [selectedProduct, setSelectedProduct] = useState<ProductWithRating | null>(null);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
@@ -1231,7 +1259,7 @@ const App: React.FC = () => {
     if (typeof window === 'undefined') return;
     const currentState = window.history.state || {};
     if (currentState.dcView !== currentView) {
-      window.history.replaceState({ ...currentState, dcView: currentView }, '', window.location.href);
+      window.history.replaceState({ ...currentState, dcView: currentView, dcAppEntry: true }, '', window.location.href);
     }
     lastHistoryViewRef.current = currentView;
 
@@ -1248,8 +1276,9 @@ const App: React.FC = () => {
         setIsCartOpen(false);
         return;
       }
-      const nextView = event.state?.dcView;
-      if (currentViewRef.current === 'community' && nextView !== 'community') {
+
+      const rawNextView = normalizeHistoryView(event.state?.dcView);
+      if (currentViewRef.current === 'community' && rawNextView !== 'community') {
         (window as any).__eduvoraCommunityHandledBack = false;
         window.dispatchEvent(new CustomEvent('eduvora-community-back-request'));
 
@@ -1258,21 +1287,26 @@ const App: React.FC = () => {
           return;
         }
       }
-      if (typeof nextView === 'string') {
-        historyNavigationRef.current = true;
-        setCurrentView(nextView);
-        return;
+
+      if (!rawNextView && currentViewRef.current === 'home') return;
+
+      const nextView = rawNextView || getPreviousAppView('home');
+      if (!nextView) return;
+
+      syncStackForHistoryView(nextView);
+      historyNavigationRef.current = true;
+      setCurrentView(nextView);
+
+      if (!rawNextView) {
+        window.history.replaceState({ ...(window.history.state || {}), dcView: nextView, dcAppEntry: true }, '', window.location.href);
       }
-      if (currentViewRef.current !== 'home') {
-        historyNavigationRef.current = true;
-        window.history.pushState({ dcView: 'home' }, '', window.location.href);
-        setCurrentView('home');
-      }
+
+      window.scrollTo(0, 0);
     };
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [getPreviousAppView, syncStackForHistoryView]);
 
   useEffect(() => {
     isCartOpenRef.current = isCartOpen;
@@ -1295,8 +1329,13 @@ const App: React.FC = () => {
       return;
     }
     if (lastHistoryViewRef.current === currentView) return;
-    appViewStackRef.current = [...appViewStackRef.current.filter((view) => view !== currentView), currentView].slice(-12);
-    window.history.pushState({ ...(window.history.state || {}), dcView: currentView }, '', window.location.href);
+
+    const stack = appViewStackRef.current.filter(Boolean);
+    if (stack[stack.length - 1] !== currentView) {
+      appViewStackRef.current = [...stack, currentView].slice(-24);
+    }
+
+    window.history.pushState({ ...(window.history.state || {}), dcView: currentView, dcAppEntry: true }, '', window.location.href);
     lastHistoryViewRef.current = currentView;
   }, [currentView]);
 
@@ -2883,7 +2922,6 @@ const App: React.FC = () => {
   const handleBackToHome = () => {
     if (currentView === 'home') window.scrollTo({ top: 0, behavior: 'smooth' });
     else {
-      appViewStackRef.current = ['home'];
       setCurrentView('home');
       window.scrollTo(0, 0);
     }
@@ -2895,14 +2933,12 @@ const App: React.FC = () => {
       return;
     }
 
-    const stack = appViewStackRef.current.filter(Boolean);
-    const currentIndex = stack.lastIndexOf(currentView);
-    const previousView = currentIndex > 0 ? stack[currentIndex - 1] : fallbackView;
-    appViewStackRef.current = previousView === 'home' ? ['home'] : stack.slice(0, Math.max(1, currentIndex));
+    const previousView = getPreviousAppView(fallbackView);
+    syncStackForHistoryView(previousView);
     historyNavigationRef.current = true;
     setCurrentView(previousView);
     if (typeof window !== 'undefined') {
-      window.history.replaceState({ ...(window.history.state || {}), dcView: previousView }, '', window.location.href);
+      window.history.replaceState({ ...(window.history.state || {}), dcView: previousView, dcAppEntry: true }, '', window.location.href);
     }
     window.scrollTo(0, 0);
   };
@@ -2918,7 +2954,7 @@ const App: React.FC = () => {
       setCurrentView('home');
       window.scrollTo(0, 0);
     } else {
-      handleBackToHome();
+      handleNavigateBack('home');
     }
   };
 
