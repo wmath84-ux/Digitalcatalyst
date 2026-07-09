@@ -1,8 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { getDownloadURL, ref, uploadBytes } from 'firebase/storage';
 import { NewsArticle, WebsiteSettings } from '../../App';
-import { storage } from '../../firebase';
 import { ContentDatabaseAdapter, ContentPostRecord, ContentPostType, runContentAutomation } from '../../utils/contentAutomator';
+import PremiumImageUrlInput from '../common/PremiumImageUrlInput';
 
 const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
 const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
@@ -123,34 +122,10 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
     setMode('form');
   };
 
-  const uploadCoverImage = async (file: File) => {
-    if (!file.type.startsWith('image/')) {
-      setCoverUploadError('Please choose a valid image file.');
-      return;
-    }
-
-    setIsUploadingCover(true);
-    setCoverUploadError('');
-
-    try {
-      const safeName = file.name.replace(/[^a-z0-9._-]/gi, '-').toLowerCase();
-      const storagePath = `news-blog-covers/${editingPost.id || 'draft'}-${Date.now()}-${safeName}`;
-      const imageRef = ref(storage, storagePath);
-      const snapshot = await uploadBytes(imageRef, file, { contentType: file.type });
-      const downloadUrl = await getDownloadURL(snapshot.ref);
-      setEditingPost((current) => ({
-        ...current,
-        coverImage: downloadUrl,
-        thumbnailImage: downloadUrl,
-      }));
-      setSuccessToast('Cover image uploaded and attached to this post.');
-    } catch (error) {
-      console.error('Cover image upload failed:', error);
-      setCoverUploadError(error instanceof Error ? error.message : 'Upload failed. Check Firebase Storage settings and try again.');
-    } finally {
-      setIsUploadingCover(false);
-    }
+  const uploadCoverImage = async (_file: File) => {
+    setCoverUploadError('Storage upload is currently disabled. Please use an image URL.');
   };
+
 
   const savePost = () => {
     const now = new Date().toISOString();
@@ -265,8 +240,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
             <input value={editingPost.category} onChange={(event) => setEditingPost({ ...editingPost, category: event.target.value })} className={fieldClass} placeholder="Education News" />
           </div>
           <div className="lg:col-span-8">
-            <label className={labelClass}>Cover Image URL</label>
-            <input value={editingPost.coverImage || ''} onChange={(event) => setEditingPost({ ...editingPost, coverImage: event.target.value, thumbnailImage: event.target.value })} className={fieldClass} placeholder="AI placeholder or uploaded Firebase Storage URL" />
+            <PremiumImageUrlInput value={editingPost.coverImage || ''} onChange={(url) => setEditingPost({ ...editingPost, coverImage: url, thumbnailImage: url })} label="News/blog cover image URL" previewAlt={`${editingPost.title || 'Article'} cover preview`} aspect="video" compact helperText="Paste a direct https cover image URL. It is saved as coverImage and thumbnailImage." />
           </div>
           <div className="lg:col-span-12 rounded-[1.5rem] border border-white/50 bg-white/70 p-5 shadow-sm">
             <label className="flex cursor-pointer flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -286,11 +260,11 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.3em] text-indigo-300/90">Cover Image</p>
                 <h2 className="mt-2 text-2xl font-black text-slate-900">Smart hybrid article thumbnail</h2>
-                <p className="mt-3 text-sm leading-6 text-slate-600">Keep the AI-generated placeholder, paste a stock image URL, or upload a custom admin-approved cover. Uploaded images are stored in Firebase Storage and override the AI cover instantly.</p>
+                <p className="mt-3 text-sm leading-6 text-slate-600">Keep the AI-generated placeholder or paste a stock/public https image URL. Firebase Storage cover upload is currently disabled; this editor saves the URL as text.</p>
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <label className="inline-flex cursor-pointer items-center justify-center rounded-2xl border border-indigo-200/70 bg-white/80 px-5 py-3 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md">
                     <input type="file" accept="image/*" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadCoverImage(file); event.currentTarget.value = ''; }} />
-                    {isUploadingCover ? 'Uploading cover…' : 'Upload Custom Cover'}
+                    URL flow active
                   </label>
                   <button type="button" onClick={() => setEditingPost({ ...editingPost, coverImage: '', thumbnailImage: '' })} className="rounded-2xl border border-white/50 bg-white/80 px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-white/90 hover:shadow-sm">Clear Image</button>
                 </div>

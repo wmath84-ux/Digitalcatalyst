@@ -52,6 +52,10 @@ const toGoogleDrivePreviewUrl = (value: string) => {
   const fileId = extractGoogleDriveFileId(value);
   return fileId ? `https://drive.google.com/file/d/${fileId}/preview` : value.trim();
 };
+const isDirectAudioUrl = (value = '') => /\.(mp3|m4a|aac|wav|ogg|oga|opus)(?:$|[?#])/i.test(value.trim());
+const isDirectVideoUrl = (value = '') => /\.(mp4|webm|mov|m4v|ogv)(?:$|[?#])/i.test(value.trim());
+const getMediaPreviewUrl = (file: ProductFile) => file.embedUrl || (isGoogleDriveUrl(file.url) ? toGoogleDrivePreviewUrl(file.url) : '');
+const getMediaProviderBadge = (file: ProductFile) => file.provider === 'drive' || isGoogleDriveUrl(file.url) ? `Google Drive ${file.type === 'audio' ? 'Audio' : 'Video'}` : file.provider === 'direct' || (file.type === 'audio' ? isDirectAudioUrl(file.url) : isDirectVideoUrl(file.url)) ? `Direct ${file.type === 'audio' ? 'Audio' : 'Video'}` : 'External Hosted Media';
 const isHostedDocsFile = (file: ProductFile) => {
   if (hostedDocsProviders.includes(file.provider as typeof hostedDocsProviders[number])) return true;
   if (file.type === 'pdf' && Boolean(file.url)) return true;
@@ -1042,6 +1046,54 @@ const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
   </div>
 );
 
+
+const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void; onVideoFullscreen?: () => void; showFullscreen?: boolean; }> = ({ file, onError, onVideoFullscreen, showFullscreen = false }) => {
+  const isAudio = file.type === 'audio';
+  const isDrive = file.provider === 'drive' || isGoogleDriveUrl(file.url);
+  const directPlayable = isAudio ? isDirectAudioUrl(file.url) : isDirectVideoUrl(file.url);
+  const previewUrl = getMediaPreviewUrl(file);
+  const badge = getMediaProviderBadge(file);
+  const openUrl = file.url || previewUrl;
+
+  return (
+    <div className="flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-[radial-gradient(circle_at_18%_10%,rgba(123,97,255,0.24),transparent_28%),linear-gradient(135deg,#EEF6FF,#F8FBFF_48%,#F1EEFF)] p-3 text-[#081A45] sm:p-5 custom-scrollbar">
+      <section className="w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/70 bg-white/82 shadow-[0_28px_90px_rgba(23,105,255,0.18)] backdrop-blur-2xl">
+        <div className="flex flex-col gap-3 border-b border-[#D9E7F8] bg-white/75 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
+          <div className="min-w-0">
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-[#7B61FF]">{badge}</p>
+            <h2 className="mt-1 truncate text-2xl font-black tracking-tight text-[#081A45] sm:text-3xl">{file.name || (isAudio ? 'Audio lesson' : 'Video lesson')}</h2>
+            {isDrive ? <p className="mt-2 text-xs font-bold text-amber-700">Google Drive file must be public or shared with anyone with the link.</p> : null}
+          </div>
+          {openUrl ? <a href={openUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-3 text-sm font-black text-white shadow-lg">Open externally</a> : null}
+        </div>
+        <div className="p-4 sm:p-6">
+          {isAudio ? (
+            <div className="rounded-[1.75rem] border border-[#D9E7F8] bg-gradient-to-br from-[#081A45] via-[#153EA8] to-[#7B61FF] p-5 text-white shadow-inner">
+              <div className="mb-5 flex h-24 items-end gap-1.5 overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-4">
+                {Array.from({ length: 34 }).map((_, index) => <span key={index} className="w-full rounded-full bg-white/75" style={{ height: `${20 + ((index * 17) % 72)}%` }} />)}
+              </div>
+              {directPlayable ? <audio src={file.url} controls className="w-full" onError={onError} /> : (
+                <div className="rounded-2xl border border-white/15 bg-white/10 p-4 text-sm font-bold leading-6 text-white/90">Audio is hosted on {isDrive ? 'Google Drive' : 'an external provider'}. Tap open/play to access if inline playback is blocked.</div>
+              )}
+            </div>
+          ) : directPlayable ? (
+            <div className="relative aspect-video overflow-hidden rounded-[1.75rem] bg-black shadow-2xl">
+              <video src={file.url} controls playsInline className="h-full w-full object-contain" onError={onError} />
+              {showFullscreen ? <button type="button" onClick={onVideoFullscreen} className="absolute bottom-4 right-4 rounded-full border border-white/25 bg-black/75 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white backdrop-blur-md">⛶ Fullscreen</button> : null}
+            </div>
+          ) : isDrive && previewUrl ? (
+            <div className="aspect-video overflow-hidden rounded-[1.75rem] border border-[#D9E7F8] bg-black shadow-2xl">
+              <iframe title={file.name || 'Google Drive video preview'} src={previewUrl} className="h-full w-full border-0" allow="autoplay; fullscreen" allowFullScreen onError={onError} />
+            </div>
+          ) : (
+            <div className="rounded-[1.75rem] border border-dashed border-[#BFD7FF] bg-[#F8FBFF] p-8 text-center"><p className="text-lg font-black">This media link may not support direct playback.</p><p className="mt-2 text-sm font-bold text-[#536178]">It will open in a secure preview card. Use the external button if playback is blocked.</p></div>
+          )}
+        </div>
+      </section>
+    </div>
+  );
+};
+
 const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ file, economySettings, onQuizReward }) => {
   const questions = useMemo(() => (Array.isArray(file.quiz?.questions) ? file.quiz?.questions : []).filter(Boolean).map((q: any) => ({ ...q, prompt: String(q.prompt || q.question || q.title || q.text || '').trim(), options: Array.isArray(q.options) ? q.options : Array.isArray(q.choices) ? q.choices : Array.isArray(q.answers) ? q.answers : [] })).filter(q => q.prompt && q.options.length), [file.id, file.quiz]);
   const [answers, setAnswers] = useState<QuizAnswerState>({});
@@ -1761,7 +1813,7 @@ const CoursePlayer: React.FC<{
           </div>
         ) : <VideoUnavailablePlaceholder />;
       }
-      case 'video': return (
+      case 'video': return activeFile.sourceType === 'url' || activeFile.provider === 'drive' || activeFile.provider === 'external' || activeFile.embedUrl ? <PremiumCourseMediaCard file={activeFile} onError={() => setMediaHasError(true)} onVideoFullscreen={enterNativeVideoFullscreen} showFullscreen={shouldUseMobileVideoFullscreen} /> : (
         <div className="course-native-video-shell relative h-full w-full overflow-hidden bg-black">
           <video
             key={activeFile.id}
@@ -1786,6 +1838,7 @@ const CoursePlayer: React.FC<{
         </div>
       );
       case 'audio': {
+        if (activeFile.sourceType === 'url' || activeFile.provider === 'drive' || activeFile.provider === 'external' || activeFile.embedUrl) return <PremiumCourseMediaCard file={activeFile} onError={() => setMediaHasError(true)} />;
         return (
           <div className="flex h-full min-h-0 w-full bg-[#d5fbff]/70 text-slate-900">
             <ProductMusicPlayer
