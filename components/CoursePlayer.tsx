@@ -13,6 +13,7 @@ import ProductMusicPlayer, { type AudioTrack } from './ProductMusicPlayer';
 import { doc, getDoc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebase';
+import { isDirectAudioUrl, isDirectVideoUrl, isGoogleDriveUrl, normalizeDriveUrl, normalizeMediaSource } from '../utils/mediaCompat';
 
 declare global {
   interface Window {
@@ -47,15 +48,16 @@ const extractGoogleDriveFileId = (value: string) => {
   }
 };
 
-const isGoogleDriveUrl = (value: string) => /https:\/\/(?:drive|docs)\.google\.com\//i.test(value.trim());
-const toGoogleDrivePreviewUrl = (value: string) => {
-  const fileId = extractGoogleDriveFileId(value);
-  return fileId ? `https://drive.google.com/file/d/${fileId}/preview` : value.trim();
+const toGoogleDrivePreviewUrl = (value: string) => normalizeDriveUrl(value) || value.trim();
+const getMediaPreviewUrl = (file: ProductFile) => normalizeMediaSource(file, { type: file.type === 'audio' ? 'audio' : file.type === 'video' ? 'video' : 'document' }).embedUrl || '';
+const getMediaProviderBadge = (file: ProductFile) => {
+  const normalized = normalizeMediaSource(file, { type: file.type === 'audio' ? 'audio' : file.type === 'video' ? 'video' : 'document' });
+  if (normalized.provider === 'drive') return `Google Drive ${file.type === 'audio' ? 'Audio' : file.type === 'video' ? 'Video' : 'Preview'}`;
+  if (normalized.provider === 'youtube') return 'YouTube Video';
+  if (normalized.provider === 'direct') return `Direct ${file.type === 'audio' ? 'Audio' : 'Video'}`;
+  if (normalized.provider === 'firebase-storage') return `Legacy Storage ${file.type === 'audio' ? 'Audio' : 'Video'}`;
+  return normalized.isLegacy ? 'Legacy Hosted Media' : 'External Hosted Media';
 };
-const isDirectAudioUrl = (value = '') => /\.(mp3|m4a|aac|wav|ogg|oga|opus)(?:$|[?#])/i.test(value.trim());
-const isDirectVideoUrl = (value = '') => /\.(mp4|webm|mov|m4v|ogv)(?:$|[?#])/i.test(value.trim());
-const getMediaPreviewUrl = (file: ProductFile) => file.embedUrl || (isGoogleDriveUrl(file.url) ? toGoogleDrivePreviewUrl(file.url) : '');
-const getMediaProviderBadge = (file: ProductFile) => file.provider === 'drive' || isGoogleDriveUrl(file.url) ? `Google Drive ${file.type === 'audio' ? 'Audio' : 'Video'}` : file.provider === 'direct' || (file.type === 'audio' ? isDirectAudioUrl(file.url) : isDirectVideoUrl(file.url)) ? `Direct ${file.type === 'audio' ? 'Audio' : 'Video'}` : 'External Hosted Media';
 const isHostedDocsFile = (file: ProductFile) => {
   if (hostedDocsProviders.includes(file.provider as typeof hostedDocsProviders[number])) return true;
   if (file.type === 'pdf' && Boolean(file.url)) return true;
@@ -1049,17 +1051,18 @@ const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
 
 const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void; onVideoFullscreen?: () => void; showFullscreen?: boolean; }> = ({ file, onError, onVideoFullscreen, showFullscreen = false }) => {
   const isAudio = file.type === 'audio';
-  const isDrive = file.provider === 'drive' || isGoogleDriveUrl(file.url);
-  const directPlayable = isAudio ? isDirectAudioUrl(file.url) : isDirectVideoUrl(file.url);
-  const previewUrl = getMediaPreviewUrl(file);
+  const normalizedMedia = normalizeMediaSource(file, { type: isAudio ? 'audio' : 'video' });
+  const isDrive = normalizedMedia.provider === 'drive';
+  const directPlayable = normalizedMedia.provider === 'direct' && normalizedMedia.isPlayable;
+  const previewUrl = normalizedMedia.embedUrl || getMediaPreviewUrl(file);
   const badge = getMediaProviderBadge(file);
-  const openUrl = file.url || previewUrl;
+  const openUrl = normalizedMedia.url || file.url || previewUrl;
   const statusLine = isDrive
     ? 'Google Drive preview is prepared. If access is blocked, set sharing to Anyone with the link.'
     : directPlayable
       ? 'Native playback is ready inside the course player.'
       : 'This media link needs public access. Open externally if inline playback is blocked.';
-  const sourceBadge = file.sourceType === 'url' ? 'URL media' : file.provider === 'upload' ? 'Storage upload' : 'Hosted media';
+  const sourceBadge = normalizedMedia.isLegacy ? 'Legacy safe media' : normalizedMedia.sourceType === 'url' ? 'URL media' : normalizedMedia.provider === 'firebase-storage' ? 'Storage media' : 'Hosted media';
 
   return (
     <div className="flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-[radial-gradient(circle_at_18%_10%,rgba(123,97,255,0.24),transparent_28%),linear-gradient(135deg,#EEF6FF,#F8FBFF_48%,#F1EEFF)] p-3 text-[#081A45] sm:p-5 custom-scrollbar">

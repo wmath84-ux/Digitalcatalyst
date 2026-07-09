@@ -10,6 +10,7 @@ import { mergeCommunitySupportTickets, isSupportTicketNeedsAttention } from '../
 import CommunityAiMentor from './CommunityAiMentor';
 import PremiumImageUrlInput, { PremiumImageUrlStatus } from './common/PremiumImageUrlInput';
 import { getStorageDisabledMessage, isStorageUploadEnabled } from '../utils/mediaMode';
+import { buildPostImageFallback, normalizeMediaSource } from '../utils/mediaCompat';
 import { isDemoMode } from '../utils/runtimeMode';
 
 interface EduvoraCommunityProps {
@@ -2535,10 +2536,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const renderUploadedImage = (src: string, alt: string, mode: 'thumbnail' | 'original' = 'original', className = '') => {
-    const isRealImage = isImageAvatar(src);
-    if (!isRealImage) return <button type="button" onClick={() => setImageLightbox({ src, alt, mode })} className={`flex h-full w-full items-center justify-center text-7xl ${className}`}>{src}</button>;
+    const normalized = normalizeMediaSource({ imagePreview: src, title: alt }, { type: 'image', title: alt });
+    const resolvedSrc = normalized.url;
+    const fallbackSrc = buildPostImageFallback({ title: alt, postType: normalized.isLegacy ? 'legacy image' : 'image' });
+    const isRealImage = isImageAvatar(resolvedSrc);
+    if (!isRealImage) return <button type="button" onClick={() => setImageLightbox({ src: fallbackSrc, alt, mode })} className={`flex h-full w-full items-center justify-center text-7xl ${className}`}>{src || '🖼️'}</button>;
     const imageClass = mode === 'thumbnail' ? 'h-full w-full object-contain' : 'max-h-full max-w-full object-contain';
-    return <button type="button" onClick={() => setImageLightbox({ src, alt, mode })} className="flex h-full w-full items-center justify-center"><img src={src} alt={alt} className={`${imageClass} ${className}`} /></button>;
+    return <button type="button" onClick={() => setImageLightbox({ src: resolvedSrc, alt, mode })} className="flex h-full w-full items-center justify-center"><img src={resolvedSrc} alt={alt} className={`${imageClass} ${className}`} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = fallbackSrc; }} /></button>;
   };
 
   const toggleStatusLike = (statusId: number) => {

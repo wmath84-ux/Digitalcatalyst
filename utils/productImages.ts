@@ -1,4 +1,5 @@
 import { Product } from '../App';
+import { buildProductImageFallback, resolveProductImage } from './mediaCompat';
 
 export type ProductImageSlot = 'card' | 'detailMobile' | 'detailDesktop' | 'homeTopRated' | 'homeList' | 'purchaseSquare' | 'purchaseCard' | 'galleryThumb';
 
@@ -13,10 +14,7 @@ export const PRODUCT_IMAGE_SLOTS: Record<ProductImageSlot, { label: string; rati
   galleryThumb: { label: 'Gallery Thumbnail', ratio: '1:1', aspectClass: 'aspect-square', recommendedSize: '512x512', ratioValue: 1 },
 };
 
-export const getProductImageFallback = (product: Pick<Product, 'images' | 'imageSeed'>): string => {
-  const firstImage = Array.isArray(product.images) ? product.images.find(Boolean) : undefined;
-  return firstImage || `https://picsum.photos/seed/${product.imageSeed || 'product'}/800/600`;
-};
+export const getProductImageFallback = (product: Pick<Product, 'images' | 'imageSeed' | 'title' | 'category'>): string => buildProductImageFallback(product);
 
 const PRODUCT_IMAGE_SLOT_FALLBACKS: Record<ProductImageSlot, ProductImageSlot[]> = {
   card: ['card', 'detailMobile', 'purchaseCard', 'galleryThumb', 'homeTopRated'],
@@ -29,9 +27,4 @@ const PRODUCT_IMAGE_SLOT_FALLBACKS: Record<ProductImageSlot, ProductImageSlot[]>
   galleryThumb: ['galleryThumb', 'homeTopRated', 'purchaseSquare', 'card'],
 };
 
-export const getProductImage = (product: Product, slot: ProductImageSlot): string => {
-  const slotImage = PRODUCT_IMAGE_SLOT_FALLBACKS[slot]
-    .map((fallbackSlot) => product.productImages?.[fallbackSlot])
-    .find(Boolean);
-  return slotImage || getProductImageFallback(product);
-};
+export const getProductImage = (product: Product, slot: ProductImageSlot): string => resolveProductImage(product, slot);

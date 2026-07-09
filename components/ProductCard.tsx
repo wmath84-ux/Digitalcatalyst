@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { ProductWithRating, WebsiteSettings, Coupon } from '../App';
-import { getProductImage } from '../utils/productImages';
+import { getProductImage, getProductImageFallback } from '../utils/productImages';
 
 interface ProductCardProps {
   settings: WebsiteSettings;
@@ -54,6 +54,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                     alt={product.title} 
                     className="absolute inset-0 w-full h-full object-contain" 
                     loading="lazy"
+                    onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = getProductImageFallback(product); }}
                 />
                 
                 {/* Badges */}

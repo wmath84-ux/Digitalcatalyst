@@ -470,7 +470,7 @@ export interface NewsArticle {
   thumbnailImage?: string;
   coverImage: string;
   imageLayout?: 'thumbnail' | 'cover';
-  sourceType?: 'url';
+  sourceType?: 'url' | 'storage' | 'ai' | 'legacy' | 'unknown';
   createdAt?: string;
   showPremiumLearningCta?: boolean;
 }
