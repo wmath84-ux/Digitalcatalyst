@@ -318,6 +318,7 @@ const COMMUNITY_PROFILES = 'community_profiles';
 const PUBLIC_PROFILES = 'publicProfiles';
 const COMMUNITY_FOLLOWS = 'community_follows';
 const COMMUNITY_NOTIFICATIONS = 'community_notifications';
+const PRIVATE_CHAT_ENABLED = false;
 const PRIVATE_CHATS = 'private_chats';
 const PRIVATE_CHAT_MESSAGES = 'messages';
 const PRIVATE_CHAT_TTL_MS = 30 * 24 * 60 * 60 * 1000;
@@ -1114,6 +1115,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const sendPrivateChatMessage = async (forcedType?: PrivateChatMessageType) => {
+    if (!PRIVATE_CHAT_ENABLED) { setPrivateChatError('Private chat is currently disabled. Use replies to continue the discussion.'); return; }
     if (!guardedAuth.currentUser || !currentUserKey) {
       redirectToAuth();
       return;
@@ -1321,7 +1323,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   useEffect(() => {
-    if (!isCommunityAllowed || !currentUserKey) return undefined;
+    if (!PRIVATE_CHAT_ENABLED || !isCommunityAllowed || !currentUserKey) return undefined;
 
     const cleanupVisibleExpiredMessages = () => {
       setPrivateMessages((current) => current.filter((message) => message.expiresAt > Date.now()));
@@ -1335,7 +1337,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [isCommunityAllowed, currentUserKey, privateConversations]);
 
   useEffect(() => {
-    if (!isCommunityAllowed || !guardedAuth.currentUser || !currentUserKey) return undefined;
+    if (!PRIVATE_CHAT_ENABLED || !isCommunityAllowed || !guardedAuth.currentUser || !currentUserKey) return undefined;
 
     const conversationsQuery = query(collection(db, PRIVATE_CHATS), where('participants', 'array-contains', currentUserKey), limit(100));
 
@@ -1350,7 +1352,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [isCommunityAllowed, currentUserKey, guardedAuth.currentUser?.uid]);
 
   useEffect(() => {
-    if (!isCommunityAllowed || !activeConversationId) {
+    if (!PRIVATE_CHAT_ENABLED || !isCommunityAllowed || !activeConversationId) {
       setPrivateMessages([]);
       return undefined;
     }
@@ -1383,7 +1385,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [activeConversationId, activePrivateMessages.length]);
 
   useEffect(() => {
-    if (!isPrivateChatSending || typeof window === 'undefined') return undefined;
+    if (!PRIVATE_CHAT_ENABLED || !isPrivateChatSending || typeof window === 'undefined') return undefined;
 
     const warnBeforeLeaving = (event: BeforeUnloadEvent) => {
       event.preventDefault();
@@ -1679,7 +1681,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
 
   useEffect(() => {
-    if (!isCommunityAllowed || !guardedAuth.currentUser || !currentUserKey) return undefined;
+    if (!PRIVATE_CHAT_ENABLED || !isCommunityAllowed || !guardedAuth.currentUser || !currentUserKey) return undefined;
 
     const publicName = profile.name || 'Eduvora Member';
     const publicUsername = normalizeUsername(profile.username || profile.name) || `member_${currentUserKey.slice(0, 6)}`;
@@ -2656,6 +2658,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const sendSharedItemToPrivateChat = async (receiver: Creator) => {
+    if (!PRIVATE_CHAT_ENABLED) { setShareFeedback('Private chat is currently disabled. Use replies to continue the discussion.'); return; }
     if (!shareTarget || !guardedAuth.currentUser || !currentUserKey) {
       redirectToAuth();
       return;
@@ -3566,6 +3569,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
     const sharedItemPreview = buildSharedItemFromTarget(shareTarget);
 
+    if (!PRIVATE_CHAT_ENABLED) return (
+      <div className="fixed inset-0 z-[1700] flex items-end justify-center bg-[#081A45]/45 p-3 backdrop-blur-sm sm:items-center sm:p-5"><div className="w-full max-w-lg rounded-[2rem] border border-white/40 bg-white p-6 text-center shadow-[0_32px_120px_rgba(8,26,69,0.30)]"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-[#EEF6FF] text-3xl">💬</div><h3 className="mt-4 text-2xl font-black text-[#081A45]">Private chat is currently disabled.</h3><p className="mt-2 text-sm font-bold leading-6 text-[#536178]">Use replies to continue the discussion in the community feed.</p><div className="mt-5 grid gap-2 sm:grid-cols-2"><button type="button" onClick={() => { closeShareComposer(); setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 py-3 text-sm font-black text-white">Go to Feed</button><button type="button" onClick={() => { closeShareComposer(); pushPage('creators'); }} className="rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-black text-[#1769FF]">Create a Post</button></div><button type="button" onClick={closeShareComposer} className="mt-3 text-xs font-black text-[#7C879A]">Close</button></div></div>
+    );
+
     return (
       <div className="fixed inset-0 z-[1700] flex items-end justify-center bg-[#081A45]/45 p-3 backdrop-blur-sm sm:items-center sm:p-5">
         <div className="grid max-h-[88dvh] w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/40 bg-white shadow-[0_32px_120px_rgba(8,26,69,0.30)] sm:grid-cols-[1fr_1.15fr]">
@@ -3648,6 +3655,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       </div>
     );
   };
+
+  const renderPrivateChatDisabledPage = () => (
+    <div className="mx-auto flex min-h-[60dvh] max-w-3xl items-center justify-center p-4"><div className="w-full rounded-[2.25rem] border border-[#D9E7F8] bg-white/90 p-8 text-center shadow-[0_28px_90px_rgba(23,105,255,0.14)] backdrop-blur-2xl"><div className="mx-auto flex h-20 w-20 items-center justify-center rounded-[1.75rem] bg-gradient-to-br from-[#EEF6FF] to-[#F1EEFF] text-4xl">💬</div><h2 className="mt-5 text-3xl font-black text-[#081A45]">Private chat is currently disabled.</h2><p className="mx-auto mt-3 max-w-md text-sm font-bold leading-6 text-[#536178]">Use replies to continue the discussion. Join the conversation in the community feed.</p><div className="mt-6 flex flex-col justify-center gap-3 sm:flex-row"><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-3 text-sm font-black text-white">Go to Feed</button><button type="button" onClick={() => pushPage('creators')} className="rounded-2xl border border-[#D9E7F8] bg-white px-5 py-3 text-sm font-black text-[#1769FF]">Create a Post</button></div></div></div>
+  );
 
   const renderChatPage = () => (
     <>
@@ -3747,7 +3758,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const navItems = [
     { label: 'Feed', icon: '📢', active: activeView === 'feed' && page === 'chat', action: () => switchView('feed') },
     { label: 'Status', icon: '⭕', active: activeView === 'status' && page === 'chat', action: () => { setActiveView('status'); setPage('chat'); setPageStack([]); setShowStatusActions((value) => window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches ? !value : false); } },
-    { label: 'Chat', icon: '💬', active: page === 'directChat' || page === 'directChatThread', action: () => pushPage('directChat') },
     { label: 'Creators', icon: '✍️', active: page === 'creators', action: () => pushPage('creators') },
     { label: 'Admin Post', icon: '📣', active: page === 'adminPosts', action: () => pushPage('adminPosts') },
     { label: 'Follow', icon: '🤝', active: page === 'network', action: () => pushPage('network') },
@@ -4035,7 +4045,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           {tags.length ? <div className="mt-3 flex flex-wrap gap-1.5">{tags.map((tag) => <span key={tag} className="rounded-full border border-[var(--community-border)] bg-[#F8FBFF] px-2.5 py-1 text-[11px] font-black text-[var(--community-primary)]">#{tag}</span>)}</div> : null}
         </div>
         <div className="flex shrink-0 gap-2 sm:flex-col">
-          <button type="button" onClick={() => openChatCreator(creator.id)} className="min-h-11 rounded-2xl border border-[var(--community-border)] bg-[#F8FBFF] px-4 text-sm font-black text-[var(--community-heading)]">Message</button>
+          <button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="min-h-11 rounded-2xl border border-[var(--community-border)] bg-[#F8FBFF] px-4 text-sm font-black text-[var(--community-heading)]">Use replies</button>
           <button type="button" onClick={() => toggleFollowCreator(creator)} disabled={Boolean(followLoadingIds[creator.id]) || self || creator.isSuspended || creator.isPublic === false} className={`min-h-11 rounded-2xl px-5 text-sm font-black transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 ${followed ? 'border border-[#D9E7F8] bg-white text-[#1769FF] shadow-sm hover:bg-[#EEF6FF]' : 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-[0_14px_32px_rgba(23,105,255,0.22)]'}`}>{self ? 'You' : followLoadingIds[creator.id] ? 'Saving…' : followed ? '✓ Following' : 'Follow'}</button>
         </div>
       </article>
@@ -4082,7 +4092,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const renderMainContent = () => (
     <div className="community-content-stage animate-in fade-in slide-in-from-bottom-3 duration-500">
-      {page === 'chat' && activeView === 'feed' && renderFeedLayout(messages, 'Chat Feed', 'Fresh community prompts, replies, and streak ideas are shown here.')}
+      {page === 'chat' && activeView === 'feed' && renderFeedLayout(messages, 'Community Feed', 'Join the conversation with public replies, reactions, polls, and creator posts.')}
       {page === 'thread' && <div className="space-y-3"><button type="button" onClick={() => { goBack(); requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: feedScrollPositionsRef.current.chatFeed || 0, behavior: 'auto' })); }} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-sm font-black text-[#64748B] shadow-sm">← Back to posts</button>{renderMessageDetails(selectedMessage, true)}</div>}
       {page === 'profile' && renderProfilePage()}
       {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_28px_90px_rgba(79,123,255,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.28em] text-[#4F7BFF]">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Post once per type daily. Stories expire after 24 hours.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">Each user can publish one text, one image, and one poll creator post per day. The used type locks immediately and syncs through Firebase for all users. Status stories expire after 24 hours.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EAF5FF] p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || isCreatorTypeUsedToday || !postDraft.trim() || (isStorageLocked && postType !== 'image') || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2) || (postType === 'image' && (!postImagePreview || postImageUrlStatus !== 'valid'))} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.28)] disabled:opacity-45">{isPublishingCreator ? 'Publishing creator post...' : isCreatorTypeUsedToday ? `${postType} post used today` : isStorageLocked ? 'Storage limit reached' : 'Publish creator post'}</button></div></div>}
@@ -4090,7 +4100,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {page === 'following' && renderFollowingPage()}
       {page === 'adminPosts' && renderFeedLayout(adminPosts, 'ADMIN POST', 'Official admin posts from Firebase. Like, react, vote, and reply here.')}
       {page === 'tagMaster' && renderTagMasterPage()}{page === 'masterTags' && renderMasterTagsPage()}{page === 'masterTagDetail' && renderMasterTagDetailPage()}
-      {page === 'directChat' && renderChatPage()}{page === 'directChatThread' && renderChatThreadPage()}{page === 'statusDetail' && renderStatusDetailPage()}
+      {(page === 'directChat' || page === 'directChatThread') && renderPrivateChatDisabledPage()}{page === 'statusDetail' && renderStatusDetailPage()}
       {page === 'chat' && activeView === 'status' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[1.8rem] border border-[#E3ECF8] bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-5 text-center text-[#081B5C] shadow-[0_22px_70px_rgba(79,123,255,0.16)]"><p className="text-lg font-black sm:text-2xl">Daily one per type · {statusAvailableSlots.toLocaleString()} real slots left</p><p className="mt-2 text-sm font-bold text-[#64748B]">Text, image, and poll stories each lock after one daily use and stay visible for 24 hours via Firebase.</p><div className="mt-4 flex justify-center gap-2"><button type="button" onClick={openStatusUploadFromTop} disabled={isStorageLocked} className="rounded-2xl bg-[#4F7BFF] px-4 py-3 text-xs font-black text-white disabled:bg-transparent disabled:text-[#64748B] disabled:ring-2 disabled:ring-[#E3ECF8]">{isStorageLocked ? 'Uploads locked' : 'Upload your status'}</button><button type="button" onClick={openMyStatusesFromTop} className="rounded-2xl bg-white px-4 py-3 text-xs font-black text-[#081B5C]">View your status</button></div></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
       {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_30px_90px_rgba(79,123,255,0.16)]"><div className="bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.3em] text-[#4F7BFF]">Story studio</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2></div><div className="p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : <div className="mb-4 rounded-2xl border border-[#D2E3FC] bg-[#E8F0FE] px-4 py-3 text-sm font-black text-[#1967D2]">Each story type locks after one daily publish · Visible for 24 hours · Image stories use URL previews</div>}<div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange', true)}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={isPublishingStatus || isStatusTypeUsedToday || (isStorageLocked && statusType !== 'image') || (statusType === 'image' && (!statusImagePreview || statusImageUrlStatus !== 'valid')) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white disabled:opacity-45">{isPublishingStatus ? 'Publishing status story...' : isStatusTypeUsedToday ? `${statusType} story used today` : isStorageLocked ? 'Storage limit reached' : 'Publish status story'}</button></div></div>}
       {page === 'statusMine' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[2rem] border border-[#E3ECF8] bg-white p-6"><h2 className="text-4xl font-black tracking-tight text-[#081B5C]">View your status</h2><p className="mt-2 text-sm font-bold text-[#64748B]">Tap a card to open reel view.</p></div>{myStatuses.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{myStatuses.map(renderStatusTile)}</div> : <div className="rounded-[2rem] border border-dashed border-[#E3ECF8] bg-white p-10 text-center font-black text-[#64748B]">No status uploaded yet.</div>}</div>}
