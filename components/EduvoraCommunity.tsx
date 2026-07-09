@@ -8,6 +8,7 @@ import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storag
 import type { WebsiteSettings } from '../App';
 import { mergeCommunitySupportTickets, isSupportTicketNeedsAttention } from '../utils/communitySupportBadge';
 import CommunityAiMentor from './CommunityAiMentor';
+import PremiumImageUrlInput, { PremiumImageUrlStatus } from './common/PremiumImageUrlInput';
 import { isDemoMode } from '../utils/runtimeMode';
 
 interface EduvoraCommunityProps {
@@ -774,6 +775,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [postImageName, setPostImageName] = useState('');
   const [postImagePreview, setPostImagePreview] = useState('');
   const [statusImagePreview, setStatusImagePreview] = useState('');
+  const [postImageUrlStatus, setPostImageUrlStatus] = useState<PremiumImageUrlStatus>('empty');
+  const [statusImageUrlStatus, setStatusImageUrlStatus] = useState<PremiumImageUrlStatus>('empty');
   const [eduCoins, setEduCoins] = useState(0);
   const [postType, setPostType] = useState<PostType>('text');
   const [statusType, setStatusType] = useState<PostType>('text');
@@ -2318,14 +2321,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const submitCreatorPost = async () => {
     const draft = postDraft.trim();
     const cleanedOptions = postPollOptions.map((option) => option.trim()).filter(Boolean);
-    if (!draft || isCreatorTypeUsedToday || isStorageLocked || isPublishingCreator) return;
+    if (!draft || isCreatorTypeUsedToday || (isStorageLocked && postType !== 'image') || isPublishingCreator) return;
     if (postType === 'poll' && cleanedOptions.length < 2) return;
     setComposerError('');
     setIsPublishingCreator(true);
 
     const publishType = postType;
     const publishImagePreview = postImagePreview;
-    const publishImageBytes = publishType === 'image' ? dataUrlBytes(publishImagePreview) : 0;
+    if (publishType === 'image' && (!publishImagePreview || postImageUrlStatus !== 'valid')) { setComposerError('Please paste a valid https image URL.'); setIsPublishingCreator(false); return; }
+    const publishImageBytes = 0;
     const labels: Record<PostType, { badge: string; title: string; avatar: string }> = {
       text: { badge: 'Creator text · +1 EduCoin', title: `${profile.name} shared a note`, avatar: profile.avatar },
       image: { badge: 'Creator image · +1 EduCoin', title: `${profile.name} shared an image idea`, avatar: profile.avatar },
@@ -2374,10 +2378,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
     (async () => {
       try {
-        await claimDailyUploadSlot('creator', publishType, publishImageBytes);
-        const upload = publishType === 'image' && publishImagePreview
-          ? await uploadCommunityImage('creator-posts', localMessage.id, publishImagePreview)
-          : { imageUrl: localMessage.imagePreview, storagePath: undefined, uploadBytes: 0 };
+        await claimDailyUploadSlot('creator', publishType, 0);
+        const upload = { imageUrl: localMessage.imagePreview, storagePath: undefined, uploadBytes: 0 };
         const cloudMessage = normalizeFeedMessage({
           ...localMessage,
           imagePreview: upload.imageUrl,
@@ -2405,14 +2407,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const submitStatus = async () => {
     const draft = statusDraft.trim();
     const cleanedOptions = statusPollOptions.map((option) => option.trim()).filter(Boolean);
-    if ((!draft && statusType !== 'image') || isStatusTypeUsedToday || isStorageLocked || isPublishingStatus) return;
+    if ((!draft && statusType !== 'image') || isStatusTypeUsedToday || (isStorageLocked && statusType !== 'image') || isPublishingStatus) return;
     if (statusType === 'poll' && cleanedOptions.length < 2) return;
     setComposerError('');
     setIsPublishingStatus(true);
 
     const publishType = statusType;
     const publishImagePreview = statusImagePreview;
-    const publishImageBytes = publishType === 'image' ? dataUrlBytes(publishImagePreview) : 0;
+    if (publishType === 'image' && (!publishImagePreview || statusImageUrlStatus !== 'valid')) { setComposerError('Please paste a valid https image URL.'); setIsPublishingStatus(false); return; }
+    const publishImageBytes = 0;
     const title = publishType === 'image' ? (statusImageName || 'Image story') : draft.slice(0, 54) || 'Fresh status';
     const statusStoryId = Date.now();
     const statusStory = createStatusStory({
@@ -2443,10 +2446,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
     (async () => {
       try {
-        await claimDailyUploadSlot('status', publishType, publishImageBytes);
-        const upload = publishType === 'image' && publishImagePreview
-          ? await uploadCommunityImage('stories', statusStoryId, publishImagePreview)
-          : { imageUrl: localStory.imagePreview, storagePath: undefined, uploadBytes: 0 };
+        await claimDailyUploadSlot('status', publishType, 0);
+        const upload = { imageUrl: localStory.imagePreview, storagePath: undefined, uploadBytes: 0 };
         const cloudStory = {
           ...localStory,
           imagePreview: upload.imageUrl,
@@ -2511,16 +2512,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     }
   };
 
-  const handleImageUpload = (event: React.ChangeEvent<HTMLInputElement>, setName: (value: string) => void, setPreview: (value: string) => void) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (file.size > MAX_STATUS_FILE_BYTES) { alert('Max 1MB allowed'); return; }
-    setName(file.name);
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') setPreview(reader.result);
-    };
-    reader.readAsDataURL(file);
+  const handleImageUpload = (_event: React.ChangeEvent<HTMLInputElement>, _setName: (value: string) => void, _setPreview: (value: string) => void) => {
+    setComposerError('Storage upload is currently disabled. Please use an image URL.');
   };
 
   const renderUploadedImage = (src: string, alt: string, mode: 'thumbnail' | 'original' = 'original', className = '') => {
@@ -3209,7 +3202,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const setOptions = isStatus ? setStatusPollOptions : setPostPollOptions;
 
     if (type === 'image') {
-      return <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]"><label className="flex min-h-[220px] cursor-pointer flex-col items-center justify-center rounded-[1.75rem] border-2 border-dashed border-[#C2E7FF] bg-white p-4 text-center shadow-inner transition hover:bg-white"><input type="file" accept="image/*" className="hidden" onChange={(event) => handleImageUpload(event, setImageName, setImagePreview)} /><span className={`${isStatus ? 'min-h-44 w-full' : 'aspect-square w-36'} flex overflow-hidden rounded-[2rem] bg-gradient-to-br from-[#E8F0FE] to-[#C2E7FF] shadow-inner`}>{imagePreview ? renderUploadedImage(imagePreview, imageName || 'Uploaded preview', isStatus ? 'original' : 'thumbnail') : <span className="m-auto text-5xl">🖼️</span>}</span><span className="mt-3 text-lg font-black text-[#202124]">{isStatus ? 'Upload original-ratio image' : 'Upload thumbnail image'}</span><span className="mt-1 text-sm font-bold text-[#5F6368]">{imageName || (isStatus ? 'Original ratio will be preserved' : 'Thumbnail will be square cropped')}</span></label><textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 1000))} maxLength={1000} placeholder={isStatus ? 'Add image status caption...' : 'Describe your image post...'} className="min-h-[180px] rounded-[1.75rem] border border-[#E0E3EB] bg-white px-5 py-4 text-[#202124] text-base font-semibold leading-7 outline-none transition focus:border-[#1A73E8] focus:bg-white" /></div>;
+      return <div className="grid gap-4 lg:grid-cols-[1fr_0.8fr]"><PremiumImageUrlInput value={imagePreview} onChange={(url) => { setImagePreview(url); setImageName(url ? 'Image URL' : ''); }} onStatusChange={isStatus ? setStatusImageUrlStatus : setPostImageUrlStatus} label={isStatus ? 'Status image URL' : 'Creator post image URL'} previewAlt={isStatus ? 'Status image preview' : 'Creator post image preview'} aspect={isStatus ? 'original' : 'square'} helperText="Paste a direct https image URL. Firebase Storage upload is currently disabled." /><textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 1000))} maxLength={1000} placeholder={isStatus ? 'Add image status caption...' : 'Describe your image post...'} className="min-h-[180px] rounded-[1.75rem] border border-[#E0E3EB] bg-white px-5 py-4 text-[#202124] text-base font-semibold leading-7 outline-none transition focus:border-[#1A73E8] focus:bg-white" /></div>;
     }
     if (type === 'poll') {
       return <div className="space-y-4"><textarea value={draft} onChange={(event) => setDraft(event.target.value.slice(0, 1000))} maxLength={1000} placeholder={isStatus ? 'Ask your status poll question...' : 'Write your poll question...'} className="min-h-[120px] w-full rounded-[1.75rem] border border-[#E0E3EB] bg-white px-5 py-4 text-[#202124] text-base font-semibold leading-7 outline-none transition focus:border-[#34A853] focus:bg-white" /><div className="grid gap-3 sm:grid-cols-3">{options.map((option, index) => <input key={index} value={option} onChange={(event) => setOptions((current) => current.map((item, itemIndex) => itemIndex === index ? event.target.value : item))} placeholder={`Option ${index + 1}`} className="rounded-2xl border border-[#CEEAD6] bg-white px-4 py-3 text-[#202124] text-sm font-bold outline-none focus:border-[#34A853]" />)}</div></div>;
@@ -4088,14 +4081,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {page === 'chat' && activeView === 'feed' && renderFeedLayout(messages, 'Chat Feed', 'Fresh community prompts, replies, and streak ideas are shown here.')}
       {page === 'thread' && <div className="space-y-3"><button type="button" onClick={() => { goBack(); requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: feedScrollPositionsRef.current.chatFeed || 0, behavior: 'auto' })); }} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-sm font-black text-[#64748B] shadow-sm">← Back to posts</button>{renderMessageDetails(selectedMessage, true)}</div>}
       {page === 'profile' && renderProfilePage()}
-      {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_28px_90px_rgba(79,123,255,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.28em] text-[#4F7BFF]">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Post once per type daily. Stories expire after 24 hours.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">Each user can publish one text, one image, and one poll creator post per day. The used type locks immediately and syncs through Firebase for all users. Status stories expire after 24 hours.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EAF5FF] p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || isCreatorTypeUsedToday || !postDraft.trim() || isStorageLocked || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.28)] disabled:opacity-45">{isPublishingCreator ? 'Publishing creator post...' : isCreatorTypeUsedToday ? `${postType} post used today` : isStorageLocked ? 'Storage limit reached' : 'Publish creator post'}</button></div></div>}
+      {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_28px_90px_rgba(79,123,255,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.28em] text-[#4F7BFF]">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Post once per type daily. Stories expire after 24 hours.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">Each user can publish one text, one image, and one poll creator post per day. The used type locks immediately and syncs through Firebase for all users. Status stories expire after 24 hours.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EAF5FF] p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || isCreatorTypeUsedToday || !postDraft.trim() || (isStorageLocked && postType !== 'image') || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2) || (postType === 'image' && (!postImagePreview || postImageUrlStatus !== 'valid'))} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.28)] disabled:opacity-45">{isPublishingCreator ? 'Publishing creator post...' : isCreatorTypeUsedToday ? `${postType} post used today` : isStorageLocked ? 'Storage limit reached' : 'Publish creator post'}</button></div></div>}
       {page === 'network' && renderFollowPage()}
       {page === 'following' && renderFollowingPage()}
       {page === 'adminPosts' && renderFeedLayout(adminPosts, 'ADMIN POST', 'Official admin posts from Firebase. Like, react, vote, and reply here.')}
       {page === 'tagMaster' && renderTagMasterPage()}{page === 'masterTags' && renderMasterTagsPage()}{page === 'masterTagDetail' && renderMasterTagDetailPage()}
       {page === 'directChat' && renderChatPage()}{page === 'directChatThread' && renderChatThreadPage()}{page === 'statusDetail' && renderStatusDetailPage()}
       {page === 'chat' && activeView === 'status' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[1.8rem] border border-[#E3ECF8] bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-5 text-center text-[#081B5C] shadow-[0_22px_70px_rgba(79,123,255,0.16)]"><p className="text-lg font-black sm:text-2xl">Daily one per type · {statusAvailableSlots.toLocaleString()} real slots left</p><p className="mt-2 text-sm font-bold text-[#64748B]">Text, image, and poll stories each lock after one daily use and stay visible for 24 hours via Firebase.</p><div className="mt-4 flex justify-center gap-2"><button type="button" onClick={openStatusUploadFromTop} disabled={isStorageLocked} className="rounded-2xl bg-[#4F7BFF] px-4 py-3 text-xs font-black text-white disabled:bg-transparent disabled:text-[#64748B] disabled:ring-2 disabled:ring-[#E3ECF8]">{isStorageLocked ? 'Uploads locked' : 'Upload your status'}</button><button type="button" onClick={openMyStatusesFromTop} className="rounded-2xl bg-white px-4 py-3 text-xs font-black text-[#081B5C]">View your status</button></div></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
-      {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_30px_90px_rgba(79,123,255,0.16)]"><div className="bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.3em] text-[#4F7BFF]">Story studio</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2></div><div className="p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : <div className="mb-4 rounded-2xl border border-[#D2E3FC] bg-[#E8F0FE] px-4 py-3 text-sm font-black text-[#1967D2]">Each story type locks after one daily publish · Visible for 24 hours · Storage used: {storagePercent(storageUsedBytes)}%</div>}<div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange', true)}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={isPublishingStatus || isStatusTypeUsedToday || isStorageLocked || (statusType === 'image' && !statusImagePreview) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white disabled:opacity-45">{isPublishingStatus ? 'Publishing status story...' : isStatusTypeUsedToday ? `${statusType} story used today` : isStorageLocked ? 'Storage limit reached' : 'Publish status story'}</button></div></div>}
+      {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_30px_90px_rgba(79,123,255,0.16)]"><div className="bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.3em] text-[#4F7BFF]">Story studio</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2></div><div className="p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : <div className="mb-4 rounded-2xl border border-[#D2E3FC] bg-[#E8F0FE] px-4 py-3 text-sm font-black text-[#1967D2]">Each story type locks after one daily publish · Visible for 24 hours · Storage used: {storagePercent(storageUsedBytes)}%</div>}<div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange', true)}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={isPublishingStatus || isStatusTypeUsedToday || (isStorageLocked && statusType !== 'image') || (statusType === 'image' && (!statusImagePreview || statusImageUrlStatus !== 'valid')) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white disabled:opacity-45">{isPublishingStatus ? 'Publishing status story...' : isStatusTypeUsedToday ? `${statusType} story used today` : isStorageLocked ? 'Storage limit reached' : 'Publish status story'}</button></div></div>}
       {page === 'statusMine' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[2rem] border border-[#E3ECF8] bg-white p-6"><h2 className="text-4xl font-black tracking-tight text-[#081B5C]">View your status</h2><p className="mt-2 text-sm font-bold text-[#64748B]">Tap a card to open reel view.</p></div>{myStatuses.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{myStatuses.map(renderStatusTile)}</div> : <div className="rounded-[2rem] border border-dashed border-[#E3ECF8] bg-white p-10 text-center font-black text-[#64748B]">No status uploaded yet.</div>}</div>}
     </div>
   );
