@@ -24,7 +24,7 @@ interface NewsBlogManagementProps {
 }
 
 type AdminMode = 'list' | 'form';
-type EditablePost = NewsArticle & { type: ContentPostType; thumbnailImage?: string; coverImage: string; createdAt: string; };
+type EditablePost = NewsArticle & { type: ContentPostType; thumbnailImage?: string; coverImage: string; createdAt: string; imageLayout?: 'thumbnail' | 'cover'; sourceType?: 'url'; };
 
 const normalizePost = (post: NewsArticle): EditablePost => ({
   ...post,
@@ -32,6 +32,8 @@ const normalizePost = (post: NewsArticle): EditablePost => ({
   createdAt: (post as NewsArticle & { createdAt?: string }).createdAt || `${post.date || new Date().toISOString().split('T')[0]}T00:00:00.000Z`,
   thumbnailImage: (post as NewsArticle & { thumbnailImage?: string }).thumbnailImage || '',
   coverImage: (post as NewsArticle & { coverImage?: string }).coverImage || (post as NewsArticle & { thumbnailImage?: string }).thumbnailImage || '',
+  imageLayout: (post as NewsArticle & { imageLayout?: 'thumbnail' | 'cover' }).imageLayout || ((post as NewsArticle & { coverImage?: string }).coverImage ? 'cover' : undefined),
+  sourceType: (post as NewsArticle & { sourceType?: 'url' }).sourceType || ((post as NewsArticle & { coverImage?: string; thumbnailImage?: string }).coverImage || (post as NewsArticle & { coverImage?: string; thumbnailImage?: string }).thumbnailImage ? 'url' : undefined),
   showPremiumLearningCta: Boolean((post as NewsArticle & { showPremiumLearningCta?: boolean }).showPremiumLearningCta),
 });
 
@@ -45,6 +47,7 @@ const emptyPost = (): EditablePost => ({
   imageSeed: `post-${Date.now()}`,
   thumbnailImage: '',
   coverImage: '',
+  imageLayout: 'cover',
   excerpt: '',
   content: '<h2>Start with the big idea</h2><p>Write a clear, student-focused introduction here.</p><ul><li>Add practical takeaways.</li><li>Keep paragraphs readable.</li></ul>',
   showPremiumLearningCta: false,
@@ -124,24 +127,26 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
   };
 
   const uploadCoverImage = async (_file: File) => {
-    setCoverUploadError('Storage upload is currently disabled. Please use an image URL.');
+    setCoverUploadError('File upload requires Firebase Storage. Use Image URL for now.');
   };
 
 
   const savePost = () => {
     if ((editingPost.coverImage || '').trim() && coverImageStatus !== 'valid') {
-      setCoverUploadError('Please paste a valid https image URL.');
+      setCoverUploadError(coverImageStatus === 'invalid' ? 'This image link is not loading. Try another public image URL.' : 'Please paste a valid https image URL.');
       return;
     }
     const now = new Date().toISOString();
+    const resolvedCoverImage = (editingPost.coverImage || editingPost.thumbnailImage || '').trim();
     const preparedPost: EditablePost = {
       ...editingPost,
       id: editingPost.id || Date.now(),
       date: editingPost.date || now.split('T')[0],
       createdAt: editingPost.createdAt || now,
       imageSeed: editingPost.imageSeed || `post-${Date.now()}`,
-      coverImage: editingPost.coverImage || editingPost.thumbnailImage || '',
-      thumbnailImage: editingPost.thumbnailImage || editingPost.coverImage || '',
+      coverImage: resolvedCoverImage,
+      thumbnailImage: resolvedCoverImage,
+      ...(resolvedCoverImage ? { imageLayout: 'cover' as const, sourceType: 'url' as const } : {}),
       excerpt: editingPost.excerpt || editingPost.content.replace(/<[^>]+>/g, ' ').trim().slice(0, 180),
       showPremiumLearningCta: Boolean(editingPost.showPremiumLearningCta),
     };

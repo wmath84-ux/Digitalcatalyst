@@ -46,8 +46,18 @@ const AdminPostManagement: React.FC = () => {
     const body = text.trim();
     const options = pollOptions.map((item) => item.trim()).filter(Boolean);
 
-    if (!body || (type === 'poll' && options.length < 2) || (type === 'image' && (!image || imageStatus !== 'valid'))) {
+    if (!body) {
       setFeedback('Please complete the required admin post fields before publishing.');
+      return;
+    }
+
+    if (type === 'poll' && options.length < 2) {
+      setFeedback('Please add at least two poll options before publishing.');
+      return;
+    }
+
+    if (type === 'image' && (!image.trim() || imageStatus !== 'valid')) {
+      setFeedback(image.trim() ? 'This image link is not loading. Try another public image URL.' : 'Please paste a valid https image URL.');
       return;
     }
 
@@ -65,6 +75,7 @@ const AdminPostManagement: React.FC = () => {
       badge: 'ADMIN POST',
       title: type === 'poll' ? 'Admin poll' : type === 'image' ? 'Admin image update' : 'Admin update',
       body: link.trim() ? `${body}\n\nLink: ${link.trim()}` : body,
+      link: link.trim() || undefined,
       time: 'Just now',
       creatorId: 'admin',
       ownerId: 'admin',

@@ -469,6 +469,8 @@ export interface NewsArticle {
   type?: 'news' | 'blog';
   thumbnailImage?: string;
   coverImage: string;
+  imageLayout?: 'thumbnail' | 'cover';
+  sourceType?: 'url';
   createdAt?: string;
   showPremiumLearningCta?: boolean;
 }
