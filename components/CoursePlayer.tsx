@@ -1050,6 +1050,27 @@ const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
 );
 
 
+const getGoogleDriveDirectMediaUrl = (url: string | null | undefined): string | null => {
+  if (!url) return null;
+
+  const raw = String(url).trim();
+  const patterns = [
+    /\/file\/d\/([a-zA-Z0-9_-]+)/,
+    /[?&]id=([a-zA-Z0-9_-]+)/,
+    /\/uc\?[^#]*[?&]id=([a-zA-Z0-9_-]+)/,
+    /\/open\?[^#]*[?&]id=([a-zA-Z0-9_-]+)/,
+  ];
+
+  for (const pattern of patterns) {
+    const match = raw.match(pattern);
+    if (match?.[1]) {
+      return `https://drive.google.com/uc?export=download&id=${encodeURIComponent(match[1])}`;
+    }
+  }
+
+  return null;
+};
+
 const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void; onVideoFullscreen?: () => void; showFullscreen?: boolean; }> = ({ file, onError, onVideoFullscreen, showFullscreen = false }) => {
   const isAudio = file.type === 'audio';
   const normalizedMedia = normalizeMediaSource(file, { type: isAudio ? 'audio' : 'video' });
@@ -1065,10 +1086,11 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
       : 'This media link needs public access. Open externally if inline playback is blocked.';
   const sourceBadge = normalizedMedia.isLegacy ? 'Legacy safe media' : normalizedMedia.sourceType === 'url' ? 'URL media' : normalizedMedia.provider === 'firebase-storage' ? 'Storage media' : 'Hosted media';
   const [mediaFailed, setMediaFailed] = useState(false);
+  const [nativeDriveFailed, setNativeDriveFailed] = useState(false);
   const mediaBodyRef = useRef<HTMLDivElement | null>(null);
   const [mediaBodySize, setMediaBodySize] = useState({ width: 0, height: 0 });
 
-  useEffect(() => { setMediaFailed(false); }, [file.id, openUrl, previewUrl]);
+  useEffect(() => { setMediaFailed(false); setNativeDriveFailed(false); }, [file.id, openUrl, previewUrl]);
 
   useEffect(() => {
     const body = mediaBodyRef.current;
@@ -1122,6 +1144,38 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
 
   if (isDrive && previewUrl && !mediaFailed) {
     const driveTitle = file.name || (isAudio ? 'Google Drive audio preview' : 'Google Drive video preview');
+    const driveMediaSource = getGoogleDriveDirectMediaUrl(openUrl || previewUrl);
+
+    if (driveMediaSource && !nativeDriveFailed) {
+      if (isAudio) {
+        return (
+          <div className="course-drive-native-embed course-drive-native-audio-embed h-full min-h-0 w-full overflow-hidden bg-black">
+            <audio
+              title={driveTitle}
+              src={driveMediaSource}
+              className="course-drive-html5-audio"
+              controls
+              preload="metadata"
+              onError={() => setNativeDriveFailed(true)}
+            />
+          </div>
+        );
+      }
+
+      return (
+        <div className="course-drive-native-embed h-full min-h-0 w-full overflow-hidden bg-black">
+          <video
+            title={driveTitle}
+            src={driveMediaSource}
+            className="course-drive-html5-video h-full w-full bg-black"
+            controls
+            playsInline
+            preload="metadata"
+            onError={() => setNativeDriveFailed(true)}
+          />
+        </div>
+      );
+    }
 
     return (
       <div className="course-drive-native-embed h-full min-h-0 w-full overflow-hidden bg-black">
@@ -1136,6 +1190,7 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
       </div>
     );
   }
+
 
   return (
     <div className="course-drive-media-viewport flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-[radial-gradient(circle_at_18%_10%,rgba(123,97,255,0.24),transparent_28%),linear-gradient(135deg,#EEF6FF,#F8FBFF_48%,#F1EEFF)] p-3 text-[#081A45] sm:p-5 custom-scrollbar">
