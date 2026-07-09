@@ -1095,7 +1095,13 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
               <div className="mb-5 flex h-24 items-end gap-1.5 overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-4">
                 {Array.from({ length: 34 }).map((_, index) => <span key={index} className="w-full rounded-full bg-white/75" style={{ height: `${20 + ((index * 17) % 72)}%` }} />)}
               </div>
-              {directPlayable && !mediaFailed ? <audio src={openUrl} controls className="w-full" onError={handleMediaError} /> : (
+              {directPlayable && !mediaFailed ? (
+                <audio src={openUrl} controls className="w-full" onError={handleMediaError} />
+              ) : isDrive && previewUrl && !mediaFailed ? (
+                <div className="overflow-hidden rounded-2xl border border-white/15 bg-black/30 shadow-2xl">
+                  <iframe title={file.name || 'Google Drive audio preview'} src={previewUrl} className="h-64 w-full border-0 bg-white sm:h-80" allow="autoplay; fullscreen" allowFullScreen onError={handleMediaError} />
+                </div>
+              ) : (
                 <MediaFallbackCard title={file.name || 'Audio lesson'} badge={isDrive ? 'Drive audio' : 'Audio'} icon="🎧" message={isDrive ? 'This Drive file needs public access.' : 'Audio source unavailable'} actionHref={openUrl} actionLabel={isDrive ? 'Open in Drive' : 'Open source'} aspect="auto" className="min-h-40 rounded-2xl border-white/15" />
               )}
             </div>
