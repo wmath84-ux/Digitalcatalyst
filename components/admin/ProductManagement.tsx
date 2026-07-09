@@ -337,13 +337,14 @@ const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] te
 
 
 type HostedDocsProvider = 'direct_pdf' | 'google_drive_pdf' | 'google_drive_doc' | 'external_docs_link' | 'open_docs';
+type MediaUrlProvider = 'direct_audio' | 'direct_video' | 'google_drive_audio' | 'google_drive_video' | 'external_media';
 
 type ContentComposerFormState = {
     type: ProductFileType;
     url: string;
     name: string;
     content: string;
-    provider?: HostedDocsProvider | 'upload' | 'external_url';
+    provider?: HostedDocsProvider | MediaUrlProvider | 'upload' | 'external_url' | 'drive' | 'direct' | 'external';
     accessLevel?: CourseAccessLevel;
     paidUpdateId?: string;
     paidUpdateTitle?: string;
@@ -360,6 +361,16 @@ const hostedDocsProviderLabels: Record<HostedDocsProvider, string> = {
 };
 
 const hostedDocsProviders: HostedDocsProvider[] = ['direct_pdf', 'google_drive_pdf', 'google_drive_doc', 'open_docs', 'external_docs_link'];
+const mediaUrlProviders: MediaUrlProvider[] = ['direct_audio', 'direct_video', 'google_drive_audio', 'google_drive_video', 'external_media'];
+
+const isMediaUrlProvider = (provider?: string): provider is MediaUrlProvider => Boolean(provider && mediaUrlProviders.includes(provider as MediaUrlProvider));
+const mediaProviderLabel = (provider?: string) => {
+    if (provider === 'direct_audio') return 'Direct Audio URL';
+    if (provider === 'direct_video') return 'Direct Video URL';
+    if (provider === 'google_drive_audio') return 'Google Drive Audio URL';
+    if (provider === 'google_drive_video') return 'Google Drive Video URL';
+    return 'External Hosted Media URL';
+};
 
 const extractGoogleDriveFileId = (value: string) => {
     const trimmed = value.trim();
@@ -384,6 +395,10 @@ const extractGoogleDriveFileId = (value: string) => {
 };
 
 const isGoogleDriveUrl = (value: string) => /https:\/\/(?:drive|docs)\.google\.com\//i.test(value.trim());
+const isDirectAudioUrl = (value: string) => /\.(mp3|m4a|aac|wav|ogg|oga|opus)(?:$|[?#])/i.test(value.trim());
+const isDirectVideoUrl = (value: string) => /\.(mp4|webm|mov|m4v|ogv)(?:$|[?#])/i.test(value.trim());
+const mediaProviderToProductProvider = (provider?: string) => provider === 'google_drive_audio' || provider === 'google_drive_video' ? 'drive' : provider === 'direct_audio' || provider === 'direct_video' ? 'direct' : 'external';
+const mediaProviderContentType = (type: ProductFileType, provider?: string, url = '') => type === 'audio' ? (provider === 'direct_audio' || isDirectAudioUrl(url) ? 'audio/url' : 'audio/external') : type === 'video' ? (provider === 'direct_video' || isDirectVideoUrl(url) ? 'video/url' : 'video/external') : undefined;
 
 const toGoogleDrivePreviewUrl = (value: string) => {
     const fileId = extractGoogleDriveFileId(value);
@@ -1028,8 +1043,10 @@ const ContentComposer: React.FC<{
         };
     };
 
-    const contentTypes: Array<{ type: ProductFileType; title: string; description: string; icon: string; accept?: string; action?: 'docsUrl' }> = [
-        { type: 'video', title: 'Video Upload', description: 'Upload MP4/WebM lesson files.', icon: '🎬', accept: 'video/*' },
+    const contentTypes: Array<{ type: ProductFileType; title: string; description: string; icon: string; accept?: string; action?: 'docsUrl' | 'audioUrl' | 'videoUrl' | 'driveAudioUrl' | 'driveVideoUrl' | 'externalMediaUrl' }> = [
+        { type: 'video', title: 'Video Upload', description: 'File upload requires Firebase Storage. Use URL media for now.', icon: '🎬', accept: 'video/*' },
+        { type: 'video', title: 'Video URL', description: 'Paste direct MP4/WebM or hosted video URL.', icon: '🔗', action: 'videoUrl' },
+        { type: 'video', title: 'Google Drive Video URL', description: 'Paste a public Drive video share link.', icon: '▶️', action: 'driveVideoUrl' },
         { type: 'youtube', title: 'YouTube Video', description: 'Embed a hosted YouTube lesson.', icon: '▶️' },
         { type: 'pdf', title: 'PDF', description: 'Attach worksheets, notes, or guides.', icon: '📄', accept: 'application/pdf' },
         { type: 'doc', title: 'Open Docs', description: 'Open a full-page builder for multi-page lesson notes.', icon: '🧠' },
@@ -1038,10 +1055,18 @@ const ContentComposer: React.FC<{
         { type: 'link', title: 'External Link', description: 'Reference any hosted resource.', icon: '🔗' },
         { type: 'sheet', title: 'Spreadsheet', description: 'Upload CSV/XLS study material.', icon: '📊', accept: '.csv,.xls,.xlsx' },
         { type: 'ebook', title: 'E-book', description: 'Upload EPUB or PDF book content.', icon: '📚', accept: '.epub,.pdf' },
-        { type: 'audio', title: 'Audio', description: 'Upload audio classes or podcasts.', icon: '🎧', accept: 'audio/*' },
+        { type: 'audio', title: 'Audio Upload', description: 'File upload requires Firebase Storage. Use URL media for now.', icon: '🎧', accept: 'audio/*' },
+        { type: 'audio', title: 'Audio URL', description: 'Paste direct MP3/M4A/WAV or hosted audio URL.', icon: '🎧', action: 'audioUrl' },
+        { type: 'audio', title: 'Google Drive Audio URL', description: 'Paste a public Drive audio share link.', icon: '☁️', action: 'driveAudioUrl' },
+        { type: 'video', title: 'External Hosted Media URL', description: 'Use a secure hosted media link with fallback card.', icon: '🌐', action: 'externalMediaUrl' },
     ];
 
     const triggerFileUpload = (type: ProductFileType, accept: string) => {
+        if (type === 'audio' || type === 'video') {
+            setUploadError('Firebase Storage upload is currently disabled. Use URL media for now.');
+            setLastUploadRequest(null);
+            return;
+        }
         setUploadConfig({ type, accept });
         fileInputRef.current?.click();
     };
@@ -1066,6 +1091,18 @@ const ContentComposer: React.FC<{
         if (type === 'quiz') {
             setQuizQuestions([{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
         }
+    };
+
+
+    const showMediaUrlForm = (type: 'audio' | 'video', provider: MediaUrlProvider) => {
+        setFormState({
+            type,
+            provider,
+            url: '',
+            name: type === 'audio' ? 'Audio lesson' : 'Video lesson',
+            content: '',
+        });
+        setDocError('');
     };
 
     const showDocsUrlForm = () => {
@@ -1184,6 +1221,22 @@ const ContentComposer: React.FC<{
         setQuizQuestions(prev => [...(prev || []), { prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
     };
 
+
+    const previewMediaUrl = () => {
+        if (!formState || !isMediaUrlProvider(formState.provider)) return;
+        const trimmedUrl = formState.url.trim();
+        if (!trimmedUrl || !trimmedUrl.startsWith('https://')) {
+            setDocError('Please paste a valid https media URL.');
+            return;
+        }
+        if ((formState.provider === 'google_drive_audio' || formState.provider === 'google_drive_video') && (!isGoogleDriveUrl(trimmedUrl) || !extractGoogleDriveFileId(trimmedUrl))) {
+            setDocError('Google Drive file must be public or shared with anyone with the link.');
+            return;
+        }
+        const directPlayable = formState.type === 'audio' ? isDirectAudioUrl(trimmedUrl) : isDirectVideoUrl(trimmedUrl);
+        setDocError(directPlayable || formState.provider?.startsWith('google_drive') ? 'Media preview ready. Save to course when ready.' : 'This media link may not support direct playback. It will open in a secure preview card.');
+    };
+
     const handleFormSubmit = () => {
         if (!formState) return;
 
@@ -1275,6 +1328,45 @@ const ContentComposer: React.FC<{
             return;
         }
 
+        if (isMediaUrlProvider(provider)) {
+            if (!trimmedUrl || !trimmedUrl.startsWith('https://')) {
+                setDocError('Please paste a valid https media URL.');
+                return;
+            }
+
+            const isDriveProvider = provider === 'google_drive_audio' || provider === 'google_drive_video';
+            if (isDriveProvider && (!isGoogleDriveUrl(trimmedUrl) || !extractGoogleDriveFileId(trimmedUrl))) {
+                setDocError('Google Drive file must be public or shared with anyone with the link.');
+                return;
+            }
+
+            const isDirectProvider = provider === 'direct_audio' || provider === 'direct_video';
+            const isDirectPlayable = formState.type === 'audio' ? isDirectAudioUrl(trimmedUrl) : isDirectVideoUrl(trimmedUrl);
+            const now = Date.now();
+            const embedUrl = isDriveProvider ? toGoogleDrivePreviewUrl(trimmedUrl) : '';
+
+            if (isDirectProvider && !isDirectPlayable) {
+                setDocError('This media link may not support direct playback. It will open in a secure preview card. Click Save to continue, or paste a direct media file URL.');
+            }
+
+            onAdd({
+                name: trimmedName,
+                type: formState.type,
+                url: trimmedUrl,
+                provider: isDirectProvider && !isDirectPlayable ? 'external' : mediaProviderToProductProvider(provider),
+                sourceType: 'url',
+                embedUrl,
+                contentType: mediaProviderContentType(formState.type, provider, trimmedUrl),
+                createdAt: initialFile?.createdAt || now,
+                updatedAt: now,
+                content: '',
+                ...buildContentAccessMeta(formState),
+                quiz: { questions: [] },
+            });
+            onClose();
+            return;
+        }
+
         if (trimmedUrl && !trimmedUrl.startsWith('https://')) {
             setDocError('Resource URL must start with https://');
             return;
@@ -1331,7 +1423,7 @@ const ContentComposer: React.FC<{
                         <button
                             key={`${item.type}-${item.title}`}
                             type="button"
-                            onClick={() => item.action === 'docsUrl' ? showDocsUrlForm() : item.accept ? triggerFileUpload(item.type, item.accept) : showForm(item.type)}
+                            onClick={() => item.action === 'docsUrl' ? showDocsUrlForm() : item.action === 'audioUrl' ? showMediaUrlForm('audio', 'direct_audio') : item.action === 'videoUrl' ? showMediaUrlForm('video', 'direct_video') : item.action === 'driveAudioUrl' ? showMediaUrlForm('audio', 'google_drive_audio') : item.action === 'driveVideoUrl' ? showMediaUrlForm('video', 'google_drive_video') : item.action === 'externalMediaUrl' ? showMediaUrlForm('video', 'external_media') : item.accept ? triggerFileUpload(item.type, item.accept) : showForm(item.type)}
                             className="rounded-2xl border border-white/50 bg-white/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/50 hover:bg-white/80 hover:shadow-sm"
                         >
                             <span className="text-2xl">{item.icon}</span>
@@ -1481,7 +1573,7 @@ const ContentComposer: React.FC<{
                                 )}
                                 {formState.provider !== 'open_docs' && (
                                     <div>
-                                        <label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : 'Resource URL'}</label>
+                                        <label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : isMediaUrlProvider(formState.provider) ? 'Paste Media URL' : 'Resource URL'}</label>
                                         <input
                                             value={formState.url}
                                             onChange={event => {
@@ -1489,8 +1581,14 @@ const ContentComposer: React.FC<{
                                                 setFormState(prev => prev ? { ...prev, url: event.target.value } : prev);
                                             }}
                                             className={fieldClass}
-                                            placeholder={formState.type === 'youtube' ? 'https://www.youtube.com/watch?v=VIDEO_ID' : 'https://example.com/resource'}
+                                            placeholder={formState.type === 'youtube' ? 'https://www.youtube.com/watch?v=VIDEO_ID' : isMediaUrlProvider(formState.provider) ? 'https://drive.google.com/file/d/FILE_ID/view or https://example.com/media.mp4' : 'https://example.com/resource'}
                                         />
+                                        {isMediaUrlProvider(formState.provider) && (
+                                            <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800">
+                                                <p>{mediaProviderLabel(formState.provider)} · Google Drive link supported. File upload requires Firebase Storage. Use URL media for now.</p>
+                                                <button type="button" onClick={previewMediaUrl} className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white">Preview media</button>
+                                            </div>
+                                        )}
                                         {formState.type === 'youtube' && (
                                             <p className="mt-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
                                                 Paste a public YouTube video link. Watch, youtu.be, embed, shorts, live, and raw video ID formats are supported.
@@ -1514,7 +1612,7 @@ const ContentComposer: React.FC<{
                                 Back
                             </button>
                             <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-600 px-6 py-3 font-black text-white shadow-sm hover:bg-cyan-700">
-                                {isEditing ? 'Save Content' : 'Add Content'}
+                                {isMediaUrlProvider(formState.provider) ? 'Save to course' : isEditing ? 'Save Content' : 'Add Content'}
                             </button>
                         </div>
                     </div>
@@ -1523,10 +1621,10 @@ const ContentComposer: React.FC<{
 
             <input ref={fileInputRef} type="file" accept={uploadConfig?.accept} onChange={handleFileSelected} className="hidden" />
             {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content... {uploadProgress}% complete. Audio/video/PDF files are added only after Firebase Storage returns a download URL.</p>}
-            {!isUploading && uploadError && lastUploadRequest ? (
+            {!isUploading && uploadError ? (
                 <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-3">
                     <p className="text-sm font-bold text-rose-700">{uploadError}</p>
-                    <button type="button" onClick={() => runFileUpload(lastUploadRequest.file, lastUploadRequest.config)} className="mt-3 rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white">Retry upload</button>
+                    {lastUploadRequest ? <button type="button" onClick={() => runFileUpload(lastUploadRequest.file, lastUploadRequest.config)} className="mt-3 rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white">Retry upload</button> : null}
                 </div>
             ) : null}
         </div>
