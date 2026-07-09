@@ -35,7 +35,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
   const [activeFilter, setActiveFilter] = useState<string>('All');
   const sectionRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
-  const [isMobileFilterCompact, setIsMobileFilterCompact] = useState(false);
+  const [isStoreFilterCompact, setIsStoreFilterCompact] = useState(false);
   const isMobileHome = variant === 'mobileHome';
 
   useEffect(() => {
@@ -73,30 +73,33 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
     if (typeof window === 'undefined') return;
 
     let rafId = 0;
-    const updateMobileSearchChrome = () => {
+    const updateStoreSearchChrome = () => {
       window.cancelAnimationFrame(rafId);
       rafId = window.requestAnimationFrame(() => {
         const section = sectionRef.current;
-        const isMobileViewport = window.innerWidth < 640;
 
-        if (!section || !isMobileViewport) {
-          setIsMobileFilterCompact(false);
+        if (!section) {
+          setIsStoreFilterCompact(false);
           return;
         }
 
         const rect = section.getBoundingClientRect();
-        setIsMobileFilterCompact(rect.top < 8 && rect.bottom > 220);
+        const isMobileViewport = window.innerWidth < 640;
+        const compactTop = isMobileViewport ? 8 : 72;
+        const visibleBottom = isMobileViewport ? 220 : 360;
+
+        setIsStoreFilterCompact(rect.top < compactTop && rect.bottom > visibleBottom);
       });
     };
 
-    updateMobileSearchChrome();
-    window.addEventListener('scroll', updateMobileSearchChrome, { passive: true });
-    window.addEventListener('resize', updateMobileSearchChrome);
+    updateStoreSearchChrome();
+    window.addEventListener('scroll', updateStoreSearchChrome, { passive: true });
+    window.addEventListener('resize', updateStoreSearchChrome);
 
     return () => {
       window.cancelAnimationFrame(rafId);
-      window.removeEventListener('scroll', updateMobileSearchChrome);
-      window.removeEventListener('resize', updateMobileSearchChrome);
+      window.removeEventListener('scroll', updateStoreSearchChrome);
+      window.removeEventListener('resize', updateStoreSearchChrome);
     };
   }, []);
 
@@ -148,7 +151,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
           <p className="mt-3 text-base text-[#536178] sm:mt-4 sm:text-lg">{isMobileHome ? 'Find courses, notes, PDFs, and learning tools instantly.' : 'Search by title, subject, class, tags, keyword, format, or course description.'}</p>
         </div>
 
-        <div className={`sticky top-1 z-20 mx-auto max-w-6xl border border-blue-100/90 bg-white/90 shadow-[0_18px_55px_rgba(23,105,255,0.10)] backdrop-blur-xl animate-child animate-delay-2 transition-all duration-300 sm:static sm:rounded-[2rem] sm:p-4 ${isMobileFilterCompact ? 'rounded-[1.25rem] p-2' : 'rounded-[1.6rem] p-3'}`}>
+        <div className={`sticky top-1 z-20 mx-auto max-w-6xl border border-blue-100/90 bg-white/90 shadow-[0_18px_55px_rgba(23,105,255,0.10)] backdrop-blur-xl animate-child animate-delay-2 transition-all duration-300 sm:top-3 lg:top-4 ${isStoreFilterCompact ? 'rounded-[1.25rem] p-2 sm:rounded-[1.5rem] sm:p-3' : 'rounded-[1.6rem] p-3 sm:rounded-[2rem] sm:p-4'}`}>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             {!hideInternalSearch && (
               <div className="relative min-h-[52px] flex-1">
@@ -158,18 +161,18 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
                 {searchQuery && <button type="button" onClick={clearSearch} aria-label="Clear product search" className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white text-[#536178] shadow-sm transition hover:text-[#1769FF]">×</button>}
               </div>
             )}
-            <div className={`${isMobileFilterCompact ? 'hidden sm:flex' : 'flex'} flex-col gap-3 sm:flex-row lg:w-auto`}>
+            <div className={`${isStoreFilterCompact ? 'hidden' : 'flex'} flex-col gap-3 sm:flex-row lg:w-auto`}>
               <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)} aria-label="Sort products" className="h-12 rounded-full border border-blue-100 bg-white px-4 text-sm font-bold text-[#081A45] outline-none focus:border-[#1769FF] focus:ring-4 focus:ring-blue-100">
                 <option value="recommended">Recommended</option><option value="newest">Newest</option><option value="rating">Top rated</option><option value="price-asc">Price low to high</option><option value="price-desc">Price high to low</option><option value="free-first">Free first</option><option value="popular">Popular</option>
               </select>
               <button type="button" onClick={clearAll} className="h-12 rounded-full border border-blue-100 bg-white px-5 text-sm font-black text-[#1769FF] transition hover:bg-blue-50">Clear all</button>
             </div>
           </div>
-          <div className={`${isMobileFilterCompact ? 'hidden sm:flex' : 'flex'} mt-3 items-center justify-between gap-3 text-sm font-bold text-[#536178]`} aria-live="polite"><span>{isSearching ? 'Searching…' : `${displayProducts.length} product${displayProducts.length === 1 ? '' : 's'} found`}</span><span className="hidden sm:inline">Partial words, tags, keywords, and descriptions supported</span></div>
-          <div className={`${isMobileFilterCompact ? 'hidden sm:flex' : 'flex'} mt-4 gap-2 overflow-x-auto pb-1`} aria-label="Product category filters">
+          <div className={`${isStoreFilterCompact ? 'hidden' : 'flex'} mt-3 items-center justify-between gap-3 text-sm font-bold text-[#536178]`} aria-live="polite"><span>{isSearching ? 'Searching…' : `${displayProducts.length} product${displayProducts.length === 1 ? '' : 's'} found`}</span><span className="hidden sm:inline">Partial words, tags, keywords, and descriptions supported</span></div>
+          <div className={`${isStoreFilterCompact ? 'hidden' : 'flex'} mt-4 gap-2 overflow-x-auto pb-1`} aria-label="Product category filters">
             {filters.map(filter => <button key={filter} type="button" onClick={() => setActiveFilter(filter)} className={`shrink-0 rounded-full px-4 py-2 text-xs font-black transition sm:text-sm ${activeFilter === filter ? 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-[0_12px_30px_rgba(23,105,255,0.22)]' : 'border border-blue-100 bg-[#F8FBFF] text-[#536178] hover:bg-white hover:text-[#1769FF]'}`}>{filter}</button>)}
           </div>
-          <div className={`${isMobileFilterCompact ? 'hidden sm:flex' : 'flex'} mt-3 gap-2 overflow-x-auto pb-1`} aria-label="Search suggestions">
+          <div className={`${isStoreFilterCompact ? 'hidden' : 'flex'} mt-3 gap-2 overflow-x-auto pb-1`} aria-label="Search suggestions">
             {suggestions.map(suggestion => <button key={suggestion} type="button" onClick={() => setSearchQuery(suggestion)} className="shrink-0 rounded-full bg-violet-50 px-3 py-1.5 text-xs font-bold text-[#7B61FF] transition hover:bg-violet-100">{suggestion}</button>)}
           </div>
         </div>
