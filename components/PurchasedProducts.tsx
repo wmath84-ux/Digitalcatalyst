@@ -107,6 +107,19 @@ const PurchasedProducts: React.FC<PurchasedProductsProps> = ({ settings, product
             />
           ))}
         </div>
+
+        {!isMobileHome ? (
+          <footer className="purchase-page-tablet-scroll-footer mt-10 hidden md:block 2xl:hidden" aria-label="Purchase page scroll footer">
+            <div className="mx-auto max-w-4xl rounded-[2rem] border border-[#D9E7F8] bg-white/80 p-6 text-center shadow-[0_18px_45px_rgba(8,26,69,0.08)] backdrop-blur-xl">
+              <p className="text-xs font-black uppercase tracking-[0.28em] text-[#1769FF]">Learning library</p>
+              <h3 className="mt-2 text-xl font-black text-[#081A45]">Your purchased products are ready whenever you are.</h3>
+              <p className="mx-auto mt-2 max-w-2xl text-sm font-medium leading-6 text-[#536178]">
+                This soft footer keeps the purchases page comfortable to scroll on tablet and medium screens without changing your product access flow.
+              </p>
+            </div>
+            <div className="h-[22vh] min-h-32" aria-hidden="true" />
+          </footer>
+        ) : null}
       </div>
     </section>
   );
