@@ -22,9 +22,9 @@ type PremiumImageUrlInputProps = {
 
 export const IMAGE_URL_MESSAGES = {
   invalidHttps: 'Please paste a valid https image URL.',
-  notLoading: 'This image link is not loading. Try another direct image URL.',
-  ready: 'Image preview ready.',
-  storageDisabled: 'Storage upload is currently disabled. Please use an image URL.',
+  notLoading: 'This image link is not loading. Try another public image URL.',
+  ready: 'Image ready to publish.',
+  storageDisabled: 'Direct image upload is disabled for now. Use image URL.',
   saved: 'Image URL saved successfully.',
 };
 
