@@ -9,6 +9,8 @@ import { normalizeCoinPrice } from '../../utils/economy';
 import { parseKeywordList, withProductSearchIndex } from '../../utils/productSearch';
 import { validateProductImageUpload } from '../../utils/productImageUpload.js';
 import PremiumImageUrlInput, { PremiumImageUrlStatus } from '../common/PremiumImageUrlInput';
+import PremiumMediaUrlInput from '../common/PremiumMediaUrlInput';
+import { buildUrlMediaSource, getFriendlyStorageErrorMessage, getStorageDisabledMessage, isStorageUploadEnabled } from '../../utils/mediaMode';
 
 type ProductViewState = 'list' | 'add' | 'edit';
 
@@ -1062,8 +1064,8 @@ const ContentComposer: React.FC<{
     ];
 
     const triggerFileUpload = (type: ProductFileType, accept: string) => {
-        if (type === 'audio' || type === 'video') {
-            setUploadError('Firebase Storage upload is currently disabled. Use URL media for now.');
+        if (!isStorageUploadEnabled()) {
+            setUploadError(getStorageDisabledMessage(type));
             setLastUploadRequest(null);
             return;
         }
@@ -1175,7 +1177,7 @@ const ContentComposer: React.FC<{
             setLastUploadRequest(null);
             onClose();
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'UNKNOWN_UPLOAD_ERROR: File upload failed.';
+            const message = getFriendlyStorageErrorMessage(error);
             console.error('Admin content upload failed:', error);
             setUploadError(message);
             alert(message);
@@ -1353,9 +1355,7 @@ const ContentComposer: React.FC<{
                 name: trimmedName,
                 type: formState.type,
                 url: trimmedUrl,
-                provider: isDirectProvider && !isDirectPlayable ? 'external' : mediaProviderToProductProvider(provider),
-                sourceType: 'url',
-                embedUrl,
+                ...buildUrlMediaSource({ provider: isDirectProvider && !isDirectPlayable ? 'external' : mediaProviderToProductProvider(provider), url: trimmedUrl, embedUrl }),
                 contentType: mediaProviderContentType(formState.type, provider, trimmedUrl),
                 createdAt: initialFile?.createdAt || now,
                 updatedAt: now,
@@ -1573,7 +1573,9 @@ const ContentComposer: React.FC<{
                                 )}
                                 {formState.provider !== 'open_docs' && (
                                     <div>
-                                        <label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : isMediaUrlProvider(formState.provider) ? 'Paste Media URL' : 'Resource URL'}</label>
+                                        {isMediaUrlProvider(formState.provider) ? (
+                                            <PremiumMediaUrlInput kind={formState.type === 'audio' ? 'audio' : 'video'} value={formState.url} onChange={(url) => { setDocError(''); setFormState(prev => prev ? { ...prev, url } : prev); }} label={mediaProviderLabel(formState.provider)} helperText="Paste a public media URL. Google Drive links and direct audio/video URLs are supported." />
+                                        ) : (<><label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : 'Resource URL'}</label>
                                         <input
                                             value={formState.url}
                                             onChange={event => {
@@ -1581,11 +1583,11 @@ const ContentComposer: React.FC<{
                                                 setFormState(prev => prev ? { ...prev, url: event.target.value } : prev);
                                             }}
                                             className={fieldClass}
-                                            placeholder={formState.type === 'youtube' ? 'https://www.youtube.com/watch?v=VIDEO_ID' : isMediaUrlProvider(formState.provider) ? 'https://drive.google.com/file/d/FILE_ID/view or https://example.com/media.mp4' : 'https://example.com/resource'}
-                                        />
+                                            placeholder={formState.type === 'youtube' ? 'https://www.youtube.com/watch?v=VIDEO_ID' : 'https://example.com/resource'}
+                                        /></>)}
                                         {isMediaUrlProvider(formState.provider) && (
                                             <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800">
-                                                <p>{mediaProviderLabel(formState.provider)} · Google Drive link supported. File upload requires Firebase Storage. Use URL media for now.</p>
+                                                <p>Current mode: URL media. Upload file is a future Storage feature.</p>
                                                 <button type="button" onClick={previewMediaUrl} className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white">Preview media</button>
                                             </div>
                                         )}
