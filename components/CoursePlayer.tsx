@@ -1120,6 +1120,23 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
 
   const handleMediaError = () => { setMediaFailed(true); onError?.(); };
 
+  if (isDrive && previewUrl && !mediaFailed) {
+    const driveTitle = file.name || (isAudio ? 'Google Drive audio preview' : 'Google Drive video preview');
+
+    return (
+      <div className="course-drive-native-embed h-full min-h-0 w-full overflow-hidden bg-black">
+        <iframe
+          title={driveTitle}
+          src={previewUrl}
+          className="course-drive-native-iframe h-full w-full border-0 bg-white"
+          allow="autoplay; fullscreen"
+          allowFullScreen
+          onError={handleMediaError}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="course-drive-media-viewport flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-[radial-gradient(circle_at_18%_10%,rgba(123,97,255,0.24),transparent_28%),linear-gradient(135deg,#EEF6FF,#F8FBFF_48%,#F1EEFF)] p-3 text-[#081A45] sm:p-5 custom-scrollbar">
       <section className="course-drive-media-card w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/70 bg-white/82 shadow-[0_28px_90px_rgba(23,105,255,0.18)] backdrop-blur-2xl">
