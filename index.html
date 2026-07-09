@@ -32,13 +32,27 @@
         }, { passive: false });
 
         const setViewportVars = () => {
-          document.documentElement.style.setProperty('--app-vh', `${window.innerHeight * 0.01}px`);
-          document.documentElement.dataset.orientation = window.innerWidth >= window.innerHeight ? 'landscape' : 'portrait';
+          const viewport = window.visualViewport;
+          const width = Math.round(viewport?.width || window.innerWidth || document.documentElement.clientWidth || 0);
+          const height = Math.round(viewport?.height || window.innerHeight || document.documentElement.clientHeight || 0);
+          document.documentElement.style.setProperty('--app-vh', `${height * 0.01}px`);
+          document.documentElement.style.setProperty('--app-dvh', `${height}px`);
+          document.documentElement.style.setProperty('--app-vw', `${width}px`);
+          document.documentElement.dataset.orientation = width >= height ? 'landscape' : 'portrait';
+          document.documentElement.classList.add('viewport-ready');
         };
 
         setViewportVars();
+        requestAnimationFrame(setViewportVars);
+        window.setTimeout(setViewportVars, 120);
+        window.setTimeout(setViewportVars, 420);
         window.addEventListener('resize', setViewportVars, { passive: true });
-        window.addEventListener('orientationchange', () => window.setTimeout(setViewportVars, 60), { passive: true });
+        window.visualViewport?.addEventListener('resize', setViewportVars, { passive: true });
+        window.addEventListener('orientationchange', () => {
+          setViewportVars();
+          window.setTimeout(setViewportVars, 80);
+          window.setTimeout(setViewportVars, 260);
+        }, { passive: true });
       })();
     </script>
     <script src="https://cdn.tailwindcss.com"></script>

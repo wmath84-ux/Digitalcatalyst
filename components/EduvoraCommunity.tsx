@@ -9,6 +9,7 @@ import type { User, WebsiteSettings } from '../App';
 import { mergeCommunitySupportTickets, isSupportTicketNeedsAttention } from '../utils/communitySupportBadge';
 import CommunityAiMentor from './CommunityAiMentor';
 import PremiumImageUrlInput, { PremiumImageUrlStatus } from './common/PremiumImageUrlInput';
+import { uploadImageToCloudinary } from '../utils/cloudinaryUpload';
 import { getStorageDisabledMessage, isStorageUploadEnabled } from '../utils/mediaMode';
 import { buildPostImageFallback, normalizeMediaSource } from '../utils/mediaCompat';
 import SafeImage from './common/SafeImage';
@@ -52,7 +53,7 @@ type Creator = {
   isPublic?: boolean;
   isSuspended?: boolean;
 };
-type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'status'; sourceType?: 'url'; text?: string; creatorId?: string; authorName?: string; authorAvatar?: string };
+type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; viewedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'status'; sourceType?: 'url'; text?: string; creatorId?: string; authorName?: string; authorAvatar?: string };
 type PrivateSharedItem = {
   sourceType: 'status' | 'feed_message';
   sourceId: string;
@@ -182,6 +183,31 @@ const readJsonObject = <T,>(key: string, fallback: T): T => {
 };
 
 const defaultCommunityProfile: CommunityProfile = { name: '', username: '', avatar: '', bio: '' };
+
+const isInlineImageDataUrl = (value?: string) => /^data:image\//i.test(String(value || '').trim());
+const sanitizeCommunityProfileForStorage = (value: CommunityProfile): CommunityProfile => ({
+  ...value,
+  name: String(value.name || '').trim(),
+  username: normalizeUsername(String(value.username || '')),
+  avatar: isInlineImageDataUrl(value.avatar) ? '' : String(value.avatar || '').trim(),
+  bio: String(value.bio || '').slice(0, PROFILE_BIO_MAX_LENGTH),
+});
+const safeStoreCommunityJson = (key: string, value: unknown) => {
+  if (typeof window === 'undefined') return;
+  try {
+    localStorage.setItem(key, JSON.stringify(value));
+  } catch (error) {
+    console.warn(`Unable to store ${key}:`, error);
+    if (key.startsWith(COMMUNITY_PROFILE_STORAGE_KEY)) {
+      try {
+        localStorage.removeItem(COMMUNITY_PROFILE_STORAGE_KEY);
+        localStorage.removeItem(key);
+      } catch (cleanupError) {
+        console.warn('Unable to clean oversized community profile cache:', cleanupError);
+      }
+    }
+  }
+};
 
 const buildStableCommunityName = (seedValue?: string | null) => {
   const seed = String(seedValue || 'member').replace(/[^a-zA-Z0-9]/g, '').slice(-8) || 'member';
@@ -478,6 +504,25 @@ const normalizeFeedMessage = (message: FeedMessage): FeedMessage => ({
   source: message.source || 'creator',
 });
 
+const getReplyMergeKey = (reply: Reply) => reply.clientMessageId ? `client:${reply.clientMessageId}` : reply.docId ? `doc:${reply.docId}` : `local:${reply.id}`;
+const mergeReplyLists = (remoteReplies: Reply[] = [], currentReplies: Reply[] = []) => {
+  const merged = new Map<string, Reply>();
+  currentReplies.forEach((reply) => {
+    if (reply.status === 'sending' || reply.status === 'failed') merged.set(getReplyMergeKey(reply), reply);
+  });
+  remoteReplies.forEach((reply) => {
+    const key = getReplyMergeKey(reply);
+    const pending = reply.clientMessageId ? merged.get(`client:${reply.clientMessageId}`) : undefined;
+    merged.set(key, { ...(pending || {}), ...reply, status: reply.status || 'sent' });
+    if (reply.docId) merged.delete(`local:${reply.id}`);
+  });
+  currentReplies.forEach((reply) => {
+    const key = getReplyMergeKey(reply);
+    if (!merged.has(key) && reply.status === 'sent' && !reply.docId) merged.set(key, reply);
+  });
+  return Array.from(merged.values()).sort((a, b) => (a.createdAt || a.id) - (b.createdAt || b.id));
+};
+
 const isUnexpired = (item: { expiresAt?: number; createdAt?: number }, ttlMs: number) => {
   const expiresAt = item.expiresAt || ((item.createdAt || Date.now()) + ttlMs);
   return expiresAt > Date.now();
@@ -649,6 +694,7 @@ const mapStatusDoc = (snapshotDoc: { id: string; data: () => Record<string, any>
     pollOptions: Array.isArray(data.pollOptions) ? data.pollOptions : undefined,
     pollVotes: Array.isArray(data.pollVotes) ? data.pollVotes : undefined,
     likedByUsers: data.likedByUsers || {},
+    viewedByUsers: data.viewedByUsers || {},
     pollVoters: data.pollVoters || {},
     createdAt: asMillis(data.createdAt),
     storagePath: data.storagePath,
@@ -782,6 +828,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const pageStackRef = useRef<CommunityPage[]>([]);
   const [selectedMessageId, setSelectedMessageId] = useState(initialMessages[0].id);
   const [selectedStatusId, setSelectedStatusId] = useState(initialStatusCards[0].id);
+  const [statusViewerPanelId, setStatusViewerPanelId] = useState<number | null>(null);
   const [messages, setMessages] = useState<FeedMessage[]>(initialMessages);
   const [statusCards, setStatusCards] = useState<StatusCard[]>(initialStatusCards);
   const [likedStatuses, setLikedStatuses] = useState<number[]>([]);
@@ -884,8 +931,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const masterTagDetailPanelRef = useRef<HTMLDivElement>(null);
   const masterTagViewReturnRef = useRef<HTMLButtonElement | null>(null);
   const [likedMasterTagIds, setLikedMasterTagIds] = useState<number[]>([]);
-  const [profile, setProfile] = useState<CommunityProfile>(() => readJsonObject(COMMUNITY_PROFILE_STORAGE_KEY, defaultCommunityProfile));
-  const [profileDraft, setProfileDraft] = useState<CommunityProfile>(() => readJsonObject(COMMUNITY_PROFILE_STORAGE_KEY, defaultCommunityProfile));
+  const [profile, setProfile] = useState<CommunityProfile>(() => sanitizeCommunityProfileForStorage(readJsonObject(COMMUNITY_PROFILE_STORAGE_KEY, defaultCommunityProfile)));
+  const [profileDraft, setProfileDraft] = useState<CommunityProfile>(() => sanitizeCommunityProfileForStorage(readJsonObject(COMMUNITY_PROFILE_STORAGE_KEY, defaultCommunityProfile)));
   const [profileFeedback, setProfileFeedback] = useState<ProfileFeedback>(null);
   const [composerError, setComposerError] = useState('');
   const [activeProfilePanel, setActiveProfilePanel] = useState<ProfilePanel>('privacy');
@@ -937,7 +984,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const hasScopedProfile = typeof window !== 'undefined' && Boolean(localStorage.getItem(getCommunityProfileStorageKey(currentUserKey)));
     const shouldUseLegacy = !hasScopedProfile && legacyProfile.name && legacyProfile.name !== 'Eduvora Member';
     const mergedProfile = { ...baseProfile, ...(shouldUseLegacy ? legacyProfile : scopedProfile) };
-    const nextProfile = { ...mergedProfile, avatar: String(mergedProfile.avatar || baseProfile.avatar || '').trim() };
+    const nextProfile = sanitizeCommunityProfileForStorage({ ...mergedProfile, avatar: String(mergedProfile.avatar || baseProfile.avatar || '').trim() });
     setProfile(nextProfile);
     setProfileDraft(nextProfile);
   }, [currentUserKey, currentUser?.id, currentUser?.name, currentUser?.photoURL]);
@@ -1688,15 +1735,20 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   useEffect(() => {
-    localStorage.setItem(COMMUNITY_PROFILE_STORAGE_KEY, JSON.stringify(profile));
-  }, [profile]);
+    if (!currentUserKey) return;
+    const storedProfile = sanitizeCommunityProfileForStorage(profile);
+    safeStoreCommunityJson(getCommunityProfileStorageKey(currentUserKey), storedProfile);
+    if (typeof window !== 'undefined') {
+      try { localStorage.removeItem(COMMUNITY_PROFILE_STORAGE_KEY); } catch (error) { console.warn('Unable to remove legacy community profile cache:', error); }
+    }
+  }, [currentUserKey, profile]);
 
   useEffect(() => {
-    localStorage.setItem(COMMUNITY_PRIVACY_STORAGE_KEY, JSON.stringify(privacySettings));
+    safeStoreCommunityJson(COMMUNITY_PRIVACY_STORAGE_KEY, privacySettings);
   }, [privacySettings]);
 
   useEffect(() => {
-    localStorage.setItem(COMMUNITY_NOTIFICATION_PREFS_KEY, JSON.stringify(notificationPreferences));
+    safeStoreCommunityJson(COMMUNITY_NOTIFICATION_PREFS_KEY, notificationPreferences);
   }, [notificationPreferences]);
 
   useEffect(() => {
@@ -1779,7 +1831,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       // Feed posts are permanent. Only status stories use expiry cleanup.
       const firebaseMessages = snapshot.docs.map((item) => normalizeFeedMessage(mapFeedDoc(item)));
       setMessages((current) => {
-        const mergedMessages = mergeUnexpiredByIdentity(firebaseMessages, current.map(normalizeFeedMessage), initialMessages.map(normalizeFeedMessage), POST_TTL_MS);
+        const stabilizedFirebaseMessages = firebaseMessages.map((remoteMessage) => {
+          const currentMatch = current.find((item) => (remoteMessage.docId && item.docId === remoteMessage.docId) || item.id === remoteMessage.id);
+          if (!currentMatch) return remoteMessage;
+          const replies = mergeReplyLists(remoteMessage.replies, currentMatch.replies);
+          return { ...remoteMessage, replies, replyCount: Math.max(remoteMessage.replyCount || 0, currentMatch.replyCount || 0, replies.length) };
+        });
+        const mergedMessages = mergeUnexpiredByIdentity(stabilizedFirebaseMessages, current.map(normalizeFeedMessage), initialMessages.map(normalizeFeedMessage), POST_TTL_MS);
         setAdminPosts(mergedMessages.filter((message) => message.source === 'admin' || message.badge === 'ADMIN POST' || message.creatorId === 'admin'));
         return mergedMessages;
       });
@@ -2201,7 +2259,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         const data = replyDoc.data();
         return { id: Number.parseInt(replyDoc.id.replace(/\D/g, '').slice(-9), 10) || Date.now(), docId: replyDoc.id, author: data.author || data.authorName || 'Member', avatar: data.avatar || '👤', text: data.text || '', time: data.time || formatCommunityTime(data.createdAt), createdAt: asMillis(data.createdAt), ownerId: data.ownerId, senderId: data.senderId || data.ownerId, clientMessageId: data.clientMessageId, status: data.status || 'sent', replyToMessageId: data.replyToMessageId, replyToSenderName: data.replyToSenderName, replyToTextPreview: data.replyToTextPreview, replyToType: data.replyToType || 'feed_message', replyToDeleted: Boolean(data.replyToDeleted) };
       });
-      setMessages((current) => current.map((item) => item.docId === message.docId ? { ...item, replies } : item));
+      setMessages((current) => current.map((item) => {
+        if (item.docId !== message.docId) return item;
+        const mergedReplies = mergeReplyLists(replies, item.replies);
+        return { ...item, replies: mergedReplies, replyCount: Math.max(item.replyCount || 0, replies.length, mergedReplies.length) };
+      }));
     }, (error) => console.warn('Lazy replies failed', error));
   };
 
@@ -2238,8 +2300,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (viewedStatusIds.includes(statusId)) return;
     const targetStatus = statusCards.find((status) => status.id === statusId);
     setViewedStatusIds((current) => [...current, statusId]);
-    setStatusCards((current) => current.map((status) => status.id === statusId ? { ...status, views: status.views + 1 } : status));
-    if (targetStatus?.docId) updateDoc(doc(db, COMMUNITY_STATUS, targetStatus.docId), { views: increment(1) }).catch((error) => console.warn('Status view update failed', error));
+    setStatusCards((current) => current.map((status) => status.id === statusId ? { ...status, views: status.views + 1, viewedByUsers: { ...(status.viewedByUsers || {}), [currentUserKey]: true } } : status));
+    if (targetStatus?.docId) updateDoc(doc(db, COMMUNITY_STATUS, targetStatus.docId), { views: increment(1), [`viewedByUsers.${currentUserKey}`]: true }).catch((error) => console.warn('Status view update failed', error));
   };
 
   const openStatusReel = (statusId: number) => {
@@ -2717,17 +2779,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     })();
   };
 
-  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    event.currentTarget.value = '';
     if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => {
-      if (typeof reader.result === 'string') {
-        setProfileDraft((current) => ({ ...current, avatar: reader.result as string }));
-        setProfileFeedback({ type: 'success', message: 'Avatar staged. Save changes to update your profile everywhere.' });
-      }
-    };
-    reader.readAsDataURL(file);
+    setProfileFeedback({ type: 'success', message: 'Uploading photo…' });
+    try {
+      const hostedUrl = await uploadImageToCloudinary(file, { folder: 'community-profiles', tags: ['community-profile-avatar'] });
+      setProfileDraft((current) => ({ ...current, avatar: hostedUrl }));
+      setProfileFeedback({ type: 'success', message: 'Photo uploaded. Save changes to update your profile.' });
+    } catch (error) {
+      setProfileFeedback({ type: 'error', message: error instanceof Error ? error.message : 'Photo upload failed. Paste an image URL instead.' });
+    }
   };
 
   const saveProfileChanges = () => {
@@ -2740,12 +2803,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       return;
     }
 
-    const nextProfile = { ...profileDraft, name, username, bio, avatar: profileDraft.avatar || '' };
+    const nextProfile = sanitizeCommunityProfileForStorage({ ...profileDraft, name, username, bio, avatar: profileDraft.avatar || '' });
     setProfile(nextProfile);
     setProfileDraft(nextProfile);
 
     if (typeof window !== 'undefined') {
-      localStorage.setItem(getCommunityProfileStorageKey(currentUserKey), JSON.stringify(nextProfile));
+      safeStoreCommunityJson(getCommunityProfileStorageKey(currentUserKey), nextProfile);
       window.dispatchEvent(new CustomEvent('eduvoraProfileIdentityUpdated', {
         detail: { uid: currentUserKey, name: nextProfile.name, photoURL: nextProfile.avatar, avatar: nextProfile.avatar, username: nextProfile.username, bio: nextProfile.bio },
       }));
@@ -3423,30 +3486,33 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     </div>
   );
 
-  const MessageSummaryCard: React.FC<{ message: FeedMessage; isActive?: boolean }> = ({ message, isActive = false }) => (
-    <article className={`overflow-hidden rounded-[1.35rem] border bg-white shadow-sm transition duration-300 ${isActive ? 'border-[#1769FF] bg-[#F8FBFF] shadow-[0_14px_34px_rgba(26,115,232,0.10)] ring-2 ring-[#E8F2FF]' : 'border-[#D9E7F8] hover:border-[#BFD7FF] hover:bg-[#F8FBFF]'}`}>
-      <button type="button" onClick={() => openMessage(message.id)} className={`flex w-full items-center gap-3 border-l-4 px-3 py-2.5 text-left transition sm:px-4 ${isActive ? 'border-[#1769FF]' : 'border-transparent'}`}>
-        <Avatar value={resolveAvatar(message)} size="h-10 w-10" />
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center justify-between gap-3">
-            <h3 className="truncate text-sm font-black text-[#081A45] sm:text-base">{message.title}</h3>
-            <span className="shrink-0 text-[11px] font-black text-[#7C879A]">{message.time}</span>
-          </div>
-          <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] font-bold text-[#536178] sm:text-xs">
-            <span className="truncate">{resolveName(message)}</span>
-            <span>•</span>
-            <span className="rounded-full border border-[#D9E7F8] bg-[#F8FBFF] px-2 py-0.5 text-[#1769FF]">{message.badge}</span>
-          </div>
-          <div className="mt-2 flex flex-wrap items-center gap-1.5">
-            <span className="rounded-full bg-[#FCE8E6] px-2 py-1 text-[11px] font-black text-[#C5221F]">❤️ {message.likeCount || 0}</span>
-            <span className="rounded-full bg-[#E8F2FF] px-2 py-1 text-[11px] font-black text-[#1769FF]">💬 {message.replyCount || message.replies.length}</span>
-            <button type="button" onClick={(event) => { event.stopPropagation(); openMessage(message.id); setExpandedReplyId(message.id); }} className="rounded-full border border-[#D9E7F8] bg-white px-2 py-1 text-[11px] font-black text-[#081A45] transition hover:border-[#1769FF] hover:text-[#1769FF]">💬 Reply</button>
-            {REACTION_EMOJIS.slice(0, 3).map((emoji) => <button key={emoji} type="button" onClick={(event) => { event.stopPropagation(); reactToMessage(message, emoji); }} className="rounded-full border border-[#D9E7F8] bg-white px-2 py-1 text-[11px] font-black text-[#081A45]">{emoji} {(message.reactionCounts || {})[emoji] || 0}</button>)}
-          </div>
+  const MessageSummaryCard: React.FC<{ message: FeedMessage; isActive?: boolean }> = ({ message, isActive = false }) => {
+    const liked = Boolean(message.likedByUsers?.[currentUserKey]) || likedMessages.includes(message.id);
+    return (
+      <article className={`overflow-hidden rounded-[1.35rem] border bg-white shadow-sm transition duration-300 ${isActive ? 'border-[#1769FF] bg-[#F8FBFF] shadow-[0_14px_34px_rgba(26,115,232,0.10)] ring-2 ring-[#E8F2FF]' : 'border-[#D9E7F8] hover:border-[#BFD7FF] hover:bg-[#F8FBFF]'}`}>
+        <button type="button" onClick={() => openMessage(message.id)} className={`flex w-full items-start gap-3 border-l-4 px-3 py-3 text-left transition sm:px-4 ${isActive ? 'border-[#1769FF]' : 'border-transparent'}`}>
+          <Avatar value={resolveAvatar(message)} size="h-11 w-11" />
+          <span className="min-w-0 flex-1">
+            <span className="flex min-w-0 items-center justify-between gap-3">
+              <span className="truncate text-sm font-black text-[#081A45] sm:text-base">{message.title}</span>
+              <span className="shrink-0 text-[11px] font-black text-[#7C879A]">{message.time}</span>
+            </span>
+            <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-bold text-[#536178] sm:text-xs">
+              <span className="truncate">{resolveName(message)}</span>
+              <span>•</span>
+              <span className="rounded-full border border-[#D9E7F8] bg-[#F8FBFF] px-2 py-0.5 text-[#1769FF]">{message.postType || message.type || 'post'}</span>
+            </span>
+            <span className="mt-2 line-clamp-2 text-xs font-semibold leading-5 text-[#536178] sm:text-sm">{message.body || message.badge}</span>
+          </span>
+        </button>
+        <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-[#EEF6FF] px-3 py-2 sm:px-4">
+          <button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-3 py-1.5 text-[11px] font-black transition ${liked ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D9E7F8] bg-[#E8F2FF] text-[#1769FF]'}`}>❤️ {message.likeCount || 0}</button>
+          <button type="button" onClick={() => { openMessage(message.id); setExpandedReplyId(message.id); }} className="rounded-full border border-[#D9E7F8] bg-white px-3 py-1.5 text-[11px] font-black text-[#1769FF] transition hover:border-[#1769FF]">💬 {message.replyCount || message.replies.length}</button>
+          {REACTION_EMOJIS.slice(0, 3).map((emoji) => <button key={emoji} type="button" onClick={() => reactToMessage(message, emoji)} className="rounded-full border border-[#D9E7F8] bg-white px-2 py-1.5 text-[11px] font-black text-[#081A45]">{emoji} {(message.reactionCounts || {})[emoji] || 0}</button>)}
         </div>
-      </button>
-    </article>
-  );
+      </article>
+    );
+  };
 
   const renderReplyBubble = (message: FeedMessage, reply: Reply) => {
     const mine = isOwnCommunityId(reply.ownerId || reply.senderId) || reply.author === profile.name;
@@ -3483,7 +3549,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const canSendReply = Boolean(draft.trim()) && !replySendingIds[message.id] && !(typeof navigator !== 'undefined' && !navigator.onLine);
     const threadHighlighted = highlightedThreadId === message.id;
     return (
-      <div className={`flex min-h-0 flex-col overflow-hidden bg-[#F8FBFF] ${fullScreen ? 'h-[calc(100dvh-8.75rem)] md:h-[calc(100dvh-10rem)]' : 'h-[calc(100dvh-11rem)] rounded-[1.75rem] border border-[#D9E7F8] shadow-[0_16px_48px_rgba(23,105,255,0.08)]'}`}>
+      <div className={`flex min-h-0 flex-col overflow-hidden bg-[#F8FBFF] ${fullScreen ? 'h-[calc(100dvh-7.75rem)] md:h-[calc(100dvh-8.5rem)]' : 'h-full rounded-[1.75rem] border border-[#D9E7F8] shadow-[0_16px_48px_rgba(23,105,255,0.08)]'}`}>
         <div className="sticky top-0 z-10 border-b border-[#D9E7F8] bg-white/95 px-4 py-3 backdrop-blur-xl lg:px-6">
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => { const ownerId = getMessageOwnerId(message); if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); } }} className="shrink-0"><Avatar value={resolveAvatar(message)} size="h-10 w-10" /></button>
@@ -3494,7 +3560,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             {isOwnCommunityId(getMessageOwnerId(message)) ? <button type="button" onClick={() => deleteOwnFeedPost(message)} className="min-h-11 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-3 text-xs font-black text-[#C5221F]">Delete</button> : null}<button type="button" onClick={() => setExpandedReplyId(message.id)} className="min-h-11 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-xs font-black text-[#1769FF]">Reply</button>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 pb-6 custom-scrollbar sm:px-5 lg:px-7">
+        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 pb-4 custom-scrollbar sm:px-5 lg:px-7">
           <article className={`mx-auto max-w-3xl rounded-[1.8rem] border bg-white p-4 shadow-[0_14px_44px_rgba(23,105,255,0.08)] transition ${threadHighlighted ? 'border-[#7B61FF] ring-4 ring-[#F1EEFF]' : 'border-[#D9E7F8]'}`}>
             <h3 className="text-2xl font-black tracking-tight text-[#081A45] lg:text-4xl">{message.title}</h3>
             <p className="mt-3 whitespace-pre-wrap text-base font-semibold leading-8 text-[#536178] sm:text-lg">{message.body}</p>
@@ -3618,13 +3684,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const title = card.title.length > 64 ? `${card.title.slice(0, 64)}...` : card.title;
     const preview = hasDetail ? `${card.body.slice(0, card.imagePreview ? 96 : 150)}...` : card.body;
 
-    return <div className="min-h-0 flex-1 overflow-hidden"><div className="min-h-0 max-h-[62dvh] overflow-y-auto pr-1 custom-scrollbar">{card.imagePreview ? <div className={`mb-4 ${card.imageLayout === 'original' ? 'h-[min(34dvh,320px)] w-full' : 'mx-auto aspect-square w-full max-w-[320px]'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-[#202124]/20 shadow-2xl`}>{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'original')}</div> : null}<h2 className="line-clamp-3 text-2xl font-black tracking-tight sm:text-4xl">{title}</h2>{card.body ? <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-white/90 sm:text-base sm:leading-7">{preview}</p> : null}{hasDetail ? <button type="button" onClick={() => { setSelectedStatusId(card.id); pushPage('statusDetail'); }} className="mt-4 rounded-full border border-white/25 bg-white/18 px-4 py-2 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/28">Learn more</button> : null}{renderStatusPoll(card)}</div></div>;
+    return <div className="min-h-0 flex-1 overflow-hidden"><div className="min-h-0 max-h-[62dvh] overflow-y-auto pr-1 custom-scrollbar">{card.imagePreview ? <div className={`mb-4 ${card.imageLayout === 'original' ? 'h-[min(34dvh,320px)] w-full' : 'mx-auto aspect-square w-full max-w-[320px]'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-[#202124]/20 shadow-2xl`}>{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'original')}</div> : null}<h2 className="line-clamp-3 text-2xl font-black tracking-tight sm:text-4xl">{title}</h2>{card.body ? <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-white/90 sm:text-base sm:leading-7">{preview}</p> : null}{hasDetail ? <button type="button" onClick={() => { setSelectedStatusId(card.id); pushPage('statusDetail'); }} className="mt-4 rounded-full border border-white/25 bg-white/18 px-4 py-2 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/28">View more</button> : null}{renderStatusPoll(card)}</div></div>;
   };
 
   const renderStatusTile = (card: StatusCard) => {
     const owner = getStatusOwnerIdentity(card);
     return (
-      <button key={card.id} type="button" onClick={() => openStatusReel(card.id)} className="group relative aspect-[9/14] overflow-hidden rounded-[1.8rem] border border-white/80 bg-white p-3 text-left shadow-[0_18px_52px_rgba(15,23,42,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
+      <article key={card.id} role="button" tabIndex={0} onClick={() => openStatusReel(card.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openStatusReel(card.id); }} className="group relative aspect-[9/14] cursor-pointer overflow-hidden rounded-[1.8rem] border border-white/80 bg-white p-3 text-left shadow-[0_18px_52px_rgba(15,23,42,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
         <div className={`absolute inset-2 rounded-[1.35rem] bg-gradient-to-br ${card.gradient} transition duration-500 group-hover:scale-[1.04]`} />
         <div className="absolute inset-2 rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.30),rgba(255,255,255,0.04)_38%,rgba(15,23,42,0.60))]" />
         <div className="relative flex h-full flex-col justify-between p-2 text-white">
@@ -3636,10 +3702,37 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             {card.imagePreview ? <div className="mb-5 aspect-square w-24 overflow-hidden rounded-2xl bg-white/18 shadow-inner">{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'thumbnail')}</div> : null}
             <h3 className="line-clamp-2 text-xl font-black tracking-tight drop-shadow sm:text-2xl">{card.title}</h3>
             <p className="mt-2 line-clamp-2 text-sm font-bold text-white/90 drop-shadow">{card.body}</p>
-            <p className="mt-3 w-max rounded-full border border-white/60 bg-white/85 px-3 py-1 text-[11px] font-black text-[#202124] shadow-sm backdrop-blur-xl">❤️ {card.likedBy} · 👁️ {card.views}</p>
+            <div className="mt-3 flex flex-wrap gap-2"><span className="rounded-full border border-white/60 bg-white/85 px-3 py-1 text-[11px] font-black text-[#202124] shadow-sm backdrop-blur-xl">❤️ {card.likedBy}</span><button type="button" onClick={(event) => { event.stopPropagation(); setStatusViewerPanelId(card.id); }} className="rounded-full border border-white/60 bg-white/85 px-3 py-1 text-[11px] font-black text-[#202124] shadow-sm backdrop-blur-xl">👁️ {card.views}</button></div>
           </div>
         </div>
-      </button>
+      </article>
+    );
+  };
+
+  const renderStatusViewerModal = () => {
+    const status = statusCards.find((item) => item.id === statusViewerPanelId);
+    if (!status) return null;
+    const likedIds = Object.entries(status.likedByUsers || {}).filter(([, value]) => Boolean(value)).map(([id]) => id);
+    const viewedIds = Object.entries(status.viewedByUsers || {}).filter(([, value]) => Boolean(value)).map(([id]) => id);
+    const passiveIds = viewedIds.filter((id) => !likedIds.includes(id));
+    const renderViewerRows = (ids: string[], empty: string) => ids.length ? ids.map((id) => {
+      const identity = getIdentityForId(id);
+      return <div key={id} className="flex items-center gap-3 rounded-2xl border border-[#D9E7F8] bg-white px-3 py-2"><Avatar value={identity.avatar} size="h-10 w-10" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-black text-[#081A45]">{identity.name || buildStableCommunityName(id)}</span><span className="block truncate text-xs font-bold text-[#7C879A]">@{identity.username || buildStableCommunityUsername(id)}</span></span></div>;
+    }) : <p className="rounded-2xl border border-dashed border-[#D9E7F8] bg-[#F8FBFF] p-4 text-center text-sm font-bold text-[#7C879A]">{empty}</p>;
+    return (
+      <div className="fixed inset-0 z-[1900] flex items-center justify-center bg-[#081B5C]/60 p-4 backdrop-blur-xl">
+        <section className="max-h-[86dvh] w-full max-w-lg overflow-hidden rounded-[2rem] border border-[#D9E7F8] bg-white shadow-2xl">
+          <div className="flex items-center justify-between gap-3 border-b border-[#D9E7F8] bg-gradient-to-r from-[#F8FBFF] to-[#EEF6FF] p-4">
+            <div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#1769FF]">Status activity</p><h2 className="text-2xl font-black text-[#081A45]">Views & likes</h2></div>
+            <button type="button" onClick={() => setStatusViewerPanelId(null)} className="rounded-full border border-[#D9E7F8] bg-white px-4 py-2 text-sm font-black text-[#081A45]">Close</button>
+          </div>
+          <div className="max-h-[70dvh] space-y-5 overflow-y-auto p-4 custom-scrollbar">
+            <div className="grid grid-cols-2 gap-3 text-center"><div className="rounded-2xl bg-[#FCE8E6] p-4"><b className="block text-2xl text-[#C5221F]">{likedIds.length}</b><span className="text-xs font-black text-[#C5221F]">Liked</span></div><div className="rounded-2xl bg-[#E8F2FF] p-4"><b className="block text-2xl text-[#1769FF]">{viewedIds.length || status.views}</b><span className="text-xs font-black text-[#1769FF]">Viewed</span></div></div>
+            <div><h3 className="mb-2 text-sm font-black text-[#081A45]">Liked by</h3><div className="space-y-2">{renderViewerRows(likedIds, 'No likes yet.')}</div></div>
+            <div><h3 className="mb-2 text-sm font-black text-[#081A45]">Viewed only</h3><div className="space-y-2">{renderViewerRows(passiveIds, 'No view-only users yet.')}</div></div>
+          </div>
+        </section>
+      </div>
     );
   };
 
@@ -3659,7 +3752,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
               <article className="mx-auto flex min-h-[74dvh] w-full max-w-[520px] flex-col justify-between rounded-[2.5rem] border border-white/20 bg-[#202124]/18 p-6 shadow-[0_32px_120px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
                 <div className="flex items-center justify-between gap-3"><button type="button" onClick={() => { const ownerId = card.ownerId || card.creatorId; if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); setPage('profile'); setPageStack([]); } }} className="flex min-w-0 items-center gap-2 rounded-full border border-white/30 bg-white/18 px-3 py-2 text-left"><Avatar value={getStatusOwnerIdentity(card).avatar} size="h-8 w-8" /><span className="max-w-[10rem] truncate text-xs font-black">{getStatusOwnerIdentity(card).name}</span></button><span className="rounded-full border border-white/30 bg-white/18 px-4 py-2 text-xs font-black uppercase tracking-[0.22em]">{card.slots}</span></div>
                 {renderStatusReelContent(card)}
-                <div className="flex items-center justify-between text-sm font-black text-white/80"><span>Swipe for next status</span><span>👁️ {card.views} views</span></div>
+                <div className="flex items-center justify-between text-sm font-black text-white/80"><span>Swipe for next status</span><button type="button" onClick={() => setStatusViewerPanelId(card.id)} className="rounded-full border border-white/25 bg-white/16 px-3 py-1 text-xs font-black text-white backdrop-blur-xl transition hover:bg-white/25">👁️ {card.views} views</button></div>
               </article>
               <div className="mx-auto flex flex-row justify-center gap-3 md:flex-col"><button type="button" onClick={() => toggleStatusLike(card.id)} className={`flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 ${(card.likedByUsers?.[currentUserKey] || likedStatuses.includes(card.id)) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#202124]/20 text-white'} shadow-2xl backdrop-blur-xl transition hover:scale-105`}><span>❤️</span><span className="text-[11px] font-black">{card.likedBy}</span></button><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#202124]/20 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>💬</span><span className="text-[11px] font-black">Discuss</span></button>{isOwnCommunityId(card.ownerId) ? <button type="button" onClick={() => deleteOwnStatusStory(card)} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#C5221F]/80 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>🗑️</span><span className="text-[11px] font-black">Delete</span></button> : null}</div>
             </div>
@@ -4031,7 +4124,24 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     </div>
   );
 
-  const renderStatusDetailPage = () => <div className="mx-auto flex h-[calc(100dvh-10.5rem)] max-w-4xl flex-col overflow-hidden rounded-[2rem] border border-[#E0E3EB] bg-white shadow-[0_22px_70px_rgba(15,23,42,0.10)]"><div className="flex items-center justify-between gap-3 border-b border-[#E0E3EB] bg-white p-4"><button type="button" onClick={() => setPage('statusReel')} className="rounded-2xl border border-[#E0E3EB] bg-white px-4 py-3 text-sm font-black text-[#5F6368]">← Back to story</button><span className="rounded-full bg-[#E8F0FE] px-3 py-1 text-xs font-black text-[#1967D2]">{selectedStatus.slots}</span></div><div className={`min-h-0 flex-1 overflow-y-auto bg-gradient-to-br ${selectedStatus.gradient} p-5 text-white custom-scrollbar sm:p-8`}><article className="mx-auto max-w-3xl rounded-[2rem] border border-white/20 bg-[#202124]/10 p-5 shadow-2xl backdrop-blur-xl sm:p-8">{selectedStatus.imagePreview ? <div className={`mb-6 ${selectedStatus.imageLayout === 'original' ? 'max-h-[54dvh] min-h-48' : 'aspect-square'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-[#202124]/20 shadow-inner`}>{renderUploadedImage(selectedStatus.imagePreview, selectedStatus.title, selectedStatus.imageLayout || 'original')}</div> : null}<h2 className="text-4xl font-black tracking-tight sm:text-6xl">{selectedStatus.title}</h2><p className="mt-5 whitespace-pre-wrap text-lg font-semibold leading-9 text-white/90">{selectedStatus.body}</p>{renderStatusPoll(selectedStatus)}</article></div></div>;
+  const renderStatusDetailPage = () => (
+    <div className="mx-auto flex h-[calc(100dvh-8.5rem)] max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-[#D9E7F8] bg-white shadow-[0_24px_80px_rgba(15,23,42,0.12)]">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#D9E7F8] bg-white/95 p-4 backdrop-blur-xl">
+        <button type="button" onClick={() => setPage('statusReel')} className="rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-3 text-sm font-black text-[#081A45]">← Story</button>
+        <div className="min-w-0 flex-1 text-center"><p className="truncate text-sm font-black text-[#1769FF]">{selectedStatus.slots}</p><h2 className="truncate text-xl font-black text-[#081A45]">{selectedStatus.title}</h2></div>
+        <button type="button" onClick={() => setStatusViewerPanelId(selectedStatus.id)} className="rounded-2xl border border-[#D9E7F8] bg-[#E8F2FF] px-4 py-3 text-sm font-black text-[#1769FF]">👁️ {selectedStatus.views}</button>
+      </div>
+      <div className={`min-h-0 flex-1 overflow-y-auto bg-gradient-to-br ${selectedStatus.gradient} p-4 text-white custom-scrollbar sm:p-8`}>
+        <article className="mx-auto max-w-3xl rounded-[2.2rem] border border-white/24 bg-[#202124]/16 p-5 shadow-2xl backdrop-blur-2xl sm:p-8">
+          {selectedStatus.imagePreview ? <div className={`mb-6 ${selectedStatus.imageLayout === 'original' ? 'max-h-[54dvh] min-h-48' : 'aspect-square'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-[#202124]/20 shadow-inner`}>{renderUploadedImage(selectedStatus.imagePreview, selectedStatus.title, selectedStatus.imageLayout || 'original')}</div> : null}
+          <div className="mb-4 flex flex-wrap gap-2"><span className="rounded-full border border-white/30 bg-white/18 px-3 py-1 text-xs font-black uppercase tracking-[0.18em]">{selectedStatus.type}</span><button type="button" onClick={() => setStatusViewerPanelId(selectedStatus.id)} className="rounded-full border border-white/30 bg-white/18 px-3 py-1 text-xs font-black">❤️ {selectedStatus.likedBy} · 👁️ {selectedStatus.views}</button></div>
+          <h2 className="text-4xl font-black tracking-tight sm:text-6xl">{selectedStatus.title}</h2>
+          <p className="mt-5 whitespace-pre-wrap text-lg font-semibold leading-9 text-white/90">{selectedStatus.body}</p>
+          {renderStatusPoll(selectedStatus)}
+        </article>
+      </div>
+    </div>
+  );
 
   const filteredCreators = useMemo(() => {
     const query = debouncedNetworkSearch;
@@ -4295,7 +4405,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     </nav>
   );
 
-  const ProfileAccountCard = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Edit profile</p><h3 className="text-2xl font-black text-[#081B5C]">Name, photo & bio</h3></div><button type="button" onClick={() => setProfileViewMode('overview')} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Done</button></div>{profileFeedback ? <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-black ${profileFeedback.type === 'success' ? 'border-[#CEEAD6] bg-[#E6F4EA] text-[#137333]' : 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]'}`}>{profileFeedback.message}</div> : null}<div className="mt-5 flex flex-col items-center gap-4 rounded-[2rem] border border-[#E3ECF8] bg-[#F8FBFF] p-5 text-center"><Avatar value={profileDraft.avatar} size="h-28 w-28" className="text-5xl ring-4 ring-white" /><label className="inline-flex cursor-pointer rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 py-3 text-sm font-black text-white shadow-sm"><input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />Change profile photo</label><button type="button" onClick={() => setProfileDraft((current) => ({ ...current, avatar: '' }))} className="text-xs font-black text-[#7C879A]">Remove photo</button></div><div className="mt-5 grid min-w-0 gap-4 sm:grid-cols-2"><label className="min-w-0 text-sm font-black text-[#081B5C]">Display Name<input value={profileDraft.name} onChange={(event) => setProfileDraft((current) => ({ ...current, name: event.target.value }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C]">Username<input value={profileDraft.username} onChange={(event) => setProfileDraft((current) => ({ ...current, username: normalizeUsername(event.target.value) }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C] sm:col-span-2">Bio<textarea value={profileDraft.bio} maxLength={PROFILE_BIO_MAX_LENGTH} onChange={(event) => setProfileDraft((current) => ({ ...current, bio: event.target.value.slice(0, PROFILE_BIO_MAX_LENGTH) }))} className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold leading-7 outline-none focus:border-[#4F7BFF]" /><span className="mt-1 block text-right text-xs font-bold text-[#64748B]">{profileDraft.bio.length}/{PROFILE_BIO_MAX_LENGTH}</span></label></div><div className="mt-5 flex flex-col gap-3 sm:flex-row"><button type="button" onClick={saveProfileChanges} className="flex-1 rounded-2xl bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-5 py-4 font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.22)]">Save Changes</button><button type="button" onClick={resetProfileDraft} className="rounded-2xl border border-[#E3ECF8] bg-white px-5 py-4 font-black text-[#081B5C]">Cancel / Reset</button></div></section>;
+  const ProfileAccountCard = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Edit profile</p><h3 className="text-2xl font-black text-[#081B5C]">Name, photo & bio</h3></div><button type="button" onClick={() => setProfileViewMode('overview')} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Done</button></div>{profileFeedback ? <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-black ${profileFeedback.type === 'success' ? 'border-[#CEEAD6] bg-[#E6F4EA] text-[#137333]' : 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]'}`}>{profileFeedback.message}</div> : null}<div className="mt-5 grid gap-4 rounded-[2rem] border border-[#E3ECF8] bg-[#F8FBFF] p-5 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start"><div className="flex flex-col items-center gap-3"><Avatar value={profileDraft.avatar} size="h-28 w-28" className="text-5xl ring-4 ring-white" /><label className="inline-flex cursor-pointer rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 py-3 text-sm font-black text-white shadow-sm"><input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />Upload photo</label><button type="button" onClick={() => setProfileDraft((current) => ({ ...current, avatar: '' }))} className="text-xs font-black text-[#7C879A]">Remove photo</button></div><PremiumImageUrlInput value={profileDraft.avatar} onChange={(url) => setProfileDraft((current) => ({ ...current, avatar: url }))} label="Profile photo URL" previewAlt="Community profile photo" aspect="square" helperText="Upload to Cloudinary or paste a public https image URL. Only the URL is saved, not base64." compact /></div><div className="mt-5 grid min-w-0 gap-4 sm:grid-cols-2"><label className="min-w-0 text-sm font-black text-[#081B5C]">Display Name<input value={profileDraft.name} onChange={(event) => setProfileDraft((current) => ({ ...current, name: event.target.value }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C]">Username<input value={profileDraft.username} onChange={(event) => setProfileDraft((current) => ({ ...current, username: normalizeUsername(event.target.value) }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C] sm:col-span-2">Bio<textarea value={profileDraft.bio} maxLength={PROFILE_BIO_MAX_LENGTH} onChange={(event) => setProfileDraft((current) => ({ ...current, bio: event.target.value.slice(0, PROFILE_BIO_MAX_LENGTH) }))} className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold leading-7 outline-none focus:border-[#4F7BFF]" /><span className="mt-1 block text-right text-xs font-bold text-[#64748B]">{profileDraft.bio.length}/{PROFILE_BIO_MAX_LENGTH}</span></label></div><div className="mt-5 flex flex-col gap-3 sm:flex-row"><button type="button" onClick={saveProfileChanges} className="flex-1 rounded-2xl bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-5 py-4 font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.22)]">Save Changes</button><button type="button" onClick={resetProfileDraft} className="rounded-2xl border border-[#E3ECF8] bg-white px-5 py-4 font-black text-[#081B5C]">Cancel / Reset</button></div></section>;
 
   const ToggleRow = ({ label, description, checked, onChange }: { label: string; description: string; checked: boolean; onChange: (checked: boolean) => void }) => <label className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] p-4"><span className="min-w-0"><span className="block text-sm font-black text-[#081B5C]">{label}</span><span className="mt-1 block text-xs font-bold leading-5 text-[#64748B]">{description}</span></span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 shrink-0 accent-[#4F7BFF]" /></label>;
 
@@ -4306,40 +4416,37 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       return (
         <div className="rounded-[1.5rem] border border-dashed border-[#BFD7FF] bg-gradient-to-br from-[#F8FBFF] via-white to-[#EEF6FF] p-8 text-center">
           <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-inner">○</div>
-          <h3 className="text-xl font-black text-[#081B5C]">Check active stories from the top story row</h3>
-          <p className="mt-2 text-sm font-bold leading-6 text-[#64748B]">Stories are shown as circular highlights above the posts. Tap any circle to open the full story view.</p>
+          <h3 className="text-xl font-black text-[#081B5C]">Stories are above</h3>
+          <p className="mt-2 text-sm font-bold leading-6 text-[#64748B]">Tap any active story circle to open it.</p>
         </div>
       );
     }
 
     return profilePosts.length ? (
-      <div className="grid grid-cols-3 gap-1 sm:gap-2">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {profilePosts.slice(0, 30).map((message) => {
           const type = message.postType || message.type || 'text';
           const isPoll = type === 'poll';
           const isImage = Boolean(message.imagePreview);
+          const liked = Boolean(message.likedByUsers?.[currentUserKey]) || likedMessages.includes(message.id);
           return (
-            <button key={message.id} type="button" onClick={() => openProfilePostDetail(message.id)} className="group relative aspect-square overflow-hidden bg-[#EEF6FF] text-left">
-              <div className="absolute inset-0 bg-gradient-to-br from-[#EEF6FF] via-white to-[#DCEEFF]" />
-              {isImage ? (
-                <div className="absolute inset-0 scale-105 blur-[2px] opacity-70 transition duration-300 group-hover:scale-110 group-hover:blur-[1px]">{renderUploadedImage(message.imagePreview || '', message.title, message.imageLayout || 'thumbnail')}</div>
-              ) : (
-                <div className="absolute inset-0 flex h-full w-full flex-col justify-center gap-2 p-3 text-center blur-[2.5px] opacity-50 select-none">
-                  <span className="mx-auto rounded-full bg-white/90 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#1769FF]">{type}</span>
-                  <span className="line-clamp-3 text-xs font-black leading-5 text-[#081B5C] sm:text-sm">{message.title || (isPoll ? 'Poll post' : 'Text post')}</span>
-                  {message.body ? <span className="hidden text-[11px] font-bold leading-4 text-[#536178] sm:line-clamp-2">{message.body}</span> : null}
+            <article key={message.id} className="overflow-hidden rounded-[1.65rem] border border-[#D9E7F8] bg-white shadow-[0_16px_44px_rgba(23,105,255,0.10)]">
+              <button type="button" onClick={() => openProfilePostDetail(message.id)} className="block w-full text-left">
+                <div className="relative bg-gradient-to-br from-[#EEF6FF] via-white to-[#F1EEFF]">
+                  {isImage ? <div className="aspect-[4/3] w-full overflow-hidden">{renderUploadedImage(message.imagePreview || '', message.title, message.imageLayout || 'original')}</div> : <div className="flex min-h-[11rem] flex-col justify-center gap-3 p-5"><span className="w-max rounded-full bg-white px-3 py-1 text-[11px] font-black uppercase tracking-[0.16em] text-[#1769FF] shadow-sm">{isPoll ? 'Poll' : 'Text'}</span><h3 className="line-clamp-3 text-2xl font-black leading-tight text-[#081A45]">{message.title || (isPoll ? 'Poll post' : 'Text post')}</h3><p className="line-clamp-3 text-sm font-semibold leading-6 text-[#536178]">{message.body}</p></div>}
+                  <span className="absolute left-3 top-3 rounded-full bg-white/92 px-3 py-1 text-[11px] font-black uppercase tracking-[0.14em] text-[#1769FF] shadow-sm backdrop-blur">{isPoll ? 'Poll' : isImage ? 'Image' : 'Text'}</span>
                 </div>
-              )}
-              <div className="absolute inset-0 bg-gradient-to-t from-[#081A45]/64 via-white/10 to-white/42" />
-              <span className="absolute left-2 top-2 rounded-full bg-white/92 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#1769FF] shadow-sm">{isPoll ? 'Poll' : isImage ? 'Image' : 'Text'}</span>
-              <span className="absolute inset-x-2 top-1/2 -translate-y-1/2 rounded-2xl border border-white/70 bg-white/82 px-2 py-2 text-center text-[11px] font-black text-[#081B5C] shadow-sm backdrop-blur-md">Tap to view full post</span>
-              <span className="absolute bottom-1 left-1 rounded-full bg-[#081A45]/84 px-2 py-1 text-[10px] font-black text-white">❤️ {message.likeCount || 0}</span>
-              <span className="absolute bottom-1 right-1 rounded-full bg-[#081A45]/84 px-2 py-1 text-[10px] font-black text-white">💬 {message.replyCount || message.replies.length}</span>
-            </button>
+                <div className="p-4"><h3 className="line-clamp-2 text-base font-black text-[#081A45]">{message.title}</h3><p className="mt-1 line-clamp-2 text-sm font-semibold leading-6 text-[#536178]">{message.body}</p></div>
+              </button>
+              <div className="flex items-center justify-end gap-2 border-t border-[#EEF6FF] px-4 py-3">
+                <button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-3 py-1.5 text-xs font-black ${liked ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D9E7F8] bg-[#E8F2FF] text-[#1769FF]'}`}>❤️ {message.likeCount || 0}</button>
+                <button type="button" onClick={() => openProfilePostDetail(message.id, true)} className="rounded-full border border-[#D9E7F8] bg-white px-3 py-1.5 text-xs font-black text-[#1769FF]">💬 {message.replyCount || message.replies.length}</button>
+              </div>
+            </article>
           );
         })}
       </div>
-    ) : <div className="rounded-[1.5rem] border border-dashed border-[#D9E7F8] bg-[#F8FBFF] p-8 text-center text-sm font-bold text-[#7C879A]">No permanent posts yet.</div>;
+    ) : <div className="rounded-[1.5rem] border border-dashed border-[#D9E7F8] bg-[#F8FBFF] p-8 text-center text-sm font-bold text-[#7C879A]">No posts yet.</div>;
   };
 
   const renderStoryHighlights = (profileStories: StatusCard[]) => <div className="flex gap-4 overflow-x-auto py-2 custom-scrollbar">{profileStories.length ? profileStories.map((story) => { const owner = getStatusOwnerIdentity(story); return <button key={story.id} type="button" onClick={() => openStatusReel(story.id)} className="shrink-0 text-center"><span className="block rounded-full bg-gradient-to-tr from-[#F5B82E] via-[#7B61FF] to-[#1769FF] p-[3px]"><span className="block rounded-full bg-white p-[3px]"><Avatar value={owner.avatar || story.imagePreview || ''} size="h-16 w-16" /></span></span><span className="mt-1 block max-w-[5rem] truncate text-[11px] font-black text-[#536178]">{story.type}</span></button>; }) : <div className="rounded-2xl border border-dashed border-[#D9E7F8] bg-[#F8FBFF] px-5 py-4 text-sm font-bold text-[#7C879A]">No active stories.</div>}</div>;
@@ -4348,8 +4455,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const followed = followedIds.includes(creator.id) || Boolean(followedByCreatorIds[creator.id]);
     const self = isOwnCommunityId(creator.id);
     return (
-      <article key={creator.id} className={`flex flex-col gap-4 rounded-[1.5rem] border p-4 shadow-[0_12px_34px_rgba(23,105,255,0.08)] sm:flex-row sm:items-center ${self ? 'border-[#BFD7FF] bg-[#EEF6FF]' : 'border-[#D9E7F8] bg-white'}`}>
-        <Avatar value={creator.avatar} size="h-14 w-14" />
+      <article key={creator.id} className={`flex items-center gap-3 rounded-[1.25rem] border p-3 shadow-[0_10px_28px_rgba(23,105,255,0.08)] ${self ? 'border-[#BFD7FF] bg-[#EEF6FF]' : 'border-[#D9E7F8] bg-white'}`}>
+        <Avatar value={creator.avatar} size="h-12 w-12" />
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <h3 className="truncate text-lg font-black text-[#081B5C]">{self ? `${creator.name} (You)` : creator.name}</h3>
@@ -4362,7 +4469,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <span className="rounded-full bg-[#F1EEFF] px-3 py-1.5 text-[#7B61FF]">{compactCount(followingCounts[creator.id] ?? creator.followingCount)} Following</span>
           </div>
         </div>
-        <div className="flex shrink-0 gap-2 sm:flex-col">
+        <div className="ml-auto flex shrink-0 flex-col gap-2">
           <button type="button" onClick={() => { setSelectedProfileId(creator.id); setProfileViewMode('overview'); setProfileContentTab('posts'); }} className="min-h-11 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 text-sm font-black text-[#081B5C]">View Profile</button>
           <button type="button" onClick={() => toggleFollowCreator(creator)} disabled={Boolean(followLoadingIds[creator.id]) || self || creator.isSuspended || creator.isPublic === false} className={`min-h-11 rounded-2xl px-5 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${followed ? 'border border-[#D9E7F8] bg-white text-[#1769FF]' : 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-[0_14px_32px_rgba(23,105,255,0.22)]'}`}>{self ? 'You' : followLoadingIds[creator.id] ? 'Saving…' : followed ? '✓ Following' : 'Follow'}</button>
         </div>
@@ -4389,20 +4496,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
-  const renderProfilePostDetailPage = (profileId: string, display: { name: string; username: string; avatar: string }) => {
+  const renderProfilePostDetailPage = (profileId: string, _display: { name: string; username: string; avatar: string }) => {
     const profilePosts = messages.filter((message) => isMessageFromId(message, profileId)).sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
     const message = messages.find((item) => item.id === profileSelectedPostId) || profilePosts[0];
     if (!message) return <div className="mx-auto max-w-4xl rounded-[2rem] border border-dashed border-[#D9E7F8] bg-white p-10 text-center"><h2 className="text-2xl font-black text-[#081B5C]">Post unavailable</h2><button type="button" onClick={() => setProfileViewMode('overview')} className="mt-5 rounded-2xl bg-[#1769FF] px-5 py-3 text-sm font-black text-white">Back to profile</button></div>;
-    return (
-      <div className="mx-auto max-w-5xl space-y-3">
-        <div className="flex items-center gap-3 rounded-[1.5rem] border border-[#E3ECF8] bg-white p-3 shadow-sm">
-          <button type="button" onClick={() => setProfileViewMode('overview')} className="rounded-full px-3 py-2 text-sm font-black text-[#081B5C]">←</button>
-          <Avatar value={display.avatar} size="h-10 w-10" />
-          <div className="min-w-0 flex-1"><p className="truncate text-sm font-black text-[#081B5C]">{display.name}</p><p className="truncate text-xs font-bold text-[#7C879A]">Profile post detail · like, reply, and read replies here</p></div>
-        </div>
-        {renderMessageDetails(message, true)}
-      </div>
-    );
+    return <div className="mx-auto h-full max-w-5xl">{renderMessageDetails(message, true)}</div>;
   };
 
   const renderInstagramProfile = (profileId: string, display: { name: string; username: string; avatar: string; bio?: string; verified?: boolean }, options: { own: boolean; followed?: boolean; creator?: Creator | null }) => {
@@ -4435,7 +4533,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const followed = followedIds.includes(creator.id) || Boolean(followedByCreatorIds[creator.id]);
     const self = isOwnCommunityId(creator.id);
     return (
-      <article key={creator.id} className="group flex min-w-0 flex-col gap-4 rounded-[1.7rem] border border-[var(--community-border)] bg-white p-4 shadow-[0_14px_38px_rgba(23,105,255,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_54px_rgba(23,105,255,0.14)] sm:flex-row sm:items-center">
+      <article key={creator.id} className="group flex min-w-0 items-center gap-3 rounded-[1.25rem] border border-[var(--community-border)] bg-white p-3 shadow-[0_12px_32px_rgba(23,105,255,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_46px_rgba(23,105,255,0.13)]">
         <Avatar value={creator.avatar} size="h-14 w-14" />
         <div className="min-w-0 flex-1">
           <div className="flex min-w-0 flex-wrap items-center gap-2">
@@ -4488,9 +4586,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const renderMainContent = () => (
     <div className="community-content-stage animate-in fade-in slide-in-from-bottom-3 duration-500">
       {page === 'chat' && activeView === 'feed' && renderFeedLayout(filteredFeedMessages, 'Community Feed', 'Join the conversation with public replies, reactions, polls, and creator posts.')}
-      {page === 'thread' && <div className="space-y-3"><button type="button" onClick={() => { goBack(); requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: feedScrollPositionsRef.current.chatFeed || 0, behavior: 'auto' })); }} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-sm font-black text-[#64748B] shadow-sm">← Back to posts</button>{renderMessageDetails(selectedMessage, true)}</div>}
+      {page === 'thread' && renderMessageDetails(selectedMessage, true)}
       {page === 'profile' && renderProfilePage()}
-      {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_28px_90px_rgba(79,123,255,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.28em] text-[#4F7BFF]">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Post once per type daily. Stories expire after 24 hours.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">Each user can publish one text, one image, and one poll creator post per day. Image posts use public URL previews, so Firebase Storage upload is not required.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EAF5FF] p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || isCreatorTypeUsedToday || !postDraft.trim() || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2) || (postType === 'image' && (!postImagePreview || postImageUrlStatus !== 'valid'))} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.28)] disabled:opacity-45">{isPublishingCreator ? 'Publishing creator post...' : isCreatorTypeUsedToday ? `${postType} post used today` : 'Publish creator post'}</button></div></div>}
+      {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-[#D9E7F8] bg-white shadow-[0_24px_70px_rgba(23,105,255,0.12)]"><div className="relative bg-gradient-to-br from-[#EEF6FF] via-white to-[#F1EEFF] p-5 text-[#081A45] sm:p-7"><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Creator studio</p><h2 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Create a clean post</h2><p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#536178]">Share one text, image, or poll per day. Image posts use a saved URL.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EEF6FF] p-4 sm:p-6">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || isCreatorTypeUsedToday || !postDraft.trim() || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2) || (postType === 'image' && (!postImagePreview || postImageUrlStatus !== 'valid'))} className="mt-5 w-full rounded-[1.35rem] bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(23,105,255,0.24)] disabled:opacity-45">{isPublishingCreator ? 'Publishing…' : isCreatorTypeUsedToday ? `${postType} used today` : 'Publish post'}</button></div></div>}
       {page === 'network' && renderFollowPage()}
       {page === 'following' && renderFollowingPage()}
       {page === 'adminPosts' && renderFeedLayout(adminPosts, 'ADMIN POST', 'Official admin posts from Firebase. Like, react, vote, and reply here.')}
@@ -4507,7 +4605,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }
 
   return (
-    <section style={communityCssVars} className="eduvora-community-polish relative h-[100dvh] overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-4 lg:p-6">
+    <section style={communityCssVars} className="eduvora-community-polish relative h-[100dvh] overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-2 lg:p-3">
       <style>{`
         @keyframes eduvoraBondShine {
           0% { transform: translateX(0); opacity: 0; }
@@ -4520,6 +4618,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {notificationDropdownPortal}
       {renderMasterTagDetailOverlay()}
       {showStatusRulesModal ? <div className="fixed inset-0 z-[1900] flex items-center justify-center bg-[#081B5C]/55 p-4 backdrop-blur-xl"><div className="max-w-md rounded-[2rem] border border-[#E3ECF8] bg-white p-6 shadow-2xl"><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Status rules</p><h2 className="mt-2 text-2xl font-black text-[#081B5C]">Story visibility</h2><p className="mt-3 text-sm font-bold leading-7 text-[#536178]">You can publish one text, one image, and one poll status every 24 hours. Status stories stay visible for 24 hours, appear on your profile while active, and can be deleted by you anytime.</p><button type="button" onClick={() => setShowStatusRulesModal(false)} className="mt-5 w-full rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-3 text-sm font-black text-white">Got it</button></div></div> : null}
+      {renderStatusViewerModal()}
       {imageLightbox ? <div className="fixed inset-0 z-[1800] flex items-center justify-center bg-[#081B5C]/80 p-4 backdrop-blur-xl"><button type="button" onClick={() => setImageLightbox(null)} className="absolute right-4 top-4 rounded-full bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Close</button><div className="flex max-h-[90dvh] max-w-[94vw] items-center justify-center overflow-hidden rounded-[2rem] bg-white p-3 shadow-2xl">{renderUploadedImage(imageLightbox.src, imageLightbox.alt, 'original')}</div></div> : null}
       <CommunityAiMentor
         isOpen={isCommunityAiOpen}
@@ -4530,7 +4629,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       />
       {page === 'statusReel' ? renderStatusReel() : null}
       <ShareComposerModal />
-      <div className="eduvora-community-app mx-auto flex h-full min-w-0 max-w-[1720px] overflow-hidden border border-[var(--community-border)] bg-[var(--community-surface)]/62 shadow-[var(--community-shadow)] backdrop-blur-2xl sm:rounded-[2rem] lg:rounded-[2.5rem]">
+      <div className="eduvora-community-app mx-auto flex h-full w-full min-w-0 max-w-none overflow-hidden border border-[var(--community-border)] bg-[var(--community-surface)]/68 shadow-[var(--community-shadow)] backdrop-blur-2xl sm:rounded-[1.5rem] lg:rounded-[1.85rem]">
         <CommunitySidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <CommunityHeader />
