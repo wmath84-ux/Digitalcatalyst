@@ -4532,9 +4532,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const renderInstagramProfile = (profileId: string, display: { name: string; username: string; avatar: string; bio?: string; verified?: boolean }, options: { own: boolean; followed?: boolean; creator?: Creator | null }) => {
     const profilePosts = messages.filter((message) => isMessageFromId(message, profileId)).sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
-    const profileStories = statusCards.filter((status) => (status.ownerId || status.creatorId) === profileId);
+    const profileStories = statusCards
+      .filter((status) => String(status.ownerId || status.creatorId || '') === profileId && isUnexpired(status, STORY_TTL_MS))
+      .sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
     const followerTotal = compactCount(followerCounts[profileId] || (options.creator?.followerCount ?? options.creator?.followers) || (options.own ? followerIds.length : 0));
     const followingTotal = compactCount(followingCounts[profileId] || options.creator?.followingCount || (options.own ? followedIds.length : 0));
+
+    if (options.own && profileViewMode === 'edit') return <div className="mx-auto max-w-4xl">{renderProfileAccountCard()}</div>;
+    if (options.own && profileViewMode === 'settings') return <div className="mx-auto max-w-4xl">{renderProfileSettingsPanel()}</div>;
+    if (profileViewMode === 'relations') return renderProfileRelationsPage(profileId, display);
+    if (profileViewMode === 'post') return renderProfilePostDetailPage(profileId, display);
 
     return (
       <div className="mx-auto max-w-6xl overflow-hidden rounded-[1.75rem] border border-[#D9E7F8] bg-white shadow-[0_16px_44px_rgba(8,26,69,0.08)]">
@@ -4564,7 +4571,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 ) : options.creator ? (
                   <button type="button" onClick={() => toggleFollowCreator(options.creator!)} disabled={Boolean(followLoadingIds[profileId]) || options.creator.isSuspended || options.creator.isPublic === false} className={`min-h-11 rounded-2xl px-3 py-2.5 text-xs font-black shadow-sm sm:text-sm ${options.followed ? 'border border-[#D9E7F8] bg-white text-[#1769FF]' : 'bg-[#1769FF] text-white'}`}>{followLoadingIds[profileId] ? 'Saving…' : options.followed ? 'Following' : 'Follow'}</button>
                 ) : <span />}
-                <button type="button" onClick={() => { setProfileRelationTab('followers'); setProfileViewMode('relations'); }} className="min-h-11 rounded-2xl border border-[#D9E7F8] bg-white px-3 py-2.5 text-xs font-black text-[#081B5C] shadow-sm sm:text-sm">Followers</button>
+                <button type="button" onClick={() => { setProfileRelationTab('followers'); setProfileViewMode('relations'); }} className="min-h-11 rounded-2xl border border-[#D9E7F8] bg-white px-3 py-2.5 text-xs font-black text-[#081B5C] shadow-sm sm:text-sm">Followers & Following</button>
               </div>
             </div>
           </div>
