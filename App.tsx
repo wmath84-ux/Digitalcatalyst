@@ -289,6 +289,8 @@ export interface Review {
     rating: number;
     comment: string;
     date: string;
+    userId?: string;
+    avatar?: string;
 }
 
 // A derived type that includes the calculated rating for display
@@ -1113,6 +1115,39 @@ const App: React.FC = () => {
     Math.max(0, Math.floor(Number(user?.coinBalance ?? user?.eduCoins ?? 0)));
 
   const liveWalletBalance = liveEduCoinBalance ?? readEduCoinBalance(effectiveAppUser);
+
+  useEffect(() => {
+    const handleProfileIdentityUpdate = (event: Event) => {
+      const detail = (event as CustomEvent<{ uid?: string; name?: string; photoURL?: string; avatar?: string }>).detail || {};
+      const targetUid = detail.uid || effectiveAppUser?.id;
+      if (!targetUid || effectiveAppUser?.id !== targetUid) return;
+
+      const nextName = String(detail.name || effectiveAppUser.name || buildStableDisplayName(targetUid)).trim();
+      const nextPhotoURL = String(detail.photoURL || detail.avatar || '').trim();
+      const updatedUser = { ...effectiveAppUser, name: nextName, photoURL: nextPhotoURL } as User;
+
+      setCurrentUser(updatedUser);
+      setUsers(current => current.map(user => user.id === targetUid ? { ...user, name: nextName, photoURL: nextPhotoURL } : user));
+      safeSetItem('currentUser', updatedUser);
+      saveRememberedAuthAccount({ uid: updatedUser.id, email: updatedUser.email, name: updatedUser.name, photoURL: updatedUser.photoURL, providerIds: updatedUser.providerIds, authProvider: updatedUser.authProvider });
+      setRememberedAuthAccount(getRememberedAuthAccount());
+
+      setReviews(currentReviews => {
+        const nextReviews = Object.fromEntries(Object.entries(currentReviews).map(([productId, productReviews]) => [
+          productId,
+          (Array.isArray(productReviews) ? productReviews : []).map((review: Review) => review.userId === targetUid ? { ...review, name: nextName, avatar: nextPhotoURL } : review),
+        ])) as typeof currentReviews;
+
+        safeSetItem('productReviews', nextReviews);
+        void setDoc(doc(db, ...GLOBAL_REVIEWS_DOC), { reviews: stripUndefinedDeep(nextReviews) }, { merge: true })
+          .catch(error => logGlobalSyncWarning('Reviews', error));
+        return nextReviews;
+      });
+    };
+
+    window.addEventListener('eduvoraProfileIdentityUpdated', handleProfileIdentityUpdate as EventListener);
+    return () => window.removeEventListener('eduvoraProfileIdentityUpdated', handleProfileIdentityUpdate as EventListener);
+  }, [effectiveAppUser?.id, effectiveAppUser?.name, effectiveAppUser?.photoURL]);
 
   const normalizePurchasedProductUpdateIds = (value: unknown): Record<string, string[]> => {
     if (!value || typeof value !== 'object') return {};
@@ -2011,38 +2046,10 @@ const App: React.FC = () => {
   const requiresMobileCompletion = () => shouldAskForMobileCompletion();
 
   useEffect(() => {
-    if (!isLoggedIn) {
-      setIsMobileCompletionModalOpen(false);
-      setMobileCompletionError('');
-      setMobileCompletionInput('');
-      return;
-    }
-
-    if (!effectiveAppUser) return;
-
-    const savedMobile = getResolvedSavedMobile(effectiveAppUser, effectiveFirebaseUser);
-
-    if (savedMobile.length === 10) {
-      mergeCompletedMobileIntoCurrentUser(savedMobile);
-      setIsMobileCompletionModalOpen(false);
-      setMobileCompletionError('');
-      setMobileCompletionInput('');
-      return;
-    }
-
-    if (profileStatus === 'loading' || profileStatus === 'idle') {
-      return;
-    }
-
-    setMobileCompletionInput(current => getNormalizedMobile(current));
-    setIsMobileCompletionModalOpen(true);
-  }, [
-    isLoggedIn,
-    effectiveAppUser?.id,
-    effectiveAppUser?.mobile,
-    effectiveFirebaseUser?.phoneNumber,
-    profileStatus,
-  ]);
+    setIsMobileCompletionModalOpen(false);
+    setMobileCompletionError('');
+    setMobileCompletionInput('');
+  }, [isLoggedIn, effectiveAppUser?.id]);
 
   const handleInitiateCheckout = () => {
     if (cart.length === 0) return;
@@ -2221,6 +2228,16 @@ const App: React.FC = () => {
   const getFirebaseUserPhotoURL = (firebaseUser: FirebaseUser): string =>
       firebaseUser.photoURL || firebaseUser.providerData.find(provider => Boolean(provider.photoURL))?.photoURL || '';
 
+  const buildStableDisplayName = (uidOrEmail?: string | null): string => {
+      const seed = String(uidOrEmail || 'member').replace(/[^a-zA-Z0-9]/g, '').slice(-8) || 'member';
+      return `User ${seed.toUpperCase()}`;
+  };
+
+  const buildStableUsername = (uidOrEmail?: string | null): string => {
+      const seed = String(uidOrEmail || 'member').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(-10) || 'member';
+      return `user_${seed}`;
+  };
+
   const shouldReplaceProfilePhoto = (existingPhotoURL: unknown, nextPhotoURL: string) => {
       if (!nextPhotoURL) return false;
       const existingPhoto = typeof existingPhotoURL === 'string' ? existingPhotoURL : '';
@@ -2235,10 +2252,10 @@ const App: React.FC = () => {
       return {
           id: firebaseUser.uid,
           uid: firebaseUser.uid,
-          name: data.name || firebaseUser.displayName || firebaseUser.email?.split('@')[0] || 'Learner',
+          name: data.name || data.generatedDisplayName || buildStableDisplayName(firebaseUser.uid || firebaseUser.email),
           email: data.email || firebaseUser.email || '',
           mobile: data.mobile || firebaseUser.phoneNumber || '',
-          photoURL: data.photoURL || getFirebaseUserPhotoURL(firebaseUser),
+          photoURL: data.photoURL || '',
           authProvider: data.authProvider || getFirebaseAuthProvider(firebaseUser),
           providerIds: data.providerIds || getProviderIds(firebaseUser),
           emailVerified: data.emailVerified ?? firebaseUser.emailVerified,
@@ -2265,8 +2282,8 @@ const App: React.FC = () => {
   };
 
   function createFallbackUserFromFirebase(firebaseUser: FirebaseUser): User {
-      const fallbackDisplayName = firebaseUser.displayName || firebaseUser.email || 'Student';
-      const fallbackPhotoURL = getFirebaseUserPhotoURL(firebaseUser);
+      const fallbackDisplayName = buildStableDisplayName(firebaseUser.uid || firebaseUser.email);
+      const fallbackPhotoURL = '';
       return {
           uid: firebaseUser.uid,
           id: firebaseUser.uid,
@@ -2301,12 +2318,11 @@ const App: React.FC = () => {
       const providerIds = getProviderIds(firebaseUser);
       const authProvider = providerIds.includes(GoogleAuthProvider.PROVIDER_ID) ? 'google' : 'password';
       const existingName = String(existing.name || '').trim();
-      const providerName = String(firebaseUser.displayName || '').trim();
-      const fallbackName = firebaseUser.email?.split('@')[0] || 'Learner';
-      const nextName = profile?.name || existingName || providerName || fallbackName;
+      const generatedDisplayName = String(existing.generatedDisplayName || buildStableDisplayName(firebaseUser.uid || firebaseUser.email)).trim();
+      const generatedUsername = String(existing.generatedUsername || buildStableUsername(firebaseUser.uid || firebaseUser.email)).trim();
+      const nextName = profile?.name || existingName || generatedDisplayName;
       const nextMobile = profile?.mobile || existing.mobile || firebaseUser.phoneNumber || '';
-      const firebasePhotoURL = getFirebaseUserPhotoURL(firebaseUser);
-      const nextPhotoURL = shouldReplaceProfilePhoto(existing.photoURL, firebasePhotoURL) ? firebasePhotoURL : existing.photoURL || '';
+      const nextPhotoURL = typeof existing.photoURL === 'string' ? existing.photoURL : '';
       const existingBalance = existing.coinBalance ?? existing.eduCoins ?? 0;
       const totalCoinsEarned = existing.totalCoinsEarned ?? existing.totalLifetimeCoins ?? existingBalance;
       const safeProfileFields = {
@@ -2315,6 +2331,8 @@ const App: React.FC = () => {
           email: firebaseUser.email || existing.email || '',
           mobile: nextMobile,
           photoURL: nextPhotoURL,
+          generatedDisplayName,
+          generatedUsername,
           role: existing.role === 'admin' ? 'admin' : 'user',
           status: existing.status === 'blocked' ? 'blocked' : 'active',
           blocked: existing.blocked === true,
@@ -3300,7 +3318,9 @@ const App: React.FC = () => {
   const handleAddReview = (productId: number, reviewData: Omit<Review, 'name' | 'date'>) => {
     const newReview: Review = {
         ...reviewData,
-        name: currentUser?.name || currentUser?.email.split('@')[0] || 'Customer',
+        name: currentUser?.name || buildStableDisplayName(currentUser?.id || currentUser?.email),
+        avatar: currentUser?.photoURL || '',
+        userId: currentUser?.id || currentUser?.uid,
         date: 'Just now'
     };
     const updatedReviews = { ...reviews, [productId]: [newReview, ...(reviews[productId] || [])] };
@@ -4504,7 +4524,7 @@ const App: React.FC = () => {
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent(effectiveAppUser)}</div>;
-    if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity settings={websiteSettings} onClose={() => handleNavigateBack('home')}  isAuthenticated={isLoggedIn} /></div>;
+    if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity settings={websiteSettings} onClose={() => handleNavigateBack('home')}  isAuthenticated={isLoggedIn} currentUser={effectiveAppUser} /></div>;
 
     return (
        <ErrorBoundary>

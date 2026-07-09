@@ -5,7 +5,7 @@ import { addDoc, collection, deleteDoc, deleteField, doc, getDocs, increment, li
 import { getAuth, onAuthStateChanged, signOut } from 'firebase/auth';
 import { db, storage } from '../firebase';
 import { deleteObject, getDownloadURL, ref, uploadString } from 'firebase/storage';
-import type { WebsiteSettings } from '../App';
+import type { User, WebsiteSettings } from '../App';
 import { mergeCommunitySupportTickets, isSupportTicketNeedsAttention } from '../utils/communitySupportBadge';
 import CommunityAiMentor from './CommunityAiMentor';
 import PremiumImageUrlInput, { PremiumImageUrlStatus } from './common/PremiumImageUrlInput';
@@ -18,6 +18,7 @@ interface EduvoraCommunityProps {
   onClose?: () => void;
   isAuthenticated?: boolean;
   settings?: WebsiteSettings;
+  currentUser?: User | null;
 }
 
 type CommunityView = 'feed' | 'status';
@@ -25,7 +26,7 @@ type FeedFilter = 'all' | 'following' | 'followers' | 'mine' | 'admin';
 type CommunityPage = 'chat' | 'adminPosts' | 'thread' | 'profile' | 'creators' | 'network' | 'following' | 'tagMaster' | 'masterTags' | 'masterTagDetail' | 'statusUpload' | 'statusMine' | 'statusReel' | 'directChat' | 'directChatThread' | 'statusDetail';
 type PostType = 'text' | 'image' | 'poll';
 type Reply = { id: number; author: string; text: string; time: string; avatar?: string; docId?: string; createdAt?: number; ownerId?: string; senderId?: string; clientMessageId?: string; status?: 'sending' | 'sent' | 'failed' | 'deleted' | 'hidden'; replyToMessageId?: string; replyToSenderName?: string; replyToTextPreview?: string; replyToType?: 'feed_message'; replyToDeleted?: boolean };
-type FeedMessage = { id: number; admin: string; badge: string; avatar: string; title: string; body: string; time: string; reactions: string[]; replies: Reply[]; creatorId?: string; ownerId?: string; postType?: PostType; type?: PostType; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; likeCount?: number; docId?: string; createdAt?: number; reactionCounts?: Record<string, number>; replyCount?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; reactionUsers?: Record<string, string>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'creator' | 'admin'; sourceType?: 'url' };
+type FeedMessage = { id: number; admin: string; badge: string; avatar: string; title: string; body: string; time: string; reactions: string[]; replies: Reply[]; creatorId?: string; ownerId?: string; authorName?: string; authorAvatar?: string; postType?: PostType; type?: PostType; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; likeCount?: number; docId?: string; createdAt?: number; reactionCounts?: Record<string, number>; replyCount?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; reactionUsers?: Record<string, string>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'creator' | 'admin'; sourceType?: 'url' };
 type Creator = {
   id: string;
   username: string;
@@ -51,7 +52,7 @@ type Creator = {
   isPublic?: boolean;
   isSuspended?: boolean;
 };
-type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'status'; sourceType?: 'url'; text?: string; creatorId?: string };
+type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'status'; sourceType?: 'url'; text?: string; creatorId?: string; authorName?: string; authorAvatar?: string };
 type PrivateSharedItem = {
   sourceType: 'status' | 'feed_message';
   sourceId: string;
@@ -126,6 +127,7 @@ type CommunityNotification = { id: string; title: string; body: string; time: st
 type CommunityProfile = { name: string; username: string; avatar: string; bio: string };
 type ProfileFeedback = { type: 'success' | 'error'; message: string } | null;
 type ProfilePanel = 'privacy' | 'notifications' | 'connected' | 'logout';
+type ProfileViewMode = 'overview' | 'edit' | 'settings';
 type PrivacySettings = { profileVisible: boolean; showActivity: boolean; allowMessages: boolean; allowFollowRequests: boolean };
 type NotificationPreferences = { replies: boolean; masterTags: boolean; statuses: boolean; creatorPosts: boolean; follows: boolean };
 type NotificationFilter = 'all' | CommunityNotification['type'];
@@ -176,7 +178,30 @@ const readJsonObject = <T,>(key: string, fallback: T): T => {
   }
 };
 
-const defaultCommunityProfile: CommunityProfile = { name: 'Eduvora Member', username: 'eduvora_member', avatar: '🧑‍🎓', bio: 'Building digital skills daily.' };
+const defaultCommunityProfile: CommunityProfile = { name: '', username: '', avatar: '', bio: '' };
+
+const buildStableCommunityName = (seedValue?: string | null) => {
+  const seed = String(seedValue || 'member').replace(/[^a-zA-Z0-9]/g, '').slice(-8) || 'member';
+  return `User ${seed.toUpperCase()}`;
+};
+
+const buildStableCommunityUsername = (seedValue?: string | null) => {
+  const seed = String(seedValue || 'member').toLowerCase().replace(/[^a-z0-9]+/g, '').slice(-10) || 'member';
+  return `user_${seed}`;
+};
+
+const getCommunityProfileStorageKey = (uid?: string | null) => uid ? `${COMMUNITY_PROFILE_STORAGE_KEY}:${uid}` : COMMUNITY_PROFILE_STORAGE_KEY;
+
+const buildProfileFromUser = (user?: User | null, uid?: string | null): CommunityProfile => {
+  const seed = uid || user?.id || user?.uid || user?.email || 'member';
+  const name = String(user?.name || '').trim() || buildStableCommunityName(seed);
+  return {
+    name,
+    username: normalizeUsername((user as any)?.generatedUsername || name) || buildStableCommunityUsername(seed),
+    avatar: String(user?.photoURL || '').trim(),
+    bio: '',
+  };
+};
 const defaultPrivacySettings: PrivacySettings = { profileVisible: true, showActivity: true, allowMessages: true, allowFollowRequests: true };
 const defaultNotificationPreferences: NotificationPreferences = { replies: true, masterTags: true, statuses: true, creatorPosts: true, follows: true };
 
@@ -534,13 +559,14 @@ const mapFeedDoc = (snapshotDoc: { id: string; data: () => Record<string, any> }
   return {
     id: numericId,
     docId: snapshotDoc.id,
-    admin: data.admin || data.authorName || 'Eduvora Creator',
+    admin: data.admin || data.authorName || data.displayName || 'Eduvora Creator',
     badge: data.badge || 'Community post',
-    avatar: data.avatar || '🧑‍🎓',
+    avatar: data.avatar || data.authorAvatar || data.photoURL || '',
     title: data.title || 'Fresh community update',
     body: data.body || data.text || '',
     time: data.time || formatCommunityTime(data.createdAt),
     creatorId: data.creatorId,
+    ownerId: data.ownerId || data.creatorId,
     postType: data.postType || data.type || 'text',
     imagePreview: data.imagePreview,
     imageLayout: data.imageLayout || 'thumbnail',
@@ -611,6 +637,9 @@ const mapStatusDoc = (snapshotDoc: { id: string; data: () => Record<string, any>
     slots: data.slots || `${data.type || 'Text'} · Just now`,
     type: data.type || 'text',
     ownerId: data.ownerId,
+    creatorId: data.creatorId || data.ownerId,
+    authorName: data.authorName || data.displayName || data.admin || '',
+    authorAvatar: data.authorAvatar || data.avatar || data.photoURL || '',
     imagePreview: data.imagePreview,
     imageLayout: data.imageLayout || (data.type === 'image' ? 'original' : undefined),
     pollOptions: Array.isArray(data.pollOptions) ? data.pollOptions : undefined,
@@ -737,7 +766,7 @@ const communityPolishCss = `
   }
 `;
 
-const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenticated = false, settings }) => {
+const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenticated = false, settings, currentUser = null }) => {
   const navigate = useNavigate();
   const guardedAuth = getAuth();
   const [isCommunityAllowed, setIsCommunityAllowed] = useState(false);
@@ -852,6 +881,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [profileFeedback, setProfileFeedback] = useState<ProfileFeedback>(null);
   const [composerError, setComposerError] = useState('');
   const [activeProfilePanel, setActiveProfilePanel] = useState<ProfilePanel>('privacy');
+  const [profileViewMode, setProfileViewMode] = useState<ProfileViewMode>('overview');
+  const [showStatusRulesModal, setShowStatusRulesModal] = useState(false);
   const [privacySettings, setPrivacySettings] = useState<PrivacySettings>(() => readJsonObject(COMMUNITY_PRIVACY_STORAGE_KEY, defaultPrivacySettings));
   const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>(() => readJsonObject(COMMUNITY_NOTIFICATION_PREFS_KEY, defaultNotificationPreferences));
   const [showStatusActions, setShowStatusActions] = useState(false);
@@ -871,16 +902,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const notificationPanelRef = useRef<HTMLDivElement>(null);
   const notificationDropdownRef = useRef<HTMLDivElement>(null);
   const directChatMessagesEndRef = useRef<HTMLDivElement>(null);
-  const currentUserKey = guardedAuth.currentUser?.uid || authEmail || `profile-${normalizeUsername(profile.username || profile.name) || 'local'}`;
+  const currentUserKey = guardedAuth.currentUser?.uid || currentUser?.id || currentUser?.uid || authEmail || `profile-${normalizeUsername(profile.username || profile.name) || 'local'}`;
   const isOwnCommunityId = (id?: string) => id === currentUserKey || id === 'me';
   const selectedMessage = messages.find((message) => message.id === selectedMessageId) || messages[0];
   const selectedStatus = statusCards.find((status) => status.id === selectedStatusId) || statusCards[0];
   const currentProfileCreator = useMemo<Creator>(() => ({
     id: currentUserKey,
     ownerId: currentUserKey,
-    username: normalizeUsername(profile.username) || 'eduvora_member',
-    name: profile.name || 'Eduvora Member',
-    avatar: profile.avatar || '🧑‍🎓',
+    username: normalizeUsername(profile.username) || buildStableCommunityUsername(currentUserKey),
+    name: profile.name || buildStableCommunityName(currentUserKey),
+    avatar: profile.avatar || '',
     role: 'Community member',
     followers: followerIds.length,
     followerCount: followerIds.length,
@@ -889,6 +920,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     verified: false,
     source: 'profile',
   }), [currentUserKey, followedIds.length, followerIds.length, profile.avatar, profile.name, profile.username]);
+
+  useEffect(() => {
+    if (!currentUserKey) return;
+    const baseProfile = buildProfileFromUser(currentUser, currentUserKey);
+    const scopedProfile = readJsonObject(getCommunityProfileStorageKey(currentUserKey), baseProfile);
+    const legacyProfile = readJsonObject(COMMUNITY_PROFILE_STORAGE_KEY, defaultCommunityProfile);
+    const hasScopedProfile = typeof window !== 'undefined' && Boolean(localStorage.getItem(getCommunityProfileStorageKey(currentUserKey)));
+    const shouldUseLegacy = !hasScopedProfile && legacyProfile.name && legacyProfile.name !== 'Eduvora Member';
+    const nextProfile = { ...baseProfile, ...(shouldUseLegacy ? legacyProfile : scopedProfile) };
+    setProfile(nextProfile);
+    setProfileDraft(nextProfile);
+  }, [currentUserKey, currentUser?.id, currentUser?.name, currentUser?.photoURL]);
 
   const allCreators = useMemo(() => {
     const merged = new Map<string, Creator>();
@@ -945,7 +988,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [messages, feedFilter, followedIds, followedByCreatorIds, followerIds, followerByCreatorIds, currentUserKey]);
 
   const feedFilterOptions: Array<{ key: FeedFilter; label: string; helper: string; count: number }> = [
-    { key: 'all', label: 'All Feed', helper: 'Every permanent public post', count: messages.length },
     { key: 'following', label: 'Following Feed', helper: 'Posts from people you follow', count: messages.filter((message) => {
       const ownerId = getMessageOwnerId(message);
       return ownerId && (followedIds.includes(ownerId) || Boolean(followedByCreatorIds[ownerId]));
@@ -1735,8 +1777,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   useEffect(() => {
     if (!PRIVATE_CHAT_ENABLED || !isCommunityAllowed || !guardedAuth.currentUser || !currentUserKey) return undefined;
 
-    const publicName = profile.name || 'Eduvora Member';
-    const publicUsername = normalizeUsername(profile.username || profile.name) || `member_${currentUserKey.slice(0, 6)}`;
+    const publicName = profile.name || buildStableCommunityName(currentUserKey);
+    const publicUsername = normalizeUsername(profile.username || profile.name) || buildStableCommunityUsername(currentUserKey);
     const publicBio = profile.bio || '';
     const searchableText = normalizeSearchText([publicName, publicUsername, 'Community member', publicBio].join(' '));
     const publicProfilePayload = stripUndefinedDeep({
@@ -1748,7 +1790,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       name: publicName,
       username: publicUsername,
       photoURL: isImageAvatar(profile.avatar || '') ? profile.avatar : '',
-      avatar: profile.avatar || '🧑‍🎓',
+      avatar: profile.avatar || '',
       role: 'student',
       bio: publicBio,
       subjects: [],
@@ -1758,7 +1800,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       searchTokens: buildSearchTokens(publicName, publicUsername, 'student', 'Community member', publicBio),
       followerCount: Math.max(0, followerCounts[currentUserKey] || followerIds.length),
       followingCount: Math.max(0, followingCounts[currentUserKey] || followedIds.length),
-      postCount: messages.filter((message) => isOwnCommunityId(message.creatorId)).length,
+      postCount: messages.filter((message) => isOwnCommunityId(message.ownerId || message.creatorId)).length,
       isCreator: false,
       isVerified: false,
       isPublic: privacySettings.profileVisible,
@@ -1787,7 +1829,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         const userId = String(data.uid || data.userId || data.ownerId || item.id);
         const rawName = typeof data.displayName === 'string' && data.displayName.trim() ? data.displayName : typeof data.name === 'string' && data.name.trim() ? data.name : 'Eduvora Member';
         const rawUsername = typeof data.username === 'string' && data.username.trim() ? data.username : rawName;
-        const rawAvatar = typeof data.avatar === 'string' && data.avatar.trim() ? data.avatar : typeof data.photoURL === 'string' && data.photoURL.trim() ? data.photoURL : '🧑‍🎓';
+        const rawAvatar = typeof data.avatar === 'string' && data.avatar.trim() ? data.avatar : typeof data.photoURL === 'string' && data.photoURL.trim() ? data.photoURL : '';
         const rawRole = typeof data.role === 'string' && data.role.trim() ? data.role : 'student';
         const subjects = Array.isArray(data.subjects) ? data.subjects.filter((value): value is string => typeof value === 'string') : [];
         const masterTags = Array.isArray(data.masterTags) ? data.masterTags.filter((value): value is string => typeof value === 'string') : [];
@@ -2060,11 +2102,29 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const resolveAvatar = (message: FeedMessage) => isOwnCommunityId(message.creatorId) ? profile.avatar : message.avatar;
-  const resolveName = (message: FeedMessage) => isOwnCommunityId(message.creatorId) ? profile.name : message.admin;
+  const getIdentityForId = (profileId?: string) => {
+    if (!profileId) return { name: '', avatar: '', username: '' };
+    if (isOwnCommunityId(profileId)) return { name: profile.name || buildStableCommunityName(currentUserKey), avatar: profile.avatar || '', username: profile.username || buildStableCommunityUsername(currentUserKey) };
+    const creator = allCreators.find((item) => item.id === profileId || item.ownerId === profileId);
+    return { name: creator?.name || '', avatar: creator?.avatar || '', username: creator?.username || '' };
+  };
 
-  const Avatar: React.FC<{ value: string; size?: string; className?: string }> = ({ value, size = 'h-12 w-12', className = '' }) => (
-    <div className={`${size} shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-[#E8F0FE] via-[#D3E3FD] to-[#C2E7FF] text-xl shadow-inner ring-1 ring-[#D2E3FC] text-[#202124] ${className}`}>{isImageAvatar(value) ? <img src={value} alt="Profile avatar" className="h-full w-full object-cover" /> : <span className="flex h-full w-full items-center justify-center">{value}</span>}</div>
+  const getStatusOwnerIdentity = (status: StatusCard) => {
+    const identity = getIdentityForId(status.ownerId || status.creatorId);
+    return { name: identity.name || status.authorName || 'Community member', avatar: identity.avatar || status.authorAvatar || '' };
+  };
+
+  const resolveAvatar = (message: FeedMessage) => {
+    const ownerIdentity = getIdentityForId(message.ownerId || message.creatorId);
+    return ownerIdentity.avatar || message.avatar || '';
+  };
+  const resolveName = (message: FeedMessage) => {
+    const ownerIdentity = getIdentityForId(message.ownerId || message.creatorId);
+    return ownerIdentity.name || message.admin || 'Community member';
+  };
+
+  const Avatar: React.FC<{ value?: string; size?: string; className?: string }> = ({ value = '', size = 'h-12 w-12', className = '' }) => (
+    <div className={`${size} shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-[#E8F0FE] via-[#D3E3FD] to-[#C2E7FF] text-xl shadow-inner ring-1 ring-[#D2E3FC] text-[#202124] ${className}`}>{isImageAvatar(value) ? <img src={value} alt="Profile avatar" className="h-full w-full object-cover" /> : value ? <span className="flex h-full w-full items-center justify-center">{value}</span> : <span className="flex h-full w-full items-center justify-center" aria-hidden="true" />}</div>
   );
 
   const loadRepliesForMessage = (message: FeedMessage) => {
@@ -2153,7 +2213,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const reply: Reply = {
       id: optimisticId,
       author: profile.name || 'Eduvora Member',
-      avatar: profile.avatar || '🧑‍🎓',
+      avatar: profile.avatar || '',
       text: draft,
       time: retryReply ? 'Retrying…' : 'Sending…',
       createdAt: retryReply?.createdAt || Date.now(),
@@ -2344,7 +2404,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           displayName: profile.name || 'Eduvora Member',
           name: profile.name || 'Eduvora Member',
           username: normalizeUsername(profile.username || profile.name) || `member_${followerId.slice(0, 6)}`,
-          avatar: profile.avatar || '🧑‍🎓',
+          avatar: profile.avatar || '',
           role: 'student',
           followerCount: Math.max(0, Number(followerPublicSnap.data()?.followerCount ?? followerLegacySnap.data()?.followerCount ?? followerIds.length) || 0),
           followingCount: currentFollowingCount,
@@ -2458,6 +2518,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       createdAt: now,
       expiresAt: FEED_POST_NEVER_EXPIRES_AT,
       ownerId: currentUserKey,
+      authorName: profile.name || buildStableCommunityName(currentUserKey),
+      authorAvatar: profile.avatar || '',
       source: 'creator',
       sourceType: publishType === 'image' ? 'url' : undefined,
       reactionCounts: {},
@@ -2538,6 +2600,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       sourceType: publishType === 'image' ? 'url' as const : undefined,
       text: draft,
       creatorId: currentUserKey,
+      authorName: profile.name || buildStableCommunityName(currentUserKey),
+      authorAvatar: profile.avatar || '',
     };
     flushSync(() => setStatusCards((current) => [localStory, ...current.filter((status) => status.id !== localStory.id)]));
     openPublishedStatusStory(statusStoryId);
@@ -2587,16 +2651,63 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const saveProfileChanges = () => {
-    const name = profileDraft.name.trim();
-    const username = normalizeUsername(profileDraft.username);
+    const name = profileDraft.name.trim() || buildStableCommunityName(currentUserKey);
+    const username = normalizeUsername(profileDraft.username || name) || buildStableCommunityUsername(currentUserKey);
     const bio = profileDraft.bio.trim().slice(0, PROFILE_BIO_MAX_LENGTH);
-    if (!name) { setProfileFeedback({ type: 'error', message: 'Display name is required.' }); return; }
-    if (!username) { setProfileFeedback({ type: 'error', message: 'Username is required. Use lowercase letters, numbers, underscores, or dots.' }); return; }
-    if (!/^[a-z0-9][a-z0-9._]{1,28}[a-z0-9]$/.test(username)) { setProfileFeedback({ type: 'error', message: 'Username must be 3-30 characters and can use lowercase letters, numbers, underscores, or dots.' }); return; }
-    const nextProfile = { ...profileDraft, name, username, bio };
+
+    if (!/^[a-z0-9][a-z0-9._]{1,28}[a-z0-9]$/.test(username)) {
+      setProfileFeedback({ type: 'error', message: 'Username must be 3-30 characters and can use lowercase letters, numbers, underscores, or dots.' });
+      return;
+    }
+
+    const nextProfile = { ...profileDraft, name, username, bio, avatar: profileDraft.avatar || '' };
     setProfile(nextProfile);
     setProfileDraft(nextProfile);
-    setProfileFeedback({ type: 'success', message: 'Profile saved. Header, sidebar, posts, and profile hero now use your latest details.' });
+
+    if (typeof window !== 'undefined') {
+      localStorage.setItem(getCommunityProfileStorageKey(currentUserKey), JSON.stringify(nextProfile));
+      window.dispatchEvent(new CustomEvent('eduvoraProfileIdentityUpdated', {
+        detail: { uid: currentUserKey, name: nextProfile.name, photoURL: nextProfile.avatar, avatar: nextProfile.avatar, username: nextProfile.username, bio: nextProfile.bio },
+      }));
+    }
+
+    if (guardedAuth.currentUser && currentUserKey) {
+      const identityPayload = stripUndefinedDeep({
+        name: nextProfile.name,
+        displayName: nextProfile.name,
+        username: nextProfile.username,
+        photoURL: nextProfile.avatar || '',
+        avatar: nextProfile.avatar || '',
+        bio: nextProfile.bio,
+        updatedAt: Date.now(),
+      });
+
+      setDoc(doc(db, 'users', currentUserKey), identityPayload, { merge: true })
+        .catch((error) => console.warn('User identity profile sync failed', error));
+
+      setDoc(doc(db, COMMUNITY_PROFILES, currentUserKey), {
+        ...identityPayload,
+        uid: currentUserKey,
+        id: currentUserKey,
+        userId: currentUserKey,
+        ownerId: currentUserKey,
+        role: 'student',
+        isPublic: privacySettings.profileVisible,
+      }, { merge: true }).catch((error) => console.warn('Community profile identity sync failed', error));
+
+      setDoc(doc(db, PUBLIC_PROFILES, currentUserKey), {
+        ...identityPayload,
+        uid: currentUserKey,
+        id: currentUserKey,
+        userId: currentUserKey,
+        ownerId: currentUserKey,
+        role: 'student',
+        isPublic: privacySettings.profileVisible,
+      }, { merge: true }).catch((error) => console.warn('Public profile identity sync failed', error));
+    }
+
+    setProfileFeedback({ type: 'success', message: 'Profile saved. Your name and photo now update across community posts, replies, follows, and product reviews.' });
+    setProfileViewMode('overview');
   };
 
   const resetProfileDraft = () => {
@@ -2664,6 +2775,28 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     } catch (error) {
       console.warn('Status story delete failed', error);
       setProfileFeedback({ type: 'error', message: 'Status removed locally, but Firebase delete failed. Please retry if it appears again.' });
+    }
+  };
+
+
+  const deleteOwnFeedPost = async (message: FeedMessage) => {
+    const ownerId = getMessageOwnerId(message);
+    if (!isOwnCommunityId(ownerId)) {
+      setProfileFeedback({ type: 'error', message: 'You can delete only your own post.' });
+      return;
+    }
+
+    if (typeof window !== 'undefined' && !window.confirm('Delete this post from your profile and feed?')) return;
+
+    setMessages((current) => current.filter((item) => item.id !== message.id));
+    if (selectedMessageId === message.id) setSelectedMessageId(messages.find((item) => item.id !== message.id)?.id || 0);
+
+    try {
+      if (message.docId) await deleteDoc(doc(db, COMMUNITY_FEED, message.docId));
+      setProfileFeedback({ type: 'success', message: 'Post deleted.' });
+    } catch (error) {
+      console.warn('Feed post delete failed', error);
+      setProfileFeedback({ type: 'error', message: 'Post removed locally, but Firebase delete failed. Please retry if it appears again.' });
     }
   };
 
@@ -3102,7 +3235,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF6FF] text-2xl">🏷️</div>
       <h3 className="mt-4 text-2xl font-black text-[#081A45]">This master tag is no longer available.</h3>
       <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">It may have been deleted, hidden, or it is not visible to your account.</p>
-      <button type="button" onClick={closeMasterTagDetail} className="mt-5 rounded-2xl bg-[#1769FF] px-5 py-3 text-sm font-black text-white">Back to Master Tags</button>
+      <button type="button" onClick={closeMasterTagDetail} className="mt-5 rounded-2xl bg-[#1769FF] px-5 py-3 text-sm font-black text-white">Back to Master Taggedged</button>
     </div>
   );
 
@@ -3150,17 +3283,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const renderMasterTagDetailPage = (showBackButton = true) => (
     <div className="space-y-4 pb-28 md:pb-0">
-      {showBackButton ? <button type="button" onClick={() => setPage('masterTags')} className="rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-black text-[#536178] shadow-sm transition hover:bg-[#EEF6FF]">← Back to Master Tags</button> : null}
+      {showBackButton ? <button type="button" onClick={() => setPage('masterTags')} className="rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-black text-[#536178] shadow-sm transition hover:bg-[#EEF6FF]">← Back to Master Taggedged</button> : null}
       {renderMasterTagDetailContent()}
     </div>
   );
 
   const renderMasterTagDetailOverlay = () => isMasterTagDetailOpen ? (
-    <div className="fixed inset-0 z-[1700] flex justify-end bg-[#081A45]/35 p-0 backdrop-blur-[3px] md:p-3" role="dialog" aria-modal="true" aria-label="Master Tag detail">
+    <div className="fixed inset-0 z-[1700] flex justify-end bg-[#081A45]/35 p-0 backdrop-blur-[3px] md:p-3" role="dialog" aria-modal="true" aria-label="Master Tagged detail">
       <div ref={masterTagDetailPanelRef} tabIndex={-1} className="flex h-[100dvh] w-full flex-col overflow-hidden bg-[#F8FBFF] text-[#081A45] shadow-[0_30px_90px_rgba(8,26,69,0.22)] outline-none md:h-[calc(100dvh-1.5rem)] md:max-w-[560px] md:rounded-[2rem] md:border md:border-[#D9E7F8]">
         <header className="flex shrink-0 items-center gap-3 border-b border-[#D9E7F8] bg-white/94 px-4 py-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-2xl md:pt-3">
           <button type="button" onClick={closeMasterTagDetail} aria-label="Close master tag detail" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-sm">←</button>
-          <div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Master Tag</p><h2 className="truncate text-lg font-black">{selectedMasterTag?.targetMasterName || selectedMasterTag?.title || 'Master Tag'}</h2></div>
+          <div className="min-w-0 flex-1"><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Master Tagged</p><h2 className="truncate text-lg font-black">{selectedMasterTag?.targetMasterName || selectedMasterTag?.title || 'Master Tagged'}</h2></div>
           <button type="button" onClick={closeMasterTagDetail} aria-label="Close master tag detail" className="hidden h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-sm md:flex">×</button>
         </header>
         <main className="min-h-0 flex-1 overflow-y-auto px-4 py-4 pb-[calc(env(safe-area-inset-bottom)+2rem)] custom-scrollbar md:px-5">
@@ -3185,7 +3318,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <div className="mt-5"><p className="text-sm font-black text-[#081A45]">Category / subject</p><div className="mt-2 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">{masterTagCategories.map((category) => <button key={category} type="button" onClick={() => setMasterTagCategory(category)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black transition ${masterTagCategory === category ? 'border-[#1769FF] bg-[#1769FF] text-white' : 'border-[#D9E7F8] bg-white text-[#536178]'}`}>{category}</button>)}</div></div>
             <div className="mt-5"><p className="text-sm font-black text-[#081A45]">Tag type</p><div className="mt-2 grid grid-cols-2 gap-2 sm:grid-cols-3">{masterTagTypes.map((type) => <button key={type} type="button" onClick={() => setMasterTagType(type)} className={`rounded-2xl border px-3 py-2 text-xs font-black ${masterTagType === type ? 'border-[#7B61FF] bg-[#F2EFFF] text-[#5B42D6]' : 'border-[#D9E7F8] bg-white text-[#536178]'}`}>{type}</button>)}</div></div>
             {composerError ? <div className="mt-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{composerError}</div> : null}
-            <button type="button" onClick={submitMasterTag} disabled={isSubmittingMasterTag || !masterSearch.trim() || masterTagDetail.trim().length < MASTER_TAG_MESSAGE_MIN} className="mt-5 w-full rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-4 text-sm font-black text-white shadow-[0_16px_42px_rgba(23,105,255,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-55">{isSubmittingMasterTag ? 'Publishing…' : 'Publish Master Tag'}</button>
+            <button type="button" onClick={submitMasterTag} disabled={isSubmittingMasterTag || !masterSearch.trim() || masterTagDetail.trim().length < MASTER_TAG_MESSAGE_MIN} className="mt-5 w-full rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-4 text-sm font-black text-white shadow-[0_16px_42px_rgba(23,105,255,0.28)] transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-55">{isSubmittingMasterTag ? 'Publishing…' : 'Publish Master Tagged'}</button>
           </div>
           <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start"><div><p className="mb-2 px-1 text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Live preview</p>{renderMasterTagCard(masterTagPreview, true)}</div><div className="rounded-[1.8rem] border border-[#D9E7F8] bg-white p-5"><h3 className="text-lg font-black text-[#081A45]">Why tag a master?</h3><p className="mt-2 text-sm font-semibold leading-7 text-[#536178]">Specific, kind appreciation helps learners discover respected teachers and reminds mentors their work matters.</p><div className="mt-4 space-y-2 text-sm font-bold text-[#536178]"><p>• “I learned ___ because you explained ___.”</p><p>• “Your guidance helped me stay consistent with ___.”</p><p>• “Thank you for making ___ feel possible.”</p></div></div><div className="rounded-[1.8rem] border border-[#D9E7F8] bg-white p-5"><h3 className="text-lg font-black text-[#081A45]">Trending appreciation</h3><div className="mt-3 space-y-2">{trendingMasterTags.slice(0, 3).map((tag) => <button key={tag.id} type="button" onClick={() => openMasterTagDetail(tag.id)} className="flex w-full items-center justify-between rounded-2xl bg-[#F8FBFF] px-3 py-2 text-left text-xs font-black text-[#536178]"><span className="truncate">{tag.targetMasterName || tag.title}</span><span>💛 {tag.likes}</span></button>)}</div></div></aside>
         </div>
@@ -3195,7 +3328,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const renderMasterTagFilters = (compact = false) => (
     <div className={compact ? 'space-y-4' : 'rounded-[2rem] border border-[#D9E7F8] bg-gradient-to-br from-[#EEF6FF] via-white to-[#F8FBFF] p-5 shadow-[0_24px_70px_rgba(23,105,255,0.12)] sm:p-7'}>
-      <p className="text-xs font-black uppercase tracking-[0.28em] text-[#1769FF]">Master Tags</p><h2 className="mt-2 text-3xl font-black tracking-tight text-[#081A45] sm:text-5xl">A community wall of gratitude.</h2><p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-[#536178]">Discover masters through respectful appreciation posts, filter by category, and search names, subjects, authors, or message words.</p>
+      <p className="text-xs font-black uppercase tracking-[0.28em] text-[#1769FF]">Master Taggedged</p><h2 className="mt-2 text-3xl font-black tracking-tight text-[#081A45] sm:text-5xl">A community wall of gratitude.</h2><p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-[#536178]">Discover masters through respectful appreciation posts, filter by category, and search names, subjects, authors, or message words.</p>
       <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto]"><input value={masterTagSearch} onChange={(event) => setMasterTagSearch(event.target.value)} placeholder="Search master tags…" className="h-12 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-sm font-bold outline-none focus:border-[#1769FF]" /><select value={masterTagSort} onChange={(event) => setMasterTagSort(event.target.value as typeof masterTagSort)} className="h-12 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-sm font-black text-[#081A45]"><option value="recent">Recent</option><option value="appreciated">Most appreciated</option><option value="trending">Trending</option></select></div>
       <div className="mt-4 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">{(['all', 'mine', 'following', 'verified'] as const).map((filter) => <button key={filter} type="button" onClick={() => setMasterTagsAudienceFilter(filter)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black capitalize ${masterTagsAudienceFilter === filter ? 'border-[#1769FF] bg-[#1769FF] text-white' : 'border-[#D9E7F8] bg-white text-[#536178]'}`}>{filter === 'all' ? 'All' : filter}</button>)}{(['All', ...masterTagCategories] as Array<'All' | (typeof masterTagCategories)[number]>).map((category) => <button key={category} type="button" onClick={() => setMasterTagFilter(category)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black ${masterTagFilter === category ? 'border-[#7B61FF] bg-[#7B61FF] text-white' : 'border-[#D9E7F8] bg-white text-[#536178]'}`}>{category}</button>)}</div>
     </div>
@@ -3237,11 +3370,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const renderReplyBubble = (message: FeedMessage, reply: Reply) => {
     const mine = isOwnCommunityId(reply.ownerId || reply.senderId) || reply.author === profile.name;
+    const replyIdentity = getIdentityForId(reply.ownerId || reply.senderId);
+    const replyName = replyIdentity.name || reply.author || 'Member';
+    const replyAvatar = replyIdentity.avatar || reply.avatar || '';
     const failed = reply.status === 'failed';
     const deleted = reply.status === 'deleted' || reply.status === 'hidden';
     return (
       <div key={reply.clientMessageId || reply.docId || reply.id} data-community-reply-id={String(reply.clientMessageId || reply.docId || reply.id)} className={`group flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
-        {!mine ? <Avatar value={reply.avatar || '👤'} size="h-8 w-8" className="mb-1 text-base" /> : null}
+        {!mine ? <Avatar value={replyAvatar} size="h-8 w-8" className="mb-1 text-base" /> : null}
         <div className={`max-w-[86%] rounded-[1.45rem] px-4 py-3 shadow-[0_12px_34px_rgba(23,105,255,0.10)] sm:max-w-[74%] ${mine ? 'rounded-br-md bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white' : 'rounded-bl-md border border-[#D9E7F8] bg-white text-[#081A45]'}`}>
           {reply.replyToTextPreview ? (
             <button type="button" onClick={() => { setHighlightedThreadId(message.id); setTimeout(() => setHighlightedThreadId(null), 1400); }} className={`mb-2 w-full rounded-2xl border-l-4 px-3 py-2 text-left text-xs font-bold ${mine ? 'border-l-white/80 bg-white/15 text-white/90' : 'border-l-[#7B61FF] bg-[#F1EEFF] text-[#536178]'}`}>
@@ -3250,14 +3386,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             </button>
           ) : null}
           <div className="flex flex-wrap items-center gap-2">
-            {!mine ? <span className="text-xs font-black text-[#1769FF]">{reply.author || 'Member'}</span> : null}
+            {!mine ? <span className="text-xs font-black text-[#1769FF]">{replyName}</span> : null}
             <span className={`text-[11px] font-bold ${mine ? 'text-white/75' : 'text-[#7C879A]'}`}>{reply.time}</span>
             {reply.status === 'sending' ? <span className={`text-[11px] font-black ${mine ? 'text-white/80' : 'text-[#7C879A]'}`}>Sending…</span> : null}
           </div>
           <p className={`mt-1 whitespace-pre-wrap break-words text-sm font-semibold leading-6 sm:text-base ${deleted ? 'italic opacity-70' : ''}`}>{deleted ? 'This message was deleted' : reply.text}</p>
           {failed ? <div className="mt-2 flex flex-wrap items-center gap-2 rounded-2xl bg-[#FCE8E6] px-3 py-2 text-xs font-black text-[#C5221F]"><span>Failed to send.</span><button type="button" onClick={() => submitReply(message.id, reply)} disabled={Boolean(replySendingIds[message.id])} className="rounded-full bg-white px-3 py-1 text-[#C5221F] disabled:opacity-50">Retry</button></div> : null}
         </div>
-        {mine ? <Avatar value={profile.avatar || reply.avatar || '🧑‍🎓'} size="h-8 w-8" className="mb-1 text-base" /> : null}
+        {mine ? <Avatar value={profile.avatar || replyAvatar} size="h-8 w-8" className="mb-1 text-base" /> : null}
       </div>
     );
   };
@@ -3270,12 +3406,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       <div className={`flex min-h-0 flex-col overflow-hidden bg-[#F8FBFF] ${fullScreen ? 'h-[calc(100dvh-8.75rem)] md:h-[calc(100dvh-10rem)]' : 'h-[calc(100dvh-11rem)] rounded-[1.75rem] border border-[#D9E7F8] shadow-[0_16px_48px_rgba(23,105,255,0.08)]'}`}>
         <div className="sticky top-0 z-10 border-b border-[#D9E7F8] bg-white/95 px-4 py-3 backdrop-blur-xl lg:px-6">
           <div className="flex items-center gap-3">
-            <Avatar value={resolveAvatar(message)} size="h-10 w-10" />
+            <button type="button" onClick={() => { const ownerId = getMessageOwnerId(message); if (ownerId) { setSelectedProfileId(ownerId); pushPage('profile'); } }} className="shrink-0"><Avatar value={resolveAvatar(message)} size="h-10 w-10" /></button>
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-base font-black text-[#081A45] sm:text-lg">{resolveName(message)}</h2><span className="rounded-full bg-[#E8F2FF] px-2.5 py-1 text-[11px] font-black text-[#1769FF]">{message.badge}</span></div>
               <p className="truncate text-xs font-bold text-[#7C879A]">{message.time} · {message.replyCount || message.replies.length} replies</p>
             </div>
-            <button type="button" onClick={() => setExpandedReplyId(message.id)} className="min-h-11 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-xs font-black text-[#1769FF]">Reply</button>
+            {isOwnCommunityId(getMessageOwnerId(message)) ? <button type="button" onClick={() => deleteOwnFeedPost(message)} className="min-h-11 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-3 text-xs font-black text-[#C5221F]">Delete</button> : null}<button type="button" onClick={() => setExpandedReplyId(message.id)} className="min-h-11 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-xs font-black text-[#1769FF]">Reply</button>
           </div>
         </div>
         <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 pb-6 custom-scrollbar sm:px-5 lg:px-7">
@@ -3305,32 +3441,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const isAdminFeed = title.toLowerCase().includes('admin');
     const isMainFeed = title === 'Community Feed';
     const emptyCopy = isAdminFeed ? 'No official admin posts are available right now.' : feedFilter === 'following' ? 'No posts from people you follow yet. Follow creators to build this feed.' : feedFilter === 'followers' ? 'No posts from your followers yet.' : feedFilter === 'mine' ? 'You have not published a permanent post yet.' : 'No messages yet. Start the conversation.';
-    const filterHeader = isMainFeed ? (
-      <section className="mx-auto mb-4 max-w-[1600px] overflow-hidden rounded-[2rem] border border-[#D9E7F8] bg-white/92 p-4 shadow-[0_18px_54px_rgba(23,105,255,0.10)] backdrop-blur-xl">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Dynamic feed</p>
-            <h2 className="mt-1 text-2xl font-black text-[#081A45]">{title}</h2>
-            <p className="mt-1 text-sm font-semibold leading-6 text-[#536178]">{subtitle}</p>
-          </div>
-          <span className="rounded-full bg-[#EEF6FF] px-3 py-1.5 text-xs font-black text-[#1769FF]">{compactCount(feedMessages.length)} visible</span>
-        </div>
-        <div className="mt-4 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
-          {feedFilterOptions.map((option) => (
-            <button key={option.key} type="button" onClick={() => setFeedFilter(option.key)} className={`min-h-11 shrink-0 rounded-full border px-4 text-left text-xs font-black transition ${feedFilter === option.key ? 'border-[#1769FF] bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-[0_12px_30px_rgba(23,105,255,0.24)]' : 'border-[#D9E7F8] bg-[#F8FBFF] text-[#536178] hover:border-[#BFD7FF] hover:text-[#1769FF]'}`}>
-              <span>{option.label}</span>
-              <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5">{compactCount(option.count)}</span>
-            </button>
-          ))}
-        </div>
-      </section>
-    ) : null;
+    const filterHeader = null;
 
-    if (!feedMessages.length) return <>{filterHeader}<div className="mx-auto max-w-5xl rounded-[2rem] border border-dashed border-[#C2E7FF] bg-gradient-to-br from-[#F8FAFD] via-white to-[#E8F0FE] p-8 text-center font-bold text-[#536178] shadow-[0_18px_54px_rgba(37,99,235,0.10)]"><div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white text-3xl shadow-inner">{isAdminFeed ? '📣' : '💬'}</div>{emptyCopy}</div></>;
+    if (!feedMessages.length) return <><div className="mx-auto max-w-5xl rounded-[2rem] border border-dashed border-[#C2E7FF] bg-gradient-to-br from-[#F8FAFD] via-white to-[#E8F0FE] p-8 text-center font-bold text-[#536178] shadow-[0_18px_54px_rgba(37,99,235,0.10)]"><div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white text-3xl shadow-inner">{isAdminFeed ? '📣' : '💬'}</div>{emptyCopy}</div></>;
 
     return (
       <>
-        {filterHeader}
         <div className="mx-auto grid h-[clamp(34rem,calc(100dvh-13.5rem),78rem)] min-h-0 w-full min-w-0 max-w-[1600px] gap-4 overflow-hidden lg:gap-5 md:grid-cols-[minmax(0,clamp(18rem,28vw,25rem))_minmax(0,1fr)]">
           <aside className="hidden h-full min-h-0 min-w-0 overflow-y-auto rounded-[2rem] border border-[#D9E7F8] bg-white p-3 shadow-[0_20px_60px_rgba(23,105,255,0.08)] ring-1 ring-[#EEF6FF] backdrop-blur-xl custom-scrollbar md:block">
             <div className="space-y-3">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} isActive={activeMessage?.id === message.id} />)}</div>
@@ -3425,16 +3541,27 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return <div className="min-h-0 flex-1 overflow-hidden"><div className="min-h-0 max-h-[62dvh] overflow-y-auto pr-1 custom-scrollbar">{card.imagePreview ? <div className={`mb-4 ${card.imageLayout === 'original' ? 'h-[min(34dvh,320px)] w-full' : 'mx-auto aspect-square w-full max-w-[320px]'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-[#202124]/20 shadow-2xl`}>{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'original')}</div> : null}<h2 className="line-clamp-3 text-2xl font-black tracking-tight sm:text-4xl">{title}</h2>{card.body ? <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-white/90 sm:text-base sm:leading-7">{preview}</p> : null}{hasDetail ? <button type="button" onClick={() => { setSelectedStatusId(card.id); pushPage('statusDetail'); }} className="mt-4 rounded-full border border-white/25 bg-white/18 px-4 py-2 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/28">Learn more</button> : null}{renderStatusPoll(card)}</div></div>;
   };
 
-  const renderStatusTile = (card: StatusCard) => (
-    <button key={card.id} type="button" onClick={() => openStatusReel(card.id)} className="group relative aspect-[9/14] overflow-hidden rounded-[1.8rem] border border-white/80 bg-white p-3 text-left shadow-[0_18px_52px_rgba(15,23,42,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
-      <div className={`absolute inset-2 rounded-[1.35rem] bg-gradient-to-br ${card.gradient} transition duration-500 group-hover:scale-[1.04]`} />
-      <div className="absolute inset-2 rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.30),rgba(255,255,255,0.04)_38%,rgba(15,23,42,0.60))]" />
-      <div className="relative flex h-full flex-col justify-between p-2 text-white">
-        <span className="w-max rounded-full border border-white/70 bg-white px-3 py-1 text-[10px] font-black text-[#202124] shadow-sm backdrop-blur-xl">{card.slots}</span>
-        <div>{card.imagePreview ? <div className="mb-5 aspect-square w-24 overflow-hidden rounded-2xl bg-white/18 shadow-inner">{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'thumbnail')}</div> : null}<h3 className="line-clamp-2 text-xl font-black tracking-tight drop-shadow sm:text-2xl">{card.title}</h3><p className="mt-2 line-clamp-2 text-sm font-bold text-white/90 drop-shadow">{card.body}</p><p className="mt-3 w-max rounded-full border border-white/60 bg-white/85 px-3 py-1 text-[11px] font-black text-[#202124] shadow-sm backdrop-blur-xl">❤️ {card.likedBy} · 👁️ {card.views}</p></div>
-      </div>
-    </button>
-  );
+  const renderStatusTile = (card: StatusCard) => {
+    const owner = getStatusOwnerIdentity(card);
+    return (
+      <button key={card.id} type="button" onClick={() => openStatusReel(card.id)} className="group relative aspect-[9/14] overflow-hidden rounded-[1.8rem] border border-white/80 bg-white p-3 text-left shadow-[0_18px_52px_rgba(15,23,42,0.12)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(15,23,42,0.16)]">
+        <div className={`absolute inset-2 rounded-[1.35rem] bg-gradient-to-br ${card.gradient} transition duration-500 group-hover:scale-[1.04]`} />
+        <div className="absolute inset-2 rounded-[1.35rem] bg-[linear-gradient(180deg,rgba(255,255,255,0.30),rgba(255,255,255,0.04)_38%,rgba(15,23,42,0.60))]" />
+        <div className="relative flex h-full flex-col justify-between p-2 text-white">
+          <div className="flex items-center gap-2">
+            <Avatar value={owner.avatar} size="h-9 w-9" className="ring-2 ring-white/70" />
+            <span className="min-w-0 truncate rounded-full border border-white/55 bg-white/85 px-2.5 py-1 text-[10px] font-black text-[#202124] shadow-sm">{owner.name}</span>
+          </div>
+          <div>
+            {card.imagePreview ? <div className="mb-5 aspect-square w-24 overflow-hidden rounded-2xl bg-white/18 shadow-inner">{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'thumbnail')}</div> : null}
+            <h3 className="line-clamp-2 text-xl font-black tracking-tight drop-shadow sm:text-2xl">{card.title}</h3>
+            <p className="mt-2 line-clamp-2 text-sm font-bold text-white/90 drop-shadow">{card.body}</p>
+            <p className="mt-3 w-max rounded-full border border-white/60 bg-white/85 px-3 py-1 text-[11px] font-black text-[#202124] shadow-sm backdrop-blur-xl">❤️ {card.likedBy} · 👁️ {card.views}</p>
+          </div>
+        </div>
+      </button>
+    );
+  };
 
   const renderStatusReel = () => {
     const selectedIndex = Math.max(0, statusCards.findIndex((card) => card.id === selectedStatus.id));
@@ -3450,7 +3577,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(255,255,255,0.36),transparent_24%),linear-gradient(180deg,rgba(32,33,36,0.04),rgba(32,33,36,0.42))]" />
             <div className="relative grid w-full max-w-5xl items-center gap-5 md:grid-cols-[1fr_96px]">
               <article className="mx-auto flex min-h-[74dvh] w-full max-w-[520px] flex-col justify-between rounded-[2.5rem] border border-white/20 bg-[#202124]/18 p-6 shadow-[0_32px_120px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
-                <div className="flex items-center justify-between gap-3"><span className="rounded-full border border-white/30 bg-white/18 px-4 py-2 text-xs font-black uppercase tracking-[0.22em]">{card.slots}</span><span className="text-sm font-black">{isOwnCommunityId(card.ownerId) ? 'Your status' : 'Community'}</span></div>
+                <div className="flex items-center justify-between gap-3"><button type="button" onClick={() => { const ownerId = card.ownerId || card.creatorId; if (ownerId) { setSelectedProfileId(ownerId); setPage('profile'); setPageStack([]); } }} className="flex min-w-0 items-center gap-2 rounded-full border border-white/30 bg-white/18 px-3 py-2 text-left"><Avatar value={getStatusOwnerIdentity(card).avatar} size="h-8 w-8" /><span className="max-w-[10rem] truncate text-xs font-black">{getStatusOwnerIdentity(card).name}</span></button><span className="rounded-full border border-white/30 bg-white/18 px-4 py-2 text-xs font-black uppercase tracking-[0.22em]">{card.slots}</span></div>
                 {renderStatusReelContent(card)}
                 <div className="flex items-center justify-between text-sm font-black text-white/80"><span>Swipe for next status</span><span>👁️ {card.views} views</span></div>
               </article>
@@ -3908,12 +4035,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     { label: 'Creators', icon: '✍️', active: page === 'creators', action: () => pushPage('creators') },
     { label: 'Follow', icon: '🤝', active: page === 'network', action: () => pushPage('network') },
     { label: 'Following', icon: '👥', active: page === 'following', action: () => pushPage('following') },
-    { label: 'Master Tag', icon: '📚', active: page === 'tagMaster' || page === 'masterTags' || page === 'masterTagDetail', action: () => pushPage('masterTags') },
+    { label: 'Master Taggedged', icon: '📚', active: page === 'tagMaster' || page === 'masterTags' || page === 'masterTagDetail', action: () => pushPage('masterTags') },
     { label: 'Profile', icon: '👤', active: page === 'profile' && !selectedProfileId, action: () => { setSelectedProfileId(null); pushPage('profile'); } },
   ];
 
   const activeNavItem = navItems.find((item) => item.active) || navItems[0];
-  const showCreateCta = page === 'creators' || (page === 'chat' && activeView === 'status') || page === 'statusUpload';
+  const showCreateCta = (page === 'chat' && activeView === 'status') || page === 'statusUpload';
   const communityAiButtonRef = useRef<HTMLButtonElement>(null);
   const openCommunityAiMentor = () => setIsCommunityAiOpen(true);
   const handleHeaderCreate = () => {
@@ -3927,7 +4054,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const visibleSnippet = page === 'thread'
       ? `${selectedMessage.title}: ${selectedMessage.body}`
       : page === 'masterTagDetail'
-        ? `${selectedMasterTag?.targetMasterName || selectedMasterTag?.title || 'Master Tag'}: ${selectedMasterTag?.detail || ''}`
+        ? `${selectedMasterTag?.targetMasterName || selectedMasterTag?.title || 'Master Tagged'}: ${selectedMasterTag?.detail || ''}`
         : page === 'directChatThread'
           ? `Direct chat with ${(allCreators.find((creator) => creator.id === activeConversationId)?.name || 'selected member')}`
           : page === 'chat' && activeView === 'feed'
@@ -3985,9 +4112,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         </div>
 
         <div className="-mt-0.5 flex min-w-0 shrink-0 items-center justify-end gap-2 lg:mt-0">
-          {showCreateCta ? <button type="button" onClick={handleHeaderCreate} className="hidden rounded-2xl bg-gradient-to-r from-[#7B61FF] to-[#1769FF] px-4 py-3 text-xs font-black text-white shadow-[0_16px_38px_rgba(23,105,255,0.22)] transition hover:-translate-y-0.5 sm:inline-flex">Create</button> : null}
-          <button type="button" onClick={() => pushPage('network')} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-3 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] md:flex">⌕ Search</button>
-          <button type="button" onClick={() => { setSelectedProfileId(null); pushPage('profile'); }} className="flex min-w-0 items-center gap-2 rounded-full border border-[#D9E7F8] bg-white px-2 py-2 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] sm:px-3"><Avatar value={profile.avatar || '🧑‍🎓'} size="h-8 w-8" /><span className="hidden max-w-[8rem] truncate sm:inline">{profile.name || 'Eduvora Member'}</span></button>
+          {page === 'chat' && activeView === 'feed' ? <div className="hidden min-w-0 items-center gap-1 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 md:flex">{feedFilterOptions.map((option) => <button key={option.key} type="button" onClick={() => setFeedFilter(option.key)} className={`min-h-9 shrink-0 rounded-xl px-3 text-[11px] font-black transition ${feedFilter === option.key ? 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-sm' : 'text-[#536178] hover:bg-white hover:text-[#1769FF]'}`}>{option.label}<span className="ml-1 opacity-80">{compactCount(option.count)}</span></button>)}</div> : null}
+          {page === 'chat' && activeView === 'status' ? <div className="hidden items-center gap-1 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 md:flex"><button type="button" onClick={openStatusUploadFromTop} className="min-h-9 rounded-xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-3 text-[11px] font-black text-white">Create</button><button type="button" onClick={openMyStatusesFromTop} className="min-h-9 rounded-xl bg-white px-3 text-[11px] font-black text-[#081A45]">Your status</button><button type="button" onClick={() => setShowStatusRulesModal(true)} className="min-h-9 rounded-xl bg-white px-3 text-[11px] font-black text-[#1769FF]">Rules</button></div> : null}
+          {showCreateCta ? <button type="button" onClick={handleHeaderCreate} className="hidden rounded-2xl bg-gradient-to-r from-[#7B61FF] to-[#1769FF] px-4 py-3 text-xs font-black text-white shadow-[0_16px_38px_rgba(23,105,255,0.22)] transition hover:-translate-y-0.5 sm:inline-flex md:hidden">Create</button> : null}
+          <button type="button" onClick={() => pushPage('network')} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-3 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] xl:flex">⌕ Search</button>
+          <button type="button" onClick={() => { setSelectedProfileId(null); setProfileViewMode('overview'); pushPage('profile'); }} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#D9E7F8] bg-white text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF]" aria-label="Open profile"><Avatar value={profile.avatar} size="h-8 w-8" /></button>
           <span className="hidden rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400] sm:inline-flex">🪙 {eduCoins}</span>
           <div ref={notificationPanelRef} className="relative"><button type="button" onClick={() => setIsNotificationPanelOpen((open) => !open)} aria-expanded={isNotificationPanelOpen} aria-label="Community notifications" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16"><span aria-hidden="true">🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button></div>
         </div>
@@ -4077,7 +4206,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
         <button
           type="button"
-          onClick={() => pushPage('profile')}
+          onClick={() => { setSelectedProfileId(null); setProfileViewMode('overview'); pushPage('profile'); }}
           aria-label={`Open profile for ${memberName}`}
           className={`mt-4 flex w-full items-center gap-3 rounded-[1.6rem] border border-[#D9E7F8] bg-gradient-to-br from-white to-[#F8FBFF] p-3 text-left shadow-[0_16px_38px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_46px_rgba(123,97,255,0.13)] focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 ${sidebarExpanded ? 'justify-start' : 'justify-center'}`}
           title={memberName}
@@ -4135,121 +4264,43 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     </nav>
   );
 
-  const ProfileHeroCard = () => <section className="overflow-hidden rounded-[2rem] border border-[#E3ECF8] bg-white shadow-[0_20px_60px_rgba(79,123,255,0.12)]"><div className="relative min-h-48 bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6"><div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-[#6C4CF6]/18 blur-3xl" /><div className="absolute bottom-4 left-10 h-28 w-28 rounded-full bg-[#4F7BFF]/20 blur-2xl" /><div className="relative flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left"><div className="relative"><Avatar value={profile.avatar} size="h-28 w-28" className="text-5xl ring-4 ring-white" /><label className="absolute bottom-1 right-1 flex h-10 w-10 cursor-pointer items-center justify-center rounded-full bg-gradient-to-br from-[#6C4CF6] to-[#4F7BFF] text-white shadow-lg"><input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />📷</label></div><div className="min-w-0 flex-1"><h2 className="break-words text-4xl font-black text-[#081B5C]">{profile.name}</h2><p className="mt-1 text-sm font-black text-[#4F7BFF]">@{profile.username}</p><p className="mt-3 max-w-2xl whitespace-pre-wrap break-words text-sm font-semibold leading-6 text-[#64748B]">{profile.bio}</p><label className="mt-4 inline-flex cursor-pointer rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-sm font-black text-[#081B5C] shadow-sm"><input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />Stage new avatar</label></div></div></div></section>;
-
-  const ProfileSummaryCard = () => {
-    const items = [
-      ['Coin Balance', compactCount(profileStats.coinBalance)],
-      ['Followers', compactCount(profileStats.followers)],
-      ['Following', compactCount(profileStats.following)],
-      ['Creator Posts', compactCount(profileStats.creatorPosts)],
-      ['My Statuses', compactCount(profileStats.myStatuses)],
-      ['Master Tags', compactCount(profileStats.masterTags)],
-      ['Replies Given', compactCount(profileStats.repliesGiven)],
-      ['Sample Level', `Builder ${Math.max(1, Math.min(99, profileStats.creatorPosts + profileStats.myStatuses + 1)).toString().padStart(2, '0')}`],
-    ];
-    const accountButtons: Array<[ProfilePanel, string]> = [['privacy', 'Privacy Settings'], ['notifications', 'Notification Preferences'], ['connected', 'Connected Accounts'], ['logout', 'Log Out']];
-    return <aside className="space-y-4"><div className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_16px_48px_rgba(79,123,255,0.10)]"><h3 className="text-xl font-black text-[#081B5C]">Profile Summary</h3>{items.map(([k,v])=><div key={k} className="mt-3 flex justify-between gap-3 rounded-2xl bg-[#F8FBFF] px-4 py-3 text-sm"><span className="font-bold text-[#64748B]">{k}</span><span className="font-black text-[#081B5C]">{v}</span></div>)}</div><div className="rounded-[2rem] border border-[#E3ECF8] bg-[#EEF2FF] p-5"><h3 className="font-black text-[#081B5C]">Quick Tip</h3><p className="mt-2 text-sm font-semibold leading-6 text-[#64748B]">Keep your bio outcome-focused so creators know how to collaborate with you.</p></div><div className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5"><h3 className="text-xl font-black text-[#081B5C]">Account</h3>{accountButtons.map(([panel, label])=><button key={panel} type="button" onClick={() => setActiveProfilePanel(panel)} className={`mt-2 flex w-full justify-between rounded-2xl px-4 py-3 text-sm font-black transition ${activeProfilePanel === panel ? 'bg-[#4F7BFF] text-white shadow-md' : 'bg-[#F8FBFF] text-[#081B5C] hover:bg-[#EEF2FF]'}`}>{label}<span>›</span></button>)}</div></aside>;
-  };
+  const ProfileAccountCard = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Edit profile</p><h3 className="text-2xl font-black text-[#081B5C]">Name, photo & bio</h3></div><button type="button" onClick={() => setProfileViewMode('overview')} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Done</button></div>{profileFeedback ? <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-black ${profileFeedback.type === 'success' ? 'border-[#CEEAD6] bg-[#E6F4EA] text-[#137333]' : 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]'}`}>{profileFeedback.message}</div> : null}<div className="mt-5 flex flex-col items-center gap-4 rounded-[2rem] border border-[#E3ECF8] bg-[#F8FBFF] p-5 text-center"><Avatar value={profileDraft.avatar} size="h-28 w-28" className="text-5xl ring-4 ring-white" /><label className="inline-flex cursor-pointer rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 py-3 text-sm font-black text-white shadow-sm"><input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />Change profile photo</label><button type="button" onClick={() => setProfileDraft((current) => ({ ...current, avatar: '' }))} className="text-xs font-black text-[#7C879A]">Remove photo</button></div><div className="mt-5 grid min-w-0 gap-4 sm:grid-cols-2"><label className="min-w-0 text-sm font-black text-[#081B5C]">Display Name<input value={profileDraft.name} onChange={(event) => setProfileDraft((current) => ({ ...current, name: event.target.value }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C]">Username<input value={profileDraft.username} onChange={(event) => setProfileDraft((current) => ({ ...current, username: normalizeUsername(event.target.value) }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C] sm:col-span-2">Bio<textarea value={profileDraft.bio} maxLength={PROFILE_BIO_MAX_LENGTH} onChange={(event) => setProfileDraft((current) => ({ ...current, bio: event.target.value.slice(0, PROFILE_BIO_MAX_LENGTH) }))} className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold leading-7 outline-none focus:border-[#4F7BFF]" /><span className="mt-1 block text-right text-xs font-bold text-[#64748B]">{profileDraft.bio.length}/{PROFILE_BIO_MAX_LENGTH}</span></label></div><div className="mt-5 flex flex-col gap-3 sm:flex-row"><button type="button" onClick={saveProfileChanges} className="flex-1 rounded-2xl bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-5 py-4 font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.22)]">Save Changes</button><button type="button" onClick={resetProfileDraft} className="rounded-2xl border border-[#E3ECF8] bg-white px-5 py-4 font-black text-[#081B5C]">Cancel / Reset</button></div></section>;
 
   const ToggleRow = ({ label, description, checked, onChange }: { label: string; description: string; checked: boolean; onChange: (checked: boolean) => void }) => <label className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] p-4"><span className="min-w-0"><span className="block text-sm font-black text-[#081B5C]">{label}</span><span className="mt-1 block text-xs font-bold leading-5 text-[#64748B]">{description}</span></span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 shrink-0 accent-[#4F7BFF]" /></label>;
 
-  const ProfileSettingsPanel = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><h3 className="text-2xl font-black text-[#081B5C]">Account Settings</h3>{activeProfilePanel === 'privacy' && <div className="mt-5 space-y-3"><ToggleRow label="Public profile" description="Allow your profile card to be visible inside the community." checked={privacySettings.profileVisible} onChange={(value) => setPrivacySettings((current) => ({ ...current, profileVisible: value }))} /><ToggleRow label="Show activity" description="Show your creator posts, replies, statuses, and master-tag activity in summaries." checked={privacySettings.showActivity} onChange={(value) => setPrivacySettings((current) => ({ ...current, showActivity: value }))} /><ToggleRow label="Allow messages" description="Let creators receive status shares and future direct-message requests from you." checked={privacySettings.allowMessages} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowMessages: value }))} /><ToggleRow label="Allow follow requests" description="Keep your profile available for follow-request features when they launch." checked={privacySettings.allowFollowRequests} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowFollowRequests: value }))} /></div>}{activeProfilePanel === 'notifications' && <div className="mt-5 space-y-3"><ToggleRow label="Replies" description="Show reply alerts in the bell dropdown." checked={notificationPreferences.replies} onChange={(value) => setNotificationPreferences((current) => ({ ...current, replies: value }))} /><ToggleRow label="Master-tag replies" description="Show admin/master responses to your tag requests." checked={notificationPreferences.masterTags} onChange={(value) => setNotificationPreferences((current) => ({ ...current, masterTags: value }))} /><ToggleRow label="Status interactions" description="Show likes and views for your statuses." checked={notificationPreferences.statuses} onChange={(value) => setNotificationPreferences((current) => ({ ...current, statuses: value }))} /><ToggleRow label="Creator posts" description="Show new post alerts from community creators." checked={notificationPreferences.creatorPosts} onChange={(value) => setNotificationPreferences((current) => ({ ...current, creatorPosts: value }))} />
-<ToggleRow label="Follows" description="Show alerts when someone follows your community profile." checked={notificationPreferences.follows} onChange={(value) => setNotificationPreferences((current) => ({ ...current, follows: value }))} /></div>}{activeProfilePanel === 'connected' && <div className="mt-5 space-y-3"><div className="rounded-2xl bg-[#F8FBFF] p-4 text-sm font-bold text-[#64748B]">Signed in email: <span className="font-black text-[#081B5C]">{authEmail || 'Local community session'}</span></div>{['Google', 'Email password', 'Social account'].map((account) => <button key={account} type="button" disabled className="flex w-full justify-between rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] px-4 py-3 text-sm font-black text-[#64748B] opacity-70"><span>{account}</span><span>Coming soon</span></button>)}</div>}{activeProfilePanel === 'logout' && <div className="mt-5 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] p-4"><p className="text-sm font-bold leading-6 text-[#5F6368]">Sign out of Firebase when available and return to the app auth flow. Local profile preferences remain saved for the next session.</p><button type="button" onClick={handleLogout} className="mt-4 w-full rounded-2xl bg-[#C5221F] px-5 py-3 font-black text-white">Log out and go to auth</button></div>}</section>;
+  const ProfileSettingsPanel = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Settings</p><h3 className="text-2xl font-black text-[#081B5C]">Account controls</h3></div><button type="button" onClick={() => setProfileViewMode('overview')} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Back</button></div><div className="mt-5 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">{([['privacy','Privacy'],['notifications','Notifications'],['connected','Account'],['logout','Logout']] as Array<[ProfilePanel,string]>).map(([panel,label]) => <button key={panel} type="button" onClick={() => setActiveProfilePanel(panel)} className={`shrink-0 rounded-full px-4 py-2 text-xs font-black ${activeProfilePanel === panel ? 'bg-[#4F7BFF] text-white' : 'bg-[#F8FBFF] text-[#081B5C]'}`}>{label}</button>)}</div>{activeProfilePanel === 'privacy' && <div className="mt-5 space-y-3"><ToggleRow label="Public profile" description="Allow your profile card to be visible inside the community." checked={privacySettings.profileVisible} onChange={(value) => setPrivacySettings((current) => ({ ...current, profileVisible: value }))} /><ToggleRow label="Show activity" description="Show your creator posts, replies, statuses, and master-tag activity in summaries." checked={privacySettings.showActivity} onChange={(value) => setPrivacySettings((current) => ({ ...current, showActivity: value }))} /><ToggleRow label="Allow messages" description="Let creators receive status shares and future direct-message requests from you." checked={privacySettings.allowMessages} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowMessages: value }))} /><ToggleRow label="Allow follow requests" description="Keep your profile available for follow-request features when they launch." checked={privacySettings.allowFollowRequests} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowFollowRequests: value }))} /></div>}{activeProfilePanel === 'notifications' && <div className="mt-5 space-y-3"><ToggleRow label="Replies" description="Show reply alerts in the bell dropdown." checked={notificationPreferences.replies} onChange={(value) => setNotificationPreferences((current) => ({ ...current, replies: value }))} /><ToggleRow label="Master-tag replies" description="Show admin/master responses to your tag requests." checked={notificationPreferences.masterTags} onChange={(value) => setNotificationPreferences((current) => ({ ...current, masterTags: value }))} /><ToggleRow label="Status interactions" description="Show likes and views for your statuses." checked={notificationPreferences.statuses} onChange={(value) => setNotificationPreferences((current) => ({ ...current, statuses: value }))} /><ToggleRow label="Creator posts" description="Show new post alerts from community creators." checked={notificationPreferences.creatorPosts} onChange={(value) => setNotificationPreferences((current) => ({ ...current, creatorPosts: value }))} /><ToggleRow label="Follows" description="Show alerts when someone follows your community profile." checked={notificationPreferences.follows} onChange={(value) => setNotificationPreferences((current) => ({ ...current, follows: value }))} /></div>}{activeProfilePanel === 'connected' && <div className="mt-5 space-y-3"><div className="rounded-2xl bg-[#F8FBFF] p-4 text-sm font-bold text-[#64748B]">Signed in email: <span className="font-black text-[#081B5C]">{authEmail || currentUser?.email || 'Local community session'}</span></div>{['Google', 'Email password', 'Social account'].map((account) => <button key={account} type="button" disabled className="flex w-full justify-between rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] px-4 py-3 text-sm font-black text-[#64748B] opacity-70"><span>{account}</span><span>Connected through app login</span></button>)}</div>}{activeProfilePanel === 'logout' && <div className="mt-5 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] p-4"><p className="text-sm font-bold leading-6 text-[#5F6368]">Sign out of Firebase and return to the app auth flow.</p><button type="button" onClick={handleLogout} className="mt-4 w-full rounded-2xl bg-[#C5221F] px-5 py-3 font-black text-white">Log out and go to auth</button></div>}</section>;
 
-  const ProfileAccountCard = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><h3 className="text-2xl font-black text-[#081B5C]">Edit Profile</h3>{profileFeedback ? <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-black ${profileFeedback.type === 'success' ? 'border-[#CEEAD6] bg-[#E6F4EA] text-[#137333]' : 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]'}`}>{profileFeedback.message}</div> : null}<div className="mt-5 grid min-w-0 gap-4 sm:grid-cols-2"><label className="min-w-0 text-sm font-black text-[#081B5C]">Display Name<input value={profileDraft.name} onChange={(event) => setProfileDraft((current) => ({ ...current, name: event.target.value }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C]">Username<input value={profileDraft.username} onChange={(event) => setProfileDraft((current) => ({ ...current, username: normalizeUsername(event.target.value) }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C] sm:col-span-2">Bio<textarea value={profileDraft.bio} maxLength={PROFILE_BIO_MAX_LENGTH} onChange={(event) => setProfileDraft((current) => ({ ...current, bio: event.target.value.slice(0, PROFILE_BIO_MAX_LENGTH) }))} className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold leading-7 outline-none focus:border-[#4F7BFF]" /><span className="mt-1 block text-right text-xs font-bold text-[#64748B]">{profileDraft.bio.length}/{PROFILE_BIO_MAX_LENGTH}</span></label></div><div className="mt-5 flex flex-col gap-3 sm:flex-row"><button type="button" onClick={saveProfileChanges} className="flex-1 rounded-2xl bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-5 py-4 font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.22)]">Save Changes</button><button type="button" onClick={resetProfileDraft} className="rounded-2xl border border-[#E3ECF8] bg-white px-5 py-4 font-black text-[#081B5C]">Cancel / Reset</button></div></section>;
+  const renderProfileGrid = (profilePosts: FeedMessage[]) => profilePosts.length ? <div className="grid grid-cols-3 gap-1 sm:gap-2">{profilePosts.slice(0, 30).map((message) => <button key={message.id} type="button" onClick={() => openMessage(message.id)} className="group relative aspect-square overflow-hidden bg-[#EEF6FF]"><div className="absolute inset-0 bg-gradient-to-br from-[#EEF6FF] via-white to-[#DCEEFF]" />{message.imagePreview ? renderUploadedImage(message.imagePreview, message.title, message.imageLayout || 'thumbnail') : <div className="relative flex h-full w-full items-center justify-center p-3 text-center text-xs font-black text-[#081B5C] sm:text-sm">{message.title}</div>}<span className="absolute bottom-1 right-1 rounded-full bg-[#081A45]/80 px-2 py-1 text-[10px] font-black text-white">💬 {message.replyCount || message.replies.length}</span></button>)}</div> : <div className="rounded-[1.5rem] border border-dashed border-[#D9E7F8] bg-[#F8FBFF] p-8 text-center text-sm font-bold text-[#7C879A]">No permanent posts yet.</div>;
 
-  const renderProfileActivityPanel = (profileId: string, displayName: string) => {
+  const renderStoryHighlights = (profileStories: StatusCard[]) => <div className="flex gap-4 overflow-x-auto py-2 custom-scrollbar">{profileStories.length ? profileStories.map((story) => { const owner = getStatusOwnerIdentity(story); return <button key={story.id} type="button" onClick={() => openStatusReel(story.id)} className="shrink-0 text-center"><span className="block rounded-full bg-gradient-to-tr from-[#F5B82E] via-[#7B61FF] to-[#1769FF] p-[3px]"><span className="block rounded-full bg-white p-[3px]"><Avatar value={owner.avatar || story.imagePreview || ''} size="h-16 w-16" /></span></span><span className="mt-1 block max-w-[5rem] truncate text-[11px] font-black text-[#536178]">{story.type}</span></button>; }) : <div className="rounded-2xl border border-dashed border-[#D9E7F8] bg-[#F8FBFF] px-5 py-4 text-sm font-bold text-[#7C879A]">No active stories.</div>}</div>;
+
+  const renderInstagramProfile = (profileId: string, display: { name: string; username: string; avatar: string; bio?: string; verified?: boolean }, options: { own: boolean; followed?: boolean; creator?: Creator | null }) => {
     const profilePosts = messages.filter((message) => isMessageFromId(message, profileId)).sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
-    const profileStories = statusCards.filter((status) => {
-      const ownerId = String(status.ownerId || status.creatorId || '');
-      return ownerId === profileId && isUnexpired(status, STORY_TTL_MS);
-    }).sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
-    return (
-      <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]">
-        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-          <div>
-            <p className="text-xs font-black uppercase tracking-[0.24em] text-[#4F7BFF]">Profile activity</p>
-            <h3 className="mt-1 text-2xl font-black text-[#081B5C]">{displayName}'s posts & stories</h3>
-            <p className="mt-1 text-sm font-bold text-[#64748B]">Posts stay permanent. Status stories stay visible only for 24 hours unless deleted earlier.</p>
-          </div>
-          <div className="flex gap-2 text-xs font-black">
-            <span className="rounded-full bg-[#E8F2FF] px-3 py-1.5 text-[#1769FF]">{compactCount(profilePosts.length)} posts</span>
-            <span className="rounded-full bg-[#FEF7E0] px-3 py-1.5 text-[#9A6400]">{compactCount(profileStories.length)} stories</span>
-          </div>
-        </div>
-        <div className="mt-5 grid gap-5 xl:grid-cols-2">
-          <div>
-            <h4 className="text-sm font-black uppercase tracking-[0.18em] text-[#1769FF]">Permanent posts</h4>
-            <div className="mt-3 space-y-3">{profilePosts.length ? profilePosts.slice(0, 12).map((message) => <MessageSummaryCard key={message.id} message={message} />) : <div className="rounded-[1.5rem] border border-dashed border-[#D9E7F8] bg-[#F8FBFF] p-6 text-sm font-bold text-[#7C879A]">No permanent posts yet.</div>}</div>
-          </div>
-          <div>
-            <h4 className="text-sm font-black uppercase tracking-[0.18em] text-[#F5B82E]">Active stories</h4>
-            {profileStories.length ? <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-2">{profileStories.slice(0, 6).map(renderStatusTile)}</div> : <div className="mt-3 rounded-[1.5rem] border border-dashed border-[#D9E7F8] bg-[#F8FBFF] p-6 text-sm font-bold text-[#7C879A]">No active stories right now.</div>}
-          </div>
-        </div>
-      </section>
-    );
+    const profileStories = statusCards.filter((status) => String(status.ownerId || status.creatorId || '') === profileId && isUnexpired(status, STORY_TTL_MS)).sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
+
+    if (options.own && profileViewMode === 'edit') return <div className="mx-auto max-w-4xl"><ProfileAccountCard /></div>;
+    if (options.own && profileViewMode === 'settings') return <div className="mx-auto max-w-4xl"><ProfileSettingsPanel /></div>;
+
+    return <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-[#E3ECF8] bg-white shadow-[0_20px_60px_rgba(79,123,255,0.10)]"><div className="sticky top-0 z-10 grid grid-cols-3 items-center border-b border-[#E3ECF8] bg-white/95 px-4 py-3 backdrop-blur-xl"><button type="button" onClick={() => options.own ? goBack() : setSelectedProfileId(null)} className="justify-self-start rounded-full px-3 py-2 text-sm font-black text-[#081B5C]">←</button><h2 className="truncate text-center text-base font-black text-[#081B5C]">@{display.username}</h2>{options.own ? <button type="button" onClick={() => setProfileViewMode('settings')} className="justify-self-end rounded-full border border-[#E3ECF8] bg-[#F8FBFF] px-3 py-2 text-lg" aria-label="Profile settings">⚙️</button> : <span />}</div><section className="p-4 sm:p-7"><div className="grid grid-cols-[auto_minmax(0,1fr)] gap-5 sm:gap-8"><Avatar value={display.avatar} size="h-24 w-24 sm:h-36 sm:w-36" className="text-5xl ring-4 ring-[#EEF6FF]" /><div className="min-w-0"><div className="flex flex-wrap items-center gap-3"><h1 className="truncate text-2xl font-black text-[#081B5C] sm:text-3xl">{display.name}</h1>{display.verified ? <span className="rounded-full bg-[#E8F2FF] px-2 py-1 text-xs font-black text-[#1769FF]">✓</span> : null}</div><div className="mt-4 grid max-w-md grid-cols-3 gap-2 text-center"><span><b className="block text-xl text-[#081B5C]">{compactCount(profilePosts.length)}</b><small className="font-bold text-[#64748B]">posts</small></span><span><b className="block text-xl text-[#081B5C]">{compactCount(followerCounts[profileId] || (options.creator?.followerCount ?? options.creator?.followers) || (options.own ? followerIds.length : 0))}</b><small className="font-bold text-[#64748B]">followers</small></span><span><b className="block text-xl text-[#081B5C]">{compactCount(followingCounts[profileId] || options.creator?.followingCount || (options.own ? followedIds.length : 0))}</b><small className="font-bold text-[#64748B]">following</small></span></div><p className="mt-4 whitespace-pre-wrap text-sm font-semibold leading-6 text-[#536178]">{display.bio || 'No bio yet.'}</p><div className="mt-4 flex flex-wrap gap-2">{options.own ? <button type="button" onClick={() => { setProfileDraft(profile); setProfileViewMode('edit'); }} className="rounded-xl bg-[#EEF6FF] px-5 py-2.5 text-sm font-black text-[#081B5C]">Edit profile</button> : options.creator ? <button type="button" onClick={() => toggleFollowCreator(options.creator!)} disabled={Boolean(followLoadingIds[profileId]) || options.creator.isSuspended || options.creator.isPublic === false} className={`rounded-xl px-5 py-2.5 text-sm font-black ${options.followed ? 'border border-[#D9E7F8] bg-white text-[#1769FF]' : 'bg-[#1769FF] text-white'}`}>{followLoadingIds[profileId] ? 'Saving…' : options.followed ? 'Following' : 'Follow'}</button> : null}</div></div></div><div className="mt-6">{renderStoryHighlights(profileStories)}</div><div className="mt-6 border-t border-[#E3ECF8] pt-3"><div className="mb-3 flex justify-center gap-10 text-xs font-black uppercase tracking-[0.18em] text-[#081B5C]"><span>▦ Posts</span><span className="text-[#7C879A]">○ Stories</span></div>{renderProfileGrid(profilePosts)}</div></section></div>;
   };
 
   const renderProfilePage = () => {
     const profileId = selectedProfileId || currentUserKey;
     const viewingOwnProfile = !selectedProfileId || isOwnCommunityId(selectedProfileId);
-    if (viewingOwnProfile) {
-      return <div className="mx-auto grid min-w-0 max-w-7xl gap-5 lg:grid-cols-[minmax(0,1fr)_340px]"><div className="min-w-0 space-y-5"><ProfileHeroCard />{renderProfileActivityPanel(currentUserKey, profile.name || 'Your')}<ProfileAccountCard /><ProfileSettingsPanel /></div><div className="hidden min-w-0 lg:block"><ProfileSummaryCard /></div><div className="min-w-0 lg:hidden"><ProfileSummaryCard /></div></div>;
-    }
+
+    if (viewingOwnProfile) return renderInstagramProfile(currentUserKey, { name: profile.name || buildStableCommunityName(currentUserKey), username: profile.username || buildStableCommunityUsername(currentUserKey), avatar: profile.avatar || '', bio: profile.bio }, { own: true });
 
     const profileCreator = allCreators.find((creator) => creator.id === profileId) || communityProfiles.find((creator) => creator.id === profileId);
-    if (!profileCreator) {
-      return <div className="mx-auto max-w-4xl rounded-[2rem] border border-dashed border-[#D9E7F8] bg-white p-10 text-center shadow-sm"><h2 className="text-3xl font-black text-[#081B5C]">Profile not found</h2><p className="mt-2 text-sm font-bold text-[#64748B]">This public profile is unavailable or hidden.</p><button type="button" onClick={() => { setSelectedProfileId(null); pushPage('network'); }} className="mt-5 rounded-2xl bg-[#1769FF] px-5 py-3 text-sm font-black text-white">Find people</button></div>;
-    }
+    if (!profileCreator) return <div className="mx-auto max-w-4xl rounded-[2rem] border border-dashed border-[#D9E7F8] bg-white p-10 text-center shadow-sm"><h2 className="text-3xl font-black text-[#081B5C]">Profile not found</h2><p className="mt-2 text-sm font-bold text-[#64748B]">This public profile is unavailable or hidden.</p><button type="button" onClick={() => { setSelectedProfileId(null); pushPage('network'); }} className="mt-5 rounded-2xl bg-[#1769FF] px-5 py-3 text-sm font-black text-white">Find people</button></div>;
 
     const followed = followedIds.includes(profileCreator.id) || Boolean(followedByCreatorIds[profileCreator.id]);
-    return (
-      <div className="mx-auto max-w-7xl space-y-5">
-        <section className="overflow-hidden rounded-[2rem] border border-[#E3ECF8] bg-white shadow-[0_20px_60px_rgba(79,123,255,0.12)]">
-          <div className="relative min-h-56 bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 sm:p-8">
-            <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-[#6C4CF6]/18 blur-3xl" />
-            <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end">
-              <Avatar value={profileCreator.avatar} size="h-28 w-28" className="text-5xl ring-4 ring-white" />
-              <div className="min-w-0 flex-1">
-                <p className="text-xs font-black uppercase tracking-[0.24em] text-[#4F7BFF]">Public profile</p>
-                <h2 className="mt-1 truncate text-4xl font-black text-[#081B5C]">{profileCreator.name}</h2>
-                <p className="mt-1 text-sm font-bold text-[#64748B]">@{profileCreator.username} · {profileCreator.role}</p>
-                {profileCreator.bio ? <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 text-[#536178]">{profileCreator.bio}</p> : null}
-                <div className="mt-4 flex flex-wrap gap-2 text-xs font-black">
-                  <span className="rounded-full bg-white px-3 py-1.5 text-[#1769FF]">{compactCount(followerCounts[profileCreator.id] ?? profileCreator.followerCount ?? profileCreator.followers)} Followers</span>
-                  <span className="rounded-full bg-white px-3 py-1.5 text-[#7B61FF]">{compactCount(followingCounts[profileCreator.id] ?? profileCreator.followingCount)} Following</span>
-                  {profileCreator.verified ? <span className="rounded-full bg-white px-3 py-1.5 text-[#137333]">✓ Verified</span> : null}
-                </div>
-              </div>
-              <div className="flex shrink-0 flex-col gap-2">
-                <button type="button" onClick={() => toggleFollowCreator(profileCreator)} disabled={Boolean(followLoadingIds[profileCreator.id]) || profileCreator.isSuspended || profileCreator.isPublic === false} className={`min-h-12 rounded-2xl px-5 text-sm font-black transition disabled:opacity-60 ${followed ? 'border border-[#D9E7F8] bg-white text-[#1769FF]' : 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-[0_14px_32px_rgba(23,105,255,0.22)]'}`}>{followLoadingIds[profileCreator.id] ? 'Saving…' : followed ? '✓ Following' : 'Follow'}</button>
-                <button type="button" onClick={() => { setSelectedProfileId(null); pushPage('network'); }} className="min-h-12 rounded-2xl border border-[#D9E7F8] bg-white px-5 text-sm font-black text-[#081B5C]">Back to people</button>
-              </div>
-            </div>
-          </div>
-        </section>
-        {renderProfileActivityPanel(profileCreator.id, profileCreator.name)}
-      </div>
-    );
+    return renderInstagramProfile(profileCreator.id, { name: profileCreator.name, username: profileCreator.username, avatar: profileCreator.avatar || '', bio: profileCreator.bio, verified: profileCreator.verified }, { own: false, followed, creator: profileCreator });
   };
 
-
-  const followSuggestions = ['Math', 'Physics', 'Creator', 'Master', 'Class 10', 'Class 12'];
-  const followFilters: Array<{ key: typeof networkTab; label: string }> = [
-    { key: 'all', label: 'All' },
-    { key: 'creators', label: 'Creators' },
-    { key: 'teachers', label: 'Teachers' },
-    { key: 'students', label: 'Students' },
-    { key: 'masters', label: 'Masters' },
-    { key: 'verified', label: 'Verified' },
-  ];
 
   const renderFollowCard = (creator: Creator) => {
     const followed = followedIds.includes(creator.id) || Boolean(followedByCreatorIds[creator.id]);
     const self = isOwnCommunityId(creator.id);
-    const tags = [...(creator.masterTags || []), ...(creator.subjects || [])].slice(0, 3);
     return (
       <article key={creator.id} className="group flex min-w-0 flex-col gap-4 rounded-[1.7rem] border border-[var(--community-border)] bg-white p-4 shadow-[0_14px_38px_rgba(23,105,255,0.08)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_54px_rgba(23,105,255,0.14)] sm:flex-row sm:items-center">
         <Avatar value={creator.avatar} size="h-14 w-14" />
@@ -4262,7 +4313,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <p className="mt-1 truncate text-sm font-bold text-[var(--community-muted)]">@{creator.username}</p>
           <div className="mt-2 flex flex-wrap gap-2 text-xs font-black"><span className="rounded-full bg-[#EEF6FF] px-3 py-1.5 text-[#1769FF]">{compactCount(followerCounts[creator.id] ?? creator.followerCount ?? creator.followers)} Followers</span><span className="rounded-full bg-[#F1EEFF] px-3 py-1.5 text-[#7B61FF]">{compactCount(followingCounts[creator.id] ?? creator.followingCount)} Following</span></div>
           {creator.bio ? <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-[var(--community-body)]">{creator.bio}</p> : null}
-          {tags.length ? <div className="mt-3 flex flex-wrap gap-1.5">{tags.map((tag) => <span key={tag} className="rounded-full border border-[var(--community-border)] bg-[#F8FBFF] px-2.5 py-1 text-[11px] font-black text-[var(--community-primary)]">#{tag}</span>)}</div> : null}
         </div>
         <div className="flex shrink-0 gap-2 sm:flex-col">
           <button type="button" onClick={() => { setSelectedProfileId(creator.id); pushPage('profile'); }} className="min-h-11 rounded-2xl border border-[var(--community-border)] bg-[#F8FBFF] px-4 text-sm font-black text-[var(--community-heading)]">View Profile</button>
@@ -4287,26 +4337,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const renderFollowPage = () => (
-    <div className="mx-auto grid max-w-7xl gap-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+    <div className="mx-auto max-w-6xl">
       <section className="min-w-0 overflow-hidden rounded-[2rem] border border-[var(--community-border)] bg-white/92 shadow-[0_24px_70px_rgba(23,105,255,0.12)]">
         <div className="sticky top-0 z-20 border-b border-[var(--community-border)] bg-white/95 p-4 backdrop-blur-xl sm:p-5">
-          <p className="text-xs font-black uppercase tracking-[0.24em] text-[var(--community-primary)]">Follow community</p>
-          <h2 className="mt-1 text-3xl font-black tracking-tight text-[var(--community-heading)] sm:text-4xl">Discover learners, creators & masters</h2>
-          <p className="mt-2 max-w-3xl text-sm font-semibold leading-6 text-[var(--community-body)]">Search public profiles by name, username, role, subject, master tag, creator category, and bio keywords.</p>
+          <h2 className="text-3xl font-black tracking-tight text-[var(--community-heading)] sm:text-4xl">Discover people</h2>
           <div className="mt-4 flex min-h-12 items-center gap-3 rounded-[1.35rem] border border-[var(--community-border)] bg-[#F8FBFF] px-4 focus-within:border-[var(--community-primary)]">
             <span className="text-lg text-[var(--community-muted)]">⌕</span>
-            <input value={networkSearch} onChange={(event) => setNetworkSearch(event.target.value)} placeholder="Search Shiv, math, physics, creator, class 10…" className="min-w-0 flex-1 bg-transparent py-3 text-sm font-bold text-[var(--community-heading)] outline-none placeholder:text-[var(--community-muted)]" />
+            <input value={networkSearch} onChange={(event) => setNetworkSearch(event.target.value)} placeholder="Search people by name or username" className="min-w-0 flex-1 bg-transparent py-3 text-sm font-bold text-[var(--community-heading)] outline-none placeholder:text-[var(--community-muted)]" />
             {networkSearch ? <button type="button" onClick={() => setNetworkSearch('')} className="rounded-full bg-white px-3 py-1.5 text-xs font-black text-[var(--community-primary)] shadow-sm">Clear</button> : null}
           </div>
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">{followSuggestions.map((chip) => <button key={chip} type="button" onClick={() => setNetworkSearch(chip)} className="min-h-10 shrink-0 rounded-full border border-[var(--community-border)] bg-[#EEF6FF] px-3 text-xs font-black text-[var(--community-primary)]">{chip}</button>)}</div>
-          <div className="mt-3 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">{followFilters.map((filter) => <button key={filter.key} type="button" onClick={() => setNetworkTab(filter.key)} className={`min-h-10 shrink-0 rounded-full px-4 text-xs font-black transition ${networkTab === filter.key ? 'bg-[var(--community-primary)] text-white shadow-sm' : 'bg-[#F8FBFF] text-[var(--community-body)]'}`}>{filter.label}</button>)}</div>
         </div>
-        <div className="space-y-3 p-3 sm:p-5">{networkVisibleCreators.length ? networkVisibleCreators.map(renderFollowCard) : <div className="rounded-[1.7rem] border border-dashed border-[#BFD7FF] bg-[#F8FBFF] p-10 text-center"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#E8F2FF] text-2xl">🔎</div><h3 className="mt-4 text-xl font-black text-[var(--community-heading)]">No users found</h3><p className="mt-2 text-sm font-semibold text-[var(--community-body)]">Try a subject, role, creator category, or suggested chip.</p><button type="button" onClick={() => setNetworkSearch('')} className="mt-4 rounded-2xl bg-[var(--community-primary)] px-5 py-3 text-sm font-black text-white">Clear search</button></div>}</div>
+        <div className="space-y-3 p-3 sm:p-5">{networkVisibleCreators.length ? networkVisibleCreators.map(renderFollowCard) : <div className="rounded-[1.7rem] border border-dashed border-[#BFD7FF] bg-[#F8FBFF] p-10 text-center"><div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#E8F2FF] text-2xl">🔎</div><h3 className="mt-4 text-xl font-black text-[var(--community-heading)]">No users found</h3><p className="mt-2 text-sm font-semibold text-[var(--community-body)]">Try another name or username.</p><button type="button" onClick={() => setNetworkSearch('')} className="mt-4 rounded-2xl bg-[var(--community-primary)] px-5 py-3 text-sm font-black text-white">Clear search</button></div>}</div>
       </section>
-      <aside className="hidden space-y-4 xl:block">
-        <div className="rounded-[2rem] border border-[var(--community-border)] bg-white p-5 shadow-[0_18px_54px_rgba(23,105,255,0.10)]"><h3 className="text-xl font-black text-[var(--community-heading)]">Your follow stats</h3><div className="mt-4 grid grid-cols-2 gap-3">{[['Followers', followerIds.length], ['Following', followedIds.length]].map(([label, value]) => <div key={label} className="rounded-2xl bg-[#F8FBFF] p-4"><p className="text-xs font-black uppercase text-[var(--community-muted)]">{label}</p><p className="mt-1 text-2xl font-black text-[var(--community-heading)]">{compactCount(value)}</p></div>)}</div></div>
-        <div className="rounded-[2rem] border border-[var(--community-border)] bg-[#EEF6FF] p-5"><h3 className="font-black text-[var(--community-heading)]">Trending master tags</h3><div className="mt-3 flex flex-wrap gap-2">{['Math', 'Physics', 'Class 10', 'Funnels', 'Automation'].map((tag) => <button key={tag} type="button" onClick={() => setNetworkSearch(tag)} className="rounded-full bg-white px-3 py-2 text-xs font-black text-[var(--community-primary)]">#{tag}</button>)}</div></div>
-      </aside>
     </div>
   );
 
@@ -4321,8 +4363,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {page === 'adminPosts' && renderFeedLayout(adminPosts, 'ADMIN POST', 'Official admin posts from Firebase. Like, react, vote, and reply here.')}
       {page === 'tagMaster' && renderTagMasterPage()}{page === 'masterTags' && renderMasterTagsPage()}{page === 'masterTagDetail' && renderMasterTagDetailPage()}
       {(page === 'directChat' || page === 'directChatThread') && renderPrivateChatDisabledPage()}{page === 'statusDetail' && renderStatusDetailPage()}
-      {page === 'chat' && activeView === 'status' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[1.8rem] border border-[#E3ECF8] bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-5 text-center text-[#081B5C] shadow-[0_22px_70px_rgba(79,123,255,0.16)]"><p className="text-lg font-black sm:text-2xl">Daily one per type · {statusAvailableSlots.toLocaleString()} real slots left</p><p className="mt-2 text-sm font-bold text-[#64748B]">Text, image, and poll stories each lock after one daily use and stay visible for 24 hours via Firebase. Image stories use URL previews without Firebase Storage upload.</p><div className="mt-4 flex justify-center gap-2"><button type="button" onClick={openStatusUploadFromTop} className="rounded-2xl bg-[#4F7BFF] px-4 py-3 text-xs font-black text-white">Upload your status</button><button type="button" onClick={openMyStatusesFromTop} className="rounded-2xl bg-white px-4 py-3 text-xs font-black text-[#081B5C]">View your status</button></div></div><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
-      {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_30px_90px_rgba(79,123,255,0.16)]"><div className="bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.3em] text-[#4F7BFF]">Story studio</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2></div><div className="p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : <div className="mb-4 rounded-2xl border border-[#D2E3FC] bg-[#E8F0FE] px-4 py-3 text-sm font-black text-[#1967D2]">Each story type locks after one daily publish · Visible for 24 hours · Image stories use URL previews without Firebase Storage upload</div>}<div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange', true)}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={isPublishingStatus || isStatusTypeUsedToday || (statusType === 'image' && (!statusImagePreview || statusImageUrlStatus !== 'valid')) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white disabled:opacity-45">{isPublishingStatus ? 'Publishing status story...' : isStatusTypeUsedToday ? `${statusType} story used today` : 'Publish status story'}</button></div></div>}
+      {page === 'chat' && activeView === 'status' && <div className="mx-auto max-w-[1800px] rounded-[2rem] bg-white/70 p-4"><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
+      {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_30px_90px_rgba(79,123,255,0.16)]"><div className="bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.3em] text-[#4F7BFF]">Story studio</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2></div><div className="p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange', true)}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={isPublishingStatus || isStatusTypeUsedToday || (statusType === 'image' && (!statusImagePreview || statusImageUrlStatus !== 'valid')) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white disabled:opacity-45">{isPublishingStatus ? 'Publishing status story...' : isStatusTypeUsedToday ? `${statusType} story used today` : 'Publish status story'}</button></div></div>}
       {page === 'statusMine' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[2rem] border border-[#E3ECF8] bg-white p-6"><h2 className="text-4xl font-black tracking-tight text-[#081B5C]">View your status</h2><p className="mt-2 text-sm font-bold text-[#64748B]">Tap a card to open reel view.</p></div>{myStatuses.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{myStatuses.map(renderStatusTile)}</div> : <div className="rounded-[2rem] border border-dashed border-[#E3ECF8] bg-white p-10 text-center font-black text-[#64748B]">No status uploaded yet.</div>}</div>}
     </div>
   );
@@ -4344,6 +4386,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       `}</style>
       {notificationDropdownPortal}
       {renderMasterTagDetailOverlay()}
+      {showStatusRulesModal ? <div className="fixed inset-0 z-[1900] flex items-center justify-center bg-[#081B5C]/55 p-4 backdrop-blur-xl"><div className="max-w-md rounded-[2rem] border border-[#E3ECF8] bg-white p-6 shadow-2xl"><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Status rules</p><h2 className="mt-2 text-2xl font-black text-[#081B5C]">Story visibility</h2><p className="mt-3 text-sm font-bold leading-7 text-[#536178]">You can publish one text, one image, and one poll status every 24 hours. Status stories stay visible for 24 hours, appear on your profile while active, and can be deleted by you anytime.</p><button type="button" onClick={() => setShowStatusRulesModal(false)} className="mt-5 w-full rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-3 text-sm font-black text-white">Got it</button></div></div> : null}
       {imageLightbox ? <div className="fixed inset-0 z-[1800] flex items-center justify-center bg-[#081B5C]/80 p-4 backdrop-blur-xl"><button type="button" onClick={() => setImageLightbox(null)} className="absolute right-4 top-4 rounded-full bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Close</button><div className="flex max-h-[90dvh] max-w-[94vw] items-center justify-center overflow-hidden rounded-[2rem] bg-white p-3 shadow-2xl">{renderUploadedImage(imageLightbox.src, imageLightbox.alt, 'original')}</div></div> : null}
       <CommunityAiMentor
         isOpen={isCommunityAiOpen}
@@ -4367,7 +4410,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           </main>
         </div>
       </div>
-      {showStatusActions ? <div className="fixed bottom-[calc(env(safe-area-inset-bottom)+6.3rem)] left-1/2 z-[1350] flex -translate-x-1/2 flex-col gap-2 lg:left-[310px] lg:translate-x-0"><button type="button" onClick={() => { setShowStatusActions(false); pushPage('statusUpload'); }} className="whitespace-nowrap rounded-2xl bg-[#4F7BFF] px-4 py-3 text-xs font-black text-white shadow-lg">⬆️ Upload your status</button><button type="button" onClick={() => { setShowStatusActions(false); pushPage('statusMine'); }} className="whitespace-nowrap rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-xs font-black text-[#081B5C] shadow-lg">👁️ View your status</button></div> : null}
       <CommunityBottomNav />
     </section>
   );

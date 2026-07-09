@@ -1,6 +1,6 @@
 
 import React, { useState } from 'react';
-import { Review, WebsiteSettings } from '../App';
+import { Review, User, WebsiteSettings } from '../App';
 
 interface StarRatingProps {
   rating: number;
@@ -87,9 +87,10 @@ interface RatingsAndReviewsProps {
   prompt?: string;
   reviews: Review[];
   onAddReview: (reviewData: { rating: number; comment: string }) => void;
+  currentUser?: User | null;
 }
 
-const RatingsAndReviews: React.FC<RatingsAndReviewsProps> = ({ settings, productTitle, prompt, reviews, onAddReview }) => {
+const RatingsAndReviews: React.FC<RatingsAndReviewsProps> = ({ settings, productTitle, prompt, reviews, onAddReview, currentUser }) => {
   const [newRating, setNewRating] = useState(5);
   const [newComment, setNewComment] = useState('');
   const [submitted, setSubmitted] = useState(false);
@@ -210,8 +211,8 @@ const RatingsAndReviews: React.FC<RatingsAndReviewsProps> = ({ settings, product
                         <div key={index} className="bg-white/70 backdrop-blur-xl p-6 rounded-2xl shadow-sm border border-gray-100 hover:shadow-sm transition-shadow duration-300 flex gap-4 animate-fade-in-up" style={{ animationDelay: `${index * 100}ms`}}>
                             {/* Avatar Placeholder */}
                             <div className="flex-shrink-0">
-                                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-slate-900 font-bold text-lg shadow-inner`} style={{ backgroundColor: `hsl(${(review.name.length * 50) % 360}, 70%, 50%)` }}>
-                                    {review.name.charAt(0).toUpperCase()}
+                                <div className={`w-12 h-12 rounded-full flex items-center justify-center overflow-hidden text-slate-900 font-bold text-lg shadow-inner`} style={{ backgroundColor: review.avatar ? '#F8FBFF' : `hsl(${(review.name.length * 50) % 360}, 70%, 50%)` }}>
+                                    {review.avatar ? <img src={review.avatar} alt={`${review.name} avatar`} className="h-full w-full object-cover" /> : review.name.charAt(0).toUpperCase()}
                                 </div>
                             </div>
                             

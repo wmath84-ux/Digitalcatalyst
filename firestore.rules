@@ -98,7 +98,7 @@ service cloud.firestore {
         && request.resource.data.postType in ['text', 'image', 'poll'])
         || (isAdmin() && request.resource.data.source == 'admin');
       allow update: if signedIn();
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid);
 
       match /replies/{replyId} {
         allow read: if signedIn();
@@ -126,7 +126,7 @@ service cloud.firestore {
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.type in ['text', 'image', 'poll'];
       allow update: if signedIn();
-      allow delete: if isAdmin();
+      allow delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid);
     }
 
     match /community_upload_quotas/{quotaId} {

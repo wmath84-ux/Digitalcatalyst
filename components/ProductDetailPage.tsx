@@ -634,7 +634,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 settings={settings} 
                 productTitle={product.title} 
                 reviews={reviews} 
-                onAddReview={onAddReview} 
+                onAddReview={onAddReview}
+                currentUser={currentUser}
             />
         </div>
       )}
