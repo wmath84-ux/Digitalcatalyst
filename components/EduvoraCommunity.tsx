@@ -21,6 +21,7 @@ interface EduvoraCommunityProps {
 }
 
 type CommunityView = 'feed' | 'status';
+type FeedFilter = 'all' | 'following' | 'followers' | 'mine' | 'admin';
 type CommunityPage = 'chat' | 'adminPosts' | 'thread' | 'profile' | 'creators' | 'network' | 'following' | 'tagMaster' | 'masterTags' | 'masterTagDetail' | 'statusUpload' | 'statusMine' | 'statusReel' | 'directChat' | 'directChatThread' | 'statusDetail';
 type PostType = 'text' | 'image' | 'poll';
 type Reply = { id: number; author: string; text: string; time: string; avatar?: string; docId?: string; createdAt?: number; ownerId?: string; senderId?: string; clientMessageId?: string; status?: 'sending' | 'sent' | 'failed' | 'deleted' | 'hidden'; replyToMessageId?: string; replyToSenderName?: string; replyToTextPreview?: string; replyToType?: 'feed_message'; replyToDeleted?: boolean };
@@ -408,10 +409,15 @@ const scoreCreatorSearch = (creator: Creator, rawQuery: string) => {
 };
 const ADMIN_POST_FALLBACK_STORAGE_KEY = 'eduvoraAdminPostFallbacks';
 const ADMIN_POST_FALLBACK_EVENT = 'eduvoraAdminPostFallbackUpdated';
-const POST_TTL_MS = 15 * 24 * 60 * 60 * 1000;
+const FEED_POST_NEVER_EXPIRES_AT = 253402300799000;
+const POST_TTL_MS = 100 * 365 * 24 * 60 * 60 * 1000;
 const STORAGE_LOCK_BYTES = 4 * 1024 * 1024 * 1024;
 const STORAGE_TOTAL_BYTES = 5 * 1024 * 1024 * 1024;
 const MAX_STATUS_FILE_BYTES = 1048576;
+const normalizeFeedExpiresAt = (value: unknown) => {
+  const numericValue = typeof value === 'number' ? value : Number(value);
+  return Number.isFinite(numericValue) && numericValue > Date.now() ? numericValue : FEED_POST_NEVER_EXPIRES_AT;
+};
 const isImageAvatar = (value: string) => value.startsWith('data:') || value.startsWith('http://') || value.startsWith('https://');
 
 const countTruthyValues = (value: unknown): number => {
@@ -439,7 +445,7 @@ const normalizeFeedMessage = (message: FeedMessage): FeedMessage => ({
   pollVotes: Array.isArray(message.pollVotes) ? message.pollVotes : (Array.isArray(message.pollOptions) ? message.pollOptions.map(() => 0) : undefined),
   imagePreview: message.imagePreview || undefined,
   createdAt: message.createdAt || Date.now(),
-  expiresAt: message.expiresAt || Date.now() + POST_TTL_MS,
+  expiresAt: normalizeFeedExpiresAt(message.expiresAt),
   source: message.source || 'creator',
 });
 
@@ -772,6 +778,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [expandedReplyId, setExpandedReplyId] = useState<number | null>(null);
   const [replySendingIds, setReplySendingIds] = useState<Record<number, boolean>>({});
+  const [feedFilter, setFeedFilter] = useState<FeedFilter>('all');
   const [highlightedThreadId, setHighlightedThreadId] = useState<number | null>(null);
   const [loadedReplyDocIds, setLoadedReplyDocIds] = useState<Record<string, boolean>>({});
   const [postDraft, setPostDraft] = useState('');
@@ -792,6 +799,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [creatorQuota, setCreatorQuota] = useState<Record<string, string[]>>(() => readJsonObject<Record<string, string[]>>(COMMUNITY_CREATOR_QUOTA_KEY, { [todayKey()]: [] }));
   const [statusQuota, setStatusQuota] = useState<Record<string, string[]>>(() => readJsonObject<Record<string, string[]>>(COMMUNITY_STATUS_QUOTA_KEY, { [todayKey()]: [] }));
   const [communityProfiles, setCommunityProfiles] = useState<Creator[]>([]);
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [followedIds, setFollowedIds] = useState<string[]>([]);
   const [followerIds, setFollowerIds] = useState<string[]>([]);
   const [followedByCreatorIds, setFollowedByCreatorIds] = useState<Record<string, boolean>>({});
@@ -917,6 +925,38 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const isCreatorTypeUsedToday = usedCreatorTypesToday.includes(postType);
   const isStatusTypeUsedToday = usedStatusTypesToday.includes(statusType);
   const myStatuses = statusCards.filter((status) => isOwnCommunityId(status.ownerId));
+
+  const getMessageOwnerId = (message: FeedMessage) => String(message.ownerId || message.creatorId || '');
+  const isMessageFromId = (message: FeedMessage, profileId: string) => getMessageOwnerId(message) === profileId || String(message.creatorId || '') === profileId;
+
+  const filteredFeedMessages = useMemo(() => {
+    const sortedMessages = [...messages].sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
+    if (feedFilter === 'following') return sortedMessages.filter((message) => {
+      const ownerId = getMessageOwnerId(message);
+      return ownerId && (followedIds.includes(ownerId) || Boolean(followedByCreatorIds[ownerId]));
+    });
+    if (feedFilter === 'followers') return sortedMessages.filter((message) => {
+      const ownerId = getMessageOwnerId(message);
+      return ownerId && (followerIds.includes(ownerId) || Boolean(followerByCreatorIds[ownerId]));
+    });
+    if (feedFilter === 'mine') return sortedMessages.filter((message) => isOwnCommunityId(getMessageOwnerId(message)));
+    if (feedFilter === 'admin') return sortedMessages.filter((message) => message.source === 'admin' || message.badge === 'ADMIN POST' || message.creatorId === 'admin');
+    return sortedMessages;
+  }, [messages, feedFilter, followedIds, followedByCreatorIds, followerIds, followerByCreatorIds, currentUserKey]);
+
+  const feedFilterOptions: Array<{ key: FeedFilter; label: string; helper: string; count: number }> = [
+    { key: 'all', label: 'All Feed', helper: 'Every permanent public post', count: messages.length },
+    { key: 'following', label: 'Following Feed', helper: 'Posts from people you follow', count: messages.filter((message) => {
+      const ownerId = getMessageOwnerId(message);
+      return ownerId && (followedIds.includes(ownerId) || Boolean(followedByCreatorIds[ownerId]));
+    }).length },
+    { key: 'followers', label: 'Followers Feed', helper: 'Posts from people following you', count: messages.filter((message) => {
+      const ownerId = getMessageOwnerId(message);
+      return ownerId && (followerIds.includes(ownerId) || Boolean(followerByCreatorIds[ownerId]));
+    }).length },
+    { key: 'mine', label: 'My Posts', helper: 'Your permanent posts', count: messages.filter((message) => isOwnCommunityId(getMessageOwnerId(message))).length },
+    { key: 'admin', label: 'Admin', helper: 'Official admin posts', count: messages.filter((message) => message.source === 'admin' || message.badge === 'ADMIN POST' || message.creatorId === 'admin').length },
+  ];
   const chatCreators = allCreators.length ? allCreators : [currentProfileCreator];
   const activeChatCreator = allCreators.find((creator) => creator.id === selectedChatId) || chatCreators[0];
   const activeConversationId = activeChatCreator ? getPrivateConversationId(currentUserKey, activeChatCreator.id) : '';
@@ -1604,7 +1644,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const syncLocalAdminPosts = () => {
       const localAdminPosts = readJsonArray<FeedMessage>(ADMIN_POST_FALLBACK_STORAGE_KEY, [])
         .map((post) => normalizeFeedMessage({ ...post, source: 'admin', badge: post.badge || 'ADMIN POST', creatorId: post.creatorId || 'admin', ownerId: post.ownerId || 'admin' }))
-        .filter((message) => isUnexpired(message, POST_TTL_MS));
+        ;
       if (!localAdminPosts.length) return;
       setMessages((current) => {
         const mergedMessages = mergeUnexpiredByIdentity(localAdminPosts, current.map(normalizeFeedMessage), initialMessages.map(normalizeFeedMessage), POST_TTL_MS);
@@ -1625,7 +1665,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   useEffect(() => {
     if (!isCommunityAllowed) return undefined;
     const cleanup = () => {
-      cleanupExpiredCommunityCollection(COMMUNITY_FEED);
       cleanupExpiredCommunityCollection(COMMUNITY_STATUS);
     };
     cleanup();
@@ -1635,10 +1674,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   useEffect(() => {
     if (!isCommunityAllowed) return undefined;
-    const feedQuery = query(collection(db, COMMUNITY_FEED), where('expiresAt', '>', Date.now()), orderBy('expiresAt', 'desc'), limit(150));
+    const feedQuery = query(collection(db, COMMUNITY_FEED), orderBy('createdAt', 'desc'), limit(200));
     return onSnapshot(feedQuery, (snapshot) => {
-      snapshot.docs.forEach((item) => { const expiresAt = asMillis(item.data().expiresAt); if (expiresAt <= Date.now()) deleteExpiredCommunityItem(COMMUNITY_FEED, item.id, item.data().storagePath, Number(item.data().uploadBytes) || 0); });
-      const firebaseMessages = snapshot.docs.map((item) => normalizeFeedMessage(mapFeedDoc(item))).filter((message) => isUnexpired(message, POST_TTL_MS));
+      // Feed posts are permanent. Only status stories use expiry cleanup.
+      const firebaseMessages = snapshot.docs.map((item) => normalizeFeedMessage(mapFeedDoc(item)));
       setMessages((current) => {
         const mergedMessages = mergeUnexpiredByIdentity(firebaseMessages, current.map(normalizeFeedMessage), initialMessages.map(normalizeFeedMessage), POST_TTL_MS);
         setAdminPosts(mergedMessages.filter((message) => message.source === 'admin' || message.badge === 'ADMIN POST' || message.creatorId === 'admin'));
@@ -1844,7 +1883,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       const nextNotifications = snapshot.docs.map((item): CommunityNotification => {
         const data = item.data() as Record<string, unknown>;
         const createdAt = typeof data.createdAt === 'number' ? data.createdAt : Date.now();
-        const type = data.type === 'follow' ? 'follow' : 'creator';
+        const rawType = String(data.type || 'creator');
+        const type = (['reply', 'masterTag', 'status', 'creator', 'follow'].includes(rawType) ? rawType : 'creator') as CommunityNotification['type'];
 
         return {
           id: item.id,
@@ -2077,6 +2117,21 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     replyToDeleted: false,
   });
 
+  const focusReplyAfterRender = (messageId: number, replyKey?: string) => {
+    setSelectedMessageId(messageId);
+    setActiveView('feed');
+    setPage(window.matchMedia('(max-width: 767px)').matches ? 'thread' : 'chat');
+    setPageStack([]);
+    setHighlightedThreadId(messageId);
+    window.setTimeout(() => setHighlightedThreadId(null), 1400);
+    window.setTimeout(() => {
+      const selector = replyKey ? `[data-community-reply-id="${CSS.escape(String(replyKey))}"]` : '';
+      const replyNode = selector ? document.querySelector<HTMLElement>(selector) : null;
+      const targetNode = replyNode || replyComposerRef.current;
+      targetNode?.scrollIntoView({ behavior: 'smooth', block: 'end' });
+    }, 90);
+  };
+
   const submitReply = async (messageId: number, retryReply?: Reply) => {
     const targetMessage = messages.find((message) => message.id === messageId);
     if (!targetMessage || replySendingIds[messageId]) return;
@@ -2110,30 +2165,60 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     };
 
     setReplySendingIds((current) => ({ ...current, [messageId]: true }));
+    if (!retryReply) setReplyDrafts((current) => ({ ...current, [messageId]: '' }));
+    setExpandedReplyId(messageId);
     setMessages((current) => current.map((message) => {
       if (message.id !== messageId) return message;
       const withoutDuplicate = message.replies.filter((item) => item.clientMessageId !== clientMessageId && item.id !== optimisticId);
       return { ...message, replies: [...withoutDuplicate, reply], replyCount: Math.max(message.replyCount || 0, withoutDuplicate.length) + 1 };
     }));
+    focusReplyAfterRender(messageId, clientMessageId);
 
     try {
-      if (!targetMessage.docId) throw new Error('This thread is still syncing. Try again in a moment.');
+      if (!targetMessage.docId) {
+        setMessages((current) => current.map((message) => message.id === messageId ? {
+          ...message,
+          replies: message.replies.map((item) => item.clientMessageId === clientMessageId ? { ...item, status: 'sent', time: 'Saved locally' } : item),
+        } : message));
+        setProfileFeedback({ type: 'success', message: 'Reply added locally. It will stay visible in this thread while the post syncs.' });
+        return;
+      }
+
       const replyPayload = stripUndefinedDeep({
         ...reply,
         time: 'Just now',
-        status: 'active',
+        status: 'sent',
         createdAt: Date.now(),
         updatedAt: Date.now(),
         senderName: reply.author,
       });
+
       const replyRef = await addDoc(collection(db, COMMUNITY_FEED, targetMessage.docId, 'replies'), replyPayload);
       await updateDoc(doc(db, COMMUNITY_FEED, targetMessage.docId), { replyCount: increment(1), updatedAt: Date.now() });
+
+      if (targetMessage.ownerId && targetMessage.ownerId !== currentUserKey) {
+        addDoc(collection(db, COMMUNITY_NOTIFICATIONS), stripUndefinedDeep({
+          recipientId: targetMessage.ownerId,
+          actorId: currentUserKey,
+          actorName: profile.name,
+          actorUsername: normalizeUsername(profile.username || profile.name),
+          actorAvatar: profile.avatar,
+          type: 'reply',
+          title: `${profile.name || 'Someone'} replied to your post`,
+          body: safeText(draft, 180),
+          targetPage: 'thread',
+          targetId: messageId,
+          createdAt: Date.now(),
+          read: false,
+        })).catch((error) => console.warn('Reply notification failed', error));
+      }
+
       setMessages((current) => current.map((message) => message.id === messageId ? {
         ...message,
         replies: message.replies.map((item) => item.clientMessageId === clientMessageId ? { ...reply, docId: replyRef.id, status: 'sent', time: 'Just now' } : item),
       } : message));
-      setReplyDrafts((current) => ({ ...current, [messageId]: '' }));
       setExpandedReplyId(null);
+      focusReplyAfterRender(messageId, clientMessageId);
     } catch (error) {
       console.warn('Reply write failed', error);
       setMessages((current) => current.map((message) => message.id === messageId ? {
@@ -2371,7 +2456,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       likeCount: 0,
       replies: [],
       createdAt: now,
-      expiresAt: now + POST_TTL_MS,
+      expiresAt: FEED_POST_NEVER_EXPIRES_AT,
       ownerId: currentUserKey,
       source: 'creator',
       sourceType: publishType === 'image' ? 'url' : undefined,
@@ -2405,7 +2490,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           ownerId: currentUserKey,
           creatorId: currentUserKey,
           createdAt: now,
-          expiresAt: now + POST_TTL_MS,
+          expiresAt: FEED_POST_NEVER_EXPIRES_AT,
           source: 'creator',
           reactionCounts: {},
           replyCount: 0,
@@ -2552,6 +2637,34 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setLikedStatuses((current) => alreadyLiked ? current.filter((id) => id !== statusId) : [...current, statusId]);
     setStatusCards((current) => current.map((status) => status.id === statusId ? { ...status, likedBy: Math.max(0, status.likedBy + (alreadyLiked ? -1 : 1)), likedByUsers: { ...(status.likedByUsers || {}), [currentUserKey]: !alreadyLiked } } : status));
     if (targetStatus?.docId) updateDoc(doc(db, COMMUNITY_STATUS, targetStatus.docId), { likedBy: increment(alreadyLiked ? -1 : 1), [`likedByUsers.${currentUserKey}`]: alreadyLiked ? deleteField() : true }).catch((error) => console.warn('Status like update failed', error));
+  };
+
+  const deleteOwnStatusStory = async (status: StatusCard) => {
+    if (!isOwnCommunityId(status.ownerId)) {
+      setProfileFeedback({ type: 'error', message: 'You can delete only your own status story.' });
+      return;
+    }
+    if (typeof window !== 'undefined' && !window.confirm('Delete this status story?')) return;
+
+    setStatusCards((current) => current.filter((item) => item.id !== status.id));
+    if (selectedStatusId === status.id) {
+      setSelectedStatusId((current) => {
+        const nextStatus = statusCards.find((item) => item.id !== current);
+        return nextStatus?.id || 0;
+      });
+      setPage('chat');
+      setActiveView('status');
+      setPageStack([]);
+    }
+
+    try {
+      if (status.docId) await deleteDoc(doc(db, COMMUNITY_STATUS, status.docId));
+      if (status.storagePath) deleteObject(ref(storage, status.storagePath)).catch((error) => console.warn('Status media delete failed', error));
+      setProfileFeedback({ type: 'success', message: 'Status story deleted.' });
+    } catch (error) {
+      console.warn('Status story delete failed', error);
+      setProfileFeedback({ type: 'error', message: 'Status removed locally, but Firebase delete failed. Please retry if it appears again.' });
+    }
   };
 
   const toggleMessageLike = (messageId: number) => {
@@ -3127,7 +3240,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const failed = reply.status === 'failed';
     const deleted = reply.status === 'deleted' || reply.status === 'hidden';
     return (
-      <div key={reply.clientMessageId || reply.docId || reply.id} className={`group flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
+      <div key={reply.clientMessageId || reply.docId || reply.id} data-community-reply-id={String(reply.clientMessageId || reply.docId || reply.id)} className={`group flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
         {!mine ? <Avatar value={reply.avatar || '👤'} size="h-8 w-8" className="mb-1 text-base" /> : null}
         <div className={`max-w-[86%] rounded-[1.45rem] px-4 py-3 shadow-[0_12px_34px_rgba(23,105,255,0.10)] sm:max-w-[74%] ${mine ? 'rounded-br-md bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white' : 'rounded-bl-md border border-[#D9E7F8] bg-white text-[#081A45]'}`}>
           {reply.replyToTextPreview ? (
@@ -3189,10 +3302,44 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const renderFeedLayout = (feedMessages: FeedMessage[], title = 'Community Feed', subtitle = 'Public discussions, replies, reactions, polls, and creator posts.') => {
     const activeMessage = feedMessages.find((message) => message.id === selectedMessageId) || feedMessages[0];
-    const isFollowingFeed = title.toLowerCase().includes('followers');
     const isAdminFeed = title.toLowerCase().includes('admin');
-    if (!feedMessages.length) return <div className="mx-auto max-w-5xl rounded-[2rem] border border-dashed border-[#C2E7FF] bg-gradient-to-br from-[#F8FAFD] via-white to-[#E8F0FE] p-8 text-center font-bold text-[#536178] shadow-[0_18px_54px_rgba(37,99,235,0.10)]"><div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white text-3xl shadow-inner">{isAdminFeed ? '📣' : '💬'}</div>{isAdminFeed ? 'No unexpired admin posts are available right now.' : 'No messages yet. Start the conversation.'}</div>;
-    return <div className="mx-auto grid h-[clamp(34rem,calc(100dvh-9.5rem),78rem)] min-h-0 w-full min-w-0 max-w-[1600px] gap-4 overflow-hidden lg:gap-5 md:grid-cols-[minmax(0,clamp(18rem,28vw,25rem))_minmax(0,1fr)]"><aside className="hidden h-full min-h-0 min-w-0 overflow-y-auto rounded-[2rem] border border-[#D9E7F8] bg-white p-3 shadow-[0_20px_60px_rgba(23,105,255,0.08)] ring-1 ring-[#EEF6FF] backdrop-blur-xl custom-scrollbar md:block"><div className="space-y-3">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} isActive={activeMessage?.id === message.id} />)}</div></aside><section className="hidden min-h-0 min-w-0 overflow-hidden md:block">{activeMessage ? renderMessageDetails(activeMessage) : null}</section><div className="h-full space-y-3 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+6rem)] custom-scrollbar md:hidden">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)}</div></div>;
+    const isMainFeed = title === 'Community Feed';
+    const emptyCopy = isAdminFeed ? 'No official admin posts are available right now.' : feedFilter === 'following' ? 'No posts from people you follow yet. Follow creators to build this feed.' : feedFilter === 'followers' ? 'No posts from your followers yet.' : feedFilter === 'mine' ? 'You have not published a permanent post yet.' : 'No messages yet. Start the conversation.';
+    const filterHeader = isMainFeed ? (
+      <section className="mx-auto mb-4 max-w-[1600px] overflow-hidden rounded-[2rem] border border-[#D9E7F8] bg-white/92 p-4 shadow-[0_18px_54px_rgba(23,105,255,0.10)] backdrop-blur-xl">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Dynamic feed</p>
+            <h2 className="mt-1 text-2xl font-black text-[#081A45]">{title}</h2>
+            <p className="mt-1 text-sm font-semibold leading-6 text-[#536178]">{subtitle}</p>
+          </div>
+          <span className="rounded-full bg-[#EEF6FF] px-3 py-1.5 text-xs font-black text-[#1769FF]">{compactCount(feedMessages.length)} visible</span>
+        </div>
+        <div className="mt-4 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+          {feedFilterOptions.map((option) => (
+            <button key={option.key} type="button" onClick={() => setFeedFilter(option.key)} className={`min-h-11 shrink-0 rounded-full border px-4 text-left text-xs font-black transition ${feedFilter === option.key ? 'border-[#1769FF] bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-[0_12px_30px_rgba(23,105,255,0.24)]' : 'border-[#D9E7F8] bg-[#F8FBFF] text-[#536178] hover:border-[#BFD7FF] hover:text-[#1769FF]'}`}>
+              <span>{option.label}</span>
+              <span className="ml-2 rounded-full bg-white/20 px-2 py-0.5">{compactCount(option.count)}</span>
+            </button>
+          ))}
+        </div>
+      </section>
+    ) : null;
+
+    if (!feedMessages.length) return <>{filterHeader}<div className="mx-auto max-w-5xl rounded-[2rem] border border-dashed border-[#C2E7FF] bg-gradient-to-br from-[#F8FAFD] via-white to-[#E8F0FE] p-8 text-center font-bold text-[#536178] shadow-[0_18px_54px_rgba(37,99,235,0.10)]"><div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white text-3xl shadow-inner">{isAdminFeed ? '📣' : '💬'}</div>{emptyCopy}</div></>;
+
+    return (
+      <>
+        {filterHeader}
+        <div className="mx-auto grid h-[clamp(34rem,calc(100dvh-13.5rem),78rem)] min-h-0 w-full min-w-0 max-w-[1600px] gap-4 overflow-hidden lg:gap-5 md:grid-cols-[minmax(0,clamp(18rem,28vw,25rem))_minmax(0,1fr)]">
+          <aside className="hidden h-full min-h-0 min-w-0 overflow-y-auto rounded-[2rem] border border-[#D9E7F8] bg-white p-3 shadow-[0_20px_60px_rgba(23,105,255,0.08)] ring-1 ring-[#EEF6FF] backdrop-blur-xl custom-scrollbar md:block">
+            <div className="space-y-3">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} isActive={activeMessage?.id === message.id} />)}</div>
+          </aside>
+          <section className="hidden min-h-0 min-w-0 overflow-hidden md:block">{activeMessage ? renderMessageDetails(activeMessage) : null}</section>
+          <div className="h-full space-y-3 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+6rem)] custom-scrollbar md:hidden">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)}</div>
+        </div>
+      </>
+    );
   };
 
   const renderTypeComposer = (activeType: PostType, setActiveType: (type: PostType) => void, accent: 'sky' | 'orange' = 'sky', isStatus = false) => {
@@ -3303,11 +3450,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(255,255,255,0.36),transparent_24%),linear-gradient(180deg,rgba(32,33,36,0.04),rgba(32,33,36,0.42))]" />
             <div className="relative grid w-full max-w-5xl items-center gap-5 md:grid-cols-[1fr_96px]">
               <article className="mx-auto flex min-h-[74dvh] w-full max-w-[520px] flex-col justify-between rounded-[2.5rem] border border-white/20 bg-[#202124]/18 p-6 shadow-[0_32px_120px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
-                <div className="flex items-center justify-between gap-3"><span className="rounded-full border border-white/30 bg-white/18 px-4 py-2 text-xs font-black uppercase tracking-[0.22em]">{card.slots}</span><span className="text-sm font-black">{card.ownerId === 'me' ? 'Your status' : 'Community'}</span></div>
+                <div className="flex items-center justify-between gap-3"><span className="rounded-full border border-white/30 bg-white/18 px-4 py-2 text-xs font-black uppercase tracking-[0.22em]">{card.slots}</span><span className="text-sm font-black">{isOwnCommunityId(card.ownerId) ? 'Your status' : 'Community'}</span></div>
                 {renderStatusReelContent(card)}
                 <div className="flex items-center justify-between text-sm font-black text-white/80"><span>Swipe for next status</span><span>👁️ {card.views} views</span></div>
               </article>
-              <div className="mx-auto flex flex-row justify-center gap-3 md:flex-col"><button type="button" onClick={() => toggleStatusLike(card.id)} className={`flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 ${(card.likedByUsers?.[currentUserKey] || likedStatuses.includes(card.id)) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#202124]/20 text-white'} shadow-2xl backdrop-blur-xl transition hover:scale-105`}><span>❤️</span><span className="text-[11px] font-black">{card.likedBy}</span></button><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#202124]/20 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>💬</span><span className="text-[11px] font-black">Discuss</span></button></div>
+              <div className="mx-auto flex flex-row justify-center gap-3 md:flex-col"><button type="button" onClick={() => toggleStatusLike(card.id)} className={`flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 ${(card.likedByUsers?.[currentUserKey] || likedStatuses.includes(card.id)) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#202124]/20 text-white'} shadow-2xl backdrop-blur-xl transition hover:scale-105`}><span>❤️</span><span className="text-[11px] font-black">{card.likedBy}</span></button><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#202124]/20 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>💬</span><span className="text-[11px] font-black">Discuss</span></button>{isOwnCommunityId(card.ownerId) ? <button type="button" onClick={() => deleteOwnStatusStory(card)} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#C5221F]/80 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>🗑️</span><span className="text-[11px] font-black">Delete</span></button> : null}</div>
             </div>
           </section>
         ))}
@@ -3762,7 +3909,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     { label: 'Follow', icon: '🤝', active: page === 'network', action: () => pushPage('network') },
     { label: 'Following', icon: '👥', active: page === 'following', action: () => pushPage('following') },
     { label: 'Master Tag', icon: '📚', active: page === 'tagMaster' || page === 'masterTags' || page === 'masterTagDetail', action: () => pushPage('masterTags') },
-    { label: 'Profile', icon: '👤', active: page === 'profile', action: () => pushPage('profile') },
+    { label: 'Profile', icon: '👤', active: page === 'profile' && !selectedProfileId, action: () => { setSelectedProfileId(null); pushPage('profile'); } },
   ];
 
   const activeNavItem = navItems.find((item) => item.active) || navItems[0];
@@ -3840,7 +3987,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <div className="-mt-0.5 flex min-w-0 shrink-0 items-center justify-end gap-2 lg:mt-0">
           {showCreateCta ? <button type="button" onClick={handleHeaderCreate} className="hidden rounded-2xl bg-gradient-to-r from-[#7B61FF] to-[#1769FF] px-4 py-3 text-xs font-black text-white shadow-[0_16px_38px_rgba(23,105,255,0.22)] transition hover:-translate-y-0.5 sm:inline-flex">Create</button> : null}
           <button type="button" onClick={() => pushPage('network')} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-3 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] md:flex">⌕ Search</button>
-          <button type="button" onClick={() => pushPage('profile')} className="flex min-w-0 items-center gap-2 rounded-full border border-[#D9E7F8] bg-white px-2 py-2 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] sm:px-3"><Avatar value={profile.avatar || '🧑‍🎓'} size="h-8 w-8" /><span className="hidden max-w-[8rem] truncate sm:inline">{profile.name || 'Eduvora Member'}</span></button>
+          <button type="button" onClick={() => { setSelectedProfileId(null); pushPage('profile'); }} className="flex min-w-0 items-center gap-2 rounded-full border border-[#D9E7F8] bg-white px-2 py-2 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] sm:px-3"><Avatar value={profile.avatar || '🧑‍🎓'} size="h-8 w-8" /><span className="hidden max-w-[8rem] truncate sm:inline">{profile.name || 'Eduvora Member'}</span></button>
           <span className="hidden rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400] sm:inline-flex">🪙 {eduCoins}</span>
           <div ref={notificationPanelRef} className="relative"><button type="button" onClick={() => setIsNotificationPanelOpen((open) => !open)} aria-expanded={isNotificationPanelOpen} aria-label="Community notifications" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16"><span aria-hidden="true">🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button></div>
         </div>
@@ -4012,7 +4159,81 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const ProfileAccountCard = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><h3 className="text-2xl font-black text-[#081B5C]">Edit Profile</h3>{profileFeedback ? <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-black ${profileFeedback.type === 'success' ? 'border-[#CEEAD6] bg-[#E6F4EA] text-[#137333]' : 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]'}`}>{profileFeedback.message}</div> : null}<div className="mt-5 grid min-w-0 gap-4 sm:grid-cols-2"><label className="min-w-0 text-sm font-black text-[#081B5C]">Display Name<input value={profileDraft.name} onChange={(event) => setProfileDraft((current) => ({ ...current, name: event.target.value }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C]">Username<input value={profileDraft.username} onChange={(event) => setProfileDraft((current) => ({ ...current, username: normalizeUsername(event.target.value) }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C] sm:col-span-2">Bio<textarea value={profileDraft.bio} maxLength={PROFILE_BIO_MAX_LENGTH} onChange={(event) => setProfileDraft((current) => ({ ...current, bio: event.target.value.slice(0, PROFILE_BIO_MAX_LENGTH) }))} className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold leading-7 outline-none focus:border-[#4F7BFF]" /><span className="mt-1 block text-right text-xs font-bold text-[#64748B]">{profileDraft.bio.length}/{PROFILE_BIO_MAX_LENGTH}</span></label></div><div className="mt-5 flex flex-col gap-3 sm:flex-row"><button type="button" onClick={saveProfileChanges} className="flex-1 rounded-2xl bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-5 py-4 font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.22)]">Save Changes</button><button type="button" onClick={resetProfileDraft} className="rounded-2xl border border-[#E3ECF8] bg-white px-5 py-4 font-black text-[#081B5C]">Cancel / Reset</button></div></section>;
 
-  const renderProfilePage = () => <div className="mx-auto grid min-w-0 max-w-7xl gap-5 lg:grid-cols-[minmax(0,1fr)_340px]"><div className="min-w-0 space-y-5"><ProfileHeroCard /><ProfileAccountCard /><ProfileSettingsPanel /></div><div className="hidden min-w-0 lg:block"><ProfileSummaryCard /></div><div className="min-w-0 lg:hidden"><ProfileSummaryCard /></div></div>;
+  const renderProfileActivityPanel = (profileId: string, displayName: string) => {
+    const profilePosts = messages.filter((message) => isMessageFromId(message, profileId)).sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
+    const profileStories = statusCards.filter((status) => {
+      const ownerId = String(status.ownerId || status.creatorId || '');
+      return ownerId === profileId && isUnexpired(status, STORY_TTL_MS);
+    }).sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
+    return (
+      <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <p className="text-xs font-black uppercase tracking-[0.24em] text-[#4F7BFF]">Profile activity</p>
+            <h3 className="mt-1 text-2xl font-black text-[#081B5C]">{displayName}'s posts & stories</h3>
+            <p className="mt-1 text-sm font-bold text-[#64748B]">Posts stay permanent. Status stories stay visible only for 24 hours unless deleted earlier.</p>
+          </div>
+          <div className="flex gap-2 text-xs font-black">
+            <span className="rounded-full bg-[#E8F2FF] px-3 py-1.5 text-[#1769FF]">{compactCount(profilePosts.length)} posts</span>
+            <span className="rounded-full bg-[#FEF7E0] px-3 py-1.5 text-[#9A6400]">{compactCount(profileStories.length)} stories</span>
+          </div>
+        </div>
+        <div className="mt-5 grid gap-5 xl:grid-cols-2">
+          <div>
+            <h4 className="text-sm font-black uppercase tracking-[0.18em] text-[#1769FF]">Permanent posts</h4>
+            <div className="mt-3 space-y-3">{profilePosts.length ? profilePosts.slice(0, 12).map((message) => <MessageSummaryCard key={message.id} message={message} />) : <div className="rounded-[1.5rem] border border-dashed border-[#D9E7F8] bg-[#F8FBFF] p-6 text-sm font-bold text-[#7C879A]">No permanent posts yet.</div>}</div>
+          </div>
+          <div>
+            <h4 className="text-sm font-black uppercase tracking-[0.18em] text-[#F5B82E]">Active stories</h4>
+            {profileStories.length ? <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-2">{profileStories.slice(0, 6).map(renderStatusTile)}</div> : <div className="mt-3 rounded-[1.5rem] border border-dashed border-[#D9E7F8] bg-[#F8FBFF] p-6 text-sm font-bold text-[#7C879A]">No active stories right now.</div>}
+          </div>
+        </div>
+      </section>
+    );
+  };
+
+  const renderProfilePage = () => {
+    const profileId = selectedProfileId || currentUserKey;
+    const viewingOwnProfile = !selectedProfileId || isOwnCommunityId(selectedProfileId);
+    if (viewingOwnProfile) {
+      return <div className="mx-auto grid min-w-0 max-w-7xl gap-5 lg:grid-cols-[minmax(0,1fr)_340px]"><div className="min-w-0 space-y-5"><ProfileHeroCard />{renderProfileActivityPanel(currentUserKey, profile.name || 'Your')}<ProfileAccountCard /><ProfileSettingsPanel /></div><div className="hidden min-w-0 lg:block"><ProfileSummaryCard /></div><div className="min-w-0 lg:hidden"><ProfileSummaryCard /></div></div>;
+    }
+
+    const profileCreator = allCreators.find((creator) => creator.id === profileId) || communityProfiles.find((creator) => creator.id === profileId);
+    if (!profileCreator) {
+      return <div className="mx-auto max-w-4xl rounded-[2rem] border border-dashed border-[#D9E7F8] bg-white p-10 text-center shadow-sm"><h2 className="text-3xl font-black text-[#081B5C]">Profile not found</h2><p className="mt-2 text-sm font-bold text-[#64748B]">This public profile is unavailable or hidden.</p><button type="button" onClick={() => { setSelectedProfileId(null); pushPage('network'); }} className="mt-5 rounded-2xl bg-[#1769FF] px-5 py-3 text-sm font-black text-white">Find people</button></div>;
+    }
+
+    const followed = followedIds.includes(profileCreator.id) || Boolean(followedByCreatorIds[profileCreator.id]);
+    return (
+      <div className="mx-auto max-w-7xl space-y-5">
+        <section className="overflow-hidden rounded-[2rem] border border-[#E3ECF8] bg-white shadow-[0_20px_60px_rgba(79,123,255,0.12)]">
+          <div className="relative min-h-56 bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 sm:p-8">
+            <div className="absolute -right-12 -top-12 h-44 w-44 rounded-full bg-[#6C4CF6]/18 blur-3xl" />
+            <div className="relative flex flex-col gap-5 sm:flex-row sm:items-end">
+              <Avatar value={profileCreator.avatar} size="h-28 w-28" className="text-5xl ring-4 ring-white" />
+              <div className="min-w-0 flex-1">
+                <p className="text-xs font-black uppercase tracking-[0.24em] text-[#4F7BFF]">Public profile</p>
+                <h2 className="mt-1 truncate text-4xl font-black text-[#081B5C]">{profileCreator.name}</h2>
+                <p className="mt-1 text-sm font-bold text-[#64748B]">@{profileCreator.username} · {profileCreator.role}</p>
+                {profileCreator.bio ? <p className="mt-3 max-w-2xl text-sm font-semibold leading-7 text-[#536178]">{profileCreator.bio}</p> : null}
+                <div className="mt-4 flex flex-wrap gap-2 text-xs font-black">
+                  <span className="rounded-full bg-white px-3 py-1.5 text-[#1769FF]">{compactCount(followerCounts[profileCreator.id] ?? profileCreator.followerCount ?? profileCreator.followers)} Followers</span>
+                  <span className="rounded-full bg-white px-3 py-1.5 text-[#7B61FF]">{compactCount(followingCounts[profileCreator.id] ?? profileCreator.followingCount)} Following</span>
+                  {profileCreator.verified ? <span className="rounded-full bg-white px-3 py-1.5 text-[#137333]">✓ Verified</span> : null}
+                </div>
+              </div>
+              <div className="flex shrink-0 flex-col gap-2">
+                <button type="button" onClick={() => toggleFollowCreator(profileCreator)} disabled={Boolean(followLoadingIds[profileCreator.id]) || profileCreator.isSuspended || profileCreator.isPublic === false} className={`min-h-12 rounded-2xl px-5 text-sm font-black transition disabled:opacity-60 ${followed ? 'border border-[#D9E7F8] bg-white text-[#1769FF]' : 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-[0_14px_32px_rgba(23,105,255,0.22)]'}`}>{followLoadingIds[profileCreator.id] ? 'Saving…' : followed ? '✓ Following' : 'Follow'}</button>
+                <button type="button" onClick={() => { setSelectedProfileId(null); pushPage('network'); }} className="min-h-12 rounded-2xl border border-[#D9E7F8] bg-white px-5 text-sm font-black text-[#081B5C]">Back to people</button>
+              </div>
+            </div>
+          </div>
+        </section>
+        {renderProfileActivityPanel(profileCreator.id, profileCreator.name)}
+      </div>
+    );
+  };
 
 
   const followSuggestions = ['Math', 'Physics', 'Creator', 'Master', 'Class 10', 'Class 12'];
@@ -4044,7 +4265,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           {tags.length ? <div className="mt-3 flex flex-wrap gap-1.5">{tags.map((tag) => <span key={tag} className="rounded-full border border-[var(--community-border)] bg-[#F8FBFF] px-2.5 py-1 text-[11px] font-black text-[var(--community-primary)]">#{tag}</span>)}</div> : null}
         </div>
         <div className="flex shrink-0 gap-2 sm:flex-col">
-          <button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="min-h-11 rounded-2xl border border-[var(--community-border)] bg-[#F8FBFF] px-4 text-sm font-black text-[var(--community-heading)]">Use replies</button>
+          <button type="button" onClick={() => { setSelectedProfileId(creator.id); pushPage('profile'); }} className="min-h-11 rounded-2xl border border-[var(--community-border)] bg-[#F8FBFF] px-4 text-sm font-black text-[var(--community-heading)]">View Profile</button>
           <button type="button" onClick={() => toggleFollowCreator(creator)} disabled={Boolean(followLoadingIds[creator.id]) || self || creator.isSuspended || creator.isPublic === false} className={`min-h-11 rounded-2xl px-5 text-sm font-black transition hover:-translate-y-0.5 disabled:cursor-not-allowed disabled:opacity-60 ${followed ? 'border border-[#D9E7F8] bg-white text-[#1769FF] shadow-sm hover:bg-[#EEF6FF]' : 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-[0_14px_32px_rgba(23,105,255,0.22)]'}`}>{self ? 'You' : followLoadingIds[creator.id] ? 'Saving…' : followed ? '✓ Following' : 'Follow'}</button>
         </div>
       </article>
@@ -4091,7 +4312,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const renderMainContent = () => (
     <div className="community-content-stage animate-in fade-in slide-in-from-bottom-3 duration-500">
-      {page === 'chat' && activeView === 'feed' && renderFeedLayout(messages, 'Community Feed', 'Join the conversation with public replies, reactions, polls, and creator posts.')}
+      {page === 'chat' && activeView === 'feed' && renderFeedLayout(filteredFeedMessages, 'Community Feed', 'Join the conversation with public replies, reactions, polls, and creator posts.')}
       {page === 'thread' && <div className="space-y-3"><button type="button" onClick={() => { goBack(); requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: feedScrollPositionsRef.current.chatFeed || 0, behavior: 'auto' })); }} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-3 text-sm font-black text-[#64748B] shadow-sm">← Back to posts</button>{renderMessageDetails(selectedMessage, true)}</div>}
       {page === 'profile' && renderProfilePage()}
       {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_28px_90px_rgba(79,123,255,0.16)]"><div className="relative overflow-hidden bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.28em] text-[#4F7BFF]">Motivational rule</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-5xl">Post once per type daily. Stories expire after 24 hours.</h2><p className="mt-4 max-w-2xl text-base font-semibold leading-8 text-[#64748B]">Each user can publish one text, one image, and one poll creator post per day. Image posts use public URL previews, so Firebase Storage upload is not required.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EAF5FF] p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || isCreatorTypeUsedToday || !postDraft.trim() || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2) || (postType === 'image' && (!postImagePreview || postImageUrlStatus !== 'valid'))} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.28)] disabled:opacity-45">{isPublishingCreator ? 'Publishing creator post...' : isCreatorTypeUsedToday ? `${postType} post used today` : 'Publish creator post'}</button></div></div>}

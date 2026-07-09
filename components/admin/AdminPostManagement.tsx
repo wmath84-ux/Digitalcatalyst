@@ -4,7 +4,7 @@ import { auth, db } from '../../firebase';
 import PremiumImageUrlInput, { PremiumImageUrlStatus } from '../common/PremiumImageUrlInput';
 
 const COMMUNITY_FEED = 'community_feed';
-const POST_TTL_MS = 15 * 24 * 60 * 60 * 1000;
+const FEED_POST_NEVER_EXPIRES_AT = 253402300799000;
 const ADMIN_POST_FALLBACK_STORAGE_KEY = 'eduvoraAdminPostFallbacks';
 const ADMIN_POST_FALLBACK_EVENT = 'eduvoraAdminPostFallbackUpdated';
 type PostType = 'text' | 'image' | 'poll';
@@ -91,7 +91,7 @@ const AdminPostManagement: React.FC = () => {
       replyCount: 0,
       replies: [],
       createdAt: Date.now(),
-      expiresAt: Date.now() + POST_TTL_MS,
+      expiresAt: FEED_POST_NEVER_EXPIRES_AT,
     };
 
     if (type === 'image') Object.assign(payload, { imagePreview, imageLayout: 'thumbnail', sourceType: 'url' });

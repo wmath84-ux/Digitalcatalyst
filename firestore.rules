@@ -98,7 +98,7 @@ service cloud.firestore {
         && request.resource.data.postType in ['text', 'image', 'poll'])
         || (isAdmin() && request.resource.data.source == 'admin');
       allow update: if signedIn();
-      allow delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid) || (signedIn() && resource.data.expiresAt < request.time.toMillis());
+      allow delete: if isAdmin();
 
       match /replies/{replyId} {
         allow read: if signedIn();
@@ -126,7 +126,7 @@ service cloud.firestore {
         && request.resource.data.ownerId == request.auth.uid
         && request.resource.data.type in ['text', 'image', 'poll'];
       allow update: if signedIn();
-      allow delete: if isAdmin() || (signedIn() && resource.data.ownerId == request.auth.uid) || (signedIn() && resource.data.expiresAt < request.time.toMillis());
+      allow delete: if isAdmin();
     }
 
     match /community_upload_quotas/{quotaId} {
@@ -208,6 +208,31 @@ service cloud.firestore {
 
       allow delete: if isAdmin()
         || (signedIn() && resource.data.followerId == request.auth.uid);
+    }
+
+
+    match /community_notifications/{notificationId} {
+      allow read: if signedIn()
+        && (isAdmin()
+          || resource.data.recipientId == request.auth.uid
+          || resource.data.actorId == request.auth.uid);
+
+      allow create: if signedIn()
+        && request.resource.data.actorId == request.auth.uid
+        && request.resource.data.recipientId is string
+        && request.resource.data.recipientId != ''
+        && request.resource.data.type in ['reply', 'masterTag', 'status', 'creator', 'follow']
+        && request.resource.data.title is string
+        && request.resource.data.body is string
+        && request.resource.data.createdAt is number
+        && !request.resource.data.keys().hasAny(['email', 'phone', 'apiKey', 'authorization', 'secret', 'rawHtml']);
+
+      allow update: if signedIn()
+        && resource.data.recipientId == request.auth.uid
+        && request.resource.data.diff(resource.data).changedKeys().hasOnly(['read', 'readAt', 'updatedAt']);
+
+      allow delete: if isAdmin()
+        || (signedIn() && resource.data.recipientId == request.auth.uid);
     }
 
     match /private_chats/{chatId} {
