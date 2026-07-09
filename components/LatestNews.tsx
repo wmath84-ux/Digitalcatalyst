@@ -3,7 +3,8 @@ import React, { useRef, useEffect } from 'react';
 import { NewsArticle, WebsiteSettings } from '../App';
 import GoogleAd from './GoogleAd';
 import { hasUnsafePublicPlaceholder } from '../utils/reviewStableMode';
-import { resolveNewsCover } from '../utils/mediaCompat';
+import { buildArticleImageFallback, resolveNewsCover } from '../utils/mediaCompat';
+import SafeImage from './common/SafeImage';
 
 interface LatestNewsProps {
   settings: WebsiteSettings;
@@ -61,11 +62,17 @@ const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, setting
     return (
         <div style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }} className={`backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgba(60,64,67,0.08)] hover:shadow-[0_12px_34px_rgba(60,64,67,0.12)] border overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
             <div className="relative h-48 overflow-hidden rounded-t-2xl" style={{ backgroundColor: chatPalette.searchBlue }}>
-                <img 
-                    src={getArticleCoverImage(article)} 
-                    alt={article.title} 
+                <SafeImage
+                    src={getArticleCoverImage(article)}
+                    fallbackSrc={buildArticleImageFallback(article)}
+                    alt={article.title}
+                    wrapperClassName="h-full w-full rounded-t-2xl"
                     className="h-full w-full rounded-t-2xl object-cover transition-transform duration-700 group-hover:scale-110"
-                    onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = buildPremiumArticleImage(article); }}
+                    fallbackTitle={article.title}
+                    fallbackBadge={article.type === 'news' ? 'News' : article.category || 'Blog'}
+                    fallbackIcon="📰"
+                    fallbackMessage="Image preview unavailable"
+                    aspect="video"
                 />
                 <div className="absolute top-4 left-4 backdrop-blur-xl px-3 py-1 text-xs font-bold uppercase tracking-wider border rounded-md shadow-sm" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder, color: chatPalette.linkText }}>
                     {article.type === 'news' ? 'News' : article.category}

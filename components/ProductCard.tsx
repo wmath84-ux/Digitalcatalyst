@@ -2,6 +2,7 @@
 import React from 'react';
 import { ProductWithRating, WebsiteSettings, Coupon } from '../App';
 import { getProductImage, getProductImageFallback } from '../utils/productImages';
+import SafeImage from './common/SafeImage';
 
 interface ProductCardProps {
   settings: WebsiteSettings;
@@ -49,12 +50,17 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
         <div className={`group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-sm hover:shadow-sm transition-all duration-300 ease-out border border-gray-100 flex flex-col overflow-hidden hover:-translate-y-2 product-card-shine ${animationClass}`}>
             {/* Image Container */}
             <div className="relative w-full overflow-hidden aspect-[4/3] bg-gray-100">
-                <img 
-                    src={displayImage} 
-                    alt={product.title} 
-                    className="absolute inset-0 w-full h-full object-contain" 
-                    loading="lazy"
-                    onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = getProductImageFallback(product); }}
+                <SafeImage
+                    src={displayImage}
+                    fallbackSrc={getProductImageFallback(product)}
+                    alt={product.title}
+                    wrapperClassName="absolute inset-0"
+                    className="h-full w-full object-contain"
+                    fallbackTitle={product.title}
+                    fallbackBadge={product.category || 'Product'}
+                    fallbackIcon="🎓"
+                    fallbackMessage="Image preview unavailable"
+                    aspect="video"
                 />
                 
                 {/* Badges */}

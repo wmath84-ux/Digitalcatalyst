@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { MEDIA_UPLOAD_FUTURE_MESSAGE, URL_FIRST_MEDIA_MODE_LABEL, getMediaModeHelperCopy, getStorageDisabledMessage } from '../../utils/mediaMode';
+import SafeImage from './SafeImage';
 
 export type PremiumImageUrlStatus = 'empty' | 'checking' | 'valid' | 'invalid';
 
@@ -137,7 +138,7 @@ const PremiumImageUrlInput: React.FC<PremiumImageUrlInputProps> = ({
         </div>
         <div className={`overflow-hidden rounded-[1.5rem] border bg-gradient-to-br from-[#EEF6FF] via-white to-[#F1EEFF] p-2 shadow-inner ${status === 'valid' ? 'border-[#7B61FF] shadow-[0_0_0_4px_rgba(123,97,255,0.10)]' : status === 'invalid' && trimmed ? 'border-rose-200' : 'border-[#D9E7F8]'}`}>
           <div className={`${aspectClass(aspect)} flex w-full items-center justify-center overflow-hidden rounded-[1.15rem] bg-white/80`}>
-            {status === 'checking' ? <div className="h-full w-full animate-pulse bg-gradient-to-r from-[#EEF6FF] via-white to-[#E8F2FF]" /> : status === 'valid' ? <img src={trimmed} alt={previewAlt} className="h-full w-full object-contain" /> : <div className="p-6 text-center"><div className="text-5xl">🖼️</div><p className="mt-3 text-sm font-black text-[#536178]">Preview Image</p></div>}
+            {status === 'checking' ? <div className="h-full w-full animate-pulse bg-gradient-to-r from-[#EEF6FF] via-white to-[#E8F2FF]" /> : status === 'valid' ? <SafeImage src={trimmed} alt={previewAlt} className="h-full w-full object-contain" fallbackTitle={label} fallbackBadge="Admin preview" fallbackIcon="🖼️" fallbackMessage="This image URL is not loading. Replace it with another public URL." aspect={aspect === 'square' ? 'square' : aspect === 'video' ? 'video' : 'auto'} /> : <div className="p-6 text-center"><div className="text-5xl">🖼️</div><p className="mt-3 text-sm font-black text-[#536178]">Preview Image</p></div>}
           </div>
           <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className={`rounded-full px-3 py-1 text-[11px] font-black ${status === 'valid' ? 'bg-emerald-100 text-emerald-700' : status === 'invalid' && trimmed ? 'bg-rose-100 text-rose-700' : 'bg-[#EEF6FF] text-[#1769FF]'}`}>{badge}</span><div className="flex gap-2"><button type="button" onClick={() => onChange('')} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#EF4444]">Remove Image</button><button type="button" onClick={() => setHelperOpen(true)} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#1769FF]">Change URL</button></div></div>
         </div>

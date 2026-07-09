@@ -3,7 +3,8 @@ import { Announcement, NewsArticle, User, WebsiteSettings } from '../App';
 import { EconomySettings } from '../utils/economy';
 import GoogleAd from './GoogleAd';
 import { countVisibleWords, hasUnsafePublicPlaceholder } from '../utils/reviewStableMode';
-import { resolveNewsCover } from '../utils/mediaCompat';
+import { buildArticleImageFallback, resolveNewsCover } from '../utils/mediaCompat';
+import SafeImage from './common/SafeImage';
 
 type ReadingListType = 'news' | 'blog';
 type ReadingView = ReadingListType | 'article' | 'announcement';
@@ -207,7 +208,7 @@ const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: s
   <button onClick={onClick} className="group relative overflow-hidden rounded-[1.75rem] border text-left shadow-[0_12px_36px_rgba(60,64,67,0.10)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_48px_rgba(60,64,67,0.14)]" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
     {imageSeed && (
       <div className="aspect-video overflow-hidden rounded-t-[1.75rem]" style={{ backgroundColor: chatPalette.searchBlue }}>
-        <img src={imageSeed || ''} alt="" className="h-full w-full rounded-t-[1.75rem] object-cover opacity-90 transition duration-700 group-hover:scale-110 group-hover:opacity-100" onError={(event) => { event.currentTarget.onerror = null; if (fallbackImage) event.currentTarget.src = fallbackImage; }} />
+        <SafeImage src={imageSeed || ''} fallbackSrc={fallbackImage || ''} alt={title} wrapperClassName="h-full w-full rounded-t-[1.75rem]" className="h-full w-full rounded-t-[1.75rem] object-cover opacity-90 transition duration-700 group-hover:scale-110 group-hover:opacity-100" fallbackTitle={title} fallbackBadge={badge} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
       </div>
     )}
     <div className="p-5">
@@ -485,7 +486,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                     </div>
                     {!isExternalArticle(selectedArticle) && (
                       <div className="hidden overflow-hidden rounded-[2rem] border shadow-sm backdrop-blur-2xl lg:block" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
-                        <img src={getArticleImage(selectedArticle, '900/700')} alt={selectedArticle.title} className="aspect-[4/3] h-full w-full object-cover opacity-90 animate-article-hero-image" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = buildPremiumArticleImage(selectedArticle); }} />
+                        <SafeImage src={getArticleImage(selectedArticle, '900/700')} fallbackSrc={buildArticleImageFallback(selectedArticle)} alt={selectedArticle.title} wrapperClassName="aspect-[4/3] h-full w-full" className="h-full w-full object-cover opacity-90 animate-article-hero-image" fallbackTitle={selectedArticle.title} fallbackBadge={selectedArticle.type === 'news' ? 'News' : selectedArticle.category || 'Blog'} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
                       </div>
                     )}
                   </div>
@@ -508,7 +509,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                   ) : (
                     <>
                       <div className="mb-6 mt-8 aspect-video overflow-hidden rounded-2xl border shadow-sm backdrop-blur-2xl lg:hidden" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
-                        <img src={getArticleImage(selectedArticle, '1400/800')} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = buildPremiumArticleImage(selectedArticle); }} />
+                        <SafeImage src={getArticleImage(selectedArticle, '1400/800')} fallbackSrc={buildArticleImageFallback(selectedArticle)} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" fallbackTitle={selectedArticle.title} fallbackBadge={selectedArticle.type === 'news' ? 'News' : selectedArticle.category || 'Blog'} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
                       </div>
                       <div className="mx-auto mt-8 max-w-4xl rounded-[2rem] border p-6 text-lg leading-9 shadow-[0_18px_50px_rgba(60,64,67,0.08)] backdrop-blur-2xl sm:p-8 lg:mt-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
                         <MarkdownContent

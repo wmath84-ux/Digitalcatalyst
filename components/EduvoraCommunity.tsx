@@ -11,6 +11,7 @@ import CommunityAiMentor from './CommunityAiMentor';
 import PremiumImageUrlInput, { PremiumImageUrlStatus } from './common/PremiumImageUrlInput';
 import { getStorageDisabledMessage, isStorageUploadEnabled } from '../utils/mediaMode';
 import { buildPostImageFallback, normalizeMediaSource } from '../utils/mediaCompat';
+import SafeImage from './common/SafeImage';
 import { isDemoMode } from '../utils/runtimeMode';
 
 interface EduvoraCommunityProps {
@@ -2542,7 +2543,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const isRealImage = isImageAvatar(resolvedSrc);
     if (!isRealImage) return <button type="button" onClick={() => setImageLightbox({ src: fallbackSrc, alt, mode })} className={`flex h-full w-full items-center justify-center text-7xl ${className}`}>{src || '🖼️'}</button>;
     const imageClass = mode === 'thumbnail' ? 'h-full w-full object-contain' : 'max-h-full max-w-full object-contain';
-    return <button type="button" onClick={() => setImageLightbox({ src: resolvedSrc, alt, mode })} className="flex h-full w-full items-center justify-center"><img src={resolvedSrc} alt={alt} className={`${imageClass} ${className}`} onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = fallbackSrc; }} /></button>;
+    return <button type="button" onClick={() => setImageLightbox({ src: resolvedSrc || fallbackSrc, alt, mode })} className="flex h-full w-full items-center justify-center"><SafeImage src={resolvedSrc} fallbackSrc={fallbackSrc} alt={alt} className={`${imageClass} ${className}`} fallbackTitle={alt} fallbackBadge={normalized.isLegacy ? 'Legacy image' : 'Community image'} fallbackIcon="💬" fallbackMessage="Image preview unavailable" aspect={mode === 'thumbnail' ? 'square' : 'auto'} /></button>;
   };
 
   const toggleStatusLike = (statusId: number) => {

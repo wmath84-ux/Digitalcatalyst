@@ -14,6 +14,7 @@ import { doc, getDoc, runTransaction, serverTimestamp, setDoc } from 'firebase/f
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { isDirectAudioUrl, isDirectVideoUrl, isGoogleDriveUrl, normalizeDriveUrl, normalizeMediaSource } from '../utils/mediaCompat';
+import MediaFallbackCard from './common/MediaFallbackCard';
 
 declare global {
   interface Window {
@@ -1063,6 +1064,9 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
       ? 'Native playback is ready inside the course player.'
       : 'This media link needs public access. Open externally if inline playback is blocked.';
   const sourceBadge = normalizedMedia.isLegacy ? 'Legacy safe media' : normalizedMedia.sourceType === 'url' ? 'URL media' : normalizedMedia.provider === 'firebase-storage' ? 'Storage media' : 'Hosted media';
+  const [mediaFailed, setMediaFailed] = useState(false);
+  useEffect(() => { setMediaFailed(false); }, [file.id, openUrl, previewUrl]);
+  const handleMediaError = () => { setMediaFailed(true); onError?.(); };
 
   return (
     <div className="flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-[radial-gradient(circle_at_18%_10%,rgba(123,97,255,0.24),transparent_28%),linear-gradient(135deg,#EEF6FF,#F8FBFF_48%,#F1EEFF)] p-3 text-[#081A45] sm:p-5 custom-scrollbar">
@@ -1091,24 +1095,21 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
               <div className="mb-5 flex h-24 items-end gap-1.5 overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-4">
                 {Array.from({ length: 34 }).map((_, index) => <span key={index} className="w-full rounded-full bg-white/75" style={{ height: `${20 + ((index * 17) % 72)}%` }} />)}
               </div>
-              {directPlayable ? <audio src={file.url} controls className="w-full" onError={onError} /> : (
-                <div className="rounded-2xl border border-white/15 bg-white/10 p-4 text-sm font-bold leading-6 text-white/90">
-                  <p>Premium audio unavailable inline. This media link needs public access, so use the source button if playback is blocked.</p>
-                  {openUrl ? <a href={openUrl} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-xs font-black text-[#1769FF]">Open source</a> : null}
-                </div>
+              {directPlayable && !mediaFailed ? <audio src={openUrl} controls className="w-full" onError={handleMediaError} /> : (
+                <MediaFallbackCard title={file.name || 'Audio lesson'} badge={isDrive ? 'Drive audio' : 'Audio'} icon="🎧" message={isDrive ? 'This Drive file needs public access.' : 'Audio source unavailable'} actionHref={openUrl} actionLabel={isDrive ? 'Open in Drive' : 'Open source'} aspect="auto" className="min-h-40 rounded-2xl border-white/15" />
               )}
             </div>
-          ) : directPlayable ? (
+          ) : directPlayable && !mediaFailed ? (
             <div className="relative aspect-video overflow-hidden rounded-[1.75rem] bg-black shadow-2xl">
-              <video src={file.url} controls playsInline className="h-full w-full object-contain" onError={onError} />
+              <video src={openUrl} controls playsInline className="h-full w-full object-contain" onError={handleMediaError} />
               {showFullscreen ? <button type="button" onClick={onVideoFullscreen} className="absolute bottom-4 right-4 rounded-full border border-white/25 bg-black/75 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white backdrop-blur-md">⛶ Fullscreen</button> : null}
             </div>
-          ) : isDrive && previewUrl ? (
+          ) : isDrive && previewUrl && !mediaFailed ? (
             <div className="aspect-video overflow-hidden rounded-[1.75rem] border border-[#D9E7F8] bg-black shadow-2xl">
-              <iframe title={file.name || 'Google Drive video preview'} src={previewUrl} className="h-full w-full border-0" allow="autoplay; fullscreen" allowFullScreen onError={onError} />
+              <iframe title={file.name || 'Google Drive video preview'} src={previewUrl} className="h-full w-full border-0" allow="autoplay; fullscreen" allowFullScreen onError={handleMediaError} />
             </div>
           ) : (
-            <div className="rounded-[1.75rem] border border-dashed border-[#BFD7FF] bg-gradient-to-br from-[#EEF6FF] via-white to-[#F1EEFF] p-8 text-center"><p className="text-lg font-black">This media link needs public access.</p><p className="mt-2 text-sm font-bold text-[#536178]">Inline playback is blocked or unavailable. Use the source button to open the video safely.</p>{openUrl ? <a href={openUrl} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-3 text-sm font-black text-white shadow-lg">Open video</a> : null}</div>
+            <MediaFallbackCard title={file.name || 'Video lesson'} badge={isDrive ? 'Drive video' : 'Video'} icon="▶️" message={isDrive ? 'This Drive file needs public access.' : 'Video preview unavailable'} actionHref={openUrl} actionLabel={isDrive ? 'Open in Drive' : 'Open video'} aspect="video" className="rounded-[1.75rem]" />
           )}
         </div>
       </section>

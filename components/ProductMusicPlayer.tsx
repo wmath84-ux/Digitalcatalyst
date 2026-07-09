@@ -1,5 +1,7 @@
 import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
 import type { CourseModule, ProductFile, ProductWithRating } from '../App';
+import SafeImage from './common/SafeImage';
+import { buildProductImageFallback } from '../utils/mediaCompat';
 
 type PlayerVariant = 'compact' | 'full';
 
@@ -43,9 +45,10 @@ const collectAudioFiles = (modules: CourseModule[] = [], moduleTrail: string[] =
 
 export const getProductAudioTracks = (product: ProductWithRating): AudioTrack[] => {
   const covers = (product.images || []).filter(Boolean);
+  const fallbackCover = buildProductImageFallback(product);
   return collectAudioFiles(product.courseContent || []).map((track, index) => ({
     ...track,
-    cover: covers[index % Math.max(covers.length, 1)] || `https://picsum.photos/seed/${product.imageSeed || product.id}-${index}/600/600`,
+    cover: covers[index % Math.max(covers.length, 1)] || fallbackCover,
   }));
 };
 
@@ -65,7 +68,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
     if (providedTracks) {
       return providedTracks.map((track, index) => ({
         ...track,
-        cover: track.cover || `https://picsum.photos/seed/${fallbackCoverSeed}-${index}/600/600`,
+        cover: track.cover || buildProductImageFallback({ title: fallbackTitle, imageSeed: `${fallbackCoverSeed}-${index}` }),
       }));
     }
 
@@ -350,7 +353,7 @@ const ProductMusicPlayer: React.FC<ProductMusicPlayerProps> = ({ product, tracks
                 style={isActive && isPlaying ? { transform: `scale(${1 + beatLevel * 0.09})`, boxShadow: `0 0 ${58 + beatLevel * 54}px rgba(56,189,248,0.94), 0 0 ${74 + beatLevel * 62}px rgba(109,40,217,0.64)` } : undefined}
                 aria-label={`Play ${track.title}`}
               >
-                <img src={track.cover} alt="" className="absolute inset-0 h-full w-full object-cover" loading="lazy" />
+                <SafeImage src={track.cover} alt={track.title} wrapperClassName="absolute inset-0" className="h-full w-full object-cover" fallbackTitle={track.title} fallbackBadge="Audio" fallbackIcon="🎧" fallbackMessage="Image preview unavailable" aspect="square" />
                 {isActive && isPlaying && (
                   <>
                     <span className="absolute inset-0 bg-cyan-300/10 mix-blend-screen" style={{ opacity: Math.min(0.72, beatLevel * 0.58) }} />
