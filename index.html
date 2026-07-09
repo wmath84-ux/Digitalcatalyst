@@ -138,6 +138,96 @@
         isolation: isolate;
       }
 
+      /* Course player Drive URL audio/video responsive sizing */
+      .course-drive-media-viewport {
+        display: flex;
+        align-items: stretch !important;
+        justify-content: center;
+        height: 100%;
+        min-height: 0;
+        overflow: hidden !important;
+      }
+
+      .course-drive-media-card {
+        display: flex;
+        flex-direction: column;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+        max-height: 100%;
+      }
+
+      .course-drive-media-header,
+      .course-drive-media-toolbar {
+        flex: 0 0 auto;
+      }
+
+      .course-drive-media-body {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+        overflow: hidden;
+      }
+
+      .course-drive-native-video-shell,
+      .course-drive-video-shell {
+        flex: 1 1 auto;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+      }
+
+      .course-drive-video-shell iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+      }
+
+      .course-drive-audio-shell {
+        display: flex;
+        flex: 1 1 auto;
+        flex-direction: column;
+        min-height: 0;
+      }
+
+      .course-drive-audio-bars {
+        flex: 0 0 auto;
+        height: clamp(3.25rem, 14svh, 6rem);
+      }
+
+      .course-drive-audio-preview {
+        flex: 1 1 0;
+        min-height: 0;
+        height: auto;
+      }
+
+      .course-drive-audio-preview iframe {
+        display: block;
+        width: 100%;
+        height: 100%;
+        min-height: 0;
+      }
+
+      @media (max-height: 620px), (max-width: 700px) {
+        .course-drive-media-card {
+          border-radius: 1.35rem;
+        }
+
+        .course-drive-media-status {
+          display: none;
+        }
+
+        .course-drive-media-title {
+          font-size: clamp(1.15rem, 4vw, 1.6rem);
+          line-height: 1.15;
+        }
+
+        .course-drive-audio-bars {
+          height: 3.25rem;
+        }
+      }
+
       .course-youtube-frame,
       .course-youtube-player-shell,
       .course-native-video-shell {
