@@ -340,6 +340,7 @@ const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] te
 
 type HostedDocsProvider = 'direct_pdf' | 'google_drive_pdf' | 'google_drive_doc' | 'external_docs_link' | 'open_docs';
 type MediaUrlProvider = 'direct_audio' | 'direct_video' | 'google_drive_audio' | 'google_drive_video' | 'external_media';
+type MediaComposerKind = 'audio' | 'video';
 
 type ContentComposerFormState = {
     type: ProductFileType;
@@ -364,14 +365,35 @@ const hostedDocsProviderLabels: Record<HostedDocsProvider, string> = {
 
 const hostedDocsProviders: HostedDocsProvider[] = ['direct_pdf', 'google_drive_pdf', 'google_drive_doc', 'open_docs', 'external_docs_link'];
 const mediaUrlProviders: MediaUrlProvider[] = ['direct_audio', 'direct_video', 'google_drive_audio', 'google_drive_video', 'external_media'];
+const mediaProviderOptions: Record<MediaComposerKind, Array<{ provider: MediaUrlProvider; label: string; helper: string }>> = {
+    audio: [
+        { provider: 'direct_audio', label: 'Audio URL', helper: 'Paste a direct MP3/M4A/WAV/OGG link for native playback.' },
+        { provider: 'google_drive_audio', label: 'Google Drive Audio URL', helper: 'Paste a public Google Drive audio share link. Anyone with the link must be able to view.' },
+        { provider: 'external_media', label: 'External Hosted Audio URL', helper: 'Paste any secure hosted audio page/link. It opens inside a premium fallback card if direct playback is blocked.' },
+    ],
+    video: [
+        { provider: 'direct_video', label: 'Video URL', helper: 'Paste a direct MP4/WebM/MOV link for native playback.' },
+        { provider: 'google_drive_video', label: 'Google Drive Video URL', helper: 'Paste a public Google Drive video share link for embedded preview.' },
+        { provider: 'external_media', label: 'External Hosted Video URL', helper: 'Paste any secure hosted video page/link. It opens inside a premium fallback card if direct playback is blocked.' },
+    ],
+};
 
 const isMediaUrlProvider = (provider?: string): provider is MediaUrlProvider => Boolean(provider && mediaUrlProviders.includes(provider as MediaUrlProvider));
-const mediaProviderLabel = (provider?: string) => {
-    if (provider === 'direct_audio') return 'Direct Audio URL';
-    if (provider === 'direct_video') return 'Direct Video URL';
+const mediaProviderKind = (provider?: string, fallback: MediaComposerKind = 'video'): MediaComposerKind => {
+    if (provider === 'direct_audio' || provider === 'google_drive_audio') return 'audio';
+    if (provider === 'direct_video' || provider === 'google_drive_video') return 'video';
+    return fallback;
+};
+const mediaProviderLabel = (provider?: string, kind: MediaComposerKind = 'video') => {
+    if (provider === 'direct_audio') return 'Audio URL';
+    if (provider === 'direct_video') return 'Video URL';
     if (provider === 'google_drive_audio') return 'Google Drive Audio URL';
     if (provider === 'google_drive_video') return 'Google Drive Video URL';
-    return 'External Hosted Media URL';
+    return kind === 'audio' ? 'External Hosted Audio URL' : 'External Hosted Video URL';
+};
+const mediaProviderHelper = (provider?: string, kind: MediaComposerKind = 'video') => {
+    const option = mediaProviderOptions[kind].find(item => item.provider === provider);
+    return option?.helper || 'Paste a public https media URL. Google Drive links and direct audio/video URLs are supported.';
 };
 
 const extractGoogleDriveFileId = (value: string) => {
@@ -401,6 +423,22 @@ const isDirectAudioUrl = (value: string) => /\.(mp3|m4a|aac|wav|ogg|oga|opus)(?:
 const isDirectVideoUrl = (value: string) => /\.(mp4|webm|mov|m4v|ogv)(?:$|[?#])/i.test(value.trim());
 const mediaProviderToProductProvider = (provider?: string) => provider === 'google_drive_audio' || provider === 'google_drive_video' ? 'drive' : provider === 'direct_audio' || provider === 'direct_video' ? 'direct' : 'external';
 const mediaProviderContentType = (type: ProductFileType, provider?: string, url = '') => type === 'audio' ? (provider === 'direct_audio' || isDirectAudioUrl(url) ? 'audio/url' : 'audio/external') : type === 'video' ? (provider === 'direct_video' || isDirectVideoUrl(url) ? 'video/url' : 'video/external') : undefined;
+
+const resolveInitialMediaProvider = (file?: ProductFile | null): ContentComposerFormState['provider'] => {
+    if (!file) return undefined;
+    if (isMediaUrlProvider(file.provider)) return file.provider;
+    if (file.type === 'audio') {
+        if (file.provider === 'drive' || isGoogleDriveUrl(file.url)) return 'google_drive_audio';
+        if (file.provider === 'direct' || isDirectAudioUrl(file.url)) return 'direct_audio';
+        if (file.provider === 'external' || file.sourceType === 'url') return 'external_media';
+    }
+    if (file.type === 'video') {
+        if (file.provider === 'drive' || isGoogleDriveUrl(file.url)) return 'google_drive_video';
+        if (file.provider === 'direct' || isDirectVideoUrl(file.url)) return 'direct_video';
+        if (file.provider === 'external' || file.sourceType === 'url') return 'external_media';
+    }
+    return file.provider as ContentComposerFormState['provider'];
+};
 
 const toGoogleDrivePreviewUrl = (value: string) => {
     const fileId = extractGoogleDriveFileId(value);
@@ -1011,7 +1049,7 @@ const ContentComposer: React.FC<{
         url: initialFile.url || '',
         name: initialFile.name || 'Learning Resource',
         content: initialFile.content || '',
-        provider: initialFile.provider as ContentComposerFormState['provider'],
+        provider: resolveInitialMediaProvider(initialFile),
         accessLevel: normaliseCourseAccessLevel(initialFile.accessLevel),
         paidUpdateId: initialFile.paidUpdateId || '',
         paidUpdateTitle: initialFile.paidUpdateTitle || '',
@@ -1045,7 +1083,7 @@ const ContentComposer: React.FC<{
         };
     };
 
-    const contentTypes: Array<{ type: ProductFileType; title: string; description: string; icon: string; accept?: string; action?: 'docsUrl' | 'audioUrl' | 'videoUrl' | 'driveAudioUrl' | 'driveVideoUrl' | 'externalMediaUrl' }> = [
+    const contentTypes: Array<{ type: ProductFileType; title: string; description: string; icon: string; accept?: string; action?: 'docsUrl' | 'audioUrl' | 'videoUrl' | 'driveAudioUrl' | 'driveVideoUrl' | 'externalAudioUrl' | 'externalVideoUrl' }> = [
         { type: 'video', title: 'Video Upload', description: 'File upload requires Firebase Storage. Use URL media for now.', icon: '🎬', accept: 'video/*' },
         { type: 'video', title: 'Video URL', description: 'Paste direct MP4/WebM or hosted video URL.', icon: '🔗', action: 'videoUrl' },
         { type: 'video', title: 'Google Drive Video URL', description: 'Paste a public Drive video share link.', icon: '▶️', action: 'driveVideoUrl' },
@@ -1060,7 +1098,8 @@ const ContentComposer: React.FC<{
         { type: 'audio', title: 'Audio Upload', description: 'File upload requires Firebase Storage. Use URL media for now.', icon: '🎧', accept: 'audio/*' },
         { type: 'audio', title: 'Audio URL', description: 'Paste direct MP3/M4A/WAV or hosted audio URL.', icon: '🎧', action: 'audioUrl' },
         { type: 'audio', title: 'Google Drive Audio URL', description: 'Paste a public Drive audio share link.', icon: '☁️', action: 'driveAudioUrl' },
-        { type: 'video', title: 'External Hosted Media URL', description: 'Use a secure hosted media link with fallback card.', icon: '🌐', action: 'externalMediaUrl' },
+        { type: 'audio', title: 'External Hosted Audio URL', description: 'Use a secure hosted audio link with fallback card.', icon: '🌐', action: 'externalAudioUrl' },
+        { type: 'video', title: 'External Hosted Video URL', description: 'Use a secure hosted video link with fallback card.', icon: '🌐', action: 'externalVideoUrl' },
     ];
 
     const triggerFileUpload = (type: ProductFileType, accept: string) => {
@@ -1348,7 +1387,11 @@ const ContentComposer: React.FC<{
             const embedUrl = isDriveProvider ? toGoogleDrivePreviewUrl(trimmedUrl) : '';
 
             if (isDirectProvider && !isDirectPlayable) {
-                setDocError('This media link may not support direct playback. It will open in a secure preview card. Click Save to continue, or paste a direct media file URL.');
+                const warningMessage = 'This media link may not support direct playback. Click Save again to save it as external hosted media, or paste a direct media file URL.';
+                if (docError !== warningMessage) {
+                    setDocError(warningMessage);
+                    return;
+                }
             }
 
             onAdd({
@@ -1423,7 +1466,7 @@ const ContentComposer: React.FC<{
                         <button
                             key={`${item.type}-${item.title}`}
                             type="button"
-                            onClick={() => item.action === 'docsUrl' ? showDocsUrlForm() : item.action === 'audioUrl' ? showMediaUrlForm('audio', 'direct_audio') : item.action === 'videoUrl' ? showMediaUrlForm('video', 'direct_video') : item.action === 'driveAudioUrl' ? showMediaUrlForm('audio', 'google_drive_audio') : item.action === 'driveVideoUrl' ? showMediaUrlForm('video', 'google_drive_video') : item.action === 'externalMediaUrl' ? showMediaUrlForm('video', 'external_media') : item.accept ? triggerFileUpload(item.type, item.accept) : showForm(item.type)}
+                            onClick={() => item.action === 'docsUrl' ? showDocsUrlForm() : item.action === 'audioUrl' ? showMediaUrlForm('audio', 'direct_audio') : item.action === 'videoUrl' ? showMediaUrlForm('video', 'direct_video') : item.action === 'driveAudioUrl' ? showMediaUrlForm('audio', 'google_drive_audio') : item.action === 'driveVideoUrl' ? showMediaUrlForm('video', 'google_drive_video') : item.action === 'externalAudioUrl' ? showMediaUrlForm('audio', 'external_media') : item.action === 'externalVideoUrl' ? showMediaUrlForm('video', 'external_media') : item.accept ? triggerFileUpload(item.type, item.accept) : showForm(item.type)}
                             className="rounded-2xl border border-white/50 bg-white/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/50 hover:bg-white/80 hover:shadow-sm"
                         >
                             <span className="text-2xl">{item.icon}</span>
@@ -1571,10 +1614,30 @@ const ContentComposer: React.FC<{
                                         </select>
                                     </div>
                                 )}
+                                {isMediaUrlProvider(formState.provider) && (
+                                    <div className="rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] p-4">
+                                        <label className={labelClass}>Provider type</label>
+                                        <select
+                                            value={formState.provider}
+                                            onChange={event => {
+                                                const nextProvider = event.target.value as MediaUrlProvider;
+                                                const currentKind = formState.type === 'audio' ? 'audio' : 'video';
+                                                setDocError('');
+                                                setFormState(prev => prev ? { ...prev, provider: nextProvider, type: mediaProviderKind(nextProvider, currentKind) } : prev);
+                                            }}
+                                            className={fieldClass}
+                                        >
+                                            {mediaProviderOptions[formState.type === 'audio' ? 'audio' : 'video'].map(option => (
+                                                <option key={`${formState.type}-${option.provider}`} value={option.provider}>{option.label}</option>
+                                            ))}
+                                        </select>
+                                        <p className="mt-2 text-xs font-bold leading-5 text-slate-600">{mediaProviderHelper(formState.provider, formState.type === 'audio' ? 'audio' : 'video')}</p>
+                                    </div>
+                                )}
                                 {formState.provider !== 'open_docs' && (
                                     <div>
                                         {isMediaUrlProvider(formState.provider) ? (
-                                            <PremiumMediaUrlInput kind={formState.type === 'audio' ? 'audio' : 'video'} value={formState.url} onChange={(url) => { setDocError(''); setFormState(prev => prev ? { ...prev, url } : prev); }} label={mediaProviderLabel(formState.provider)} helperText="Paste a public media URL. Google Drive links and direct audio/video URLs are supported." />
+                                            <PremiumMediaUrlInput kind={formState.type === 'audio' ? 'audio' : 'video'} value={formState.url} onChange={(url) => { setDocError(''); setFormState(prev => prev ? { ...prev, url } : prev); }} label={mediaProviderLabel(formState.provider, formState.type === 'audio' ? 'audio' : 'video')} helperText={mediaProviderHelper(formState.provider, formState.type === 'audio' ? 'audio' : 'video')} />
                                         ) : (<><label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : 'Resource URL'}</label>
                                         <input
                                             value={formState.url}
@@ -1587,7 +1650,8 @@ const ContentComposer: React.FC<{
                                         /></>)}
                                         {isMediaUrlProvider(formState.provider) && (
                                             <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800">
-                                                <p>Current mode: URL media. Upload file is a future Storage feature.</p>
+                                                <p>Current mode: URL media. File upload requires Firebase Storage. Use URL media for now.</p>
+                                                <p className="mt-1 text-xs text-blue-700">Drive links are normalized into a clean preview card. Private files show a clear fallback message.</p>
                                                 <button type="button" onClick={previewMediaUrl} className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white">Preview media</button>
                                             </div>
                                         )}

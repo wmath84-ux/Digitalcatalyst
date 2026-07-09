@@ -1054,17 +1054,33 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
   const previewUrl = getMediaPreviewUrl(file);
   const badge = getMediaProviderBadge(file);
   const openUrl = file.url || previewUrl;
+  const statusLine = isDrive
+    ? 'Google Drive preview is prepared. If access is blocked, set sharing to Anyone with the link.'
+    : directPlayable
+      ? 'Native playback is ready inside the course player.'
+      : 'Secure fallback mode is ready. Open externally if inline playback is blocked.';
+  const sourceBadge = file.sourceType === 'url' ? 'URL media' : file.provider === 'upload' ? 'Storage upload' : 'Hosted media';
 
   return (
     <div className="flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-[radial-gradient(circle_at_18%_10%,rgba(123,97,255,0.24),transparent_28%),linear-gradient(135deg,#EEF6FF,#F8FBFF_48%,#F1EEFF)] p-3 text-[#081A45] sm:p-5 custom-scrollbar">
       <section className="w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/70 bg-white/82 shadow-[0_28px_90px_rgba(23,105,255,0.18)] backdrop-blur-2xl">
         <div className="flex flex-col gap-3 border-b border-[#D9E7F8] bg-white/75 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="min-w-0">
-            <p className="text-xs font-black uppercase tracking-[0.24em] text-[#7B61FF]">{badge}</p>
+            <div className="flex flex-wrap items-center gap-2">
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#7B61FF]">{badge}</p>
+              <span className="rounded-full border border-[#D9E7F8] bg-[#EEF6FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#1769FF]">{sourceBadge}</span>
+            </div>
             <h2 className="mt-1 truncate text-2xl font-black tracking-tight text-[#081A45] sm:text-3xl">{file.name || (isAudio ? 'Audio lesson' : 'Video lesson')}</h2>
-            {isDrive ? <p className="mt-2 text-xs font-bold text-amber-700">Google Drive file must be public or shared with anyone with the link.</p> : null}
+            <p className={`mt-2 text-xs font-bold ${isDrive ? 'text-amber-700' : 'text-[#536178]'}`}>{statusLine}</p>
           </div>
           {openUrl ? <a href={openUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-3 text-sm font-black text-white shadow-lg">Open externally</a> : null}
+        </div>
+        <div className="border-b border-[#D9E7F8] bg-[#F8FBFF]/80 px-4 py-3 sm:px-6">
+          <div className="flex flex-wrap items-center gap-2 text-xs font-black text-[#536178]">
+            <span className="rounded-full bg-white px-3 py-1 shadow-sm">{isAudio ? 'Audio' : 'Video'}</span>
+            <span className="rounded-full bg-white px-3 py-1 shadow-sm">{isDrive ? 'Drive preview' : directPlayable ? 'Native player' : 'Fallback card'}</span>
+            <span className="rounded-full bg-white px-3 py-1 shadow-sm">Payment / EduCoin locks unchanged</span>
+          </div>
         </div>
         <div className="p-4 sm:p-6">
           {isAudio ? (
@@ -1073,7 +1089,10 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
                 {Array.from({ length: 34 }).map((_, index) => <span key={index} className="w-full rounded-full bg-white/75" style={{ height: `${20 + ((index * 17) % 72)}%` }} />)}
               </div>
               {directPlayable ? <audio src={file.url} controls className="w-full" onError={onError} /> : (
-                <div className="rounded-2xl border border-white/15 bg-white/10 p-4 text-sm font-bold leading-6 text-white/90">Audio is hosted on {isDrive ? 'Google Drive' : 'an external provider'}. Tap open/play to access if inline playback is blocked.</div>
+                <div className="rounded-2xl border border-white/15 bg-white/10 p-4 text-sm font-bold leading-6 text-white/90">
+                  <p>Audio is hosted on {isDrive ? 'Google Drive' : 'an external provider'}. Tap open/play to access if inline playback is blocked.</p>
+                  {openUrl ? <a href={openUrl} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-xs font-black text-[#1769FF]">Open audio</a> : null}
+                </div>
               )}
             </div>
           ) : directPlayable ? (
