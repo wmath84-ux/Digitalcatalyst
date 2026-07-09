@@ -198,10 +198,11 @@ const getCommunityProfileStorageKey = (uid?: string | null) => uid ? `${COMMUNIT
 const buildProfileFromUser = (user?: User | null, uid?: string | null): CommunityProfile => {
   const seed = uid || user?.id || user?.uid || user?.email || 'member';
   const name = String(user?.name || '').trim() || buildStableCommunityName(seed);
+  const googlePhoto = String(user?.photoURL || (user as any)?.avatarUrl || '').trim();
   return {
     name,
     username: normalizeUsername((user as any)?.generatedUsername || name) || buildStableCommunityUsername(seed),
-    avatar: String(user?.photoURL || '').trim(),
+    avatar: googlePhoto,
     bio: '',
   };
 };
@@ -935,7 +936,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const legacyProfile = readJsonObject(COMMUNITY_PROFILE_STORAGE_KEY, defaultCommunityProfile);
     const hasScopedProfile = typeof window !== 'undefined' && Boolean(localStorage.getItem(getCommunityProfileStorageKey(currentUserKey)));
     const shouldUseLegacy = !hasScopedProfile && legacyProfile.name && legacyProfile.name !== 'Eduvora Member';
-    const nextProfile = { ...baseProfile, ...(shouldUseLegacy ? legacyProfile : scopedProfile) };
+    const mergedProfile = { ...baseProfile, ...(shouldUseLegacy ? legacyProfile : scopedProfile) };
+    const nextProfile = { ...mergedProfile, avatar: String(mergedProfile.avatar || baseProfile.avatar || '').trim() };
     setProfile(nextProfile);
     setProfileDraft(nextProfile);
   }, [currentUserKey, currentUser?.id, currentUser?.name, currentUser?.photoURL]);
@@ -1614,6 +1616,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const goBack = (options: { fromBrowser?: boolean } = {}): boolean => {
+    if (isCommunityAiOpen) { setIsCommunityAiOpen(false); return true; }
+    if (isNotificationPanelOpen) { setIsNotificationPanelOpen(false); return true; }
+    if (showStatusRulesModal) { setShowStatusRulesModal(false); return true; }
+    if (imageLightbox) { setImageLightbox(null); return true; }
+    if (shareTarget) { setShareTarget(null); setShareRecipientSearch(''); setShareCaption(''); setShareSendingId(''); setShareFeedback(''); return true; }
+    if (isMasterTagDetailOpen) { setIsMasterTagDetailOpen(false); return true; }
+    if (profileViewMode !== 'overview') { setProfileViewMode('overview'); setProfileSelectedPostId(null); setExpandedReplyId(null); return true; }
+    if (pageRef.current === 'profile' && selectedProfileId) { setSelectedProfileId(null); return true; }
+
     setIsNotificationPanelOpen(false);
     setExpandedReplyId(null);
 
@@ -3304,7 +3315,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-[#EEF6FF] text-2xl">🏷️</div>
       <h3 className="mt-4 text-2xl font-black text-[#081A45]">This master tag is no longer available.</h3>
       <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">It may have been deleted, hidden, or it is not visible to your account.</p>
-      <button type="button" onClick={closeMasterTagDetail} className="mt-5 rounded-2xl bg-[#1769FF] px-5 py-3 text-sm font-black text-white">Back to Master Taggedged</button>
+      <button type="button" onClick={closeMasterTagDetail} className="mt-5 rounded-2xl bg-[#1769FF] px-5 py-3 text-sm font-black text-white">Back to Master Tagged</button>
     </div>
   );
 
@@ -3352,7 +3363,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const renderMasterTagDetailPage = (showBackButton = true) => (
     <div className="space-y-4 pb-28 md:pb-0">
-      {showBackButton ? <button type="button" onClick={() => setPage('masterTags')} className="rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-black text-[#536178] shadow-sm transition hover:bg-[#EEF6FF]">← Back to Master Taggedged</button> : null}
+      {showBackButton ? <button type="button" onClick={() => setPage('masterTags')} className="rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-black text-[#536178] shadow-sm transition hover:bg-[#EEF6FF]">← Back to Master Tagged</button> : null}
       {renderMasterTagDetailContent()}
     </div>
   );
@@ -3397,7 +3408,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const renderMasterTagFilters = (compact = false) => (
     <div className={compact ? 'space-y-4' : 'rounded-[2rem] border border-[#D9E7F8] bg-gradient-to-br from-[#EEF6FF] via-white to-[#F8FBFF] p-5 shadow-[0_24px_70px_rgba(23,105,255,0.12)] sm:p-7'}>
-      <p className="text-xs font-black uppercase tracking-[0.28em] text-[#1769FF]">Master Taggedged</p><h2 className="mt-2 text-3xl font-black tracking-tight text-[#081A45] sm:text-5xl">A community wall of gratitude.</h2><p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-[#536178]">Discover masters through respectful appreciation posts, filter by category, and search names, subjects, authors, or message words.</p>
+      <p className="text-xs font-black uppercase tracking-[0.28em] text-[#1769FF]">Master Tagged</p><h2 className="mt-2 text-3xl font-black tracking-tight text-[#081A45] sm:text-5xl">A community wall of gratitude.</h2><p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-[#536178]">Discover masters through respectful appreciation posts, filter by category, and search names, subjects, authors, or message words.</p>
       <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto]"><input value={masterTagSearch} onChange={(event) => setMasterTagSearch(event.target.value)} placeholder="Search master tags…" className="h-12 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-sm font-bold outline-none focus:border-[#1769FF]" /><select value={masterTagSort} onChange={(event) => setMasterTagSort(event.target.value as typeof masterTagSort)} className="h-12 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-sm font-black text-[#081A45]"><option value="recent">Recent</option><option value="appreciated">Most appreciated</option><option value="trending">Trending</option></select></div>
       <div className="mt-4 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">{(['all', 'mine', 'following', 'verified'] as const).map((filter) => <button key={filter} type="button" onClick={() => setMasterTagsAudienceFilter(filter)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black capitalize ${masterTagsAudienceFilter === filter ? 'border-[#1769FF] bg-[#1769FF] text-white' : 'border-[#D9E7F8] bg-white text-[#536178]'}`}>{filter === 'all' ? 'All' : filter}</button>)}{(['All', ...masterTagCategories] as Array<'All' | (typeof masterTagCategories)[number]>).map((category) => <button key={category} type="button" onClick={() => setMasterTagFilter(category)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black ${masterTagFilter === category ? 'border-[#7B61FF] bg-[#7B61FF] text-white' : 'border-[#D9E7F8] bg-white text-[#536178]'}`}>{category}</button>)}</div>
     </div>
@@ -4104,7 +4115,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     { label: 'Creators', icon: '✍️', active: page === 'creators', action: () => pushPage('creators') },
     { label: 'Follow', icon: '🤝', active: page === 'network', action: () => pushPage('network') },
     { label: 'Following', icon: '👥', active: page === 'following', action: () => pushPage('following') },
-    { label: 'Master Taggedged', icon: '📚', active: page === 'tagMaster' || page === 'masterTags' || page === 'masterTagDetail', action: () => pushPage('masterTags') },
+    { label: 'Master Tagged', icon: '📚', active: page === 'tagMaster' || page === 'masterTags' || page === 'masterTagDetail', action: () => pushPage('masterTags') },
     { label: 'Profile', icon: '👤', active: page === 'profile' && !selectedProfileId, action: () => { setSelectedProfileId(null); pushPage('profile'); } },
   ];
 
@@ -4144,7 +4155,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const CommunityHeader = () => (
     <header className="sticky top-0 z-[1200] shrink-0 border-b border-[#D9E7F8] bg-white/94 px-3 py-2 shadow-[0_14px_36px_rgba(23,105,255,0.08)] backdrop-blur-2xl sm:px-5 lg:px-6 lg:py-3">
-      <div className="mx-auto grid max-w-[1500px] items-start gap-2 lg:grid-cols-[minmax(13rem,1fr)_minmax(15rem,auto)] lg:items-center lg:gap-3">
+      <div className="mx-auto grid max-w-[1500px] grid-cols-[minmax(0,1fr)_auto] items-start gap-2 lg:grid-cols-[minmax(13rem,1fr)_minmax(15rem,auto)] lg:items-center lg:gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={goBack} aria-label="Back from Community" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-[0_12px_30px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16">←</button>
           <div className="min-w-0">
@@ -4153,66 +4164,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           </div>
         </div>
 
-        <div className="hidden">
-          <button
-            type="button"
-            ref={communityAiButtonRef}
-            onClick={openCommunityAiMentor}
-            aria-label="Open Community AI Mentor"
-            className="inline-flex min-h-11 shrink-0 items-center gap-2 rounded-[1.35rem] border border-[#BFD7FF]/80 bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 py-2.5 text-xs font-black text-white shadow-[0_16px_38px_rgba(123,97,255,0.24)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_48px_rgba(123,97,255,0.30)] focus:outline-none focus:ring-4 focus:ring-[#7B61FF]/20 active:scale-95"
-          >
-            <span aria-hidden="true">✦</span>
-            <span>AI Mentor</span>
-          </button>
-          <nav aria-label="Community shortcut sections" className="flex min-w-0 max-w-[48rem] flex-1 items-center justify-center gap-1 overflow-x-auto rounded-[1.55rem] border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 shadow-[0_14px_36px_rgba(23,105,255,0.08)] custom-scrollbar">
-            {navItems.slice(0, 7).map((item) => (
-              <button
-                key={item.label}
-                type="button"
-                onClick={item.action}
-                aria-label={item.label}
-                aria-current={item.active ? 'page' : undefined}
-                className={`inline-flex min-h-10 shrink-0 items-center rounded-[1.15rem] px-3 py-2 text-xs font-black transition focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 ${item.active ? 'bg-white text-[#1769FF] shadow-[0_10px_24px_rgba(23,105,255,0.13)] ring-1 ring-[#D9E7F8]' : 'text-[#536178] hover:bg-white hover:text-[#081A45] hover:shadow-sm'}`}
-              >
-                <span className="mr-1.5" aria-hidden="true">{item.icon}</span>{item.label}
-              </button>
-            ))}
-          </nav>
-        </div>
-
         <div className="-mt-0.5 flex min-w-0 shrink-0 items-center justify-end gap-2 lg:mt-0">
+          <button type="button" onClick={() => onClose?.()} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] lg:inline-flex">← Leave</button>
+          <button type="button" ref={communityAiButtonRef} onClick={openCommunityAiMentor} aria-label="Open Community AI Mentor" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-xs font-black text-white shadow-[0_14px_32px_rgba(123,97,255,0.24)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[#7B61FF]/20 active:scale-95"><span aria-hidden="true">✦</span><span className="sr-only">AI</span></button>
           {page === 'chat' && activeView === 'feed' ? <div className="hidden min-w-0 items-center gap-1 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 md:flex">{feedFilterOptions.map((option) => <button key={option.key} type="button" onClick={() => setFeedFilter(option.key)} className={`min-h-9 shrink-0 rounded-xl px-3 text-[11px] font-black transition ${feedFilter === option.key ? 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-sm' : 'text-[#536178] hover:bg-white hover:text-[#1769FF]'}`}>{option.label}<span className="ml-1 opacity-80">{compactCount(option.count)}</span></button>)}</div> : null}
           {page === 'chat' && activeView === 'status' ? <div className="hidden items-center gap-1 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 md:flex"><button type="button" onClick={openStatusUploadFromTop} className="min-h-9 rounded-xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-3 text-[11px] font-black text-white">Create</button><button type="button" onClick={openMyStatusesFromTop} className="min-h-9 rounded-xl bg-white px-3 text-[11px] font-black text-[#081A45]">Your status</button><button type="button" onClick={() => setShowStatusRulesModal(true)} className="min-h-9 rounded-xl bg-white px-3 text-[11px] font-black text-[#1769FF]">Rules</button></div> : null}
-          {showCreateCta ? <button type="button" onClick={handleHeaderCreate} className="hidden rounded-2xl bg-gradient-to-r from-[#7B61FF] to-[#1769FF] px-4 py-3 text-xs font-black text-white shadow-[0_16px_38px_rgba(23,105,255,0.22)] transition hover:-translate-y-0.5 sm:inline-flex md:hidden">Create</button> : null}
+          {showCreateCta ? <button type="button" onClick={handleHeaderCreate} className="hidden rounded-2xl bg-gradient-to-r from-[#7B61FF] to-[#1769FF] px-4 py-3 text-xs font-black text-white shadow-[0_16px_38px_rgba(23,105,255,0.22)] transition hover:-translate-y-0.5 hidden">Create</button> : null}
           <button type="button" onClick={() => pushPage('network')} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-3 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] xl:flex">⌕ Search</button>
           <button type="button" onClick={() => { setSelectedProfileId(null); setProfileViewMode('overview'); pushPage('profile'); }} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#D9E7F8] bg-white text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF]" aria-label="Open profile"><Avatar value={profile.avatar} size="h-8 w-8" /></button>
-          <span className="hidden rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400] sm:inline-flex">🪙 {eduCoins}</span>
+          <span className="hidden rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400] lg:inline-flex">🪙 {eduCoins}</span>
           <div ref={notificationPanelRef} className="relative"><button type="button" onClick={() => setIsNotificationPanelOpen((open) => !open)} aria-expanded={isNotificationPanelOpen} aria-label="Community notifications" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16"><span aria-hidden="true">🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button></div>
         </div>
-      </div>
-      <div className="mt-1.5 flex min-w-0 items-center gap-2 overflow-hidden lg:hidden">
-        <button
-          type="button"
-          onClick={openCommunityAiMentor}
-          aria-label="Open Community AI Mentor"
-          className="flex min-h-11 shrink-0 items-center gap-1.5 rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-3 text-xs font-black text-white shadow-[0_14px_32px_rgba(123,97,255,0.24)] focus:outline-none focus:ring-4 focus:ring-[#7B61FF]/20 active:scale-95"
-        >
-          <span aria-hidden="true">✦</span><span>AI</span>
-        </button>
-        <nav aria-label="Community shortcut sections" className="flex min-w-0 flex-1 gap-2 overflow-x-auto rounded-[1.45rem] border border-[#D9E7F8] bg-[#F8FBFF]/85 p-1 custom-scrollbar">
-          {navItems.map((item) => (
-            <button
-              key={item.label}
-              type="button"
-              onClick={item.action}
-              aria-label={item.label}
-              aria-current={item.active ? 'page' : undefined}
-              className={`min-h-10 shrink-0 rounded-[1.15rem] px-3 text-xs font-black transition focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 ${item.active ? 'bg-white text-[#1769FF] shadow-sm ring-1 ring-[#D9E7F8]' : 'text-[#536178] hover:bg-white hover:text-[#081A45]'}`}
-            >
-              <span aria-hidden="true">{item.icon}</span> {item.label}
-            </button>
-          ))}
-        </nav>
       </div>
     </header>
   );
@@ -4280,7 +4242,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           className={`mt-4 flex w-full items-center gap-3 rounded-[1.6rem] border border-[#D9E7F8] bg-gradient-to-br from-white to-[#F8FBFF] p-3 text-left shadow-[0_16px_38px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_46px_rgba(123,97,255,0.13)] focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 ${sidebarExpanded ? 'justify-start' : 'justify-center'}`}
           title={memberName}
         >
-          <Avatar value={profile.avatar || '🧑‍🎓'} size="h-11 w-11" />
+          <Avatar value={profile.avatar} size="h-11 w-11" />
           {sidebarExpanded ? (
             <span className="min-w-0 flex-1">
               <span className="block truncate text-sm font-black text-[#081A45]">{memberName}</span>
@@ -4354,18 +4316,25 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       <div className="grid grid-cols-3 gap-1 sm:gap-2">
         {profilePosts.slice(0, 30).map((message) => {
           const type = message.postType || message.type || 'text';
+          const isPoll = type === 'poll';
+          const isImage = Boolean(message.imagePreview);
           return (
             <button key={message.id} type="button" onClick={() => openProfilePostDetail(message.id)} className="group relative aspect-square overflow-hidden bg-[#EEF6FF] text-left">
               <div className="absolute inset-0 bg-gradient-to-br from-[#EEF6FF] via-white to-[#DCEEFF]" />
-              {message.imagePreview ? renderUploadedImage(message.imagePreview, message.title, message.imageLayout || 'thumbnail') : (
-                <div className="relative flex h-full w-full flex-col justify-center gap-2 p-3 text-center">
+              {isImage ? (
+                <div className="absolute inset-0 scale-105 blur-[2px] opacity-70 transition duration-300 group-hover:scale-110 group-hover:blur-[1px]">{renderUploadedImage(message.imagePreview || '', message.title, message.imageLayout || 'thumbnail')}</div>
+              ) : (
+                <div className="absolute inset-0 flex h-full w-full flex-col justify-center gap-2 p-3 text-center blur-[2.5px] opacity-50 select-none">
                   <span className="mx-auto rounded-full bg-white/90 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#1769FF]">{type}</span>
-                  <span className="line-clamp-3 text-xs font-black leading-5 text-[#081B5C] sm:text-sm">{message.title}</span>
+                  <span className="line-clamp-3 text-xs font-black leading-5 text-[#081B5C] sm:text-sm">{message.title || (isPoll ? 'Poll post' : 'Text post')}</span>
                   {message.body ? <span className="hidden text-[11px] font-bold leading-4 text-[#536178] sm:line-clamp-2">{message.body}</span> : null}
                 </div>
               )}
-              <span className="absolute bottom-1 left-1 rounded-full bg-[#081A45]/80 px-2 py-1 text-[10px] font-black text-white">❤️ {message.likeCount || 0}</span>
-              <span className="absolute bottom-1 right-1 rounded-full bg-[#081A45]/80 px-2 py-1 text-[10px] font-black text-white">💬 {message.replyCount || message.replies.length}</span>
+              <div className="absolute inset-0 bg-gradient-to-t from-[#081A45]/64 via-white/10 to-white/42" />
+              <span className="absolute left-2 top-2 rounded-full bg-white/92 px-2 py-1 text-[10px] font-black uppercase tracking-[0.14em] text-[#1769FF] shadow-sm">{isPoll ? 'Poll' : isImage ? 'Image' : 'Text'}</span>
+              <span className="absolute inset-x-2 top-1/2 -translate-y-1/2 rounded-2xl border border-white/70 bg-white/82 px-2 py-2 text-center text-[11px] font-black text-[#081B5C] shadow-sm backdrop-blur-md">Tap to view full post</span>
+              <span className="absolute bottom-1 left-1 rounded-full bg-[#081A45]/84 px-2 py-1 text-[10px] font-black text-white">❤️ {message.likeCount || 0}</span>
+              <span className="absolute bottom-1 right-1 rounded-full bg-[#081A45]/84 px-2 py-1 text-[10px] font-black text-white">💬 {message.replyCount || message.replies.length}</span>
             </button>
           );
         })}

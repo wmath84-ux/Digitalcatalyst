@@ -24,7 +24,7 @@ export default defineConfig(({ mode }) => {
             start_url: '/',
             scope: '/',
             display: 'standalone',
-            orientation: 'any',
+            orientation: 'landscape',
             theme_color: '#2563eb',
             background_color: '#ffffff',
             categories: ['education', 'productivity'],

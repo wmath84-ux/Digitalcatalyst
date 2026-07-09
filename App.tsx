@@ -2255,7 +2255,7 @@ const App: React.FC = () => {
           name: data.name || data.generatedDisplayName || buildStableDisplayName(firebaseUser.uid || firebaseUser.email),
           email: data.email || firebaseUser.email || '',
           mobile: data.mobile || firebaseUser.phoneNumber || '',
-          photoURL: data.photoURL || '',
+          photoURL: data.photoURL || getFirebaseUserPhotoURL(firebaseUser),
           authProvider: data.authProvider || getFirebaseAuthProvider(firebaseUser),
           providerIds: data.providerIds || getProviderIds(firebaseUser),
           emailVerified: data.emailVerified ?? firebaseUser.emailVerified,
@@ -2283,7 +2283,7 @@ const App: React.FC = () => {
 
   function createFallbackUserFromFirebase(firebaseUser: FirebaseUser): User {
       const fallbackDisplayName = buildStableDisplayName(firebaseUser.uid || firebaseUser.email);
-      const fallbackPhotoURL = '';
+      const fallbackPhotoURL = getFirebaseUserPhotoURL(firebaseUser);
       return {
           uid: firebaseUser.uid,
           id: firebaseUser.uid,
@@ -2322,7 +2322,8 @@ const App: React.FC = () => {
       const generatedUsername = String(existing.generatedUsername || buildStableUsername(firebaseUser.uid || firebaseUser.email)).trim();
       const nextName = profile?.name || existingName || generatedDisplayName;
       const nextMobile = profile?.mobile || existing.mobile || firebaseUser.phoneNumber || '';
-      const nextPhotoURL = typeof existing.photoURL === 'string' ? existing.photoURL : '';
+      const firebasePhotoURL = getFirebaseUserPhotoURL(firebaseUser);
+      const nextPhotoURL = typeof existing.photoURL === 'string' && existing.photoURL.trim() ? existing.photoURL : firebasePhotoURL;
       const existingBalance = existing.coinBalance ?? existing.eduCoins ?? 0;
       const totalCoinsEarned = existing.totalCoinsEarned ?? existing.totalLifetimeCoins ?? existingBalance;
       const safeProfileFields = {
