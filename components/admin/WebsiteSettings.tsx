@@ -5,6 +5,7 @@ import { ServiceItem } from '../Services';
 import { FaqItem } from '../Faq';
 import { UpcomingFeatureItem } from '../UpcomingFeatures';
 import { defaultDockStyle, dockCustomizationItems } from '../BottomGlassDock';
+import PremiumImageUrlInput from '../common/PremiumImageUrlInput';
 
 const sectionNames: Record<HomepageSection['id'], string> = {
     hero: 'Hero Section',
@@ -538,14 +539,16 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                         <FormRow label="Website Name"><input type="text" value={(localSettings.content as any).siteName || 'Digital Catalyst'} onChange={e => handleNestedChange('content', 'siteName', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="Hero Title"><input type="text" value={localSettings.content.heroTitle} onChange={e => handleNestedChange('content', 'heroTitle', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
                         <FormRow label="Hero Subtitle"><textarea value={localSettings.content.heroSubtitle} onChange={e => handleNestedChange('content', 'heroSubtitle', e.target.value)} className="w-full p-2 border rounded" rows={3}></textarea></FormRow>
-                        <FormRow label="Hero Image" description="Upload a meaningful learning/course image from your local file.">
-                            <div className="space-y-3">
-                                {localSettings.content.heroImageUrl && <img src={localSettings.content.heroImageUrl} alt="Hero preview" className="h-36 w-full rounded-xl object-cover shadow-inner" />}
-                                <label className="inline-flex cursor-pointer items-center gap-2 rounded-xl bg-white/80 px-4 py-3 text-sm font-bold text-slate-900 hover:bg-primary">
-                                    Upload hero image
-                                    <input type="file" accept="image/*" onChange={handleHeroImageUpload} className="hidden" />
-                                </label>
-                            </div>
+                        <FormRow label="Hero Image URL" description="URL-first media mode. Paste a public hero image URL; file upload is preserved for future Storage setup.">
+                            <PremiumImageUrlInput
+                                value={localSettings.content.heroImageUrl || ''}
+                                onChange={(url) => handleNestedChange('content', 'heroImageUrl', url)}
+                                label="Hero image URL"
+                                previewAlt="Hero preview"
+                                aspect="video"
+                                compact
+                                helperText="Paste a public https hero image URL. File upload requires Firebase Storage, so URL media is the active path for now."
+                            />
                         </FormRow>
                     </div>
 

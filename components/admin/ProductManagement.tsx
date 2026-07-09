@@ -1900,6 +1900,12 @@ const ProductForm: React.FC<{
         event.target.value = '';
         if (!file) return;
 
+        if (!isStorageUploadEnabled()) {
+            setProductImageUploadError(getStorageDisabledMessage('Image'));
+            setImageMode('url');
+            return;
+        }
+
         const validation = validateProductImageUpload(file);
         if (!validation.valid) {
             setProductImageUploadError(validation.error || 'Please choose a valid image file.');
@@ -1922,7 +1928,7 @@ const ProductForm: React.FC<{
             setImageMode('upload');
             setProductImageUploadError('');
         } catch (error) {
-            const message = classifyAdminUploadError(error);
+            const message = getFriendlyStorageErrorMessage(error);
             console.error('Product image upload failed:', error);
             setProductImageUploadError(message);
         } finally {
@@ -2148,13 +2154,13 @@ const ProductForm: React.FC<{
                                     {imageMode === 'url' ? (
                                         <PremiumImageUrlInput value={(images || []).find(Boolean) || ''} onChange={(url) => setImages(url ? [url] : [])} onStatusChange={setProductImageUrlStatus} label="Product image URL" previewAlt="Primary product image" aspect="square" compact helperText="One valid https image URL will be saved into images and every productImages display slot." />
                                     ) : imageMode === 'upload' ? (
-                                        <div className="rounded-3xl border border-dashed border-cyan-300/60 bg-cyan-50/70 p-5 text-center"><p className="font-black text-cyan-800">Storage upload is currently disabled. Please use an image URL.</p><button type="button" onClick={() => productImageInputRef.current?.click()} disabled className="mt-3 w-full rounded-2xl bg-slate-200 p-4 font-black text-slate-500">Firebase upload kept for future use</button></div>
+                                        <div className="rounded-3xl border border-dashed border-cyan-300/60 bg-cyan-50/70 p-5 text-center"><p className="font-black text-cyan-800">{getStorageDisabledMessage('Image')}</p><p className="mt-2 text-xs font-bold text-cyan-700">Current mode: URL media. File upload stays preserved for future Firebase Storage setup.</p><button type="button" onClick={() => productImageInputRef.current?.click()} disabled className="mt-3 w-full rounded-2xl bg-slate-200 p-4 font-black text-slate-500">Upload File — Future / Storage required</button></div>
                                     ) : (
                                         <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-3xl border border-dashed border-purple-300/40 bg-purple-400/5 p-8 text-center font-black text-purple-700 hover:bg-purple-400/10 disabled:opacity-60">{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</button>
                                     )}
                                     <input ref={productImageInputRef} type="file" accept="image/*" onChange={handleProductImagesUpload} className="hidden" />
                                     {isUploadingProductImage && (
-                                        <p className="mt-3 text-sm font-bold text-cyan-700">Uploading image to Firebase... {productImageUploadProgress}% complete.</p>
+                                        <p className="mt-3 text-sm font-bold text-cyan-700">Uploading image with future Storage mode... {productImageUploadProgress}% complete.</p>
                                     )}
                                     {productImageUploadError && (
                                         <p className="mt-3 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{productImageUploadError}</p>

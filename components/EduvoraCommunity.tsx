@@ -9,6 +9,7 @@ import type { WebsiteSettings } from '../App';
 import { mergeCommunitySupportTickets, isSupportTicketNeedsAttention } from '../utils/communitySupportBadge';
 import CommunityAiMentor from './CommunityAiMentor';
 import PremiumImageUrlInput, { PremiumImageUrlStatus } from './common/PremiumImageUrlInput';
+import { getStorageDisabledMessage, isStorageUploadEnabled } from '../utils/mediaMode';
 import { isDemoMode } from '../utils/runtimeMode';
 
 interface EduvoraCommunityProps {
@@ -1047,7 +1048,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       const usageSnap = await transaction.get(usageRef);
       const usedTypes = quotaSnap.exists() ? (quotaSnap.data().usedTypes || {}) : {};
       const usedBytes = Number(usageSnap.exists() ? usageSnap.data().usedBytes : 0) || 0;
-      if (usedBytes + uploadBytes >= STORAGE_LOCK_BYTES) throw new Error('Community uploads are paused because Firebase Storage reached the 4GB safety limit.');
+      if (uploadBytes > 0 && usedBytes + uploadBytes >= STORAGE_LOCK_BYTES) throw new Error(getStorageDisabledMessage('Image'));
       const lastUsed = Number(usedTypes[type] || 0);
       if (isWithinRollingUploadLock(lastUsed)) {
         const unlockAt = new Date(lastUsed + DAILY_UPLOAD_LOCK_MS).toLocaleString();
@@ -1066,6 +1067,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const uploadCommunityImage = async (kind: 'creator-posts' | 'stories', localId: number, dataUrl: string) => {
     if (!dataUrl.startsWith('data:')) return { imageUrl: dataUrl, storagePath: undefined, uploadBytes: 0 };
+    if (!isStorageUploadEnabled()) return { imageUrl: '', storagePath: undefined, uploadBytes: 0 };
     const storagePath = `community/${kind}/${currentUserKey}/${localId}.jpg`;
     await uploadString(ref(storage, storagePath), dataUrl, 'data_url');
     return { imageUrl: await getDownloadURL(ref(storage, storagePath)), storagePath, uploadBytes: dataUrlBytes(dataUrl) };
@@ -1663,7 +1665,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return onSnapshot(doc(db, COMMUNITY_STORAGE_META, 'usage'), (snapshot) => {
       const usedBytes = Number(snapshot.data()?.usedBytes) || 0;
       setStorageUsedBytes(Math.max(0, usedBytes));
-      setLimitMessage(usedBytes >= STORAGE_LOCK_BYTES ? 'Firebase Storage 4GB safety limit reached. Uploads are locked for all users until expired 24-hour stories/posts are cleaned up.' : '');
+      setLimitMessage(usedBytes >= STORAGE_LOCK_BYTES && isStorageUploadEnabled() ? 'Storage upload safety limit reached. URL media publishing is still the active path for now.' : '');
     }, (error) => console.warn('Storage usage sync failed', error));
   }, [isCommunityAllowed]);
 
@@ -2522,7 +2524,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const handleImageUpload = (_event: React.ChangeEvent<HTMLInputElement>, _setName: (value: string) => void, _setPreview: (value: string) => void) => {
-    setComposerError('Storage upload is currently disabled. Please use an image URL.');
+    setComposerError(getStorageDisabledMessage('Image'));
   };
 
   const renderUploadedImage = (src: string, alt: string, mode: 'thumbnail' | 'original' = 'original', className = '') => {

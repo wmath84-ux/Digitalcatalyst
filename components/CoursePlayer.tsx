@@ -1058,7 +1058,7 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
     ? 'Google Drive preview is prepared. If access is blocked, set sharing to Anyone with the link.'
     : directPlayable
       ? 'Native playback is ready inside the course player.'
-      : 'Secure fallback mode is ready. Open externally if inline playback is blocked.';
+      : 'This media link needs public access. Open externally if inline playback is blocked.';
   const sourceBadge = file.sourceType === 'url' ? 'URL media' : file.provider === 'upload' ? 'Storage upload' : 'Hosted media';
 
   return (
@@ -1090,8 +1090,8 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
               </div>
               {directPlayable ? <audio src={file.url} controls className="w-full" onError={onError} /> : (
                 <div className="rounded-2xl border border-white/15 bg-white/10 p-4 text-sm font-bold leading-6 text-white/90">
-                  <p>Audio is hosted on {isDrive ? 'Google Drive' : 'an external provider'}. Tap open/play to access if inline playback is blocked.</p>
-                  {openUrl ? <a href={openUrl} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-xs font-black text-[#1769FF]">Open audio</a> : null}
+                  <p>Premium audio unavailable inline. This media link needs public access, so use the source button if playback is blocked.</p>
+                  {openUrl ? <a href={openUrl} target="_blank" rel="noopener noreferrer" className="mt-4 inline-flex rounded-xl bg-white px-4 py-2 text-xs font-black text-[#1769FF]">Open source</a> : null}
                 </div>
               )}
             </div>
@@ -1105,7 +1105,7 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
               <iframe title={file.name || 'Google Drive video preview'} src={previewUrl} className="h-full w-full border-0" allow="autoplay; fullscreen" allowFullScreen onError={onError} />
             </div>
           ) : (
-            <div className="rounded-[1.75rem] border border-dashed border-[#BFD7FF] bg-[#F8FBFF] p-8 text-center"><p className="text-lg font-black">This media link may not support direct playback.</p><p className="mt-2 text-sm font-bold text-[#536178]">It will open in a secure preview card. Use the external button if playback is blocked.</p></div>
+            <div className="rounded-[1.75rem] border border-dashed border-[#BFD7FF] bg-gradient-to-br from-[#EEF6FF] via-white to-[#F1EEFF] p-8 text-center"><p className="text-lg font-black">This media link needs public access.</p><p className="mt-2 text-sm font-bold text-[#536178]">Inline playback is blocked or unavailable. Use the source button to open the video safely.</p>{openUrl ? <a href={openUrl} target="_blank" rel="noopener noreferrer" className="mt-5 inline-flex rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-3 text-sm font-black text-white shadow-lg">Open video</a> : null}</div>
           )}
         </div>
       </section>

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { MEDIA_UPLOAD_FUTURE_MESSAGE, URL_FIRST_MEDIA_MODE_LABEL, getMediaModeHelperCopy, getStorageDisabledMessage } from '../../utils/mediaMode';
 
 export type PremiumImageUrlStatus = 'empty' | 'checking' | 'valid' | 'invalid';
 
@@ -24,7 +25,7 @@ export const IMAGE_URL_MESSAGES = {
   invalidHttps: 'Please paste a valid https image URL.',
   notLoading: 'This image link is not loading. Try another public image URL.',
   ready: 'Image ready to publish.',
-  storageDisabled: 'Direct image upload is disabled for now. Use image URL.',
+  storageDisabled: getStorageDisabledMessage('Image'),
   saved: 'Image URL saved successfully.',
 };
 
@@ -91,6 +92,7 @@ const PremiumImageUrlInput: React.FC<PremiumImageUrlInputProps> = ({
     return () => { cancelled = true; };
   }, [trimmed, onStatusChange]);
 
+  const modeCopy = getMediaModeHelperCopy('image');
   const badge = useMemo(() => status === 'valid' ? 'Image ready' : status === 'checking' ? 'Checking…' : status === 'invalid' && trimmed ? 'Broken link' : 'URL required', [status, trimmed]);
 
   const handleProviderFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -113,8 +115,8 @@ const PremiumImageUrlInput: React.FC<PremiumImageUrlInputProps> = ({
         <div>
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#7B61FF]">Paste Image URL</p>
-              <label className="mt-1 block text-lg font-black text-[#081A45]">{label}</label>
+              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#7B61FF]">{URL_FIRST_MEDIA_MODE_LABEL}</p>
+              <label className="mt-1 block text-lg font-black text-[#081A45]">{label || modeCopy.primaryAction}</label>
             </div>
             <button type="button" onClick={() => setHelperOpen(open => !open)} className="rounded-2xl border border-[#BFD7FF] bg-[#EEF6FF] px-4 py-2 text-xs font-black text-[#1769FF]">Need image URL?</button>
           </div>
@@ -124,11 +126,11 @@ const PremiumImageUrlInput: React.FC<PremiumImageUrlInputProps> = ({
           {helperOpen ? (
             <div className="mt-4 rounded-[1.5rem] border border-[#D9E7F8] bg-gradient-to-br from-[#F8FBFF] via-white to-[#F1EEFF] p-4">
               <h3 className="text-base font-black text-[#081A45]">Smart Image-to-URL Helper</h3>
-              <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">Image URL generate karne ke liye image ko kisi public image hosting service par upload karna hota hai. Firebase Storage abhi disabled hai, isliye direct website ke andar permanent image URL tabhi banega jab external image hosting provider connect hoga.</p>
+              <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">{modeCopy.helper}</p>
               {providerReady ? (
                 <label className="mt-4 inline-flex cursor-pointer rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 py-3 text-sm font-black text-white shadow-lg"><input type="file" accept="image/*" onChange={handleProviderFile} className="hidden" />{providerBusy ? 'Generating URL…' : `Generate with ${provider?.label || 'connected provider'}`}</label>
               ) : (
-                <div className="mt-4 space-y-3 text-sm font-bold text-[#081A45]"><p className="rounded-2xl bg-white/80 p-3">1. Image ko public hosting service par upload karo.<br />2. Direct image link copy karo.<br />3. Yahan paste karo, preview check karo, phir save karo.</p><a href="https://postimages.org/" target="_blank" rel="noreferrer" className="inline-flex rounded-2xl border border-[#BFD7FF] bg-white px-4 py-3 text-sm font-black text-[#1769FF]">Open Image URL Generator</a><p className="text-xs text-[#C5221F]">{IMAGE_URL_MESSAGES.storageDisabled}</p></div>
+                <div className="mt-4 space-y-3 text-sm font-bold text-[#081A45]"><p className="rounded-2xl bg-white/80 p-3">1. Image ko public hosting service par upload karo.<br />2. Direct image link copy karo.<br />3. Yahan paste karo, preview check karo, phir save karo.</p><div className="rounded-2xl bg-white/80 p-3 text-xs text-[#7C879A]">{MEDIA_UPLOAD_FUTURE_MESSAGE}</div><a href="https://postimages.org/" target="_blank" rel="noreferrer" className="inline-flex rounded-2xl border border-[#BFD7FF] bg-white px-4 py-3 text-sm font-black text-[#1769FF]">Open Image URL Generator</a><p className="text-xs text-[#C5221F]">{IMAGE_URL_MESSAGES.storageDisabled}</p></div>
               )}
             </div>
           ) : null}
