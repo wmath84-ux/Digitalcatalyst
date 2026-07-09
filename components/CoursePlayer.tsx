@@ -910,8 +910,8 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   }[theme];
 
   return (
-    <div className="relative flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-white/70 text-slate-900 backdrop-blur-xl">
-      <div className="open-docs-toolbar flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-b border-[#D9E7F8] bg-white/82 p-2 shadow-sm backdrop-blur-xl sm:gap-2 sm:p-3 custom-scrollbar">
+    <div className="relative flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-white text-slate-900">
+      <div className="open-docs-toolbar flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-b border-[#D9E7F8] bg-white p-2 shadow-sm sm:gap-2 sm:p-3 custom-scrollbar">
         <button type="button" onClick={() => setIsSidebarOpen(value => !value)} className={`min-h-11 shrink-0 rounded-2xl border px-4 py-2 text-xs font-black uppercase tracking-widest shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/45 ${isSidebarOpen ? 'border-[#7B61FF] bg-gradient-to-r from-[#5B4BFF] to-[#7B61FF] text-white' : 'border-[#D9E7F8] bg-white/90 text-[#5B4BFF] hover:bg-[#F7F5FF]'}`} aria-label={isSidebarOpen ? 'Close Open Docs panel' : 'Open Open Docs panel'} aria-expanded={isSidebarOpen} aria-controls="open-docs-panel">Open Docs</button>
         <button type="button" onClick={() => { saveCurrentPage(); setIsReadingMode(true); }} className="min-h-11 shrink-0 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-2 text-xs font-black uppercase tracking-widest text-[#536178] shadow-sm transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF] hover:shadow-md">Reading Mode</button>
         {(smartDocToolbarCommands || []).map(([cmd, label]) => (<button key={cmd} type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand(cmd)} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 shadow-sm transition active:scale-95 hover:bg-white/90 hover:shadow-sm">{label}</button>))}
@@ -935,7 +935,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
             aria-labelledby={panelTitleId}
             aria-describedby={panelDescriptionId}
             tabIndex={-1}
-            className={`${isCompactDocs ? 'fixed inset-y-0 left-0 z-20 w-[min(92svw,24rem)] max-w-full rounded-r-[2rem] border-r border-[#D9E7F8] bg-white/96 shadow-[0_24px_70px_rgba(8,26,69,0.24)]' : 'absolute left-4 top-4 z-20 h-[calc(100%-2rem)] w-[21rem] rounded-[1.75rem] border border-[#D9E7F8] bg-white/88 shadow-[0_24px_70px_rgba(91,75,255,0.16)]'} flex min-h-0 flex-col overflow-hidden outline-none backdrop-blur-2xl transition-transform duration-300`}
+            className={`${isCompactDocs ? 'fixed inset-y-0 left-0 z-20 w-[min(92svw,24rem)] max-w-full rounded-r-[2rem] border-r border-[#D9E7F8] bg-white shadow-[0_24px_70px_rgba(8,26,69,0.24)]' : 'absolute left-4 top-4 z-20 h-[calc(100%-2rem)] w-[21rem] rounded-[1.75rem] border border-[#D9E7F8] bg-white shadow-[0_24px_70px_rgba(91,75,255,0.16)]'} flex min-h-0 flex-col overflow-hidden outline-none transition-transform duration-300`}
             style={isCompactDocs ? { paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' } : undefined}
           >
             <div className="shrink-0 border-b border-[#E3E8F5] bg-gradient-to-br from-white via-[#F8FBFF] to-[#F1EEFF] p-4">
@@ -954,7 +954,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
                 <div className="space-y-2.5">{pages.map(page => {
                   const selected = page.id === activePageId;
                   return (
-                    <button key={page.id} type="button" onClick={() => { selectPage(page.id); if (isCompactDocs) setIsSidebarOpen(false); }} aria-current={selected ? 'page' : undefined} className={`min-h-16 w-full rounded-2xl border px-4 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/45 ${selected ? 'border-[#B7E7FF] bg-gradient-to-br from-[#F1EEFF] via-white to-[#EAFBFF] text-[#081A45] shadow-[0_14px_34px_rgba(91,75,255,0.12)]' : 'border-[#E3E8F5] bg-white/82 text-[#536178] hover:border-[#C9C2FF] hover:bg-[#F8FBFF]'}`}>
+                    <button key={page.id} type="button" onClick={() => { selectPage(page.id); if (isCompactDocs) setIsSidebarOpen(false); }} aria-current={selected ? 'page' : undefined} className={`min-h-16 w-full rounded-2xl border px-4 py-3 text-left transition focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/45 ${selected ? 'border-[#B7E7FF] bg-gradient-to-br from-[#F1EEFF] via-white to-[#EAFBFF] text-[#081A45] shadow-[0_14px_34px_rgba(91,75,255,0.12)]' : 'border-[#E3E8F5] bg-white text-[#536178] hover:border-[#C9C2FF] hover:bg-[#F8FBFF]'}`}>
                       <span className="block truncate text-sm font-black">{page.title}</span>
                       <span className="mt-1 block truncate text-xs font-bold text-[#7C879A]">{getMeaningfulDocText(page.content).slice(0, 64) || 'Empty page'}</span>
                       <span className="mt-1 block text-[10px] font-black uppercase tracking-widest text-[#9AA4B5]">Updated {new Date(page.updatedAt || Date.now()).toLocaleDateString()}</span>
