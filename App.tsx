@@ -517,6 +517,7 @@ export interface Order {
     shippingAddress: string;
     billingAddress: string;
     paymentBreakdown?: OrderPaymentBreakdown;
+    customerUid?: string | null;
 }
 
 // New Support Ticket interface, centralized here
@@ -1212,15 +1213,24 @@ const App: React.FC = () => {
   }, [effectiveFirebaseUser?.uid, isLocalLogoutPending]);
 
   useEffect(() => {
-    const updateMobileViewport = () => setIsMobileViewport(getIsMobileViewport());
-    updateMobileViewport();
     if (typeof window === 'undefined') return;
+    let rafId = 0;
+    const updateMobileViewport = () => {
+      window.cancelAnimationFrame(rafId);
+      rafId = window.requestAnimationFrame(() => setIsMobileViewport(getIsMobileViewport()));
+    };
+    updateMobileViewport();
     const media = window.matchMedia('(max-width: 768px)');
     media.addEventListener?.('change', updateMobileViewport);
     window.addEventListener('resize', updateMobileViewport, { passive: true });
+    window.addEventListener('orientationchange', updateMobileViewport, { passive: true });
+    window.visualViewport?.addEventListener('resize', updateMobileViewport);
     return () => {
+      window.cancelAnimationFrame(rafId);
       media.removeEventListener?.('change', updateMobileViewport);
       window.removeEventListener('resize', updateMobileViewport);
+      window.removeEventListener('orientationchange', updateMobileViewport);
+      window.visualViewport?.removeEventListener('resize', updateMobileViewport);
     };
   }, []);
 
@@ -1885,8 +1895,10 @@ const App: React.FC = () => {
   };
 
   const addGlobalOrder = (order: Order) => {
-    setOrders(prevOrders => [order, ...prevOrders.filter(existingOrder => existingOrder.id !== order.id)]);
-    void setDoc(doc(db, GLOBAL_ORDERS_COLLECTION, String(order.id)), stripUndefinedDeep({ ...order, customerUid: auth.currentUser?.uid || currentUser?.id || null }), { merge: false })
+    const customerUid = auth.currentUser?.uid || currentUser?.id || null;
+    const orderWithCustomerUid: Order = { ...order, customerUid };
+    setOrders(prevOrders => [orderWithCustomerUid, ...prevOrders.filter(existingOrder => existingOrder.id !== orderWithCustomerUid.id)]);
+    void setDoc(doc(db, GLOBAL_ORDERS_COLLECTION, String(orderWithCustomerUid.id)), stripUndefinedDeep(orderWithCustomerUid), { merge: false })
       .catch(error => logGlobalSyncWarning('Order create', error));
   };
 
@@ -4396,7 +4408,7 @@ const App: React.FC = () => {
         return isLoggedIn ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
       case 'profile':
         if (!isAuthStateReady) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
-        return isLoggedIn && appUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={appUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+        return isLoggedIn && appUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={appUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} orders={orders} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={() => handleNavigateBack('home')} onActivatePlan={handleActivateSubscription} currentUser={appUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={() => handleNavigateBack('home')} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onClearWishlist={handleClearWishlist} coupons={coupons} />;

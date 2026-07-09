@@ -1,6 +1,6 @@
 import React from 'react';
 import { collection, onSnapshot, orderBy, query } from 'firebase/firestore';
-import { ActiveCoinDiscount, CoinTransaction, Coupon, ProductWithRating, ProfileMilestoneConfig, ProfileStreakConfig, ProfileStreakMetric, ProfileMilestoneMetric, ThemeName, themes, User, WebsiteSettings } from '../App';
+import { ActiveCoinDiscount, CoinTransaction, Coupon, Order, ProductWithRating, ProfileMilestoneConfig, ProfileStreakConfig, ProfileStreakMetric, ProfileMilestoneMetric, ThemeName, themes, User, WebsiteSettings } from '../App';
 import { EconomySettings, resolveCoinPrice, resolveMaxDiscountPercentage } from '../utils/economy';
 import { db } from '../firebase';
 import UserAvatar from './common/UserAvatar';
@@ -16,6 +16,7 @@ interface ProfilePageProps {
   purchasedProducts: ProductWithRating[];
   products: ProductWithRating[];
   coupons: Coupon[];
+  orders: Order[];
   onBack: () => void;
   onExplore: () => void;
   activeTheme: ThemeName;
@@ -83,6 +84,12 @@ const fallbackMilestoneConfigs: ProfileMilestoneConfig[] = [
 ];
 
 const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
+const formatRupees = (value: number) => `₹${Math.max(0, value).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
+const parseRupeeAmount = (value: unknown) => {
+  const text = String(value || '');
+  const match = text.match(/(?:₹|Rs\.?|INR)?\s*([0-9][0-9,]*(?:\.\d+)?)/i);
+  return match ? Number(match[1].replace(/,/g, '')) || 0 : 0;
+};
 
 const formatLedgerTime = (value: string) => {
   const date = new Date(value);
@@ -106,6 +113,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   purchasedProducts,
   products,
   coupons,
+  orders,
   onBack,
   onExplore,
   activeTheme,
@@ -188,6 +196,23 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const watchTimeMinutes = currentUser?.totalWatchTimeMinutes ?? studyMinutes;
   const eduPoints = profileCoinWallet.coinBalance;
   const totalLifetimeCoins = profileCoinWallet.totalCoinsEarned || eduPoints;
+  const normalizedProfileEmail = String(currentUser?.email || '').trim().toLowerCase();
+  const profileUserIds = React.useMemo(() => new Set([currentUser?.id, currentUser?.uid].filter(Boolean).map(String)), [currentUser?.id, currentUser?.uid]);
+  const profileCompletedOrders = React.useMemo(() => orders.filter((order) => {
+    if (order.status !== 'Completed') return false;
+    const orderIdentity = order as Order & { userId?: string | null; uid?: string | null; buyerUid?: string | null; buyerId?: string | null };
+    const orderIds = [orderIdentity.customerUid, orderIdentity.userId, orderIdentity.uid, orderIdentity.buyerUid, orderIdentity.buyerId].filter(Boolean).map(String);
+    const idMatches = orderIds.some((id) => profileUserIds.has(id));
+    const emailMatches = normalizedProfileEmail && String(order.customerEmail || '').trim().toLowerCase() === normalizedProfileEmail;
+    return Boolean(idMatches || emailMatches);
+  }), [orders, profileUserIds, normalizedProfileEmail]);
+  const totalFiatSpent = React.useMemo(() => profileCompletedOrders.reduce((total, order) => {
+    const finalPrice = Number(order.paymentBreakdown?.finalPrice);
+    if (Number.isFinite(finalPrice)) return total + Math.max(0, finalPrice);
+    const totalLabel = String(order.total || '');
+    if (/🪙|educoin|coin/i.test(totalLabel) && !/₹|rs\.?|inr/i.test(totalLabel)) return total;
+    return total + parseRupeeAmount(totalLabel);
+  }, 0), [profileCompletedOrders]);
   const profileStyle = { ...fallbackProfileStyle, ...((settings.content as any).profileStyle || {}) };
   const profileStreakConfigs = (((settings.content as any).profileStreaks || fallbackStreakConfigs) as ProfileStreakConfig[])
     .filter(streak => streak.active !== false && !streak.draft && !streak.archived && Number(streak.goal) > 0)
@@ -495,9 +520,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
               <h2 className="mt-1 text-3xl font-black text-slate-900">{profileCoinWallet.coinBalance} EduCoins</h2>
               <p className="mt-1 text-sm text-slate-500">Start watching eligible YouTube course videos to earn.</p>
             </div>
-            <div className="grid grid-cols-2 gap-3">
+            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
               <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-center"><p className="text-xs text-slate-500">Lifetime earned</p><p className="text-lg font-bold text-emerald-700">{profileCoinWallet.totalCoinsEarned}</p></div>
-              <div className="rounded-2xl bg-rose-50 px-4 py-3 text-center"><p className="text-xs text-slate-500">Spent</p><p className="text-lg font-bold text-rose-700">{profileCoinWallet.totalCoinsSpent}</p></div>
+              <div className="rounded-2xl bg-blue-50 px-4 py-3 text-center"><p className="text-xs text-slate-500">Total spent</p><p className="text-lg font-bold text-blue-700">{formatRupees(totalFiatSpent)}</p></div>
+              <div className="rounded-2xl bg-rose-50 px-4 py-3 text-center"><p className="text-xs text-slate-500">Coins spent</p><p className="text-lg font-bold text-rose-700">{profileCoinWallet.totalCoinsSpent}</p></div>
             </div>
           </div>
           {profileCoinError && <p className="mt-3 rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{profileCoinError}</p>}

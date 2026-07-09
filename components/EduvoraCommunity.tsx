@@ -3800,8 +3800,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [activeConversationId, activeNavItem.label, activeView, allCreators, page, profile.name, selectedMasterTag, selectedMessage.body, selectedMessage.title, selectedStatus.caption]);
 
   const CommunityHeader = () => (
-    <header className="sticky top-0 z-[1200] shrink-0 border-b border-[#D9E7F8] bg-white/92 px-3 py-2.5 shadow-[0_14px_36px_rgba(23,105,255,0.08)] backdrop-blur-2xl sm:px-5 lg:px-6 lg:py-3">
-      <div className="mx-auto grid max-w-[1500px] items-center gap-3 lg:grid-cols-[minmax(13rem,0.78fr)_minmax(28rem,1.35fr)_minmax(15rem,0.78fr)]">
+    <header className="sticky top-0 z-[1200] shrink-0 border-b border-[#D9E7F8] bg-white/94 px-3 py-2 shadow-[0_14px_36px_rgba(23,105,255,0.08)] backdrop-blur-2xl sm:px-5 lg:px-6 lg:py-3">
+      <div className="mx-auto grid max-w-[1500px] items-start gap-2 lg:grid-cols-[minmax(13rem,1fr)_minmax(15rem,auto)] lg:items-center lg:gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={goBack} aria-label="Back from Community" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-[0_12px_30px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16">←</button>
           <div className="min-w-0">
@@ -3810,7 +3810,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           </div>
         </div>
 
-        <div className="hidden min-w-0 items-center justify-center gap-2 lg:flex">
+        <div className="hidden">
           <button
             type="button"
             ref={communityAiButtonRef}
@@ -3837,7 +3837,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           </nav>
         </div>
 
-        <div className="flex min-w-0 shrink-0 items-center justify-end gap-2">
+        <div className="-mt-0.5 flex min-w-0 shrink-0 items-center justify-end gap-2 lg:mt-0">
           {showCreateCta ? <button type="button" onClick={handleHeaderCreate} className="hidden rounded-2xl bg-gradient-to-r from-[#7B61FF] to-[#1769FF] px-4 py-3 text-xs font-black text-white shadow-[0_16px_38px_rgba(23,105,255,0.22)] transition hover:-translate-y-0.5 sm:inline-flex">Create</button> : null}
           <button type="button" onClick={() => pushPage('network')} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-3 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] md:flex">⌕ Search</button>
           <button type="button" onClick={() => pushPage('profile')} className="flex min-w-0 items-center gap-2 rounded-full border border-[#D9E7F8] bg-white px-2 py-2 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] sm:px-3"><Avatar value={profile.avatar || '🧑‍🎓'} size="h-8 w-8" /><span className="hidden max-w-[8rem] truncate sm:inline">{profile.name || 'Eduvora Member'}</span></button>
@@ -3845,7 +3845,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <div ref={notificationPanelRef} className="relative"><button type="button" onClick={() => setIsNotificationPanelOpen((open) => !open)} aria-expanded={isNotificationPanelOpen} aria-label="Community notifications" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16"><span aria-hidden="true">🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button></div>
         </div>
       </div>
-      <div className="mt-2 flex min-w-0 items-center gap-2 overflow-hidden lg:hidden">
+      <div className="mt-1.5 flex min-w-0 items-center gap-2 overflow-hidden lg:hidden">
         <button
           type="button"
           onClick={openCommunityAiMentor}
