@@ -1065,7 +1065,59 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
       : 'This media link needs public access. Open externally if inline playback is blocked.';
   const sourceBadge = normalizedMedia.isLegacy ? 'Legacy safe media' : normalizedMedia.sourceType === 'url' ? 'URL media' : normalizedMedia.provider === 'firebase-storage' ? 'Storage media' : 'Hosted media';
   const [mediaFailed, setMediaFailed] = useState(false);
+  const mediaBodyRef = useRef<HTMLDivElement | null>(null);
+  const [mediaBodySize, setMediaBodySize] = useState({ width: 0, height: 0 });
+
   useEffect(() => { setMediaFailed(false); }, [file.id, openUrl, previewUrl]);
+
+  useEffect(() => {
+    const body = mediaBodyRef.current;
+    if (!body) return;
+
+    let frame = 0;
+    const updateSize = () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        const rect = body.getBoundingClientRect();
+        const width = Math.max(0, Math.round(rect.width));
+        const height = Math.max(0, Math.round(rect.height));
+        setMediaBodySize(previous => previous.width === width && previous.height === height ? previous : { width, height });
+      });
+    };
+
+    updateSize();
+    const observer = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(updateSize) : null;
+    observer?.observe(body);
+    window.addEventListener('resize', updateSize);
+    window.addEventListener('orientationchange', updateSize);
+    window.visualViewport?.addEventListener('resize', updateSize);
+    window.visualViewport?.addEventListener('scroll', updateSize);
+
+    return () => {
+      if (frame) window.cancelAnimationFrame(frame);
+      observer?.disconnect();
+      window.removeEventListener('resize', updateSize);
+      window.removeEventListener('orientationchange', updateSize);
+      window.visualViewport?.removeEventListener('resize', updateSize);
+      window.visualViewport?.removeEventListener('scroll', updateSize);
+    };
+  }, [file.id, isAudio, previewUrl]);
+
+  const driveVideoShellStyle = useMemo<React.CSSProperties | undefined>(() => {
+    if (isAudio || !mediaBodySize.width || !mediaBodySize.height) return undefined;
+    const availableWidth = Math.max(0, mediaBodySize.width - 2);
+    const availableHeight = Math.max(0, mediaBodySize.height - 2);
+    const fittedWidth = Math.min(availableWidth, availableHeight * (16 / 9));
+    const fittedHeight = fittedWidth * (9 / 16);
+    if (!Number.isFinite(fittedWidth) || !Number.isFinite(fittedHeight) || fittedWidth < 1 || fittedHeight < 1) return undefined;
+    return {
+      width: `${Math.floor(fittedWidth)}px`,
+      height: `${Math.floor(fittedHeight)}px`,
+      maxWidth: '100%',
+      maxHeight: '100%',
+    };
+  }, [isAudio, mediaBodySize.height, mediaBodySize.width]);
+
   const handleMediaError = () => { setMediaFailed(true); onError?.(); };
 
   return (
@@ -1089,17 +1141,17 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
             <span className="rounded-full bg-white px-3 py-1 shadow-sm">Payment / EduCoin locks unchanged</span>
           </div>
         </div>
-        <div className="course-drive-media-body p-4 sm:p-6">
+        <div ref={mediaBodyRef} className="course-drive-media-body p-4 sm:p-6">
           {isAudio ? (
-            <div className="rounded-[1.75rem] border border-[#D9E7F8] bg-gradient-to-br from-[#081A45] via-[#153EA8] to-[#7B61FF] p-5 text-white shadow-inner">
-              <div className="mb-5 flex h-24 items-end gap-1.5 overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-4">
+            <div className="course-drive-audio-stage rounded-[1.75rem] border border-[#D9E7F8] bg-gradient-to-br from-[#081A45] via-[#153EA8] to-[#7B61FF] p-5 text-white shadow-inner">
+              <div className="course-drive-audio-waveform mb-5 flex h-24 items-end gap-1.5 overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-4">
                 {Array.from({ length: 34 }).map((_, index) => <span key={index} className="w-full rounded-full bg-white/75" style={{ height: `${20 + ((index * 17) % 72)}%` }} />)}
               </div>
               {directPlayable && !mediaFailed ? (
                 <audio src={openUrl} controls className="w-full" onError={handleMediaError} />
               ) : isDrive && previewUrl && !mediaFailed ? (
-                <div className="overflow-hidden rounded-2xl border border-white/15 bg-black/30 shadow-2xl">
-                  <iframe title={file.name || 'Google Drive audio preview'} src={previewUrl} className="h-64 w-full border-0 bg-white sm:h-80" allow="autoplay; fullscreen" allowFullScreen onError={handleMediaError} />
+                <div className="course-drive-audio-shell overflow-hidden rounded-2xl border border-white/15 bg-black/30 shadow-2xl">
+                  <iframe title={file.name || 'Google Drive audio preview'} src={previewUrl} className="course-drive-audio-iframe h-64 w-full border-0 bg-white sm:h-80" allow="autoplay; fullscreen" allowFullScreen onError={handleMediaError} />
                 </div>
               ) : (
                 <MediaFallbackCard title={file.name || 'Audio lesson'} badge={isDrive ? 'Drive audio' : 'Audio'} icon="🎧" message={isDrive ? 'This Drive file needs public access.' : 'Audio source unavailable'} actionHref={openUrl} actionLabel={isDrive ? 'Open in Drive' : 'Open source'} aspect="auto" className="min-h-40 rounded-2xl border-white/15" />
@@ -1111,7 +1163,7 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
               {showFullscreen ? <button type="button" onClick={onVideoFullscreen} className="absolute bottom-4 right-4 rounded-full border border-white/25 bg-black/75 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white backdrop-blur-md">⛶ Fullscreen</button> : null}
             </div>
           ) : isDrive && previewUrl && !mediaFailed ? (
-            <div className="course-drive-video-shell aspect-video overflow-hidden rounded-[1.75rem] border border-[#D9E7F8] bg-black shadow-2xl">
+            <div className="course-drive-video-shell aspect-video overflow-hidden rounded-[1.75rem] border border-[#D9E7F8] bg-black shadow-2xl" style={driveVideoShellStyle}>
               <iframe title={file.name || 'Google Drive video preview'} src={previewUrl} className="course-drive-video-iframe h-full w-full border-0" allow="autoplay; fullscreen" allowFullScreen onError={handleMediaError} />
             </div>
           ) : (

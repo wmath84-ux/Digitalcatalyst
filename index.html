@@ -138,38 +138,112 @@
         isolation: isolate;
       }
 
-      /* Mobile Drive URL video portrait UX patch */
-      .course-drive-video-iframe {
+      /* Course Player fixed Drive URL media shell */
+      .course-drive-video-iframe,
+      .course-drive-audio-iframe {
         display: block;
-        width: 100%;
+        width: 100% !important;
+        height: 100% !important;
+        border: 0 !important;
+      }
+
+      .course-drive-media-viewport {
         height: 100%;
-        border: 0;
+        min-height: 0;
+        align-items: stretch !important;
+        overflow: hidden !important;
+        padding: clamp(0.35rem, 1.35vmin, 1.25rem) !important;
+      }
+
+      .course-drive-media-card {
+        display: flex;
+        flex-direction: column;
+        width: 100% !important;
+        height: 100% !important;
+        max-width: min(100%, 78rem) !important;
+        max-height: 100% !important;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden !important;
+      }
+
+      .course-drive-media-header,
+      .course-drive-media-toolbar {
+        flex: 0 0 auto;
+      }
+
+      .course-drive-media-body {
+        display: flex;
+        flex: 1 1 auto;
+        align-items: center !important;
+        justify-content: center !important;
+        width: 100%;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden !important;
+        padding: clamp(0.35rem, 1.55vmin, 1.25rem) !important;
+      }
+
+      .course-drive-video-shell {
+        position: relative;
+        display: block;
+        width: 100% !important;
+        height: auto !important;
+        max-width: 100% !important;
+        max-height: 100% !important;
+        aspect-ratio: 16 / 9 !important;
+        margin: auto !important;
+        contain: layout paint size;
+      }
+
+      .course-drive-video-iframe {
+        position: absolute;
+        inset: 0;
         background: #000;
+      }
+
+      .course-drive-audio-stage {
+        display: flex;
+        flex-direction: column;
+        width: min(100%, 64rem) !important;
+        max-height: 100% !important;
+        min-width: 0;
+        min-height: 0;
+        overflow: hidden !important;
+        padding: clamp(0.75rem, 2vmin, 1.25rem) !important;
+      }
+
+      .course-drive-audio-waveform {
+        flex: 0 0 clamp(3.25rem, 18vh, 6rem) !important;
+        height: auto !important;
+        min-height: 3.25rem;
+        margin-bottom: clamp(0.55rem, 1.4vmin, 1.25rem) !important;
+      }
+
+      .course-drive-audio-shell {
+        flex: 1 1 auto;
+        width: 100%;
+        min-height: clamp(9rem, 38vh, 20rem);
+        max-height: 100%;
+        overflow: hidden !important;
+      }
+
+      .course-drive-audio-iframe {
+        min-height: clamp(9rem, 38vh, 20rem);
+        background: #fff;
       }
 
       @media (max-width: 767px) {
         .course-drive-media-viewport {
-          align-items: stretch !important;
-          justify-content: center !important;
-          overflow: hidden !important;
-          padding: 0.2rem !important;
+          padding: 0.25rem !important;
         }
 
         .course-drive-media-card {
-          display: flex;
-          flex-direction: column;
-          width: 100% !important;
-          height: 100% !important;
           max-width: none !important;
-          min-width: 0;
-          min-height: 0;
-          margin: 0 auto !important;
           border-radius: 1.15rem !important;
-          overflow: hidden !important;
         }
 
         .course-drive-media-header {
-          flex: 0 0 auto;
           padding: 0.62rem 0.7rem 0.38rem !important;
           gap: 0.28rem !important;
           border-bottom: 0 !important;
@@ -187,38 +261,35 @@
         }
 
         .course-drive-media-body {
-          container-type: size;
-          display: flex;
-          flex: 1 1 auto;
-          align-items: stretch !important;
-          justify-content: center !important;
-          width: 100%;
-          min-width: 0;
-          min-height: 0;
-          overflow: hidden !important;
-          padding: 0.2rem 0.3rem 0.38rem !important;
+          padding: 0.25rem 0.3rem 0.4rem !important;
         }
 
         .course-drive-video-shell {
-          width: 100% !important;
-          height: 100% !important;
-          max-width: 100% !important;
-          max-height: 100% !important;
-          margin: 0 auto !important;
-          aspect-ratio: 9 / 16 !important;
+          aspect-ratio: 16 / 9 !important;
           border-radius: 1.15rem !important;
         }
 
-        .course-drive-video-iframe {
+        .course-drive-audio-stage {
           width: 100% !important;
-          height: 100% !important;
+          padding: 0.85rem !important;
+          border-radius: 1.15rem !important;
+        }
+
+        .course-drive-audio-waveform {
+          flex-basis: clamp(3rem, 14vh, 4.75rem) !important;
+          min-height: 3rem;
+        }
+
+        .course-drive-audio-shell,
+        .course-drive-audio-iframe {
+          min-height: clamp(9rem, 42vh, 16rem);
         }
       }
 
       @supports (height: 100svh) {
         @media (max-width: 767px) {
           .course-drive-media-card {
-            max-height: calc(100svh - 0.4rem) !important;
+            max-height: calc(100svh - 0.5rem) !important;
           }
         }
       }
