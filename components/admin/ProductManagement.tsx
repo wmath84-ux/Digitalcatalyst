@@ -8,6 +8,9 @@ import { auth, db, storage } from '../../firebase';
 import { normalizeCoinPrice } from '../../utils/economy';
 import { parseKeywordList, withProductSearchIndex } from '../../utils/productSearch';
 import { validateProductImageUpload } from '../../utils/productImageUpload.js';
+import PremiumImageUrlInput, { PremiumImageUrlStatus } from '../common/PremiumImageUrlInput';
+import PremiumMediaUrlInput from '../common/PremiumMediaUrlInput';
+import { buildUrlMediaSource, getFriendlyStorageErrorMessage, getStorageDisabledMessage, isStorageUploadEnabled } from '../../utils/mediaMode';
 
 type ProductViewState = 'list' | 'add' | 'edit';
 
@@ -336,13 +339,14 @@ const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] te
 
 
 type HostedDocsProvider = 'direct_pdf' | 'google_drive_pdf' | 'google_drive_doc' | 'external_docs_link' | 'open_docs';
+type MediaUrlProvider = 'direct_audio' | 'direct_video' | 'google_drive_audio' | 'google_drive_video' | 'external_media';
 
 type ContentComposerFormState = {
     type: ProductFileType;
     url: string;
     name: string;
     content: string;
-    provider?: HostedDocsProvider | 'upload' | 'external_url';
+    provider?: HostedDocsProvider | MediaUrlProvider | 'upload' | 'external_url' | 'drive' | 'direct' | 'external';
     accessLevel?: CourseAccessLevel;
     paidUpdateId?: string;
     paidUpdateTitle?: string;
@@ -359,6 +363,16 @@ const hostedDocsProviderLabels: Record<HostedDocsProvider, string> = {
 };
 
 const hostedDocsProviders: HostedDocsProvider[] = ['direct_pdf', 'google_drive_pdf', 'google_drive_doc', 'open_docs', 'external_docs_link'];
+const mediaUrlProviders: MediaUrlProvider[] = ['direct_audio', 'direct_video', 'google_drive_audio', 'google_drive_video', 'external_media'];
+
+const isMediaUrlProvider = (provider?: string): provider is MediaUrlProvider => Boolean(provider && mediaUrlProviders.includes(provider as MediaUrlProvider));
+const mediaProviderLabel = (provider?: string) => {
+    if (provider === 'direct_audio') return 'Direct Audio URL';
+    if (provider === 'direct_video') return 'Direct Video URL';
+    if (provider === 'google_drive_audio') return 'Google Drive Audio URL';
+    if (provider === 'google_drive_video') return 'Google Drive Video URL';
+    return 'External Hosted Media URL';
+};
 
 const extractGoogleDriveFileId = (value: string) => {
     const trimmed = value.trim();
@@ -383,6 +397,10 @@ const extractGoogleDriveFileId = (value: string) => {
 };
 
 const isGoogleDriveUrl = (value: string) => /https:\/\/(?:drive|docs)\.google\.com\//i.test(value.trim());
+const isDirectAudioUrl = (value: string) => /\.(mp3|m4a|aac|wav|ogg|oga|opus)(?:$|[?#])/i.test(value.trim());
+const isDirectVideoUrl = (value: string) => /\.(mp4|webm|mov|m4v|ogv)(?:$|[?#])/i.test(value.trim());
+const mediaProviderToProductProvider = (provider?: string) => provider === 'google_drive_audio' || provider === 'google_drive_video' ? 'drive' : provider === 'direct_audio' || provider === 'direct_video' ? 'direct' : 'external';
+const mediaProviderContentType = (type: ProductFileType, provider?: string, url = '') => type === 'audio' ? (provider === 'direct_audio' || isDirectAudioUrl(url) ? 'audio/url' : 'audio/external') : type === 'video' ? (provider === 'direct_video' || isDirectVideoUrl(url) ? 'video/url' : 'video/external') : undefined;
 
 const toGoogleDrivePreviewUrl = (value: string) => {
     const fileId = extractGoogleDriveFileId(value);
@@ -1027,8 +1045,10 @@ const ContentComposer: React.FC<{
         };
     };
 
-    const contentTypes: Array<{ type: ProductFileType; title: string; description: string; icon: string; accept?: string; action?: 'docsUrl' }> = [
-        { type: 'video', title: 'Video Upload', description: 'Upload MP4/WebM lesson files.', icon: '🎬', accept: 'video/*' },
+    const contentTypes: Array<{ type: ProductFileType; title: string; description: string; icon: string; accept?: string; action?: 'docsUrl' | 'audioUrl' | 'videoUrl' | 'driveAudioUrl' | 'driveVideoUrl' | 'externalMediaUrl' }> = [
+        { type: 'video', title: 'Video Upload', description: 'File upload requires Firebase Storage. Use URL media for now.', icon: '🎬', accept: 'video/*' },
+        { type: 'video', title: 'Video URL', description: 'Paste direct MP4/WebM or hosted video URL.', icon: '🔗', action: 'videoUrl' },
+        { type: 'video', title: 'Google Drive Video URL', description: 'Paste a public Drive video share link.', icon: '▶️', action: 'driveVideoUrl' },
         { type: 'youtube', title: 'YouTube Video', description: 'Embed a hosted YouTube lesson.', icon: '▶️' },
         { type: 'pdf', title: 'PDF', description: 'Attach worksheets, notes, or guides.', icon: '📄', accept: 'application/pdf' },
         { type: 'doc', title: 'Open Docs', description: 'Open a full-page builder for multi-page lesson notes.', icon: '🧠' },
@@ -1037,10 +1057,18 @@ const ContentComposer: React.FC<{
         { type: 'link', title: 'External Link', description: 'Reference any hosted resource.', icon: '🔗' },
         { type: 'sheet', title: 'Spreadsheet', description: 'Upload CSV/XLS study material.', icon: '📊', accept: '.csv,.xls,.xlsx' },
         { type: 'ebook', title: 'E-book', description: 'Upload EPUB or PDF book content.', icon: '📚', accept: '.epub,.pdf' },
-        { type: 'audio', title: 'Audio', description: 'Upload audio classes or podcasts.', icon: '🎧', accept: 'audio/*' },
+        { type: 'audio', title: 'Audio Upload', description: 'File upload requires Firebase Storage. Use URL media for now.', icon: '🎧', accept: 'audio/*' },
+        { type: 'audio', title: 'Audio URL', description: 'Paste direct MP3/M4A/WAV or hosted audio URL.', icon: '🎧', action: 'audioUrl' },
+        { type: 'audio', title: 'Google Drive Audio URL', description: 'Paste a public Drive audio share link.', icon: '☁️', action: 'driveAudioUrl' },
+        { type: 'video', title: 'External Hosted Media URL', description: 'Use a secure hosted media link with fallback card.', icon: '🌐', action: 'externalMediaUrl' },
     ];
 
     const triggerFileUpload = (type: ProductFileType, accept: string) => {
+        if (!isStorageUploadEnabled()) {
+            setUploadError(getStorageDisabledMessage(type));
+            setLastUploadRequest(null);
+            return;
+        }
         setUploadConfig({ type, accept });
         fileInputRef.current?.click();
     };
@@ -1065,6 +1093,18 @@ const ContentComposer: React.FC<{
         if (type === 'quiz') {
             setQuizQuestions([{ prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
         }
+    };
+
+
+    const showMediaUrlForm = (type: 'audio' | 'video', provider: MediaUrlProvider) => {
+        setFormState({
+            type,
+            provider,
+            url: '',
+            name: type === 'audio' ? 'Audio lesson' : 'Video lesson',
+            content: '',
+        });
+        setDocError('');
     };
 
     const showDocsUrlForm = () => {
@@ -1137,7 +1177,7 @@ const ContentComposer: React.FC<{
             setLastUploadRequest(null);
             onClose();
         } catch (error) {
-            const message = error instanceof Error ? error.message : 'UNKNOWN_UPLOAD_ERROR: File upload failed.';
+            const message = getFriendlyStorageErrorMessage(error);
             console.error('Admin content upload failed:', error);
             setUploadError(message);
             alert(message);
@@ -1181,6 +1221,22 @@ const ContentComposer: React.FC<{
 
     const addQuizQuestion = () => {
         setQuizQuestions(prev => [...(prev || []), { prompt: '', options: ['', '', '', ''], correctAnswer: 0 }]);
+    };
+
+
+    const previewMediaUrl = () => {
+        if (!formState || !isMediaUrlProvider(formState.provider)) return;
+        const trimmedUrl = formState.url.trim();
+        if (!trimmedUrl || !trimmedUrl.startsWith('https://')) {
+            setDocError('Please paste a valid https media URL.');
+            return;
+        }
+        if ((formState.provider === 'google_drive_audio' || formState.provider === 'google_drive_video') && (!isGoogleDriveUrl(trimmedUrl) || !extractGoogleDriveFileId(trimmedUrl))) {
+            setDocError('Google Drive file must be public or shared with anyone with the link.');
+            return;
+        }
+        const directPlayable = formState.type === 'audio' ? isDirectAudioUrl(trimmedUrl) : isDirectVideoUrl(trimmedUrl);
+        setDocError(directPlayable || formState.provider?.startsWith('google_drive') ? 'Media preview ready. Save to course when ready.' : 'This media link may not support direct playback. It will open in a secure preview card.');
     };
 
     const handleFormSubmit = () => {
@@ -1274,6 +1330,43 @@ const ContentComposer: React.FC<{
             return;
         }
 
+        if (isMediaUrlProvider(provider)) {
+            if (!trimmedUrl || !trimmedUrl.startsWith('https://')) {
+                setDocError('Please paste a valid https media URL.');
+                return;
+            }
+
+            const isDriveProvider = provider === 'google_drive_audio' || provider === 'google_drive_video';
+            if (isDriveProvider && (!isGoogleDriveUrl(trimmedUrl) || !extractGoogleDriveFileId(trimmedUrl))) {
+                setDocError('Google Drive file must be public or shared with anyone with the link.');
+                return;
+            }
+
+            const isDirectProvider = provider === 'direct_audio' || provider === 'direct_video';
+            const isDirectPlayable = formState.type === 'audio' ? isDirectAudioUrl(trimmedUrl) : isDirectVideoUrl(trimmedUrl);
+            const now = Date.now();
+            const embedUrl = isDriveProvider ? toGoogleDrivePreviewUrl(trimmedUrl) : '';
+
+            if (isDirectProvider && !isDirectPlayable) {
+                setDocError('This media link may not support direct playback. It will open in a secure preview card. Click Save to continue, or paste a direct media file URL.');
+            }
+
+            onAdd({
+                name: trimmedName,
+                type: formState.type,
+                url: trimmedUrl,
+                ...buildUrlMediaSource({ provider: isDirectProvider && !isDirectPlayable ? 'external' : mediaProviderToProductProvider(provider), url: trimmedUrl, embedUrl }),
+                contentType: mediaProviderContentType(formState.type, provider, trimmedUrl),
+                createdAt: initialFile?.createdAt || now,
+                updatedAt: now,
+                content: '',
+                ...buildContentAccessMeta(formState),
+                quiz: { questions: [] },
+            });
+            onClose();
+            return;
+        }
+
         if (trimmedUrl && !trimmedUrl.startsWith('https://')) {
             setDocError('Resource URL must start with https://');
             return;
@@ -1330,7 +1423,7 @@ const ContentComposer: React.FC<{
                         <button
                             key={`${item.type}-${item.title}`}
                             type="button"
-                            onClick={() => item.action === 'docsUrl' ? showDocsUrlForm() : item.accept ? triggerFileUpload(item.type, item.accept) : showForm(item.type)}
+                            onClick={() => item.action === 'docsUrl' ? showDocsUrlForm() : item.action === 'audioUrl' ? showMediaUrlForm('audio', 'direct_audio') : item.action === 'videoUrl' ? showMediaUrlForm('video', 'direct_video') : item.action === 'driveAudioUrl' ? showMediaUrlForm('audio', 'google_drive_audio') : item.action === 'driveVideoUrl' ? showMediaUrlForm('video', 'google_drive_video') : item.action === 'externalMediaUrl' ? showMediaUrlForm('video', 'external_media') : item.accept ? triggerFileUpload(item.type, item.accept) : showForm(item.type)}
                             className="rounded-2xl border border-white/50 bg-white/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/50 hover:bg-white/80 hover:shadow-sm"
                         >
                             <span className="text-2xl">{item.icon}</span>
@@ -1480,7 +1573,9 @@ const ContentComposer: React.FC<{
                                 )}
                                 {formState.provider !== 'open_docs' && (
                                     <div>
-                                        <label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : 'Resource URL'}</label>
+                                        {isMediaUrlProvider(formState.provider) ? (
+                                            <PremiumMediaUrlInput kind={formState.type === 'audio' ? 'audio' : 'video'} value={formState.url} onChange={(url) => { setDocError(''); setFormState(prev => prev ? { ...prev, url } : prev); }} label={mediaProviderLabel(formState.provider)} helperText="Paste a public media URL. Google Drive links and direct audio/video URLs are supported." />
+                                        ) : (<><label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : 'Resource URL'}</label>
                                         <input
                                             value={formState.url}
                                             onChange={event => {
@@ -1489,7 +1584,13 @@ const ContentComposer: React.FC<{
                                             }}
                                             className={fieldClass}
                                             placeholder={formState.type === 'youtube' ? 'https://www.youtube.com/watch?v=VIDEO_ID' : 'https://example.com/resource'}
-                                        />
+                                        /></>)}
+                                        {isMediaUrlProvider(formState.provider) && (
+                                            <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800">
+                                                <p>Current mode: URL media. Upload file is a future Storage feature.</p>
+                                                <button type="button" onClick={previewMediaUrl} className="mt-3 rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white">Preview media</button>
+                                            </div>
+                                        )}
                                         {formState.type === 'youtube' && (
                                             <p className="mt-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
                                                 Paste a public YouTube video link. Watch, youtu.be, embed, shorts, live, and raw video ID formats are supported.
@@ -1513,7 +1614,7 @@ const ContentComposer: React.FC<{
                                 Back
                             </button>
                             <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-600 px-6 py-3 font-black text-white shadow-sm hover:bg-cyan-700">
-                                {isEditing ? 'Save Content' : 'Add Content'}
+                                {isMediaUrlProvider(formState.provider) ? 'Save to course' : isEditing ? 'Save Content' : 'Add Content'}
                             </button>
                         </div>
                     </div>
@@ -1522,10 +1623,10 @@ const ContentComposer: React.FC<{
 
             <input ref={fileInputRef} type="file" accept={uploadConfig?.accept} onChange={handleFileSelected} className="hidden" />
             {isUploading && <p className="mt-4 text-sm font-bold text-cyan-700">Uploading content... {uploadProgress}% complete. Audio/video/PDF files are added only after Firebase Storage returns a download URL.</p>}
-            {!isUploading && uploadError && lastUploadRequest ? (
+            {!isUploading && uploadError ? (
                 <div className="mt-4 rounded-2xl border border-rose-200 bg-rose-50 p-3">
                     <p className="text-sm font-bold text-rose-700">{uploadError}</p>
-                    <button type="button" onClick={() => runFileUpload(lastUploadRequest.file, lastUploadRequest.config)} className="mt-3 rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white">Retry upload</button>
+                    {lastUploadRequest ? <button type="button" onClick={() => runFileUpload(lastUploadRequest.file, lastUploadRequest.config)} className="mt-3 rounded-xl bg-rose-600 px-4 py-2 text-xs font-black text-white">Retry upload</button> : null}
                 </div>
             ) : null}
         </div>
@@ -1693,13 +1794,14 @@ const ProductForm: React.FC<{
     const [formData, setFormData] = useState<ProductFormData>(() => createEmptyProductForm(product));
     const [modules, setModules] = useState<CourseModule[]>(() => ensureEditableCourseIntroModule(product?.courseContent || initialProductState.courseContent || [], product?.title || formData.title));
     const [images, setImages] = useState<string[]>(() => product?.images || initialProductState.images || []);
-    const [imageMode, setImageMode] = useState<'upload' | 'ai'>('upload');
+    const [imageMode, setImageMode] = useState<'url' | 'upload' | 'ai'>('url');
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [discountPercent, setDiscountPercent] = useState(0);
     const [isSavingProduct, setIsSavingProduct] = useState(false);
     const [isUploadingProductImage, setIsUploadingProductImage] = useState(false);
     const [productImageUploadError, setProductImageUploadError] = useState('');
     const [productImageUploadProgress, setProductImageUploadProgress] = useState(0);
+    const [productImageUrlStatus, setProductImageUrlStatus] = useState<PremiumImageUrlStatus>((product?.images || initialProductState.images || []).find(Boolean) ? 'checking' : 'empty');
     const productImageInputRef = useRef<HTMLInputElement>(null);
     const draftProductIdRef = useRef<number | string>(product?.id || `draft-${Date.now()}`);
 
@@ -1774,7 +1876,7 @@ const ProductForm: React.FC<{
             setProductImageUploadError('');
             setProductImageUploadProgress(0);
             setImages([aiImageUrl]);
-            setImageMode('upload');
+            setImageMode('url');
         } finally {
             setIsGeneratingImage(false);
         }
@@ -1804,6 +1906,12 @@ const ProductForm: React.FC<{
         const keywords = parseKeywordList(formData.searchKeywordsText);
         const formattedPrice = formData.price ? `₹${formData.price}` : '₹0';
         const formattedSalePrice = formData.salePrice ? `₹${formData.salePrice}` : undefined;
+
+        const primaryImageCandidate = (images || []).find(Boolean);
+        if (primaryImageCandidate && productImageUrlStatus !== 'valid' && imageMode === 'url') {
+            setProductImageUploadError('Please paste a valid https image URL.');
+            return;
+        }
 
         setIsSavingProduct(true);
 
@@ -1966,14 +2074,17 @@ const ProductForm: React.FC<{
                             </div>
 
                             <div className={glassCard}>
-                                <h2 className="text-xl font-black text-slate-900">Image Upload</h2>
-                                <div className="mt-5 grid grid-cols-2 gap-2">
-                                    <button type="button" onClick={() => setImageMode('upload')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'upload' ? 'bg-cyan-600 text-slate-900' : 'border border-white/50 text-slate-600'}`}>Upload</button>
+                                <h2 className="text-xl font-black text-slate-900">Image URL</h2>
+                                <div className="mt-5 grid grid-cols-3 gap-2">
+                                    <button type="button" onClick={() => setImageMode('url')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'url' ? 'bg-blue-600 text-white' : 'border border-white/50 text-slate-600'}`}>Image URL</button>
+                                    <button type="button" onClick={() => setImageMode('upload')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'upload' ? 'bg-cyan-100 text-cyan-800' : 'border border-white/50 text-slate-600'}`}>Future Upload</button>
                                     <button type="button" onClick={() => setImageMode('ai')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'ai' ? 'bg-purple-300 text-slate-900' : 'border border-white/50 text-slate-600'}`}>AI Image</button>
                                 </div>
                                 <div className="mt-4">
-                                    {imageMode === 'upload' ? (
-                                        <button type="button" onClick={() => productImageInputRef.current?.click()} disabled={isUploadingProductImage} className="w-full rounded-3xl border border-dashed border-cyan-300/40 bg-cyan-400/5 p-8 text-center font-black text-cyan-700 hover:bg-cyan-400/10 disabled:opacity-60">{isUploadingProductImage ? 'Uploading image to Firebase...' : 'Upload product image'}</button>
+                                    {imageMode === 'url' ? (
+                                        <PremiumImageUrlInput value={(images || []).find(Boolean) || ''} onChange={(url) => setImages(url ? [url] : [])} onStatusChange={setProductImageUrlStatus} label="Product image URL" previewAlt="Primary product image" aspect="square" compact helperText="One valid https image URL will be saved into images and every productImages display slot." />
+                                    ) : imageMode === 'upload' ? (
+                                        <div className="rounded-3xl border border-dashed border-cyan-300/60 bg-cyan-50/70 p-5 text-center"><p className="font-black text-cyan-800">Storage upload is currently disabled. Please use an image URL.</p><button type="button" onClick={() => productImageInputRef.current?.click()} disabled className="mt-3 w-full rounded-2xl bg-slate-200 p-4 font-black text-slate-500">Firebase upload kept for future use</button></div>
                                     ) : (
                                         <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-3xl border border-dashed border-purple-300/40 bg-purple-400/5 p-8 text-center font-black text-purple-700 hover:bg-purple-400/10 disabled:opacity-60">{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</button>
                                     )}
@@ -1993,13 +2104,13 @@ const ProductForm: React.FC<{
                                         </div>
                                     ) : (
                                         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-center text-sm font-bold text-slate-500">
-                                            No product image selected. Upload or generate one primary image.
+                                            No product image selected. Paste a valid https image URL or generate one primary image.
                                         </div>
                                     )}
                                 </div>
                                 <div className="mt-4"><label className={labelClass}>Image Seed</label><input value={formData.imageSeed} onChange={event => setFormData(prev => ({ ...prev, imageSeed: event.target.value }))} className={fieldClass} placeholder="Fallback image seed" /></div>
                                 <div className="mt-4 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm font-bold text-emerald-700">
-                                    Only one product image is used across product cards, detail pages, mobile home, and purchased-product previews.
+                                    Only one valid image URL is saved across images and all productImages slots for product cards, detail pages, home, gallery, and purchase previews.
                                 </div>
 
                             </div>
