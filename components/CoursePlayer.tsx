@@ -1069,49 +1069,49 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
   const handleMediaError = () => { setMediaFailed(true); onError?.(); };
 
   return (
-    <div className="course-drive-media-viewport flex h-full min-h-0 w-full items-stretch justify-center overflow-hidden bg-[radial-gradient(circle_at_18%_10%,rgba(123,97,255,0.24),transparent_28%),linear-gradient(135deg,#EEF6FF,#F8FBFF_48%,#F1EEFF)] p-2 text-[#081A45] sm:p-3 lg:p-4">
-      <section className="course-drive-media-card flex h-full max-h-full min-h-0 w-full max-w-6xl flex-col overflow-hidden rounded-[2rem] border border-white/70 bg-white/82 shadow-[0_28px_90px_rgba(23,105,255,0.18)] backdrop-blur-2xl">
-        <div className="course-drive-media-header flex shrink-0 flex-col gap-2 border-b border-[#D9E7F8] bg-white/75 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+    <div className="flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-[radial-gradient(circle_at_18%_10%,rgba(123,97,255,0.24),transparent_28%),linear-gradient(135deg,#EEF6FF,#F8FBFF_48%,#F1EEFF)] p-3 text-[#081A45] sm:p-5 custom-scrollbar">
+      <section className="w-full max-w-5xl overflow-hidden rounded-[2rem] border border-white/70 bg-white/82 shadow-[0_28px_90px_rgba(23,105,255,0.18)] backdrop-blur-2xl">
+        <div className="flex flex-col gap-3 border-b border-[#D9E7F8] bg-white/75 p-4 sm:flex-row sm:items-center sm:justify-between sm:p-5">
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <p className="text-xs font-black uppercase tracking-[0.24em] text-[#7B61FF]">{badge}</p>
               <span className="rounded-full border border-[#D9E7F8] bg-[#EEF6FF] px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-[#1769FF]">{sourceBadge}</span>
             </div>
-            <h2 className="course-drive-media-title mt-1 truncate text-xl font-black tracking-tight text-[#081A45] sm:text-2xl lg:text-3xl">{file.name || (isAudio ? 'Audio lesson' : 'Video lesson')}</h2>
-            <p className={`course-drive-media-status mt-1 text-xs font-bold ${isDrive ? 'text-amber-700' : 'text-[#536178]'}`}>{statusLine}</p>
+            <h2 className="mt-1 truncate text-2xl font-black tracking-tight text-[#081A45] sm:text-3xl">{file.name || (isAudio ? 'Audio lesson' : 'Video lesson')}</h2>
+            <p className={`mt-2 text-xs font-bold ${isDrive ? 'text-amber-700' : 'text-[#536178]'}`}>{statusLine}</p>
           </div>
-          {openUrl ? <a href={openUrl} target="_blank" rel="noopener noreferrer" className="course-drive-open-button shrink-0 rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 py-2.5 text-sm font-black text-white shadow-lg sm:px-5 sm:py-3">Open externally</a> : null}
+          {openUrl ? <a href={openUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-3 text-sm font-black text-white shadow-lg">Open externally</a> : null}
         </div>
-        <div className="course-drive-media-toolbar shrink-0 border-b border-[#D9E7F8] bg-[#F8FBFF]/80 px-3 py-2 sm:px-5 sm:py-3">
+        <div className="border-b border-[#D9E7F8] bg-[#F8FBFF]/80 px-4 py-3 sm:px-6">
           <div className="flex flex-wrap items-center gap-2 text-xs font-black text-[#536178]">
             <span className="rounded-full bg-white px-3 py-1 shadow-sm">{isAudio ? 'Audio' : 'Video'}</span>
             <span className="rounded-full bg-white px-3 py-1 shadow-sm">{isDrive ? 'Drive preview' : directPlayable ? 'Native player' : 'Fallback card'}</span>
             <span className="rounded-full bg-white px-3 py-1 shadow-sm">Payment / EduCoin locks unchanged</span>
           </div>
         </div>
-        <div className="course-drive-media-body min-h-0 flex-1 p-2 sm:p-3 lg:p-4">
+        <div className="p-4 sm:p-6">
           {isAudio ? (
-            <div className="course-drive-audio-shell rounded-[1.75rem] border border-[#D9E7F8] bg-gradient-to-br from-[#081A45] via-[#153EA8] to-[#7B61FF] p-3 text-white shadow-inner sm:p-4 lg:p-5">
-              <div className="course-drive-audio-bars mb-3 flex items-end gap-1.5 overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-3 sm:mb-4 sm:p-4">
+            <div className="rounded-[1.75rem] border border-[#D9E7F8] bg-gradient-to-br from-[#081A45] via-[#153EA8] to-[#7B61FF] p-5 text-white shadow-inner">
+              <div className="mb-5 flex h-24 items-end gap-1.5 overflow-hidden rounded-2xl border border-white/10 bg-white/10 p-4">
                 {Array.from({ length: 34 }).map((_, index) => <span key={index} className="w-full rounded-full bg-white/75" style={{ height: `${20 + ((index * 17) % 72)}%` }} />)}
               </div>
               {directPlayable && !mediaFailed ? (
                 <audio src={openUrl} controls className="w-full" onError={handleMediaError} />
               ) : isDrive && previewUrl && !mediaFailed ? (
-                <div className="course-drive-audio-preview overflow-hidden rounded-2xl border border-white/15 bg-black/30 shadow-2xl">
-                  <iframe title={file.name || 'Google Drive audio preview'} src={previewUrl} className="h-full w-full border-0 bg-white" allow="autoplay; fullscreen" allowFullScreen onError={handleMediaError} />
+                <div className="overflow-hidden rounded-2xl border border-white/15 bg-black/30 shadow-2xl">
+                  <iframe title={file.name || 'Google Drive audio preview'} src={previewUrl} className="h-64 w-full border-0 bg-white sm:h-80" allow="autoplay; fullscreen" allowFullScreen onError={handleMediaError} />
                 </div>
               ) : (
                 <MediaFallbackCard title={file.name || 'Audio lesson'} badge={isDrive ? 'Drive audio' : 'Audio'} icon="🎧" message={isDrive ? 'This Drive file needs public access.' : 'Audio source unavailable'} actionHref={openUrl} actionLabel={isDrive ? 'Open in Drive' : 'Open source'} aspect="auto" className="min-h-40 rounded-2xl border-white/15" />
               )}
             </div>
           ) : directPlayable && !mediaFailed ? (
-            <div className="course-drive-native-video-shell relative overflow-hidden rounded-[1.75rem] bg-black shadow-2xl">
+            <div className="relative aspect-video overflow-hidden rounded-[1.75rem] bg-black shadow-2xl">
               <video src={openUrl} controls playsInline className="h-full w-full object-contain" onError={handleMediaError} />
               {showFullscreen ? <button type="button" onClick={onVideoFullscreen} className="absolute bottom-4 right-4 rounded-full border border-white/25 bg-black/75 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-white backdrop-blur-md">⛶ Fullscreen</button> : null}
             </div>
           ) : isDrive && previewUrl && !mediaFailed ? (
-            <div className="course-drive-video-shell overflow-hidden rounded-[1.75rem] border border-[#D9E7F8] bg-black shadow-2xl">
+            <div className="aspect-video overflow-hidden rounded-[1.75rem] border border-[#D9E7F8] bg-black shadow-2xl">
               <iframe title={file.name || 'Google Drive video preview'} src={previewUrl} className="h-full w-full border-0" allow="autoplay; fullscreen" allowFullScreen onError={handleMediaError} />
             </div>
           ) : (
