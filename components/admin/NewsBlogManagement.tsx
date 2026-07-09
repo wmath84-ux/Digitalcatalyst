@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NewsArticle, WebsiteSettings } from '../../App';
 import { ContentDatabaseAdapter, ContentPostRecord, ContentPostType, runContentAutomation } from '../../utils/contentAutomator';
-import PremiumImageUrlInput from '../common/PremiumImageUrlInput';
+import PremiumImageUrlInput, { PremiumImageUrlStatus } from '../common/PremiumImageUrlInput';
 
 const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
 const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
@@ -90,6 +90,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
   const [successToast, setSuccessToast] = useState('');
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [coverUploadError, setCoverUploadError] = useState('');
+  const [coverImageStatus, setCoverImageStatus] = useState<PremiumImageUrlStatus>('empty');
 
   useEffect(() => {
     setArticles(settingsPosts);
@@ -128,6 +129,10 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
 
 
   const savePost = () => {
+    if ((editingPost.coverImage || '').trim() && coverImageStatus !== 'valid') {
+      setCoverUploadError('Please paste a valid https image URL.');
+      return;
+    }
     const now = new Date().toISOString();
     const preparedPost: EditablePost = {
       ...editingPost,
@@ -146,6 +151,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
       : [preparedPost, ...posts];
 
     updatePosts(nextPosts);
+    setSuccessToast('News/blog post saved successfully.');
     setMode('list');
   };
 
@@ -215,7 +221,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
           </div>
           <div className="flex gap-3">
             <button onClick={() => setMode('list')} className="rounded-2xl border border-white/50 bg-white/80 px-5 py-3 font-black text-slate-600 transition hover:bg-white/80 hover:shadow-sm">Cancel</button>
-            <button onClick={savePost} className="rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3 font-black text-white shadow-sm transition hover:scale-105">Save Post</button>
+            <button onClick={savePost} disabled={Boolean((editingPost.coverImage || '').trim()) && coverImageStatus !== 'valid'} className="rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3 font-black text-white shadow-sm transition hover:scale-105 disabled:cursor-not-allowed disabled:opacity-50">Save Post</button>
           </div>
         </div>
 
@@ -240,7 +246,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
             <input value={editingPost.category} onChange={(event) => setEditingPost({ ...editingPost, category: event.target.value })} className={fieldClass} placeholder="Education News" />
           </div>
           <div className="lg:col-span-8">
-            <PremiumImageUrlInput value={editingPost.coverImage || ''} onChange={(url) => setEditingPost({ ...editingPost, coverImage: url, thumbnailImage: url })} label="News/blog cover image URL" previewAlt={`${editingPost.title || 'Article'} cover preview`} aspect="video" compact helperText="Paste a direct https cover image URL. It is saved as coverImage and thumbnailImage." />
+            <PremiumImageUrlInput value={editingPost.coverImage || ''} onChange={(url) => { setCoverUploadError(''); setEditingPost({ ...editingPost, coverImage: url, thumbnailImage: url }); }} onStatusChange={setCoverImageStatus} label="News/blog cover image URL" previewAlt={`${editingPost.title || 'Article'} cover preview`} aspect="video" compact helperText="Paste a public https cover image URL. It is saved as coverImage and thumbnailImage." />
           </div>
           <div className="lg:col-span-12 rounded-[1.5rem] border border-white/50 bg-white/70 p-5 shadow-sm">
             <label className="flex cursor-pointer flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -259,21 +265,21 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
             <div className="grid gap-6 rounded-[1.75rem] bg-white/60 p-5 backdrop-blur-2xl lg:grid-cols-[minmax(0,1fr)_320px] lg:items-center">
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.3em] text-indigo-300/90">Cover Image</p>
-                <h2 className="mt-2 text-2xl font-black text-slate-900">Smart hybrid article thumbnail</h2>
+                <h2 className="mt-2 text-2xl font-black text-slate-900">Premium editorial cover</h2>
                 <p className="mt-3 text-sm leading-6 text-slate-600">Keep the AI-generated placeholder or paste a stock/public https image URL. Firebase Storage cover upload is currently disabled; this editor saves the URL as text.</p>
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <label className="inline-flex cursor-pointer items-center justify-center rounded-2xl border border-indigo-200/70 bg-white/80 px-5 py-3 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md">
                     <input type="file" accept="image/*" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadCoverImage(file); event.currentTarget.value = ''; }} />
-                    URL flow active
+                    File upload requires Firebase Storage. Use Image URL for now.
                   </label>
                   <button type="button" onClick={() => setEditingPost({ ...editingPost, coverImage: '', thumbnailImage: '' })} className="rounded-2xl border border-white/50 bg-white/80 px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-white/90 hover:shadow-sm">Clear Image</button>
                 </div>
                 {coverUploadError && <p className="mt-4 rounded-2xl border border-rose-200/70 bg-rose-50/80 px-4 py-3 text-sm font-bold text-rose-700">{coverUploadError}</p>}
               </div>
               <div className="overflow-hidden rounded-[1.5rem] border border-white/60 bg-gradient-to-br from-indigo-50 via-white to-fuchsia-50 p-2 shadow-sm">
-                <div className="aspect-video overflow-hidden rounded-[1.15rem] bg-white/80">
-                  {editingPost.coverImage ? (
-                    <img src={editingPost.coverImage} alt={`${editingPost.title || 'Article'} cover preview`} className="h-full w-full object-cover transition duration-700 hover:scale-105" />
+                <div className="relative aspect-video overflow-hidden rounded-[1.15rem] bg-white/80">
+                  {editingPost.coverImage && coverImageStatus === 'valid' ? (
+                    <><div className="absolute left-4 top-4 z-10 rounded-full bg-emerald-100 px-3 py-1 text-[11px] font-black text-emerald-700">Cover image ready</div><img src={editingPost.coverImage} alt={`${editingPost.title || 'Article'} cover preview`} className="h-full w-full object-cover transition duration-700 hover:scale-105" /></>
                   ) : (
                     <div className="flex h-full w-full flex-col items-center justify-center px-6 text-center text-slate-500">
                       <span className="text-4xl">🖼️</span>

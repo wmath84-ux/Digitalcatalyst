@@ -58,6 +58,7 @@ const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, setting
                     src={getArticleCoverImage(article)} 
                     alt={article.title} 
                     className="h-full w-full rounded-t-2xl object-cover transition-transform duration-700 group-hover:scale-110"
+                    onError={(event) => { event.currentTarget.onerror = null; event.currentTarget.src = buildPremiumArticleImage(article); }}
                 />
                 <div className="absolute top-4 left-4 backdrop-blur-xl px-3 py-1 text-xs font-bold uppercase tracking-wider border rounded-md shadow-sm" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder, color: chatPalette.linkText }}>
                     {article.type === 'news' ? 'News' : article.category}
