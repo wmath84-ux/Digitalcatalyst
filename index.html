@@ -138,9 +138,20 @@
         isolation: isolate;
       }
 
-      /* Native HTML5 Google Drive media player inside course player */
-      .course-drive-native-embed {
+      /* Fixed desktop-viewport Google Drive iframe inside course player */
+      .course-drive-fixed-stage {
+        position: relative;
         display: flex;
+        width: 100%;
+        height: 100%;
+        min-width: 0;
+        min-height: 0;
+        background: #000;
+      }
+
+      .course-drive-fixed-body {
+        display: flex;
+        flex: 1 1 auto;
         align-items: center;
         justify-content: center;
         width: 100%;
@@ -148,54 +159,92 @@
         min-width: 0;
         min-height: 0;
         overflow: hidden;
+        padding: clamp(0.25rem, 1.25vmin, 0.9rem);
         background: #000;
       }
 
-      .course-drive-html5-video {
+      .course-drive-fixed-viewport {
+        position: relative;
+        flex: 0 0 auto;
+        overflow: hidden;
+        border-radius: clamp(0.9rem, 1.8vmin, 1.6rem);
+        background: #000;
+        box-shadow: 0 18px 60px rgba(0, 0, 0, 0.28);
+      }
+
+      .course-drive-fixed-audio-viewport {
+        background: #fff;
+      }
+
+      .course-drive-fixed-iframe {
+        position: absolute;
+        left: 0;
+        top: 0;
         display: block;
-        width: 100% !important;
-        height: 100% !important;
-        min-width: 0;
-        min-height: 0;
-        max-width: 100%;
-        max-height: 100%;
+        border: 0 !important;
+        background: #000;
+      }
+
+      .course-drive-fixed-open {
+        position: absolute;
+        top: clamp(0.45rem, 1.4vmin, 0.85rem);
+        right: clamp(0.45rem, 1.4vmin, 0.85rem);
+        z-index: 3;
+        display: inline-flex;
+        height: 2.35rem;
+        width: 2.35rem;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        border: 1px solid rgba(255, 255, 255, 0.22);
+        background: rgba(0, 0, 0, 0.48);
+        color: #fff;
+        font-size: 1.1rem;
+        font-weight: 900;
+        text-decoration: none;
+        opacity: 0.55;
+        backdrop-filter: blur(10px);
+        transition: opacity 160ms ease, transform 160ms ease;
+      }
+
+      .course-drive-fixed-open:hover,
+      .course-drive-fixed-open:focus-visible {
+        opacity: 1;
+        transform: scale(1.04);
+      }
+
+      .course-direct-video-stage,
+      .course-direct-audio-stage {
+        background: #000;
+      }
+
+      .course-direct-video-player {
+        display: block;
+        width: 100%;
+        height: 100%;
         object-fit: contain;
         background: #000;
       }
 
-      .course-drive-native-audio-embed {
-        padding: clamp(0.75rem, 2.5vmin, 1.5rem);
-        background: linear-gradient(135deg, #081A45 0%, #111827 52%, #000 100%);
-      }
-
-      .course-drive-html5-audio {
+      .course-direct-audio-player {
         display: block;
-        width: min(100%, 760px) !important;
+        width: min(100%, 760px);
         max-width: 100%;
       }
 
-      .course-drive-native-iframe {
-        display: block;
-        width: 100% !important;
-        height: 100% !important;
-        min-width: 0;
-        min-height: 0;
-        border: 0 !important;
-        background: #fff;
-      }
-
       @media (max-width: 767px) {
-        .course-drive-native-embed,
-        .course-drive-html5-video,
-        .course-drive-native-iframe {
-          width: 100% !important;
-          height: 100% !important;
-          max-width: 100% !important;
-          max-height: 100% !important;
+        .course-drive-fixed-body {
+          padding: 0.25rem;
         }
 
-        .course-drive-native-audio-embed {
-          padding: 0.85rem;
+        .course-drive-fixed-viewport {
+          border-radius: 1rem;
+        }
+
+        .course-drive-fixed-open {
+          height: 2.1rem;
+          width: 2.1rem;
+          opacity: 0.42;
         }
       }
 
