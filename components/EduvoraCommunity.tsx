@@ -2298,6 +2298,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const openProfilePostDetail = (messageId: number, focusReply = false) => {
     const targetMessage = messages.find((message) => message.id === messageId);
+    setPage('profile');
+    pageRef.current = 'profile';
     setSelectedMessageId(messageId);
     setProfileSelectedPostId(messageId);
     setProfileViewMode('post');
@@ -4462,9 +4464,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           const liked = Boolean(message.likedByUsers?.[currentUserKey]) || likedMessages.includes(message.id);
           return (
             <article key={message.id} className="group overflow-hidden rounded-[1.25rem] border border-[#D9E7F8] bg-white shadow-[0_10px_28px_rgba(8,26,69,0.08)] ring-1 ring-white transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-[0_18px_50px_rgba(23,105,255,0.14)]">
-              <button type="button" onClick={() => openProfilePostDetail(message.id)} className="block w-full text-left">
+              <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openProfilePostDetail(message.id); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProfilePostDetail(message.id); }} className="block w-full text-left touch-manipulation">
                 <div className="relative aspect-square overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(23,105,255,0.18),transparent_42%),linear-gradient(135deg,#FFFFFF_0%,#EEF6FF_48%,#F1EEFF_100%)]">
-                  {isImage ? renderUploadedImage(message.imagePreview || '', message.title, message.imageLayout || 'original') : <div className="flex h-full flex-col justify-between p-3 sm:p-4"><span className="w-max rounded-full border border-white/80 bg-white/92 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#1769FF] shadow-sm">{isPoll ? 'Poll' : 'Text'}</span><div><h3 className="line-clamp-3 text-base font-black leading-tight text-[#081A45] sm:text-xl">{message.title || (isPoll ? 'Poll post' : 'Text post')}</h3><p className="mt-2 line-clamp-3 text-xs font-semibold leading-5 text-[#536178] sm:text-sm">{message.body}</p></div></div>}
+                  {isImage ? <div className="flex h-full w-full items-center justify-center bg-[#EEF6FF]">{isImageAvatar(message.imagePreview || '') ? <SafeImage src={message.imagePreview || ''} fallbackSrc={buildPostImageFallback({ title: message.title, postType: 'image' })} alt={message.title} className="h-full w-full object-cover" fallbackTitle={message.title} fallbackBadge="Community image" fallbackIcon="💬" fallbackMessage="Image preview unavailable" aspect="square" /> : <span className="text-6xl">{message.imagePreview || '🖼️'}</span>}</div> : <div className="flex h-full flex-col justify-between p-3 sm:p-4"><span className="w-max rounded-full border border-white/80 bg-white/92 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#1769FF] shadow-sm">{isPoll ? 'Poll' : 'Text'}</span><div><h3 className="line-clamp-3 text-base font-black leading-tight text-[#081A45] sm:text-xl">{message.title || (isPoll ? 'Poll post' : 'Text post')}</h3><p className="mt-2 line-clamp-3 text-xs font-semibold leading-5 text-[#536178] sm:text-sm">{message.body}</p></div></div>}
                   <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#081A45]/16 to-transparent opacity-0 transition group-hover:opacity-100" />
                 </div>
                 <div className="min-h-[4.75rem] p-2.5 sm:p-4"><h3 className="line-clamp-2 text-sm font-black leading-snug text-[#081A45] sm:text-base">{message.title}</h3><p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[#536178]">{message.body}</p></div>
@@ -4530,6 +4532,27 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return <div className="mx-auto h-full max-w-5xl">{renderMessageDetails(message, true)}</div>;
   };
 
+  const keepProfilePageActive = () => {
+    setPage('profile');
+    pageRef.current = 'profile';
+  };
+  const openOwnProfileEdit = () => {
+    keepProfilePageActive();
+    setSelectedProfileId(null);
+    setProfileDraft(profile);
+    setProfileViewMode('edit');
+  };
+  const openOwnProfileSettings = () => {
+    keepProfilePageActive();
+    setSelectedProfileId(null);
+    setProfileViewMode('settings');
+  };
+  const openProfileRelations = (tab: ProfileRelationTab) => {
+    keepProfilePageActive();
+    setProfileRelationTab(tab);
+    setProfileViewMode('relations');
+  };
+
   const renderInstagramProfile = (profileId: string, display: { name: string; username: string; avatar: string; bio?: string; verified?: boolean }, options: { own: boolean; followed?: boolean; creator?: Creator | null }) => {
     const profilePosts = messages.filter((message) => isMessageFromId(message, profileId)).sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
     const profileStories = statusCards
@@ -4548,7 +4571,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <div className="sticky top-0 z-10 grid grid-cols-3 items-center border-b border-[#E3ECF8] bg-white px-3 py-2.5">
           <button type="button" onClick={() => options.own ? goBack() : setSelectedProfileId(null)} className="justify-self-start rounded-full px-3 py-2 text-sm font-black text-[#081B5C]">←</button>
           <h2 className="truncate text-center text-sm font-black text-[#081B5C]">@{display.username}</h2>
-          {options.own ? <button type="button" onClick={() => setProfileViewMode('settings')} className="justify-self-end rounded-full border border-[#E3ECF8] bg-[#F8FBFF] px-3 py-2 text-base" aria-label="Profile settings">⚙️</button> : <span />}
+          {options.own ? <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openOwnProfileSettings(); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openOwnProfileSettings(); }} className="justify-self-end rounded-full border border-[#E3ECF8] bg-[#F8FBFF] px-3 py-2 text-base touch-manipulation" aria-label="Profile settings">⚙️</button> : <span />}
         </div>
 
         <section className="px-4 py-4 sm:px-7 sm:py-6">
@@ -4561,17 +4584,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
               </div>
               <div className="mt-3 grid max-w-sm grid-cols-3 gap-1.5 text-center">
                 <span className="rounded-2xl bg-[#F8FBFF] px-2 py-2"><b className="block text-lg text-[#081B5C] sm:text-xl">{compactCount(profilePosts.length)}</b><small className="text-[11px] font-black text-[#64748B]">posts</small></span>
-                <button type="button" onClick={() => { setProfileRelationTab('followers'); setProfileViewMode('relations'); }} className="rounded-2xl bg-[#F8FBFF] px-2 py-2 transition hover:bg-[#EEF6FF]"><b className="block text-lg text-[#081B5C] sm:text-xl">{followerTotal}</b><small className="text-[11px] font-black text-[#64748B]">followers</small></button>
-                <button type="button" onClick={() => { setProfileRelationTab('following'); setProfileViewMode('relations'); }} className="rounded-2xl bg-[#F8FBFF] px-2 py-2 transition hover:bg-[#EEF6FF]"><b className="block text-lg text-[#081B5C] sm:text-xl">{followingTotal}</b><small className="text-[11px] font-black text-[#64748B]">following</small></button>
+                <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('followers'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('followers'); }} className="rounded-2xl bg-[#F8FBFF] px-2 py-2 transition hover:bg-[#EEF6FF] touch-manipulation"><b className="block text-lg text-[#081B5C] sm:text-xl">{followerTotal}</b><small className="text-[11px] font-black text-[#64748B]">followers</small></button>
+                <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('following'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('following'); }} className="rounded-2xl bg-[#F8FBFF] px-2 py-2 transition hover:bg-[#EEF6FF] touch-manipulation"><b className="block text-lg text-[#081B5C] sm:text-xl">{followingTotal}</b><small className="text-[11px] font-black text-[#64748B]">following</small></button>
               </div>
               <p className="mt-3 whitespace-pre-wrap text-sm font-bold leading-6 text-[#536178]">{display.bio || 'No bio yet.'}</p>
               <div className="mt-3 grid w-full max-w-[19rem] grid-cols-2 gap-2">
                 {options.own ? (
-                  <button type="button" onClick={() => { setProfileDraft(profile); setProfileViewMode('edit'); }} className="min-h-11 rounded-2xl bg-[#EEF6FF] px-3 py-2.5 text-xs font-black text-[#081B5C] shadow-sm sm:text-sm">Edit profile</button>
+                  <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openOwnProfileEdit(); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openOwnProfileEdit(); }} className="min-h-11 rounded-2xl bg-[#EEF6FF] px-3 py-2.5 text-xs font-black text-[#081B5C] shadow-sm sm:text-sm touch-manipulation">Edit profile</button>
                 ) : options.creator ? (
                   <button type="button" onClick={() => toggleFollowCreator(options.creator!)} disabled={Boolean(followLoadingIds[profileId]) || options.creator.isSuspended || options.creator.isPublic === false} className={`min-h-11 rounded-2xl px-3 py-2.5 text-xs font-black shadow-sm sm:text-sm ${options.followed ? 'border border-[#D9E7F8] bg-white text-[#1769FF]' : 'bg-[#1769FF] text-white'}`}>{followLoadingIds[profileId] ? 'Saving…' : options.followed ? 'Following' : 'Follow'}</button>
                 ) : <span />}
-                <button type="button" onClick={() => { setProfileRelationTab('followers'); setProfileViewMode('relations'); }} className="min-h-11 rounded-2xl border border-[#D9E7F8] bg-white px-3 py-2.5 text-xs font-black text-[#081B5C] shadow-sm sm:text-sm">Followers & Following</button>
+                <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('followers'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('followers'); }} className="min-h-11 rounded-2xl border border-[#D9E7F8] bg-white px-3 py-2.5 text-xs font-black text-[#081B5C] shadow-sm sm:text-sm touch-manipulation">Followers & Following</button>
               </div>
             </div>
           </div>
@@ -4579,8 +4602,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <div className="mt-5">{renderStoryHighlights(profileStories)}</div>
           <div className="mt-5 border-t border-[#E3ECF8] pt-3">
             <div className="mb-3 flex justify-center gap-3 text-[11px] font-black uppercase tracking-[0.16em]">
-              <button type="button" onClick={() => setProfileContentTab('posts')} className={`rounded-full px-4 py-2 ${profileContentTab === 'posts' ? 'bg-[#EEF6FF] text-[#081B5C]' : 'text-[#7C879A]'}`}>▦ Posts</button>
-              <button type="button" onClick={() => setProfileContentTab('stories')} className={`rounded-full px-4 py-2 ${profileContentTab === 'stories' ? 'bg-[#EEF6FF] text-[#081B5C]' : 'text-[#7C879A]'}`}>○ Stories</button>
+              <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); setProfileContentTab('posts'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setProfileContentTab('posts'); }} className={`rounded-full px-4 py-2 touch-manipulation ${profileContentTab === 'posts' ? 'bg-[#EEF6FF] text-[#081B5C]' : 'text-[#7C879A]'}`}>▦ Posts</button>
+              <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); setProfileContentTab('stories'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setProfileContentTab('stories'); }} className={`rounded-full px-4 py-2 touch-manipulation ${profileContentTab === 'stories' ? 'bg-[#EEF6FF] text-[#081B5C]' : 'text-[#7C879A]'}`}>○ Stories</button>
             </div>
             {renderProfileGrid(profilePosts)}
           </div>
