@@ -614,7 +614,7 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
 // Comprehensive settings for the entire website, manageable from the admin panel
 export interface WebsiteSettings {
     theme: {
-        colorExperience: 'original' | 'immersive';
+        colorExperience: 'original' | 'immersive' | 'warm' | 'modern-white';
         primaryColor: string;
         accentColor: string;
         backgroundColor: string;
@@ -1746,17 +1746,42 @@ const App: React.FC = () => {
     const root = document.documentElement;
     const activePalette = themes[activeTheme]?.palette || themes.default.palette;
     const adminTheme = websiteSettings.theme;
-    const colorExperience = adminTheme.colorExperience === 'original' ? 'original' : 'immersive';
-    const immersivePalette: ThemePalette = {
-      primaryColor: '#315BCA',
-      accentColor: '#315BCA',
-      backgroundColor: '#F2F5F9',
-      textColor: '#0D1B3E',
-      textMutedColor: '#46556D',
+    const requestedColorExperience = adminTheme.colorExperience;
+    const colorExperience: WebsiteSettings['theme']['colorExperience'] =
+      requestedColorExperience === 'original' ||
+      requestedColorExperience === 'immersive' ||
+      requestedColorExperience === 'warm' ||
+      requestedColorExperience === 'modern-white'
+        ? requestedColorExperience
+        : 'immersive';
+
+    const experiencePalettes: Record<'immersive' | 'warm' | 'modern-white', ThemePalette> = {
+      immersive: {
+        primaryColor: '#315BCA',
+        accentColor: '#315BCA',
+        backgroundColor: '#F2F5F9',
+        textColor: '#0D1B3E',
+        textMutedColor: '#46556D',
+      },
+      warm: {
+        primaryColor: '#7A4A3A',
+        accentColor: '#A56A4F',
+        backgroundColor: '#F7F4EC',
+        textColor: '#2F2925',
+        textMutedColor: '#6F625B',
+      },
+      'modern-white': {
+        primaryColor: '#2563EB',
+        accentColor: '#0EA5E9',
+        backgroundColor: '#F7F8FA',
+        textColor: '#111827',
+        textMutedColor: '#64748B',
+      },
     };
-    const mergedPalette = colorExperience === 'immersive'
-      ? immersivePalette
-      : { ...activePalette, ...adminTheme };
+
+    const mergedPalette = colorExperience === 'original'
+      ? { ...activePalette, ...adminTheme }
+      : experiencePalettes[colorExperience];
 
     root.dataset.colorExperience = colorExperience;
     root.style.setProperty('--color-primary', mergedPalette.primaryColor);
@@ -1767,7 +1792,7 @@ const App: React.FC = () => {
     safeSetItem('siteColorExperience', colorExperience);
 
     const themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
-    if (themeMeta) themeMeta.content = colorExperience === 'immersive' ? '#F2F5F9' : mergedPalette.primaryColor;
+    if (themeMeta) themeMeta.content = colorExperience === 'original' ? mergedPalette.primaryColor : mergedPalette.backgroundColor;
 
     const fonts = {
       'inter-lato': { sans: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', serif: 'Lato, ui-serif, Georgia, serif' },
@@ -1784,8 +1809,21 @@ const App: React.FC = () => {
       heavy: '0 18px 48px rgb(15 23 42 / 0.12)',
     };
     root.style.setProperty('--style-shadow-base', shadows[adminTheme.shadowIntensity as keyof typeof shadows] || shadows.medium);
-    root.style.setProperty('--style-shadow-lg', colorExperience === 'immersive' ? '0 16px 42px rgb(15 23 42 / 0.10)' : shadows.heavy);
-    root.style.setProperty('--style-shadow-xl', colorExperience === 'immersive' ? '0 22px 60px rgb(15 23 42 / 0.12)' : shadows.heavy);
+
+    const experienceShadowLg = colorExperience === 'warm'
+      ? '0 16px 42px rgb(73 52 43 / 0.10)'
+      : colorExperience === 'modern-white'
+        ? '0 16px 42px rgb(17 24 39 / 0.08)'
+        : '0 16px 42px rgb(15 23 42 / 0.10)';
+
+    const experienceShadowXl = colorExperience === 'warm'
+      ? '0 22px 60px rgb(73 52 43 / 0.13)'
+      : colorExperience === 'modern-white'
+        ? '0 22px 60px rgb(17 24 39 / 0.10)'
+        : '0 22px 60px rgb(15 23 42 / 0.12)';
+
+    root.style.setProperty('--style-shadow-lg', colorExperience === 'original' ? shadows.heavy : experienceShadowLg);
+    root.style.setProperty('--style-shadow-xl', colorExperience === 'original' ? shadows.heavy : experienceShadowXl);
   }, [websiteSettings.theme, activeTheme]);
 
   const handleWebsiteSettingsUpdate = async (newSettings: WebsiteSettings): Promise<boolean> => {

@@ -496,7 +496,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             <h2 className="text-xl font-black text-slate-950">Choose the complete website colour mode</h2>
                             <p className="text-sm font-semibold leading-6 text-slate-600">This selection controls every public page, Community screen, modal, card, button, form and Admin page. Choose a mode, then click Save Changes.</p>
                         </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
                             <button
                                 type="button"
                                 aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'original'}
@@ -522,6 +522,32 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             >
                                 <span className="block text-base font-black">Immersive Colours</span>
                                 <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'immersive' ? 'text-white/85' : 'text-slate-500'}`}>Applies the solid, eye-comfortable palette across the complete website without decorative gradients.</span>
+                            </button>
+                            <button
+                                type="button"
+                                aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'warm'}
+                                onClick={() => handleNestedChange('theme', 'colorExperience', 'warm')}
+                                className={`rounded-2xl border p-4 text-left transition ${
+                                    (localSettings.theme.colorExperience || 'immersive') === 'warm'
+                                        ? 'border-[#7A4A3A] bg-[#7A4A3A] text-white shadow-lg'
+                                        : 'border-[#DED4C6] bg-[#FFFEFB] text-[#2F2925] hover:border-[#A56A4F]'
+                                }`}
+                            >
+                                <span className="block text-base font-black">Warm Chocolate Cream</span>
+                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'warm' ? 'text-white/85' : 'text-[#6F625B]'}`}>Uses the calm cream, ivory and chocolate colour direction from the Community profile experience.</span>
+                            </button>
+                            <button
+                                type="button"
+                                aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'modern-white'}
+                                onClick={() => handleNestedChange('theme', 'colorExperience', 'modern-white')}
+                                className={`rounded-2xl border p-4 text-left transition ${
+                                    (localSettings.theme.colorExperience || 'immersive') === 'modern-white'
+                                        ? 'border-slate-950 bg-slate-950 text-white shadow-lg'
+                                        : 'border-slate-200 bg-white text-slate-900 hover:border-blue-300'
+                                }`}
+                            >
+                                <span className="block text-base font-black">Modern White</span>
+                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'modern-white' ? 'text-white/85' : 'text-slate-500'}`}>Uses crisp white cards, soft neutral pages and modern blue actions like current premium apps.</span>
                             </button>
                         </div>
                     </section>
