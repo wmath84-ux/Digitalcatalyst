@@ -2399,6 +2399,58 @@ const communityPolishCss = `
       width: min(100%, 44rem);
     }
   }
+
+  /* Instagram-inspired default mobile Community UX */
+  @media (max-width: 767px) {
+    .community-mobile-latest { background: #fff !important; color: #111 !important; }
+    .community-mobile-latest .eduvora-community-app,
+    .community-mobile-latest .community-center-shell,
+    .community-mobile-latest .eduvora-community-main { background: #fff !important; }
+    .community-mobile-latest .eduvora-community-app { border: 0 !important; border-radius: 0 !important; box-shadow: none !important; }
+    .community-mobile-latest .community-desktop-header { min-height: 3.5rem !important; padding: calc(env(safe-area-inset-top) + .35rem) .75rem .4rem !important; border-bottom: 1px solid #e8e8e8 !important; background: rgba(255,255,255,.97) !important; }
+    .community-mobile-latest .community-mobile-title { font-size: 1.05rem !important; font-weight: 800 !important; color: #111 !important; }
+    .community-mobile-latest .community-mobile-back-button,
+    .community-mobile-latest .community-mobile-ai-button,
+    .community-mobile-latest .community-mobile-notification-button { width: 2.45rem !important; height: 2.45rem !important; border: 0 !important; border-radius: 999px !important; background: #f5f5f5 !important; color: #111 !important; }
+    .community-mobile-latest .eduvora-community-main { padding: 0 0 calc(env(safe-area-inset-bottom) + 4.5rem) !important; }
+    .community-mobile-latest .community-mobile-feed-filters { margin: 0 !important; padding: .55rem .75rem !important; border-bottom: 1px solid #e8e8e8; background: rgba(255,255,255,.97) !important; }
+    .community-mobile-latest .community-mobile-feed-filter { min-height: 2rem !important; border: 0 !important; border-radius: 999px !important; background: #f3f3f3 !important; color: #5f5f5f !important; padding: .42rem .72rem !important; }
+    .community-mobile-latest .community-mobile-feed-filter.is-active { background: #111 !important; color: #fff !important; }
+    .community-mobile-latest .community-desktop-feed-card { margin: 0 !important; border-width: 0 0 1px !important; border-color: #e8e8e8 !important; border-radius: 0 !important; box-shadow: none !important; }
+    .community-mobile-latest .community-desktop-feed-card-main { padding: .78rem .85rem .55rem !important; }
+    .community-mobile-latest .community-mobile-feed-card-title { font-size: .9rem !important; color: #111 !important; }
+    .community-mobile-latest .community-mobile-feed-card-meta,
+    .community-mobile-latest .community-mobile-feed-card-time { color: #737373 !important; }
+    .community-mobile-latest .community-mobile-feed-card-body { color: #262626 !important; font-size: .82rem !important; line-height: 1.45 !important; }
+    .community-mobile-latest .community-desktop-feed-card-actions { border-top: 0 !important; padding: .2rem .65rem .5rem !important; gap: .15rem !important; }
+    .community-mobile-latest .community-desktop-feed-card-actions button { min-width: 2.75rem !important; min-height: 2.75rem !important; color: #111 !important; }
+    .community-mobile-latest .community-desktop-post-card { border: 0 !important; border-radius: 0 !important; padding: .9rem .85rem 1rem !important; box-shadow: none !important; }
+    .community-mobile-latest .community-desktop-post-media { margin-inline: -.85rem !important; width: calc(100% + 1.7rem) !important; border-inline: 0 !important; border-radius: 0 !important; background: #050505 !important; }
+    .community-mobile-latest .community-mobile-post-title { font-size: 1.18rem !important; color: #111 !important; }
+    .community-mobile-latest .community-mobile-post-body { color: #262626 !important; font-size: .9rem !important; }
+    .community-mobile-latest .community-desktop-thread-scroll { background: #fff !important; padding: 0 0 5rem !important; }
+    .community-mobile-latest .community-desktop-reply-composer { padding: .45rem .65rem calc(env(safe-area-inset-bottom) + .45rem) !important; border-top: 1px solid #e8e8e8 !important; box-shadow: none !important; }
+    .community-mobile-latest .community-desktop-reply-composer textarea { border: 1px solid #ddd !important; border-radius: 999px !important; background: #fff !important; }
+    .community-mobile-latest #community-bottom-dock { border-top: 1px solid #e8e8e8 !important; background: rgba(255,255,255,.98) !important; padding: .28rem .35rem calc(env(safe-area-inset-bottom) + .28rem) !important; }
+    .community-mobile-latest .community-mobile-dock-item { min-height: 3.2rem !important; border-radius: .65rem !important; }
+    .community-mobile-latest .community-mobile-dock-item[class*="bg-[var(--community-dock-active-bg)]"] { background: #f3f3f3 !important; color: #111 !important; }
+    .community-mobile-latest .community-mobile-dock-icon { font-size: 1.18rem !important; }
+    .community-mobile-latest .community-mobile-dock-label { font-size: .5rem !important; color: currentColor !important; }
+    .community-mobile-latest .community-status-grid-shell { padding: .5rem !important; border-radius: 0 !important; }
+  }
+
+  .community-status-reel-shell { background: #000 !important; color: #fff !important; }
+  .community-status-reel-shell .community-status-reel-backdrop { background: radial-gradient(circle at 50% 20%, rgba(255,255,255,.08), transparent 34%), #000 !important; }
+  .community-status-reel-shell .community-status-reel-card { background: #050505 !important; color: #fff !important; }
+  .community-status-reel-shell .community-story-media > * { width: 100%; max-height: 100%; }
+  .community-status-reel-shell .community-story-media img,
+  .community-status-reel-shell .community-story-media video { width: 100% !important; height: 100% !important; max-height: 100dvh !important; object-fit: contain !important; background: #000 !important; }
+  .community-status-reel-shell .community-story-progress span > span { width: 0; }
+  .community-status-reel-shell .community-story-progress span.is-active > span { animation: communityStoryProgress 6s linear both; }
+  .community-status-reel-shell .community-story-action.is-liked { background: rgba(225,29,72,.82) !important; color: #fff !important; }
+  @keyframes communityStoryProgress { from { width: 0; } to { width: 100%; } }
+  @media (min-width: 768px) { .community-status-reel-shell .community-story-slide { padding: 1.5rem 5rem; } }
+
   @media (prefers-reduced-motion: reduce) {
     .eduvora-community-polish *, .eduvora-community-polish *::before, .eduvora-community-polish *::after {
       transition-duration: 0.01ms !important;
@@ -5777,22 +5829,43 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const reelStatuses = [...statusCards.slice(selectedIndex), ...statusCards.slice(0, selectedIndex)];
 
     return (
-      <div className="community-status-reel-shell fixed inset-0 z-[1500]">
-        <button type="button" onClick={goBack} className="community-status-reel-control fixed left-4 top-4 z-20 rounded-full border px-4 py-2 text-sm font-black shadow-xl">← Back</button>
-        <div className="h-full snap-y snap-mandatory overflow-y-auto scroll-smooth custom-scrollbar" onScroll={(event) => { const viewport = event.currentTarget; const index = Math.round(viewport.scrollTop / Math.max(1, viewport.clientHeight)); const visibleStatus = reelStatuses[Math.min(reelStatuses.length - 1, Math.max(0, index))]; if (visibleStatus && visibleStatus.id !== selectedStatusId) { setSelectedStatusId(visibleStatus.id); void recordStatusView(visibleStatus.id); } }}>
-          {reelStatuses.map((card) => (
-            <section key={card.id} className="relative flex h-[100dvh] snap-start items-center justify-center overflow-hidden p-4" onMouseEnter={() => { setSelectedStatusId(card.id); void recordStatusView(card.id); }}>
-              <div className="community-status-reel-backdrop absolute inset-0" />
-              <div className="relative grid w-full max-w-5xl items-center gap-5 md:grid-cols-[1fr_96px]">
-                <article className="community-status-reel-card mx-auto flex min-h-[74dvh] w-full max-w-[520px] flex-col justify-between rounded-[2.5rem] border p-6 shadow-[0_32px_120px_rgba(0,0,0,0.42)]">
-                  <div className="flex items-center justify-between gap-3"><button type="button" onClick={() => { const ownerId = card.ownerId || card.creatorId; if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); setPage('profile'); setPageStack([]); } }} className="flex min-w-0 items-center gap-2 rounded-full border border-[var(--status-card-border)] bg-white px-3 py-2 text-left"><Avatar value={getStatusOwnerIdentity(card).avatar} size="h-8 w-8" /><span className="max-w-[10rem] truncate text-xs font-black text-[var(--status-card-ink)]">{getStatusOwnerIdentity(card).name}</span></button><span className="rounded-full border border-[var(--status-card-border)] bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-[var(--status-card-body)]">{card.slots}</span></div>
-                  {renderStatusReelContent(card)}
-                  <div className="flex items-center justify-between text-sm font-black text-[var(--status-card-body)]"><span>Swipe for next status</span><button type="button" onClick={() => setStatusViewerPanelId(card.id)} className="rounded-full border border-[var(--status-card-border)] bg-white px-3 py-1 text-xs font-black text-[var(--status-card-ink)]">👁️ {card.views} views</button></div>
+      <div className="community-status-reel-shell fixed inset-0 z-[1500] overflow-hidden bg-black">
+        <div className="community-story-progress fixed inset-x-0 top-0 z-40 flex gap-1 px-3 pt-[calc(env(safe-area-inset-top)+0.55rem)] md:left-1/2 md:max-w-[31rem] md:-translate-x-1/2">
+          {reelStatuses.map((card) => <span key={`progress-${card.id}`} className={`h-[3px] flex-1 overflow-hidden rounded-full bg-white/25 ${card.id === selectedStatusId ? 'is-active' : ''}`}><span className="block h-full rounded-full bg-white" /></span>)}
+        </div>
+        <button type="button" onClick={goBack} aria-label="Close story viewer" className="community-status-reel-control fixed left-3 top-[calc(env(safe-area-inset-top)+1.05rem)] z-50 flex h-10 w-10 items-center justify-center rounded-full border text-lg font-black shadow-xl">←</button>
+        <div className="h-full snap-y snap-mandatory overflow-y-auto overscroll-y-contain scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" onScroll={(event) => { const viewport = event.currentTarget; const index = Math.round(viewport.scrollTop / Math.max(1, viewport.clientHeight)); const visibleStatus = reelStatuses[Math.min(reelStatuses.length - 1, Math.max(0, index))]; if (visibleStatus && visibleStatus.id !== selectedStatusId) { setSelectedStatusId(visibleStatus.id); void recordStatusView(visibleStatus.id); } }}>
+          {reelStatuses.map((card) => {
+            const owner = getStatusOwnerIdentity(card);
+            const liked = Boolean(card.likedByUsers?.[currentUserKey]) || likedStatuses.includes(card.id);
+            return (
+              <section key={card.id} className="community-story-slide relative flex h-[100dvh] snap-start items-center justify-center overflow-hidden bg-black" onMouseEnter={() => { setSelectedStatusId(card.id); void recordStatusView(card.id); }}>
+                <div className="community-status-reel-backdrop absolute inset-0" />
+                <article className="community-status-reel-card relative flex h-[100dvh] w-full max-w-[31rem] flex-col overflow-hidden border-0 bg-black shadow-[0_30px_100px_rgba(0,0,0,0.65)] md:h-[min(92dvh,880px)] md:rounded-[1.75rem]">
+                  <div className="community-story-topbar absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 px-4 pt-[calc(env(safe-area-inset-top)+3.25rem)] md:pt-14">
+                    <button type="button" onClick={() => { const ownerId = card.ownerId || card.creatorId; if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); setPage('profile'); setPageStack([]); } }} className="flex min-w-0 items-center gap-2 text-left text-white">
+                      <Avatar value={owner.avatar} size="h-9 w-9" className="ring-2 ring-white/80" />
+                      <span className="min-w-0"><span className="block max-w-[11rem] truncate text-sm font-black">{owner.name}</span><span className="block text-[11px] font-semibold text-white/70">{card.slots}</span></span>
+                    </button>
+                    <button type="button" onClick={() => setStatusViewerPanelId(card.id)} className="community-status-reel-control flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-xs font-black">•••</button>
+                  </div>
+                  <div className="community-story-media flex min-h-0 flex-1 items-center justify-center">{renderStatusReelContent(card)}</div>
+                  <div className="community-story-bottom absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black via-black/72 to-transparent px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-24 text-white">
+                    <h2 className="line-clamp-2 text-lg font-black leading-tight">{card.title}</h2>
+                    {card.body ? <p className="mt-1 line-clamp-3 text-sm font-semibold leading-5 text-white/85">{card.body}</p> : null}
+                    <div className="mt-4 flex items-end justify-between gap-3">
+                      <button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="min-h-11 flex-1 rounded-full border border-white/25 bg-black/35 px-4 text-left text-sm font-semibold text-white/80 backdrop-blur-md">Reply or discuss…</button>
+                      <div className="flex items-center gap-2">
+                        <button type="button" onClick={() => toggleStatusLike(card.id)} aria-label="Like story" className={`community-story-action flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 text-xl backdrop-blur-md ${liked ? 'is-liked' : ''}`}>♡</button>
+                        <button type="button" onClick={() => setStatusViewerPanelId(card.id)} aria-label="Story activity" className="community-story-action flex h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 px-3 text-xs font-black backdrop-blur-md">👁 {card.views}</button>
+                        {isOwnCommunityId(card.ownerId) ? <button type="button" onClick={() => deleteOwnStatusStory(card)} aria-label="Delete story" className="community-story-action flex h-11 w-11 items-center justify-center rounded-full border border-red-300/30 bg-red-600/50 text-base backdrop-blur-md">🗑</button> : null}
+                      </div>
+                    </div>
+                  </div>
                 </article>
-                <div className="mx-auto flex flex-row justify-center gap-3 md:flex-col"><button type="button" onClick={() => toggleStatusLike(card.id)} className={`community-status-reel-control flex h-16 w-16 flex-col items-center justify-center rounded-full border shadow-2xl transition hover:scale-105 ${(card.likedByUsers?.[currentUserKey] || likedStatuses.includes(card.id)) ? '!bg-[#FCE8E6] !text-[#C5221F]' : ''}`}><span>❤️</span><span className="text-[11px] font-black">{card.likedBy}</span></button><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="community-status-reel-control flex h-16 w-16 flex-col items-center justify-center rounded-full border shadow-2xl transition hover:scale-105"><span>💬</span><span className="text-[11px] font-black">Discuss</span></button>{isOwnCommunityId(card.ownerId) ? <button type="button" onClick={() => deleteOwnStatusStory(card)} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#A33B3B] text-white shadow-2xl transition hover:scale-105"><span>🗑️</span><span className="text-[11px] font-black">Delete</span></button> : null}</div>
-              </div>
-            </section>
-          ))}
+              </section>
+            );
+          })}
         </div>
       </div>
     );
@@ -6243,7 +6316,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     ...((settings?.content as any)?.communityStyle || {}),
   };
   const useLatestDesktopLayout = communityStyle.desktopLayout !== 'classic';
-  const useLatestMobileLayout = communityStyle.mobileLayout !== 'classic';
+  const useLatestMobileLayout = true;
 
   const communityCssVars = useMemo(
     () => toCommunityCssVars(communityStyle),
