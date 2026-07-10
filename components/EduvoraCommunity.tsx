@@ -183,13 +183,26 @@ const readJsonObject = <T,>(key: string, fallback: T): T => {
 };
 
 const defaultCommunityProfile: CommunityProfile = { name: '', username: '', avatar: '', bio: '' };
+const DEFAULT_COMMUNITY_AVATAR = '👤';
 
 const isInlineImageDataUrl = (value?: string) => /^data:image\//i.test(String(value || '').trim());
+const normalizeCommunityAvatar = (value?: string) => {
+  const trimmed = String(value || '').trim();
+  if (!trimmed || trimmed === DEFAULT_COMMUNITY_AVATAR || isInlineImageDataUrl(trimmed)) return '';
+  if (!/^https?:\/\//i.test(trimmed)) return '';
+  try {
+    const hostname = new URL(trimmed).hostname.toLowerCase();
+    if (hostname === 'googleusercontent.com' || hostname.endsWith('.googleusercontent.com') || hostname === 'ggpht.com' || hostname.endsWith('.ggpht.com')) return '';
+  } catch {
+    return '';
+  }
+  return trimmed;
+};
 const sanitizeCommunityProfileForStorage = (value: CommunityProfile): CommunityProfile => ({
   ...value,
   name: String(value.name || '').trim(),
   username: normalizeUsername(String(value.username || '')),
-  avatar: isInlineImageDataUrl(value.avatar) ? '' : String(value.avatar || '').trim(),
+  avatar: normalizeCommunityAvatar(value.avatar),
   bio: String(value.bio || '').slice(0, PROFILE_BIO_MAX_LENGTH),
 });
 const safeStoreCommunityJson = (key: string, value: unknown) => {
@@ -224,11 +237,10 @@ const getCommunityProfileStorageKey = (uid?: string | null) => uid ? `${COMMUNIT
 const buildProfileFromUser = (user?: User | null, uid?: string | null): CommunityProfile => {
   const seed = uid || user?.id || user?.uid || user?.email || 'member';
   const name = String(user?.name || '').trim() || buildStableCommunityName(seed);
-  const googlePhoto = String(user?.photoURL || (user as any)?.avatarUrl || '').trim();
   return {
     name,
     username: normalizeUsername((user as any)?.generatedUsername || name) || buildStableCommunityUsername(seed),
-    avatar: googlePhoto,
+    avatar: '',
     bio: '',
   };
 };
@@ -314,11 +326,7 @@ const creators: Creator[] = [
   { id: 'yash', username: 'yashgrowth', name: 'Yash Verma', avatar: '🧑‍🚀', role: 'Growth experiments', followers: 690, mutual: false },
 ];
 
-const initialMessages: FeedMessage[] = [
-  { id: 1, admin: 'Admin Aarya', badge: 'Pinned announcement', avatar: '🧑‍💻', title: 'New creator funnel PDF is live', body: 'Batch 06 students can now download the revised funnel checklist. Reply below with your best landing page hook and we will review the strongest ones in tomorrow\'s sprint.', time: '9:41 AM', creatorId: 'riya', postType: 'text', reactions: ['🔥 24', '🚀 12', '✅ 31'], replies: [{ id: 1, author: 'Riya', avatar: '🧕', text: 'My hook: Stop wasting ad spend on cold pages. Build trust first.', time: '9:48 AM' }, { id: 2, author: 'Kabir', avatar: '🧑‍🎨', text: 'Can we include a one-page audit template too?', time: '9:55 AM' }, { id: 3, author: 'Meera', avatar: '👩‍💻', text: 'The CTA examples are super clear now.', time: '10:02 AM' }] },
-  { id: 2, admin: 'Admin Veer', badge: 'Daily task', avatar: '👨‍🏫', title: 'Drop your 3-line offer stack', body: 'Normal users cannot create main feed posts, but everyone can contribute inside the thread. Keep your offer short: product, bonus, guarantee.', time: '11:20 AM', creatorId: 'kabir', postType: 'poll', pollOptions: ['Product', 'Bonus', 'Guarantee'], pollVotes: [12, 9, 6], reactions: ['💡 18', '❤️ 29', '📌 7'], replies: [{ id: 1, author: 'Nisha', avatar: '👩‍🎓', text: 'Product: Canva kit. Bonus: 25 captions. Guarantee: 7-day launch clarity.', time: '11:26 AM' }, { id: 2, author: 'Arjun', avatar: '🧑‍💼', text: 'I need help making my guarantee stronger.', time: '11:31 AM' }] },
-  { id: 3, admin: 'Admin Sia', badge: 'Poll reminder', avatar: '👩‍🚀', title: 'Choose next workshop topic', body: 'Poll closes tonight. Vote for reels scripting, email automation, or beginner ads. Detailed notes will be uploaded in Status after the workshop.', time: '1:05 PM', creatorId: 'meera', postType: 'image', imagePreview: '🖼️', reactions: ['🗳️ 42', '✨ 16', '👀 22'], replies: [{ id: 1, author: 'Tara', avatar: '👩‍🎤', text: 'Email automation please. It feels most confusing right now.', time: '1:17 PM' }, { id: 2, author: 'Yash', avatar: '🧑‍🚀', text: 'Beginner ads + budget sheet would be amazing.', time: '1:22 PM' }] },
-];
+const initialMessages: FeedMessage[] = [];
 
 const initialStatusCards: StatusCard[] = [
   { id: 1, title: 'Morning sprint template', body: 'Use this prompt stack before your first sales call today.', gradient: 'from-[#1A73E8] via-[#34A853] to-[#C2E7FF]', likedBy: 0, views: 0, slots: 'Text · 1 min', type: 'text' },
@@ -491,8 +499,10 @@ const countEmojiUsers = (value: unknown): Record<string, number> => {
 
 const normalizeFeedMessage = (message: FeedMessage): FeedMessage => ({
   ...message,
+  avatar: normalizeCommunityAvatar(message.avatar),
+  authorAvatar: normalizeCommunityAvatar(message.authorAvatar),
   reactions: Array.isArray(message.reactions) ? message.reactions : [],
-  replies: Array.isArray(message.replies) ? message.replies : [],
+  replies: Array.isArray(message.replies) ? message.replies.map((reply) => ({ ...reply, avatar: normalizeCommunityAvatar(reply.avatar) })) : [],
   reactionCounts: message.reactionCounts && typeof message.reactionCounts === 'object' ? message.reactionCounts : {},
   likeCount: Number(message.likeCount) || 0,
   replyCount: Number(message.replyCount) || (Array.isArray(message.replies) ? message.replies.length : 0),
@@ -615,7 +625,7 @@ const mapFeedDoc = (snapshotDoc: { id: string; data: () => Record<string, any> }
     docId: snapshotDoc.id,
     admin: data.admin || data.authorName || data.displayName || 'Eduvora Creator',
     badge: data.badge || 'Community post',
-    avatar: data.avatar || data.authorAvatar || data.photoURL || '',
+    avatar: normalizeCommunityAvatar(data.avatar || data.authorAvatar || data.photoURL),
     title: data.title || 'Fresh community update',
     body: data.body || data.text || '',
     time: data.time || formatCommunityTime(data.createdAt),
@@ -651,7 +661,7 @@ const mapMasterTagDoc = (snapshotDoc: { id: string; data: () => Record<string, a
     id: typeof data.id === 'number' ? data.id : Number.parseInt(snapshotDoc.id.replace(/\D/g, '').slice(-9), 10) || Date.now(),
     docId: snapshotDoc.id,
     author: data.author || data.authorName || 'Eduvora Member',
-    avatar: data.avatar || '🧑‍🎓',
+    avatar: normalizeCommunityAvatar(data.avatar || data.authorAvatar || data.photoURL),
     category: (masterTagCategories as readonly string[]).includes(data.category) ? data.category : 'Other',
     title: data.title || data.targetMasterName || data.externalMasterName || 'A respected master',
     detail: data.detail || data.message || data.body || '',
@@ -693,7 +703,7 @@ const mapStatusDoc = (snapshotDoc: { id: string; data: () => Record<string, any>
     ownerId: data.ownerId,
     creatorId: data.creatorId || data.ownerId,
     authorName: data.authorName || data.displayName || data.admin || '',
-    authorAvatar: data.authorAvatar || data.avatar || data.photoURL || '',
+    authorAvatar: normalizeCommunityAvatar(data.authorAvatar || data.avatar || data.photoURL),
     imagePreview: data.imagePreview,
     imageLayout: data.imageLayout || (data.type === 'image' ? 'original' : undefined),
     pollOptions: Array.isArray(data.pollOptions) ? data.pollOptions : undefined,
@@ -800,6 +810,65 @@ const communityPolishCss = `
   .eduvora-community-polish button:disabled {
     box-shadow: none !important;
   }
+  .eduvora-community-polish .community-avatar-shell {
+    background: #F4F6F8 !important;
+    border-color: #D9E0E8 !important;
+    color: #5D6B7C !important;
+  }
+  .eduvora-community-polish .community-status-grid-shell {
+    background: var(--community-soft) !important;
+    border: 1px solid var(--community-border) !important;
+  }
+  .eduvora-community-polish .community-status-tile {
+    background: #FFFDF8 !important;
+    border-color: #E2D7C8 !important;
+    color: #302A26 !important;
+  }
+  .eduvora-community-polish .community-status-card-surface {
+    background: #F7F0E5 !important;
+  }
+  .eduvora-community-polish .community-status-tone-image { background: #EEEAE3 !important; }
+  .eduvora-community-polish .community-status-tone-poll { background: #E9EEE7 !important; }
+  .eduvora-community-polish .community-status-card-vignette { background: rgba(48, 42, 38, 0.035) !important; }
+  .eduvora-community-polish .community-status-owner-chip,
+  .eduvora-community-polish .community-status-metric-chip {
+    background: rgba(255, 255, 255, 0.92) !important;
+    border-color: #DED3C5 !important;
+    color: #302A26 !important;
+  }
+  .eduvora-community-polish .community-status-reel-shell {
+    --status-card-bg: #F5EBDD;
+    --status-card-ink: #2F2925;
+    --status-card-body: #695D55;
+    --status-card-border: #D5C5B3;
+    --status-control-bg: rgba(18, 24, 35, 0.78);
+    background: #090F1C !important;
+    color: var(--status-card-ink) !important;
+  }
+  .eduvora-community-polish .community-status-reel-backdrop { background: #0B1322 !important; }
+  .eduvora-community-polish .community-status-reel-card,
+  .eduvora-community-polish .community-status-detail-card {
+    background: var(--status-card-bg) !important;
+    border-color: var(--status-card-border) !important;
+    color: var(--status-card-ink) !important;
+    backdrop-filter: none !important;
+  }
+  .eduvora-community-polish .community-status-reel-control {
+    background: var(--status-control-bg) !important;
+    border-color: rgba(255, 255, 255, 0.18) !important;
+    color: #FFFFFF !important;
+  }
+  .eduvora-community-polish .community-status-poll-option {
+    background: #FFFDF8 !important;
+    border-color: #D7C9B8 !important;
+    color: var(--status-card-ink) !important;
+  }
+  .eduvora-community-polish .community-status-poll-option.is-selected {
+    background: #E7F0E6 !important;
+    border-color: #8BA68B !important;
+    color: #315A39 !important;
+  }
+  .eduvora-community-polish .community-status-poll-progress { background: rgba(122, 74, 58, 0.12) !important; }
   @media (max-width: 767px) {
     .eduvora-community-app {
       border: 0 !important;
@@ -831,14 +900,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const pageRef = useRef<CommunityPage>('chat');
   const activeViewRef = useRef<CommunityView>('feed');
   const pageStackRef = useRef<CommunityPage[]>([]);
-  const [selectedMessageId, setSelectedMessageId] = useState(initialMessages[0].id);
+  const [selectedMessageId, setSelectedMessageId] = useState(0);
   const [selectedStatusId, setSelectedStatusId] = useState(initialStatusCards[0].id);
   const [statusViewerPanelId, setStatusViewerPanelId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<FeedMessage[]>(initialMessages);
+  const [messages, setMessages] = useState<FeedMessage[]>([]);
   const [statusCards, setStatusCards] = useState<StatusCard[]>(initialStatusCards);
   const [likedStatuses, setLikedStatuses] = useState<number[]>([]);
   const [likedMessages, setLikedMessages] = useState<number[]>([]);
-  const [viewedStatusIds, setViewedStatusIds] = useState<number[]>([]);
+  const pendingStatusViewKeysRef = useRef<Set<string>>(new Set());
   const [imageLightbox, setImageLightbox] = useState<{ src: string; alt: string; mode: 'thumbnail' | 'original' } | null>(null);
   useEffect(() => {
     if (typeof document === 'undefined') return;
@@ -987,10 +1056,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const directChatMessagesEndRef = useRef<HTMLDivElement>(null);
   const currentUserKey = guardedAuth.currentUser?.uid || currentUser?.id || currentUser?.uid || authEmail || `profile-${normalizeUsername(profile.username || profile.name) || 'local'}`;
   const isOwnCommunityId = (id?: string) => id === currentUserKey || id === 'me';
-  const getGoogleProfileAvatar = () => String(currentUser?.photoURL || guardedAuth.currentUser?.photoURL || (currentUser as any)?.avatarUrl || '').trim();
-  const isMeaningfulCommunityAvatar = (value?: string) => Boolean(String(value || '').trim()) && String(value || '').trim() !== '👤';
-  const getOwnDisplayAvatar = () => isMeaningfulCommunityAvatar(profile.avatar) ? profile.avatar : getGoogleProfileAvatar();
-  const getDraftDisplayAvatar = () => isMeaningfulCommunityAvatar(profileDraft.avatar) ? profileDraft.avatar : getGoogleProfileAvatar();
+  const getOwnDisplayAvatar = () => normalizeCommunityAvatar(profile.avatar);
+  const getDraftDisplayAvatar = () => normalizeCommunityAvatar(profileDraft.avatar);
   const selectedMessage = messages.find((message) => message.id === selectedMessageId) || messages[0];
   const selectedStatus = statusCards.find((status) => status.id === selectedStatusId) || statusCards[0];
   const currentProfileCreator = useMemo<Creator>(() => ({
@@ -1016,7 +1083,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const hasScopedProfile = typeof window !== 'undefined' && Boolean(localStorage.getItem(getCommunityProfileStorageKey(currentUserKey)));
     const shouldUseLegacy = !hasScopedProfile && legacyProfile.name && legacyProfile.name !== 'Eduvora Member';
     const mergedProfile = { ...baseProfile, ...(shouldUseLegacy ? legacyProfile : scopedProfile) };
-    const nextProfile = sanitizeCommunityProfileForStorage({ ...mergedProfile, avatar: String(mergedProfile.avatar || baseProfile.avatar || '').trim() });
+    const nextProfile = sanitizeCommunityProfileForStorage({ ...mergedProfile, avatar: normalizeCommunityAvatar(mergedProfile.avatar) });
     setProfile(nextProfile);
     setProfileDraft(nextProfile);
   }, [currentUserKey, currentUser?.id, currentUser?.name, currentUser?.photoURL]);
@@ -1831,7 +1898,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         ;
       if (!localAdminPosts.length) return;
       setMessages((current) => {
-        const mergedMessages = mergeUnexpiredByIdentity(localAdminPosts, current.map(normalizeFeedMessage), initialMessages.map(normalizeFeedMessage), POST_TTL_MS);
+        const mergedMessages = mergeUnexpiredByIdentity(localAdminPosts, current.map(normalizeFeedMessage), [], POST_TTL_MS);
         setAdminPosts(mergedMessages.filter((message) => message.source === 'admin' || message.badge === 'ADMIN POST' || message.creatorId === 'admin'));
         return mergedMessages;
       });
@@ -1870,7 +1937,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           const replies = mergeReplyLists(remoteMessage.replies, mergeReplyLists(currentMatch.replies, pendingReplies));
           return { ...remoteMessage, replies, replyCount: Math.max(remoteMessage.replyCount || 0, currentMatch.replyCount || 0, replies.length) };
         });
-        const mergedMessages = mergeUnexpiredByIdentity(stabilizedFirebaseMessages, current.map(normalizeFeedMessage), initialMessages.map(normalizeFeedMessage), POST_TTL_MS);
+        const mergedMessages = mergeUnexpiredByIdentity(stabilizedFirebaseMessages, current.map(normalizeFeedMessage), [], POST_TTL_MS);
         setAdminPosts(mergedMessages.filter((message) => message.source === 'admin' || message.badge === 'ADMIN POST' || message.creatorId === 'admin'));
         return mergedMessages;
       });
@@ -1981,7 +2048,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         const defaultishIdentity = !storedName || normalizeSearchText(`${storedName} ${storedUsername}`) === normalizeSearchText('Eduvora Member eduvora_member') || normalizeSearchText(storedName) === normalizeSearchText('Eduvora Member');
         const rawName = defaultishIdentity ? buildStableCommunityName(userId) : storedName;
         const rawUsername = defaultishIdentity ? buildStableCommunityUsername(userId) : storedUsername || rawName;
-        const storedAvatar = typeof data.avatar === 'string' && data.avatar.trim() ? data.avatar.trim() : typeof data.photoURL === 'string' && data.photoURL.trim() ? data.photoURL.trim() : '';
+        const storedAvatar = normalizeCommunityAvatar(typeof data.avatar === 'string' && data.avatar.trim() ? data.avatar : typeof data.photoURL === 'string' ? data.photoURL : '');
         const rawAvatar = defaultishIdentity ? '' : storedAvatar;
         const rawRole = typeof data.role === 'string' && data.role.trim() ? data.role : 'student';
         const subjects = Array.isArray(data.subjects) ? data.subjects.filter((value): value is string => typeof value === 'string') : [];
@@ -2267,21 +2334,30 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const getStatusOwnerIdentity = (status: StatusCard) => {
     const identity = getIdentityForId(status.ownerId || status.creatorId);
-    return { name: identity.name || status.authorName || 'Community member', avatar: identity.avatar || status.authorAvatar || '' };
+    return { name: identity.name || status.authorName || 'Community member', avatar: identity.avatar || normalizeCommunityAvatar(status.authorAvatar) };
   };
 
   const resolveAvatar = (message: FeedMessage) => {
     const ownerIdentity = getIdentityForId(message.ownerId || message.creatorId);
-    return ownerIdentity.avatar || message.avatar || '';
+    return ownerIdentity.avatar || normalizeCommunityAvatar(message.avatar);
   };
   const resolveName = (message: FeedMessage) => {
     const ownerIdentity = getIdentityForId(message.ownerId || message.creatorId);
     return ownerIdentity.name || message.admin || 'Community member';
   };
 
-  const Avatar: React.FC<{ value?: string; size?: string; className?: string }> = ({ value = '', size = 'h-12 w-12', className = '' }) => (
-    <div className={`${size} shrink-0 overflow-hidden rounded-full bg-gradient-to-br from-[#E8F0FE] via-[#D3E3FD] to-[#C2E7FF] text-xl shadow-inner ring-1 ring-[#D2E3FC] text-[#202124] ${className}`}>{isImageAvatar(value) ? <img src={value} alt="Profile avatar" className="h-full w-full object-cover" /> : value ? <span className="flex h-full w-full items-center justify-center">{value}</span> : <span className="flex h-full w-full items-center justify-center" aria-hidden="true" />}</div>
-  );
+  const Avatar: React.FC<{ value?: string; size?: string; className?: string }> = ({ value = '', size = 'h-12 w-12', className = '' }) => {
+    const imageAvatar = normalizeCommunityAvatar(value);
+    return (
+      <div className={`community-avatar-shell relative ${size} shrink-0 overflow-hidden rounded-full text-xl shadow-inner ring-1 ${className}`} aria-label={imageAvatar ? 'Community profile photo' : 'Default community profile'}>
+        <svg viewBox="0 0 64 64" aria-hidden="true" className="absolute inset-[18%] h-[64%] w-[64%] fill-current">
+          <circle cx="32" cy="22" r="12" />
+          <path d="M11 55c1.6-12.4 9.7-19 21-19s19.4 6.6 21 19H11Z" />
+        </svg>
+        {imageAvatar ? <img src={imageAvatar} alt="Community profile" className="absolute inset-0 h-full w-full object-cover" onError={(event) => { event.currentTarget.style.display = 'none'; }} /> : null}
+      </div>
+    );
+  };
 
   const BlueVerifiedTick = ({ label = 'Verified admin' }: { label?: string }) => <span title={label} aria-label={label} className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-[#1769FF] text-[11px] font-black leading-none text-white shadow-[0_6px_16px_rgba(23,105,255,0.24)]">✓</span>;
   const isOfficialAdminMessage = (message: FeedMessage) => message.source === 'admin' || message.creatorId === 'admin' || /admin/i.test(message.badge || '') || /^admin\s/i.test(message.admin || '');
@@ -2335,12 +2411,47 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }));
   };
 
-  const recordStatusView = (statusId: number) => {
-    if (viewedStatusIds.includes(statusId)) return;
+  const recordStatusView = async (statusId: number) => {
     const targetStatus = statusCards.find((status) => status.id === statusId);
-    setViewedStatusIds((current) => [...current, statusId]);
-    setStatusCards((current) => current.map((status) => status.id === statusId ? { ...status, views: status.views + 1, viewedByUsers: { ...(status.viewedByUsers || {}), [currentUserKey]: true } } : status));
-    if (targetStatus?.docId) updateDoc(doc(db, COMMUNITY_STATUS, targetStatus.docId), { views: increment(1), [`viewedByUsers.${currentUserKey}`]: true }).catch((error) => console.warn('Status view update failed', error));
+    const viewerId = guardedAuth.currentUser?.uid || currentUser?.uid || currentUser?.id || currentUserKey;
+    if (!targetStatus || !viewerId) return;
+
+    const statusKey = String(targetStatus.docId || targetStatus.id);
+    if (targetStatus.viewedByUsers?.[viewerId] || pendingStatusViewKeysRef.current.has(statusKey)) return;
+
+    pendingStatusViewKeysRef.current.add(statusKey);
+    const applyLocalView = (remove = false) => {
+      setStatusCards((current) => current.map((status) => {
+        if (status.id !== statusId) return status;
+        const nextViewedByUsers = { ...(status.viewedByUsers || {}) };
+        if (remove) delete nextViewedByUsers[viewerId];
+        else nextViewedByUsers[viewerId] = true;
+        return { ...status, viewedByUsers: nextViewedByUsers, views: Object.values(nextViewedByUsers).filter(Boolean).length };
+      }));
+    };
+
+    applyLocalView();
+    if (!targetStatus.docId) return;
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const statusRef = doc(db, COMMUNITY_STATUS, targetStatus.docId!);
+        const snapshot = await transaction.get(statusRef);
+        if (!snapshot.exists()) return;
+        const data = snapshot.data() as Record<string, any>;
+        const viewedByUsers = { ...(data.viewedByUsers || {}) } as Record<string, boolean>;
+        if (viewedByUsers[viewerId]) return;
+        viewedByUsers[viewerId] = true;
+        transaction.update(statusRef, {
+          viewedByUsers,
+          views: Object.values(viewedByUsers).filter(Boolean).length,
+        });
+      });
+    } catch (error) {
+      pendingStatusViewKeysRef.current.delete(statusKey);
+      applyLocalView(true);
+      console.warn('Status view transaction failed', error);
+    }
   };
 
   const openStatusReel = (statusId: number) => {
@@ -2876,6 +2987,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         photoURL: nextProfile.avatar || '',
         avatar: nextProfile.avatar || '',
         bio: nextProfile.bio,
+        communityProfileSaved: true,
+        communityAvatarSet: Boolean(nextProfile.avatar),
         updatedAt: Date.now(),
       });
 
@@ -3688,7 +3801,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const mine = isOwnCommunityId(reply.ownerId || reply.senderId) || reply.author === profile.name;
     const replyIdentity = getIdentityForId(reply.ownerId || reply.senderId);
     const replyName = replyIdentity.name || reply.author || 'Member';
-    const replyAvatar = replyIdentity.avatar || reply.avatar || '';
+    const replyAvatar = replyIdentity.avatar || normalizeCommunityAvatar(reply.avatar);
     const failed = reply.status === 'failed';
     const deleted = reply.status === 'deleted' || reply.status === 'hidden';
     return (
@@ -3832,9 +3945,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
               type="button"
               onClick={() => voteOnStatusPoll(card.id, index)}
               disabled={selectedOption !== undefined}
-              className={`relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left text-sm font-black shadow-inner transition sm:text-base disabled:cursor-not-allowed ${selected ? 'border-white bg-white text-[#137333]' : 'border-white/30 bg-white/18 text-white hover:bg-white/25 disabled:hover:bg-white/18'}`}
+              className={`community-status-poll-option relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left text-sm font-black shadow-inner transition sm:text-base disabled:cursor-not-allowed ${selected ? 'is-selected' : ''}`}
             >
-              <span className="absolute inset-y-0 left-0 bg-white/30" style={{ width: selectedOption !== undefined ? `${percent}%` : '0%' }} />
+              <span className="community-status-poll-progress absolute inset-y-0 left-0" style={{ width: selectedOption !== undefined ? `${percent}%` : '0%' }} />
               <span className="relative flex items-center justify-between gap-3">
                 <span className="min-w-0 flex-1 truncate">
                   <span className="mr-2 opacity-70">{index + 1}.</span>
@@ -3854,25 +3967,25 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const title = card.title.length > 64 ? `${card.title.slice(0, 64)}...` : card.title;
     const preview = hasDetail ? `${card.body.slice(0, card.imagePreview ? 96 : 150)}...` : card.body;
 
-    return <div className="min-h-0 flex-1 overflow-hidden"><div className="min-h-0 max-h-[62dvh] overflow-y-auto pr-1 custom-scrollbar">{card.imagePreview ? <div className={`mb-4 ${card.imageLayout === 'original' ? 'h-[min(34dvh,320px)] w-full' : 'mx-auto aspect-square w-full max-w-[320px]'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-[#202124]/20 shadow-2xl`}>{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'original')}</div> : null}<h2 className="line-clamp-3 text-2xl font-black tracking-tight sm:text-4xl">{title}</h2>{card.body ? <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-white/90 sm:text-base sm:leading-7">{preview}</p> : null}{hasDetail ? <button type="button" onClick={() => { setSelectedStatusId(card.id); pushPage('statusDetail'); }} className="mt-4 rounded-full border border-white/25 bg-white/18 px-4 py-2 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/28">View more</button> : null}{renderStatusPoll(card)}</div></div>;
+    return <div className="min-h-0 flex-1 overflow-hidden"><div className="min-h-0 max-h-[62dvh] overflow-y-auto pr-1 custom-scrollbar">{card.imagePreview ? <div className={`mb-4 ${card.imageLayout === 'original' ? 'h-[min(34dvh,320px)] w-full' : 'mx-auto aspect-square w-full max-w-[320px]'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-[#171F2D] shadow-2xl`}>{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'original')}</div> : null}<h2 className="line-clamp-3 text-2xl font-black tracking-tight text-[var(--status-card-ink)] sm:text-4xl">{title}</h2>{card.body ? <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-[var(--status-card-body)] sm:text-base sm:leading-7">{preview}</p> : null}{hasDetail ? <button type="button" onClick={() => { setSelectedStatusId(card.id); pushPage('statusDetail'); }} className="mt-4 rounded-full border border-[var(--status-card-border)] bg-white px-4 py-2 text-sm font-black text-[var(--status-card-ink)] transition hover:bg-[#FFF9F0]">View more</button> : null}{renderStatusPoll(card)}</div></div>;
   };
 
   const renderStatusTile = (card: StatusCard) => {
     const owner = getStatusOwnerIdentity(card);
     return (
-      <article key={card.id} role="button" tabIndex={0} onClick={() => openStatusReel(card.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openStatusReel(card.id); }} className="group relative aspect-[9/14] cursor-pointer overflow-hidden rounded-[1.65rem] border border-[#D9E7F8] bg-white p-2.5 text-left shadow-[0_16px_44px_rgba(8,26,69,0.12)] ring-1 ring-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(23,105,255,0.18)]">
-        <div className={`absolute inset-2 rounded-[1.25rem] bg-gradient-to-br ${card.gradient} transition duration-500 group-hover:scale-[1.04]`} />
-        <div className="absolute inset-2 rounded-[1.25rem] bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.48),transparent_34%),linear-gradient(180deg,rgba(255,255,255,0.22),rgba(8,26,69,0.12)_42%,rgba(8,26,69,0.72))]" />
-        <div className="relative flex h-full flex-col justify-between p-2 text-white">
+      <article key={card.id} role="button" tabIndex={0} onClick={() => openStatusReel(card.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openStatusReel(card.id); }} className="community-status-tile group relative aspect-[9/14] cursor-pointer overflow-hidden rounded-[1.65rem] border p-2.5 text-left shadow-[0_16px_44px_rgba(8,26,69,0.12)] ring-1 ring-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(23,105,255,0.18)]">
+        <div className={`community-status-card-surface community-status-tone-${card.type} absolute inset-2 rounded-[1.25rem] transition duration-300 group-hover:scale-[1.015]`} />
+        <div className="community-status-card-vignette absolute inset-2 rounded-[1.25rem]" />
+        <div className="relative flex h-full flex-col justify-between p-2 text-[#302A26]">
           <div className="flex items-center gap-2">
-            <Avatar value={owner.avatar} size="h-9 w-9" className="ring-2 ring-white/70" />
-            <span className="min-w-0 truncate rounded-full border border-white/55 bg-white/85 px-2.5 py-1 text-[10px] font-black text-[#202124] shadow-sm">{owner.name}</span>
+            <Avatar value={owner.avatar} size="h-9 w-9" className="ring-2 ring-white/80" />
+            <span className="community-status-owner-chip min-w-0 truncate rounded-full border px-2.5 py-1 text-[10px] font-black shadow-sm">{owner.name}</span>
           </div>
           <div>
-            {card.imagePreview ? <div className="mb-5 aspect-square w-24 overflow-hidden rounded-2xl bg-white/18 shadow-inner">{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'thumbnail')}</div> : null}
-            <h3 className="line-clamp-2 text-xl font-black tracking-tight drop-shadow sm:text-2xl">{card.title}</h3>
-            <p className="mt-2 line-clamp-2 text-sm font-bold text-white/90 drop-shadow">{card.body}</p>
-            <div className="mt-3 flex flex-wrap gap-2"><span className="rounded-full border border-white/60 bg-white/85 px-3 py-1 text-[11px] font-black text-[#202124] shadow-sm backdrop-blur-xl">❤️ {card.likedBy}</span><button type="button" onClick={(event) => { event.stopPropagation(); setStatusViewerPanelId(card.id); }} className="rounded-full border border-white/60 bg-white/85 px-3 py-1 text-[11px] font-black text-[#202124] shadow-sm backdrop-blur-xl">👁️ {card.views}</button></div>
+            {card.imagePreview ? <div className="mb-4 aspect-square w-full max-w-[9rem] overflow-hidden rounded-2xl bg-[#171F2D] shadow-inner">{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'thumbnail')}</div> : <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#DED3C5] bg-white/80 text-2xl">{card.type === 'poll' ? '▤' : '✦'}</div>}
+            <h3 className="line-clamp-3 text-xl font-black tracking-tight sm:text-2xl">{card.title}</h3>
+            <p className="mt-2 line-clamp-3 text-sm font-bold text-[#695D55]">{card.body}</p>
+            <div className="mt-3 flex flex-wrap gap-2"><span className="community-status-metric-chip rounded-full border px-3 py-1 text-[11px] font-black shadow-sm">❤️ {card.likedBy}</span><button type="button" onClick={(event) => { event.stopPropagation(); setStatusViewerPanelId(card.id); }} className="community-status-metric-chip rounded-full border px-3 py-1 text-[11px] font-black shadow-sm">👁️ {card.views}</button></div>
           </div>
         </div>
       </article>
@@ -3911,25 +4024,23 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const reelStatuses = [...statusCards.slice(selectedIndex), ...statusCards.slice(0, selectedIndex)];
 
     return (
-      <div className="fixed inset-0 z-[1500] bg-[#D3E3FD] text-white">
-      <button type="button" onClick={goBack} className="fixed left-4 top-4 z-20 rounded-full border border-white/20 bg-[#202124]/20 px-4 py-2 text-sm font-black text-white backdrop-blur-xl transition hover:bg-white/20">← Back</button>
-      <div className="h-full snap-y snap-mandatory overflow-y-auto scroll-smooth custom-scrollbar">
-        {reelStatuses.map((card) => (
-          <section key={card.id} className="relative flex h-[100dvh] snap-start items-center justify-center p-4" onMouseEnter={() => setSelectedStatusId(card.id)}>
-            <div className={`absolute inset-0 bg-gradient-to-br ${card.gradient}`} />
-            <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(255,255,255,0.36),transparent_24%),linear-gradient(180deg,rgba(32,33,36,0.04),rgba(32,33,36,0.42))]" />
-            <div className="relative grid w-full max-w-5xl items-center gap-5 md:grid-cols-[1fr_96px]">
-              <article className="mx-auto flex min-h-[74dvh] w-full max-w-[520px] flex-col justify-between rounded-[2.5rem] border border-white/20 bg-[#202124]/18 p-6 shadow-[0_32px_120px_rgba(0,0,0,0.34)] backdrop-blur-2xl">
-                <div className="flex items-center justify-between gap-3"><button type="button" onClick={() => { const ownerId = card.ownerId || card.creatorId; if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); setPage('profile'); setPageStack([]); } }} className="flex min-w-0 items-center gap-2 rounded-full border border-white/30 bg-white/18 px-3 py-2 text-left"><Avatar value={getStatusOwnerIdentity(card).avatar} size="h-8 w-8" /><span className="max-w-[10rem] truncate text-xs font-black">{getStatusOwnerIdentity(card).name}</span></button><span className="rounded-full border border-white/30 bg-white/18 px-4 py-2 text-xs font-black uppercase tracking-[0.22em]">{card.slots}</span></div>
-                {renderStatusReelContent(card)}
-                <div className="flex items-center justify-between text-sm font-black text-white/80"><span>Swipe for next status</span><button type="button" onClick={() => setStatusViewerPanelId(card.id)} className="rounded-full border border-white/25 bg-white/16 px-3 py-1 text-xs font-black text-white backdrop-blur-xl transition hover:bg-white/25">👁️ {card.views} views</button></div>
-              </article>
-              <div className="mx-auto flex flex-row justify-center gap-3 md:flex-col"><button type="button" onClick={() => toggleStatusLike(card.id)} className={`flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 ${(card.likedByUsers?.[currentUserKey] || likedStatuses.includes(card.id)) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#202124]/20 text-white'} shadow-2xl backdrop-blur-xl transition hover:scale-105`}><span>❤️</span><span className="text-[11px] font-black">{card.likedBy}</span></button><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#202124]/20 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>💬</span><span className="text-[11px] font-black">Discuss</span></button>{isOwnCommunityId(card.ownerId) ? <button type="button" onClick={() => deleteOwnStatusStory(card)} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#C5221F]/80 text-white shadow-2xl backdrop-blur-xl transition hover:scale-105"><span>🗑️</span><span className="text-[11px] font-black">Delete</span></button> : null}</div>
-            </div>
-          </section>
-        ))}
-      </div>
-
+      <div className="community-status-reel-shell fixed inset-0 z-[1500]">
+        <button type="button" onClick={goBack} className="community-status-reel-control fixed left-4 top-4 z-20 rounded-full border px-4 py-2 text-sm font-black shadow-xl">← Back</button>
+        <div className="h-full snap-y snap-mandatory overflow-y-auto scroll-smooth custom-scrollbar" onScroll={(event) => { const viewport = event.currentTarget; const index = Math.round(viewport.scrollTop / Math.max(1, viewport.clientHeight)); const visibleStatus = reelStatuses[Math.min(reelStatuses.length - 1, Math.max(0, index))]; if (visibleStatus && visibleStatus.id !== selectedStatusId) { setSelectedStatusId(visibleStatus.id); void recordStatusView(visibleStatus.id); } }}>
+          {reelStatuses.map((card) => (
+            <section key={card.id} className="relative flex h-[100dvh] snap-start items-center justify-center overflow-hidden p-4" onMouseEnter={() => { setSelectedStatusId(card.id); void recordStatusView(card.id); }}>
+              <div className="community-status-reel-backdrop absolute inset-0" />
+              <div className="relative grid w-full max-w-5xl items-center gap-5 md:grid-cols-[1fr_96px]">
+                <article className="community-status-reel-card mx-auto flex min-h-[74dvh] w-full max-w-[520px] flex-col justify-between rounded-[2.5rem] border p-6 shadow-[0_32px_120px_rgba(0,0,0,0.42)]">
+                  <div className="flex items-center justify-between gap-3"><button type="button" onClick={() => { const ownerId = card.ownerId || card.creatorId; if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); setPage('profile'); setPageStack([]); } }} className="flex min-w-0 items-center gap-2 rounded-full border border-[var(--status-card-border)] bg-white px-3 py-2 text-left"><Avatar value={getStatusOwnerIdentity(card).avatar} size="h-8 w-8" /><span className="max-w-[10rem] truncate text-xs font-black text-[var(--status-card-ink)]">{getStatusOwnerIdentity(card).name}</span></button><span className="rounded-full border border-[var(--status-card-border)] bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.22em] text-[var(--status-card-body)]">{card.slots}</span></div>
+                  {renderStatusReelContent(card)}
+                  <div className="flex items-center justify-between text-sm font-black text-[var(--status-card-body)]"><span>Swipe for next status</span><button type="button" onClick={() => setStatusViewerPanelId(card.id)} className="rounded-full border border-[var(--status-card-border)] bg-white px-3 py-1 text-xs font-black text-[var(--status-card-ink)]">👁️ {card.views} views</button></div>
+                </article>
+                <div className="mx-auto flex flex-row justify-center gap-3 md:flex-col"><button type="button" onClick={() => toggleStatusLike(card.id)} className={`community-status-reel-control flex h-16 w-16 flex-col items-center justify-center rounded-full border shadow-2xl transition hover:scale-105 ${(card.likedByUsers?.[currentUserKey] || likedStatuses.includes(card.id)) ? '!bg-[#FCE8E6] !text-[#C5221F]' : ''}`}><span>❤️</span><span className="text-[11px] font-black">{card.likedBy}</span></button><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="community-status-reel-control flex h-16 w-16 flex-col items-center justify-center rounded-full border shadow-2xl transition hover:scale-105"><span>💬</span><span className="text-[11px] font-black">Discuss</span></button>{isOwnCommunityId(card.ownerId) ? <button type="button" onClick={() => deleteOwnStatusStory(card)} className="flex h-16 w-16 flex-col items-center justify-center rounded-full border border-white/20 bg-[#A33B3B] text-white shadow-2xl transition hover:scale-105"><span>🗑️</span><span className="text-[11px] font-black">Delete</span></button> : null}</div>
+              </div>
+            </section>
+          ))}
+        </div>
       </div>
     );
   };
@@ -4295,18 +4406,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   );
 
   const renderStatusDetailPage = () => (
-    <div className="mx-auto flex h-[calc(100dvh-8.5rem)] max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-[#D9E7F8] bg-white shadow-[0_24px_80px_rgba(15,23,42,0.12)]">
-      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#D9E7F8] bg-white/95 p-4 backdrop-blur-xl">
-        <button type="button" onClick={() => setPage('statusReel')} className="rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-3 text-sm font-black text-[#081A45]">← Story</button>
-        <div className="min-w-0 flex-1 text-center"><p className="truncate text-sm font-black text-[#1769FF]">{selectedStatus.slots}</p><h2 className="truncate text-xl font-black text-[#081A45]">{selectedStatus.title}</h2></div>
-        <button type="button" onClick={() => setStatusViewerPanelId(selectedStatus.id)} className="rounded-2xl border border-[#D9E7F8] bg-[#E8F2FF] px-4 py-3 text-sm font-black text-[#1769FF]">👁️ {selectedStatus.views}</button>
+    <div className="community-status-reel-shell mx-auto flex h-[calc(100dvh-8.5rem)] max-w-5xl flex-col overflow-hidden rounded-[2rem] border border-[#202A3A] shadow-[0_24px_80px_rgba(15,23,42,0.28)]">
+      <div className="flex shrink-0 items-center justify-between gap-3 border-b border-white/10 bg-[#111A2A] p-4">
+        <button type="button" onClick={() => setPage('statusReel')} className="community-status-reel-control rounded-2xl border px-4 py-3 text-sm font-black">← Story</button>
+        <div className="min-w-0 flex-1 text-center"><p className="truncate text-sm font-black text-[#C9D7F2]">{selectedStatus.slots}</p><h2 className="truncate text-xl font-black text-white">{selectedStatus.title}</h2></div>
+        <button type="button" onClick={() => setStatusViewerPanelId(selectedStatus.id)} className="community-status-reel-control rounded-2xl border px-4 py-3 text-sm font-black">👁️ {selectedStatus.views}</button>
       </div>
-      <div className={`min-h-0 flex-1 overflow-y-auto bg-gradient-to-br ${selectedStatus.gradient} p-4 text-white custom-scrollbar sm:p-8`}>
-        <article className="mx-auto max-w-3xl rounded-[2.2rem] border border-white/24 bg-[#202124]/16 p-5 shadow-2xl backdrop-blur-2xl sm:p-8">
-          {selectedStatus.imagePreview ? <div className={`mb-6 ${selectedStatus.imageLayout === 'original' ? 'max-h-[54dvh] min-h-48' : 'aspect-square'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-[#202124]/20 shadow-inner`}>{renderUploadedImage(selectedStatus.imagePreview, selectedStatus.title, selectedStatus.imageLayout || 'original')}</div> : null}
-          <div className="mb-4 flex flex-wrap gap-2"><span className="rounded-full border border-white/30 bg-white/18 px-3 py-1 text-xs font-black uppercase tracking-[0.18em]">{selectedStatus.type}</span><button type="button" onClick={() => setStatusViewerPanelId(selectedStatus.id)} className="rounded-full border border-white/30 bg-white/18 px-3 py-1 text-xs font-black">❤️ {selectedStatus.likedBy} · 👁️ {selectedStatus.views}</button></div>
-          <h2 className="text-4xl font-black tracking-tight sm:text-6xl">{selectedStatus.title}</h2>
-          <p className="mt-5 whitespace-pre-wrap text-lg font-semibold leading-9 text-white/90">{selectedStatus.body}</p>
+      <div className="community-status-reel-backdrop min-h-0 flex-1 overflow-y-auto p-4 custom-scrollbar sm:p-8">
+        <article className="community-status-detail-card mx-auto max-w-3xl rounded-[2.2rem] border p-5 shadow-2xl sm:p-8">
+          {selectedStatus.imagePreview ? <div className={`mb-6 ${selectedStatus.imageLayout === 'original' ? 'max-h-[54dvh] min-h-48' : 'aspect-square'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-[#171F2D] shadow-inner`}>{renderUploadedImage(selectedStatus.imagePreview, selectedStatus.title, selectedStatus.imageLayout || 'original')}</div> : null}
+          <div className="mb-4 flex flex-wrap gap-2"><span className="rounded-full border border-[var(--status-card-border)] bg-white px-3 py-1 text-xs font-black uppercase tracking-[0.18em] text-[var(--status-card-body)]">{selectedStatus.type}</span><button type="button" onClick={() => setStatusViewerPanelId(selectedStatus.id)} className="rounded-full border border-[var(--status-card-border)] bg-white px-3 py-1 text-xs font-black text-[var(--status-card-ink)]">❤️ {selectedStatus.likedBy} · 👁️ {selectedStatus.views}</button></div>
+          <h2 className="text-4xl font-black tracking-tight text-[var(--status-card-ink)] sm:text-6xl">{selectedStatus.title}</h2>
+          <p className="mt-5 whitespace-pre-wrap text-lg font-semibold leading-9 text-[var(--status-card-body)]">{selectedStatus.body}</p>
           {renderStatusPoll(selectedStatus)}
         </article>
       </div>
@@ -4422,15 +4533,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const communityAiContext = useMemo(() => {
     const activeLabel = activeNavItem.label;
     const visibleSnippet = page === 'thread'
-      ? `${selectedMessage.title}: ${selectedMessage.body}`
+      ? selectedMessage ? `${selectedMessage.title}: ${selectedMessage.body}` : ''
       : page === 'masterTagDetail'
         ? `${selectedMasterTag?.targetMasterName || selectedMasterTag?.title || 'Master Tagged'}: ${selectedMasterTag?.detail || ''}`
         : page === 'directChatThread'
           ? `Direct chat with ${(allCreators.find((creator) => creator.id === activeConversationId)?.name || 'selected member')}`
           : page === 'chat' && activeView === 'feed'
-            ? `${selectedMessage.title}: ${selectedMessage.body}`
+            ? selectedMessage ? `${selectedMessage.title}: ${selectedMessage.body}` : ''
             : page === 'chat' && activeView === 'status'
-              ? selectedStatus.caption
+              ? selectedStatus.body
               : '';
 
     return {
@@ -4441,7 +4552,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       visibleSnippet: visibleSnippet ? safeText(visibleSnippet, 260) : '',
       userDisplayName: profile.name || 'Eduvora Member',
     };
-  }, [activeConversationId, activeNavItem.label, activeView, allCreators, page, profile.name, selectedMasterTag, selectedMessage.body, selectedMessage.title, selectedStatus.caption]);
+  }, [activeConversationId, activeNavItem.label, activeView, allCreators, page, profile.name, selectedMasterTag, selectedMessage?.body, selectedMessage?.title, selectedStatus.body]);
 
   const CommunityHeader = () => (
     <header className="sticky top-0 z-[1200] shrink-0 border-b border-[#D9E7F8] bg-white/94 px-3 py-2 shadow-[0_14px_36px_rgba(23,105,255,0.08)] backdrop-blur-2xl sm:px-5 lg:px-6 lg:py-3">
@@ -4916,7 +5027,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const renderMainContent = () => (
     <div className="community-content-stage animate-in fade-in slide-in-from-bottom-3 duration-500">
       {page === 'chat' && activeView === 'feed' && renderFeedLayout(filteredFeedMessages, 'Community Feed', 'Join the conversation with public replies, reactions, polls, and creator posts.')}
-      {page === 'thread' && renderMessageDetails(selectedMessage, true)}
+      {page === 'thread' && selectedMessage ? renderMessageDetails(selectedMessage, true) : null}
       {page === 'profile' && renderProfilePage()}
       {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-[#D9E7F8] bg-white shadow-[0_24px_70px_rgba(23,105,255,0.12)]"><div className="relative bg-gradient-to-br from-[#EEF6FF] via-white to-[#F1EEFF] p-5 text-[#081A45] sm:p-7"><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Creator studio</p><h2 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Create a clean post</h2><p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#536178]">Share one text, image, or poll per day. Image posts use a saved URL.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EEF6FF] p-4 sm:p-6">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || isCreatorTypeUsedToday || !postDraft.trim() || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2) || (postType === 'image' && (!postImagePreview || postImageUrlStatus !== 'valid'))} className="mt-5 w-full rounded-[1.35rem] bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(23,105,255,0.24)] disabled:opacity-45">{isPublishingCreator ? 'Publishing…' : isCreatorTypeUsedToday ? `${postType} used today` : 'Publish post'}</button></div></div>}
       {page === 'network' && renderFollowPage()}
@@ -4924,9 +5035,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {page === 'adminPosts' && renderFeedLayout(adminPosts, 'ADMIN POST', 'Official admin posts from Firebase. Like, react, vote, and reply here.')}
       {page === 'tagMaster' && renderTagMasterPage()}{page === 'masterTags' && renderMasterTagsPage()}{page === 'masterTagDetail' && renderMasterTagDetailPage()}
       {(page === 'directChat' || page === 'directChatThread') && renderPrivateChatDisabledPage()}{page === 'statusDetail' && renderStatusDetailPage()}
-      {page === 'chat' && activeView === 'status' && <div className="mx-auto max-w-[1800px] rounded-[2rem] bg-white/70 p-4"><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
+      {page === 'chat' && activeView === 'status' && <div className="community-status-grid-shell mx-auto max-w-[1800px] rounded-[2rem] p-4"><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
       {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_30px_90px_rgba(79,123,255,0.16)]"><div className="bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.3em] text-[#4F7BFF]">Story studio</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2></div><div className="p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange', true)}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={isPublishingStatus || isStatusTypeUsedToday || (statusType === 'image' && (!statusImagePreview || statusImageUrlStatus !== 'valid')) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white disabled:opacity-45">{isPublishingStatus ? 'Publishing status story...' : isStatusTypeUsedToday ? `${statusType} story used today` : 'Publish status story'}</button></div></div>}
-      {page === 'statusMine' && <div className="mx-auto max-w-[1800px] space-y-5 rounded-[2rem] bg-white/70 p-4"><div className="rounded-[2rem] border border-[#E3ECF8] bg-white p-6"><h2 className="text-4xl font-black tracking-tight text-[#081B5C]">View your status</h2><p className="mt-2 text-sm font-bold text-[#64748B]">Tap a card to open reel view.</p></div>{myStatuses.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{myStatuses.map(renderStatusTile)}</div> : <div className="rounded-[2rem] border border-dashed border-[#E3ECF8] bg-white p-10 text-center font-black text-[#64748B]">No status uploaded yet.</div>}</div>}
+      {page === 'statusMine' && <div className="community-status-grid-shell mx-auto max-w-[1800px] space-y-5 rounded-[2rem] p-4"><div className="rounded-[2rem] border border-[#E3ECF8] bg-white p-6"><h2 className="text-4xl font-black tracking-tight text-[#081B5C]">View your status</h2><p className="mt-2 text-sm font-bold text-[#64748B]">Tap a card to open reel view.</p></div>{myStatuses.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{myStatuses.map(renderStatusTile)}</div> : <div className="rounded-[2rem] border border-dashed border-[#E3ECF8] bg-white p-10 text-center font-black text-[#64748B]">No status uploaded yet.</div>}</div>}
     </div>
   );
 
