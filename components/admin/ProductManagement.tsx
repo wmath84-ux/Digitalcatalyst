@@ -1858,7 +1858,10 @@ const ProductForm: React.FC<{
 }> = ({ mode, product, coupons, onSave, onCancel }) => {
     const [formData, setFormData] = useState<ProductFormData>(() => createEmptyProductForm(product));
     const [modules, setModules] = useState<CourseModule[]>(() => ensureEditableCourseIntroModule(product?.courseContent || initialProductState.courseContent || [], product?.title || formData.title));
-    const [images, setImages] = useState<string[]>(() => product?.images || initialProductState.images || []);
+    const [images, setImages] = useState<string[]>(() => Array.from(new Set(
+        (product?.images || initialProductState.images || []).map((image) => String(image || '').trim()).filter(Boolean)
+    )));
+    const [imageUrlDraft, setImageUrlDraft] = useState('');
     const [imageMode, setImageMode] = useState<'url' | 'upload' | 'ai'>('url');
     const [isGeneratingImage, setIsGeneratingImage] = useState(false);
     const [discountPercent, setDiscountPercent] = useState(0);
@@ -1866,7 +1869,7 @@ const ProductForm: React.FC<{
     const [isUploadingProductImage, setIsUploadingProductImage] = useState(false);
     const [productImageUploadError, setProductImageUploadError] = useState('');
     const [productImageUploadProgress, setProductImageUploadProgress] = useState(0);
-    const [productImageUrlStatus, setProductImageUrlStatus] = useState<PremiumImageUrlStatus>((product?.images || initialProductState.images || []).find(Boolean) ? 'checking' : 'empty');
+    const [productImageUrlStatus, setProductImageUrlStatus] = useState<PremiumImageUrlStatus>('empty');
     const productImageInputRef = useRef<HTMLInputElement>(null);
     const draftProductIdRef = useRef<number | string>(product?.id || `draft-${Date.now()}`);
     const cloudinaryImageReady = isCloudinaryImageUploadConfigured();
@@ -1897,10 +1900,38 @@ const ProductForm: React.FC<{
         };
     };
 
+    const appendProductImages = (nextImages: string[]) => {
+        const cleanImages = nextImages.map((image) => String(image || '').trim()).filter(Boolean);
+        if (!cleanImages.length) return;
+        setImages((current) => Array.from(new Set([...current, ...cleanImages])));
+    };
+
+    const addImageUrlDraft = () => {
+        const imageUrl = imageUrlDraft.trim();
+        if (!imageUrl || productImageUrlStatus !== 'valid') {
+            setProductImageUploadError('Wait for a valid HTTPS image preview before adding it.');
+            return;
+        }
+        appendProductImages([imageUrl]);
+        setImageUrlDraft('');
+        setProductImageUrlStatus('empty');
+        setProductImageUploadError('');
+    };
+
+    const moveProductImage = (index: number, direction: -1 | 1) => {
+        setImages((current) => {
+            const targetIndex = index + direction;
+            if (targetIndex < 0 || targetIndex >= current.length) return current;
+            const next = [...current];
+            [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+            return next;
+        });
+    };
+
     const handleProductImagesUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.currentTarget.files?.[0];
-        event.target.value = '';
-        if (!file) return;
+        const files: File[] = event.currentTarget.files ? Array.from(event.currentTarget.files) : [];
+        event.currentTarget.value = '';
+        if (!files.length) return;
 
         if (!cloudinaryImageReady) {
             setProductImageUploadError('Cloudinary upload is not configured. Add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET, then restart the app. You can still paste a public image URL.');
@@ -1908,22 +1939,25 @@ const ProductForm: React.FC<{
             return;
         }
 
-        const validation = validateProductImageUpload(file);
-        if (!validation.valid) {
-            setProductImageUploadError(validation.error || 'Please choose a valid image file.');
+        const invalidFile = files.map((file) => ({ file, validation: validateProductImageUpload(file) })).find(({ validation }) => !validation.valid);
+        if (invalidFile) {
+            setProductImageUploadError(`${invalidFile.file.name}: ${invalidFile.validation.error || 'Please choose a valid image file.'}`);
             return;
         }
 
         setProductImageUploadError('');
-        setProductImageUploadProgress(15);
+        setProductImageUploadProgress(5);
         setIsUploadingProductImage(true);
 
         try {
-            const hostedUrl = await uploadImageToCloudinary(file, { folder: 'products', tags: ['product-image'] });
-            setProductImageUploadProgress(100);
-            setImages([hostedUrl]);
-            setImageMode('url');
-            setProductImageUrlStatus('checking');
+            const hostedUrls: string[] = [];
+            for (let index = 0; index < files.length; index += 1) {
+                const hostedUrl = await uploadImageToCloudinary(files[index], { folder: 'products', tags: ['product-image'] });
+                hostedUrls.push(hostedUrl);
+                setProductImageUploadProgress(Math.round(((index + 1) / files.length) * 100));
+            }
+            appendProductImages(hostedUrls);
+            setImageMode('upload');
             setProductImageUploadError('');
         } catch (error) {
             console.error('Cloudinary product image upload failed:', error);
@@ -1942,7 +1976,7 @@ const ProductForm: React.FC<{
             const aiImageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=768&nologo=true`;
             setProductImageUploadError('');
             setProductImageUploadProgress(0);
-            setImages([aiImageUrl]);
+            appendProductImages([aiImageUrl]);
             setImageMode('url');
         } finally {
             setIsGeneratingImage(false);
@@ -1974,20 +2008,23 @@ const ProductForm: React.FC<{
         const formattedPrice = formData.price ? `₹${formData.price}` : '₹0';
         const formattedSalePrice = formData.salePrice ? `₹${formData.salePrice}` : undefined;
 
-        const primaryImageCandidate = (images || []).find(Boolean);
-        if (primaryImageCandidate && productImageUrlStatus !== 'valid' && imageMode === 'url') {
-            setProductImageUploadError('Please paste a valid https image URL.');
+        const pendingImageUrl = imageUrlDraft.trim();
+        if (pendingImageUrl && productImageUrlStatus !== 'valid') {
+            setProductImageUploadError('Please wait for a valid HTTPS image preview or clear the pending URL.');
             return;
         }
 
+        const productImages = Array.from(new Set(
+            [...images, ...(pendingImageUrl ? [pendingImageUrl] : [])].map((image) => String(image || '').trim()).filter(Boolean)
+        ));
         setIsSavingProduct(true);
 
-        const primaryImage = (images || []).find(Boolean);
+        const primaryImage = productImages[0];
         const productImageMap = buildProductImageMap(primaryImage);
 
         const saved = await onSave({
             imageSeed: formData.imageSeed || formData.title || `product-${Date.now()}`,
-            images: primaryImage ? [primaryImage] : [],
+            images: productImages,
             productImages: productImageMap,
             title: formData.title,
             description: formData.description,
@@ -2149,35 +2186,49 @@ const ProductForm: React.FC<{
                                 </div>
                                 <div className="mt-4">
                                     {imageMode === 'url' ? (
-                                        <PremiumImageUrlInput value={(images || []).find(Boolean) || ''} onChange={(url) => setImages(url ? [url] : [])} onStatusChange={setProductImageUrlStatus} label="Product image URL" previewAlt="Primary product image" aspect="square" compact helperText="One valid https image URL will be saved into images and every productImages display slot." />
+                                        <div className="space-y-3">
+                                            <PremiumImageUrlInput value={imageUrlDraft} onChange={setImageUrlDraft} onStatusChange={setProductImageUrlStatus} label="Add product image URL" previewAlt="New product image" aspect="square" compact helperText="Add one public HTTPS image at a time. Distinct images are kept in gallery order; the first image is primary." />
+                                            <button type="button" onClick={addImageUrlDraft} disabled={productImageUrlStatus !== 'valid'} className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">Add image to gallery</button>
+                                        </div>
                                     ) : imageMode === 'upload' ? (
-                                        <div className="rounded-3xl border border-dashed border-cyan-300/60 bg-cyan-50/70 p-5 text-center"><p className="font-black text-cyan-800">Upload product image</p><p className="mt-2 text-xs font-bold text-cyan-700">Select an image, upload it to Cloudinary, auto-generate the URL, then save it into Firestore with this product.</p><button type="button" onClick={() => productImageInputRef.current?.click()} disabled={!cloudinaryImageReady || isUploadingProductImage} className="mt-3 w-full rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 p-4 font-black text-slate-900 disabled:cursor-not-allowed disabled:bg-none disabled:bg-slate-200 disabled:text-slate-500">{cloudinaryImageReady ? (isUploadingProductImage ? 'Uploading…' : 'Choose image') : 'Cloudinary env not configured'}</button>{!cloudinaryImageReady ? <p className="mt-3 text-xs font-bold text-rose-600">Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to enable upload.</p> : null}</div>
+                                        <div className="rounded-3xl border border-dashed border-cyan-300/60 bg-cyan-50/70 p-5 text-center"><p className="font-black text-cyan-800">Upload product image</p><p className="mt-2 text-xs font-bold text-cyan-700">Select one or more images. Each valid file uploads to Cloudinary and is appended to this product's ordered Firestore gallery.</p><button type="button" onClick={() => productImageInputRef.current?.click()} disabled={!cloudinaryImageReady || isUploadingProductImage} className="mt-3 w-full rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 p-4 font-black text-slate-900 disabled:cursor-not-allowed disabled:bg-none disabled:bg-slate-200 disabled:text-slate-500">{cloudinaryImageReady ? (isUploadingProductImage ? 'Uploading…' : 'Choose image(s)') : 'Cloudinary env not configured'}</button>{!cloudinaryImageReady ? <p className="mt-3 text-xs font-bold text-rose-600">Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to enable upload.</p> : null}</div>
                                     ) : (
                                         <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-3xl border border-dashed border-purple-300/40 bg-purple-400/5 p-8 text-center font-black text-purple-700 hover:bg-purple-400/10 disabled:opacity-60">{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</button>
                                     )}
-                                    <input ref={productImageInputRef} type="file" accept="image/*" onChange={handleProductImagesUpload} className="hidden" />
+                                    <input ref={productImageInputRef} type="file" accept="image/*" multiple onChange={handleProductImagesUpload} className="hidden" />
                                     {isUploadingProductImage && (
-                                        <p className="mt-3 text-sm font-bold text-cyan-700">Uploading image to Cloudinary... {productImageUploadProgress}% complete.</p>
+                                        <p className="mt-3 text-sm font-bold text-cyan-700">Uploading image(s) to Cloudinary... {productImageUploadProgress}% complete.</p>
                                     )}
                                     {productImageUploadError && (
                                         <p className="mt-3 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{productImageUploadError}</p>
                                     )}
                                 </div>
                                 <div className="mt-4">
-                                    {(images || []).find(Boolean) ? (
-                                        <div className="group relative aspect-square overflow-hidden rounded-2xl border border-white/50 bg-white/80">
-                                            <img src={(images || []).find(Boolean)} alt="Primary product" className="h-full w-full object-contain" />
-                                            <button type="button" onClick={() => setImages([])} className="absolute right-2 top-2 rounded-full bg-red-500 px-2 py-0.5 text-sm font-black text-white opacity-90">×</button>
+                                    {images.length ? (
+                                        <div className="grid grid-cols-2 gap-3">
+                                            {images.map((image, index) => (
+                                                <div key={image} className="group relative overflow-hidden rounded-2xl border border-white/50 bg-white/80 p-2">
+                                                    <div className="aspect-square overflow-hidden rounded-xl bg-slate-50"><img src={image} alt={`Product image ${index + 1}`} className="h-full w-full object-contain" /></div>
+                                                    <div className="mt-2 flex items-center justify-between gap-1">
+                                                        <span className="truncate text-[11px] font-black text-slate-600">{index === 0 ? 'Primary' : `Image ${index + 1}`}</span>
+                                                        <span className="flex gap-1">
+                                                            <button type="button" onClick={() => moveProductImage(index, -1)} disabled={index === 0} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-black disabled:opacity-30" aria-label={`Move image ${index + 1} left`}>←</button>
+                                                            <button type="button" onClick={() => moveProductImage(index, 1)} disabled={index === images.length - 1} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-black disabled:opacity-30" aria-label={`Move image ${index + 1} right`}>→</button>
+                                                            <button type="button" onClick={() => setImages((current) => current.filter((_, imageIndex) => imageIndex !== index))} className="rounded-lg bg-red-500 px-2 py-1 text-xs font-black text-white" aria-label={`Remove image ${index + 1}`}>×</button>
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
                                         </div>
                                     ) : (
                                         <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-center text-sm font-bold text-slate-500">
-                                            No product image selected. Paste a valid https image URL or generate one primary image.
+                                            No product image selected. Add URLs, upload files, or generate images; the first image becomes primary.
                                         </div>
                                     )}
                                 </div>
                                 <div className="mt-4"><label className={labelClass}>Image Seed</label><input value={formData.imageSeed} onChange={event => setFormData(prev => ({ ...prev, imageSeed: event.target.value }))} className={fieldClass} placeholder="Fallback image seed" /></div>
                                 <div className="mt-4 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm font-bold text-emerald-700">
-                                    Only one valid image URL is saved across images and all productImages slots for product cards, detail pages, home, gallery, and purchase previews.
+                                    All distinct images are saved in gallery order. The first image is primary and is mirrored into productImages display slots; extra images appear only in the product detail gallery.
                                 </div>
 
                             </div>

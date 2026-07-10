@@ -4808,7 +4808,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
           return (
             <article key={message.id} className="group relative aspect-square overflow-hidden rounded-[1.25rem] border border-[#D9E7F8] bg-white shadow-[0_10px_28px_rgba(8,26,69,0.08)] ring-1 ring-white transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-[0_18px_50px_rgba(23,105,255,0.14)]">
-              <button type="button" aria-label={`Open ${type} post: ${title}`} onPointerDown={openPost} onClick={openPost} className="absolute inset-0 block h-full w-full overflow-hidden text-left touch-manipulation focus:outline-none focus:ring-4 focus:ring-inset focus:ring-[#1769FF]/25">
+              <button type="button" aria-label={`Open ${type} post: ${title}`} onClick={openPost} className="absolute inset-0 block h-full w-full overflow-hidden text-left [touch-action:pan-y] focus:outline-none focus:ring-4 focus:ring-inset focus:ring-[#1769FF]/25">
                 {isImage ? (
                   <>
                     <SafeImage src={imageSource || imageFallback} fallbackSrc={imageFallback} alt={title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" fallbackTitle={title} fallbackBadge="Community image" fallbackIcon="💬" fallbackMessage="Image preview unavailable" aspect="square" />

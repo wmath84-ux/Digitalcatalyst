@@ -8,7 +8,7 @@ import PaymentModal from './PaymentModal';
 import RatingsAndReviews from './RatingsAndReviews';
 import FeaturedProducts from './FeaturedProducts';
 import ShareModal from './ShareModal';
-import { PRODUCT_IMAGE_SLOTS, ProductImageSlot, getProductImage, getProductImageFallback } from '../utils/productImages';
+import { getProductImage, getProductImageFallback } from '../utils/productImages';
 import SafeImage from './common/SafeImage';
 
 const ProductAnalyticsChart: React.FC = () => {
@@ -93,10 +93,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const [mainImage, setMainImage] = useState<string | null>(null);
 
-  const detailGallerySlots: ProductImageSlot[] = ['galleryThumb', 'detailMobile', 'detailDesktop', 'card'];
-  const detailGalleryImages = detailGallerySlots
-    .map((slot) => ({ slot, image: product.productImages?.[slot], config: PRODUCT_IMAGE_SLOTS[slot] }))
-    .filter((item): item is { slot: ProductImageSlot; image: string; config: typeof PRODUCT_IMAGE_SLOTS[ProductImageSlot] } => Boolean(item.image));
+  const detailGalleryImages = Array.from(new Set(
+    (product.images || []).map((image) => String(image || '').trim()).filter(Boolean)
+  ));
   const quantity = 1;
   const [isShareModalOpen, setIsShareModalOpen] = useState(false);
 
@@ -499,16 +498,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <div className="rounded-2xl border border-white/70 bg-white/70 p-3 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl sm:rounded-3xl sm:p-4"><p className="text-xl sm:text-2xl">⭐</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Rating</p><p className="text-sm font-black text-slate-900">{product.rating.toFixed(1)} / 5</p></div>
               </div>
 
-              {(detailGalleryImages.length > 0 || (product.images || []).length > 1) && (
-                <div className="mt-4 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:gap-3 sm:overflow-visible sm:pb-0">
-                  {detailGalleryImages.map(({ slot, image, config }) => (
-                    <button key={slot} onClick={() => setMainImage(image)} className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-white/75 transition-all sm:h-20 sm:w-20 sm:rounded-2xl ${mainImage === image ? 'border-primary shadow-lg' : 'border-white/70 hover:border-indigo-300'}`} aria-label={`View ${config.label}`}>
-                      <SafeImage src={image} fallbackSrc={getProductImageFallback(product)} alt={`${product.title} ${config.label}`} className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={config.label} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="square" />
-                    </button>
-                  ))}
-                  {(product.images || []).map((img, i) => (
-                    <button key={`legacy-${i}`} onClick={() => setMainImage(img)} className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-white/75 transition-all sm:h-20 sm:w-20 sm:rounded-2xl ${mainImage === img ? 'border-primary shadow-lg' : 'border-white/70 hover:border-indigo-300'}`} aria-label={`View fallback thumbnail ${i + 1}`}>
-                      <SafeImage src={img} fallbackSrc={getProductImageFallback(product)} alt={`${product.title} fallback thumbnail ${i + 1}`} className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Product'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="square" />
+              {detailGalleryImages.length > 1 && (
+                <div className="mt-4 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:gap-3 sm:overflow-visible sm:pb-0" aria-label={`${product.title} image gallery`}>
+                  {detailGalleryImages.map((image, index) => (
+                    <button key={image} onClick={() => setMainImage(image)} className={`h-16 w-16 shrink-0 overflow-hidden rounded-xl border-2 bg-white/75 transition-all sm:h-20 sm:w-20 sm:rounded-2xl ${mainImage === image || (!mainImage && index === 0) ? 'border-primary shadow-lg' : 'border-white/70 hover:border-indigo-300'}`} aria-label={`View product image ${index + 1} of ${detailGalleryImages.length}`}>
+                      <SafeImage src={image} fallbackSrc={getProductImageFallback(product)} alt={`${product.title} image ${index + 1}`} className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={`${index + 1} / ${detailGalleryImages.length}`} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="square" />
                     </button>
                   ))}
                 </div>
@@ -557,7 +551,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </div>
 
             <aside className="md:col-span-5">
-              <div id="price-section" className={`overflow-hidden rounded-[1.5rem] border border-white/60 bg-white/75 p-4 shadow-[0_28px_85px_rgba(79,70,229,0.14)] backdrop-blur-2xl sm:rounded-[2rem] sm:p-6 md:sticky md:top-24 ${priceJustUpdated ? 'price-flash' : ''}`}>
+              <div id="price-section" className={`product-checkout-panel overflow-hidden rounded-[1.5rem] border border-white/60 bg-white/75 p-4 shadow-[0_28px_85px_rgba(79,70,229,0.14)] backdrop-blur-2xl sm:rounded-[2rem] sm:p-6 md:sticky md:top-24 ${priceJustUpdated ? 'price-flash' : ''}`}>
                 <div className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-indigo-300/20 blur-3xl" />
                 <div className="pointer-events-none absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-cyan-600/20 blur-3xl" />
                 <div className="relative">
@@ -589,7 +583,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 )}
 
                 <div className="mt-5 space-y-3 sm:mt-6">
-                  <button disabled={isPurchased} onClick={handleBuyClick} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3.5 text-base font-black text-white shadow-[0_16px_40px_rgba(79,70,229,0.25)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
+                  <button disabled={isPurchased} onClick={handleBuyClick} className="product-checkout-primary w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3.5 text-base font-black text-white shadow-[0_16px_40px_rgba(79,70,229,0.25)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
                     {isPurchased ? 'Purchased' : 'Pay with Razorpay'}
                   </button>
                   {canShowProductCoinCheckout && (
@@ -604,14 +598,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     </button>
                   )}
                   {hasLockedPaidUpdates && (
-                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className="w-full rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-6 py-3.5 text-base font-black text-white shadow-[0_16px_40px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 active:scale-95 sm:px-8 sm:py-4 sm:text-lg">
+                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className="product-checkout-update w-full rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-6 py-3.5 text-base font-black text-white shadow-[0_16px_40px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 active:scale-95 sm:px-8 sm:py-4 sm:text-lg">
                       Purchase the latest update
                       <span className="mt-2 block text-xs font-bold text-white/85">
                         {productAccess?.lockedPaidUpdateCount || 0} new paid content item{(productAccess?.lockedPaidUpdateCount || 0) === 1 ? '' : 's'} available
                       </span>
                     </button>
                   )}
-                  <button disabled={isPurchased} onClick={() => onAddToCart(product.id, 1)} className="w-full rounded-2xl border border-indigo-200/70 bg-white/85 px-6 py-3.5 text-base font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4">
+                  <button disabled={isPurchased} onClick={() => onAddToCart(product.id, 1)} className="product-checkout-secondary w-full rounded-2xl border border-indigo-200/70 bg-white/85 px-6 py-3.5 text-base font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4">
                     {isPurchased ? 'Already in My Purchases' : 'Add to Cart'}
                   </button>
                 </div>

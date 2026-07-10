@@ -1138,6 +1138,9 @@ const App: React.FC = () => {
   const isCartOpenRef = useRef(false);
   const isCartPaymentModalOpenRef = useRef(false);
   const latestUpdateCheckoutRef = useRef<typeof latestUpdateCheckout>(null);
+  const isReadingDrawerOpenRef = useRef(false);
+  const readingDrawerViewRef = useRef<ReadingView>('blog');
+  const pendingReadingNavigationRef = useRef<string | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
   const activeSessionUidRef = useRef<string | null>(null);
   const sessionUnsubscribeRef = useRef<(() => void) | null>(null);
@@ -1355,6 +1358,41 @@ const App: React.FC = () => {
     lastHistoryViewRef.current = currentView;
 
     const onPopState = (event: PopStateEvent) => {
+      const historyOverlay = event.state?.dcOverlay;
+      if (historyOverlay === 'reading') {
+        const nextListType: ReadingListType = event.state?.dcReadingListType === 'news' ? 'news' : 'blog';
+        const nextReadingView: ReadingView = event.state?.dcReadingView === 'article' || event.state?.dcReadingView === 'announcement'
+          ? event.state.dcReadingView
+          : nextListType;
+        const nextArticle = nextReadingView === 'article'
+          ? websiteSettings.content.newsArticles.find((article) => String(article.id) === String(event.state?.dcReadingItemId)) || null
+          : null;
+        const nextAnnouncement = nextReadingView === 'announcement'
+          ? websiteSettings.content.announcements.find((announcement) => String(announcement.id) === String(event.state?.dcReadingItemId)) || null
+          : null;
+
+        setReadingListType(nextListType);
+        setReadingDrawerView(nextArticle || nextAnnouncement ? nextReadingView : nextListType);
+        setSelectedArticle(nextArticle);
+        setSelectedAnnouncement(nextAnnouncement);
+        setIsReadingDrawerOpen(true);
+        return;
+      }
+
+      if (isReadingDrawerOpenRef.current) {
+        setIsReadingDrawerOpen(false);
+        setSelectedArticle(null);
+        setSelectedAnnouncement(null);
+      }
+
+      if (pendingReadingNavigationRef.current) {
+        const pendingView = pendingReadingNavigationRef.current;
+        pendingReadingNavigationRef.current = null;
+        setCurrentView(pendingView);
+        window.scrollTo(0, 0);
+        return;
+      }
+
       if (latestUpdateCheckoutRef.current) {
         setLatestUpdateCheckout(null);
         return;
@@ -1397,7 +1435,7 @@ const App: React.FC = () => {
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [getPreviousAppView, syncStackForHistoryView]);
+  }, [getPreviousAppView, syncStackForHistoryView, websiteSettings.content.announcements, websiteSettings.content.newsArticles]);
 
   useEffect(() => {
     isCartOpenRef.current = isCartOpen;
@@ -1516,6 +1554,8 @@ const App: React.FC = () => {
   const [isReadingDrawerOpen, setIsReadingDrawerOpen] = useState(false);
   const [readingDrawerView, setReadingDrawerView] = useState<ReadingView>('blog');
   const [readingListType, setReadingListType] = useState<ReadingListType>('blog');
+  isReadingDrawerOpenRef.current = isReadingDrawerOpen;
+  readingDrawerViewRef.current = readingDrawerView;
   const [isFreeModalOpen, setIsFreeModalOpen] = useState(false);
 
   // User Theme State
@@ -4174,13 +4214,38 @@ const App: React.FC = () => {
     setIsSubscriptionModalOpen(true);
   };
 
-  const closeReadingDrawer = () => {
+  const closeReadingDrawerState = () => {
     setIsReadingDrawerOpen(false);
     setSelectedArticle(null);
     setSelectedAnnouncement(null);
   };
 
+  const closeReadingDrawer = () => {
+    const state = window.history.state || {};
+    if (state.dcOverlay === 'reading') {
+      window.history.go(Math.max(-2, -Math.max(1, Number(state.dcReadingDepth) || 1)));
+      return;
+    }
+    closeReadingDrawerState();
+  };
+
+  const pushReadingHistory = (view: ReadingView, listType: ReadingListType, itemId?: string | number, depth = 1) => {
+    window.history.pushState({
+      ...(window.history.state || {}),
+      dcView: currentViewRef.current,
+      dcOverlay: 'reading',
+      dcReadingView: view,
+      dcReadingListType: listType,
+      dcReadingItemId: itemId === undefined ? null : String(itemId),
+      dcReadingDepth: depth,
+    }, '', window.location.href);
+  };
+
   const openReadingHub = (type: ReadingListType = 'blog') => {
+    if (!isReadingDrawerOpenRef.current) pushReadingHistory(type, type, undefined, 1);
+    else if (window.history.state?.dcOverlay === 'reading') {
+      window.history.replaceState({ ...(window.history.state || {}), dcReadingView: type, dcReadingListType: type, dcReadingItemId: null, dcReadingDepth: Math.max(1, Number(window.history.state?.dcReadingDepth) || 1) }, '', window.location.href);
+    }
     setSelectedArticle(null);
     setSelectedAnnouncement(null);
     setReadingListType(type);
@@ -4189,6 +4254,9 @@ const App: React.FC = () => {
   };
 
   const handleViewAnnouncement = (announcement: Announcement) => {
+    if (!isReadingDrawerOpenRef.current) pushReadingHistory('news', 'news', undefined, 1);
+    if (readingDrawerViewRef.current === 'blog' || readingDrawerViewRef.current === 'news' || !isReadingDrawerOpenRef.current) pushReadingHistory('announcement', 'news', announcement.id, 2);
+    else window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'announcement', dcReadingListType: 'news', dcReadingItemId: String(announcement.id), dcReadingDepth: 2 }, '', window.location.href);
     setSelectedAnnouncement(announcement);
     setSelectedArticle(null);
     setReadingListType('news');
@@ -4197,21 +4265,34 @@ const App: React.FC = () => {
   };
 
   const handleViewBlogArticle = (article: NewsArticle) => {
+    const type: ReadingListType = article.type === 'news' ? 'news' : 'blog';
+    if (!isReadingDrawerOpenRef.current) pushReadingHistory(type, type, undefined, 1);
+    if (readingDrawerViewRef.current === 'blog' || readingDrawerViewRef.current === 'news' || !isReadingDrawerOpenRef.current) pushReadingHistory('article', type, article.id, 2);
+    else window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'article', dcReadingListType: type, dcReadingItemId: String(article.id), dcReadingDepth: 2 }, '', window.location.href);
     setSelectedArticle(article);
     setSelectedAnnouncement(null);
-    setReadingListType(article.type === 'news' ? 'news' : 'blog');
+    setReadingListType(type);
     setReadingDrawerView('article');
     setIsReadingDrawerOpen(true);
   };
 
   const handleBackToReadingList = () => {
+    if (window.history.state?.dcOverlay === 'reading' && window.history.state?.dcReadingDepth === 2) {
+      window.history.back();
+      return;
+    }
     setSelectedArticle(null);
     setSelectedAnnouncement(null);
     setReadingDrawerView(readingListType);
   };
 
   const handleExploreReadingFeature = () => {
-    closeReadingDrawer();
+    if (window.history.state?.dcOverlay === 'reading') {
+      pendingReadingNavigationRef.current = 'allProducts';
+      closeReadingDrawer();
+      return;
+    }
+    closeReadingDrawerState();
     handleNavigateToAllProducts();
   };
 

@@ -1481,6 +1481,71 @@
         }
       }
     </style>
+    <style id="mobile-interaction-and-checkout-contrast">
+      @media (hover: none) and (pointer: coarse) {
+        #root,
+        #root *:not(input):not(textarea):not(select):not(option):not([contenteditable="true"]):not([contenteditable="true"] *) {
+          -webkit-user-select: none !important;
+          user-select: none !important;
+          -webkit-touch-callout: none;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        #root :where(input, textarea, select, option, [contenteditable="true"], [contenteditable="true"] *) {
+          -webkit-user-select: text !important;
+          user-select: text !important;
+        }
+
+        #root :where(button, a, [role="button"], label, summary) {
+          touch-action: manipulation;
+        }
+
+        #root :where(img, svg) {
+          -webkit-user-drag: none;
+        }
+      }
+
+      .product-checkout-panel {
+        background: var(--bg-card, rgba(255, 255, 255, 0.92)) !important;
+        border-color: var(--border-soft, rgba(226, 232, 240, 0.9)) !important;
+        color: var(--text-body, var(--color-text-muted, #475569));
+      }
+
+      .product-checkout-panel :where(h2, .text-slate-950, .text-slate-900) {
+        color: var(--text-heading, var(--color-text, #0f172a)) !important;
+      }
+
+      .product-checkout-panel :where(.text-slate-600, .text-slate-500) {
+        color: var(--text-body, var(--color-text-muted, #475569)) !important;
+      }
+
+      .product-checkout-primary,
+      .product-checkout-update {
+        background: var(--primary, var(--color-primary, #315bca)) !important;
+        border-color: var(--primary, var(--color-primary, #315bca)) !important;
+        color: #ffffff !important;
+        opacity: 1 !important;
+      }
+
+      .product-checkout-update {
+        background: var(--immersive-success, #19704a) !important;
+        border-color: var(--immersive-success, #19704a) !important;
+      }
+
+      .product-checkout-primary:disabled,
+      .product-checkout-secondary:disabled {
+        background: var(--immersive-control, #e2e8f0) !important;
+        border-color: var(--border-soft, #cbd5e1) !important;
+        color: var(--text-body, var(--color-text-muted, #475569)) !important;
+        opacity: 1 !important;
+      }
+
+      .product-checkout-secondary {
+        background: var(--bg-card, #ffffff) !important;
+        border-color: var(--border-soft, #cbd5e1) !important;
+        color: var(--primary, var(--color-primary, #315bca)) !important;
+      }
+    </style>
   <script type="importmap">
 {
   "imports": {

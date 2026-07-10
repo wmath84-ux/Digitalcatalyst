@@ -43,15 +43,16 @@ const defaultReadingStyle = {
 };
 
 const chatPalette = {
-  appCanvas: '#F8FAFD',
-  searchBlue: '#EAF2FF',
-  activeBlue: '#CFE1FF',
-  bubbleGray: '#F8FAFD',
-  cardBorder: '#DDE6F7',
-  primaryText: '#07133F',
-  secondaryText: '#4F5B76',
-  linkText: '#0057D8',
-  green: '#1e8e3e',
+  appCanvas: 'var(--bg-main, var(--color-background, #F8FAFD))',
+  searchBlue: 'var(--bg-section, #EAF2FF)',
+  activeBlue: 'var(--tag-blue, var(--color-accent, #CFE1FF))',
+  bubbleGray: 'var(--bg-card, #F8FAFD)',
+  cardSurface: 'var(--bg-card, #FFFFFF)',
+  cardBorder: 'var(--border-soft, #DDE6F7)',
+  primaryText: 'var(--text-heading, var(--color-text, #07133F))',
+  secondaryText: 'var(--text-body, var(--color-text-muted, #4F5B76))',
+  linkText: 'var(--primary, var(--color-primary, #0057D8))',
+  green: 'var(--immersive-success, #1e8e3e)',
 };
 
 const clampPercent = (value: unknown, fallback: number) => {
@@ -114,7 +115,7 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
     const current = bullets;
     bullets = [];
     nodes.push(
-      <ul key={`ul-${nodes.length}`} className="my-6 space-y-3 rounded-[1.5rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderColor: chatPalette.cardBorder }}>
+      <ul key={`ul-${nodes.length}`} className="my-6 space-y-3 rounded-[1.5rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
         {current.map((item, index) => <li key={index} className="flex gap-3"><span className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: chatPalette.activeBlue }} /><span><InlineMarkdown text={item} /></span></li>)}
       </ul>
     );
@@ -138,7 +139,7 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
             isContentLoaded={true}
             disabled={articleAdDisabled}
             className="my-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
-            style={{ backgroundColor: 'rgba(255,255,255,0.9)', borderColor: chatPalette.cardBorder }}
+            style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}
           />
         );
       }
@@ -189,7 +190,7 @@ const SponsoredPartnerCard: React.FC<{
   onExploreFeature,
 }) => (
   <aside className="my-12 overflow-hidden rounded-[2rem] border bg-gradient-to-r from-[#EAF2FF] via-[#F8FAFD] to-[#CFE1FF] p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-    <div className="rounded-[1.75rem] p-6 backdrop-blur-2xl sm:p-8" style={{ backgroundColor: 'rgba(255,255,255,0.92)' }}>
+    <div className="rounded-[1.75rem] p-6 backdrop-blur-2xl sm:p-8" style={{ backgroundColor: chatPalette.cardSurface }}>
       <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
         <div>
           <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>Sponsored Partner</p>
@@ -205,7 +206,7 @@ const SponsoredPartnerCard: React.FC<{
 );
 
 const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: string; imageSeed?: string; fallbackImage?: string; onClick: () => void; }> = ({ title, meta, excerpt, badge, imageSeed, fallbackImage, onClick }) => (
-  <button onClick={onClick} className="group relative overflow-hidden rounded-[1.75rem] border text-left shadow-[0_12px_36px_rgba(60,64,67,0.10)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_48px_rgba(60,64,67,0.14)]" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
+  <button onClick={onClick} className="group relative overflow-hidden rounded-[1.75rem] border text-left shadow-[0_12px_36px_rgba(60,64,67,0.10)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_48px_rgba(60,64,67,0.14)]" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
     {imageSeed && (
       <div className="aspect-video overflow-hidden rounded-t-[1.75rem]" style={{ backgroundColor: chatPalette.searchBlue }}>
         <SafeImage src={imageSeed || ''} fallbackSrc={fallbackImage || ''} alt={title} wrapperClassName="h-full w-full rounded-t-[1.75rem]" className="h-full w-full rounded-t-[1.75rem] object-cover opacity-90 transition duration-700 group-hover:scale-110 group-hover:opacity-100" fallbackTitle={title} fallbackBadge={badge} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
@@ -369,11 +370,12 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
     accentColor: defaultReadingStyle.accentColor,
     accentOpacity: defaultReadingStyle.accentOpacity,
   };
-  const readingBackground = hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity);
-  const panelBackground = hexToRgba(readingStyle.backgroundColor, readingStyle.panelOpacity);
-  const cardBackground = `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;
-  const accentSoftBackground = hexToRgba(readingStyle.accentColor, readingStyle.accentOpacity, defaultReadingStyle.accentColor);
-  const accentStrongBackground = hexToRgba(readingStyle.accentColor, 92, defaultReadingStyle.accentColor);
+  const themedExperience = settings.theme.colorExperience !== 'original';
+  const readingBackground = themedExperience ? chatPalette.appCanvas : hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity);
+  const panelBackground = themedExperience ? chatPalette.searchBlue : hexToRgba(readingStyle.backgroundColor, readingStyle.panelOpacity);
+  const cardBackground = themedExperience ? chatPalette.cardSurface : `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;
+  const accentSoftBackground = themedExperience ? chatPalette.activeBlue : hexToRgba(readingStyle.accentColor, readingStyle.accentOpacity, defaultReadingStyle.accentColor);
+  const accentStrongBackground = themedExperience ? chatPalette.linkText : hexToRgba(readingStyle.accentColor, 92, defaultReadingStyle.accentColor);
 
   if (!isOpen) return null;
 
@@ -384,15 +386,15 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
       role="dialog"
       aria-modal="true"
       aria-labelledby="reading-drawer-title"
-      onMouseDown={(event) => {
-        if (event.target === event.currentTarget) {
-          onClose();
-        }
+      onPointerDown={(event) => {
+        const target = event.target as HTMLElement;
+        const isDesktopPointer = window.matchMedia('(min-width: 768px) and (hover: hover) and (pointer: fine)').matches;
+        if (isDesktopPointer && !target.closest('[data-reading-panel="true"]')) onClose();
       }}
     >
       <div className="absolute inset-y-0 right-0 flex w-full justify-end">
-        <section onMouseDown={(e) => e.stopPropagation()} className="relative h-full w-full overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw]" style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder }}>
-          <div className="sticky top-0 z-30 h-1" style={{ backgroundColor: 'rgba(255,255,255,0.9)' }}>
+        <section data-reading-panel="true" onPointerDown={(event) => event.stopPropagation()} className="relative h-full w-full overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw]" style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder }}>
+          <div className="sticky top-0 z-30 h-1" style={{ backgroundColor: chatPalette.cardSurface }}>
             <div className="h-full rounded-r-full shadow-sm transition-all duration-150" style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${accentStrongBackground}, rgba(194, 231, 255, 0.92), rgba(11, 87, 208, 0.72))` }} />
           </div>
 
@@ -442,7 +444,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                   </div>
                   <div className="grid gap-6 lg:grid-cols-3">
                     {visibleArticles.length === 0 && (
-                      <div className="rounded-[2rem] border p-8 shadow-sm backdrop-blur-xl lg:col-span-3" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
+                      <div className="rounded-[2rem] border p-8 shadow-sm backdrop-blur-xl lg:col-span-3" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
                         <p className="text-3xl">📚</p>
                         <h3 className="mt-3 text-2xl font-black" style={{ color: chatPalette.primaryText }}>No {listType} posts yet</h3>
                         <p className="mt-2">Fresh learning posts will appear here after they are reviewed and published.</p>
@@ -459,7 +461,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                             realContentCardCount={visibleArticles.length}
                             isContentLoaded={true}
                             className="lg:col-span-3 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
-                            style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}
+                            style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}
                           />
                         )}
                       </React.Fragment>
@@ -485,14 +487,14 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                       </div>
                     </div>
                     {!isExternalArticle(selectedArticle) && (
-                      <div className="hidden overflow-hidden rounded-[2rem] border shadow-sm backdrop-blur-2xl lg:block" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
+                      <div className="hidden overflow-hidden rounded-[2rem] border shadow-sm backdrop-blur-2xl lg:block" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
                         <SafeImage src={getArticleImage(selectedArticle, '900/700')} fallbackSrc={buildArticleImageFallback(selectedArticle)} alt={selectedArticle.title} wrapperClassName="aspect-[4/3] h-full w-full" className="h-full w-full object-cover opacity-90 animate-article-hero-image" fallbackTitle={selectedArticle.title} fallbackBadge={selectedArticle.type === 'news' ? 'News' : selectedArticle.category || 'Blog'} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
                       </div>
                     )}
                   </div>
                   {isExternalArticle(selectedArticle) ? (
                     <>
-                      <div className="mt-8 overflow-hidden rounded-[2rem] border p-2 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl lg:mt-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
+                      <div className="mt-8 overflow-hidden rounded-[2rem] border p-2 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl lg:mt-10" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
                         <iframe src={getArticleUrl(selectedArticle)} title={selectedArticle.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-white [scrollbar-width:none] lg:h-[76vh]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
                       </div>
                       <GoogleAd
@@ -503,15 +505,15 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                         isContentLoaded={true}
                         disabled={selectedArticleAdDisabled}
                         className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
-                        style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}
+                        style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}
                       />
                     </>
                   ) : (
                     <>
-                      <div className="mb-6 mt-8 aspect-video overflow-hidden rounded-2xl border shadow-sm backdrop-blur-2xl lg:hidden" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}>
+                      <div className="mb-6 mt-8 aspect-video overflow-hidden rounded-2xl border shadow-sm backdrop-blur-2xl lg:hidden" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
                         <SafeImage src={getArticleImage(selectedArticle, '1400/800')} fallbackSrc={buildArticleImageFallback(selectedArticle)} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" fallbackTitle={selectedArticle.title} fallbackBadge={selectedArticle.type === 'news' ? 'News' : selectedArticle.category || 'Blog'} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
                       </div>
-                      <div className="mx-auto mt-8 max-w-4xl rounded-[2rem] border p-6 text-lg leading-9 shadow-[0_18px_50px_rgba(60,64,67,0.08)] backdrop-blur-2xl sm:p-8 lg:mt-10" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
+                      <div className="mx-auto mt-8 max-w-4xl rounded-[2rem] border p-6 text-lg leading-9 shadow-[0_18px_50px_rgba(60,64,67,0.08)] backdrop-blur-2xl sm:p-8 lg:mt-10" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
                         <MarkdownContent
                           content={selectedArticle.content}
                           includeInArticleAd
@@ -527,7 +529,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                           isContentLoaded={true}
                           disabled={selectedArticleAdDisabled}
                           className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
-                          style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder }}
+                          style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}
                         />
                       </div>
                     </>
@@ -539,7 +541,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                 <article className="mx-auto max-w-3xl">
                   <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>Official Announcement</p>
                   <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-6xl" style={{ color: chatPalette.primaryText }}>{selectedAnnouncement.title}</h1>
-                  <div className="mt-12 space-y-7 rounded-[2rem] border p-6 text-lg leading-9 shadow-sm backdrop-blur-2xl sm:p-8" style={{ backgroundColor: 'rgba(255,255,255,0.92)', borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
+                  <div className="mt-12 space-y-7 rounded-[2rem] border p-6 text-lg leading-9 shadow-sm backdrop-blur-2xl sm:p-8" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
                     {selectedAnnouncement.content.split('\n').filter(Boolean).map((paragraph, index) => (
                       <React.Fragment key={index}>
                         {index === 1 && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} />}
@@ -555,7 +557,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
           </div>
 
           {view === 'article' && selectedArticle && (
-            <div className="absolute bottom-5 right-5 z-30 max-w-sm rounded-[1.5rem] border px-5 py-4 text-sm font-black shadow-[0_12px_40px_rgba(60,64,67,0.14)] backdrop-blur-2xl animate-fade-in-up" style={{ backgroundColor: 'rgba(255,255,255,0.94)', borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>
+            <div className="absolute bottom-5 right-5 z-30 max-w-sm rounded-[1.5rem] border px-5 py-4 text-sm font-black shadow-[0_12px_40px_rgba(60,64,67,0.14)] backdrop-blur-2xl animate-fade-in-up" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>
               {rewardStatus === 'claimed' && <span className="text-emerald-700">🎉 +{economySettings.coinPerArticleRead} Coins Claimed!</span>}
               {rewardStatus === 'already' && <span style={{ color: chatPalette.linkText }}>✔️ Reward already claimed for this article</span>}
               {rewardStatus === 'login' && <span className="text-amber-700">🔐 Login to earn reading coins</span>}
