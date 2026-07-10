@@ -16,6 +16,23 @@
     <meta name="description" content="A premium marketplace for online notes, rich learning documents, private video courses, subscriptions, coupons, reviews, and AI-assisted study inside Digital Catalyst." />
     <script>
       (() => {
+        try {
+          const storedMode = JSON.parse(localStorage.getItem('siteColorExperience') || 'null');
+          const cachedSettings = JSON.parse(localStorage.getItem('websiteSettings') || 'null');
+          const cachedMode = cachedSettings?.theme?.colorExperience;
+          const mode = storedMode === 'original' || storedMode === 'immersive'
+            ? storedMode
+            : cachedMode === 'original' || cachedMode === 'immersive'
+              ? cachedMode
+              : 'immersive';
+          document.documentElement.dataset.colorExperience = mode;
+        } catch (error) {
+          document.documentElement.dataset.colorExperience = 'immersive';
+        }
+      })();
+    </script>
+    <script>
+      (() => {
         const preventGesture = (event) => event.preventDefault();
         document.addEventListener('gesturestart', preventGesture, { passive: false });
         document.addEventListener('gesturechange', preventGesture, { passive: false });
@@ -1081,6 +1098,333 @@
         }
       }
 
+    </style>
+    <style id="immersive-color-experience">
+      html[data-color-experience="immersive"] {
+        --immersive-canvas: #F2F5F9;
+        --immersive-section: #E9EEF5;
+        --immersive-surface: #FFFFFF;
+        --immersive-surface-soft: #F7F9FC;
+        --immersive-control: #EDF2F7;
+        --immersive-primary: #315BCA;
+        --immersive-primary-strong: #2448A5;
+        --immersive-primary-soft: #E3EAF8;
+        --immersive-ink: #0D1B3E;
+        --immersive-body: #46556D;
+        --immersive-muted: #6E7C91;
+        --immersive-border: #D4DEEA;
+        --immersive-border-strong: #BCC9D9;
+        --immersive-success: #19704A;
+        --immersive-success-soft: #E8F5EE;
+        --immersive-warning: #8A6116;
+        --immersive-warning-soft: #FBF3DE;
+        --immersive-danger: #B4232E;
+        --immersive-danger-soft: #FBEAEC;
+        --immersive-shadow-soft: 0 10px 28px rgba(15, 23, 42, 0.07);
+        --immersive-shadow-card: 0 18px 48px rgba(15, 23, 42, 0.10);
+
+        --bg-main: var(--immersive-canvas);
+        --bg-section: var(--immersive-section);
+        --bg-card: var(--immersive-surface);
+        --bg-glass: var(--immersive-surface);
+        --text-heading: var(--immersive-ink);
+        --text-title: var(--immersive-ink);
+        --text-body: var(--immersive-body);
+        --text-muted: var(--immersive-muted);
+        --primary: var(--immersive-primary);
+        --primary-hover: var(--immersive-primary-strong);
+        --accent-violet: var(--immersive-primary);
+        --tag-blue: var(--immersive-primary-soft);
+        --border-soft: var(--immersive-border);
+        --border-active: var(--immersive-border-strong);
+        --shadow-card: var(--immersive-shadow-card);
+        --shadow-soft: var(--immersive-shadow-soft);
+        --shadow-blue: var(--immersive-shadow-card);
+        --premium-background: var(--immersive-canvas);
+
+        --mobile-bg: var(--immersive-canvas);
+        --mobile-bg-soft: var(--immersive-section);
+        --mobile-card: var(--immersive-surface);
+        --mobile-heading: var(--immersive-ink);
+        --mobile-body: var(--immersive-body);
+        --mobile-muted: var(--immersive-muted);
+        --mobile-primary: var(--immersive-primary);
+        --mobile-violet: var(--immersive-primary);
+        --mobile-border: var(--immersive-border);
+        --mobile-border-active: var(--immersive-border-strong);
+        --mobile-page-gradient: var(--immersive-canvas);
+
+        --tagmaster-ink: var(--immersive-ink);
+        --tagmaster-muted: var(--immersive-body);
+        --tagmaster-blue: var(--immersive-primary);
+        --tagmaster-blue-strong: var(--immersive-primary-strong);
+        --tagmaster-blue-deep: var(--immersive-primary-strong);
+        --tagmaster-blue-soft: var(--immersive-primary-soft);
+        --tagmaster-blue-mid: var(--immersive-section);
+        --tagmaster-blue-border: var(--immersive-border);
+        --tagmaster-blue-border-strong: var(--immersive-border-strong);
+        --tagmaster-border: var(--immersive-border);
+        --tagmaster-surface: var(--immersive-surface);
+        --tagmaster-page: var(--immersive-canvas);
+        color-scheme: light;
+        background-color: var(--immersive-canvas);
+      }
+
+      html[data-color-experience="immersive"],
+      html[data-color-experience="immersive"] body,
+      html[data-color-experience="immersive"] #root {
+        background: var(--immersive-canvas) !important;
+        color: var(--immersive-body) !important;
+      }
+
+      html[data-color-experience="immersive"] body {
+        font-family: var(--font-sans, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif);
+      }
+
+      html[data-color-experience="immersive"] ::selection {
+        background: var(--immersive-primary-soft);
+        color: var(--immersive-ink);
+      }
+
+      html[data-color-experience="immersive"] :where(h1, h2, h3, h4, h5, h6, .admin-page-title, .admin-section-title) {
+        color: var(--immersive-ink) !important;
+        letter-spacing: -0.025em;
+      }
+
+      html[data-color-experience="immersive"] :where(p, li, dd, label, small) {
+        color: var(--immersive-body);
+      }
+
+      html[data-color-experience="immersive"] :where(input, textarea, select) {
+        background: var(--immersive-surface) !important;
+        border-color: var(--immersive-border) !important;
+        color: var(--immersive-ink) !important;
+        box-shadow: none !important;
+      }
+
+      html[data-color-experience="immersive"] :where(input, textarea, select)::placeholder {
+        color: var(--immersive-muted) !important;
+      }
+
+      html[data-color-experience="immersive"] :where(input, textarea, select):focus {
+        border-color: var(--immersive-primary) !important;
+        box-shadow: 0 0 0 4px rgba(49, 91, 202, 0.14) !important;
+        outline: none !important;
+      }
+
+      html[data-color-experience="immersive"] :where(article, form, dialog, .common-modal-content, .coming-soon-content, .share-modal-content, .cart-sidebar) {
+        border-color: var(--immersive-border) !important;
+        box-shadow: var(--immersive-shadow-soft) !important;
+      }
+
+      html[data-color-experience="immersive"] :where(.common-modal-content, .coming-soon-content, .share-modal-content, .cart-sidebar) {
+        background: var(--immersive-surface) !important;
+      }
+
+      html[data-color-experience="immersive"] header {
+        background: rgba(255, 255, 255, 0.96) !important;
+        border-color: var(--immersive-border) !important;
+        box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06) !important;
+      }
+
+      html[data-color-experience="immersive"] :where([class~="bg-white"], [class*="bg-white/80"], [class*="bg-white/85"], [class*="bg-white/90"], [class*="bg-white/92"], [class*="bg-white/94"], [class*="bg-white/95"], [class*="bg-white/96"], [class*="bg-white/98"], [class*="bg-[#FFFFFF]"], [class*="bg-[#FBFDFF]"]) {
+        background-color: var(--immersive-surface) !important;
+      }
+
+      html[data-color-experience="immersive"] :where(
+        [class~="bg-slate-50"], [class*="bg-slate-50/"], [class~="bg-gray-50"], [class*="bg-gray-50/"],
+        [class~="bg-blue-50"], [class*="bg-blue-50/"], [class~="bg-indigo-50"], [class*="bg-indigo-50/"],
+        [class~="bg-violet-50"], [class*="bg-violet-50/"], [class~="bg-purple-50"], [class*="bg-purple-50/"],
+        [class*="bg-[#F8FBFF]"], [class*="bg-[#F8FAFD]"], [class*="bg-[#F5F7FA]"], [class*="bg-[#FFFEFB]"]
+      ) {
+        background-color: var(--immersive-surface-soft) !important;
+      }
+
+      html[data-color-experience="immersive"] :where(
+        [class~="bg-slate-100"], [class*="bg-slate-100/"], [class~="bg-gray-100"], [class*="bg-gray-100/"],
+        [class~="bg-blue-100"], [class*="bg-blue-100/"], [class~="bg-indigo-100"], [class*="bg-indigo-100/"],
+        [class~="bg-violet-100"], [class*="bg-violet-100/"], [class~="bg-purple-100"], [class*="bg-purple-100/"],
+        [class*="bg-[#EEF6FF]"], [class*="bg-[#EEF2FF]"], [class*="bg-[#E8F2FF]"], [class*="bg-[#E8F0FE]"],
+        [class*="bg-[#F1EEFF]"], [class*="bg-[#E3ECF8]"], [class*="bg-[#EAF2FF]"], [class*="bg-[#DCEEFF]"]
+      ) {
+        background-color: var(--immersive-control) !important;
+      }
+
+      html[data-color-experience="immersive"] :where(
+        [class~="bg-blue-600"], [class~="bg-blue-700"], [class~="bg-indigo-600"], [class~="bg-indigo-700"],
+        [class~="bg-violet-600"], [class~="bg-violet-700"], [class~="bg-purple-600"], [class~="bg-purple-700"],
+        [class*="bg-[#1769FF]"], [class*="bg-[#1A73E8]"], [class*="bg-[#1967D2]"], [class*="bg-[#0B63FF]"],
+        [class*="bg-[#4F7BFF]"], [class*="bg-[#5B4BFF]"], [class*="bg-[#7B61FF]"], [class*="bg-[#3157A4]"]
+      ) {
+        background-color: var(--immersive-primary) !important;
+        border-color: var(--immersive-primary) !important;
+        color: #FFFFFF !important;
+      }
+
+      html[data-color-experience="immersive"] :where(
+        [class~="bg-slate-900"], [class~="bg-slate-950"], [class~="bg-gray-900"], [class~="bg-gray-950"],
+        [class*="bg-[#081A45]"], [class*="bg-[#081B5C]"], [class*="bg-[#071735]"], [class*="bg-[#0F172A]"]
+      ) {
+        background-color: var(--immersive-ink) !important;
+        color: #FFFFFF !important;
+      }
+
+      html[data-color-experience="immersive"] :where([class*="text-slate-900"], [class*="text-slate-950"], [class*="text-gray-900"], [class*="text-gray-950"], [class*="text-black"], [class*="text-[#081A45]"], [class*="text-[#081B5C]"], [class*="text-[#202124]"], [class*="text-[#0F172A]"]) {
+        color: var(--immersive-ink) !important;
+      }
+
+      html[data-color-experience="immersive"] :where([class*="text-slate-600"], [class*="text-slate-700"], [class*="text-gray-600"], [class*="text-gray-700"], [class*="text-[#536178]"], [class*="text-[#42516A]"], [class*="text-[#46556D]"]) {
+        color: var(--immersive-body) !important;
+      }
+
+      html[data-color-experience="immersive"] :where([class*="text-slate-400"], [class*="text-slate-500"], [class*="text-gray-400"], [class*="text-gray-500"], [class*="text-[#7C879A]"], [class*="text-[#64748B]"], [class*="text-[#6B7482]"]) {
+        color: var(--immersive-muted) !important;
+      }
+
+      html[data-color-experience="immersive"] :where([class*="text-blue"], [class*="text-indigo"], [class*="text-violet"], [class*="text-purple"], [class*="text-cyan"], [class*="text-[#1769FF]"], [class*="text-[#1A73E8]"], [class*="text-[#1967D2]"], [class*="text-[#7B61FF]"], [class*="text-[#4F7BFF]"]) {
+        color: var(--immersive-primary) !important;
+      }
+
+      html[data-color-experience="immersive"] :where([class*="border-slate"], [class*="border-gray"], [class*="border-blue"], [class*="border-indigo"], [class*="border-violet"], [class*="border-purple"], [class*="border-cyan"], [class*="border-[#D9E7F8]"], [class*="border-[#D2E3FC]"], [class*="border-[#BFD7FF]"], [class*="border-[#E3ECF8]"]) {
+        border-color: var(--immersive-border) !important;
+      }
+
+      html[data-color-experience="immersive"] :where([class*="ring-blue"], [class*="ring-indigo"], [class*="ring-violet"], [class*="ring-purple"], [class*="ring-[#1769FF]"], [class*="ring-[#7B61FF]"]) {
+        --tw-ring-color: rgba(49, 91, 202, 0.18) !important;
+      }
+
+      html[data-color-experience="immersive"] :where([class*="shadow-["], .shadow-lg, .shadow-xl, .shadow-2xl):not(.no-premium-shadow) {
+        box-shadow: var(--immersive-shadow-soft) !important;
+      }
+
+      html[data-color-experience="immersive"] :where(
+        [class*="bg-gradient-"], [class*="bg-[linear-gradient"], [class*="bg-[radial-gradient"], [class*="bg-[conic-gradient"],
+        [style*="linear-gradient"], [style*="radial-gradient"], [style*="conic-gradient"]
+      ) {
+        background-image: none !important;
+      }
+
+      html[data-color-experience="immersive"] :where(section, article, main, aside, header, footer, form, dialog, div):not(.absolute):is([class*="bg-gradient-"], [class*="bg-[linear-gradient"], [class*="bg-[radial-gradient"], [class*="bg-[conic-gradient"]) {
+        background-color: var(--immersive-surface-soft) !important;
+      }
+
+      html[data-color-experience="immersive"] :where(button, a, [role="button"], section, article, div):is([class*="bg-gradient-"], [class*="bg-[linear-gradient"], [class*="bg-[radial-gradient"]):is([class~="text-white"], [class*="text-white/"]) {
+        background-color: var(--immersive-primary) !important;
+        border-color: var(--immersive-primary) !important;
+        color: #FFFFFF !important;
+      }
+
+      html[data-color-experience="immersive"] :where([class*="bg-clip-text"][class*="text-transparent"], [class*="text-transparent"][class*="bg-gradient-"]) {
+        background: none !important;
+        color: var(--immersive-primary) !important;
+        -webkit-text-fill-color: currentColor !important;
+      }
+
+      html[data-color-experience="immersive"] :where([class~="text-white"], [class*="text-white/"], [class~="text-white"] h1, [class~="text-white"] h2, [class~="text-white"] h3, [class~="text-white"] h4, [class~="text-white"] p, [class~="text-white"] span, [class~="text-white"] small) {
+        color: #FFFFFF !important;
+      }
+
+      html[data-color-experience="immersive"] :where([class*="bg-green"], [class*="bg-emerald"]) {
+        background-color: var(--immersive-success-soft) !important;
+        color: var(--immersive-success) !important;
+      }
+
+      html[data-color-experience="immersive"] :where([class*="bg-yellow"], [class*="bg-amber"], [class*="bg-orange"]) {
+        background-color: var(--immersive-warning-soft) !important;
+        color: var(--immersive-warning) !important;
+      }
+
+      html[data-color-experience="immersive"] :where([class*="bg-red"], [class*="bg-rose"]) {
+        background-color: var(--immersive-danger-soft) !important;
+        color: var(--immersive-danger) !important;
+      }
+
+      html[data-color-experience="immersive"] .tagmaster-section-theme,
+      html[data-color-experience="immersive"] .tagmaster-admin-theme {
+        background: var(--immersive-canvas) !important;
+      }
+
+      html[data-color-experience="immersive"] .tagmaster-section-theme > .absolute.inset-0,
+      html[data-color-experience="immersive"] .tagmaster-admin-theme::before,
+      html[data-color-experience="immersive"] .eduvora-community-app::before,
+      html[data-color-experience="immersive"] .product-card-shine::after {
+        background: none !important;
+      }
+
+      html[data-color-experience="immersive"] .tagmaster-admin-theme aside {
+        background: var(--immersive-section) !important;
+      }
+
+      html[data-color-experience="immersive"] .eduvora-community-polish {
+        --community-page-bg: var(--immersive-canvas) !important;
+        --community-surface: var(--immersive-surface) !important;
+        --community-card: var(--immersive-surface) !important;
+        --community-soft: var(--immersive-section) !important;
+        --community-primary: var(--immersive-primary) !important;
+        --community-secondary: var(--immersive-primary-strong) !important;
+        --community-accent: var(--immersive-primary-soft) !important;
+        --community-heading: var(--immersive-ink) !important;
+        --community-body: var(--immersive-body) !important;
+        --community-muted: var(--immersive-muted) !important;
+        --community-border: var(--immersive-border) !important;
+        --community-active-bg: var(--immersive-primary-soft) !important;
+        --community-active-text: var(--immersive-primary) !important;
+        --community-dock-bg: var(--immersive-surface) !important;
+        --community-dock-item-bg: var(--immersive-surface-soft) !important;
+        --community-dock-active-bg: var(--immersive-primary-soft) !important;
+        --community-dock-text: var(--immersive-body) !important;
+        --community-dock-active-text: var(--immersive-primary) !important;
+        --community-outgoing-bubble: var(--immersive-primary) !important;
+        --community-incoming-bubble: var(--immersive-surface) !important;
+        --community-shadow: var(--immersive-shadow-soft) !important;
+        background: var(--immersive-canvas) !important;
+      }
+
+      html[data-color-experience="immersive"] .eduvora-community-main {
+        background: var(--immersive-canvas) !important;
+      }
+
+      html[data-color-experience="immersive"] .eduvora-community-polish :where([class*="bg-gradient-"], [class*="bg-[linear-gradient"], [class*="bg-[radial-gradient"]) {
+        background-image: none !important;
+      }
+
+      html[data-color-experience="immersive"] .eduvora-community-polish .absolute[class*="bg-gradient-"]:not(.community-profile-image-scrim) {
+        background-color: var(--immersive-primary) !important;
+      }
+
+      html[data-color-experience="immersive"] .community-profile-empty-state,
+      html[data-color-experience="immersive"] .community-profile-poll-preview {
+        background: var(--immersive-control) !important;
+      }
+
+      html[data-color-experience="immersive"] .community-profile-text-preview {
+        background: var(--immersive-surface-soft) !important;
+      }
+
+      html[data-color-experience="immersive"] .community-profile-image-scrim {
+        inset: auto 0 0 !important;
+        height: 58% !important;
+        background: rgba(13, 27, 62, 0.66) !important;
+      }
+
+      html[data-color-experience="immersive"] .community-story-ring {
+        background: var(--immersive-primary) !important;
+      }
+
+      html[data-color-experience="immersive"] :where(img, video, canvas, iframe) {
+        filter: none !important;
+      }
+
+      html[data-color-experience="immersive"] :where(button, a, input, textarea, select) {
+        transition-property: color, background-color, border-color, box-shadow, transform;
+        transition-duration: 180ms;
+      }
+
+      @media (max-width: 640px) {
+        html[data-color-experience="immersive"] :where(article, form, dialog) {
+          box-shadow: 0 10px 26px rgba(15, 23, 42, 0.07) !important;
+        }
+      }
     </style>
   <script type="importmap">
 {

@@ -4659,7 +4659,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const renderProfileGrid = (profilePosts: FeedMessage[]) => {
     if (profileContentTab === 'stories') {
-      return <div className="rounded-[1.5rem] border border-dashed border-[#BFD7FF] bg-gradient-to-br from-[#F8FBFF] via-white to-[#EEF6FF] p-8 text-center"><div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-inner">○</div><h3 className="text-xl font-black text-[#081B5C]">Stories are above</h3><p className="mt-2 text-sm font-bold leading-6 text-[#64748B]">Tap any active story circle to open it.</p></div>;
+      return <div className="community-profile-empty-state rounded-[1.5rem] border border-dashed border-[#BFD7FF] bg-gradient-to-br from-[#F8FBFF] via-white to-[#EEF6FF] p-8 text-center"><div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-inner">○</div><h3 className="text-xl font-black text-[#081B5C]">Stories are above</h3><p className="mt-2 text-sm font-bold leading-6 text-[#64748B]">Tap any active story circle to open it.</p></div>;
     }
 
     return profilePosts.length ? (
@@ -4682,18 +4682,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 {isImage ? (
                   <>
                     <SafeImage src={imageSource || imageFallback} fallbackSrc={imageFallback} alt={title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" fallbackTitle={title} fallbackBadge="Community image" fallbackIcon="💬" fallbackMessage="Image preview unavailable" aspect="square" />
-                    <div className="absolute inset-0 bg-gradient-to-t from-[#081A45]/92 via-[#081A45]/10 to-transparent" />
+                    <div className="community-profile-image-scrim absolute inset-0 bg-gradient-to-t from-[#081A45]/92 via-[#081A45]/10 to-transparent" />
                     <div className="absolute inset-x-0 bottom-0 p-3 pb-12 sm:p-4 sm:pb-12"><span className="rounded-full border border-white/35 bg-[#081A45]/55 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-white">Image</span><h3 className="mt-2 line-clamp-2 text-sm font-black leading-snug text-white sm:text-base">{title}</h3><p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-white/90 sm:text-xs">{body}</p></div>
                   </>
                 ) : isPoll ? (
-                  <div className="flex h-full flex-col bg-[radial-gradient(circle_at_top_right,rgba(123,97,255,0.24),transparent_42%),linear-gradient(145deg,#FFFFFF_0%,#EEF6FF_52%,#F1EEFF_100%)] p-3 pb-12 sm:p-4 sm:pb-12">
+                  <div className="community-profile-poll-preview flex h-full flex-col bg-[radial-gradient(circle_at_top_right,rgba(123,97,255,0.24),transparent_42%),linear-gradient(145deg,#FFFFFF_0%,#EEF6FF_52%,#F1EEFF_100%)] p-3 pb-12 sm:p-4 sm:pb-12">
                     <span className="w-max rounded-full border border-[#BFD7FF] bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-[#1769FF]">Poll</span>
                     <h3 className="mt-3 line-clamp-3 text-sm font-black leading-tight text-[#081A45] sm:text-lg">{title}</h3>
                     {message.body ? <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-[#536178]">{message.body}</p> : null}
                     <div className="mt-auto space-y-1.5">{options.length ? options.map((option, index) => <div key={`${message.id}-${index}`} className="rounded-xl border border-[#D9E7F8] bg-white/90 px-2.5 py-2 text-[10px] font-black text-[#081A45] shadow-sm sm:text-xs"><span className="line-clamp-1">{option}</span></div>) : <div className="rounded-xl border border-dashed border-[#BFD7FF] bg-white/75 px-3 py-2 text-[10px] font-black text-[#1769FF]">Open poll to view options</div>}</div>
                   </div>
                 ) : (
-                  <div className="flex h-full flex-col bg-[radial-gradient(circle_at_top_left,rgba(23,105,255,0.18),transparent_42%),linear-gradient(145deg,#FFFFFF_0%,#EEF6FF_56%,#F8FBFF_100%)] p-3 pb-12 sm:p-4 sm:pb-12">
+                  <div className="community-profile-text-preview flex h-full flex-col bg-[radial-gradient(circle_at_top_left,rgba(23,105,255,0.18),transparent_42%),linear-gradient(145deg,#FFFFFF_0%,#EEF6FF_56%,#F8FBFF_100%)] p-3 pb-12 sm:p-4 sm:pb-12">
                     <span className="w-max rounded-full border border-[#BFD7FF] bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-[#1769FF]">Text</span>
                     <div className="my-auto"><h3 className="line-clamp-4 text-base font-black leading-tight text-[#081A45] sm:text-xl">{title}</h3><p className="mt-2 line-clamp-5 text-xs font-semibold leading-5 text-[#536178] sm:text-sm">{body}</p></div>
                   </div>
@@ -4718,7 +4718,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         {profileStories.length ? <span className="rounded-full bg-[#F1F4F8] px-3 py-1 text-xs font-black text-[#536178]">{profileStories.length} active</span> : null}
       </div>
       <div className="flex gap-4 overflow-x-auto pb-1 custom-scrollbar">
-        {profileStories.length ? profileStories.map((story) => { const owner = getStatusOwnerIdentity(story); return <button key={story.id} type="button" onClick={() => openStatusReel(story.id)} className="shrink-0 text-center"><span className="block rounded-full bg-gradient-to-tr from-[#B88A2B] via-[#7B61FF] to-[#3157A4] p-[3px] shadow-sm"><span className="block rounded-full bg-white p-[3px]"><Avatar value={owner.avatar || story.imagePreview || ''} size="h-16 w-16" /></span></span><span className="mt-2 block max-w-[5rem] truncate text-[11px] font-black text-[#536178]">{story.type}</span></button>; }) : <div className="w-full rounded-2xl border border-dashed border-[#C9D3E1] bg-[#FAF8F3] px-5 py-4 text-sm font-semibold text-[#6B7482]">No active stories yet.</div>}
+        {profileStories.length ? profileStories.map((story) => { const owner = getStatusOwnerIdentity(story); return <button key={story.id} type="button" onClick={() => openStatusReel(story.id)} className="shrink-0 text-center"><span className="community-story-ring block rounded-full bg-gradient-to-tr from-[#B88A2B] via-[#7B61FF] to-[#3157A4] p-[3px] shadow-sm"><span className="block rounded-full bg-white p-[3px]"><Avatar value={owner.avatar || story.imagePreview || ''} size="h-16 w-16" /></span></span><span className="mt-2 block max-w-[5rem] truncate text-[11px] font-black text-[#536178]">{story.type}</span></button>; }) : <div className="w-full rounded-2xl border border-dashed border-[#C9D3E1] bg-[#FAF8F3] px-5 py-4 text-sm font-semibold text-[#6B7482]">No active stories yet.</div>}
       </div>
     </section>
   );

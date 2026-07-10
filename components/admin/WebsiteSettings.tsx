@@ -490,6 +490,45 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         switch (activeTab) {
             case 'theme': return (
                 <div>
+                    <section className="mb-6 rounded-[1.5rem] border border-slate-200 bg-slate-50 p-4 sm:p-5">
+                        <div className="flex flex-col gap-1">
+                            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">Global colour experience</p>
+                            <h2 className="text-xl font-black text-slate-950">Choose the complete website colour mode</h2>
+                            <p className="text-sm font-semibold leading-6 text-slate-600">This selection controls every public page, Community screen, modal, card, button, form and Admin page. Choose a mode, then click Save Changes.</p>
+                        </div>
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                            <button
+                                type="button"
+                                aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'original'}
+                                onClick={() => handleNestedChange('theme', 'colorExperience', 'original')}
+                                className={`rounded-2xl border p-4 text-left transition ${
+                                    (localSettings.theme.colorExperience || 'immersive') === 'original'
+                                        ? 'border-blue-600 bg-blue-600 text-white shadow-lg'
+                                        : 'border-slate-200 bg-white text-slate-900 hover:border-blue-300'
+                                }`}
+                            >
+                                <span className="block text-base font-black">Current / Original Colours</span>
+                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'original' ? 'text-white/85' : 'text-slate-500'}`}>Restores the website appearance exactly as it exists before the immersive layer.</span>
+                            </button>
+                            <button
+                                type="button"
+                                aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'immersive'}
+                                onClick={() => handleNestedChange('theme', 'colorExperience', 'immersive')}
+                                className={`rounded-2xl border p-4 text-left transition ${
+                                    (localSettings.theme.colorExperience || 'immersive') === 'immersive'
+                                        ? 'border-blue-600 bg-blue-600 text-white shadow-lg'
+                                        : 'border-slate-200 bg-white text-slate-900 hover:border-blue-300'
+                                }`}
+                            >
+                                <span className="block text-base font-black">Immersive Colours</span>
+                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'immersive' ? 'text-white/85' : 'text-slate-500'}`}>Applies the solid, eye-comfortable palette across the complete website without decorative gradients.</span>
+                            </button>
+                        </div>
+                    </section>
+                    <div className="mb-4">
+                        <h3 className="text-lg font-black text-slate-900">Original palette controls</h3>
+                        <p className="mt-1 text-sm text-slate-600">These detailed colours remain available for Current / Original Colours mode.</p>
+                    </div>
                     <FormRow label="Primary Color" description="Main brand color for headers, buttons, and links.">
                         <input type="color" value={localSettings.theme.primaryColor} onChange={e => handleNestedChange('theme', 'primaryColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" />
                     </FormRow>

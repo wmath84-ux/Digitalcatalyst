@@ -614,6 +614,7 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
 // Comprehensive settings for the entire website, manageable from the admin panel
 export interface WebsiteSettings {
     theme: {
+        colorExperience: 'original' | 'immersive';
         primaryColor: string;
         accentColor: string;
         backgroundColor: string;
@@ -790,6 +791,7 @@ const initialAdminUsers: AdminUser[] = [];
 
 const defaultWebsiteSettings: WebsiteSettings = {
     theme: {
+        colorExperience: 'immersive',
         primaryColor: '#1769FF',
         accentColor: '#7B61FF',
         backgroundColor: '#F8FBFF',
@@ -942,6 +944,34 @@ const defaultWebsiteSettings: WebsiteSettings = {
     },
 };
 
+const mergeWebsiteSettings = (settings?: Partial<WebsiteSettings> | null): WebsiteSettings => {
+  const incoming = settings || {};
+  return {
+    ...defaultWebsiteSettings,
+    ...incoming,
+    theme: {
+      ...defaultWebsiteSettings.theme,
+      ...(incoming.theme || {}),
+    },
+    mobile: {
+      ...defaultWebsiteSettings.mobile,
+      ...(incoming.mobile || {}),
+    },
+    content: {
+      ...defaultWebsiteSettings.content,
+      ...(incoming.content || {}),
+      dockStyle: {
+        ...defaultWebsiteSettings.content.dockStyle,
+        ...((incoming.content as any)?.dockStyle || {}),
+      },
+      communityStyle: {
+        ...defaultWebsiteSettings.content.communityStyle,
+        ...((incoming.content as any)?.communityStyle || {}),
+      },
+    },
+  } as WebsiteSettings;
+};
+
 const GLOBAL_PRODUCTS_COLLECTION = 'siteProducts';
 const GLOBAL_COUPONS_COLLECTION = 'siteCoupons';
 const GLOBAL_TICKETS_COLLECTION = 'siteSupportTickets';
@@ -1082,7 +1112,9 @@ const App: React.FC = () => {
   const [activeCoinDiscount, setActiveCoinDiscount] = useState<ActiveCoinDiscount | null>(null);
   const [eduCoinGuideRequest, setEduCoinGuideRequest] = useState<{ requiredCoins: number; balance: number; missingCoins: number; productTitle?: string } | null>(null);
 
-  const [websiteSettings, setWebsiteSettings] = useState<WebsiteSettings>(defaultWebsiteSettings);
+  const [websiteSettings, setWebsiteSettings] = useState<WebsiteSettings>(() =>
+    mergeWebsiteSettings(safeGetItem<Partial<WebsiteSettings> | null>('websiteSettings', null))
+  );
   const [economySettings, setEconomySettings] = useState<EconomySettings>(DEFAULT_ECONOMY_SETTINGS);
 
   // New E-commerce State
@@ -1562,23 +1594,7 @@ const App: React.FC = () => {
     const storedSettings = localStorage.getItem('websiteSettings');
     if (storedSettings) {
         const parsedSettings = JSON.parse(storedSettings);
-        setWebsiteSettings({
-    ...defaultWebsiteSettings,
-    ...parsedSettings,
-    mobile: { ...defaultWebsiteSettings.mobile, ...(parsedSettings.mobile || {}) },
-    content: {
-        ...defaultWebsiteSettings.content,
-        ...(parsedSettings.content || {}),
-        dockStyle: {
-            ...defaultWebsiteSettings.content.dockStyle,
-            ...((parsedSettings.content as any)?.dockStyle || {}),
-        },
-        communityStyle: {
-            ...defaultWebsiteSettings.content.communityStyle,
-            ...((parsedSettings.content as any)?.communityStyle || {}),
-        },
-    },
-});
+        setWebsiteSettings(mergeWebsiteSettings(parsedSettings));
     }
 
     const storedCoupons = localStorage.getItem('siteCoupons');
@@ -1664,23 +1680,7 @@ const App: React.FC = () => {
     const unsubscribeWebsiteSettings = onSnapshot(doc(db, ...GLOBAL_WEBSITE_SETTINGS_DOC), (snapshot) => {
       if (!snapshot.exists()) return;
       const remoteSettings = snapshot.data() as WebsiteSettings;
-      const mergedSettings = {
-  ...defaultWebsiteSettings,
-  ...remoteSettings,
-  mobile: { ...defaultWebsiteSettings.mobile, ...(remoteSettings.mobile || {}) },
-  content: {
-    ...defaultWebsiteSettings.content,
-    ...(remoteSettings.content || {}),
-    dockStyle: {
-      ...defaultWebsiteSettings.content.dockStyle,
-      ...((remoteSettings.content as any)?.dockStyle || {}),
-    },
-    communityStyle: {
-      ...defaultWebsiteSettings.content.communityStyle,
-      ...((remoteSettings.content as any)?.communityStyle || {}),
-    },
-  },
-};
+      const mergedSettings = mergeWebsiteSettings(remoteSettings);
       setWebsiteSettings(mergedSettings);
       safeSetItem('websiteSettings', mergedSettings);
     }, error => logGlobalSyncWarning('Website settings', error));
@@ -1744,71 +1744,54 @@ const App: React.FC = () => {
   // --- Dynamic Theming ---
   useEffect(() => {
     const root = document.documentElement;
-
-    // User-selectable color palette
     const activePalette = themes[activeTheme]?.palette || themes.default.palette;
-
-    // Admin-controlled theme settings (structure, fonts, etc.)
     const adminTheme = websiteSettings.theme;
-    const mergedPalette = {
-        ...activePalette,
-        ...adminTheme,
+    const colorExperience = adminTheme.colorExperience === 'original' ? 'original' : 'immersive';
+    const immersivePalette: ThemePalette = {
+      primaryColor: '#315BCA',
+      accentColor: '#315BCA',
+      backgroundColor: '#F2F5F9',
+      textColor: '#0D1B3E',
+      textMutedColor: '#46556D',
     };
+    const mergedPalette = colorExperience === 'immersive'
+      ? immersivePalette
+      : { ...activePalette, ...adminTheme };
 
-    // Apply colors from admin theme, falling back to the user's palette
+    root.dataset.colorExperience = colorExperience;
     root.style.setProperty('--color-primary', mergedPalette.primaryColor);
     root.style.setProperty('--color-accent', mergedPalette.accentColor);
     root.style.setProperty('--color-background', mergedPalette.backgroundColor);
     root.style.setProperty('--color-text', mergedPalette.textColor);
     root.style.setProperty('--color-text-muted', mergedPalette.textMutedColor);
+    safeSetItem('siteColorExperience', colorExperience);
 
-    // Apply structural styles from admin settings
+    const themeMeta = document.querySelector<HTMLMetaElement>('meta[name="theme-color"]');
+    if (themeMeta) themeMeta.content = colorExperience === 'immersive' ? '#F2F5F9' : mergedPalette.primaryColor;
+
     const fonts = {
-        'inter-lato': { sans: 'Inter, sans-serif', serif: 'Lato, serif' },
-        'roboto-merriweather': { sans: 'Roboto, sans-serif', serif: 'Merriweather, serif' },
-        'montserrat-oswald': { sans: 'Montserrat, sans-serif', serif: 'Oswald, sans-serif' },
+      'inter-lato': { sans: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif', serif: 'Lato, ui-serif, Georgia, serif' },
+      'roboto-merriweather': { sans: 'Roboto, ui-sans-serif, system-ui, sans-serif', serif: 'Merriweather, ui-serif, Georgia, serif' },
+      'montserrat-oswald': { sans: 'Montserrat, ui-sans-serif, system-ui, sans-serif', serif: 'Oswald, ui-sans-serif, system-ui, sans-serif' },
     };
     root.style.setProperty('--font-sans', fonts[adminTheme.fontPairing].sans);
     root.style.setProperty('--font-serif', fonts[adminTheme.fontPairing].serif);
-
     root.style.setProperty('--style-corner-radius', adminTheme.cornerRadius);
-    const shadows = {
-        'light': '0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)',
-        'medium': '0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)',
-        'heavy': '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)',
-    };
-    root.style.setProperty('--style-shadow-base', shadows[adminTheme.shadowIntensity] || shadows.medium);
-    root.style.setProperty('--style-shadow-[0_8px_30px_rgb(0,0,0,0.04)]', shadows[adminTheme.shadowIntensity === 'light' ? 'medium' : 'heavy']);
-    root.style.setProperty('--style-shadow-[0_8px_30px_rgb(0,0,0,0.04)]', shadows[adminTheme.shadowIntensity === 'heavy' ? 'heavy' : 'heavy']);
 
+    const shadows = {
+      light: '0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.05)',
+      medium: '0 10px 28px rgb(15 23 42 / 0.08)',
+      heavy: '0 18px 48px rgb(15 23 42 / 0.12)',
+    };
+    root.style.setProperty('--style-shadow-base', shadows[adminTheme.shadowIntensity as keyof typeof shadows] || shadows.medium);
+    root.style.setProperty('--style-shadow-lg', colorExperience === 'immersive' ? '0 16px 42px rgb(15 23 42 / 0.10)' : shadows.heavy);
+    root.style.setProperty('--style-shadow-xl', colorExperience === 'immersive' ? '0 22px 60px rgb(15 23 42 / 0.12)' : shadows.heavy);
   }, [websiteSettings.theme, activeTheme]);
 
   const handleWebsiteSettingsUpdate = async (newSettings: WebsiteSettings): Promise<boolean> => {
     // When admin saves, we don't want to override user's theme choice,
     // so we merge admin settings with the default theme palette.
-    const mergedSettings = {
-        ...newSettings,
-        theme: {
-            ...defaultWebsiteSettings.theme,
-            ...newSettings.theme,
-        },
-        mobile: {
-            ...defaultWebsiteSettings.mobile,
-            ...(newSettings.mobile || {}),
-        },
-        content: {
-            ...defaultWebsiteSettings.content,
-            ...newSettings.content,
-            dockStyle: {
-                ...defaultWebsiteSettings.content.dockStyle,
-                ...((newSettings.content as any)?.dockStyle || {}),
-            },
-            communityStyle: {
-                ...defaultWebsiteSettings.content.communityStyle,
-                ...((newSettings.content as any)?.communityStyle || {}),
-            },
-        },
-    };
+    const mergedSettings = mergeWebsiteSettings(newSettings);
     setWebsiteSettings(mergedSettings);
     safeSetItem('websiteSettings', mergedSettings);
     return setDoc(doc(db, ...GLOBAL_WEBSITE_SETTINGS_DOC), stripUndefinedDeep(mergedSettings), { merge: true })
@@ -4526,7 +4509,7 @@ const App: React.FC = () => {
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent(effectiveAppUser)}</div>;
     if (currentView === 'community') return (
-      <div key="community" className="fixed inset-0 z-[1200] min-h-0 min-w-0 overflow-hidden bg-[#F8FBFF]">
+      <div key="community" className="fixed inset-0 z-[1200] min-h-0 min-w-0 overflow-hidden bg-[var(--color-background)]">
         <EduvoraCommunity settings={websiteSettings} onClose={() => handleNavigateBack('home')} isAuthenticated={isLoggedIn} currentUser={effectiveAppUser} />
       </div>
     );
