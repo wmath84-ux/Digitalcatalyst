@@ -251,6 +251,7 @@ const defaultNotificationPreferences: NotificationPreferences = { replies: true,
 
 const defaultCommunityStyle = {
   desktopLayout: 'latest',
+  mobileLayout: 'latest',
   pageBackground: '#F8FBFF',
   surfaceColor: '#FFFFFF',
   cardColor: '#FFFFFF',
@@ -1157,6 +1158,378 @@ const communityPolishCss = `
     .eduvora-community-main {
       padding-left: clamp(0.875rem, 4vw, 1rem) !important;
       padding-right: clamp(0.875rem, 4vw, 1rem) !important;
+    }
+
+    .community-mobile-latest {
+      background: #F4F7FA !important;
+      padding: 0 !important;
+    }
+    .community-mobile-latest .eduvora-community-app {
+      height: 100% !important;
+      background: #F4F7FA !important;
+    }
+    .community-mobile-latest .eduvora-community-app::before {
+      display: none !important;
+    }
+    .community-mobile-latest .community-desktop-header {
+      min-height: 3.75rem;
+      padding: calc(env(safe-area-inset-top) + 0.5rem) 0.75rem 0.5rem !important;
+      border-color: #E3E8EF !important;
+      background: rgba(255, 255, 255, 0.96) !important;
+      box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04) !important;
+      backdrop-filter: saturate(150%) blur(18px) !important;
+    }
+    .community-mobile-latest .community-desktop-header-inner {
+      grid-template-columns: minmax(0, 1fr) auto !important;
+      align-items: center !important;
+      gap: 0.5rem !important;
+    }
+    .community-mobile-latest .community-mobile-header-left {
+      gap: 0.625rem !important;
+    }
+    .community-mobile-latest .community-mobile-back-button,
+    .community-mobile-latest .community-mobile-ai-button,
+    .community-mobile-latest .community-mobile-notification-button {
+      width: 2.5rem !important;
+      height: 2.5rem !important;
+      min-width: 2.5rem !important;
+      min-height: 2.5rem !important;
+      border-radius: 0.75rem !important;
+      box-shadow: none !important;
+      transform: none !important;
+    }
+    .community-mobile-latest .community-mobile-back-button {
+      border-color: #E3E8EF !important;
+      background: #F8FAFC !important;
+      color: #111827 !important;
+    }
+    .community-mobile-latest .community-mobile-ai-button {
+      background: var(--community-primary) !important;
+    }
+    .community-mobile-latest .community-mobile-profile-button {
+      display: none !important;
+    }
+    .community-mobile-latest .community-desktop-header-actions {
+      gap: 0.375rem !important;
+    }
+    .community-mobile-latest .community-mobile-title {
+      color: #111827 !important;
+      font-size: 1.15rem !important;
+      font-weight: 800 !important;
+      line-height: 1.15 !important;
+      letter-spacing: -0.035em !important;
+    }
+    .community-mobile-latest .community-mobile-title-latest {
+      display: inline !important;
+    }
+    .community-mobile-latest .community-mobile-title-classic {
+      display: none !important;
+    }
+    .community-mobile-latest .eduvora-community-main {
+      background: #F4F7FA !important;
+      padding: 0.625rem 0.75rem calc(env(safe-area-inset-bottom) + 5.2rem) !important;
+      overscroll-behavior-y: contain !important;
+      scroll-padding-top: 0.625rem;
+    }
+    .community-mobile-latest .eduvora-community-main.community-thread-page {
+      overflow: hidden !important;
+      padding: 0 !important;
+      background: #FFFFFF !important;
+    }
+    .community-mobile-latest .community-thread-page .community-content-stage {
+      height: 100% !important;
+      min-height: 0 !important;
+    }
+    .community-mobile-latest .community-mobile-feed-filters {
+      position: sticky;
+      top: 0;
+      z-index: 30;
+      display: flex !important;
+      gap: 0.375rem;
+      margin: -0.625rem -0.75rem 0.625rem;
+      padding: 0.55rem 0.75rem;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      scrollbar-width: none;
+      background: rgba(244, 247, 250, 0.96);
+      backdrop-filter: blur(14px);
+    }
+    .community-mobile-latest .community-mobile-feed-filters::-webkit-scrollbar {
+      display: none;
+    }
+    .community-mobile-latest .community-mobile-feed-filter {
+      display: inline-flex;
+      min-height: 2.25rem;
+      flex: 0 0 auto;
+      align-items: center;
+      gap: 0.35rem;
+      border: 1px solid #E3E8EF;
+      border-radius: 0.7rem;
+      background: #FFFFFF;
+      padding: 0.45rem 0.7rem;
+      color: #64748B;
+      font-size: 0.7rem;
+      font-weight: 750;
+      line-height: 1;
+      box-shadow: none;
+    }
+    .community-mobile-latest .community-mobile-feed-filter.is-active {
+      border-color: #BFD2F8;
+      background: #EAF2FF;
+      color: var(--community-primary);
+    }
+    .community-mobile-latest .community-mobile-feed-filter-count {
+      display: inline-flex;
+      min-width: 1.15rem;
+      height: 1.15rem;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      background: rgba(255, 255, 255, 0.82);
+      padding: 0 0.28rem;
+      font-size: 0.62rem;
+    }
+    .community-mobile-latest .community-desktop-feed-layout {
+      display: block !important;
+      height: auto !important;
+      min-height: 0 !important;
+      max-height: none !important;
+      overflow: visible !important;
+    }
+    .community-mobile-latest .community-mobile-feed-stream {
+      height: auto !important;
+      overflow: visible !important;
+      padding-bottom: 0.35rem !important;
+    }
+    .community-mobile-latest .community-desktop-feed-card {
+      border-color: #E3E8EF !important;
+      border-radius: 1rem !important;
+      background: #FFFFFF !important;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+      transform: none !important;
+    }
+    .community-mobile-latest .community-desktop-feed-card-main {
+      gap: 0.7rem !important;
+      border-left: 0 !important;
+      padding: 0.8rem !important;
+    }
+    .community-mobile-latest .community-mobile-feed-card-title {
+      color: #111827 !important;
+      font-size: 0.9rem !important;
+      font-weight: 780 !important;
+      line-height: 1.25 !important;
+    }
+    .community-mobile-latest .community-mobile-feed-card-time {
+      font-size: 0.62rem !important;
+      font-weight: 700 !important;
+    }
+    .community-mobile-latest .community-mobile-feed-card-meta {
+      margin-top: 0.2rem !important;
+      color: #64748B !important;
+      font-size: 0.68rem !important;
+    }
+    .community-mobile-latest .community-mobile-feed-card-meta > span:last-child {
+      border: 0 !important;
+      border-radius: 0.45rem !important;
+      background: #F1F5F9 !important;
+      padding: 0.18rem 0.42rem !important;
+      color: #475569 !important;
+    }
+    .community-mobile-latest .community-mobile-feed-card-body {
+      margin-top: 0.5rem !important;
+      color: #475569 !important;
+      font-size: 0.8rem !important;
+      font-weight: 550 !important;
+      line-height: 1.45 !important;
+    }
+    .community-mobile-latest .community-desktop-feed-card-actions {
+      justify-content: flex-start !important;
+      gap: 0.15rem !important;
+      border-color: #EEF2F6 !important;
+      padding: 0.35rem 0.55rem !important;
+    }
+    .community-mobile-latest .community-desktop-feed-card-actions button {
+      min-height: 2.1rem !important;
+      border-color: transparent !important;
+      border-radius: 0.6rem !important;
+      background: transparent !important;
+      padding: 0.35rem 0.55rem !important;
+      color: #64748B !important;
+      box-shadow: none !important;
+    }
+    .community-mobile-latest .community-desktop-feed-card-actions button:nth-child(n + 3) {
+      display: none !important;
+    }
+    .community-mobile-latest .community-desktop-thread {
+      height: 100% !important;
+      min-height: 0 !important;
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: #FFFFFF !important;
+      box-shadow: none !important;
+    }
+    .community-mobile-latest .community-desktop-thread-header {
+      min-height: 3.7rem;
+      border-color: #E3E8EF !important;
+      background: rgba(255, 255, 255, 0.98) !important;
+      padding: 0.55rem 0.75rem !important;
+    }
+    .community-mobile-latest .community-desktop-thread-header h2 {
+      color: #111827 !important;
+      font-size: 0.92rem !important;
+      font-weight: 780 !important;
+    }
+    .community-mobile-latest .community-thread-badge {
+      max-width: 7rem;
+      overflow: hidden;
+      border-radius: 0.45rem !important;
+      padding: 0.2rem 0.4rem !important;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .community-mobile-latest .community-thread-reply-button {
+      display: none !important;
+    }
+    .community-mobile-latest .community-thread-delete-button {
+      min-height: 2.25rem !important;
+      border: 0 !important;
+      border-radius: 0.65rem !important;
+      padding-inline: 0.6rem !important;
+      background: #FDECEC !important;
+      box-shadow: none !important;
+    }
+    .community-mobile-latest .community-desktop-thread-scroll {
+      background: #F4F7FA !important;
+      padding: 0.7rem 0.75rem 1rem !important;
+    }
+    .community-mobile-latest .community-desktop-post-card {
+      max-width: none !important;
+      border-color: #E3E8EF !important;
+      border-radius: 1rem !important;
+      padding: 1rem !important;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04) !important;
+    }
+    .community-mobile-latest .community-mobile-post-title {
+      color: #111827 !important;
+      font-size: 1.35rem !important;
+      font-weight: 800 !important;
+      line-height: 1.22 !important;
+      letter-spacing: -0.035em !important;
+    }
+    .community-mobile-latest .community-mobile-post-body {
+      margin-top: 0.65rem !important;
+      color: #475569 !important;
+      font-size: 0.92rem !important;
+      font-weight: 520 !important;
+      line-height: 1.65 !important;
+    }
+    .community-mobile-latest .community-desktop-post-media {
+      width: 100% !important;
+      max-width: none !important;
+      margin-top: 1rem !important;
+      border-color: #E2E8F0 !important;
+      border-radius: 0.9rem !important;
+      background: #F8FAFC !important;
+      box-shadow: none !important;
+    }
+    .community-mobile-latest .community-desktop-reactions {
+      flex-wrap: nowrap !important;
+      gap: 0.2rem !important;
+      overflow-x: auto;
+      padding-top: 0.2rem;
+      scrollbar-width: none;
+    }
+    .community-mobile-latest .community-desktop-reactions::-webkit-scrollbar {
+      display: none;
+    }
+    .community-mobile-latest .community-desktop-reaction-chip {
+      flex: 0 0 auto;
+      border-color: transparent !important;
+      border-radius: 0.55rem !important;
+      background: #F8FAFC !important;
+      padding: 0.38rem 0.5rem !important;
+      color: #64748B !important;
+      box-shadow: none !important;
+    }
+    .community-mobile-latest .community-reply-bubble {
+      max-width: 88% !important;
+      border-radius: 1rem !important;
+      padding: 0.65rem 0.8rem !important;
+      box-shadow: none !important;
+    }
+    .community-mobile-latest .community-desktop-reply-composer {
+      border-color: #E3E8EF !important;
+      background: rgba(255, 255, 255, 0.98) !important;
+      padding: 0.5rem 0.65rem calc(env(safe-area-inset-bottom) + 0.5rem) !important;
+      box-shadow: 0 -6px 18px rgba(15, 23, 42, 0.04) !important;
+    }
+    .community-mobile-latest .community-desktop-reply-composer textarea {
+      min-height: 2.75rem !important;
+      max-height: 7rem;
+      border-color: #DDE3EA !important;
+      border-radius: 0.8rem !important;
+      background: #F8FAFC !important;
+      padding: 0.6rem 0.75rem !important;
+      color: #1F2937 !important;
+      font-size: 0.84rem !important;
+      font-weight: 550 !important;
+      line-height: 1.45 !important;
+    }
+    .community-mobile-latest .community-desktop-reply-composer button {
+      height: 2.75rem !important;
+      min-width: 3.6rem !important;
+      border-radius: 0.8rem !important;
+      background: var(--community-primary) !important;
+      padding-inline: 0.75rem !important;
+      box-shadow: none !important;
+    }
+    .community-mobile-latest .community-status-grid-shell {
+      border: 0 !important;
+      border-radius: 0 !important;
+      background: transparent !important;
+      padding: 0 !important;
+    }
+    .community-mobile-latest .community-status-tile {
+      border-radius: 1rem !important;
+      box-shadow: 0 1px 2px rgba(15, 23, 42, 0.05) !important;
+    }
+    .community-mobile-latest #community-bottom-dock {
+      inset-inline: 0 !important;
+      bottom: 0 !important;
+      gap: 0.125rem !important;
+      overflow-x: hidden !important;
+      border-width: 1px 0 0 !important;
+      border-color: #E3E8EF !important;
+      border-radius: 0 !important;
+      background: rgba(255, 255, 255, 0.97) !important;
+      padding: 0.35rem 0.4rem calc(env(safe-area-inset-bottom) + 0.35rem) !important;
+      box-shadow: 0 -6px 20px rgba(15, 23, 42, 0.05) !important;
+      backdrop-filter: saturate(150%) blur(18px) !important;
+    }
+    .community-mobile-latest .community-mobile-dock-item {
+      min-width: 0 !important;
+      min-height: 3.05rem !important;
+      border-radius: 0.7rem !important;
+      background: transparent !important;
+      padding: 0.3rem 0.05rem !important;
+    }
+    .community-mobile-latest .community-mobile-dock-item[class*="bg-[var(--community-dock-active-bg)]"] {
+      background: var(--community-dock-active-bg) !important;
+    }
+    .community-mobile-latest .community-mobile-dock-icon {
+      font-size: 1.05rem !important;
+      line-height: 1 !important;
+    }
+    .community-mobile-latest .community-mobile-dock-label {
+      display: block;
+      margin-top: 0.22rem;
+      overflow: hidden;
+      color: inherit;
+      font-size: clamp(0.46rem, 2vw, 0.56rem) !important;
+      font-weight: 750 !important;
+      line-height: 1.05 !important;
+      text-overflow: ellipsis;
+      white-space: nowrap;
     }
   }
   @media (prefers-reduced-motion: reduce) {
@@ -4082,15 +4455,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <Avatar value={resolveAvatar(message)} size="h-11 w-11" />
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center justify-between gap-3">
-              <span className="truncate text-sm font-black text-[#081A45] sm:text-base">{message.title}</span>
-              <span className="shrink-0 text-[11px] font-black text-[#7C879A]">{message.time}</span>
+              <span className="community-mobile-feed-card-title truncate text-sm font-black text-[#081A45] sm:text-base">{message.title}</span>
+              <span className="community-mobile-feed-card-time shrink-0 text-[11px] font-black text-[#7C879A]">{message.time}</span>
             </span>
-            <span className="mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-bold text-[#536178] sm:text-xs">
+            <span className="community-mobile-feed-card-meta mt-1 flex min-w-0 flex-wrap items-center gap-1.5 text-[11px] font-bold text-[#536178] sm:text-xs">
               <span className="flex min-w-0 items-center gap-1.5"><span className="truncate">{resolveName(message)}</span>{isOfficialAdminMessage(message) ? <BlueVerifiedTick /> : null}</span>
               <span>•</span>
               <span className="rounded-full border border-[#D9E7F8] bg-[#F8FBFF] px-2 py-0.5 text-[#1769FF]">{message.postType || message.type || 'post'}</span>
             </span>
-            <span className="mt-2 line-clamp-2 text-xs font-semibold leading-5 text-[#536178] sm:text-sm">{message.body || message.badge}</span>
+            <span className="community-mobile-feed-card-body mt-2 line-clamp-2 text-xs font-semibold leading-5 text-[#536178] sm:text-sm">{message.body || message.badge}</span>
           </span>
         </button>
         <div className="community-desktop-feed-card-actions flex flex-wrap items-center justify-end gap-1.5 border-t border-[#EEF6FF] px-3 py-2 sm:px-4">
@@ -4112,7 +4485,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return (
       <div key={reply.clientMessageId || reply.docId || reply.id} data-community-reply-id={String(reply.clientMessageId || reply.docId || reply.id)} className={`group flex items-end gap-2 ${mine ? 'justify-end' : 'justify-start'}`}>
         {!mine ? <Avatar value={replyAvatar} size="h-8 w-8" className="mb-1 text-base" /> : null}
-        <div className={`max-w-[86%] rounded-[1.45rem] px-4 py-3 shadow-[0_12px_34px_rgba(23,105,255,0.10)] sm:max-w-[74%] ${mine ? 'rounded-br-md bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white' : 'rounded-bl-md border border-[#D9E7F8] bg-white text-[#081A45]'}`}>
+        <div className={`community-reply-bubble max-w-[86%] rounded-[1.45rem] px-4 py-3 shadow-[0_12px_34px_rgba(23,105,255,0.10)] sm:max-w-[74%] ${mine ? 'rounded-br-md bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white' : 'rounded-bl-md border border-[#D9E7F8] bg-white text-[#081A45]'}`}>
           {reply.replyToTextPreview ? (
             <button type="button" onClick={() => { setHighlightedThreadId(message.id); setTimeout(() => setHighlightedThreadId(null), 1400); }} className={`mb-2 w-full rounded-2xl border-l-4 px-3 py-2 text-left text-xs font-bold ${mine ? 'border-l-white/80 bg-white/15 text-white/90' : 'border-l-[#7B61FF] bg-[#F1EEFF] text-[#536178]'}`}>
               <span className="block font-black">Replying to {reply.replyToSenderName || resolveName(message)}</span>
@@ -4142,16 +4515,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => { const ownerId = getMessageOwnerId(message); if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); } }} className="shrink-0"><Avatar value={resolveAvatar(message)} size="h-10 w-10" /></button>
             <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-base font-black text-[#081A45] sm:text-lg">{resolveName(message)}</h2>{isOfficialAdminMessage(message) ? <BlueVerifiedTick /> : null}<span className="rounded-full bg-[#E8F2FF] px-2.5 py-1 text-[11px] font-black text-[#1769FF]">{message.badge}</span></div>
+              <div className="flex flex-wrap items-center gap-2"><h2 className="truncate text-base font-black text-[#081A45] sm:text-lg">{resolveName(message)}</h2>{isOfficialAdminMessage(message) ? <BlueVerifiedTick /> : null}<span className="community-thread-badge rounded-full bg-[#E8F2FF] px-2.5 py-1 text-[11px] font-black text-[#1769FF]">{message.badge}</span></div>
               <p className="truncate text-xs font-bold text-[#7C879A]">{message.time} · {message.replyCount || message.replies.length} replies</p>
             </div>
-            {isOwnCommunityId(getMessageOwnerId(message)) ? <button type="button" onClick={() => deleteOwnFeedPost(message)} className="min-h-11 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-3 text-xs font-black text-[#C5221F]">Delete</button> : null}<button type="button" onClick={() => setExpandedReplyId(message.id)} className="min-h-11 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-xs font-black text-[#1769FF]">Reply</button>
+            {isOwnCommunityId(getMessageOwnerId(message)) ? <button type="button" onClick={() => deleteOwnFeedPost(message)} className="community-thread-delete-button min-h-11 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-3 text-xs font-black text-[#C5221F]">Delete</button> : null}<button type="button" onClick={() => setExpandedReplyId(message.id)} className="community-thread-reply-button min-h-11 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-xs font-black text-[#1769FF]">Reply</button>
           </div>
         </div>
         <div className="community-desktop-thread-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4 pb-4 custom-scrollbar sm:px-5 lg:px-7">
           <article className={`community-desktop-post-card mx-auto max-w-3xl rounded-[1.8rem] border bg-white p-4 shadow-[0_14px_44px_rgba(23,105,255,0.08)] transition ${threadHighlighted ? 'border-[#7B61FF] ring-4 ring-[#F1EEFF]' : 'border-[#D9E7F8]'}`}>
-            <h3 className="text-2xl font-black tracking-tight text-[#081A45] lg:text-4xl">{message.title}</h3>
-            <p className="mt-3 whitespace-pre-wrap text-base font-semibold leading-8 text-[#536178] sm:text-lg">{message.body}</p>
+            <h3 className="community-mobile-post-title text-2xl font-black tracking-tight text-[#081A45] lg:text-4xl">{message.title}</h3>
+            <p className="community-mobile-post-body mt-3 whitespace-pre-wrap text-base font-semibold leading-8 text-[#536178] sm:text-lg">{message.body}</p>
             {message.imagePreview ? <div className="community-desktop-post-media mt-5 aspect-square max-w-md overflow-hidden rounded-[2rem] border border-[#BFD7FF] bg-gradient-to-br from-[#E8F2FF] via-[#F8FBFF] to-[#F1EEFF] shadow-inner">{renderUploadedImage(message.imagePreview, message.title, message.imageLayout || 'thumbnail')}</div> : null}
             {message.pollOptions ? <div className="mt-5 space-y-3 rounded-[1.6rem] border border-[#CEEAD6] bg-[#E6F4EA] p-4">{message.pollOptions.map((option, index) => { const votes = message.pollVotes || message.pollOptions!.map(() => 0); const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0)); const percent = Math.round((votes[index] / total) * 100); const selectedOption = message.pollVoters?.[currentUserKey]; const selected = selectedOption === index; return <button key={option} type="button" onClick={() => voteOnMessagePoll(message.id, index)} disabled={selectedOption !== undefined} className={`relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left font-black transition disabled:cursor-not-allowed ${selected ? 'border-[#34A853] bg-white text-[#137333]' : 'border-[#CEEAD6] bg-white text-[#081A45] hover:border-[#34A853] disabled:hover:border-[#CEEAD6]'}`}><span className="absolute inset-y-0 left-0 bg-[#CEEAD6]" style={{ width: selectedOption !== undefined ? `${percent}%` : '0%' }} /><span className="relative flex items-center justify-between"><span>{option}</span>{selectedOption !== undefined ? <span>{percent}% · {votes[index]}</span> : <span>Vote</span>}</span></button>; })}</div> : null}
             {renderReactionStrip(message)}<div className="mt-5 flex flex-wrap gap-2"><button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-3 py-1.5 text-sm font-black transition ${(message.likedByUsers?.[currentUserKey] || likedMessages.includes(message.id)) ? 'border-[#F8D7DA] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D9E7F8] bg-[#E8F2FF] text-[#1769FF]'}`}>❤️ {message.likeCount || 0}</button><span className="rounded-full border border-[#D9E7F8] bg-[#E8F2FF] px-3 py-1.5 text-sm font-black text-[#1769FF]">💬 {message.replyCount || message.replies.length}</span></div>
@@ -4174,18 +4547,43 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const isAdminFeed = title.toLowerCase().includes('admin');
     const isMainFeed = title === 'Community Feed';
     const emptyCopy = isAdminFeed ? 'No official admin posts are available right now.' : feedFilter === 'following' ? 'No posts from people you follow yet. Follow creators to build this feed.' : feedFilter === 'followers' ? 'No posts from your followers yet.' : feedFilter === 'mine' ? 'You have not published a permanent post yet.' : 'No messages yet. Start the conversation.';
-    const filterHeader = null;
+    const filterHeader = isMainFeed ? (
+      <div className="community-mobile-feed-filters hidden" aria-label="Mobile feed filters">
+        <button
+          type="button"
+          onClick={() => setFeedFilter('all')}
+          aria-pressed={feedFilter === 'all'}
+          className={`community-mobile-feed-filter ${feedFilter === 'all' ? 'is-active' : ''}`}
+        >
+          <span>All</span>
+          <span className="community-mobile-feed-filter-count">{compactCount(messages.length)}</span>
+        </button>
+        {feedFilterOptions.map((option) => (
+          <button
+            key={option.key}
+            type="button"
+            onClick={() => setFeedFilter(option.key)}
+            aria-pressed={feedFilter === option.key}
+            className={`community-mobile-feed-filter ${feedFilter === option.key ? 'is-active' : ''}`}
+          >
+            <span>{option.label.replace(' Feed', '')}</span>
+            <span className="community-mobile-feed-filter-count">{compactCount(option.count)}</span>
+          </button>
+        ))}
+      </div>
+    ) : null;
 
     if (!feedMessages.length) return <><div className="mx-auto max-w-5xl rounded-[2rem] border border-dashed border-[#C2E7FF] bg-gradient-to-br from-[#F8FAFD] via-white to-[#E8F0FE] p-8 text-center font-bold text-[#536178] shadow-[0_18px_54px_rgba(37,99,235,0.10)]"><div className="mx-auto mb-4 flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white text-3xl shadow-inner">{isAdminFeed ? '📣' : '💬'}</div>{emptyCopy}</div></>;
 
     return (
       <>
+        {filterHeader}
         <div className="community-desktop-feed-layout mx-auto grid h-[calc(100dvh-8.5rem)] max-h-[calc(100dvh-8.5rem)] min-h-0 w-full min-w-0 max-w-[1600px] gap-4 overflow-hidden lg:gap-5 md:grid-cols-[minmax(0,clamp(18rem,28vw,25rem))_minmax(0,1fr)]">
           <aside className="community-desktop-feed-list hidden h-full min-h-0 min-w-0 overflow-y-auto rounded-[2rem] border border-[#D9E7F8] bg-white p-3 shadow-[0_20px_60px_rgba(23,105,255,0.08)] ring-1 ring-[#EEF6FF] backdrop-blur-xl custom-scrollbar md:block">
             <div className="space-y-3">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} isActive={activeMessage?.id === message.id} />)}</div>
           </aside>
           <section className="community-desktop-thread-pane hidden min-h-0 min-w-0 overflow-hidden md:block">{activeMessage ? renderMessageDetails(activeMessage) : null}</section>
-          <div className="h-full space-y-3 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+6rem)] custom-scrollbar md:hidden">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)}</div>
+          <div className="community-mobile-feed-stream h-full space-y-3 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+6rem)] custom-scrollbar md:hidden">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)}</div>
         </div>
       </>
     );
@@ -4795,6 +5193,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     ...((settings?.content as any)?.communityStyle || {}),
   };
   const useLatestDesktopLayout = communityStyle.desktopLayout !== 'classic';
+  const useLatestMobileLayout = communityStyle.mobileLayout !== 'classic';
 
   const communityCssVars = useMemo(
     () => toCommunityCssVars(communityStyle),
@@ -4863,24 +5262,24 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const CommunityHeader = () => (
     <header className="community-desktop-header sticky top-0 z-[1200] shrink-0 border-b border-[#D9E7F8] bg-white/94 px-3 py-2 shadow-[0_14px_36px_rgba(23,105,255,0.08)] backdrop-blur-2xl sm:px-5 lg:px-6 lg:py-3">
       <div className="community-desktop-header-inner mx-auto grid max-w-[1500px] grid-cols-[minmax(0,1fr)_auto] items-start gap-2 lg:grid-cols-[minmax(13rem,1fr)_minmax(15rem,auto)] lg:items-center lg:gap-3">
-        <div className="flex min-w-0 items-center gap-3">
-          <button type="button" onClick={goBack} aria-label="Back from Community" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-[0_12px_30px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16">←</button>
+        <div className="community-mobile-header-left flex min-w-0 items-center gap-3">
+          <button type="button" onClick={goBack} aria-label="Back from Community" className="community-mobile-back-button flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-[0_12px_30px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16">←</button>
           <div className="min-w-0">
             <p className="hidden text-[0.68rem] font-black uppercase tracking-[0.24em] text-[#1769FF] sm:block">Eduvora Community</p>
-            <h1 className="truncate text-lg font-black tracking-tight text-[#081A45] sm:text-2xl lg:text-3xl">{activeNavItem.label === 'Feed' ? 'Community Feed' : activeNavItem.label}</h1>
+            <h1 className="community-mobile-title truncate text-lg font-black tracking-tight text-[#081A45] sm:text-2xl lg:text-3xl"><span className="community-mobile-title-latest hidden">{activeNavItem.label === 'Feed' ? 'Community' : activeNavItem.label}</span><span className="community-mobile-title-classic sm:hidden">{activeNavItem.label === 'Feed' ? 'Community Feed' : activeNavItem.label}</span><span className="hidden sm:inline">{activeNavItem.label === 'Feed' ? 'Community Feed' : activeNavItem.label}</span></h1>
           </div>
         </div>
 
         <div className="community-desktop-header-actions -mt-0.5 flex min-w-0 shrink-0 items-center justify-end gap-2 lg:mt-0">
           <button type="button" onClick={() => onClose?.()} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] lg:inline-flex">← Leave</button>
-          <button type="button" ref={communityAiButtonRef} onClick={openCommunityAiMentor} aria-label="Open Community AI Mentor" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-xs font-black text-white shadow-[0_14px_32px_rgba(123,97,255,0.24)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[#7B61FF]/20 active:scale-95"><span aria-hidden="true">✦</span><span className="sr-only">AI</span></button>
+          <button type="button" ref={communityAiButtonRef} onClick={openCommunityAiMentor} aria-label="Open Community AI Mentor" className="community-mobile-ai-button flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-xs font-black text-white shadow-[0_14px_32px_rgba(123,97,255,0.24)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[#7B61FF]/20 active:scale-95"><span aria-hidden="true">✦</span><span className="sr-only">AI</span></button>
           {page === 'chat' && activeView === 'feed' ? <div className="community-desktop-feed-filters hidden min-w-0 items-center gap-1 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 md:flex">{feedFilterOptions.map((option) => <button key={option.key} type="button" onClick={() => setFeedFilter(option.key)} className={`min-h-9 shrink-0 rounded-xl px-3 text-[11px] font-black transition ${feedFilter === option.key ? 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-sm' : 'text-[#536178] hover:bg-white hover:text-[#1769FF]'}`}>{option.label}<span className="ml-1 opacity-80">{compactCount(option.count)}</span></button>)}</div> : null}
           {page === 'chat' && activeView === 'status' ? <div className="hidden items-center gap-1 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 md:flex"><button type="button" onClick={openStatusUploadFromTop} className="min-h-9 rounded-xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-3 text-[11px] font-black text-white">Create</button><button type="button" onClick={openMyStatusesFromTop} className="min-h-9 rounded-xl bg-white px-3 text-[11px] font-black text-[#081A45]">Your status</button><button type="button" onClick={() => setShowStatusRulesModal(true)} className="min-h-9 rounded-xl bg-white px-3 text-[11px] font-black text-[#1769FF]">Rules</button></div> : null}
           {showCreateCta ? <button type="button" onClick={handleHeaderCreate} className="hidden rounded-2xl bg-gradient-to-r from-[#7B61FF] to-[#1769FF] px-4 py-3 text-xs font-black text-white shadow-[0_16px_38px_rgba(23,105,255,0.22)] transition hover:-translate-y-0.5 hidden">Create</button> : null}
           <button type="button" onClick={() => pushPage('network')} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-3 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] xl:flex">⌕ Search</button>
-          <button type="button" onClick={() => { setSelectedProfileId(null); setProfileViewMode('overview'); pushPage('profile'); }} className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#D9E7F8] bg-white text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF]" aria-label="Open profile"><Avatar value={getOwnDisplayAvatar()} size="h-8 w-8" /></button>
+          <button type="button" onClick={() => { setSelectedProfileId(null); setProfileViewMode('overview'); pushPage('profile'); }} className="community-mobile-profile-button flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#D9E7F8] bg-white text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF]" aria-label="Open profile"><Avatar value={getOwnDisplayAvatar()} size="h-8 w-8" /></button>
           <span className="hidden rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400] lg:inline-flex">🪙 {eduCoins}</span>
-          <div ref={notificationPanelRef} className="relative"><button type="button" onClick={() => setIsNotificationPanelOpen((open) => !open)} aria-expanded={isNotificationPanelOpen} aria-label="Community notifications" className="relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16"><span aria-hidden="true">🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button></div>
+          <div ref={notificationPanelRef} className="relative"><button type="button" onClick={() => setIsNotificationPanelOpen((open) => !open)} aria-expanded={isNotificationPanelOpen} aria-label="Community notifications" className="community-mobile-notification-button relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16"><span aria-hidden="true">🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button></div>
         </div>
       </div>
     </header>
@@ -4990,14 +5389,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
               }
             });
           }}
-          className={`min-w-[56px] flex-1 rounded-[0.95rem] px-1.5 py-1 text-center transition ${
+          className={`community-mobile-dock-item min-w-[56px] flex-1 rounded-[0.95rem] px-1.5 py-1 text-center transition ${
             item.active
               ? 'bg-[var(--community-dock-active-bg)] text-[var(--community-dock-active-text)]'
               : 'bg-[var(--community-dock-item-bg)] text-[var(--community-dock-text)]'
           }`}
         >
-          <span className="block text-base leading-none">{item.icon}</span>
-          <span className="text-[8px] font-black leading-tight">{item.label}</span>
+          <span className="community-mobile-dock-icon block text-base leading-none">{item.icon}</span>
+          <span className="community-mobile-dock-label text-[8px] font-black leading-tight">{item.label}</span>
         </button>
       ))}
     </nav>
@@ -5352,7 +5751,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }
 
   return (
-    <section style={communityCssVars} className={`eduvora-community-polish relative h-full min-h-0 w-full overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-2 lg:p-3 ${useLatestDesktopLayout ? 'community-desktop-latest' : 'community-desktop-classic'}`}>
+    <section style={communityCssVars} className={`eduvora-community-polish relative h-full min-h-0 w-full overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-2 lg:p-3 ${useLatestDesktopLayout ? 'community-desktop-latest' : 'community-desktop-classic'} ${useLatestMobileLayout ? 'community-mobile-latest' : 'community-mobile-classic'}`}>
       <style>{`
         @keyframes eduvoraBondShine {
           0% { transform: translateX(0); opacity: 0; }
@@ -5380,7 +5779,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <CommunitySidebar />
         <div className="flex min-w-0 flex-1 flex-col">
           <CommunityHeader />
-          <main ref={scrollContainerRef} className={`eduvora-community-main min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-3 custom-scrollbar sm:px-4 lg:px-5 lg:pb-4 ${
+          <main ref={scrollContainerRef} className={`eduvora-community-main ${page === 'thread' ? 'community-thread-page' : ''} min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-3 custom-scrollbar sm:px-4 lg:px-5 lg:pb-4 ${
             shouldHideCommunityDockOnMobile
               ? 'pb-3 max-md:pb-4 max-md:overscroll-contain'
               : 'pb-[calc(env(safe-area-inset-bottom)+4.9rem)] max-md:pb-[calc(env(safe-area-inset-bottom)+4.7rem)] max-md:overscroll-contain'

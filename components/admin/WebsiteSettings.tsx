@@ -345,6 +345,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const desktopNavigationMode = localSettings.desktop?.navigationMode === 'dock' ? 'dock' : 'sidebar';
     const communityStyle = {
         desktopLayout: 'latest',
+        mobileLayout: 'latest',
         pageBackground: '#F8FBFF',
         surfaceColor: '#FFFFFF',
         cardColor: '#FFFFFF',
@@ -369,6 +370,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         ...((localSettings.content as any).communityStyle || {}),
     };
     const latestDesktopCommunityLayout = communityStyle.desktopLayout !== 'classic';
+    const latestMobileCommunityLayout = communityStyle.mobileLayout !== 'classic';
     const readingStyle = { backgroundColor: '#F8FAFD', backgroundOpacity: 98, panelOpacity: 96, cardOpacity: 94, accentColor: '#C2E7FF', accentOpacity: 66, ...((localSettings.content as any).readingStyle || {}) };
     const profileStyle = { backgroundColor: '#e2e8f0', backgroundTint: '#e0e7ff', cardOpacity: 82, heroOverlayOpacity: 76, accentColor: '#f97316', ...((localSettings.content as any).profileStyle || {}) };
     const profileStreaks = (((localSettings.content as any).profileStreaks || []) as ProfileStreakConfig[]);
@@ -938,6 +940,21 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                 <input type="checkbox" className="peer sr-only" checked={latestDesktopCommunityLayout} onChange={e => updateCommunityStyle('desktopLayout', e.target.checked ? 'latest' : 'classic')} />
                                 <span className="relative h-8 w-14 rounded-full bg-slate-300 transition peer-checked:bg-blue-600 after:absolute after:left-1 after:top-1 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow-md after:transition-transform peer-checked:after:translate-x-6" />
                                 <span className="min-w-[4.5rem] text-sm font-black text-slate-700">{latestDesktopCommunityLayout ? 'Latest' : 'Classic'}</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div className="rounded-[1.5rem] border border-cyan-100 bg-gradient-to-br from-cyan-50 via-white to-blue-50 p-5 shadow-sm">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-[0.2em] text-cyan-700">Community mobile experience</p>
+                                <h4 className="mt-1 text-lg font-black text-slate-900">Use latest clean mobile Community UX</h4>
+                                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">Latest is the default. It keeps the existing Community logic while applying the cleaner phone header, feed tabs, cards, post view, reply composer and bottom navigation. Turn it off and save to restore the preserved classic mobile layout.</p>
+                            </div>
+                            <label className="relative inline-flex cursor-pointer items-center gap-3">
+                                <input type="checkbox" className="peer sr-only" checked={latestMobileCommunityLayout} onChange={e => updateCommunityStyle('mobileLayout', e.target.checked ? 'latest' : 'classic')} />
+                                <span className="relative h-8 w-14 rounded-full bg-slate-300 transition peer-checked:bg-cyan-600 after:absolute after:left-1 after:top-1 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow-md after:transition-transform peer-checked:after:translate-x-6" />
+                                <span className="min-w-[4.5rem] text-sm font-black text-slate-700">{latestMobileCommunityLayout ? 'Latest' : 'Classic'}</span>
                             </label>
                         </div>
                     </div>
