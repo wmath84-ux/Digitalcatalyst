@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { GoogleGenAI } from '@google/genai';
 import { addDoc, collection, deleteDoc, doc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
@@ -363,11 +364,18 @@ const CommunityAiMentor: React.FC<CommunityAiMentorProps> = ({ isOpen, userId = 
     finally { setIsTesting(false); }
   };
 
-  if (!isOpen) return null;
+  if (!isOpen || typeof document === 'undefined') return null;
 
-  return (
-    <div className="fixed inset-0 z-[1750] flex justify-end bg-[#081A45]/24 p-0 backdrop-blur-[3px] sm:p-3" role="dialog" aria-modal="true" aria-label="Community AI Mentor" ref={panelRef}>
-      <div className="flex h-auto max-h-[100dvh] w-full min-w-0 flex-col overflow-hidden bg-[#F8FBFF] text-[#081A45] shadow-[0_30px_90px_rgba(8,26,69,0.22)] sm:max-h-[calc(100dvh-1.5rem)] sm:max-w-[520px] sm:rounded-[2rem] sm:border sm:border-[#D9E7F8]">
+  return createPortal(
+    <div
+      className="fixed inset-0 z-[1750] flex min-h-0 justify-end overflow-hidden overscroll-none bg-[#081A45]/24 p-0 backdrop-blur-[3px] sm:p-3"
+      style={{ height: 'var(--app-dvh, 100dvh)' }}
+      role="dialog"
+      aria-modal="true"
+      aria-label="Community AI Mentor"
+      ref={panelRef}
+    >
+      <div className="relative flex h-full min-h-0 max-h-full w-full min-w-0 flex-col overflow-hidden bg-[#F8FBFF] text-[#081A45] shadow-[0_30px_90px_rgba(8,26,69,0.22)] sm:max-w-[520px] sm:rounded-[2rem] sm:border sm:border-[#D9E7F8]">
         <header className="flex shrink-0 items-center gap-2 border-b border-[#D9E7F8] bg-white/92 px-3 py-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-2xl sm:px-4 sm:pt-3">
           <button type="button" onClick={() => setIsHistoryOpen(value => !value)} aria-label="Open Community AI chat history" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-[#1769FF] shadow-sm">☰</button>
           <div className="min-w-0 flex-1"><p className="text-[0.68rem] font-black uppercase tracking-[0.24em] text-[#7B61FF]">Community guide</p><h2 className="truncate text-lg font-black">Community AI Mentor</h2><p className="truncate text-xs font-bold text-[#7C879A]">Helping with {context.title}</p></div>
@@ -375,11 +383,11 @@ const CommunityAiMentor: React.FC<CommunityAiMentorProps> = ({ isOpen, userId = 
           <button type="button" onClick={onClose} aria-label="Close Community AI Mentor" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-sm">×</button>
         </header>
 
-        <div className="relative flex min-h-0 flex-none overflow-hidden">
+        <div className="relative flex min-h-0 flex-1 overflow-hidden">
           {isHistoryOpen ? <aside className="absolute inset-y-0 left-0 z-20 w-[min(86vw,19rem)] border-r border-[#D9E7F8] bg-white/96 p-3 shadow-[18px_0_45px_rgba(8,26,69,0.16)] backdrop-blur-2xl sm:relative sm:w-56 sm:shadow-none"><button type="button" onClick={createNewChat} className="w-full rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 py-3 text-left text-sm font-black text-white">＋ New Chat</button><div className="mt-3 space-y-2 overflow-y-auto pr-1">{sessions.filter(isActive).map(session => <button key={session.id} type="button" onClick={() => { setActiveSessionId(session.id); setIsHistoryOpen(false); }} className={`w-full rounded-2xl border px-3 py-3 text-left text-sm transition ${session.id === activeSession?.id ? 'border-[#BFD7FF] bg-[#E8F2FF] text-[#1769FF]' : 'border-[#D9E7F8] bg-white text-[#536178]'}`}><span className="block truncate font-black">{session.title}</span><span className="text-xs font-bold text-[#7C879A]">{new Date(session.updatedAt).toLocaleDateString()}</span></button>)}</div></aside> : null}
 
-          <main className="flex min-w-0 flex-1 flex-col">
-            <div ref={messagesRef} className="max-h-[54dvh] min-h-[10rem] space-y-4 overflow-y-auto px-3 py-4 sm:px-5">
+          <main className="flex min-h-0 min-w-0 flex-1 flex-col">
+            <div ref={messagesRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5">
               <div className="rounded-[1.4rem] border border-[#D9E7F8] bg-gradient-to-r from-[#E8F2FF] to-[#F1EEFF] p-3 text-xs font-bold leading-5 text-[#536178]"><span className="font-black text-[#081A45]">Context:</span> {context.helperText}{context.visibleSnippet ? <span className="mt-1 block truncate text-[#7C879A]">Visible: {context.visibleSnippet}</span> : null}</div>
               {messages.map(message => <div key={message.messageId} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[88%] rounded-[1.35rem] border p-3 shadow-sm sm:p-4 ${message.role === 'user' ? 'border-transparent bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white' : message.status === 'failed' ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D9E7F8] bg-white text-[#081A45]'}`}><MarkdownMessage text={message.text} />{message.role === 'assistant' && message.status !== 'failed' ? <button type="button" onClick={() => navigator.clipboard?.writeText(message.text).catch(() => undefined)} className="mt-3 rounded-full bg-[#EEF6FF] px-3 py-1.5 text-xs font-black text-[#1769FF]">Copy</button> : null}</div></div>)}
               {isSending ? <TypingIndicator /> : null}
@@ -396,7 +404,8 @@ const CommunityAiMentor: React.FC<CommunityAiMentorProps> = ({ isOpen, userId = 
 
         {isSettingsOpen ? <div className="absolute inset-0 z-40 flex items-end justify-center bg-[#081A45]/35 p-3 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" aria-label="AI settings panel"><div className="w-full max-w-lg rounded-[1.75rem] border border-[#D9E7F8] bg-white p-4 shadow-2xl"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.28em] text-[#7B61FF]">AI Settings</p><h3 className="text-xl font-black text-[#081A45]">Custom API key</h3></div><button type="button" onClick={() => setIsSettingsOpen(false)} aria-label="Close AI settings" className="h-10 w-10 rounded-2xl border border-[#D9E7F8] font-black">×</button></div><div className="mt-4 rounded-2xl border border-[#D9E7F8] bg-[#F1EEFF] p-3 text-sm font-bold text-[#4B2BC5]">Status: {settings.apiKey ? settings.status === 'invalid' ? 'Invalid key' : `Custom key active (${maskKey(settings.apiKey)})` : getGeminiApiKey() ? 'Default AI active' : 'No default AI key configured'}</div><div className="mt-4 grid gap-3"><label className="text-sm font-black">Provider<select value={settingsDraft.provider} onChange={event => setSettingsDraft(current => ({ ...current, provider: event.target.value as AiProvider, model: event.target.value === 'openai' ? 'gpt-4o-mini' : 'gemini-2.5-flash' }))} className="mt-1 w-full rounded-2xl border border-[#D9E7F8] p-3"><option value="gemini">Gemini</option><option value="openai">OpenAI</option></select></label><label className="text-sm font-black">Model<input value={settingsDraft.model} onChange={event => setSettingsDraft(current => ({ ...current, model: event.target.value }))} className="mt-1 w-full rounded-2xl border border-[#D9E7F8] p-3" /></label><label className="text-sm font-black">API key<input value={settingsDraft.apiKey} onChange={event => setSettingsDraft(current => ({ ...current, apiKey: event.target.value }))} type="password" autoComplete="off" className="mt-1 w-full rounded-2xl border border-[#D9E7F8] p-3" placeholder="Paste your key" /></label><label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={settingsDraft.useDefaultFallback} onChange={event => setSettingsDraft(current => ({ ...current, useDefaultFallback: event.target.checked }))} /> Use default AI if custom key fails</label></div><p className="mt-3 text-xs font-semibold leading-5 text-[#536178]">Privacy note: Your custom key stays on this device and is not saved to Firebase.</p>{settingsNotice ? <p className="mt-3 rounded-2xl bg-[#EEF6FF] p-3 text-sm font-bold text-[#081A45]">{settingsNotice}</p> : null}<div className="mt-4 flex flex-wrap gap-2"><button type="button" onClick={saveSettings} className="rounded-2xl bg-[#7B61FF] px-4 py-3 font-black text-white">Save key</button><button type="button" disabled={isTesting || !settingsDraft.apiKey.trim()} onClick={testSettings} className="rounded-2xl border border-[#BFD7FF] px-4 py-3 font-black text-[#1769FF] disabled:opacity-50">{isTesting ? 'Testing…' : 'Test connection'}</button><button type="button" onClick={clearSettings} className="rounded-2xl border border-[#FAD2CF] px-4 py-3 font-black text-[#C5221F]">Clear key</button></div></div></div> : null}
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 };
 

@@ -3365,19 +3365,36 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     .slice(0, 4) : [];
 
   const renderMasterTagCard = (request: MasterTagRequest, compact = false) => (
-    <article key={request.id || 'preview'} className={`group rounded-[1.75rem] border border-[#D9E7F8] bg-white p-4 shadow-[0_18px_54px_rgba(23,105,255,0.10)] transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(123,97,255,0.16)] ${masterTagSuccess?.id === request.id ? 'ring-4 ring-[#F5B82E]/25' : ''} ${compact ? 'p-4' : 'sm:p-5'}`}>
-      <div className="flex items-start gap-3">
-        <Avatar value={request.targetMasterAvatar || request.avatar || '🌟'} size="h-13 w-13" />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2"><h3 className="truncate text-lg font-black text-[#081A45]">{request.targetMasterName || request.title}</h3>{request.verifiedMaster ? <span className="rounded-full bg-[#E8F2FF] px-2 py-0.5 text-[10px] font-black text-[#1769FF]">✓ Verified</span> : null}{request.isExternalMaster ? <span className="rounded-full bg-[#FEF7E0] px-2 py-0.5 text-[10px] font-black text-[#9A6500]">External</span> : null}</div>
-          <p className="mt-1 text-xs font-bold text-[#7C879A]">{request.targetMasterRole || request.tagType || 'Master'}{request.targetMasterUsername ? ` · @${request.targetMasterUsername}` : ''}</p>
+    <article
+      key={request.id || 'preview'}
+      className={`group overflow-hidden rounded-[1.6rem] border border-[#DCE3EE] bg-[#FFFEFB] shadow-[0_14px_38px_rgba(23,32,51,0.08)] transition duration-300 hover:-translate-y-0.5 hover:border-[#B9C8DE] hover:shadow-[0_20px_52px_rgba(23,32,51,0.12)] ${masterTagSuccess?.id === request.id ? 'ring-4 ring-[#D7B56D]/25' : ''}`}
+    >
+      <div className={`${compact ? 'p-4' : 'p-4 sm:p-5'}`}>
+        <div className="flex items-start gap-3">
+          <Avatar value={request.targetMasterAvatar || request.avatar || '🌟'} size="h-12 w-12 sm:h-14 sm:w-14" className="ring-2 ring-[#F1E7D0]" />
+          <div className="min-w-0 flex-1">
+            <div className="flex min-w-0 flex-wrap items-center gap-2">
+              <h3 className="min-w-0 truncate text-base font-black tracking-[-0.015em] text-[#172033] sm:text-lg">{request.targetMasterName || request.title}</h3>
+              {request.verifiedMaster ? <span className="rounded-full border border-[#C9D9F0] bg-[#EDF4FF] px-2 py-0.5 text-[10px] font-black text-[#3157A4]">✓ Verified</span> : null}
+              {request.isExternalMaster ? <span className="rounded-full border border-[#E9D8AF] bg-[#FFF8E8] px-2 py-0.5 text-[10px] font-black text-[#8A6520]">External mentor</span> : null}
+            </div>
+            <p className="mt-1 truncate text-xs font-bold text-[#6B7482]">{request.targetMasterRole || request.tagType || 'Teacher or mentor'}{request.targetMasterUsername ? ` · @${request.targetMasterUsername}` : ''}</p>
+          </div>
+          <span className="shrink-0 rounded-full border border-[#D7DFEA] bg-[#F5F7FA] px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em] text-[#42516A]">{request.category}</span>
         </div>
-        <span className="shrink-0 rounded-full bg-[#EEF6FF] px-3 py-1 text-[11px] font-black text-[#1769FF]">{request.category}</span>
+
+        <p className="mt-4 whitespace-pre-wrap text-sm font-semibold leading-7 text-[#4E5968] sm:text-[0.95rem]">{request.detail}</p>
       </div>
-      <p className="mt-4 whitespace-pre-wrap text-sm font-semibold leading-7 text-[#536178] sm:text-base">“{request.detail}”</p>
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-[#EEF6FF] pt-4">
-        <div className="flex min-w-0 items-center gap-2"><Avatar value={request.avatar} size="h-8 w-8" /><p className="truncate text-xs font-bold text-[#7C879A]">Tagged by <span className="text-[#081A45]">{request.author}</span> · {request.time}</p></div>
-        <div className="flex shrink-0 items-center gap-2"><button type="button" onClick={(event) => { event.stopPropagation(); if (request.id) likeMasterTag(request.id); }} className={`rounded-full px-3 py-1.5 text-xs font-black transition ${(request.likedByUsers?.[currentUserKey] || likedMasterTagIds.includes(request.id)) ? 'bg-[#FCE8E6] text-[#C5221F]' : 'bg-[#EEF6FF] text-[#1769FF] hover:bg-[#E8F2FF]'}`}>💛 {request.likes}</button>{!compact && <button type="button" ref={selectedMasterTagId === request.id ? masterTagViewReturnRef : undefined} onClick={(event) => { event.stopPropagation(); if (request.id) openMasterTagDetail(request.id, event.currentTarget); }} aria-label={`View master tag from ${request.targetMasterName || request.title || request.author}`} className="rounded-full bg-[#081A45] px-3 py-1.5 text-xs font-black text-white transition hover:-translate-y-0.5 hover:bg-[#1769FF] focus:outline-none focus:ring-4 focus:ring-[#1769FF]/20">View</button>}</div>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E8EDF3] bg-[#FAF8F3] px-4 py-3 sm:px-5">
+        <div className="flex min-w-0 items-center gap-2">
+          <Avatar value={request.avatar} size="h-8 w-8" />
+          <p className="truncate text-xs font-semibold text-[#6B7482]">Shared by <span className="font-black text-[#273247]">{request.author}</span> · {request.time}</p>
+        </div>
+        <div className="flex shrink-0 items-center gap-2">
+          <button type="button" onClick={(event) => { event.stopPropagation(); if (request.id) likeMasterTag(request.id); }} className={`rounded-full border px-3 py-1.5 text-xs font-black transition ${(request.likedByUsers?.[currentUserKey] || likedMasterTagIds.includes(request.id)) ? 'border-[#E8C7BF] bg-[#FFF0EC] text-[#A84432]' : 'border-[#D7DFEA] bg-white text-[#3157A4] hover:border-[#B9C8DE]'}`}>💛 {request.likes}</button>
+          {!compact ? <button type="button" ref={selectedMasterTagId === request.id ? masterTagViewReturnRef : undefined} onClick={(event) => { event.stopPropagation(); if (request.id) openMasterTagDetail(request.id, event.currentTarget); }} aria-label={`Open appreciation for ${request.targetMasterName || request.title || request.author}`} className="rounded-full bg-[#273247] px-3.5 py-1.5 text-xs font-black text-white transition hover:bg-[#3157A4] focus:outline-none focus:ring-4 focus:ring-[#3157A4]/20">Read</button> : null}
+        </div>
       </div>
     </article>
   );
@@ -3479,7 +3496,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const renderMasterTagDetailPage = (showBackButton = true) => (
-    <div className="space-y-4 pb-28 md:pb-0">
+    <div className="space-y-4 pb-6">
       {showBackButton ? <button type="button" onClick={() => setPage('masterTags')} className="rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-black text-[#536178] shadow-sm transition hover:bg-[#EEF6FF]">← Back to Master Tagged</button> : null}
       {renderMasterTagDetailContent()}
     </div>
@@ -3524,19 +3541,118 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   );
 
   const renderMasterTagFilters = (compact = false) => (
-    <div className={compact ? 'space-y-4' : 'rounded-[2rem] border border-[#D9E7F8] bg-gradient-to-br from-[#EEF6FF] via-white to-[#F8FBFF] p-5 shadow-[0_24px_70px_rgba(23,105,255,0.12)] sm:p-7'}>
-      <p className="text-xs font-black uppercase tracking-[0.28em] text-[#1769FF]">Master Tagged</p><h2 className="mt-2 text-3xl font-black tracking-tight text-[#081A45] sm:text-5xl">A community wall of gratitude.</h2><p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-[#536178]">Discover masters through respectful appreciation posts, filter by category, and search names, subjects, authors, or message words.</p>
-      <div className="mt-5 grid gap-3 lg:grid-cols-[1fr_auto]"><input value={masterTagSearch} onChange={(event) => setMasterTagSearch(event.target.value)} placeholder="Search master tags…" className="h-12 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-sm font-bold outline-none focus:border-[#1769FF]" /><select value={masterTagSort} onChange={(event) => setMasterTagSort(event.target.value as typeof masterTagSort)} className="h-12 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-sm font-black text-[#081A45]"><option value="recent">Recent</option><option value="appreciated">Most appreciated</option><option value="trending">Trending</option></select></div>
-      <div className="mt-4 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">{(['all', 'mine', 'following', 'verified'] as const).map((filter) => <button key={filter} type="button" onClick={() => setMasterTagsAudienceFilter(filter)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black capitalize ${masterTagsAudienceFilter === filter ? 'border-[#1769FF] bg-[#1769FF] text-white' : 'border-[#D9E7F8] bg-white text-[#536178]'}`}>{filter === 'all' ? 'All' : filter}</button>)}{(['All', ...masterTagCategories] as Array<'All' | (typeof masterTagCategories)[number]>).map((category) => <button key={category} type="button" onClick={() => setMasterTagFilter(category)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black ${masterTagFilter === category ? 'border-[#7B61FF] bg-[#7B61FF] text-white' : 'border-[#D9E7F8] bg-white text-[#536178]'}`}>{category}</button>)}</div>
+    <section className={compact ? 'space-y-4' : 'overflow-hidden rounded-[1.8rem] border border-[#DCE3EE] bg-[#FFFEFB] shadow-[0_18px_50px_rgba(23,32,51,0.08)]'}>
+      <div className={compact ? '' : 'border-b border-[#E8EDF3] bg-[linear-gradient(135deg,#FFFDF8_0%,#F4F7FB_58%,#EEF3FA_100%)] p-5 sm:p-7'}>
+        <p className="text-[11px] font-black uppercase tracking-[0.25em] text-[#8A6520]">Mentor appreciation</p>
+        <h2 className="mt-2 max-w-3xl text-3xl font-black tracking-[-0.035em] text-[#172033] sm:text-5xl">Celebrate the people who helped you learn.</h2>
+        <p className="mt-3 max-w-3xl text-sm font-semibold leading-7 text-[#5F6B7A]">Browse thoughtful notes for teachers, creators and mentors. Search by name, subject or message, then open a card to read the full appreciation.</p>
+      </div>
+
+      <div className={compact ? 'space-y-4' : 'space-y-4 p-4 sm:p-5'}>
+        <div className="grid gap-3 lg:grid-cols-[minmax(0,1fr)_13rem]">
+          <label className="min-w-0">
+            <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-[#42516A]">Search appreciation</span>
+            <span className="flex h-12 items-center gap-3 rounded-2xl border border-[#D7DFEA] bg-white px-4 focus-within:border-[#3157A4] focus-within:ring-4 focus-within:ring-[#3157A4]/10">
+              <span className="text-[#7C879A]">⌕</span>
+              <input value={masterTagSearch} onChange={(event) => setMasterTagSearch(event.target.value)} placeholder="Name, subject, author or message" className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[#273247] outline-none" />
+              {masterTagSearch ? <button type="button" onClick={() => setMasterTagSearch('')} className="rounded-full bg-[#F1F4F8] px-2.5 py-1 text-[11px] font-black text-[#42516A]">Clear</button> : null}
+            </span>
+          </label>
+
+          <label>
+            <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-[#42516A]">Sort by</span>
+            <select value={masterTagSort} onChange={(event) => setMasterTagSort(event.target.value as typeof masterTagSort)} className="h-12 w-full rounded-2xl border border-[#D7DFEA] bg-white px-4 text-sm font-black text-[#273247] outline-none focus:border-[#3157A4] focus:ring-4 focus:ring-[#3157A4]/10">
+              <option value="recent">Newest first</option>
+              <option value="appreciated">Most appreciated</option>
+              <option value="trending">Trending now</option>
+            </select>
+          </label>
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-[#42516A]">Show posts from</p>
+          <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+            {(['all', 'mine', 'following', 'verified'] as const).map((filter) => {
+              const label = filter === 'all' ? 'Everyone' : filter === 'mine' ? 'My posts' : filter === 'following' ? 'People I follow' : 'Verified mentors';
+              return <button key={filter} type="button" onClick={() => setMasterTagsAudienceFilter(filter)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black transition ${masterTagsAudienceFilter === filter ? 'border-[#273247] bg-[#273247] text-white' : 'border-[#D7DFEA] bg-white text-[#536178] hover:border-[#B9C8DE]'}`}>{label}</button>;
+            })}
+          </div>
+        </div>
+
+        <div>
+          <p className="mb-2 text-xs font-black uppercase tracking-[0.12em] text-[#42516A]">Learning area</p>
+          <div className="flex gap-2 overflow-x-auto pb-1 custom-scrollbar">
+            {(['All', ...masterTagCategories] as Array<'All' | (typeof masterTagCategories)[number]>).map((category) => <button key={category} type="button" onClick={() => setMasterTagFilter(category)} className={`shrink-0 rounded-full border px-4 py-2 text-xs font-black transition ${masterTagFilter === category ? 'border-[#B88A2B] bg-[#FFF5D9] text-[#725116]' : 'border-[#D7DFEA] bg-white text-[#536178] hover:border-[#B9C8DE]'}`}>{category === 'All' ? 'All topics' : category}</button>)}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E8EDF3] pt-4">
+          <p className="text-sm font-semibold text-[#5F6B7A]"><span className="font-black text-[#273247]">{filteredMasterTagRequests.length}</span> appreciation {filteredMasterTagRequests.length === 1 ? 'post' : 'posts'} found</p>
+          {(masterTagSearch || masterTagsAudienceFilter !== 'all' || masterTagFilter !== 'All') ? <button type="button" onClick={() => { setMasterTagSearch(''); setMasterTagsAudienceFilter('all'); setMasterTagFilter('All'); }} className="rounded-full border border-[#D7DFEA] bg-white px-3 py-2 text-xs font-black text-[#3157A4]">Reset filters</button> : null}
+        </div>
+      </div>
+    </section>
+  );
+
+  const renderMasterTagRows = () => filteredMasterTagRequests.length ? filteredMasterTagRequests.map((request) => (
+    <div key={request.id} role="button" tabIndex={0} aria-label={`Open appreciation for ${request.targetMasterName || request.title}`} onClick={() => openMasterTagDetail(request.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openMasterTagDetail(request.id); } }}>
+      {renderMasterTagCard(request)}
+    </div>
+  )) : (
+    <div className="rounded-[1.8rem] border border-dashed border-[#C9D3E1] bg-[#FFFEFB] p-8 text-center shadow-[0_12px_34px_rgba(23,32,51,0.05)] sm:p-10">
+      <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl border border-[#E9D8AF] bg-[#FFF8E8] text-2xl">✦</div>
+      <h3 className="mt-4 text-2xl font-black tracking-[-0.025em] text-[#172033]">No appreciation posts match these filters</h3>
+      <p className="mx-auto mt-2 max-w-md text-sm font-semibold leading-6 text-[#5F6B7A]">Try a broader search, choose another topic, or write a thoughtful note for someone who helped you grow.</p>
+      <div className="mt-5 flex flex-col justify-center gap-2 sm:flex-row">
+        <button type="button" onClick={() => { setMasterTagSearch(''); setMasterTagsAudienceFilter('all'); setMasterTagFilter('All'); }} className="rounded-2xl border border-[#D7DFEA] bg-white px-5 py-3 text-sm font-black text-[#3157A4]">Clear filters</button>
+        <button type="button" onClick={() => setPage('tagMaster')} className="rounded-2xl bg-[#273247] px-5 py-3 text-sm font-black text-white">Write appreciation</button>
+      </div>
     </div>
   );
 
-  const renderMasterTagRows = () => filteredMasterTagRequests.length ? filteredMasterTagRequests.map((request) => <div key={request.id} role="button" tabIndex={0} onClick={() => openMasterTagDetail(request.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openMasterTagDetail(request.id); }}>{renderMasterTagCard(request)}</div>) : <div className="rounded-[2rem] border border-dashed border-[#D9E7F8] bg-white p-10 text-center"><h3 className="text-2xl font-black text-[#081A45]">No master tags found</h3><p className="mt-2 text-sm font-bold text-[#7C879A]">Try another search/category or be the first to appreciate someone who helped you grow.</p><button type="button" onClick={() => setPage('tagMaster')} className="mt-5 rounded-2xl bg-[#1769FF] px-5 py-3 text-sm font-black text-white">Tag your first master</button></div>;
-
   const renderMasterTagsPage = () => (
-    <div className="mx-auto max-w-7xl pb-28 md:pb-6">
-      <div className="space-y-5 md:hidden">{renderMasterTagFilters()}<div className="flex gap-3 overflow-x-auto pb-1 custom-scrollbar">{trendingMasterTags.slice(0, 6).map((tag) => <button key={tag.id} onClick={() => openMasterTagDetail(tag.id)} className="min-w-[220px] rounded-2xl border border-[#D9E7F8] bg-white p-3 text-left shadow-sm"><p className="truncate text-sm font-black text-[#081A45]">{tag.targetMasterName || tag.title}</p><p className="mt-1 text-xs font-bold text-[#7C879A]">💛 {tag.likes} appreciations</p></button>)}</div><div className="space-y-3">{renderMasterTagRows()}</div><button type="button" onClick={() => setPage('tagMaster')} className="fixed bottom-[calc(env(safe-area-inset-bottom)+6rem)] right-4 z-[1200] rounded-full bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-3 text-sm font-black text-white shadow-[0_18px_48px_rgba(23,105,255,0.32)]">+ Tag</button></div>
-      <div className="hidden grid-cols-[minmax(0,1fr)_330px] gap-6 md:grid"><main className="space-y-5">{renderMasterTagFilters()}<div className="grid gap-4 xl:grid-cols-2">{renderMasterTagRows()}</div></main><aside className="space-y-4"><div className="rounded-[2rem] border border-[#D9E7F8] bg-white p-5 shadow-sm"><h3 className="text-xl font-black text-[#081A45]">Trending masters</h3><div className="mt-3 space-y-2">{trendingMasterTags.map((tag) => <button key={tag.id} onClick={() => openMasterTagDetail(tag.id)} className="flex w-full items-center gap-3 rounded-2xl bg-[#F8FBFF] p-3 text-left"><Avatar value={tag.targetMasterAvatar || '🌟'} size="h-9 w-9" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-black text-[#081A45]">{tag.targetMasterName || tag.title}</span><span className="text-xs font-bold text-[#7C879A]">💛 {tag.likes} · {tag.category}</span></span></button>)}</div></div><div className="rounded-[2rem] border border-[#D9E7F8] bg-white p-5 shadow-sm"><h3 className="text-xl font-black text-[#081A45]">Top categories</h3><div className="mt-3 flex flex-wrap gap-2">{masterTagCategories.slice(0, 8).map((category) => <button key={category} onClick={() => setMasterTagFilter(category)} className="rounded-full bg-[#EEF6FF] px-3 py-2 text-xs font-black text-[#1769FF]">{category}</button>)}</div></div><button type="button" onClick={() => setPage('tagMaster')} className="w-full rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-4 text-sm font-black text-white shadow-[0_18px_48px_rgba(23,105,255,0.24)]">Tag Your Master</button></aside></div>
+    <div className="mx-auto max-w-7xl pb-24 font-sans md:pb-6">
+      <div className="space-y-4 md:hidden">
+        {renderMasterTagFilters()}
+
+        {trendingMasterTags.length ? (
+          <section className="rounded-[1.6rem] border border-[#DCE3EE] bg-[#FFFEFB] p-4 shadow-[0_12px_34px_rgba(23,32,51,0.06)]">
+            <div className="mb-3 flex items-end justify-between gap-3">
+              <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8A6520]">Popular now</p><h3 className="mt-1 text-lg font-black text-[#172033]">Most appreciated mentors</h3></div>
+              <span className="text-xs font-bold text-[#7C879A]">Swipe</span>
+            </div>
+            <div className="flex gap-3 overflow-x-auto pb-1 custom-scrollbar">
+              {trendingMasterTags.slice(0, 6).map((tag) => <button key={tag.id} type="button" onClick={() => openMasterTagDetail(tag.id)} className="min-w-[220px] rounded-2xl border border-[#E1E7EF] bg-[#FAF8F3] p-3 text-left transition hover:border-[#B9C8DE]"><div className="flex items-center gap-3"><Avatar value={tag.targetMasterAvatar || '🌟'} size="h-10 w-10" /><span className="min-w-0"><span className="block truncate text-sm font-black text-[#273247]">{tag.targetMasterName || tag.title}</span><span className="mt-1 block text-xs font-bold text-[#6B7482]">💛 {tag.likes} appreciations</span></span></div></button>)}
+            </div>
+          </section>
+        ) : null}
+
+        <div className="space-y-3">{renderMasterTagRows()}</div>
+        <button type="button" onClick={() => setPage('tagMaster')} className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-[1200] rounded-full border border-white/40 bg-[#273247] px-5 py-3.5 text-sm font-black text-white shadow-[0_18px_48px_rgba(23,32,51,0.28)]">＋ Write appreciation</button>
+      </div>
+
+      <div className="hidden grid-cols-[minmax(0,1fr)_330px] gap-6 md:grid">
+        <main className="min-w-0 space-y-5">
+          {renderMasterTagFilters()}
+          <div className="grid gap-4 xl:grid-cols-2">{renderMasterTagRows()}</div>
+        </main>
+
+        <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+          <section className="rounded-[1.6rem] border border-[#DCE3EE] bg-[#FFFEFB] p-5 shadow-[0_12px_34px_rgba(23,32,51,0.06)]">
+            <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8A6520]">Community favourites</p>
+            <h3 className="mt-1 text-xl font-black text-[#172033]">Most appreciated mentors</h3>
+            <div className="mt-4 space-y-2">{trendingMasterTags.length ? trendingMasterTags.map((tag) => <button key={tag.id} type="button" onClick={() => openMasterTagDetail(tag.id)} className="flex w-full items-center gap-3 rounded-2xl border border-transparent bg-[#FAF8F3] p-3 text-left transition hover:border-[#D7DFEA] hover:bg-white"><Avatar value={tag.targetMasterAvatar || '🌟'} size="h-10 w-10" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-black text-[#273247]">{tag.targetMasterName || tag.title}</span><span className="text-xs font-bold text-[#6B7482]">💛 {tag.likes} · {tag.category}</span></span></button>) : <p className="rounded-2xl bg-[#FAF8F3] p-4 text-sm font-semibold text-[#6B7482]">Appreciation posts will appear here.</p>}</div>
+          </section>
+
+          <section className="rounded-[1.6rem] border border-[#DCE3EE] bg-[#FFFEFB] p-5 shadow-[0_12px_34px_rgba(23,32,51,0.06)]">
+            <h3 className="text-xl font-black text-[#172033]">Browse by topic</h3>
+            <p className="mt-1 text-sm font-semibold text-[#6B7482]">Choose a learning area to narrow the wall.</p>
+            <div className="mt-4 flex flex-wrap gap-2">{masterTagCategories.slice(0, 8).map((category) => <button key={category} type="button" onClick={() => setMasterTagFilter(category)} className="rounded-full border border-[#E1E7EF] bg-[#F5F7FA] px-3 py-2 text-xs font-black text-[#3157A4] transition hover:border-[#B9C8DE]">{category}</button>)}</div>
+          </section>
+
+          <button type="button" onClick={() => setPage('tagMaster')} className="w-full rounded-2xl bg-[#273247] px-5 py-4 text-sm font-black text-white shadow-[0_16px_40px_rgba(23,32,51,0.18)]">Write an appreciation post</button>
+        </aside>
+      </div>
     </div>
   );
 
@@ -4470,7 +4586,72 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     </nav>
   );
 
-  const renderProfileAccountCard = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Edit profile</p><h3 className="text-2xl font-black text-[#081B5C]">Name, photo & bio</h3></div><button type="button" onClick={() => setProfileViewMode('overview')} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Done</button></div>{profileFeedback ? <div className={`mt-4 rounded-2xl border px-4 py-3 text-sm font-black ${profileFeedback.type === 'success' ? 'border-[#CEEAD6] bg-[#E6F4EA] text-[#137333]' : 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]'}`}>{profileFeedback.message}</div> : null}<div className="mt-5 grid gap-4 rounded-[2rem] border border-[#E3ECF8] bg-[#F8FBFF] p-5 lg:grid-cols-[auto_minmax(0,1fr)] lg:items-start"><div className="flex flex-col items-center gap-3"><Avatar value={getDraftDisplayAvatar()} size="h-28 w-28" className="text-5xl ring-4 ring-white" /><label className="inline-flex cursor-pointer rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 py-3 text-sm font-black text-white shadow-sm"><input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />Upload photo</label><button type="button" onClick={() => setProfileDraft((current) => ({ ...current, avatar: '' }))} className="text-xs font-black text-[#7C879A]">Remove photo</button></div><PremiumImageUrlInput value={profileDraft.avatar} onChange={(url) => setProfileDraft((current) => ({ ...current, avatar: url }))} label="Profile photo URL" previewAlt="Community profile photo" aspect="square" helperText="Upload to Cloudinary or paste a public https image URL. Only the URL is saved, not base64." compact /></div><div className="mt-5 grid min-w-0 gap-4 sm:grid-cols-2"><label className="min-w-0 text-sm font-black text-[#081B5C]">Display Name<input value={profileDraft.name} onChange={(event) => setProfileDraft((current) => ({ ...current, name: event.target.value }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C]">Username<input value={profileDraft.username} onChange={(event) => setProfileDraft((current) => ({ ...current, username: normalizeUsername(event.target.value) }))} className="mt-2 w-full rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold outline-none focus:border-[#4F7BFF]" /></label><label className="min-w-0 text-sm font-black text-[#081B5C] sm:col-span-2">Bio<textarea value={profileDraft.bio} maxLength={PROFILE_BIO_MAX_LENGTH} onChange={(event) => setProfileDraft((current) => ({ ...current, bio: event.target.value.slice(0, PROFILE_BIO_MAX_LENGTH) }))} className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-[#E3ECF8] px-4 py-3 font-bold leading-7 outline-none focus:border-[#4F7BFF]" /><span className="mt-1 block text-right text-xs font-bold text-[#64748B]">{profileDraft.bio.length}/{PROFILE_BIO_MAX_LENGTH}</span></label></div><div className="mt-5 flex flex-col gap-3 sm:flex-row"><button type="button" onClick={saveProfileChanges} className="flex-1 rounded-2xl bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-5 py-4 font-black text-white shadow-[0_18px_44px_rgba(79,123,255,0.22)]">Save Changes</button><button type="button" onClick={resetProfileDraft} className="rounded-2xl border border-[#E3ECF8] bg-white px-5 py-4 font-black text-[#081B5C]">Cancel / Reset</button></div></section>;
+  const renderProfileAccountCard = () => (
+    <section className="mx-auto overflow-hidden rounded-[1.75rem] border border-[#DCE3EE] bg-[#FFFEFB] font-sans shadow-[0_18px_52px_rgba(23,32,51,0.10)]">
+      <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-[#E8EDF3] bg-[#FFFEFB]/95 px-3 py-3 backdrop-blur-xl sm:px-5">
+        <button type="button" onClick={() => setProfileViewMode('overview')} aria-label="Back to profile" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D7DFEA] bg-white text-lg font-black text-[#273247] shadow-sm">←</button>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8A6520]">Your public identity</p>
+          <h3 className="truncate text-xl font-black tracking-[-0.025em] text-[#172033] sm:text-2xl">Edit community profile</h3>
+        </div>
+        <button type="button" onClick={() => setProfileViewMode('overview')} className="rounded-xl px-3 py-2 text-xs font-black text-[#3157A4]">Done</button>
+      </header>
+
+      <div className="space-y-5 p-3 pb-5 sm:p-6">
+        <div className="rounded-2xl border border-[#E1E7EF] bg-[#F7F4EC] px-4 py-3 text-sm font-semibold leading-6 text-[#5F6B7A]">Keep your name, photo and bio easy to recognise. These details appear on community posts, replies, follows and product reviews.</div>
+
+        {profileFeedback ? <div role="status" className={`rounded-2xl border px-4 py-3 text-sm font-black ${profileFeedback.type === 'success' ? 'border-[#C8DDCD] bg-[#EFF8F1] text-[#24613A]' : 'border-[#E8C7BF] bg-[#FFF0EC] text-[#A84432]'}`}>{profileFeedback.message}</div> : null}
+
+        <section className="grid gap-4 rounded-[1.5rem] border border-[#DCE3EE] bg-white p-4 sm:p-5 lg:grid-cols-[14rem_minmax(0,1fr)] lg:items-start">
+          <div className="flex flex-col items-center rounded-[1.35rem] border border-[#E8EDF3] bg-[#FAF8F3] p-4 text-center">
+            <Avatar value={getDraftDisplayAvatar()} size="h-28 w-28" className="text-5xl ring-4 ring-white shadow-md" />
+            <h4 className="mt-3 text-base font-black text-[#273247]">Profile photo</h4>
+            <p className="mt-1 text-xs font-semibold leading-5 text-[#6B7482]">Use a clear square image for the best result.</p>
+            <label className="mt-3 inline-flex min-h-11 cursor-pointer items-center justify-center rounded-2xl bg-[#273247] px-4 py-3 text-sm font-black text-white shadow-sm">
+              <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+              Upload photo
+            </label>
+            <button type="button" onClick={() => setProfileDraft((current) => ({ ...current, avatar: '' }))} className="mt-2 rounded-xl px-3 py-2 text-xs font-black text-[#7A4A3A]">Remove photo</button>
+          </div>
+
+          <div className="min-w-0">
+            <PremiumImageUrlInput value={profileDraft.avatar} onChange={(url) => setProfileDraft((current) => ({ ...current, avatar: url }))} label="Profile photo URL" previewAlt="Community profile photo" aspect="square" helperText="Upload to Cloudinary or paste a public HTTPS image URL. Only the image URL is saved." compact />
+          </div>
+        </section>
+
+        <section className="rounded-[1.5rem] border border-[#DCE3EE] bg-white p-4 sm:p-5">
+          <div className="mb-4"><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8A6520]">Profile details</p><h4 className="mt-1 text-xl font-black text-[#172033]">How people see you</h4></div>
+          <div className="grid min-w-0 gap-4 sm:grid-cols-2">
+            <label className="min-w-0 text-sm font-black text-[#273247]">
+              Display name
+              <input value={profileDraft.name} onChange={(event) => setProfileDraft((current) => ({ ...current, name: event.target.value }))} autoComplete="name" placeholder="Your name" className="mt-2 h-12 w-full rounded-2xl border border-[#D7DFEA] bg-[#FFFEFB] px-4 font-semibold text-[#273247] outline-none focus:border-[#3157A4] focus:ring-4 focus:ring-[#3157A4]/10" />
+              <span className="mt-1.5 block text-xs font-semibold leading-5 text-[#7C879A]">Use the name your community will recognise.</span>
+            </label>
+
+            <label className="min-w-0 text-sm font-black text-[#273247]">
+              Username
+              <span className="mt-2 flex h-12 items-center rounded-2xl border border-[#D7DFEA] bg-[#FFFEFB] px-4 focus-within:border-[#3157A4] focus-within:ring-4 focus-within:ring-[#3157A4]/10">
+                <span className="mr-1 font-black text-[#7C879A]">@</span>
+                <input value={profileDraft.username} onChange={(event) => setProfileDraft((current) => ({ ...current, username: normalizeUsername(event.target.value) }))} autoCapitalize="none" autoComplete="username" spellCheck={false} placeholder="username" className="min-w-0 flex-1 bg-transparent font-semibold text-[#273247] outline-none" />
+              </span>
+              <span className="mt-1.5 block text-xs font-semibold leading-5 text-[#7C879A]">3–30 characters: lowercase letters, numbers, dots or underscores.</span>
+            </label>
+
+            <label className="min-w-0 text-sm font-black text-[#273247] sm:col-span-2">
+              Bio
+              <textarea value={profileDraft.bio} maxLength={PROFILE_BIO_MAX_LENGTH} onChange={(event) => setProfileDraft((current) => ({ ...current, bio: event.target.value.slice(0, PROFILE_BIO_MAX_LENGTH) }))} rows={5} placeholder="Tell learners what you study, teach or create." className="mt-2 min-h-32 w-full resize-y rounded-2xl border border-[#D7DFEA] bg-[#FFFEFB] px-4 py-3 font-semibold leading-7 text-[#273247] outline-none focus:border-[#3157A4] focus:ring-4 focus:ring-[#3157A4]/10" />
+              <span className="mt-1.5 flex items-center justify-between gap-3 text-xs font-semibold text-[#7C879A]"><span>Keep it short and useful.</span><span className="font-black text-[#536178]">{profileDraft.bio.length}/{PROFILE_BIO_MAX_LENGTH}</span></span>
+            </label>
+          </div>
+        </section>
+
+        <div className="sticky bottom-0 z-10 -mx-3 flex flex-col-reverse gap-2 border-t border-[#E8EDF3] bg-[#FFFEFB]/96 px-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] pt-3 backdrop-blur-xl sm:static sm:mx-0 sm:flex-row sm:border-0 sm:bg-transparent sm:p-0">
+          <button type="button" onClick={resetProfileDraft} className="min-h-12 rounded-2xl border border-[#D7DFEA] bg-white px-5 py-3.5 font-black text-[#42516A] sm:min-w-40">Reset changes</button>
+          <button type="button" onClick={saveProfileChanges} className="min-h-12 flex-1 rounded-2xl bg-[#273247] px-5 py-3.5 font-black text-white shadow-[0_16px_38px_rgba(23,32,51,0.18)]">Save profile</button>
+        </div>
+      </div>
+    </section>
+  );
 
   const ToggleRow = ({ label, description, checked, onChange }: { label: string; description: string; checked: boolean; onChange: (checked: boolean) => void }) => <label className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] p-4"><span className="min-w-0"><span className="block text-sm font-black text-[#081B5C]">{label}</span><span className="mt-1 block text-xs font-bold leading-5 text-[#64748B]">{description}</span></span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 shrink-0 accent-[#4F7BFF]" /></label>;
 
@@ -4531,11 +4712,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const renderStoryHighlights = (profileStories: StatusCard[]) => (
-    <div className="rounded-[1.75rem] border border-[#111827] bg-[#050816] px-4 py-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.08),0_18px_48px_rgba(8,26,69,0.18)]">
-      <div className="flex gap-4 overflow-x-auto pb-1 custom-scrollbar">
-        {profileStories.length ? profileStories.map((story) => { const owner = getStatusOwnerIdentity(story); return <button key={story.id} type="button" onClick={() => openStatusReel(story.id)} className="shrink-0 text-center"><span className="block rounded-full bg-gradient-to-tr from-[#F5B82E] via-[#7B61FF] to-[#1769FF] p-[3px]"><span className="block rounded-full bg-[#050816] p-[3px]"><Avatar value={owner.avatar || story.imagePreview || ''} size="h-16 w-16" /></span></span><span className="mt-2 block max-w-[5rem] truncate text-[11px] font-black text-white/80">{story.type}</span></button>; }) : <div className="w-full rounded-2xl border border-white/12 bg-white/8 px-5 py-4 text-sm font-bold text-white/70">No active stories.</div>}
+    <section className="rounded-[1.5rem] border border-[#DCE3EE] bg-[#FFFEFB] p-4 shadow-[0_12px_34px_rgba(23,32,51,0.06)]">
+      <div className="mb-3 flex items-center justify-between gap-3">
+        <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8A6520]">Stories</p><h3 className="mt-0.5 text-base font-black text-[#273247]">Active for 24 hours</h3></div>
+        {profileStories.length ? <span className="rounded-full bg-[#F1F4F8] px-3 py-1 text-xs font-black text-[#536178]">{profileStories.length} active</span> : null}
       </div>
-    </div>
+      <div className="flex gap-4 overflow-x-auto pb-1 custom-scrollbar">
+        {profileStories.length ? profileStories.map((story) => { const owner = getStatusOwnerIdentity(story); return <button key={story.id} type="button" onClick={() => openStatusReel(story.id)} className="shrink-0 text-center"><span className="block rounded-full bg-gradient-to-tr from-[#B88A2B] via-[#7B61FF] to-[#3157A4] p-[3px] shadow-sm"><span className="block rounded-full bg-white p-[3px]"><Avatar value={owner.avatar || story.imagePreview || ''} size="h-16 w-16" /></span></span><span className="mt-2 block max-w-[5rem] truncate text-[11px] font-black text-[#536178]">{story.type}</span></button>; }) : <div className="w-full rounded-2xl border border-dashed border-[#C9D3E1] bg-[#FAF8F3] px-5 py-4 text-sm font-semibold text-[#6B7482]">No active stories yet.</div>}
+      </div>
+    </section>
   );
 
   const renderRelationRow = (creator: Creator) => {
@@ -4609,52 +4794,59 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const followerTotal = compactCount(followerCounts[profileId] || (options.creator?.followerCount ?? options.creator?.followers) || (options.own ? followerIds.length : 0));
     const followingTotal = compactCount(followingCounts[profileId] || options.creator?.followingCount || (options.own ? followedIds.length : 0));
 
-    if (options.own && profileViewMode === 'edit') return <div className="mx-auto max-w-4xl">{renderProfileAccountCard()}</div>;
-    if (options.own && profileViewMode === 'settings') return <div className="mx-auto max-w-4xl">{renderProfileSettingsPanel()}</div>;
+    if (options.own && profileViewMode === 'edit') return <div className="mx-auto max-w-5xl pb-4 font-sans">{renderProfileAccountCard()}</div>;
+    if (options.own && profileViewMode === 'settings') return <div className="mx-auto max-w-4xl font-sans">{renderProfileSettingsPanel()}</div>;
     if (profileViewMode === 'relations') return renderProfileRelationsPage(profileId, display);
     if (profileViewMode === 'post') return renderProfilePostDetailPage(profileId, display);
 
     return (
-      <div className="mx-auto max-w-6xl overflow-hidden rounded-[1.75rem] border border-[#D9E7F8] bg-white shadow-[0_16px_44px_rgba(8,26,69,0.08)]">
-        <div className="sticky top-0 z-10 grid grid-cols-3 items-center border-b border-[#E3ECF8] bg-white px-3 py-2.5">
-          <button type="button" onClick={() => options.own ? goBack() : setSelectedProfileId(null)} className="justify-self-start rounded-full px-3 py-2 text-sm font-black text-[#081B5C]">←</button>
-          <h2 className="truncate text-center text-sm font-black text-[#081B5C]">@{display.username}</h2>
-          {options.own ? <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openOwnProfileSettings(); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openOwnProfileSettings(); }} className="justify-self-end rounded-full border border-[#E3ECF8] bg-[#F8FBFF] px-3 py-2 text-base touch-manipulation" aria-label="Profile settings">⚙️</button> : <span />}
-        </div>
+      <div className="mx-auto max-w-6xl overflow-hidden rounded-[1.75rem] border border-[#DCE3EE] bg-[#FFFEFB] font-sans text-[#273247] shadow-[0_18px_54px_rgba(23,32,51,0.09)] antialiased">
+        <header className="sticky top-0 z-10 grid grid-cols-3 items-center border-b border-[#E8EDF3] bg-[#FFFEFB]/95 px-3 py-2.5 backdrop-blur-xl sm:px-5">
+          <button type="button" onClick={() => options.own ? goBack() : setSelectedProfileId(null)} aria-label="Back" className="flex h-10 w-10 items-center justify-center justify-self-start rounded-2xl border border-[#E1E7EF] bg-white text-base font-black text-[#273247] shadow-sm">←</button>
+          <div className="min-w-0 text-center"><p className="truncate text-[10px] font-black uppercase tracking-[0.16em] text-[#8A6520]">Community profile</p><h2 className="truncate text-sm font-black text-[#273247]">@{display.username}</h2></div>
+          {options.own ? <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openOwnProfileSettings(); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openOwnProfileSettings(); }} className="flex h-10 w-10 items-center justify-center justify-self-end rounded-2xl border border-[#E1E7EF] bg-white text-base shadow-sm touch-manipulation" aria-label="Profile settings">⚙️</button> : <span />}
+        </header>
 
-        <section className="px-4 py-4 sm:px-7 sm:py-6">
+        <section className="bg-[linear-gradient(180deg,#FFFDF8_0%,#F7F9FC_100%)] px-3 py-4 sm:px-7 sm:py-7">
           <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-4 sm:gap-7">
-            <Avatar value={display.avatar} size="h-20 w-20 sm:h-34 sm:w-34" className="text-4xl ring-4 ring-[#EEF6FF]" />
+            <Avatar value={display.avatar} size="h-20 w-20 sm:h-32 sm:w-32" className="text-4xl ring-4 ring-white shadow-[0_12px_30px_rgba(23,32,51,0.13)]" />
             <div className="min-w-0">
               <div className="flex min-w-0 items-center gap-2">
-                <h1 className="truncate text-xl font-black leading-tight text-[#081B5C] sm:text-3xl">{display.name}</h1>
+                <h1 className="truncate text-xl font-black leading-tight tracking-[-0.03em] text-[#172033] sm:text-3xl">{display.name}</h1>
                 {display.verified ? <BlueVerifiedTick label="Verified profile" /> : null}
               </div>
-              <div className="mt-3 grid max-w-sm grid-cols-3 gap-1.5 text-center">
-                <span className="rounded-2xl bg-[#F8FBFF] px-2 py-2"><b className="block text-lg text-[#081B5C] sm:text-xl">{compactCount(profilePosts.length)}</b><small className="text-[11px] font-black text-[#64748B]">posts</small></span>
-                <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('followers'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('followers'); }} className="rounded-2xl bg-[#F8FBFF] px-2 py-2 transition hover:bg-[#EEF6FF] touch-manipulation"><b className="block text-lg text-[#081B5C] sm:text-xl">{followerTotal}</b><small className="text-[11px] font-black text-[#64748B]">followers</small></button>
-                <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('following'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('following'); }} className="rounded-2xl bg-[#F8FBFF] px-2 py-2 transition hover:bg-[#EEF6FF] touch-manipulation"><b className="block text-lg text-[#081B5C] sm:text-xl">{followingTotal}</b><small className="text-[11px] font-black text-[#64748B]">following</small></button>
+
+              <div className="mt-3 grid max-w-md grid-cols-3 gap-1.5 text-center sm:gap-2">
+                <span className="rounded-2xl border border-[#E1E7EF] bg-white px-2 py-2.5 shadow-sm"><b className="block text-lg text-[#172033] sm:text-xl">{compactCount(profilePosts.length)}</b><small className="text-[10px] font-black uppercase tracking-[0.08em] text-[#6B7482]">posts</small></span>
+                <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('followers'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('followers'); }} className="rounded-2xl border border-[#E1E7EF] bg-white px-2 py-2.5 shadow-sm transition hover:border-[#B9C8DE] hover:bg-[#F5F7FA] touch-manipulation"><b className="block text-lg text-[#172033] sm:text-xl">{followerTotal}</b><small className="text-[10px] font-black uppercase tracking-[0.08em] text-[#6B7482]">followers</small></button>
+                <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('following'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('following'); }} className="rounded-2xl border border-[#E1E7EF] bg-white px-2 py-2.5 shadow-sm transition hover:border-[#B9C8DE] hover:bg-[#F5F7FA] touch-manipulation"><b className="block text-lg text-[#172033] sm:text-xl">{followingTotal}</b><small className="text-[10px] font-black uppercase tracking-[0.08em] text-[#6B7482]">following</small></button>
               </div>
-              <p className="mt-3 whitespace-pre-wrap text-sm font-bold leading-6 text-[#536178]">{display.bio || 'No bio yet.'}</p>
-              <div className="mt-3 grid w-full max-w-[19rem] grid-cols-2 gap-2">
+
+              <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-[#4E5968]">{display.bio || 'Add a short bio so people know what you learn, teach or create.'}</p>
+
+              <div className="mt-3 grid w-full max-w-sm grid-cols-2 gap-2">
                 {options.own ? (
-                  <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openOwnProfileEdit(); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openOwnProfileEdit(); }} className="min-h-11 rounded-2xl bg-[#EEF6FF] px-3 py-2.5 text-xs font-black text-[#081B5C] shadow-sm sm:text-sm touch-manipulation">Edit profile</button>
+                  <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openOwnProfileEdit(); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openOwnProfileEdit(); }} className="min-h-11 rounded-2xl bg-[#273247] px-3 py-2.5 text-xs font-black text-white shadow-sm transition hover:bg-[#3157A4] sm:text-sm touch-manipulation">Edit profile</button>
                 ) : options.creator ? (
-                  <button type="button" onClick={() => toggleFollowCreator(options.creator!)} disabled={Boolean(followLoadingIds[profileId]) || options.creator.isSuspended || options.creator.isPublic === false} className={`min-h-11 rounded-2xl px-3 py-2.5 text-xs font-black shadow-sm sm:text-sm ${options.followed ? 'border border-[#D9E7F8] bg-white text-[#1769FF]' : 'bg-[#1769FF] text-white'}`}>{followLoadingIds[profileId] ? 'Saving…' : options.followed ? 'Following' : 'Follow'}</button>
+                  <button type="button" onClick={() => toggleFollowCreator(options.creator!)} disabled={Boolean(followLoadingIds[profileId]) || options.creator.isSuspended || options.creator.isPublic === false} className={`min-h-11 rounded-2xl px-3 py-2.5 text-xs font-black shadow-sm sm:text-sm ${options.followed ? 'border border-[#D7DFEA] bg-white text-[#3157A4]' : 'bg-[#273247] text-white'}`}>{followLoadingIds[profileId] ? 'Saving…' : options.followed ? 'Following' : 'Follow'}</button>
                 ) : <span />}
-                <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('followers'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('followers'); }} className="min-h-11 rounded-2xl border border-[#D9E7F8] bg-white px-3 py-2.5 text-xs font-black text-[#081B5C] shadow-sm sm:text-sm touch-manipulation">Followers & Following</button>
+                <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('followers'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProfileRelations('followers'); }} className="min-h-11 rounded-2xl border border-[#D7DFEA] bg-white px-3 py-2.5 text-xs font-black text-[#273247] shadow-sm transition hover:bg-[#F5F7FA] sm:text-sm touch-manipulation">Connections</button>
               </div>
             </div>
           </div>
 
           <div className="mt-5">{renderStoryHighlights(profileStories)}</div>
-          <div className="mt-5 border-t border-[#E3ECF8] pt-3">
-            <div className="mb-3 flex justify-center gap-3 text-[11px] font-black uppercase tracking-[0.16em]">
-              <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); setProfileContentTab('posts'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setProfileContentTab('posts'); }} className={`rounded-full px-4 py-2 touch-manipulation ${profileContentTab === 'posts' ? 'bg-[#EEF6FF] text-[#081B5C]' : 'text-[#7C879A]'}`}>▦ Posts</button>
-              <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); setProfileContentTab('stories'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setProfileContentTab('stories'); }} className={`rounded-full px-4 py-2 touch-manipulation ${profileContentTab === 'stories' ? 'bg-[#EEF6FF] text-[#081B5C]' : 'text-[#7C879A]'}`}>○ Stories</button>
+
+          <section className="mt-5 overflow-hidden rounded-[1.5rem] border border-[#DCE3EE] bg-[#FFFEFB] p-3 shadow-[0_12px_34px_rgba(23,32,51,0.05)] sm:p-4">
+            <div className="mb-4 flex items-center justify-between gap-3 border-b border-[#E8EDF3] pb-3">
+              <div><p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8A6520]">Profile activity</p><h3 className="mt-0.5 text-lg font-black text-[#172033]">Posts and stories</h3></div>
+              <div className="flex rounded-2xl border border-[#E1E7EF] bg-[#F5F7FA] p-1 text-[10px] font-black uppercase tracking-[0.1em]">
+                <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); setProfileContentTab('posts'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setProfileContentTab('posts'); }} className={`rounded-xl px-3 py-2 touch-manipulation ${profileContentTab === 'posts' ? 'bg-white text-[#273247] shadow-sm' : 'text-[#7C879A]'}`}>▦ Posts</button>
+                <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); setProfileContentTab('stories'); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); setProfileContentTab('stories'); }} className={`rounded-xl px-3 py-2 touch-manipulation ${profileContentTab === 'stories' ? 'bg-white text-[#273247] shadow-sm' : 'text-[#7C879A]'}`}>○ Stories</button>
+              </div>
             </div>
             {renderProfileGrid(profilePosts)}
-          </div>
+          </section>
         </section>
       </div>
     );
