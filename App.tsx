@@ -31,6 +31,7 @@ import ComingSoonModal from './components/ComingSoonModal';
 import { FreeProductsModal, FreeProductsPage } from './components/ContentModals';
 import ReadingDrawer, { ReadingListType, ReadingView } from './components/ReadingDrawer';
 import BottomGlassDock from './components/BottomGlassDock';
+import HomeSideDock from './components/HomeSideDock';
 import ProfilePage from './components/ProfilePage';
 import PlatformExperience from './components/PlatformExperience';
 import SubscriptionPage from './components/SubscriptionPage';
@@ -635,6 +636,9 @@ export interface WebsiteSettings {
     mobile: {
         hideFooter: boolean;
     };
+    desktop: {
+        navigationMode: 'sidebar' | 'dock';
+    };
     content: {
         siteName?: string;
         heroTitle: string;
@@ -823,6 +827,9 @@ const defaultWebsiteSettings: WebsiteSettings = {
     mobile: {
         hideFooter: false,
     },
+    desktop: {
+        navigationMode: 'sidebar',
+    },
     content: {
         siteName: 'Digital Catalyst',
         heroTitle: "Elevate Your Digital Presence",
@@ -958,6 +965,10 @@ const mergeWebsiteSettings = (settings?: Partial<WebsiteSettings> | null): Websi
     mobile: {
       ...defaultWebsiteSettings.mobile,
       ...(incoming.mobile || {}),
+    },
+    desktop: {
+      ...defaultWebsiteSettings.desktop,
+      ...(incoming.desktop || {}),
     },
     content: {
       ...defaultWebsiteSettings.content,
@@ -4509,6 +4520,25 @@ const App: React.FC = () => {
     isCartPaymentModalOpen ||
     isSubscriptionModalOpen;
 
+  const useDesktopSidebar = websiteSettings.desktop.navigationMode === 'sidebar';
+  const desktopSidebarActiveItem = isCartOpen
+    ? 'Cart'
+    : isFreeModalOpen
+      ? 'Free'
+      : isReadingDrawerOpen
+        ? (readingListType === 'blog' ? 'Blog' : 'News')
+        : ({
+            home: 'Home',
+            allProducts: 'Store',
+            product: 'Store',
+            myPurchases: 'Purchases',
+            coursePlayer: 'Purchases',
+            wishlist: 'Wishlist',
+            freeProducts: 'Free',
+            profile: 'Profile',
+            subscription: 'Subscriptions',
+          } as Record<string, string>)[currentView] || '';
+
   const shouldShowMainPageBackButtonOnMobile =
     currentView !== 'home' &&
     currentView !== 'admin' &&
@@ -4567,7 +4597,7 @@ const App: React.FC = () => {
 
     return (
        <ErrorBoundary>
-         <div className={`font-sans ${currentView === 'home' ? 'desktop-home-performance' : ''} ${websiteSettings.animations.enabled ? '' : 'animations-off'}`}>
+         <div className={`font-sans ${useDesktopSidebar ? 'desktop-sidebar-mode' : ''} ${currentView === 'home' ? 'desktop-home-performance' : ''} ${websiteSettings.animations.enabled ? '' : 'animations-off'}`}>
             <style>{`
               .animations-off .hub-animate {
                 opacity: 1 !important;
@@ -4587,10 +4617,41 @@ const App: React.FC = () => {
                   -webkit-backdrop-filter: none !important;
                   backdrop-filter: none !important;
                 }
+                .desktop-sidebar-mode .desktop-site-content {
+                  min-width: 0;
+                  padding-left: var(--desktop-site-sidebar-offset, 320px);
+                  transition: padding-left 300ms cubic-bezier(0.22, 1, 0.36, 1);
+                }
+              }
+              @media (prefers-reduced-motion: reduce) {
+                .desktop-sidebar-mode .desktop-site-content { transition: none; }
               }
             `}</style>
             {/* Startup welcome overlay disabled. */}
-                        {shouldShowMainPageBackButtonOnMobile && (
+            {useDesktopSidebar && (
+              <HomeSideDock
+                settings={websiteSettings}
+                isLoggedIn={isLoggedIn}
+                purchasedProducts={purchasedProducts}
+                cartCount={cartItemCount}
+                wishlistCount={wishlist.length}
+                activeItem={desktopSidebarActiveItem}
+                onHomeClick={handleBackToHome}
+                onOpenBlogModal={() => openReadingHub('blog')}
+                onOpenFreeModal={handleNavigateToFreeProducts}
+                onOpenAnnouncementsModal={() => openReadingHub('news')}
+                onNavigateToAllProducts={handleNavigateToAllProducts}
+                onNavigateToWishlist={handleNavigateToWishlist}
+                onNavigateToPurchases={handleNavigateToPurchases}
+                onCartClick={openCartSidebar}
+                onProfileClick={handleNavigateToProfile}
+                authButtonLabel={authButtonLabel}
+                onSubscriptionClick={handleNavigateToSubscription}
+                onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }}
+              />
+            )}
+            <div className="desktop-site-content min-w-0">
+            {shouldShowMainPageBackButtonOnMobile && (
               <button
                 type="button"
                 onClick={() => handleNavigateBack('home')}
@@ -4602,7 +4663,7 @@ const App: React.FC = () => {
             )}
             <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
-              <div className={shouldHideMainDockOnMobile ? 'max-md:hidden' : ''}>
+              <div className={`${shouldHideMainDockOnMobile ? 'max-md:hidden' : ''} ${useDesktopSidebar ? 'lg:hidden' : ''}`}>
                 <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>
             )}
@@ -4668,6 +4729,7 @@ const App: React.FC = () => {
                 />
               </div>
             )}
+            </div>
          </div>
        </ErrorBoundary>
     );

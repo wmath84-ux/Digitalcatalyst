@@ -342,6 +342,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const eduCoinRules = ((localSettings.content as any).eduCoinRules || { purchase: 25, redeemRate: 10 }) as { purchase: number; redeemRate: number };
     const dockItems = (((localSettings.content as any).dockItems || []) as string[]);
     const dockStyle = { backgroundColor: '#FBFDFF', backgroundOpacity: 92, itemOpacity: 96, accentOpacity: 22, height: 76, iconSize: 36, labelSize: 11, padding: 12, ...((localSettings.content as any).dockStyle || {}) };
+    const desktopNavigationMode = localSettings.desktop?.navigationMode === 'dock' ? 'dock' : 'sidebar';
     const communityStyle = {
         pageBackground: '#F8FBFF',
         surfaceColor: '#FFFFFF',
@@ -924,9 +925,24 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
             );
             case 'dock': return (
                 <div className="space-y-5">
+                    <div className="rounded-[1.5rem] border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-violet-50 p-5 shadow-sm">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">Desktop navigation</p>
+                                <h4 className="mt-1 text-lg font-black text-slate-900">Use expanded side panel</h4>
+                                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">Enabled by default. Turn it off and save to restore the existing bottom dock on desktop. Mobile dock behavior stays unchanged.</p>
+                            </div>
+                            <label className="relative inline-flex cursor-pointer items-center gap-3">
+                                <input type="checkbox" className="peer sr-only" checked={desktopNavigationMode === 'sidebar'} onChange={e => handleNestedChange('desktop', 'navigationMode', e.target.checked ? 'sidebar' : 'dock')} />
+                                <span className="relative h-8 w-14 rounded-full bg-slate-300 transition peer-checked:bg-gradient-to-r peer-checked:from-blue-600 peer-checked:to-violet-600 after:absolute after:left-1 after:top-1 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow-md after:transition-transform peer-checked:after:translate-x-6" />
+                                <span className="min-w-[4.5rem] text-sm font-black text-slate-700">{desktopNavigationMode === 'sidebar' ? 'Side panel' : 'Bottom dock'}</span>
+                            </label>
+                        </div>
+                    </div>
+
                     <div className="rounded-xl border bg-white p-4">
-                        <h4 className="font-bold text-gray-800">Bottom Dock Items</h4>
-                        <p className="text-sm text-slate-600">Choose which labels should appear in the bottom dock for every user.</p>
+                        <h4 className="font-bold text-gray-800">Navigation Items</h4>
+                        <p className="text-sm text-slate-600">Choose which labels appear in both the desktop side panel and preserved bottom dock.</p>
                         <div className="mt-3 flex flex-wrap gap-2">
                             {defaultDockItems.map(label => (
                                 <button type="button" key={label} onClick={() => toggleDockItem(label)} className={`rounded-full border px-4 py-2 text-sm font-bold ${selectedDockItems.includes(label) ? 'border-blue-600 bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'border-slate-200/80 bg-slate-100/80 text-gray-700'}`}>{label}</button>
@@ -985,7 +1001,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
 
                     <div className="rounded-xl border bg-white p-4">
                         <h4 className="font-bold text-gray-800">Dock Color & Transparency</h4>
-                        <p className="text-sm text-slate-600">These saved values control the bottom dock globally for all users.</p>
+                        <p className="text-sm text-slate-600">These saved values control the preserved bottom dock and the matching desktop side-panel surfaces.</p>
                         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_18rem]">
                             <div className="space-y-4">
                                 <FormRow label="Dock Background Color" description="Main dark/glass color behind the dock.">
