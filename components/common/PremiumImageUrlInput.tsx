@@ -1,5 +1,4 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { MEDIA_UPLOAD_FUTURE_MESSAGE, URL_FIRST_MEDIA_MODE_LABEL, getMediaModeHelperCopy, getStorageDisabledMessage } from '../../utils/mediaMode';
 import SafeImage from './SafeImage';
 import { isCloudinaryImageUploadConfigured, uploadImageToCloudinary } from '../../utils/cloudinaryUpload';
 
@@ -24,17 +23,16 @@ type PremiumImageUrlInputProps = {
 };
 
 export const IMAGE_URL_MESSAGES = {
-  invalidHttps: 'Please paste a valid https image URL.',
-  notLoading: 'This image link is not loading. Try another public image URL.',
-  ready: 'Image ready to publish.',
-  storageDisabled: getStorageDisabledMessage('Image'),
-  saved: 'Image URL saved successfully.',
+  invalidHttps: 'Enter a valid public https image URL.',
+  notLoading: 'This image could not be loaded. Try another URL.',
+  ready: 'Preview ready.',
+  storageDisabled: 'Direct storage upload is unavailable.',
+  saved: 'Image URL ready.',
 };
 
 const isHttpsImageUrl = (value: string) => {
   try {
-    const url = new URL(value.trim());
-    return url.protocol === 'https:';
+    return new URL(value.trim()).protocol === 'https:';
   } catch {
     return false;
   }
@@ -45,127 +43,142 @@ const aspectClass = (aspect: PremiumImageUrlInputProps['aspect']) => aspect === 
 const PremiumImageUrlInput: React.FC<PremiumImageUrlInputProps> = ({
   value,
   onChange,
-  label = 'Image URL',
-  helperText = 'Upload an image to Cloudinary or paste a direct https image link. The final URL is saved as text in Firestore.',
+  label = 'Image',
+  helperText = 'Choose an image. The URL fills automatically; preview it, then save this form.',
   previewAlt = 'Image preview',
   aspect = 'square' as const,
   compact = false,
   onStatusChange,
   provider,
 }) => {
-  const [status, setStatus] = useState<PremiumImageUrlStatus>(value.trim() ? 'checking' : 'empty');
-  const [message, setMessage] = useState(value.trim() ? 'Checking image…' : IMAGE_URL_MESSAGES.invalidHttps);
-  const [helperOpen, setHelperOpen] = useState(false);
+  const trimmed = value.trim();
+  const [status, setStatus] = useState<PremiumImageUrlStatus>(trimmed ? 'checking' : 'empty');
   const [providerBusy, setProviderBusy] = useState(false);
   const [providerError, setProviderError] = useState('');
-  const [copyMessage, setCopyMessage] = useState('');
-  const trimmed = value.trim();
+  const [copied, setCopied] = useState(false);
   const cloudinaryReady = isCloudinaryImageUploadConfigured();
   const providerReady = Boolean((provider?.enabled && provider.upload) || cloudinaryReady);
   const providerLabel = provider?.label || 'Cloudinary';
 
   useEffect(() => {
     let cancelled = false;
+    let timer = 0;
+
     if (!trimmed) {
       setStatus('empty');
-      setMessage(IMAGE_URL_MESSAGES.invalidHttps);
       onStatusChange?.('empty');
-      return;
+      return undefined;
     }
+
     if (!isHttpsImageUrl(trimmed)) {
       setStatus('invalid');
-      setMessage(IMAGE_URL_MESSAGES.invalidHttps);
       onStatusChange?.('invalid');
-      return;
+      return undefined;
     }
+
     setStatus('checking');
-    setMessage('Checking image…');
     onStatusChange?.('checking');
     const image = new Image();
+    timer = window.setTimeout(() => {
+      if (cancelled) return;
+      setStatus('invalid');
+      onStatusChange?.('invalid');
+    }, 10000);
     image.onload = () => {
       if (cancelled) return;
+      window.clearTimeout(timer);
       setStatus('valid');
-      setMessage(IMAGE_URL_MESSAGES.ready);
       onStatusChange?.('valid');
     };
     image.onerror = () => {
       if (cancelled) return;
+      window.clearTimeout(timer);
       setStatus('invalid');
-      setMessage(IMAGE_URL_MESSAGES.notLoading);
       onStatusChange?.('invalid');
     };
     image.src = trimmed;
-    return () => { cancelled = true; };
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [trimmed, onStatusChange]);
 
-  const modeCopy = getMediaModeHelperCopy('image');
-  const badge = useMemo(() => status === 'valid' ? 'Image ready' : status === 'checking' ? 'Checking…' : status === 'invalid' && trimmed ? 'Broken link' : 'URL required', [status, trimmed]);
+  const statusText = useMemo(() => {
+    if (providerBusy) return 'Uploading…';
+    if (status === 'valid') return 'Preview ready';
+    if (status === 'checking') return 'Checking image…';
+    if (status === 'invalid') return IMAGE_URL_MESSAGES.notLoading;
+    return 'No image selected';
+  }, [providerBusy, status]);
 
-  const handleProviderFile = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    event.currentTarget.value = '';
-    const upload = provider?.enabled && provider.upload ? provider.upload : uploadImageToCloudinary;
-    if (!file || !providerReady) return;
+  const uploadFile = async (file: File) => {
     setProviderBusy(true);
     setProviderError('');
     try {
+      const upload = provider?.enabled && provider.upload ? provider.upload : uploadImageToCloudinary;
       const hostedUrl = await upload(file);
       onChange(hostedUrl);
-      setMessage('Image URL generated. Save to publish it.');
-      setHelperOpen(false);
     } catch (error) {
-      setProviderError(error instanceof Error ? error.message : 'Image upload failed. Try again or paste a direct image URL.');
+      setProviderError(error instanceof Error ? error.message : 'Upload failed. Try again or paste a public URL.');
     } finally {
       setProviderBusy(false);
     }
   };
 
-  const handleCopyUrl = async () => {
+  const copyUrl = async () => {
     if (!trimmed) return;
     try {
       await navigator.clipboard.writeText(trimmed);
-      setCopyMessage('URL copied.');
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1400);
     } catch {
-      setCopyMessage('Copy failed. Select the URL and copy it manually.');
+      setProviderError('Could not copy automatically. Select the URL manually.');
     }
-    window.setTimeout(() => setCopyMessage(''), 2500);
   };
 
   return (
-    <section className={`rounded-[1.75rem] border border-[#D9E7F8] bg-white/85 p-4 shadow-[0_18px_55px_rgba(23,105,255,0.10)] backdrop-blur-xl ${compact ? '' : 'sm:p-5'}`}>
-      <div className={`grid gap-4 ${compact ? '' : 'lg:grid-cols-[minmax(0,1fr)_320px] lg:items-start'}`}>
+    <section className={`rounded-2xl border border-slate-200 bg-white ${compact ? 'p-3' : 'p-4'} shadow-sm`}>
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <p className="text-xs font-black uppercase tracking-[0.24em] text-[#7B61FF]">{URL_FIRST_MEDIA_MODE_LABEL}</p>
-              <label className="mt-1 block text-lg font-black text-[#081A45]">{label || modeCopy.primaryAction}</label>
-            </div>
-            <button type="button" onClick={() => setHelperOpen(open => !open)} className="rounded-2xl border border-[#BFD7FF] bg-[#EEF6FF] px-4 py-2 text-xs font-black text-[#1769FF]">Need image URL?</button>
-          </div>
-          <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="https://example.com/image.jpg" className="mt-4 w-full rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-bold text-[#081A45] outline-none transition focus:border-[#1769FF] focus:ring-4 focus:ring-[#1769FF]/10" />
-          <p className="mt-2 text-xs font-bold leading-5 text-[#536178]">{helperText}</p>
-          <p className={`mt-3 rounded-2xl px-4 py-3 text-xs font-black ${status === 'valid' ? 'border border-emerald-200 bg-emerald-50 text-emerald-700' : status === 'invalid' && trimmed ? 'border border-rose-200 bg-rose-50 text-rose-700' : 'border border-[#D9E7F8] bg-[#F8FBFF] text-[#536178]'}`}>{message}</p>
-          {helperOpen ? (
-            <div className="mt-4 rounded-[1.5rem] border border-[#D9E7F8] bg-gradient-to-br from-[#F8FBFF] via-white to-[#F1EEFF] p-4">
-              <h3 className="text-base font-black text-[#081A45]">Smart Image-to-URL Helper</h3>
-              <p className="mt-2 text-sm font-bold leading-6 text-[#536178]">{modeCopy.helper}</p>
-              {providerReady ? (
-                <div className="mt-4 space-y-3">
-                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border border-dashed border-[#BFD7FF] bg-white/85 px-4 py-5 text-center text-sm font-black text-[#1769FF] shadow-sm transition hover:-translate-y-0.5 hover:border-[#1769FF] hover:bg-[#EEF6FF]"><input type="file" accept="image/*" onChange={handleProviderFile} className="hidden" />{providerBusy ? 'Uploading to Cloudinary…' : `Upload image to ${providerLabel}`}</label>
-                  <p className="rounded-2xl bg-white/80 p-3 text-xs font-bold text-[#536178]">Image select karte hi upload hoga, URL auto-generate hoga, preview me dikhega, aur save karne par Firestore me URL text ke roop me store hoga.</p>
-                </div>
-              ) : (
-                <div className="mt-4 space-y-3 text-sm font-bold text-[#081A45]"><p className="rounded-2xl bg-white/80 p-3">Cloudinary upload enable karne ke liye <code>VITE_CLOUDINARY_CLOUD_NAME</code> aur <code>VITE_CLOUDINARY_UPLOAD_PRESET</code> set karo. Tab tak direct public image URL paste karke preview + save use kar sakte ho.</p><div className="rounded-2xl bg-white/80 p-3 text-xs text-[#7C879A]">{MEDIA_UPLOAD_FUTURE_MESSAGE}</div><a href="https://postimages.org/" target="_blank" rel="noreferrer" className="inline-flex rounded-2xl border border-[#BFD7FF] bg-white px-4 py-3 text-sm font-black text-[#1769FF]">Open fallback Image URL Generator</a><p className="text-xs text-[#C5221F]">{IMAGE_URL_MESSAGES.storageDisabled}</p></div>
-              )}
-              {providerError ? <p className="mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-xs font-black text-rose-700">{providerError}</p> : null}
-            </div>
-          ) : null}
+          <p className="text-sm font-black text-slate-900">{label}</p>
+          <p className="mt-1 max-w-xl text-xs font-semibold leading-5 text-slate-500">{helperText}</p>
         </div>
-        <div className={`overflow-hidden rounded-[1.5rem] border bg-gradient-to-br from-[#EEF6FF] via-white to-[#F1EEFF] p-2 shadow-inner ${status === 'valid' ? 'border-[#7B61FF] shadow-[0_0_0_4px_rgba(123,97,255,0.10)]' : status === 'invalid' && trimmed ? 'border-rose-200' : 'border-[#D9E7F8]'}`}>
-          <div className={`${aspectClass(aspect)} flex w-full items-center justify-center overflow-hidden rounded-[1.15rem] bg-white/80`}>
-            {status === 'checking' ? <div className="h-full w-full animate-pulse bg-gradient-to-r from-[#EEF6FF] via-white to-[#E8F2FF]" /> : status === 'valid' ? <SafeImage src={trimmed} alt={previewAlt} className="h-full w-full object-contain" fallbackTitle={label} fallbackBadge="Admin preview" fallbackIcon="🖼️" fallbackMessage="This image URL is not loading. Replace it with another public URL." aspect={aspect === 'square' ? 'square' : aspect === 'video' ? 'video' : 'auto'} /> : <div className="p-6 text-center"><div className="text-5xl">🖼️</div><p className="mt-3 text-sm font-black text-[#536178]">Preview Image</p></div>}
+        <span className={`rounded-full px-3 py-1 text-[11px] font-black ${status === 'valid' ? 'bg-emerald-50 text-emerald-700' : status === 'invalid' ? 'bg-rose-50 text-rose-700' : 'bg-slate-100 text-slate-600'}`}>{statusText}</span>
+      </div>
+
+      <div className={`mt-4 grid gap-4 ${compact ? 'md:grid-cols-[minmax(0,1fr)_180px]' : 'md:grid-cols-[minmax(0,1fr)_240px]'}`}>
+        <div className="space-y-3">
+          <div className="rounded-xl border border-slate-200 bg-slate-50 p-3">
+            <p className="text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">1 · Choose image</p>
+            {providerReady ? (
+              <label className="mt-2 inline-flex min-h-11 cursor-pointer items-center justify-center rounded-xl bg-slate-900 px-4 text-sm font-black text-white transition hover:bg-slate-800">
+                <input type="file" accept="image/*" className="sr-only" disabled={providerBusy} onChange={(event) => { const file = event.currentTarget.files?.[0]; if (file) void uploadFile(file); event.currentTarget.value = ''; }} />
+                {providerBusy ? `Uploading to ${providerLabel}…` : 'Choose image'}
+              </label>
+            ) : (
+              <p className="mt-2 text-xs font-semibold text-amber-700">Direct upload is not configured. Use a public HTTPS URL below.</p>
+            )}
           </div>
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><span className={`rounded-full px-3 py-1 text-[11px] font-black ${status === 'valid' ? 'bg-emerald-100 text-emerald-700' : status === 'invalid' && trimmed ? 'bg-rose-100 text-rose-700' : 'bg-[#EEF6FF] text-[#1769FF]'}`}>{badge}</span><div className="flex flex-wrap gap-2">{trimmed ? <button type="button" onClick={handleCopyUrl} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#22A06B]">Copy URL</button> : null}<button type="button" onClick={() => onChange('')} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#EF4444]">Remove Image</button><button type="button" onClick={() => setHelperOpen(true)} className="rounded-full bg-white px-3 py-1.5 text-[11px] font-black text-[#1769FF]">Upload / Change</button></div>{copyMessage ? <p className="basis-full text-right text-[11px] font-black text-[#22A06B]">{copyMessage}</p> : null}</div>
+
+          <details className="rounded-xl border border-slate-200 bg-white p-3" open={!providerReady}>
+            <summary className="cursor-pointer text-xs font-black text-slate-700">Use a public image URL instead</summary>
+            <input value={value} onChange={(event) => onChange(event.target.value)} placeholder="https://example.com/image.jpg" inputMode="url" className="mt-3 w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-3 text-sm font-semibold text-slate-900 outline-none focus:border-blue-500 focus:bg-white" />
+          </details>
+
+          <div className="flex flex-wrap gap-2">
+            <button type="button" disabled={!trimmed} onClick={copyUrl} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-black text-slate-700 disabled:opacity-40">{copied ? 'Copied' : 'Copy URL'}</button>
+            <button type="button" disabled={!trimmed} onClick={() => onChange('')} className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-black text-rose-700 disabled:opacity-40">Remove</button>
+          </div>
+          {providerError ? <p className="rounded-xl border border-rose-100 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-700">{providerError}</p> : null}
+        </div>
+
+        <div>
+          <p className="mb-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-500">2 · Check preview</p>
+          <div className={`overflow-hidden rounded-xl border border-slate-200 bg-slate-100 ${aspectClass(aspect)}`}>
+            {trimmed && status !== 'invalid' ? <SafeImage src={trimmed} alt={previewAlt} aspect={aspect} loading="eager" fetchPriority="high" className="h-full w-full object-cover" fallbackTitle={previewAlt} fallbackBadge="Preview" fallbackIcon="🖼️" /> : <div className="flex h-full min-h-36 items-center justify-center p-4 text-center text-xs font-bold text-slate-500">Your image preview appears here.</div>}
+          </div>
+          <p className="mt-2 text-xs font-semibold text-slate-500">3 · Save the profile, post, product or settings form.</p>
         </div>
       </div>
     </section>

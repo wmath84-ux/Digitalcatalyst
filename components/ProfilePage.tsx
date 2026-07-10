@@ -84,13 +84,6 @@ const fallbackMilestoneConfigs: ProfileMilestoneConfig[] = [
 ];
 
 const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
-const formatRupees = (value: number) => `₹${Math.max(0, value).toLocaleString('en-IN', { maximumFractionDigits: 0 })}`;
-const parseRupeeAmount = (value: unknown) => {
-  const text = String(value || '');
-  const match = text.match(/(?:₹|Rs\.?|INR)?\s*([0-9][0-9,]*(?:\.\d+)?)/i);
-  return match ? Number(match[1].replace(/,/g, '')) || 0 : 0;
-};
-
 const formatLedgerTime = (value: string) => {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return 'Just now';
@@ -113,7 +106,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   purchasedProducts,
   products,
   coupons,
-  orders,
   onBack,
   onExplore,
   activeTheme,
@@ -196,23 +188,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const watchTimeMinutes = currentUser?.totalWatchTimeMinutes ?? studyMinutes;
   const eduPoints = profileCoinWallet.coinBalance;
   const totalLifetimeCoins = profileCoinWallet.totalCoinsEarned || eduPoints;
-  const normalizedProfileEmail = String(currentUser?.email || '').trim().toLowerCase();
-  const profileUserIds = React.useMemo(() => new Set([currentUser?.id, currentUser?.uid].filter(Boolean).map(String)), [currentUser?.id, currentUser?.uid]);
-  const profileCompletedOrders = React.useMemo(() => orders.filter((order) => {
-    if (order.status !== 'Completed') return false;
-    const orderIdentity = order as Order & { userId?: string | null; uid?: string | null; buyerUid?: string | null; buyerId?: string | null };
-    const orderIds = [orderIdentity.customerUid, orderIdentity.userId, orderIdentity.uid, orderIdentity.buyerUid, orderIdentity.buyerId].filter(Boolean).map(String);
-    const idMatches = orderIds.some((id) => profileUserIds.has(id));
-    const emailMatches = normalizedProfileEmail && String(order.customerEmail || '').trim().toLowerCase() === normalizedProfileEmail;
-    return Boolean(idMatches || emailMatches);
-  }), [orders, profileUserIds, normalizedProfileEmail]);
-  const totalFiatSpent = React.useMemo(() => profileCompletedOrders.reduce((total, order) => {
-    const finalPrice = Number(order.paymentBreakdown?.finalPrice);
-    if (Number.isFinite(finalPrice)) return total + Math.max(0, finalPrice);
-    const totalLabel = String(order.total || '');
-    if (/🪙|educoin|coin/i.test(totalLabel) && !/₹|rs\.?|inr/i.test(totalLabel)) return total;
-    return total + parseRupeeAmount(totalLabel);
-  }, 0), [profileCompletedOrders]);
   const profileStyle = { ...fallbackProfileStyle, ...((settings.content as any).profileStyle || {}) };
   const profileStreakConfigs = (((settings.content as any).profileStreaks || fallbackStreakConfigs) as ProfileStreakConfig[])
     .filter(streak => streak.active !== false && !streak.draft && !streak.archived && Number(streak.goal) > 0)
@@ -520,10 +495,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
               <h2 className="mt-1 text-3xl font-black text-slate-900">{profileCoinWallet.coinBalance} EduCoins</h2>
               <p className="mt-1 text-sm text-slate-500">Start watching eligible YouTube course videos to earn.</p>
             </div>
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-              <div className="rounded-2xl bg-emerald-50 px-4 py-3 text-center"><p className="text-xs text-slate-500">Lifetime earned</p><p className="text-lg font-bold text-emerald-700">{profileCoinWallet.totalCoinsEarned}</p></div>
-              <div className="rounded-2xl bg-blue-50 px-4 py-3 text-center"><p className="text-xs text-slate-500">Total spent</p><p className="text-lg font-bold text-blue-700">{formatRupees(totalFiatSpent)}</p></div>
-              <div className="rounded-2xl bg-rose-50 px-4 py-3 text-center"><p className="text-xs text-slate-500">Coins spent</p><p className="text-lg font-bold text-rose-700">{profileCoinWallet.totalCoinsSpent}</p></div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center"><p className="text-xs font-semibold text-slate-500">EduCoins earned</p><p className="text-lg font-black text-emerald-700">{profileCoinWallet.totalCoinsEarned}</p></div>
+              <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-center"><p className="text-xs font-semibold text-slate-500">EduCoins spent</p><p className="text-lg font-black text-rose-700">{profileCoinWallet.totalCoinsSpent}</p></div>
             </div>
           </div>
           {profileCoinError && <p className="mt-3 rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{profileCoinError}</p>}
@@ -549,7 +523,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             <div className="absolute -bottom-1 left-0 right-0 p-4 sm:p-8 lg:p-10">
               <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-5">
-                  <UserAvatar name={currentUser?.name} email={currentUser?.email} photoURL={currentUser?.photoURL} size={144} className="!h-20 !w-20 rounded-[1.5rem] border-4 border-[#D2E3FC] text-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 sm:!h-36 sm:!w-36 sm:rounded-[2rem] sm:text-5xl" imageClassName="rounded-[1.5rem] sm:rounded-[2rem]" />
+                  <UserAvatar name={currentUser?.name} email={currentUser?.email} photoURL={currentUser?.profilePhotoSet ? currentUser.photoURL : ''} size={144} className="!h-20 !w-20 rounded-[1.5rem] border-4 border-[#D2E3FC] text-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 sm:!h-36 sm:!w-36 sm:rounded-[2rem] sm:text-5xl" imageClassName="rounded-[1.5rem] sm:rounded-[2rem]" />
                   <div className="pb-2">
                     <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C2E7FF] sm:text-sm sm:tracking-[0.35em]">Level {level} Scholar</p>
                     <h1 className="mt-1 text-3xl font-black tracking-tight text-white drop-shadow sm:mt-2 sm:text-6xl">{currentUser?.name || 'Student'}</h1>

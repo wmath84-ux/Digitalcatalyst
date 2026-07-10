@@ -130,7 +130,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
   const uploadCoverImage = async (file: File) => {
     setCoverUploadError('');
     if (!isCloudinaryImageUploadConfigured()) {
-      setCoverUploadError('Cloudinary upload is not configured. Add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET, then restart the app. You can still paste a public image URL.');
+      setCoverUploadError('Direct upload is not configured. Use a public HTTPS image URL.');
       return;
     }
 
@@ -140,7 +140,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
       setEditingPost((post) => ({ ...post, coverImage: hostedUrl, thumbnailImage: hostedUrl }));
       setCoverImageStatus('checking');
     } catch (error) {
-      setCoverUploadError(error instanceof Error ? error.message : 'Cloudinary cover upload failed. Try again or paste a public image URL.');
+      setCoverUploadError(error instanceof Error ? error.message : 'Upload failed. Try again or use a public image URL.');
     } finally {
       setIsUploadingCover(false);
     }
@@ -267,7 +267,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
             <input value={editingPost.category} onChange={(event) => setEditingPost({ ...editingPost, category: event.target.value })} className={fieldClass} placeholder="Education News" />
           </div>
           <div className="lg:col-span-8">
-            <PremiumImageUrlInput value={editingPost.coverImage || ''} onChange={(url) => { setCoverUploadError(''); setEditingPost({ ...editingPost, coverImage: url, thumbnailImage: url }); }} onStatusChange={setCoverImageStatus} label="News/blog cover image URL" previewAlt={`${editingPost.title || 'Article'} cover preview`} aspect="video" compact helperText="Paste a public https cover image URL. It is saved as coverImage and thumbnailImage." />
+            <PremiumImageUrlInput value={editingPost.coverImage || ''} onChange={(url) => { setCoverUploadError(''); setEditingPost({ ...editingPost, coverImage: url, thumbnailImage: url }); }} onStatusChange={setCoverImageStatus} label="News/blog cover image URL" previewAlt={`${editingPost.title || 'Article'} cover preview`} aspect="video" compact helperText="Choose a cover image, preview it, then save the article." />
           </div>
           <div className="lg:col-span-12 rounded-[1.5rem] border border-white/50 bg-white/70 p-5 shadow-sm">
             <label className="flex cursor-pointer flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -287,11 +287,11 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
               <div>
                 <p className="text-xs font-black uppercase tracking-[0.3em] text-indigo-300/90">Cover Image</p>
                 <h2 className="mt-2 text-2xl font-black text-slate-900">Premium editorial cover</h2>
-                <p className="mt-3 text-sm leading-6 text-slate-600">Upload a cover to Cloudinary or paste a stock/public https image URL. The final URL is saved as coverImage and thumbnailImage.</p>
+                <p className="mt-3 text-sm leading-6 text-slate-600">Choose a cover image, confirm the preview, then save the article.</p>
                 <div className="mt-5 flex flex-col gap-3 sm:flex-row sm:items-center">
                   <label className="inline-flex cursor-pointer items-center justify-center rounded-2xl border border-indigo-200/70 bg-white/80 px-5 py-3 text-sm font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-md">
                     <input type="file" accept="image/*" className="sr-only" onChange={(event) => { const file = event.target.files?.[0]; if (file) void uploadCoverImage(file); event.currentTarget.value = ''; }} />
-                    {isUploadingCover ? 'Uploading to Cloudinary…' : 'Upload image to Cloudinary'}
+                    {isUploadingCover ? 'Uploading…' : 'Choose image'}
                   </label>
                   <button type="button" onClick={() => setEditingPost({ ...editingPost, coverImage: '', thumbnailImage: '' })} className="rounded-2xl border border-white/50 bg-white/80 px-5 py-3 text-sm font-black text-slate-600 transition hover:bg-white/90 hover:shadow-sm">Clear Image</button>
                 </div>

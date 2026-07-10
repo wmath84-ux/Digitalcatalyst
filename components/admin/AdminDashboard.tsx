@@ -37,7 +37,7 @@ interface AdminDashboardProps {
     onAddProduct: (product: Omit<Product, 'id'>) => Promise<boolean>;
     onUpdateProduct: (product: Product) => Promise<boolean>;
     onDeleteProduct: (id: number) => Promise<boolean>;
-    onDeleteUser: (id: number) => void;
+    onDeleteUser: (id: string) => void;
     onAdminUsersUpdate: (users: AdminUser[]) => void;
     onCouponsUpdate: (coupons: Coupon[]) => void;
     onTicketsUpdate: (tickets: SupportTicket[]) => void;

@@ -1,52 +1,30 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface UserAvatarProps {
-  name?: string;
-  email?: string;
-  photoURL?: string;
+  name?: string | null;
+  email?: string | null;
+  photoURL?: string | null;
   size?: number;
   className?: string;
   imageClassName?: string;
 }
 
-const getInitials = (name?: string, email?: string) => {
-  const source = (name || email || '').trim();
-  if (!source) return '';
-  const normalized = source.includes('@') ? source.split('@')[0] : source;
-  const parts = normalized.split(/\s+/).filter(Boolean);
-  if (parts.length >= 2) return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-  return normalized.slice(0, 2).toUpperCase();
-};
+const PersonIcon = () => (
+  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-[58%] w-[58%]" fill="none">
+    <path d="M12 12.25a4.25 4.25 0 1 0 0-8.5 4.25 4.25 0 0 0 0 8.5Z" fill="currentColor" />
+    <path d="M4.75 20.25c.52-4 3.14-6.25 7.25-6.25s6.73 2.25 7.25 6.25H4.75Z" fill="currentColor" />
+  </svg>
+);
 
 const UserAvatar: React.FC<UserAvatarProps> = ({ name, email, photoURL, size = 40, className = '', imageClassName = '' }) => {
-  const [hasImageError, setHasImageError] = useState(false);
-  const initials = useMemo(() => getInitials(name, email), [name, email]);
-
-  useEffect(() => {
-    setHasImageError(false);
-  }, [photoURL]);
-  const dimensionStyle = /(?:^|\s)!?[hw]-/.test(className) ? undefined : { width: size, height: size };
-
-  if (photoURL && !hasImageError) {
-    return (
-      <img
-        src={photoURL}
-        alt={name || email || 'User avatar'}
-        referrerPolicy="no-referrer"
-        onError={() => setHasImageError(true)}
-        className={`shrink-0 rounded-full object-cover ${className} ${imageClassName}`}
-        style={dimensionStyle}
-      />
-    );
-  }
+  const label = String(name || email || 'User profile').trim();
+  const image = typeof photoURL === 'string' ? photoURL.trim() : '';
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [image]);
 
   return (
-    <span
-      className={`inline-flex shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-blue-600 to-indigo-700 text-xs font-black text-white shadow-sm ${className}`}
-      style={dimensionStyle}
-      aria-label={name || email || 'User avatar'}
-    >
-      {initials || '👤'}
+    <span role="img" aria-label={`${label || 'User'} profile picture`} className={`inline-flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-slate-200 bg-slate-100 text-slate-500 shadow-sm ${className}`.trim()} style={{ width: size, height: size }}>
+      {image && !failed ? <img src={image} alt={`${label || 'User'} profile picture`} loading="eager" decoding="async" className={`h-full w-full object-cover ${imageClassName}`.trim()} onError={() => setFailed(true)} /> : <PersonIcon />}
     </span>
   );
 };

@@ -155,6 +155,8 @@ const COMMUNITY_NOTIFICATION_READ_KEY = 'eduvoraCommunityNotificationReads';
 const COMMUNITY_PROFILE_STORAGE_KEY = 'eduvoraCommunityProfile';
 const COMMUNITY_PRIVACY_STORAGE_KEY = 'eduvoraCommunityPrivacySettings';
 const COMMUNITY_NOTIFICATION_PREFS_KEY = 'eduvoraCommunityNotificationPreferences';
+const COMMUNITY_FEED_CACHE_KEY = 'eduvoraCommunityFeedCacheV4';
+const COMMUNITY_STATUS_CACHE_KEY = 'eduvoraCommunityStatusCacheV4';
 const COMMUNITY_CREATOR_QUOTA_KEY = 'eduvoraCommunityCreatorQuota';
 const COMMUNITY_STATUS_QUOTA_KEY = 'eduvoraCommunityStatusQuota';
 const COMMUNITY_DESKTOP_SIDEBAR_COLLAPSED_KEY = 'eduvoraCommunityDesktopSidebarCollapsed';
@@ -318,21 +320,12 @@ const formatCommunityReplyTime = (value?: string) => {
   return parsed.toLocaleString([], { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
 };
 
-const creators: Creator[] = [
-  { id: 'riya', username: 'riyafunnels', name: 'Riya Sharma', avatar: '🧕', role: 'Funnel creator', followers: 1280, mutual: true },
-  { id: 'kabir', username: 'kabir_offers', name: 'Kabir Khan', avatar: '🧑‍🎨', role: 'Offer strategist', followers: 940, mutual: false },
-  { id: 'meera', username: 'meeraauto', name: 'Meera Joshi', avatar: '👩‍💻', role: 'Automation mentor', followers: 1510, mutual: true, verified: true },
-  { id: 'tara', username: 'taracreates', name: 'Tara Singh', avatar: '👩‍🎤', role: 'Content systems', followers: 820, mutual: false, verified: true },
-  { id: 'yash', username: 'yashgrowth', name: 'Yash Verma', avatar: '🧑‍🚀', role: 'Growth experiments', followers: 690, mutual: false },
-];
+const creators: Creator[] = [];
 
 const initialMessages: FeedMessage[] = [];
 
-const initialStatusCards: StatusCard[] = [
-  { id: 1, title: 'Morning sprint template', body: 'Use this prompt stack before your first sales call today.', gradient: 'from-[#1A73E8] via-[#34A853] to-[#C2E7FF]', likedBy: 0, views: 0, slots: 'Text · 1 min', type: 'text' },
-  { id: 2, title: 'Offer-stack swipe file', body: 'A clean preview board for offer, bonus, guarantee, and urgency blocks.', gradient: 'from-[#1A73E8] via-[#AECBFA] to-[#FBBC04]', likedBy: 0, views: 0, slots: 'Image · 940KB', type: 'image', imagePreview: '🧩' },
-  { id: 3, title: 'Workshop poll snapshot', body: 'Vote for the topic we should break down in the next live workshop.', gradient: 'from-[#34A853] via-[#81C995] to-[#C2E7FF]', likedBy: 0, views: 0, slots: 'Poll · 1 min', type: 'poll', pollOptions: ['Reels scripting', 'Email automation', 'Beginner ads'], pollVotes: [18, 27, 11] },
-];
+const initialStatusCards: StatusCard[] = [];
+const EMPTY_STATUS_CARD: StatusCard = { id: 0, title: '', body: '', gradient: '', likedBy: 0, views: 0, slots: '', type: 'text' };
 
 const masterTagCategories = ['Math', 'Physics', 'Chemistry', 'Biology', 'English', 'SST', 'Coding', 'Motivation', 'Exam Strategy', 'Life Skills', 'Other'] as const;
 const masterTagTypes = ['Teacher', 'Creator', 'Mentor', 'Friend', 'Senior', 'Community Master'] as const;
@@ -901,10 +894,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const activeViewRef = useRef<CommunityView>('feed');
   const pageStackRef = useRef<CommunityPage[]>([]);
   const [selectedMessageId, setSelectedMessageId] = useState(0);
-  const [selectedStatusId, setSelectedStatusId] = useState(initialStatusCards[0].id);
+  const [selectedStatusId, setSelectedStatusId] = useState(0);
   const [statusViewerPanelId, setStatusViewerPanelId] = useState<number | null>(null);
-  const [messages, setMessages] = useState<FeedMessage[]>([]);
-  const [statusCards, setStatusCards] = useState<StatusCard[]>(initialStatusCards);
+  const [messages, setMessages] = useState<FeedMessage[]>(() => readJsonArray<FeedMessage>(COMMUNITY_FEED_CACHE_KEY, []).map(normalizeFeedMessage).filter((message) => isUnexpired(message, POST_TTL_MS)));
+  const [statusCards, setStatusCards] = useState<StatusCard[]>(() => readJsonArray<StatusCard>(COMMUNITY_STATUS_CACHE_KEY, []).filter((status) => isUnexpired(status, STORY_TTL_MS)));
   const [likedStatuses, setLikedStatuses] = useState<number[]>([]);
   const [likedMessages, setLikedMessages] = useState<number[]>([]);
   const pendingStatusViewKeysRef = useRef<Set<string>>(new Set());
@@ -936,7 +929,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [shareCaption, setShareCaption] = useState('');
   const [shareSendingId, setShareSendingId] = useState('');
   const [shareFeedback, setShareFeedback] = useState('');
-  const [selectedChatId, setSelectedChatId] = useState(creators[0].id);
+  const [selectedChatId, setSelectedChatId] = useState('');
   const [privateConversations, setPrivateConversations] = useState<PrivateConversation[]>([]);
   const [privateMessages, setPrivateMessages] = useState<PrivateChatMessage[]>([]);
   const [chatDraft, setChatDraft] = useState('');
@@ -1059,7 +1052,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const getOwnDisplayAvatar = () => normalizeCommunityAvatar(profile.avatar);
   const getDraftDisplayAvatar = () => normalizeCommunityAvatar(profileDraft.avatar);
   const selectedMessage = messages.find((message) => message.id === selectedMessageId) || messages[0];
-  const selectedStatus = statusCards.find((status) => status.id === selectedStatusId) || statusCards[0];
+  const selectedStatus = statusCards.find((status) => status.id === selectedStatusId) || statusCards[0] || EMPTY_STATUS_CARD;
   const currentProfileCreator = useMemo<Creator>(() => ({
     id: currentUserKey,
     ownerId: currentUserKey,
@@ -1925,7 +1918,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   useEffect(() => {
     if (!isCommunityAllowed) return undefined;
-    const feedQuery = query(collection(db, COMMUNITY_FEED), orderBy('createdAt', 'desc'), limit(200));
+    const feedQuery = query(collection(db, COMMUNITY_FEED), orderBy('createdAt', 'desc'), limit(80));
     return onSnapshot(feedQuery, (snapshot) => {
       // Feed posts are permanent. Only status stories use expiry cleanup.
       const firebaseMessages = snapshot.docs.map((item) => normalizeFeedMessage(mapFeedDoc(item)));
@@ -1938,6 +1931,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           return { ...remoteMessage, replies, replyCount: Math.max(remoteMessage.replyCount || 0, currentMatch.replyCount || 0, replies.length) };
         });
         const mergedMessages = mergeUnexpiredByIdentity(stabilizedFirebaseMessages, current.map(normalizeFeedMessage), [], POST_TTL_MS);
+        safeStoreCommunityJson(COMMUNITY_FEED_CACHE_KEY, mergedMessages.slice(0, 80));
         setAdminPosts(mergedMessages.filter((message) => message.source === 'admin' || message.badge === 'ADMIN POST' || message.creatorId === 'admin'));
         return mergedMessages;
       });
@@ -1946,20 +1940,21 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   useEffect(() => {
     if (!isCommunityAllowed) return undefined;
-    const statusQuery = query(collection(db, COMMUNITY_STATUS), where('expiresAt', '>', Date.now()), orderBy('expiresAt', 'desc'), limit(150));
+    const statusQuery = query(collection(db, COMMUNITY_STATUS), where('expiresAt', '>', Date.now()), orderBy('expiresAt', 'desc'), limit(60));
     return onSnapshot(statusQuery, (snapshot) => {
       snapshot.docs.forEach((item) => {
         const expiresAt = asMillis(item.data().expiresAt);
         if (expiresAt <= Date.now()) deleteExpiredCommunityItem(COMMUNITY_STATUS, item.id, item.data().storagePath, Number(item.data().uploadBytes) || 0);
       });
       const firebaseStatuses = snapshot.docs.map((item) => mapStatusDoc(item)).filter((status) => isUnexpired(status, STORY_TTL_MS));
-      setStatusCards((current) => mergeUnexpiredByIdentity(firebaseStatuses, current, initialStatusCards, STORY_TTL_MS));
+      safeStoreCommunityJson(COMMUNITY_STATUS_CACHE_KEY, firebaseStatuses.slice(0, 60));
+      setStatusCards((current) => mergeUnexpiredByIdentity(firebaseStatuses, current, [], STORY_TTL_MS));
     }, (error) => console.warn('community_status snapshot failed; using local fallback', error));
   }, [isCommunityAllowed]);
 
   useEffect(() => {
     if (!isCommunityAllowed) return undefined;
-    const masterTagsQuery = query(collection(db, COMMUNITY_MASTER_TAGS), orderBy('createdAt', 'desc'), limit(150));
+    const masterTagsQuery = query(collection(db, COMMUNITY_MASTER_TAGS), orderBy('createdAt', 'desc'), limit(80));
     return onSnapshot(masterTagsQuery, (snapshot) => {
       const firebaseMasterTags = snapshot.docs.map((item) => mapMasterTagDoc(item));
       setMasterTagRequests(firebaseMasterTags.length ? firebaseMasterTags : (ENABLE_DEMO_SEED_DATA ? readJsonArray(MASTER_TAG_STORAGE_KEY, initialMasterTagRequests) : []));
@@ -1991,7 +1986,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
 
   useEffect(() => {
-    if (!PRIVATE_CHAT_ENABLED || !isCommunityAllowed || !guardedAuth.currentUser || !currentUserKey) return undefined;
+    if (!isCommunityAllowed || !guardedAuth.currentUser || !currentUserKey) return undefined;
 
     const publicName = profile.name || buildStableCommunityName(currentUserKey);
     const publicUsername = normalizeUsername(profile.username || profile.name) || buildStableCommunityUsername(currentUserKey);
@@ -2013,7 +2008,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       masterTags: [],
       creatorCategory: '',
       searchableText,
-      searchTokens: buildSearchTokens(publicName, publicUsername, 'student', 'Community member', publicBio),
+      searchTokens: [...buildSearchTokens(publicName, publicUsername, 'student', 'Community member', publicBio), 'identity_v2'],
       followerCount: Math.max(0, followerCounts[currentUserKey] || followerIds.length),
       followingCount: Math.max(0, followingCounts[currentUserKey] || followedIds.length),
       postCount: messages.filter((message) => isOwnCommunityId(message.ownerId || message.creatorId)).length,
@@ -2038,11 +2033,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   useEffect(() => {
     if (!isCommunityAllowed) return undefined;
 
-    const profilesQuery = query(collection(db, PUBLIC_PROFILES), limit(500));
+    const profilesQuery = query(collection(db, PUBLIC_PROFILES), limit(200));
     return onSnapshot(profilesQuery, (snapshot) => {
-      const firebaseProfiles = snapshot.docs.map((item): Creator => {
+      const firebaseProfiles = snapshot.docs.map((item): Creator | null => {
         const data = item.data() as Record<string, unknown>;
         const userId = String(data.uid || data.userId || data.ownerId || item.id);
+        const profileTokens = Array.isArray(data.searchTokens) ? data.searchTokens.filter((value): value is string => typeof value === 'string') : [];
+        const accountBacked = userId === item.id && profileTokens.includes('identity_v2');
+        if (userId !== currentUserKey && !accountBacked) return null;
         const storedName = typeof data.displayName === 'string' && data.displayName.trim() ? data.displayName.trim() : typeof data.name === 'string' && data.name.trim() ? data.name.trim() : '';
         const storedUsername = typeof data.username === 'string' && data.username.trim() ? data.username.trim() : storedName;
         const defaultishIdentity = !storedName || normalizeSearchText(`${storedName} ${storedUsername}`) === normalizeSearchText('Eduvora Member eduvora_member') || normalizeSearchText(storedName) === normalizeSearchText('Eduvora Member');
@@ -2079,16 +2077,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           isOnline: Boolean(data.isOnline),
           source: 'profile',
         };
-      }).filter((creator) => Boolean(creator.id) && creator.isPublic !== false && !creator.isSuspended);
+      }).filter((creator): creator is Creator => Boolean(creator?.id) && creator.isPublic !== false && !creator.isSuspended);
 
       setCommunityProfiles(firebaseProfiles);
     }, (error) => console.warn('Community profiles sync failed', error));
-  }, [isCommunityAllowed]);
+  }, [currentUserKey, isCommunityAllowed]);
 
   useEffect(() => {
     if (!isCommunityAllowed || !currentUserKey) return undefined;
 
-    const followsQuery = query(collection(db, COMMUNITY_FOLLOWS), limit(2000));
+    const followsQuery = query(collection(db, COMMUNITY_FOLLOWS), limit(500));
     return onSnapshot(followsQuery, (snapshot) => {
       const nextFollowedIds: string[] = [];
       const nextFollowerIds: string[] = [];
@@ -2364,7 +2362,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const loadRepliesForMessage = (message: FeedMessage) => {
     if (!message.docId || loadedReplyDocIds[message.docId]) return;
-    const repliesQuery = query(collection(db, COMMUNITY_FEED, message.docId, 'replies'), orderBy('createdAt', 'asc'), limit(50));
+    const repliesQuery = query(collection(db, COMMUNITY_FEED, message.docId, 'replies'), orderBy('createdAt', 'asc'), limit(40));
     setLoadedReplyDocIds((current) => ({ ...current, [message.docId!]: true }));
     onSnapshot(repliesQuery, (snapshot) => {
       const replies = snapshot.docs.map((replyDoc) => {
@@ -2388,6 +2386,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     }
 
     setSelectedMessageId(messageId);
+    const targetMessage = messages.find((message) => message.id === messageId);
+    if (targetMessage) loadRepliesForMessage(targetMessage);
 
     if (window.matchMedia('(max-width: 767px)').matches) {
       pushPage('thread', { preserveScroll: true });
@@ -2975,7 +2975,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (typeof window !== 'undefined') {
       safeStoreCommunityJson(getCommunityProfileStorageKey(currentUserKey), nextProfile);
       window.dispatchEvent(new CustomEvent('eduvoraProfileIdentityUpdated', {
-        detail: { uid: currentUserKey, name: nextProfile.name, photoURL: nextProfile.avatar, avatar: nextProfile.avatar, username: nextProfile.username, bio: nextProfile.bio },
+        detail: { uid: currentUserKey, name: nextProfile.name, photoURL: nextProfile.avatar, avatar: nextProfile.avatar, profilePhotoSet: Boolean(nextProfile.avatar), communityAvatarSet: Boolean(nextProfile.avatar), username: nextProfile.username, bio: nextProfile.bio },
       }));
     }
 
@@ -2989,31 +2989,50 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         bio: nextProfile.bio,
         communityProfileSaved: true,
         communityAvatarSet: Boolean(nextProfile.avatar),
+        profilePhotoSet: Boolean(nextProfile.avatar),
+        canonicalUid: currentUserKey,
+        identityVersion: 2,
         updatedAt: Date.now(),
       });
 
       setDoc(doc(db, 'users', currentUserKey), identityPayload, { merge: true })
         .catch((error) => console.warn('User identity profile sync failed', error));
 
-      setDoc(doc(db, COMMUNITY_PROFILES, currentUserKey), {
-        ...identityPayload,
+      const profileIdentityPayload = stripUndefinedDeep({
         uid: currentUserKey,
         id: currentUserKey,
         userId: currentUserKey,
         ownerId: currentUserKey,
+        username: nextProfile.username,
+        displayName: nextProfile.name,
+        name: nextProfile.name,
+        photoURL: nextProfile.avatar || '',
+        avatar: nextProfile.avatar || '',
         role: 'student',
+        bio: nextProfile.bio,
+        subjects: [],
+        masterTags: [],
+        creatorCategory: '',
+        searchableText: normalizeSearchText([nextProfile.name, nextProfile.username, 'student', 'Community member', nextProfile.bio].join(' ')),
+        searchTokens: [...buildSearchTokens(nextProfile.name, nextProfile.username, 'student', 'Community member', nextProfile.bio), 'identity_v2'],
+        followerCount: Math.max(0, followerCounts[currentUserKey] || followerIds.length),
+        followingCount: Math.max(0, followingCounts[currentUserKey] || followedIds.length),
+        postCount: messages.filter((message) => isOwnCommunityId(message.ownerId || message.creatorId)).length,
+        isCreator: false,
+        isVerified: false,
         isPublic: privacySettings.profileVisible,
-      }, { merge: true }).catch((error) => console.warn('Community profile identity sync failed', error));
+        isSuspended: false,
+        isOnline: true,
+        lastActiveAt: Date.now(),
+        updatedAt: Date.now(),
+        createdAt: Date.now(),
+      });
 
-      setDoc(doc(db, PUBLIC_PROFILES, currentUserKey), {
-        ...identityPayload,
-        uid: currentUserKey,
-        id: currentUserKey,
-        userId: currentUserKey,
-        ownerId: currentUserKey,
-        role: 'student',
-        isPublic: privacySettings.profileVisible,
-      }, { merge: true }).catch((error) => console.warn('Public profile identity sync failed', error));
+      setDoc(doc(db, COMMUNITY_PROFILES, currentUserKey), profileIdentityPayload, { merge: true })
+        .catch((error) => console.warn('Community profile identity sync failed', error));
+
+      setDoc(doc(db, PUBLIC_PROFILES, currentUserKey), profileIdentityPayload, { merge: true })
+        .catch((error) => console.warn('Public profile identity sync failed', error));
     }
 
     setProfileFeedback({ type: 'success', message: 'Profile saved. Your name and photo now update across community posts, replies, follows, and product reviews.' });
@@ -3854,7 +3873,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <div className="mx-auto mt-5 max-w-3xl space-y-3 pb-4">{message.replies.length ? message.replies.map((reply) => renderReplyBubble(message, reply)) : <div className="rounded-[1.6rem] border border-dashed border-[#D9E7F8] bg-white p-6 text-center text-sm font-bold text-[#7C879A]">No replies yet. Start the conversation.</div>}</div>
         </div>
         <div ref={replyComposerRef} data-community-replybar="true" className="shrink-0 border-t border-[#D9E7F8] bg-white p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:p-4">
-          {expandedReplyId === message.id ? <div className="mx-auto mb-3 max-w-3xl rounded-[1.25rem] border border-[#D9E7F8] bg-[#F1EEFF] px-4 py-3 text-left"><div className="flex items-start justify-between gap-3"><div className="min-w-0"><p className="text-xs font-black uppercase tracking-[0.18em] text-[#7B61FF]">Replying to {resolveName(message)}</p><p className="mt-1 line-clamp-2 text-sm font-bold leading-5 text-[#536178]">{safeText(`${message.title}: ${message.body}`, COMMUNITY_REPLY_PREVIEW_LENGTH)}</p></div><button type="button" onClick={() => setExpandedReplyId(null)} className="rounded-full bg-white px-3 py-1 text-xs font-black text-[#7B61FF]">Cancel</button></div></div> : null}
           <div className="mx-auto flex max-w-3xl items-end gap-2">
             <textarea ref={replyInputRef} value={draft} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value.slice(0, COMMUNITY_REPLY_MAX_LENGTH) }))} onFocus={() => { loadRepliesForMessage(message); setExpandedReplyId(message.id); }} placeholder="Write a respectful reply…" maxLength={COMMUNITY_REPLY_MAX_LENGTH} rows={1} className="min-h-12 min-w-0 flex-1 resize-none rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-3 text-sm font-bold leading-6 text-[#081A45] outline-none transition focus:border-[#1769FF] focus:bg-white" />
             <button type="button" onClick={() => submitReply(message.id)} disabled={!canSendReply} className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(23,105,255,0.22)] disabled:cursor-not-allowed disabled:opacity-45">{replySendingIds[message.id] ? 'Sending…' : 'Send'}</button>
@@ -4020,6 +4038,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const renderStatusReel = () => {
+    if (!statusCards.length) return <div className="mx-auto max-w-xl rounded-[2rem] border border-dashed border-[var(--community-border)] bg-white p-8 text-center text-sm font-bold text-[var(--community-muted)]">No active stories yet.</div>;
     const selectedIndex = Math.max(0, statusCards.findIndex((card) => card.id === selectedStatus.id));
     const reelStatuses = [...statusCards.slice(selectedIndex), ...statusCards.slice(0, selectedIndex)];
 

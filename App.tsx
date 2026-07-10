@@ -321,6 +321,8 @@ export interface User {
     email: string;
     mobile: string;
     photoURL?: string;
+    profilePhotoSet?: boolean;
+    communityAvatarSet?: boolean;
     role?: 'user' | 'admin';
     status?: 'active' | 'blocked';
     blocked?: boolean;
@@ -1150,18 +1152,19 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const handleProfileIdentityUpdate = (event: Event) => {
-      const detail = (event as CustomEvent<{ uid?: string; name?: string; photoURL?: string; avatar?: string }>).detail || {};
+      const detail = (event as CustomEvent<{ uid?: string; name?: string; photoURL?: string; avatar?: string; profilePhotoSet?: boolean; communityAvatarSet?: boolean }>).detail || {};
       const targetUid = detail.uid || effectiveAppUser?.id;
       if (!targetUid || effectiveAppUser?.id !== targetUid) return;
 
       const nextName = String(detail.name || effectiveAppUser.name || buildStableDisplayName(targetUid)).trim();
       const nextPhotoURL = String(detail.photoURL || detail.avatar || '').trim();
-      const updatedUser = { ...effectiveAppUser, name: nextName, photoURL: nextPhotoURL } as User;
+      const nextProfilePhotoSet = detail.profilePhotoSet === true || detail.communityAvatarSet === true || Boolean(nextPhotoURL);
+      const updatedUser = { ...effectiveAppUser, name: nextName, photoURL: nextProfilePhotoSet ? nextPhotoURL : '', profilePhotoSet: nextProfilePhotoSet, communityAvatarSet: detail.communityAvatarSet === true || effectiveAppUser.communityAvatarSet === true } as User;
 
       setCurrentUser(updatedUser);
-      setUsers(current => current.map(user => user.id === targetUid ? { ...user, name: nextName, photoURL: nextPhotoURL } : user));
+      setUsers(current => current.map(user => user.id === targetUid ? { ...user, name: nextName, photoURL: updatedUser.photoURL, profilePhotoSet: updatedUser.profilePhotoSet, communityAvatarSet: updatedUser.communityAvatarSet } : user));
       safeSetItem('currentUser', updatedUser);
-      saveRememberedAuthAccount({ uid: updatedUser.id, email: updatedUser.email, name: updatedUser.name, photoURL: updatedUser.photoURL, providerIds: updatedUser.providerIds, authProvider: updatedUser.authProvider });
+      saveRememberedAuthAccount({ uid: updatedUser.id, email: updatedUser.email, name: updatedUser.name, photoURL: updatedUser.profilePhotoSet ? updatedUser.photoURL : '', profilePhotoSet: updatedUser.profilePhotoSet === true, providerIds: updatedUser.providerIds, authProvider: updatedUser.authProvider });
       setRememberedAuthAccount(getRememberedAuthAccount());
 
       setReviews(currentReviews => {
@@ -2246,8 +2249,14 @@ const App: React.FC = () => {
   const getProviderIds = (firebaseUser: FirebaseUser): string[] =>
       [...new Set(firebaseUser.providerData.map(provider => provider.providerId).filter(Boolean))];
 
-  const getFirebaseUserPhotoURL = (firebaseUser: FirebaseUser): string =>
-      firebaseUser.photoURL || firebaseUser.providerData.find(provider => Boolean(provider.photoURL))?.photoURL || '';
+  const isDeliberatelySavedProfilePhoto = (data: any): boolean => {
+      const photo = typeof data?.photoURL === 'string' ? data.photoURL.trim() : '';
+      if (!photo) return false;
+      return data?.profilePhotoSet === true || data?.communityAvatarSet === true || data?.hasCustomAvatar === true || data?.communityProfileSaved === true;
+  };
+
+  const getSavedProfilePhotoURL = (data: any): string =>
+      isDeliberatelySavedProfilePhoto(data) ? String(data.photoURL || '').trim() : '';
 
   const buildStableDisplayName = (uidOrEmail?: string | null): string => {
       const seed = String(uidOrEmail || 'member').replace(/[^a-zA-Z0-9]/g, '').slice(-8) || 'member';
@@ -2259,16 +2268,12 @@ const App: React.FC = () => {
       return `user_${seed}`;
   };
 
-  const shouldReplaceProfilePhoto = (existingPhotoURL: unknown, nextPhotoURL: string) => {
-      if (!nextPhotoURL) return false;
-      const existingPhoto = typeof existingPhotoURL === 'string' ? existingPhotoURL : '';
-      if (!existingPhoto) return true;
-      return existingPhoto.includes('googleusercontent.com') || existingPhoto === nextPhotoURL;
-  };
 
   const toUserProfile = (firebaseUser: FirebaseUser, data: any = {}): User => {
       const existingBalance = data.coinBalance ?? data.eduCoins ?? 0;
       const totalCoinsEarned = data.totalCoinsEarned ?? data.totalLifetimeCoins ?? existingBalance;
+      const savedPhotoURL = getSavedProfilePhotoURL(data);
+      const profilePhotoSet = Boolean(savedPhotoURL);
 
       return {
           id: firebaseUser.uid,
@@ -2276,7 +2281,9 @@ const App: React.FC = () => {
           name: data.name || data.generatedDisplayName || buildStableDisplayName(firebaseUser.uid || firebaseUser.email),
           email: data.email || firebaseUser.email || '',
           mobile: data.mobile || firebaseUser.phoneNumber || '',
-          photoURL: data.photoURL || getFirebaseUserPhotoURL(firebaseUser),
+          photoURL: savedPhotoURL,
+          profilePhotoSet,
+          communityAvatarSet: data.communityAvatarSet === true,
           authProvider: data.authProvider || getFirebaseAuthProvider(firebaseUser),
           providerIds: data.providerIds || getProviderIds(firebaseUser),
           emailVerified: data.emailVerified ?? firebaseUser.emailVerified,
@@ -2304,7 +2311,7 @@ const App: React.FC = () => {
 
   function createFallbackUserFromFirebase(firebaseUser: FirebaseUser): User {
       const fallbackDisplayName = buildStableDisplayName(firebaseUser.uid || firebaseUser.email);
-      const fallbackPhotoURL = getFirebaseUserPhotoURL(firebaseUser);
+      const fallbackPhotoURL = '';
       return {
           uid: firebaseUser.uid,
           id: firebaseUser.uid,
@@ -2313,13 +2320,15 @@ const App: React.FC = () => {
           name: fallbackDisplayName,
           photoURL: fallbackPhotoURL,
           avatarUrl: fallbackPhotoURL,
+          profilePhotoSet: false,
+          communityAvatarSet: false,
           role: 'student',
           isFallbackProfile: true,
       } as unknown as User;
   }
 
-  const rememberAndStoreUser = (user: User, firebaseUser: FirebaseUser) => {
-      saveRememberedAuthAccount({ uid: user.id, email: user.email, name: user.name, photoURL: user.photoURL || getFirebaseUserPhotoURL(firebaseUser), providerIds: user.providerIds, authProvider: user.authProvider });
+  const rememberAndStoreUser = (user: User, _firebaseUser: FirebaseUser) => {
+      saveRememberedAuthAccount({ uid: user.id, email: user.email, name: user.name, photoURL: user.profilePhotoSet ? user.photoURL : '', profilePhotoSet: user.profilePhotoSet === true, providerIds: user.providerIds, authProvider: user.authProvider });
       setRememberedAuthAccount(getRememberedAuthAccount());
       setCurrentUser(user);
       setUsers(current => current.some(existingUser => existingUser.id === user.id) ? current.map(existingUser => existingUser.id === user.id ? user : existingUser) : [...current, user]);
@@ -2343,8 +2352,8 @@ const App: React.FC = () => {
       const generatedUsername = String(existing.generatedUsername || buildStableUsername(firebaseUser.uid || firebaseUser.email)).trim();
       const nextName = profile?.name || existingName || generatedDisplayName;
       const nextMobile = profile?.mobile || existing.mobile || firebaseUser.phoneNumber || '';
-      const firebasePhotoURL = getFirebaseUserPhotoURL(firebaseUser);
-      const nextPhotoURL = typeof existing.photoURL === 'string' && existing.photoURL.trim() ? existing.photoURL : firebasePhotoURL;
+      const nextPhotoURL = getSavedProfilePhotoURL(existing);
+      const profilePhotoSet = Boolean(nextPhotoURL);
       const existingBalance = existing.coinBalance ?? existing.eduCoins ?? 0;
       const totalCoinsEarned = existing.totalCoinsEarned ?? existing.totalLifetimeCoins ?? existingBalance;
       const safeProfileFields = {
@@ -2353,6 +2362,10 @@ const App: React.FC = () => {
           email: firebaseUser.email || existing.email || '',
           mobile: nextMobile,
           photoURL: nextPhotoURL,
+          profilePhotoSet,
+          communityAvatarSet: existing.communityAvatarSet === true,
+          identityVersion: 2,
+          canonicalUid: firebaseUser.uid,
           generatedDisplayName,
           generatedUsername,
           role: existing.role === 'admin' ? 'admin' : 'user',
@@ -4357,7 +4370,7 @@ const App: React.FC = () => {
       }
   };
 
-  const handleDeleteUser = (userId: number) => {
+  const handleDeleteUser = (userId: string) => {
     if (window.confirm("Delete this user? This cannot be undone.")) {
         const updatedUsers = users.filter(u => u.id !== userId);
         setUsers(updatedUsers);

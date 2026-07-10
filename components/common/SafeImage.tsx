@@ -1,68 +1,104 @@
-import React, { useEffect, useState } from 'react';
-import MediaFallbackCard from './MediaFallbackCard';
+import React, { useEffect, useMemo, useState } from 'react';
+import { buildImageFallbackDataUrl, type ImageFallbackAspect } from '../../utils/imageFallbacks';
 
-type SafeImageProps = {
-  src?: string;
+interface SafeImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src' | 'aspect'> {
+  src?: string | null;
   fallbackSrc?: string;
-  alt: string;
-  className?: string;
-  wrapperClassName?: string;
-  loading?: 'lazy' | 'eager';
   fallbackTitle?: string;
   fallbackBadge?: string;
-  fallbackIcon?: string;
   fallbackMessage?: string;
-  aspect?: 'square' | 'video' | 'auto';
-};
+  fallbackIcon?: string;
+  wrapperClassName?: string;
+  aspect?: ImageFallbackAspect;
+  loadTimeoutMs?: number;
+}
 
 const SafeImage: React.FC<SafeImageProps> = ({
-  src = '',
-  fallbackSrc = '',
-  alt,
-  className = 'h-full w-full object-cover',
-  wrapperClassName = 'h-full w-full',
-  loading = 'lazy',
+  src,
+  fallbackSrc,
+  alt = '',
+  className = '',
+  wrapperClassName,
   fallbackTitle,
   fallbackBadge,
-  fallbackIcon = '🖼️',
-  fallbackMessage = 'Image preview unavailable',
-  aspect = 'auto',
+  fallbackMessage,
+  fallbackIcon,
+  aspect = 'video',
+  loading = 'lazy',
+  decoding = 'async',
+  fetchPriority = 'auto',
+  loadTimeoutMs = 9000,
+  onLoad,
+  onError,
+  ...props
 }) => {
-  const [status, setStatus] = useState<'loading' | 'loaded' | 'failed'>(src ? 'loading' : 'failed');
-  const [fallbackFailed, setFallbackFailed] = useState(false);
+  const fallbackAspect: ImageFallbackAspect =
+    aspect === 'square' ||
+    aspect === 'video' ||
+    aspect === 'portrait' ||
+    aspect === 'wide' ||
+    aspect === 'original' ||
+    aspect === 'auto'
+      ? aspect
+      : 'video';
+
+  const generatedFallback = useMemo(() => fallbackSrc || buildImageFallbackDataUrl({
+    title: fallbackTitle || String(alt || 'Digital Catalyst'),
+    badge: fallbackBadge || 'Learning resource',
+    message: fallbackMessage || 'Image preview unavailable',
+    icon: fallbackIcon || '🎓',
+    aspect: fallbackAspect,
+  }), [fallbackSrc, fallbackTitle, fallbackBadge, fallbackMessage, fallbackIcon, alt, fallbackAspect]);
+
+  const normalizedSrc = typeof src === 'string' ? src.trim() : '';
+  const [activeSrc, setActiveSrc] = useState(normalizedSrc || generatedFallback);
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    setStatus(src ? 'loading' : 'failed');
-    setFallbackFailed(false);
-  }, [src, fallbackSrc]);
+    setActiveSrc(normalizedSrc || generatedFallback);
+    setLoaded(false);
+  }, [normalizedSrc, generatedFallback]);
 
-  if (!src || status === 'failed') {
-    if (fallbackSrc && fallbackSrc !== src && !fallbackFailed) {
-      return (
-        <div className={`relative block overflow-hidden ${wrapperClassName}`}>
-          <img src={fallbackSrc} alt={alt} className={className} loading={loading} onError={() => setFallbackFailed(true)} />
-        </div>
-      );
-    }
-    return (
-      <div className={`relative block overflow-hidden ${wrapperClassName}`}>
-        <MediaFallbackCard title={fallbackTitle || alt || 'Media'} badge={fallbackBadge || 'Fallback'} icon={fallbackIcon} message={fallbackMessage} aspect={aspect} className="h-full w-full rounded-none" />
-      </div>
-    );
-  }
+  useEffect(() => {
+    if (loaded || activeSrc === generatedFallback || loadTimeoutMs <= 0) return undefined;
+    const timer = window.setTimeout(() => {
+      setActiveSrc(generatedFallback);
+      setLoaded(false);
+    }, loadTimeoutMs);
+    return () => window.clearTimeout(timer);
+  }, [activeSrc, generatedFallback, loadTimeoutMs, loaded]);
+
+  const image = (
+    <img
+      {...props}
+      src={activeSrc}
+      alt={alt}
+      loading={loading}
+      decoding={decoding}
+      fetchPriority={fetchPriority}
+      className={className}
+      onLoad={(event) => {
+        setLoaded(true);
+        onLoad?.(event);
+      }}
+      onError={(event) => {
+        if (activeSrc !== generatedFallback) {
+          setActiveSrc(generatedFallback);
+          setLoaded(false);
+        } else {
+          setLoaded(true);
+        }
+        onError?.(event);
+      }}
+    />
+  );
+
+  if (!wrapperClassName) return image;
 
   return (
-    <div className={`relative block overflow-hidden ${wrapperClassName}`}>
-      {status === 'loading' ? <span className="absolute inset-0 animate-pulse bg-gradient-to-r from-[#EEF6FF] via-white to-[#E8F2FF]" /> : null}
-      <img
-        src={src}
-        alt={alt}
-        className={`${className} transition-opacity duration-300 ${status === 'loaded' ? 'opacity-100' : 'opacity-0'}`}
-        loading={loading}
-        onLoad={() => setStatus('loaded')}
-        onError={() => setStatus('failed')}
-      />
-    </div>
+    <span className={`relative block overflow-hidden ${wrapperClassName}`}>
+      {image}
+    </span>
   );
 };
 
