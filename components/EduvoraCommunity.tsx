@@ -252,6 +252,7 @@ const defaultNotificationPreferences: NotificationPreferences = { replies: true,
 const defaultCommunityStyle = {
   desktopLayout: 'latest',
   mobileLayout: 'latest',
+  desktopSocialLayout: false,
   pageBackground: '#F8FBFF',
   surfaceColor: '#FFFFFF',
   cardColor: '#FFFFFF',
@@ -1532,6 +1533,872 @@ const communityPolishCss = `
       white-space: nowrap;
     }
   }
+
+  @media (min-width: 1024px) {
+    .community-desktop-social {
+      --community-social-ink: #172033;
+      --community-social-body: #596577;
+      --community-social-muted: #84909f;
+      --community-social-border: #dce5e8;
+      --community-social-page: #dceff0;
+      --community-social-soft: #f2f7f7;
+      --community-social-orange: #f47a31;
+      --community-social-blue: #2f6feb;
+      background: var(--community-social-page) !important;
+      padding: 0.65rem !important;
+    }
+    .community-desktop-social .eduvora-community-app {
+      max-width: 1580px !important;
+      border: 1px solid rgba(114, 147, 153, 0.32) !important;
+      border-radius: 0.9rem !important;
+      background: #f4f8f8 !important;
+      box-shadow: 0 18px 55px rgba(39, 73, 78, 0.13) !important;
+    }
+    .community-desktop-social .eduvora-community-app::before {
+      display: none !important;
+    }
+    .community-desktop-social .community-desktop-sidebar {
+      order: 0;
+      width: 14.5rem !important;
+      padding: 0.9rem 0.8rem !important;
+      border-color: var(--community-social-border) !important;
+      background: #ffffff !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-social .community-desktop-sidebar > div:first-child {
+      order: -2;
+      margin-bottom: 0.7rem !important;
+    }
+    .community-desktop-social .community-desktop-sidebar > div:first-child > button {
+      display: none !important;
+    }
+    .community-desktop-social .community-desktop-brand {
+      border: 0 !important;
+      border-radius: 0.65rem !important;
+      background: transparent !important;
+      padding: 0.35rem 0.25rem !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-social .community-desktop-brand > span {
+      display: none !important;
+    }
+    .community-desktop-social .community-desktop-brand > div > span:first-child {
+      height: 2.35rem !important;
+      width: 2.35rem !important;
+      border-radius: 0.65rem !important;
+      background: var(--community-social-orange) !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-social .community-desktop-brand > div > span:last-child > span:first-child {
+      color: var(--community-social-ink) !important;
+      font-size: 0.72rem !important;
+      letter-spacing: 0.2em !important;
+    }
+    .community-desktop-social .community-desktop-brand > div > span:last-child > span:last-child {
+      border-radius: 0.35rem !important;
+      background: #fff2e9 !important;
+      color: #b84b13 !important;
+    }
+    .community-desktop-social .community-desktop-member-card {
+      order: -1;
+      margin: 0 0 0.9rem !important;
+      border: 0 !important;
+      border-radius: 0.75rem !important;
+      background: #ffffff !important;
+      padding: 0.55rem 0.45rem !important;
+      box-shadow: none !important;
+      transform: none !important;
+    }
+    .community-desktop-social .community-desktop-member-card:hover {
+      background: var(--community-social-soft) !important;
+    }
+    .community-desktop-social .community-desktop-member-card > span:last-child > span:first-child {
+      color: var(--community-social-ink) !important;
+      font-size: 0.82rem !important;
+    }
+    .community-desktop-social .community-desktop-member-card > span:last-child > span:nth-child(2) {
+      color: var(--community-social-muted) !important;
+      font-size: 0.68rem !important;
+    }
+    .community-desktop-social .community-desktop-member-card > span:last-child > span:last-child {
+      border-radius: 0.35rem !important;
+      background: #fff2e9 !important;
+      color: #b84b13 !important;
+      font-size: 0.55rem !important;
+    }
+    .community-desktop-social .community-desktop-nav {
+      order: 1;
+      padding: 0 !important;
+    }
+    .community-desktop-social .community-desktop-nav-item {
+      min-height: 2.65rem !important;
+      gap: 0.55rem !important;
+      border-radius: 0.55rem !important;
+      padding: 0.2rem 0.55rem !important;
+      color: #647082 !important;
+      font-size: 0.76rem !important;
+      font-weight: 750 !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-social .community-desktop-nav-item[aria-current='page'] {
+      background: #fff2e9 !important;
+      color: #c65318 !important;
+    }
+    .community-desktop-social .community-desktop-nav-item[aria-current='page'] > span:first-child {
+      background: var(--community-social-orange) !important;
+    }
+    .community-desktop-social .community-desktop-nav-item:hover {
+      background: #f4f7f7 !important;
+      color: var(--community-social-ink) !important;
+    }
+    .community-desktop-social .community-desktop-nav-icon {
+      height: 2rem !important;
+      width: 2rem !important;
+      border-radius: 0.45rem !important;
+      background: transparent !important;
+      color: inherit !important;
+      font-size: 0.95rem !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-social .community-center-shell {
+      min-width: 0;
+      flex: 1 1 auto;
+      background: #f4f8f8;
+    }
+    .community-desktop-social .community-desktop-header {
+      min-height: 3.85rem !important;
+      border-color: var(--community-social-border) !important;
+      background: rgba(255, 255, 255, 0.97) !important;
+      padding: 0.45rem 0.85rem !important;
+      box-shadow: none !important;
+      backdrop-filter: blur(14px) saturate(135%) !important;
+    }
+    .community-desktop-social .community-desktop-header-inner {
+      max-width: none !important;
+      gap: 0.75rem !important;
+    }
+    .community-desktop-social .community-desktop-header h1 {
+      color: var(--community-social-ink) !important;
+      font-size: clamp(1.1rem, 1.6vw, 1.4rem) !important;
+      font-weight: 820 !important;
+      letter-spacing: -0.025em !important;
+    }
+    .community-desktop-social .community-desktop-header p {
+      color: #799095 !important;
+      font-size: 0.56rem !important;
+      letter-spacing: 0.18em !important;
+    }
+    .community-desktop-social .community-desktop-header-actions {
+      gap: 0.38rem !important;
+    }
+    .community-desktop-social .community-desktop-header-actions > button,
+    .community-desktop-social .community-desktop-header-actions > div > button {
+      height: 2.45rem !important;
+      min-height: 2.45rem !important;
+      border-color: var(--community-social-border) !important;
+      border-radius: 0.58rem !important;
+      background: #ffffff !important;
+      color: var(--community-social-ink) !important;
+      box-shadow: none !important;
+      transform: none !important;
+    }
+    .community-desktop-social .community-desktop-header-actions .community-mobile-ai-button {
+      background: var(--community-social-blue) !important;
+      color: #ffffff !important;
+    }
+    .community-desktop-social .community-desktop-header-actions .community-desktop-feed-filters {
+      display: none !important;
+    }
+    .community-desktop-social .eduvora-community-main {
+      background:
+        linear-gradient(180deg, rgba(244, 248, 248, 0.98), rgba(239, 246, 246, 0.98)) !important;
+      padding: 0.8rem 0.9rem 1rem !important;
+    }
+    .community-desktop-social .community-content-stage {
+      width: 100%;
+      min-height: 100%;
+    }
+    .community-desktop-social .community-content-stage > div:not(.community-social-feed-page) {
+      width: min(100%, 68rem);
+      margin-inline: auto;
+    }
+    .community-desktop-social .community-content-stage > div:not(.community-social-feed-page) > section,
+    .community-desktop-social .community-content-stage > div:not(.community-social-feed-page) > div {
+      border-color: var(--community-social-border) !important;
+      border-radius: 0.85rem !important;
+      box-shadow: 0 7px 22px rgba(35, 68, 74, 0.055) !important;
+    }
+    .community-desktop-social .community-social-feed-page {
+      width: min(100%, 46rem);
+      margin-inline: auto;
+      padding-bottom: 1.25rem;
+    }
+    .community-desktop-social .community-social-commandbar {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 0.7rem;
+      margin-bottom: 0.75rem;
+      border: 1px solid var(--community-social-border);
+      border-radius: 0.72rem;
+      background: #ffffff;
+      padding: 0.55rem;
+      box-shadow: 0 6px 18px rgba(35, 68, 74, 0.045);
+    }
+    .community-desktop-social .community-social-search {
+      display: flex;
+      min-width: 0;
+      min-height: 2.45rem;
+      align-items: center;
+      gap: 0.55rem;
+      border: 1px solid #e3e9eb;
+      border-radius: 0.55rem;
+      background: #f5f8f8;
+      padding-inline: 0.75rem;
+      color: #7b8795;
+      text-align: left;
+      font-size: 0.75rem;
+      font-weight: 700;
+    }
+    .community-desktop-social .community-social-search:hover {
+      border-color: #b9cccf;
+      background: #ffffff;
+      color: var(--community-social-ink);
+    }
+    .community-desktop-social .community-social-command-actions {
+      display: flex;
+      align-items: center;
+      gap: 0.45rem;
+    }
+    .community-desktop-social .community-social-command-actions button {
+      min-height: 2.45rem;
+      border-radius: 0.55rem;
+      padding-inline: 0.8rem;
+      font-size: 0.69rem;
+      font-weight: 800;
+    }
+    .community-desktop-social .community-social-watch {
+      border: 1px solid var(--community-social-border);
+      background: #ffffff;
+      color: var(--community-social-blue);
+    }
+    .community-desktop-social .community-social-create {
+      border: 1px solid #12a875;
+      background: #13b77e;
+      color: #ffffff;
+    }
+    .community-desktop-social .community-social-stories {
+      margin-bottom: 0.75rem;
+      border: 1px solid var(--community-social-border);
+      border-radius: 0.72rem;
+      background: #ffffff;
+      padding: 0.7rem 0.75rem 0.65rem;
+      box-shadow: 0 6px 18px rgba(35, 68, 74, 0.045);
+    }
+    .community-desktop-social .community-social-section-heading {
+      display: flex;
+      align-items: end;
+      justify-content: space-between;
+      gap: 0.75rem;
+      margin-bottom: 0.55rem;
+    }
+    .community-desktop-social .community-social-section-heading h2,
+    .community-desktop-social .community-social-section-heading h3 {
+      color: var(--community-social-ink);
+      font-size: 0.84rem;
+      font-weight: 820;
+    }
+    .community-desktop-social .community-social-section-heading p,
+    .community-desktop-social .community-social-section-heading span {
+      color: var(--community-social-muted);
+      font-size: 0.62rem;
+      font-weight: 700;
+    }
+    .community-desktop-social .community-social-story-row {
+      display: flex;
+      gap: 0.7rem;
+      overflow-x: auto;
+      padding: 0.1rem 0.1rem 0.25rem;
+      scrollbar-width: none;
+    }
+    .community-desktop-social .community-social-story-row::-webkit-scrollbar {
+      display: none;
+    }
+    .community-desktop-social .community-social-story {
+      display: flex;
+      width: 3.9rem;
+      flex: 0 0 3.9rem;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.32rem;
+      border-radius: 0.6rem;
+      padding: 0.2rem 0.1rem;
+      color: #606c7c;
+      font-size: 0.58rem;
+      font-weight: 750;
+      text-align: center;
+    }
+    .community-desktop-social .community-social-story:hover {
+      background: #f4f7f7;
+      color: var(--community-social-ink);
+    }
+    .community-desktop-social .community-social-story-avatar {
+      position: relative;
+      display: flex;
+      height: 3rem;
+      width: 3rem;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #f47a31;
+      border-radius: 999px;
+      background: #ffffff;
+      padding: 2px;
+    }
+    .community-desktop-social .community-social-story-avatar.is-own {
+      border-style: dashed;
+      border-color: #9bb3b7;
+    }
+    .community-desktop-social .community-social-story-plus {
+      position: absolute;
+      right: -0.18rem;
+      bottom: -0.08rem;
+      display: flex;
+      height: 1rem;
+      width: 1rem;
+      align-items: center;
+      justify-content: center;
+      border: 2px solid #ffffff;
+      border-radius: 999px;
+      background: var(--community-social-blue);
+      color: #ffffff;
+      font-size: 0.62rem;
+      line-height: 1;
+    }
+    .community-desktop-social .community-social-feed-panel {
+      overflow: hidden;
+      border: 1px solid var(--community-social-border);
+      border-radius: 0.72rem;
+      background: #ffffff;
+      box-shadow: 0 7px 22px rgba(35, 68, 74, 0.055);
+    }
+    .community-desktop-social .community-social-feed-heading {
+      display: flex;
+      align-items: flex-end;
+      justify-content: space-between;
+      gap: 0.8rem;
+      border-bottom: 1px solid #e8edef;
+      padding: 0.75rem 0.9rem 0.6rem;
+    }
+    .community-desktop-social .community-social-feed-heading h2 {
+      color: var(--community-social-ink);
+      font-size: 0.92rem;
+      font-weight: 840;
+      letter-spacing: -0.015em;
+    }
+    .community-desktop-social .community-social-feed-heading p {
+      margin-top: 0.15rem;
+      color: var(--community-social-muted);
+      font-size: 0.63rem;
+      font-weight: 650;
+    }
+    .community-desktop-social .community-social-feed-heading > span {
+      border-radius: 0.4rem;
+      background: #fff2e9;
+      padding: 0.3rem 0.5rem;
+      color: #b84b13;
+      font-size: 0.61rem;
+      font-weight: 820;
+    }
+    .community-desktop-social .community-social-feed-tabs {
+      display: flex;
+      gap: 0.15rem;
+      overflow-x: auto;
+      border-bottom: 1px solid #e8edef;
+      background: #fbfcfc;
+      padding: 0.38rem 0.55rem;
+      scrollbar-width: none;
+    }
+    .community-desktop-social .community-social-feed-tabs::-webkit-scrollbar {
+      display: none;
+    }
+    .community-desktop-social .community-social-feed-tab {
+      min-height: 2rem;
+      flex: 0 0 auto;
+      border-radius: 0.42rem;
+      padding-inline: 0.6rem;
+      color: #778391;
+      font-size: 0.62rem;
+      font-weight: 790;
+    }
+    .community-desktop-social .community-social-feed-tab:hover {
+      background: #f0f4f4;
+      color: var(--community-social-ink);
+    }
+    .community-desktop-social .community-social-feed-tab.is-active {
+      background: #e8f1ff;
+      color: var(--community-social-blue);
+    }
+    .community-desktop-social .community-social-feed-stream {
+      display: grid;
+      gap: 0.72rem;
+      background: #f3f7f7;
+      padding: 0.72rem;
+    }
+    .community-desktop-social .community-social-empty {
+      border: 1px dashed #becfd2;
+      border-radius: 0.65rem;
+      background: #ffffff;
+      padding: 2.5rem 1rem;
+      color: #6e7a88;
+      text-align: center;
+      font-size: 0.78rem;
+      font-weight: 720;
+    }
+    .community-desktop-social .community-desktop-feed-card {
+      overflow: hidden !important;
+      border: 1px solid var(--community-social-border) !important;
+      border-radius: 0.68rem !important;
+      background: #ffffff !important;
+      box-shadow: 0 5px 16px rgba(35, 68, 74, 0.045) !important;
+      transform: none !important;
+    }
+    .community-desktop-social .community-desktop-feed-card:hover {
+      border-color: #bfcfd2 !important;
+      background: #ffffff !important;
+    }
+    .community-desktop-social .community-desktop-feed-card-main {
+      gap: 0.65rem !important;
+      border-left: 0 !important;
+      padding: 0.75rem 0.85rem 0.65rem !important;
+    }
+    .community-desktop-social .community-mobile-feed-card-title {
+      color: var(--community-social-ink) !important;
+      font-size: 0.84rem !important;
+      font-weight: 820 !important;
+    }
+    .community-desktop-social .community-mobile-feed-card-time {
+      color: var(--community-social-muted) !important;
+      font-size: 0.6rem !important;
+    }
+    .community-desktop-social .community-mobile-feed-card-meta {
+      color: #778391 !important;
+      font-size: 0.63rem !important;
+    }
+    .community-desktop-social .community-mobile-feed-card-meta > span:last-child {
+      border: 0 !important;
+      border-radius: 0.35rem !important;
+      background: #eef4ff !important;
+      color: var(--community-social-blue) !important;
+    }
+    .community-desktop-social .community-mobile-feed-card-body {
+      display: -webkit-box;
+      overflow: hidden;
+      color: #566273 !important;
+      font-size: 0.78rem !important;
+      font-weight: 590 !important;
+      line-height: 1.55 !important;
+      -webkit-box-orient: vertical;
+      -webkit-line-clamp: 4 !important;
+    }
+    .community-desktop-social .community-social-card-media {
+      min-height: 13rem;
+      max-height: 30rem;
+      overflow: hidden;
+      border-top: 1px solid #edf1f2;
+      border-bottom: 1px solid #edf1f2;
+      background: #edf3f3;
+    }
+    .community-desktop-social .community-social-card-media > button {
+      min-height: 13rem;
+      width: 100%;
+    }
+    .community-desktop-social .community-social-card-media img {
+      max-height: 30rem;
+      width: 100%;
+      object-fit: contain !important;
+    }
+    .community-desktop-social .community-social-card-poll {
+      display: grid;
+      gap: 0.4rem;
+      border-top: 1px solid #edf1f2;
+      background: #fbfcfc;
+      padding: 0.7rem 0.85rem;
+    }
+    .community-desktop-social .community-social-card-poll button {
+      display: flex;
+      min-height: 2.2rem;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.65rem;
+      overflow: hidden;
+      border: 1px solid #dfe7e9;
+      border-radius: 0.48rem;
+      background: #ffffff;
+      padding: 0.45rem 0.65rem;
+      color: #4e5a69;
+      text-align: left;
+      font-size: 0.66rem;
+      font-weight: 760;
+    }
+    .community-desktop-social .community-social-card-poll button:hover:not(:disabled) {
+      border-color: #8fb3e8;
+      color: var(--community-social-blue);
+    }
+    .community-desktop-social .community-desktop-feed-card-actions {
+      justify-content: flex-start !important;
+      gap: 0.12rem !important;
+      border-color: #edf1f2 !important;
+      padding: 0.4rem 0.65rem !important;
+    }
+    .community-desktop-social .community-desktop-feed-card-actions button {
+      border: 0 !important;
+      border-radius: 0.42rem !important;
+      background: transparent !important;
+      padding: 0.38rem 0.5rem !important;
+      color: #788492 !important;
+      font-size: 0.64rem !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-social .community-desktop-feed-card-actions button:hover {
+      background: #eef3f3 !important;
+      color: var(--community-social-blue) !important;
+    }
+    .community-desktop-social .community-social-right-rail {
+      display: none;
+      width: 19rem;
+      min-width: 19rem;
+      flex-direction: column;
+      gap: 0.75rem;
+      overflow-y: auto;
+      border-left: 1px solid var(--community-social-border);
+      background: #ffffff;
+      padding: 0.85rem;
+      scrollbar-width: thin;
+    }
+    .community-desktop-social .community-social-rail-card {
+      border: 1px solid var(--community-social-border);
+      border-radius: 0.68rem;
+      background: #ffffff;
+      padding: 0.72rem;
+      box-shadow: 0 5px 16px rgba(35, 68, 74, 0.04);
+    }
+    .community-desktop-social .community-social-rail-profile {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      align-items: center;
+      gap: 0.65rem;
+      width: 100%;
+      text-align: left;
+    }
+    .community-desktop-social .community-social-rail-profile h3 {
+      overflow: hidden;
+      color: var(--community-social-ink);
+      font-size: 0.8rem;
+      font-weight: 830;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .community-desktop-social .community-social-rail-profile p {
+      overflow: hidden;
+      color: var(--community-social-muted);
+      font-size: 0.62rem;
+      font-weight: 680;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .community-desktop-social .community-social-rail-stats {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 0.35rem;
+      margin-top: 0.65rem;
+    }
+    .community-desktop-social .community-social-rail-stats span {
+      border-radius: 0.48rem;
+      background: #f3f7f7;
+      padding: 0.45rem 0.25rem;
+      color: #74808d;
+      text-align: center;
+      font-size: 0.55rem;
+      font-weight: 710;
+    }
+    .community-desktop-social .community-social-rail-stats strong {
+      display: block;
+      margin-bottom: 0.08rem;
+      color: var(--community-social-ink);
+      font-size: 0.7rem;
+      font-weight: 850;
+    }
+    .community-desktop-social .community-social-rail-title {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 0.5rem;
+      margin-bottom: 0.55rem;
+    }
+    .community-desktop-social .community-social-rail-title h3 {
+      color: var(--community-social-ink);
+      font-size: 0.76rem;
+      font-weight: 840;
+    }
+    .community-desktop-social .community-social-rail-title button,
+    .community-desktop-social .community-social-rail-title span {
+      color: var(--community-social-blue);
+      font-size: 0.58rem;
+      font-weight: 800;
+    }
+    .community-desktop-social .community-social-rail-list {
+      display: grid;
+      gap: 0.38rem;
+    }
+    .community-desktop-social .community-social-notification {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr);
+      gap: 0.48rem;
+      width: 100%;
+      border-radius: 0.48rem;
+      padding: 0.45rem;
+      text-align: left;
+    }
+    .community-desktop-social .community-social-notification:hover {
+      background: #f3f7f7;
+    }
+    .community-desktop-social .community-social-notification-dot {
+      margin-top: 0.3rem;
+      height: 0.42rem;
+      width: 0.42rem;
+      border-radius: 999px;
+      background: var(--community-social-orange);
+    }
+    .community-desktop-social .community-social-notification strong {
+      display: block;
+      color: #394454;
+      font-size: 0.64rem;
+      font-weight: 790;
+    }
+    .community-desktop-social .community-social-notification span {
+      display: block;
+      margin-top: 0.1rem;
+      overflow: hidden;
+      color: #87929f;
+      font-size: 0.56rem;
+      font-weight: 650;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .community-desktop-social .community-social-suggestion {
+      display: grid;
+      grid-template-columns: auto minmax(0, 1fr) auto;
+      align-items: center;
+      gap: 0.5rem;
+      border-radius: 0.48rem;
+      padding: 0.4rem;
+    }
+    .community-desktop-social .community-social-suggestion:hover {
+      background: #f3f7f7;
+    }
+    .community-desktop-social .community-social-suggestion-name {
+      min-width: 0;
+      text-align: left;
+    }
+    .community-desktop-social .community-social-suggestion-name strong,
+    .community-desktop-social .community-social-suggestion-name span {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .community-desktop-social .community-social-suggestion-name strong {
+      color: #394454;
+      font-size: 0.64rem;
+      font-weight: 810;
+    }
+    .community-desktop-social .community-social-suggestion-name span {
+      color: #8a95a1;
+      font-size: 0.55rem;
+      font-weight: 650;
+    }
+    .community-desktop-social .community-social-follow-button {
+      min-height: 1.85rem;
+      border-radius: 0.42rem;
+      background: #fff2e9;
+      padding-inline: 0.5rem;
+      color: #c65318;
+      font-size: 0.56rem;
+      font-weight: 830;
+    }
+    .community-desktop-social .community-social-contact {
+      display: flex;
+      width: 100%;
+      align-items: center;
+      gap: 0.5rem;
+      border-radius: 0.48rem;
+      padding: 0.38rem;
+      text-align: left;
+    }
+    .community-desktop-social .community-social-contact:hover {
+      background: #f3f7f7;
+    }
+    .community-desktop-social .community-social-contact span {
+      min-width: 0;
+      overflow: hidden;
+      color: #4c5867;
+      font-size: 0.62rem;
+      font-weight: 760;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .community-desktop-social .community-social-rail-empty {
+      border-radius: 0.48rem;
+      background: #f4f7f7;
+      padding: 0.75rem;
+      color: #87929f;
+      text-align: center;
+      font-size: 0.6rem;
+      font-weight: 680;
+    }
+    .community-desktop-social .community-desktop-thread {
+      width: min(100%, 52rem);
+      height: calc(100dvh - 5.9rem) !important;
+      margin-inline: auto;
+      border: 1px solid var(--community-social-border) !important;
+      border-radius: 0.72rem !important;
+      background: #ffffff !important;
+      box-shadow: 0 7px 22px rgba(35, 68, 74, 0.055) !important;
+    }
+    .community-desktop-social .community-desktop-thread-header {
+      min-height: 3.75rem;
+      border-color: var(--community-social-border) !important;
+      background: #ffffff !important;
+      padding: 0.55rem 0.75rem !important;
+    }
+    .community-desktop-social .community-desktop-thread-header h2 {
+      color: var(--community-social-ink) !important;
+      font-size: 0.82rem !important;
+      font-weight: 830 !important;
+    }
+    .community-desktop-social .community-desktop-thread-header button {
+      min-height: 2.25rem !important;
+      border-radius: 0.5rem !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-social .community-desktop-thread-scroll {
+      background: #f3f7f7 !important;
+      padding: 0.75rem !important;
+    }
+    .community-desktop-social .community-desktop-post-card {
+      max-width: 43rem !important;
+      border-color: var(--community-social-border) !important;
+      border-radius: 0.68rem !important;
+      background: #ffffff !important;
+      padding: 1rem !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-social .community-desktop-post-card > h3 {
+      color: var(--community-social-ink) !important;
+      font-size: clamp(1.2rem, 1.8vw, 1.55rem) !important;
+      font-weight: 840 !important;
+      line-height: 1.2 !important;
+      letter-spacing: -0.025em !important;
+    }
+    .community-desktop-social .community-desktop-post-card > p {
+      color: #556171 !important;
+      font-size: 0.9rem !important;
+      font-weight: 560 !important;
+      line-height: 1.68 !important;
+    }
+    .community-desktop-social .community-desktop-post-media {
+      width: 100% !important;
+      max-width: 41rem !important;
+      max-height: 62vh !important;
+      aspect-ratio: auto !important;
+      border-color: var(--community-social-border) !important;
+      border-radius: 0.65rem !important;
+      background: #edf3f3 !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-social .community-desktop-post-media img {
+      max-height: 62vh !important;
+      width: 100% !important;
+      object-fit: contain !important;
+    }
+    .community-desktop-social .community-desktop-reactions {
+      gap: 0.18rem !important;
+      border-top: 1px solid #edf1f2;
+      padding-top: 0.7rem;
+    }
+    .community-desktop-social .community-desktop-reaction-chip {
+      border: 0 !important;
+      border-radius: 0.42rem !important;
+      background: transparent !important;
+      padding: 0.38rem 0.48rem !important;
+      color: #778391 !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-social .community-desktop-reaction-chip:hover {
+      background: #edf3f3 !important;
+      color: var(--community-social-blue) !important;
+    }
+    .community-desktop-social .community-reply-bubble {
+      border-radius: 0.72rem !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-social .community-desktop-reply-composer {
+      border-color: var(--community-social-border) !important;
+      background: #ffffff !important;
+      padding: 0.58rem 0.75rem !important;
+    }
+    .community-desktop-social .community-desktop-reply-composer textarea {
+      min-height: 2.55rem !important;
+      border-color: #dce5e8 !important;
+      border-radius: 0.55rem !important;
+      background: #f4f7f7 !important;
+      padding: 0.6rem 0.75rem !important;
+      color: var(--community-social-ink) !important;
+      font-size: 0.75rem !important;
+      font-weight: 560 !important;
+      line-height: 1.35 !important;
+    }
+    .community-desktop-social .community-desktop-reply-composer > div > button {
+      height: 2.55rem !important;
+      min-height: 2.55rem !important;
+      min-width: 4.2rem !important;
+      border-radius: 0.55rem !important;
+      background: var(--community-social-blue) !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-social .community-status-grid-shell {
+      border-color: var(--community-social-border) !important;
+      border-radius: 0.8rem !important;
+      background: #f3f7f7 !important;
+    }
+    .community-desktop-social .community-status-tile,
+    .community-desktop-social .community-status-detail-card {
+      border-radius: 0.68rem !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-social :is(input, textarea, select) {
+      border-radius: 0.55rem !important;
+    }
+    .community-desktop-social :is(button, a) {
+      transition-duration: 160ms !important;
+    }
+  }
+  @media (min-width: 1280px) {
+    .community-desktop-social .community-social-right-rail {
+      display: flex !important;
+    }
+    .community-desktop-social .community-center-shell {
+      max-width: calc(100% - 19rem);
+    }
+  }
+  @media (min-width: 1024px) and (max-width: 1279px) {
+    .community-desktop-social .community-desktop-sidebar {
+      width: 13.25rem !important;
+    }
+    .community-desktop-social .community-social-feed-page {
+      width: min(100%, 44rem);
+    }
+  }
   @media (prefers-reduced-motion: reduce) {
     .eduvora-community-polish *, .eduvora-community-polish *::before, .eduvora-community-polish *::after {
       transition-duration: 0.01ms !important;
@@ -1545,6 +2412,23 @@ const communityPolishCss = `
 const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenticated = false, settings, currentUser = null }) => {
   const navigate = useNavigate();
   const guardedAuth = getAuth();
+  const socialDesktopSettingEnabled = Boolean((settings?.content as any)?.communityStyle?.desktopSocialLayout);
+  const [isDesktopCommunityViewport, setIsDesktopCommunityViewport] = useState(() => (
+    typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches
+  ));
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const mediaQuery = window.matchMedia('(min-width: 1024px)');
+    const syncDesktopViewport = () => setIsDesktopCommunityViewport(mediaQuery.matches);
+    syncDesktopViewport();
+    mediaQuery.addEventListener('change', syncDesktopViewport);
+    return () => mediaQuery.removeEventListener('change', syncDesktopViewport);
+  }, []);
+  const useSocialDesktopLayout = socialDesktopSettingEnabled && isDesktopCommunityViewport;
+  const socialDesktopLayoutRef = useRef(useSocialDesktopLayout);
+  useEffect(() => {
+    socialDesktopLayoutRef.current = useSocialDesktopLayout;
+  }, [useSocialDesktopLayout]);
   const [isCommunityAllowed, setIsCommunityAllowed] = useState(false);
   const [activeView, setActiveView] = useState<CommunityView>('feed');
   const [page, setPage] = useState<CommunityPage>('chat');
@@ -2344,6 +3228,20 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     pageStackRef.current = pageStack;
   }, [page, activeView, pageStack]);
 
+  const restoreSocialFeedScroll = () => {
+    if (!socialDesktopLayoutRef.current) return;
+    const savedTop = feedScrollPositionsRef.current.chatFeed || 0;
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: savedTop, behavior: 'auto' }));
+    });
+  };
+
+  const shouldUseSocialDesktopThread = () => (
+    socialDesktopLayoutRef.current
+    && typeof window !== 'undefined'
+    && window.matchMedia('(min-width: 1024px)').matches
+  );
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -2369,6 +3267,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         if (targetPage === 'chat') {
           activeViewRef.current = 'feed';
           setActiveView('feed');
+          restoreSocialFeedScroll();
         }
       } else {
         activeViewRef.current = 'feed';
@@ -2446,6 +3345,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       setPageStack(nextStack);
       pageRef.current = previous;
       replaceCommunityHistory(previous);
+      if (previous === 'chat') restoreSocialFeedScroll();
       return true;
     }
 
@@ -2457,6 +3357,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       setPage('chat');
       setPageStack([]);
       replaceCommunityHistory('chat');
+      restoreSocialFeedScroll();
       return true;
     }
 
@@ -2954,8 +3855,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if ((notification.targetPage === 'thread' || notification.type === 'reply' || notification.type === 'creator') && typeof notification.targetId === 'number') {
       setSelectedMessageId(notification.targetId);
       setActiveView('feed');
-      setPage(window.matchMedia('(max-width: 767px)').matches ? 'thread' : 'chat');
-      setPageStack([]);
+      if (window.matchMedia('(max-width: 767px)').matches) {
+        setPage('thread');
+        setPageStack([]);
+      } else if (shouldUseSocialDesktopThread()) {
+        pushPage('thread', { preserveScroll: true });
+      } else {
+        setPage('chat');
+        setPageStack([]);
+      }
       return;
     }
     if (notification.targetPage === 'statusReel' && typeof notification.targetId === 'number') {
@@ -3048,7 +3956,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const targetMessage = messages.find((message) => message.id === messageId);
     if (targetMessage) loadRepliesForMessage(targetMessage);
 
-    if (window.matchMedia('(max-width: 767px)').matches) {
+    if (window.matchMedia('(max-width: 767px)').matches || shouldUseSocialDesktopThread()) {
       pushPage('thread', { preserveScroll: true });
     }
   };
@@ -3131,8 +4039,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const focusReplyAfterRender = (messageId: number, replyKey?: string) => {
     setSelectedMessageId(messageId);
     setActiveView('feed');
-    setPage(window.matchMedia('(max-width: 767px)').matches ? 'thread' : 'chat');
-    setPageStack([]);
+    if (window.matchMedia('(max-width: 767px)').matches) {
+      setPage('thread');
+      setPageStack([]);
+    } else if (shouldUseSocialDesktopThread()) {
+      if (pageRef.current !== 'thread') pushPage('thread', { preserveScroll: true });
+    } else {
+      setPage('chat');
+      setPageStack([]);
+    }
     setHighlightedThreadId(messageId);
     window.setTimeout(() => setHighlightedThreadId(null), 1400);
     window.setTimeout(() => {
@@ -4466,6 +5381,32 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <span className="community-mobile-feed-card-body mt-2 line-clamp-2 text-xs font-semibold leading-5 text-[#536178] sm:text-sm">{message.body || message.badge}</span>
           </span>
         </button>
+        {useSocialDesktopLayout && message.imagePreview ? (
+          <div className="community-social-card-media hidden lg:block">
+            {renderUploadedImage(message.imagePreview, message.title, message.imageLayout || 'original')}
+          </div>
+        ) : null}
+        {useSocialDesktopLayout && message.pollOptions ? (
+          <div className="community-social-card-poll hidden lg:grid">
+            {message.pollOptions.slice(0, 4).map((option, index) => {
+              const votes = message.pollVotes || message.pollOptions!.map(() => 0);
+              const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0));
+              const selectedOption = message.pollVoters?.[currentUserKey];
+              const percentage = Math.round(((votes[index] || 0) / total) * 100);
+              return (
+                <button
+                  key={`${message.id}-${option}-${index}`}
+                  type="button"
+                  onClick={() => voteOnMessagePoll(message.id, index)}
+                  disabled={selectedOption !== undefined}
+                >
+                  <span className="truncate">{option}</span>
+                  <span className="shrink-0">{selectedOption !== undefined ? `${percentage}%` : 'Vote'}</span>
+                </button>
+              );
+            })}
+          </div>
+        ) : null}
         <div className="community-desktop-feed-card-actions flex flex-wrap items-center justify-end gap-1.5 border-t border-[#EEF6FF] px-3 py-2 sm:px-4">
           <button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-3 py-1.5 text-[11px] font-black transition ${liked ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D9E7F8] bg-[#E8F2FF] text-[#1769FF]'}`}>❤️ {message.likeCount || 0}</button>
           <button type="button" onClick={() => { openMessage(message.id); setExpandedReplyId(message.id); }} className="rounded-full border border-[#D9E7F8] bg-white px-3 py-1.5 text-[11px] font-black text-[#1769FF] transition hover:border-[#1769FF]">💬 {message.replyCount || message.replies.length}</button>
@@ -4542,11 +5483,120 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
+
+  const renderSocialDesktopFeedLayout = (
+    feedMessages: FeedMessage[],
+    title: string,
+    subtitle: string,
+    isAdminFeed: boolean,
+    isMainFeed: boolean,
+    emptyCopy: string,
+  ) => {
+    const storyPreview = statusCards.slice(0, 9);
+
+    return (
+      <div className="community-social-feed-page">
+        {isMainFeed ? (
+          <>
+            <section className="community-social-commandbar" aria-label="Community search and publishing">
+              <button type="button" onClick={() => pushPage('network')} className="community-social-search">
+                <span aria-hidden="true">⌕</span>
+                <span className="truncate">Search people and community profiles</span>
+              </button>
+              <div className="community-social-command-actions">
+                <button type="button" onClick={() => switchView('status')} className="community-social-watch">Watch all</button>
+                <button type="button" onClick={() => pushPage('creators')} className="community-social-create">＋ Create New Post</button>
+              </div>
+            </section>
+
+            <section className="community-social-stories" aria-label="Community stories">
+              <div className="community-social-section-heading">
+                <div>
+                  <h2>Stories</h2>
+                  <p>Fresh status updates from the community</p>
+                </div>
+                <button type="button" onClick={() => switchView('status')} className="text-[0.62rem] font-black text-[#2F6FEB]">View all</button>
+              </div>
+              <div className="community-social-story-row">
+                <button type="button" onClick={openStatusUploadFromTop} className="community-social-story">
+                  <span className="community-social-story-avatar is-own">
+                    <Avatar value={getOwnDisplayAvatar()} size="h-10 w-10" />
+                    <span className="community-social-story-plus" aria-hidden="true">＋</span>
+                  </span>
+                  <span className="line-clamp-1">Add story</span>
+                </button>
+                {storyPreview.map((status) => {
+                  const identity = getStatusOwnerIdentity(status);
+                  return (
+                    <button key={status.id} type="button" onClick={() => openStatusReel(status.id)} className="community-social-story">
+                      <span className="community-social-story-avatar">
+                        <Avatar value={identity.avatar} size="h-10 w-10" />
+                      </span>
+                      <span className="line-clamp-1">{identity.name || status.title}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </section>
+          </>
+        ) : null}
+
+        <section className="community-social-feed-panel">
+          <header className="community-social-feed-heading">
+            <div>
+              <h2>{title}</h2>
+              <p>{subtitle}</p>
+            </div>
+            <span>{compactCount(feedMessages.length)} posts</span>
+          </header>
+
+          {isMainFeed ? (
+            <div className="community-social-feed-tabs" aria-label="Desktop feed filters">
+              <button
+                type="button"
+                onClick={() => setFeedFilter('all')}
+                aria-pressed={feedFilter === 'all'}
+                className={`community-social-feed-tab ${feedFilter === 'all' ? 'is-active' : ''}`}
+              >
+                Popular · {compactCount(messages.length)}
+              </button>
+              {feedFilterOptions.map((option) => (
+                <button
+                  key={option.key}
+                  type="button"
+                  onClick={() => setFeedFilter(option.key)}
+                  aria-pressed={feedFilter === option.key}
+                  className={`community-social-feed-tab ${feedFilter === option.key ? 'is-active' : ''}`}
+                >
+                  {option.label.replace(' Feed', '')} · {compactCount(option.count)}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
+          <div className="community-social-feed-stream">
+            {feedMessages.length ? (
+              feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)
+            ) : (
+              <div className="community-social-empty">
+                <div className="mb-2 text-2xl" aria-hidden="true">{isAdminFeed ? '📣' : '💬'}</div>
+                {emptyCopy}
+              </div>
+            )}
+          </div>
+        </section>
+      </div>
+    );
+  };
+
   const renderFeedLayout = (feedMessages: FeedMessage[], title = 'Community Feed', subtitle = 'Public discussions, replies, reactions, polls, and creator posts.') => {
     const activeMessage = feedMessages.find((message) => message.id === selectedMessageId) || feedMessages[0];
     const isAdminFeed = title.toLowerCase().includes('admin');
     const isMainFeed = title === 'Community Feed';
     const emptyCopy = isAdminFeed ? 'No official admin posts are available right now.' : feedFilter === 'following' ? 'No posts from people you follow yet. Follow creators to build this feed.' : feedFilter === 'followers' ? 'No posts from your followers yet.' : feedFilter === 'mine' ? 'You have not published a permanent post yet.' : 'No messages yet. Start the conversation.';
+    if (useSocialDesktopLayout) {
+      return renderSocialDesktopFeedLayout(feedMessages, title, subtitle, isAdminFeed, isMainFeed, emptyCopy);
+    }
     const filterHeader = isMainFeed ? (
       <div className="community-mobile-feed-filters hidden" aria-label="Mobile feed filters">
         <button
@@ -5286,7 +6336,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   );
 
   const CommunitySidebar = () => {
-    const sidebarExpanded = !isDesktopSidebarCollapsed;
+    const sidebarExpanded = useSocialDesktopLayout || !isDesktopSidebarCollapsed;
     const memberName = profile.name?.trim() || 'Eduvora Member';
     const memberUsername = normalizeUsername(profile.username || memberName) || 'eduvora_member';
 
@@ -5357,6 +6407,99 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             </span>
           ) : null}
         </button>
+      </aside>
+    );
+  };
+
+
+  const SocialDesktopRightRail = () => {
+    const requestItems = notifications.filter((notification) => !notification.read).slice(0, 3);
+    const suggestedCreators = visibleForYouCreators
+      .filter((creator) => !isOwnCommunityId(creator.id) && !followedByCreatorIds[creator.id] && creator.isPublic !== false && !creator.isSuspended)
+      .slice(0, 4);
+    const contactCreators = allCreators
+      .filter((creator) => !isOwnCommunityId(creator.id) && Boolean(followedByCreatorIds[creator.id]))
+      .slice(0, 6);
+    const memberName = profile.name?.trim() || 'Eduvora Member';
+    const memberUsername = normalizeUsername(profile.username || memberName) || 'eduvora_member';
+
+    return (
+      <aside className="community-social-right-rail hidden" aria-label="Community context">
+        <section className="community-social-rail-card">
+          <button type="button" onClick={() => { setSelectedProfileId(null); setProfileViewMode('overview'); pushPage('profile'); }} className="community-social-rail-profile">
+            <Avatar value={getOwnDisplayAvatar()} size="h-11 w-11" />
+            <span className="min-w-0">
+              <h3>{memberName}</h3>
+              <p>@{memberUsername}</p>
+            </span>
+          </button>
+          <div className="community-social-rail-stats">
+            <span><strong>{compactCount(profileStats.creatorPosts)}</strong>Posts</span>
+            <span><strong>{compactCount(profileStats.followers)}</strong>Followers</span>
+            <span><strong>{compactCount(profileStats.following)}</strong>Following</span>
+          </div>
+        </section>
+
+        <section className="community-social-rail-card">
+          <div className="community-social-rail-title">
+            <h3>Requests</h3>
+            <button type="button" onClick={() => setIsNotificationPanelOpen(true)}>View all</button>
+          </div>
+          <div className="community-social-rail-list">
+            {requestItems.length ? requestItems.map((notification) => (
+              <button key={notification.id} type="button" onClick={() => openNotification(notification)} className="community-social-notification">
+                <span className="community-social-notification-dot" aria-hidden="true" />
+                <span className="min-w-0">
+                  <strong>{notification.title}</strong>
+                  <span>{notification.body}</span>
+                </span>
+              </button>
+            )) : <div className="community-social-rail-empty">You are all caught up.</div>}
+          </div>
+        </section>
+
+        <section className="community-social-rail-card">
+          <div className="community-social-rail-title">
+            <h3>Suggestions for you</h3>
+            <button type="button" onClick={() => pushPage('network')}>See all</button>
+          </div>
+          <div className="community-social-rail-list">
+            {suggestedCreators.length ? suggestedCreators.map((creator) => (
+              <article key={creator.id} className="community-social-suggestion">
+                <button type="button" onClick={() => { setSelectedProfileId(creator.id); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); }} aria-label={`Open ${creator.name} profile`}>
+                  <Avatar value={creator.avatar} size="h-9 w-9" />
+                </button>
+                <button type="button" onClick={() => { setSelectedProfileId(creator.id); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); }} className="community-social-suggestion-name">
+                  <strong>{creator.name}</strong>
+                  <span>@{creator.username}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => toggleFollowCreator(creator)}
+                  disabled={Boolean(followLoadingIds[creator.id])}
+                  className="community-social-follow-button disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {followLoadingIds[creator.id] ? '…' : 'Follow'}
+                </button>
+              </article>
+            )) : <div className="community-social-rail-empty">No new suggestions right now.</div>}
+          </div>
+        </section>
+
+        <section className="community-social-rail-card">
+          <div className="community-social-rail-title">
+            <h3>Contacts</h3>
+            <span>{compactCount(contactCreators.length)}</span>
+          </div>
+          <div className="community-social-rail-list">
+            {contactCreators.length ? contactCreators.map((creator) => (
+              <button key={creator.id} type="button" onClick={() => { setSelectedProfileId(creator.id); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); }} className="community-social-contact">
+                <Avatar value={creator.avatar} size="h-8 w-8" />
+                <span>{creator.name}</span>
+              </button>
+            )) : <div className="community-social-rail-empty">Follow people to build your contacts.</div>}
+          </div>
+        </section>
       </aside>
     );
   };
@@ -5751,7 +6894,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }
 
   return (
-    <section style={communityCssVars} className={`eduvora-community-polish relative h-full min-h-0 w-full overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-2 lg:p-3 ${useLatestDesktopLayout ? 'community-desktop-latest' : 'community-desktop-classic'} ${useLatestMobileLayout ? 'community-mobile-latest' : 'community-mobile-classic'}`}>
+    <section style={communityCssVars} className={`eduvora-community-polish relative h-full min-h-0 w-full overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-2 lg:p-3 ${useSocialDesktopLayout ? 'community-desktop-social' : useLatestDesktopLayout ? 'community-desktop-latest' : 'community-desktop-classic'} ${useLatestMobileLayout ? 'community-mobile-latest' : 'community-mobile-classic'}`}>
       <style>{`
         @keyframes eduvoraBondShine {
           0% { transform: translateX(0); opacity: 0; }
@@ -5777,7 +6920,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       <ShareComposerModal />
       <div className="eduvora-community-app mx-auto flex h-full w-full min-w-0 max-w-none overflow-hidden border border-[var(--community-border)] bg-[var(--community-surface)] shadow-[var(--community-shadow)] sm:rounded-[1.5rem] lg:rounded-[1.85rem]">
         <CommunitySidebar />
-        <div className="flex min-w-0 flex-1 flex-col">
+        <div className="community-center-shell flex min-w-0 flex-1 flex-col">
           <CommunityHeader />
           <main ref={scrollContainerRef} className={`eduvora-community-main ${page === 'thread' ? 'community-thread-page' : ''} min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-3 custom-scrollbar sm:px-4 lg:px-5 lg:pb-4 ${
             shouldHideCommunityDockOnMobile
@@ -5787,6 +6930,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             {renderMainContent()}
           </main>
         </div>
+        {useSocialDesktopLayout ? <SocialDesktopRightRail /> : null}
       </div>
       <CommunityBottomNav />
     </section>

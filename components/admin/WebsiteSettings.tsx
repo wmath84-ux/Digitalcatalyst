@@ -346,6 +346,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const communityStyle = {
         desktopLayout: 'latest',
         mobileLayout: 'latest',
+        desktopSocialLayout: false,
         pageBackground: '#F8FBFF',
         surfaceColor: '#FFFFFF',
         cardColor: '#FFFFFF',
@@ -371,6 +372,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     };
     const latestDesktopCommunityLayout = communityStyle.desktopLayout !== 'classic';
     const latestMobileCommunityLayout = communityStyle.mobileLayout !== 'classic';
+    const socialDesktopCommunityLayout = Boolean(communityStyle.desktopSocialLayout);
     const readingStyle = { backgroundColor: '#F8FAFD', backgroundOpacity: 98, panelOpacity: 96, cardOpacity: 94, accentColor: '#C2E7FF', accentOpacity: 66, ...((localSettings.content as any).readingStyle || {}) };
     const profileStyle = { backgroundColor: '#e2e8f0', backgroundTint: '#e0e7ff', cardOpacity: 82, heroOverlayOpacity: 76, accentColor: '#f97316', ...((localSettings.content as any).profileStyle || {}) };
     const profileStreaks = (((localSettings.content as any).profileStreaks || []) as ProfileStreakConfig[]);
@@ -436,7 +438,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         updateContentValue('dockStyle', { ...dockStyle, [field]: value });
     };
 
-    const updateCommunityStyle = (field: string, value: string | number) => {
+    const updateCommunityStyle = (field: string, value: string | number | boolean) => {
         updateContentValue('communityStyle', { ...communityStyle, [field]: value });
     };
 
@@ -940,6 +942,21 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                 <input type="checkbox" className="peer sr-only" checked={latestDesktopCommunityLayout} onChange={e => updateCommunityStyle('desktopLayout', e.target.checked ? 'latest' : 'classic')} />
                                 <span className="relative h-8 w-14 rounded-full bg-slate-300 transition peer-checked:bg-blue-600 after:absolute after:left-1 after:top-1 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow-md after:transition-transform peer-checked:after:translate-x-6" />
                                 <span className="min-w-[4.5rem] text-sm font-black text-slate-700">{latestDesktopCommunityLayout ? 'Latest' : 'Classic'}</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div className="rounded-[1.5rem] border border-emerald-100 bg-gradient-to-br from-[#EAF7F4] via-white to-[#EAF2FF] p-5 shadow-sm">
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Alternative desktop community</p>
+                                <h4 className="mt-1 text-lg font-black text-slate-900">Enable classic social workspace UX</h4>
+                                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">Adds the reference-style three-column desktop workspace with compact identity/navigation, stories, a readable single-column media feed, full-page post threads, requests, suggestions and contacts. Turning it off instantly returns to the preserved Classic/Latest desktop selector above. Mobile Community stays unchanged.</p>
+                            </div>
+                            <label className="relative inline-flex cursor-pointer items-center gap-3">
+                                <input type="checkbox" className="peer sr-only" checked={socialDesktopCommunityLayout} onChange={e => updateCommunityStyle('desktopSocialLayout', e.target.checked)} />
+                                <span className="relative h-8 w-14 rounded-full bg-slate-300 transition peer-checked:bg-emerald-600 after:absolute after:left-1 after:top-1 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow-md after:transition-transform peer-checked:after:translate-x-6" />
+                                <span className="min-w-[4.5rem] text-sm font-black text-slate-700">{socialDesktopCommunityLayout ? 'Social' : 'Existing'}</span>
                             </label>
                         </div>
                     </div>

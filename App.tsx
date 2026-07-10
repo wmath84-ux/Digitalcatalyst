@@ -422,6 +422,7 @@ export interface ProfileStyleSettings {
 export interface CommunityStyleSettings {
     desktopLayout: 'classic' | 'latest';
     mobileLayout: 'classic' | 'latest';
+    desktopSocialLayout: boolean;
     pageBackground: string;
     surfaceColor: string;
     cardColor: string;
@@ -886,6 +887,7 @@ const defaultWebsiteSettings: WebsiteSettings = {
         communityStyle: {
             desktopLayout: 'latest',
             mobileLayout: 'latest',
+            desktopSocialLayout: false,
             pageBackground: '#F8FBFF',
             surfaceColor: '#FFFFFF',
             cardColor: '#FFFFFF',
