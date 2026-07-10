@@ -840,6 +840,28 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [likedMessages, setLikedMessages] = useState<number[]>([]);
   const [viewedStatusIds, setViewedStatusIds] = useState<number[]>([]);
   const [imageLightbox, setImageLightbox] = useState<{ src: string; alt: string; mode: 'thumbnail' | 'original' } | null>(null);
+  useEffect(() => {
+    if (typeof document === 'undefined') return;
+
+    const root = document.documentElement;
+    const body = document.body;
+    const previousRootOverflow = root.style.overflow;
+    const previousBodyOverflow = body.style.overflow;
+    const previousRootOverscroll = root.style.overscrollBehavior;
+    const previousBodyOverscroll = body.style.overscrollBehavior;
+
+    root.style.overflow = 'hidden';
+    body.style.overflow = 'hidden';
+    root.style.overscrollBehavior = 'none';
+    body.style.overscrollBehavior = 'none';
+
+    return () => {
+      root.style.overflow = previousRootOverflow;
+      body.style.overflow = previousBodyOverflow;
+      root.style.overscrollBehavior = previousRootOverscroll;
+      body.style.overscrollBehavior = previousBodyOverscroll;
+    };
+  }, []);
   const [shareTarget, setShareTarget] = useState<ShareTarget | null>(null);
   const [shareRecipientSearch, setShareRecipientSearch] = useState('');
   const [shareCaption, setShareCaption] = useState('');
@@ -4224,6 +4246,16 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     </div>
   );
 
+  const imageLightboxPortal = imageLightbox && typeof document !== 'undefined' ? createPortal(
+    <div role="dialog" aria-modal="true" aria-label={`Image preview: ${imageLightbox.alt}`} className="fixed inset-0 z-[2147483000] flex min-h-0 flex-col overflow-hidden overscroll-none bg-[#081B5C]/94 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] backdrop-blur-xl">
+      <button type="button" onClick={() => setImageLightbox(null)} className="absolute right-3 top-[calc(env(safe-area-inset-top)+0.75rem)] z-10 rounded-full border border-white/25 bg-[#081A45]/72 px-4 py-2 text-sm font-black text-white shadow-xl">Close</button>
+      <div className="flex min-h-0 flex-1 items-center justify-center overflow-hidden p-3 sm:p-6">
+        <img src={imageLightbox.src} alt={imageLightbox.alt} onError={(event) => { const image = event.currentTarget; if (image.dataset.fallbackApplied === 'true') return; image.dataset.fallbackApplied = 'true'; image.src = buildPostImageFallback({ title: imageLightbox.alt, postType: 'image' }); }} className="block max-h-full max-w-full rounded-[1.25rem] object-contain shadow-2xl" />
+      </div>
+    </div>,
+    document.body,
+  ) : null;
+
   const notificationDropdownPortal = isNotificationPanelOpen && typeof document !== 'undefined' ? createPortal(<NotificationDropdown />, document.body) : null;
 
   const communityStyle = {
@@ -4446,13 +4478,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const renderProfileGrid = (profilePosts: FeedMessage[]) => {
     if (profileContentTab === 'stories') {
-      return (
-        <div className="rounded-[1.5rem] border border-dashed border-[#BFD7FF] bg-gradient-to-br from-[#F8FBFF] via-white to-[#EEF6FF] p-8 text-center">
-          <div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-inner">○</div>
-          <h3 className="text-xl font-black text-[#081B5C]">Stories are above</h3>
-          <p className="mt-2 text-sm font-bold leading-6 text-[#64748B]">Tap any active story circle to open it.</p>
-        </div>
-      );
+      return <div className="rounded-[1.5rem] border border-dashed border-[#BFD7FF] bg-gradient-to-br from-[#F8FBFF] via-white to-[#EEF6FF] p-8 text-center"><div className="mx-auto mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-white text-2xl shadow-inner">○</div><h3 className="text-xl font-black text-[#081B5C]">Stories are above</h3><p className="mt-2 text-sm font-bold leading-6 text-[#64748B]">Tap any active story circle to open it.</p></div>;
     }
 
     return profilePosts.length ? (
@@ -4460,20 +4486,42 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         {profilePosts.slice(0, 30).map((message) => {
           const type = message.postType || message.type || 'text';
           const isPoll = type === 'poll';
-          const isImage = Boolean(message.imagePreview);
+          const isImage = type === 'image' && Boolean(message.imagePreview);
           const liked = Boolean(message.likedByUsers?.[currentUserKey]) || likedMessages.includes(message.id);
+          const title = message.title || (isPoll ? 'Community poll' : isImage ? 'Image post' : 'Community note');
+          const body = message.body || message.badge || 'Open this post to read and reply.';
+          const options = Array.isArray(message.pollOptions) ? message.pollOptions.filter(Boolean).slice(0, 3) : [];
+          const imageSource = isImage ? normalizeMediaSource({ imagePreview: message.imagePreview, title }, { type: 'image', title }).url : '';
+          const imageFallback = buildPostImageFallback({ title, body, postType: type });
+          const openPost = (event: React.SyntheticEvent) => { event.preventDefault(); event.stopPropagation(); openProfilePostDetail(message.id); };
+
           return (
-            <article key={message.id} className="group overflow-hidden rounded-[1.25rem] border border-[#D9E7F8] bg-white shadow-[0_10px_28px_rgba(8,26,69,0.08)] ring-1 ring-white transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-[0_18px_50px_rgba(23,105,255,0.14)]">
-              <button type="button" onPointerDown={(event) => { event.preventDefault(); event.stopPropagation(); openProfilePostDetail(message.id); }} onClick={(event) => { event.preventDefault(); event.stopPropagation(); openProfilePostDetail(message.id); }} className="block w-full text-left touch-manipulation">
-                <div className="relative aspect-square overflow-hidden bg-[radial-gradient(circle_at_top_left,rgba(23,105,255,0.18),transparent_42%),linear-gradient(135deg,#FFFFFF_0%,#EEF6FF_48%,#F1EEFF_100%)]">
-                  {isImage ? <div className="flex h-full w-full items-center justify-center bg-[#EEF6FF]">{isImageAvatar(message.imagePreview || '') ? <SafeImage src={message.imagePreview || ''} fallbackSrc={buildPostImageFallback({ title: message.title, postType: 'image' })} alt={message.title} className="h-full w-full object-cover" fallbackTitle={message.title} fallbackBadge="Community image" fallbackIcon="💬" fallbackMessage="Image preview unavailable" aspect="square" /> : <span className="text-6xl">{message.imagePreview || '🖼️'}</span>}</div> : <div className="flex h-full flex-col justify-between p-3 sm:p-4"><span className="w-max rounded-full border border-white/80 bg-white/92 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.14em] text-[#1769FF] shadow-sm">{isPoll ? 'Poll' : 'Text'}</span><div><h3 className="line-clamp-3 text-base font-black leading-tight text-[#081A45] sm:text-xl">{message.title || (isPoll ? 'Poll post' : 'Text post')}</h3><p className="mt-2 line-clamp-3 text-xs font-semibold leading-5 text-[#536178] sm:text-sm">{message.body}</p></div></div>}
-                  <div className="pointer-events-none absolute inset-x-0 bottom-0 h-1/2 bg-gradient-to-t from-[#081A45]/16 to-transparent opacity-0 transition group-hover:opacity-100" />
-                </div>
-                <div className="min-h-[4.75rem] p-2.5 sm:p-4"><h3 className="line-clamp-2 text-sm font-black leading-snug text-[#081A45] sm:text-base">{message.title}</h3><p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[#536178]">{message.body}</p></div>
+            <article key={message.id} className="group relative aspect-square overflow-hidden rounded-[1.25rem] border border-[#D9E7F8] bg-white shadow-[0_10px_28px_rgba(8,26,69,0.08)] ring-1 ring-white transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-[0_18px_50px_rgba(23,105,255,0.14)]">
+              <button type="button" aria-label={`Open ${type} post: ${title}`} onPointerDown={openPost} onClick={openPost} className="absolute inset-0 block h-full w-full overflow-hidden text-left touch-manipulation focus:outline-none focus:ring-4 focus:ring-inset focus:ring-[#1769FF]/25">
+                {isImage ? (
+                  <>
+                    <SafeImage src={imageSource || imageFallback} fallbackSrc={imageFallback} alt={title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" fallbackTitle={title} fallbackBadge="Community image" fallbackIcon="💬" fallbackMessage="Image preview unavailable" aspect="square" />
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#081A45]/92 via-[#081A45]/10 to-transparent" />
+                    <div className="absolute inset-x-0 bottom-0 p-3 pb-12 sm:p-4 sm:pb-12"><span className="rounded-full border border-white/35 bg-[#081A45]/55 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-white">Image</span><h3 className="mt-2 line-clamp-2 text-sm font-black leading-snug text-white sm:text-base">{title}</h3><p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-white/90 sm:text-xs">{body}</p></div>
+                  </>
+                ) : isPoll ? (
+                  <div className="flex h-full flex-col bg-[radial-gradient(circle_at_top_right,rgba(123,97,255,0.24),transparent_42%),linear-gradient(145deg,#FFFFFF_0%,#EEF6FF_52%,#F1EEFF_100%)] p-3 pb-12 sm:p-4 sm:pb-12">
+                    <span className="w-max rounded-full border border-[#BFD7FF] bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-[#1769FF]">Poll</span>
+                    <h3 className="mt-3 line-clamp-3 text-sm font-black leading-tight text-[#081A45] sm:text-lg">{title}</h3>
+                    {message.body ? <p className="mt-1 line-clamp-2 text-[11px] font-semibold leading-4 text-[#536178]">{message.body}</p> : null}
+                    <div className="mt-auto space-y-1.5">{options.length ? options.map((option, index) => <div key={`${message.id}-${index}`} className="rounded-xl border border-[#D9E7F8] bg-white/90 px-2.5 py-2 text-[10px] font-black text-[#081A45] shadow-sm sm:text-xs"><span className="line-clamp-1">{option}</span></div>) : <div className="rounded-xl border border-dashed border-[#BFD7FF] bg-white/75 px-3 py-2 text-[10px] font-black text-[#1769FF]">Open poll to view options</div>}</div>
+                  </div>
+                ) : (
+                  <div className="flex h-full flex-col bg-[radial-gradient(circle_at_top_left,rgba(23,105,255,0.18),transparent_42%),linear-gradient(145deg,#FFFFFF_0%,#EEF6FF_56%,#F8FBFF_100%)] p-3 pb-12 sm:p-4 sm:pb-12">
+                    <span className="w-max rounded-full border border-[#BFD7FF] bg-white px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.15em] text-[#1769FF]">Text</span>
+                    <div className="my-auto"><h3 className="line-clamp-4 text-base font-black leading-tight text-[#081A45] sm:text-xl">{title}</h3><p className="mt-2 line-clamp-5 text-xs font-semibold leading-5 text-[#536178] sm:text-sm">{body}</p></div>
+                  </div>
+                )}
               </button>
-              <div className="flex items-center justify-end gap-1.5 border-t border-[#EEF6FF] bg-[#FBFDFF] px-2.5 py-2 sm:px-3">
-                <button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-2.5 py-1 text-[11px] font-black ${liked ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D9E7F8] bg-white text-[#1769FF]'}`}>❤️ {message.likeCount || 0}</button>
-                <button type="button" onClick={() => openProfilePostDetail(message.id, true)} className="rounded-full border border-[#D9E7F8] bg-white px-2.5 py-1 text-[11px] font-black text-[#1769FF]">💬 {message.replyCount || message.replies.length}</button>
+
+              <div className="absolute bottom-2 right-2 z-20 flex items-center gap-1.5">
+                <button type="button" onClick={(event) => { event.stopPropagation(); toggleMessageLike(message.id); }} className={`rounded-full border px-2.5 py-1 text-[10px] font-black shadow-sm sm:text-[11px] ${liked ? 'border-[#FAD2CF] bg-[#FCE8E6]/95 text-[#C5221F]' : 'border-white/75 bg-white/92 text-[#1769FF]'}`}>❤️ {message.likeCount || 0}</button>
+                <button type="button" onClick={(event) => { event.stopPropagation(); openProfilePostDetail(message.id, true); }} className="rounded-full border border-white/75 bg-white/92 px-2.5 py-1 text-[10px] font-black text-[#1769FF] shadow-sm sm:text-[11px]">💬 {message.replyCount || message.replies.length}</button>
               </div>
             </article>
           );
@@ -4695,7 +4743,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }
 
   return (
-    <section style={communityCssVars} className="eduvora-community-polish relative h-[100dvh] overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-2 lg:p-3">
+    <section style={communityCssVars} className="eduvora-community-polish relative h-full min-h-0 w-full overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-2 lg:p-3">
       <style>{`
         @keyframes eduvoraBondShine {
           0% { transform: translateX(0); opacity: 0; }
@@ -4709,7 +4757,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {renderMasterTagDetailOverlay()}
       {showStatusRulesModal ? <div className="fixed inset-0 z-[1900] flex items-center justify-center bg-[#081B5C]/55 p-4 backdrop-blur-xl"><div className="max-w-md rounded-[2rem] border border-[#E3ECF8] bg-white p-6 shadow-2xl"><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Status rules</p><h2 className="mt-2 text-2xl font-black text-[#081B5C]">Story visibility</h2><p className="mt-3 text-sm font-bold leading-7 text-[#536178]">You can publish one text, one image, and one poll status every 24 hours. Status stories stay visible for 24 hours, appear on your profile while active, and can be deleted by you anytime.</p><button type="button" onClick={() => setShowStatusRulesModal(false)} className="mt-5 w-full rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-5 py-3 text-sm font-black text-white">Got it</button></div></div> : null}
       {renderStatusViewerModal()}
-      {imageLightbox ? <div className="fixed inset-0 z-[1800] flex items-center justify-center bg-[#081B5C]/80 p-4 backdrop-blur-xl"><button type="button" onClick={() => setImageLightbox(null)} className="absolute right-4 top-4 rounded-full bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Close</button><div className="flex max-h-[90dvh] max-w-[94vw] items-center justify-center overflow-hidden rounded-[2rem] bg-white p-3 shadow-2xl">{renderUploadedImage(imageLightbox.src, imageLightbox.alt, 'original')}</div></div> : null}
+      {imageLightboxPortal}
       <CommunityAiMentor
         isOpen={isCommunityAiOpen}
         userId={guardedAuth.currentUser?.uid || ''}

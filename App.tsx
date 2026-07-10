@@ -4525,7 +4525,11 @@ const App: React.FC = () => {
     if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent(effectiveAppUser)}</div>;
-    if (currentView === 'community') return <div key="community" className={appleOpenClass}><EduvoraCommunity settings={websiteSettings} onClose={() => handleNavigateBack('home')}  isAuthenticated={isLoggedIn} currentUser={effectiveAppUser} /></div>;
+    if (currentView === 'community') return (
+      <div key="community" className="fixed inset-0 z-[1200] min-h-0 min-w-0 overflow-hidden bg-[#F8FBFF]">
+        <EduvoraCommunity settings={websiteSettings} onClose={() => handleNavigateBack('home')} isAuthenticated={isLoggedIn} currentUser={effectiveAppUser} />
+      </div>
+    );
 
     return (
        <ErrorBoundary>
