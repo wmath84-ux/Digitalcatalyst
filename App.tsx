@@ -420,6 +420,7 @@ export interface ProfileStyleSettings {
 }
 
 export interface CommunityStyleSettings {
+    desktopLayout: 'classic' | 'latest';
     pageBackground: string;
     surfaceColor: string;
     cardColor: string;
@@ -882,6 +883,7 @@ const defaultWebsiteSettings: WebsiteSettings = {
             padding: 12,
         },
         communityStyle: {
+            desktopLayout: 'latest',
             pageBackground: '#F8FBFF',
             surfaceColor: '#FFFFFF',
             cardColor: '#FFFFFF',

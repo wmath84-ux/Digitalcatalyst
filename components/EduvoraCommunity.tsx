@@ -250,6 +250,7 @@ const defaultPrivacySettings: PrivacySettings = { profileVisible: true, showActi
 const defaultNotificationPreferences: NotificationPreferences = { replies: true, masterTags: true, statuses: true, creatorPosts: true, follows: true };
 
 const defaultCommunityStyle = {
+  desktopLayout: 'latest',
   pageBackground: '#F8FBFF',
   surfaceColor: '#FFFFFF',
   cardColor: '#FFFFFF',
@@ -862,6 +863,291 @@ const communityPolishCss = `
     color: #315A39 !important;
   }
   .eduvora-community-polish .community-status-poll-progress { background: rgba(122, 74, 58, 0.12) !important; }
+
+  @media (min-width: 1024px) {
+    .community-desktop-latest {
+      background: #F3F7F8 !important;
+      padding: 0.65rem !important;
+    }
+    .community-desktop-latest .eduvora-community-app {
+      border-color: #E2E8F0 !important;
+      border-radius: 1.15rem !important;
+      background: #F8FAFC !important;
+      box-shadow: 0 10px 30px rgba(15, 23, 42, 0.06) !important;
+    }
+    .community-desktop-latest .eduvora-community-app::before {
+      display: none;
+    }
+    .community-desktop-latest .eduvora-community-main {
+      background: #F4F7FA !important;
+      padding: 0.875rem 1rem 1rem !important;
+    }
+    .community-desktop-latest .community-desktop-header {
+      min-height: 68px;
+      border-color: #E3E8EF !important;
+      background: rgba(255, 255, 255, 0.97) !important;
+      padding: 0.55rem 1rem !important;
+      box-shadow: none !important;
+      backdrop-filter: saturate(145%) blur(16px) !important;
+    }
+    .community-desktop-latest .community-desktop-header-inner {
+      max-width: none !important;
+      gap: 1rem !important;
+    }
+    .community-desktop-latest .community-desktop-header h1 {
+      color: #111827 !important;
+      font-size: clamp(1.35rem, 2vw, 1.75rem) !important;
+      font-weight: 800 !important;
+      line-height: 1.1 !important;
+      letter-spacing: -0.035em !important;
+    }
+    .community-desktop-latest .community-desktop-header p {
+      color: #2563EB !important;
+      font-size: 0.64rem !important;
+      letter-spacing: 0.2em !important;
+    }
+    .community-desktop-latest .community-desktop-header-actions {
+      gap: 0.5rem !important;
+    }
+    .community-desktop-latest .community-desktop-header-actions > button,
+    .community-desktop-latest .community-desktop-header-actions > div > button {
+      border-radius: 0.75rem !important;
+      box-shadow: none !important;
+      transform: none !important;
+    }
+    .community-desktop-latest .community-desktop-feed-filters {
+      border-color: #E3E8EF !important;
+      border-radius: 0.75rem !important;
+      background: #F7F9FC !important;
+      padding: 0.22rem !important;
+    }
+    .community-desktop-latest .community-desktop-feed-filters button {
+      min-height: 2.2rem !important;
+      border-radius: 0.58rem !important;
+      padding-inline: 0.7rem !important;
+      font-size: 0.68rem !important;
+      font-weight: 750 !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-latest .community-desktop-sidebar {
+      border-color: #E3E8EF !important;
+      background: #FFFFFF !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-latest .community-desktop-brand {
+      border-color: #E3E8EF !important;
+      border-radius: 0.9rem !important;
+      background: #F8FAFC !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-latest .community-desktop-brand > span:first-child,
+    .community-desktop-latest .community-desktop-brand > span:nth-child(2) {
+      opacity: 0.45 !important;
+    }
+    .community-desktop-latest .community-desktop-nav {
+      padding-right: 0 !important;
+    }
+    .community-desktop-latest .community-desktop-nav-item {
+      min-height: 46px !important;
+      border-radius: 0.75rem !important;
+      font-size: 0.875rem !important;
+      font-weight: 700 !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-latest .community-desktop-nav-item[aria-current='page'] {
+      background: #EEF4FF !important;
+      color: var(--community-primary) !important;
+    }
+    .community-desktop-latest .community-desktop-nav-item:not([aria-current='page']):hover {
+      background: #F6F8FB !important;
+      color: #1F2937 !important;
+    }
+    .community-desktop-latest .community-desktop-nav-icon {
+      height: 2.25rem !important;
+      width: 2.25rem !important;
+      border-radius: 0.65rem !important;
+      background: transparent !important;
+      color: inherit !important;
+      font-size: 1.05rem !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-latest .community-desktop-member-card {
+      border-color: #E3E8EF !important;
+      border-radius: 0.9rem !important;
+      background: #FAFBFC !important;
+      padding: 0.7rem !important;
+      box-shadow: none !important;
+      transform: none !important;
+    }
+    .community-desktop-latest .community-desktop-feed-layout {
+      height: calc(100dvh - 7.25rem) !important;
+      max-height: calc(100dvh - 7.25rem) !important;
+      max-width: none !important;
+      grid-template-columns: minmax(20rem, 26rem) minmax(0, 1fr) !important;
+      gap: 0.875rem !important;
+    }
+    .community-desktop-latest .community-desktop-feed-list {
+      border-color: #E3E8EF !important;
+      border-radius: 1rem !important;
+      background: #F9FBFC !important;
+      padding: 0.55rem !important;
+      box-shadow: none !important;
+      backdrop-filter: none !important;
+    }
+    .community-desktop-latest .community-desktop-feed-list > div {
+      gap: 0.55rem !important;
+    }
+    .community-desktop-latest .community-desktop-feed-card {
+      border-color: #E3E8EF !important;
+      border-radius: 0.875rem !important;
+      background: #FFFFFF !important;
+      box-shadow: none !important;
+      transform: none !important;
+    }
+    .community-desktop-latest .community-desktop-feed-card:hover {
+      border-color: #CBD5E1 !important;
+      background: #FFFFFF !important;
+    }
+    .community-desktop-latest .community-desktop-feed-card:has(.community-desktop-feed-card-main.border-\[\#1769FF\]) {
+      border-color: #AFC7F7 !important;
+      background: #F8FBFF !important;
+    }
+    .community-desktop-latest .community-desktop-feed-card-main {
+      padding: 0.8rem 0.85rem !important;
+      gap: 0.7rem !important;
+    }
+    .community-desktop-latest .community-desktop-feed-card-main > span:last-child > span:first-child > span:first-child {
+      color: #111827 !important;
+      font-weight: 760 !important;
+    }
+    .community-desktop-latest .community-desktop-feed-card-actions {
+      justify-content: flex-start !important;
+      gap: 0.15rem !important;
+      border-color: #EDF1F5 !important;
+      padding: 0.38rem 0.65rem !important;
+    }
+    .community-desktop-latest .community-desktop-feed-card-actions button {
+      border-color: transparent !important;
+      border-radius: 0.55rem !important;
+      background: transparent !important;
+      padding: 0.35rem 0.5rem !important;
+      color: #64748B !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-latest .community-desktop-feed-card-actions button:hover {
+      background: #F1F5F9 !important;
+      color: var(--community-primary) !important;
+    }
+    .community-desktop-latest .community-desktop-thread {
+      border-color: #E3E8EF !important;
+      border-radius: 1rem !important;
+      background: #FFFFFF !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-latest .community-desktop-thread-header {
+      min-height: 64px;
+      border-color: #E3E8EF !important;
+      background: #FFFFFF !important;
+      padding: 0.7rem 1rem !important;
+    }
+    .community-desktop-latest .community-desktop-thread-header h2 {
+      color: #111827 !important;
+      font-weight: 780 !important;
+    }
+    .community-desktop-latest .community-desktop-thread-header button {
+      border-radius: 0.72rem !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-latest .community-desktop-thread-scroll {
+      background: #FFFFFF !important;
+      padding: 0.75rem 1rem 1rem !important;
+    }
+    .community-desktop-latest .community-desktop-post-card {
+      max-width: 48rem !important;
+      border-color: transparent !important;
+      border-radius: 0 !important;
+      background: #FFFFFF !important;
+      padding: 1.25rem 1.35rem !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-latest .community-desktop-post-card > h3 {
+      color: #111827 !important;
+      font-size: clamp(1.55rem, 2.3vw, 2rem) !important;
+      font-weight: 800 !important;
+      line-height: 1.2 !important;
+      letter-spacing: -0.035em !important;
+    }
+    .community-desktop-latest .community-desktop-post-card > p {
+      color: #475569 !important;
+      font-size: 1rem !important;
+      font-weight: 520 !important;
+      line-height: 1.75 !important;
+    }
+    .community-desktop-latest .community-desktop-post-media {
+      width: 100% !important;
+      max-width: 42rem !important;
+      max-height: 68vh !important;
+      aspect-ratio: auto !important;
+      border-color: #E2E8F0 !important;
+      border-radius: 1rem !important;
+      background: #F8FAFC !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-latest .community-desktop-post-media img {
+      max-height: 68vh !important;
+      max-width: 100% !important;
+      object-fit: contain !important;
+    }
+    .community-desktop-latest .community-desktop-reactions {
+      gap: 0.2rem !important;
+      border-top: 1px solid #EDF1F5;
+      padding-top: 0.9rem;
+    }
+    .community-desktop-latest .community-desktop-reaction-chip {
+      border-color: transparent !important;
+      border-radius: 0.55rem !important;
+      background: transparent !important;
+      padding: 0.4rem 0.55rem !important;
+      color: #64748B !important;
+      font-weight: 700 !important;
+      box-shadow: none !important;
+    }
+    .community-desktop-latest .community-desktop-reaction-chip:hover {
+      background: #F1F5F9 !important;
+      color: var(--community-primary) !important;
+    }
+    .community-desktop-latest .community-desktop-reply-composer {
+      border-color: #E3E8EF !important;
+      background: #FFFFFF !important;
+      padding: 0.7rem 1rem !important;
+    }
+    .community-desktop-latest .community-desktop-reply-composer textarea {
+      min-height: 44px !important;
+      border-color: #DDE3EA !important;
+      border-radius: 0.75rem !important;
+      background: #F8FAFC !important;
+      padding: 0.65rem 0.85rem !important;
+      color: #1F2937 !important;
+      font-weight: 550 !important;
+      line-height: 1.4 !important;
+    }
+    .community-desktop-latest .community-desktop-reply-composer > div > button {
+      min-height: 44px !important;
+      height: 44px !important;
+      min-width: 5rem !important;
+      border-radius: 0.75rem !important;
+      background: var(--community-primary) !important;
+      box-shadow: none !important;
+    }
+  }
+  @media (min-width: 1024px) and (max-width: 1279px) {
+    .community-desktop-latest .community-desktop-feed-filters {
+      display: none !important;
+    }
+    .community-desktop-latest .community-desktop-feed-layout {
+      grid-template-columns: minmax(18rem, 22rem) minmax(0, 1fr) !important;
+    }
+  }
   @media (max-width: 767px) {
     .eduvora-community-app {
       border: 0 !important;
@@ -3144,7 +3430,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (message.docId) updateDoc(doc(db, COMMUNITY_FEED, message.docId), { ...(previousEmoji ? { [`reactionCounts.${previousEmoji}`]: increment(-1) } : {}), [`reactionCounts.${emoji}`]: increment(1), [`reactionUsers.${currentUserKey}`]: emoji }).catch((error) => console.warn('Reaction update failed', error));
   };
 
-  const renderReactionStrip = (message: FeedMessage) => <div className="mt-3 flex flex-wrap gap-2">{REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMessage(message, emoji)} title={`${emoji} reactions`} className="rounded-full border border-[#DADCE0] bg-white px-3 py-1.5 text-xs font-black text-[#202124] shadow-[0_1px_2px_rgba(60,64,67,0.16)] transition hover:border-[#1A73E8] hover:text-[#1967D2] hover:shadow-[0_2px_6px_rgba(60,64,67,0.18)]"><span>{emoji}</span> <span>{(message.reactionCounts || {})[emoji] || 0}</span></button>)}</div>;
+  const renderReactionStrip = (message: FeedMessage) => <div className="community-desktop-reactions mt-3 flex flex-wrap gap-2">{REACTION_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => reactToMessage(message, emoji)} title={`${emoji} reactions`} className="community-desktop-reaction-chip rounded-full border border-[#DADCE0] bg-white px-3 py-1.5 text-xs font-black text-[#202124] shadow-[0_1px_2px_rgba(60,64,67,0.16)] transition hover:border-[#1A73E8] hover:text-[#1967D2] hover:shadow-[0_2px_6px_rgba(60,64,67,0.18)]"><span>{emoji}</span> <span>{(message.reactionCounts || {})[emoji] || 0}</span></button>)}</div>;
 
 
   const voteOnStatusPoll = (statusId: number, optionIndex: number) => {
@@ -3791,8 +4077,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const MessageSummaryCard: React.FC<{ message: FeedMessage; isActive?: boolean }> = ({ message, isActive = false }) => {
     const liked = Boolean(message.likedByUsers?.[currentUserKey]) || likedMessages.includes(message.id);
     return (
-      <article className={`overflow-hidden rounded-[1.35rem] border bg-white shadow-sm transition duration-300 ${isActive ? 'border-[#1769FF] bg-[#F8FBFF] shadow-[0_14px_34px_rgba(26,115,232,0.10)] ring-2 ring-[#E8F2FF]' : 'border-[#D9E7F8] hover:border-[#BFD7FF] hover:bg-[#F8FBFF]'}`}>
-        <button type="button" onClick={() => openMessage(message.id)} className={`flex w-full items-start gap-3 border-l-4 px-3 py-3 text-left transition sm:px-4 ${isActive ? 'border-[#1769FF]' : 'border-transparent'}`}>
+      <article className={`community-desktop-feed-card overflow-hidden rounded-[1.35rem] border bg-white shadow-sm transition duration-300 ${isActive ? 'community-desktop-feed-card-active border-[#1769FF] bg-[#F8FBFF] shadow-[0_14px_34px_rgba(26,115,232,0.10)] ring-2 ring-[#E8F2FF]' : 'border-[#D9E7F8] hover:border-[#BFD7FF] hover:bg-[#F8FBFF]'}`}>
+        <button type="button" onClick={() => openMessage(message.id)} className={`community-desktop-feed-card-main flex w-full items-start gap-3 border-l-4 px-3 py-3 text-left transition sm:px-4 ${isActive ? 'border-[#1769FF]' : 'border-transparent'}`}>
           <Avatar value={resolveAvatar(message)} size="h-11 w-11" />
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center justify-between gap-3">
@@ -3807,7 +4093,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <span className="mt-2 line-clamp-2 text-xs font-semibold leading-5 text-[#536178] sm:text-sm">{message.body || message.badge}</span>
           </span>
         </button>
-        <div className="flex flex-wrap items-center justify-end gap-1.5 border-t border-[#EEF6FF] px-3 py-2 sm:px-4">
+        <div className="community-desktop-feed-card-actions flex flex-wrap items-center justify-end gap-1.5 border-t border-[#EEF6FF] px-3 py-2 sm:px-4">
           <button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-3 py-1.5 text-[11px] font-black transition ${liked ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D9E7F8] bg-[#E8F2FF] text-[#1769FF]'}`}>❤️ {message.likeCount || 0}</button>
           <button type="button" onClick={() => { openMessage(message.id); setExpandedReplyId(message.id); }} className="rounded-full border border-[#D9E7F8] bg-white px-3 py-1.5 text-[11px] font-black text-[#1769FF] transition hover:border-[#1769FF]">💬 {message.replyCount || message.replies.length}</button>
           {REACTION_EMOJIS.slice(0, 3).map((emoji) => <button key={emoji} type="button" onClick={() => reactToMessage(message, emoji)} className="rounded-full border border-[#D9E7F8] bg-white px-2 py-1.5 text-[11px] font-black text-[#081A45]">{emoji} {(message.reactionCounts || {})[emoji] || 0}</button>)}
@@ -3851,8 +4137,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const canSendReply = Boolean(draft.trim()) && !replySendingIds[message.id] && !(typeof navigator !== 'undefined' && !navigator.onLine);
     const threadHighlighted = highlightedThreadId === message.id;
     return (
-      <div className={`flex min-h-0 flex-col overflow-hidden bg-[#F8FBFF] ${fullScreen ? 'h-[calc(100dvh-6rem)] md:h-[calc(100dvh-7rem)]' : 'h-full rounded-[1.75rem] border border-[#D9E7F8] shadow-[0_16px_48px_rgba(23,105,255,0.08)]'}`}>
-        <div className="sticky top-0 z-10 border-b border-[#D9E7F8] bg-white px-4 py-3 lg:px-6">
+      <div className={`community-desktop-thread flex min-h-0 flex-col overflow-hidden bg-[#F8FBFF] ${fullScreen ? 'h-[calc(100dvh-6rem)] md:h-[calc(100dvh-7rem)]' : 'h-full rounded-[1.75rem] border border-[#D9E7F8] shadow-[0_16px_48px_rgba(23,105,255,0.08)]'}`}>
+        <div className="community-desktop-thread-header sticky top-0 z-10 border-b border-[#D9E7F8] bg-white px-4 py-3 lg:px-6">
           <div className="flex items-center gap-3">
             <button type="button" onClick={() => { const ownerId = getMessageOwnerId(message); if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); } }} className="shrink-0"><Avatar value={resolveAvatar(message)} size="h-10 w-10" /></button>
             <div className="min-w-0 flex-1">
@@ -3862,17 +4148,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             {isOwnCommunityId(getMessageOwnerId(message)) ? <button type="button" onClick={() => deleteOwnFeedPost(message)} className="min-h-11 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-3 text-xs font-black text-[#C5221F]">Delete</button> : null}<button type="button" onClick={() => setExpandedReplyId(message.id)} className="min-h-11 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-xs font-black text-[#1769FF]">Reply</button>
           </div>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-3 py-4 pb-4 custom-scrollbar sm:px-5 lg:px-7">
-          <article className={`mx-auto max-w-3xl rounded-[1.8rem] border bg-white p-4 shadow-[0_14px_44px_rgba(23,105,255,0.08)] transition ${threadHighlighted ? 'border-[#7B61FF] ring-4 ring-[#F1EEFF]' : 'border-[#D9E7F8]'}`}>
+        <div className="community-desktop-thread-scroll min-h-0 flex-1 overflow-y-auto px-3 py-4 pb-4 custom-scrollbar sm:px-5 lg:px-7">
+          <article className={`community-desktop-post-card mx-auto max-w-3xl rounded-[1.8rem] border bg-white p-4 shadow-[0_14px_44px_rgba(23,105,255,0.08)] transition ${threadHighlighted ? 'border-[#7B61FF] ring-4 ring-[#F1EEFF]' : 'border-[#D9E7F8]'}`}>
             <h3 className="text-2xl font-black tracking-tight text-[#081A45] lg:text-4xl">{message.title}</h3>
             <p className="mt-3 whitespace-pre-wrap text-base font-semibold leading-8 text-[#536178] sm:text-lg">{message.body}</p>
-            {message.imagePreview ? <div className="mt-5 aspect-square max-w-md overflow-hidden rounded-[2rem] border border-[#BFD7FF] bg-gradient-to-br from-[#E8F2FF] via-[#F8FBFF] to-[#F1EEFF] shadow-inner">{renderUploadedImage(message.imagePreview, message.title, message.imageLayout || 'thumbnail')}</div> : null}
+            {message.imagePreview ? <div className="community-desktop-post-media mt-5 aspect-square max-w-md overflow-hidden rounded-[2rem] border border-[#BFD7FF] bg-gradient-to-br from-[#E8F2FF] via-[#F8FBFF] to-[#F1EEFF] shadow-inner">{renderUploadedImage(message.imagePreview, message.title, message.imageLayout || 'thumbnail')}</div> : null}
             {message.pollOptions ? <div className="mt-5 space-y-3 rounded-[1.6rem] border border-[#CEEAD6] bg-[#E6F4EA] p-4">{message.pollOptions.map((option, index) => { const votes = message.pollVotes || message.pollOptions!.map(() => 0); const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0)); const percent = Math.round((votes[index] / total) * 100); const selectedOption = message.pollVoters?.[currentUserKey]; const selected = selectedOption === index; return <button key={option} type="button" onClick={() => voteOnMessagePoll(message.id, index)} disabled={selectedOption !== undefined} className={`relative w-full overflow-hidden rounded-2xl border px-4 py-3 text-left font-black transition disabled:cursor-not-allowed ${selected ? 'border-[#34A853] bg-white text-[#137333]' : 'border-[#CEEAD6] bg-white text-[#081A45] hover:border-[#34A853] disabled:hover:border-[#CEEAD6]'}`}><span className="absolute inset-y-0 left-0 bg-[#CEEAD6]" style={{ width: selectedOption !== undefined ? `${percent}%` : '0%' }} /><span className="relative flex items-center justify-between"><span>{option}</span>{selectedOption !== undefined ? <span>{percent}% · {votes[index]}</span> : <span>Vote</span>}</span></button>; })}</div> : null}
             {renderReactionStrip(message)}<div className="mt-5 flex flex-wrap gap-2"><button type="button" onClick={() => toggleMessageLike(message.id)} className={`rounded-full border px-3 py-1.5 text-sm font-black transition ${(message.likedByUsers?.[currentUserKey] || likedMessages.includes(message.id)) ? 'border-[#F8D7DA] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D9E7F8] bg-[#E8F2FF] text-[#1769FF]'}`}>❤️ {message.likeCount || 0}</button><span className="rounded-full border border-[#D9E7F8] bg-[#E8F2FF] px-3 py-1.5 text-sm font-black text-[#1769FF]">💬 {message.replyCount || message.replies.length}</span></div>
           </article>
           <div className="mx-auto mt-5 max-w-3xl space-y-3 pb-4">{message.replies.length ? message.replies.map((reply) => renderReplyBubble(message, reply)) : <div className="rounded-[1.6rem] border border-dashed border-[#D9E7F8] bg-white p-6 text-center text-sm font-bold text-[#7C879A]">No replies yet. Start the conversation.</div>}</div>
         </div>
-        <div ref={replyComposerRef} data-community-replybar="true" className="shrink-0 border-t border-[#D9E7F8] bg-white p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:p-4">
+        <div ref={replyComposerRef} data-community-replybar="true" className="community-desktop-reply-composer shrink-0 border-t border-[#D9E7F8] bg-white p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] lg:p-4">
           <div className="mx-auto flex max-w-3xl items-end gap-2">
             <textarea ref={replyInputRef} value={draft} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value.slice(0, COMMUNITY_REPLY_MAX_LENGTH) }))} onFocus={() => { loadRepliesForMessage(message); setExpandedReplyId(message.id); }} placeholder="Write a respectful reply…" maxLength={COMMUNITY_REPLY_MAX_LENGTH} rows={1} className="min-h-12 min-w-0 flex-1 resize-none rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-3 text-sm font-bold leading-6 text-[#081A45] outline-none transition focus:border-[#1769FF] focus:bg-white" />
             <button type="button" onClick={() => submitReply(message.id)} disabled={!canSendReply} className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-4 text-sm font-black text-white shadow-[0_14px_34px_rgba(23,105,255,0.22)] disabled:cursor-not-allowed disabled:opacity-45">{replySendingIds[message.id] ? 'Sending…' : 'Send'}</button>
@@ -3894,11 +4180,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
     return (
       <>
-        <div className="mx-auto grid h-[calc(100dvh-8.5rem)] max-h-[calc(100dvh-8.5rem)] min-h-0 w-full min-w-0 max-w-[1600px] gap-4 overflow-hidden lg:gap-5 md:grid-cols-[minmax(0,clamp(18rem,28vw,25rem))_minmax(0,1fr)]">
-          <aside className="hidden h-full min-h-0 min-w-0 overflow-y-auto rounded-[2rem] border border-[#D9E7F8] bg-white p-3 shadow-[0_20px_60px_rgba(23,105,255,0.08)] ring-1 ring-[#EEF6FF] backdrop-blur-xl custom-scrollbar md:block">
+        <div className="community-desktop-feed-layout mx-auto grid h-[calc(100dvh-8.5rem)] max-h-[calc(100dvh-8.5rem)] min-h-0 w-full min-w-0 max-w-[1600px] gap-4 overflow-hidden lg:gap-5 md:grid-cols-[minmax(0,clamp(18rem,28vw,25rem))_minmax(0,1fr)]">
+          <aside className="community-desktop-feed-list hidden h-full min-h-0 min-w-0 overflow-y-auto rounded-[2rem] border border-[#D9E7F8] bg-white p-3 shadow-[0_20px_60px_rgba(23,105,255,0.08)] ring-1 ring-[#EEF6FF] backdrop-blur-xl custom-scrollbar md:block">
             <div className="space-y-3">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} isActive={activeMessage?.id === message.id} />)}</div>
           </aside>
-          <section className="hidden min-h-0 min-w-0 overflow-hidden md:block">{activeMessage ? renderMessageDetails(activeMessage) : null}</section>
+          <section className="community-desktop-thread-pane hidden min-h-0 min-w-0 overflow-hidden md:block">{activeMessage ? renderMessageDetails(activeMessage) : null}</section>
           <div className="h-full space-y-3 overflow-y-auto pb-[calc(env(safe-area-inset-bottom)+6rem)] custom-scrollbar md:hidden">{feedMessages.map((message) => <MessageSummaryCard key={message.id} message={message} />)}</div>
         </div>
       </>
@@ -4508,6 +4794,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     ...defaultCommunityStyle,
     ...((settings?.content as any)?.communityStyle || {}),
   };
+  const useLatestDesktopLayout = communityStyle.desktopLayout !== 'classic';
 
   const communityCssVars = useMemo(
     () => toCommunityCssVars(communityStyle),
@@ -4574,8 +4861,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [activeConversationId, activeNavItem.label, activeView, allCreators, page, profile.name, selectedMasterTag, selectedMessage?.body, selectedMessage?.title, selectedStatus.body]);
 
   const CommunityHeader = () => (
-    <header className="sticky top-0 z-[1200] shrink-0 border-b border-[#D9E7F8] bg-white/94 px-3 py-2 shadow-[0_14px_36px_rgba(23,105,255,0.08)] backdrop-blur-2xl sm:px-5 lg:px-6 lg:py-3">
-      <div className="mx-auto grid max-w-[1500px] grid-cols-[minmax(0,1fr)_auto] items-start gap-2 lg:grid-cols-[minmax(13rem,1fr)_minmax(15rem,auto)] lg:items-center lg:gap-3">
+    <header className="community-desktop-header sticky top-0 z-[1200] shrink-0 border-b border-[#D9E7F8] bg-white/94 px-3 py-2 shadow-[0_14px_36px_rgba(23,105,255,0.08)] backdrop-blur-2xl sm:px-5 lg:px-6 lg:py-3">
+      <div className="community-desktop-header-inner mx-auto grid max-w-[1500px] grid-cols-[minmax(0,1fr)_auto] items-start gap-2 lg:grid-cols-[minmax(13rem,1fr)_minmax(15rem,auto)] lg:items-center lg:gap-3">
         <div className="flex min-w-0 items-center gap-3">
           <button type="button" onClick={goBack} aria-label="Back from Community" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-[0_12px_30px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16">←</button>
           <div className="min-w-0">
@@ -4584,10 +4871,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           </div>
         </div>
 
-        <div className="-mt-0.5 flex min-w-0 shrink-0 items-center justify-end gap-2 lg:mt-0">
+        <div className="community-desktop-header-actions -mt-0.5 flex min-w-0 shrink-0 items-center justify-end gap-2 lg:mt-0">
           <button type="button" onClick={() => onClose?.()} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] lg:inline-flex">← Leave</button>
           <button type="button" ref={communityAiButtonRef} onClick={openCommunityAiMentor} aria-label="Open Community AI Mentor" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-xs font-black text-white shadow-[0_14px_32px_rgba(123,97,255,0.24)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[#7B61FF]/20 active:scale-95"><span aria-hidden="true">✦</span><span className="sr-only">AI</span></button>
-          {page === 'chat' && activeView === 'feed' ? <div className="hidden min-w-0 items-center gap-1 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 md:flex">{feedFilterOptions.map((option) => <button key={option.key} type="button" onClick={() => setFeedFilter(option.key)} className={`min-h-9 shrink-0 rounded-xl px-3 text-[11px] font-black transition ${feedFilter === option.key ? 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-sm' : 'text-[#536178] hover:bg-white hover:text-[#1769FF]'}`}>{option.label}<span className="ml-1 opacity-80">{compactCount(option.count)}</span></button>)}</div> : null}
+          {page === 'chat' && activeView === 'feed' ? <div className="community-desktop-feed-filters hidden min-w-0 items-center gap-1 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 md:flex">{feedFilterOptions.map((option) => <button key={option.key} type="button" onClick={() => setFeedFilter(option.key)} className={`min-h-9 shrink-0 rounded-xl px-3 text-[11px] font-black transition ${feedFilter === option.key ? 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-sm' : 'text-[#536178] hover:bg-white hover:text-[#1769FF]'}`}>{option.label}<span className="ml-1 opacity-80">{compactCount(option.count)}</span></button>)}</div> : null}
           {page === 'chat' && activeView === 'status' ? <div className="hidden items-center gap-1 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 md:flex"><button type="button" onClick={openStatusUploadFromTop} className="min-h-9 rounded-xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-3 text-[11px] font-black text-white">Create</button><button type="button" onClick={openMyStatusesFromTop} className="min-h-9 rounded-xl bg-white px-3 text-[11px] font-black text-[#081A45]">Your status</button><button type="button" onClick={() => setShowStatusRulesModal(true)} className="min-h-9 rounded-xl bg-white px-3 text-[11px] font-black text-[#1769FF]">Rules</button></div> : null}
           {showCreateCta ? <button type="button" onClick={handleHeaderCreate} className="hidden rounded-2xl bg-gradient-to-r from-[#7B61FF] to-[#1769FF] px-4 py-3 text-xs font-black text-white shadow-[0_16px_38px_rgba(23,105,255,0.22)] transition hover:-translate-y-0.5 hidden">Create</button> : null}
           <button type="button" onClick={() => pushPage('network')} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-3 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] xl:flex">⌕ Search</button>
@@ -4607,11 +4894,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return (
       <aside
         aria-label="Community sidebar"
-        className={`hidden min-h-0 shrink-0 flex-col overflow-hidden border-r border-[#D9E7F8] bg-white shadow-[18px_0_60px_rgba(23,105,255,0.08)] transition-[width,padding] duration-300 ease-out lg:flex ${sidebarExpanded ? 'w-[clamp(16.5rem,20vw,18.5rem)] p-4 xl:p-5' : 'w-[5.5rem] p-3'}`}
+        className={`community-desktop-sidebar hidden min-h-0 shrink-0 flex-col overflow-hidden border-r border-[#D9E7F8] bg-white shadow-[18px_0_60px_rgba(23,105,255,0.08)] transition-[width,padding] duration-300 ease-out lg:flex ${sidebarExpanded ? 'w-[clamp(16.5rem,20vw,18.5rem)] p-4 xl:p-5' : 'w-[5.5rem] p-3'}`}
       >
         <div className={`mb-4 flex items-center gap-2 ${sidebarExpanded ? 'justify-between' : 'justify-center'}`}>
           {sidebarExpanded ? (
-            <div className="group relative min-w-0 flex-1 overflow-hidden rounded-[1.55rem] border border-[#D9E7F8] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EEF6FF] p-2 shadow-[0_18px_42px_rgba(23,105,255,0.12)]">
+            <div className="community-desktop-brand group relative min-w-0 flex-1 overflow-hidden rounded-[1.55rem] border border-[#D9E7F8] bg-gradient-to-br from-white via-[#F8FBFF] to-[#EEF6FF] p-2 shadow-[0_18px_42px_rgba(23,105,255,0.12)]">
               <span className="pointer-events-none absolute -right-10 -top-10 h-24 w-24 rounded-full bg-[#7B61FF]/14 blur-2xl" />
               <span className="pointer-events-none absolute inset-y-2 left-0 w-1 rounded-r-full bg-gradient-to-b from-[#1769FF] to-[#7B61FF]" />
               <div className="relative flex min-w-0 items-center gap-3 pl-1">
@@ -4637,7 +4924,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           </button>
         </div>
 
-        <nav aria-label="Community sections" className="min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
+        <nav aria-label="Community sections" className="community-desktop-nav min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
           {navItems.map((item) => (
             <button
               key={item.label}
@@ -4646,10 +4933,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
               title={item.label}
               aria-label={item.label}
               aria-current={item.active ? 'page' : undefined}
-              className={`group relative flex min-h-[52px] w-full items-center gap-3 overflow-hidden rounded-[1.35rem] px-2.5 text-left text-sm font-black transition duration-200 focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 ${sidebarExpanded ? 'justify-start' : 'justify-center'} ${item.active ? 'bg-gradient-to-r from-[#E8F2FF] to-[#F1EEFF] text-[#1769FF] shadow-[0_16px_38px_rgba(23,105,255,0.13)]' : 'text-[#536178] hover:bg-[#F8FBFF] hover:text-[#081A45]'}`}
+              className={`community-desktop-nav-item group relative flex min-h-[52px] w-full items-center gap-3 overflow-hidden rounded-[1.35rem] px-2.5 text-left text-sm font-black transition duration-200 focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 ${sidebarExpanded ? 'justify-start' : 'justify-center'} ${item.active ? 'bg-gradient-to-r from-[#E8F2FF] to-[#F1EEFF] text-[#1769FF] shadow-[0_16px_38px_rgba(23,105,255,0.13)]' : 'text-[#536178] hover:bg-[#F8FBFF] hover:text-[#081A45]'}`}
             >
               {item.active ? <span className="absolute inset-y-3 left-0 w-1 rounded-r-full bg-gradient-to-b from-[#1769FF] to-[#7B61FF]" aria-hidden="true" /> : null}
-              <span className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-[1.05rem] text-lg transition ${item.active ? 'bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-white shadow-[0_10px_24px_rgba(23,105,255,0.24)]' : 'bg-[#EEF6FF] text-[#1769FF] group-hover:bg-white group-hover:text-[#7B61FF] group-hover:shadow-sm'}`} aria-hidden="true">{item.icon}</span>
+              <span className={`community-desktop-nav-icon flex h-10 w-10 shrink-0 items-center justify-center rounded-[1.05rem] text-lg transition ${item.active ? 'bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-white shadow-[0_10px_24px_rgba(23,105,255,0.24)]' : 'bg-[#EEF6FF] text-[#1769FF] group-hover:bg-white group-hover:text-[#7B61FF] group-hover:shadow-sm'}`} aria-hidden="true">{item.icon}</span>
               {sidebarExpanded ? <span className="min-w-0 flex-1 truncate">{item.label}</span> : null}
             </button>
           ))}
@@ -4659,7 +4946,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           type="button"
           onClick={() => { setSelectedProfileId(null); setProfileViewMode('overview'); pushPage('profile'); }}
           aria-label={`Open profile for ${memberName}`}
-          className={`mt-4 flex w-full items-center gap-3 rounded-[1.6rem] border border-[#D9E7F8] bg-gradient-to-br from-white to-[#F8FBFF] p-3 text-left shadow-[0_16px_38px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_46px_rgba(123,97,255,0.13)] focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 ${sidebarExpanded ? 'justify-start' : 'justify-center'}`}
+          className={`community-desktop-member-card mt-4 flex w-full items-center gap-3 rounded-[1.6rem] border border-[#D9E7F8] bg-gradient-to-br from-white to-[#F8FBFF] p-3 text-left shadow-[0_16px_38px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_46px_rgba(123,97,255,0.13)] focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 ${sidebarExpanded ? 'justify-start' : 'justify-center'}`}
           title={memberName}
         >
           <Avatar value={getOwnDisplayAvatar()} size="h-11 w-11" />
@@ -5065,7 +5352,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }
 
   return (
-    <section style={communityCssVars} className="eduvora-community-polish relative h-full min-h-0 w-full overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-2 lg:p-3">
+    <section style={communityCssVars} className={`eduvora-community-polish relative h-full min-h-0 w-full overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-2 lg:p-3 ${useLatestDesktopLayout ? 'community-desktop-latest' : 'community-desktop-classic'}`}>
       <style>{`
         @keyframes eduvoraBondShine {
           0% { transform: translateX(0); opacity: 0; }
