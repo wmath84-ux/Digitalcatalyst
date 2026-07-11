@@ -204,7 +204,7 @@ const HomeSideDock: React.FC<HomeSideDockProps> = ({
 
   return (
     <aside
-      className="fixed inset-y-0 left-0 z-[80] hidden overflow-visible bg-gradient-to-b from-[#EEF6FF] via-[#F8FBFF] to-[#E8F2FF] p-2 transition-[width] duration-300 ease-out lg:flex"
+      className="fixed inset-y-0 left-0 z-[80] hidden overflow-visible bg-[var(--color-background)] p-2 transition-[width] duration-300 ease-out lg:flex"
       style={{ width: visualWidth }}
       data-sidebar-state={sidebarState}
       data-hover-expanded={hoverExpanded ? 'true' : 'false'}
