@@ -25,6 +25,15 @@ test('story/profile jumps preserve the previous community page', () => {
   assert.match(communitySource, /if \(ownerId\) \{ setSelectedProfileId\(ownerId\); setProfileViewMode\('overview'\); setProfileContentTab\('posts'\); pushPage\('profile'\); \}/);
 });
 
+test('mobile course player seeds a base entry before its initially open module layer', () => {
+  assert.ok(courseSource.includes("const courseHistoryReadyRef = useRef(false);"));
+  assert.ok(courseSource.includes("dcCourseLayer: null"));
+  assert.ok(courseSource.includes("if (window.history.state?.dcView === 'coursePlayer') {"));
+  assert.ok(courseSource.includes("window.history.replaceState(baseState, '', window.location.href);"));
+  assert.ok(courseSource.includes("window.history.pushState({ ...baseState, dcCourseLayer: 'modules' }, '', window.location.href);"));
+  assert.ok(courseSource.includes("if (!courseHistoryReadyRef.current || courseHistoryRestoringRef.current) return;"));
+});
+
 test('course player module panel and AI mentor are back-navigation layers', () => {
   assert.match(courseSource, /dcCourseLayer/);
   assert.match(courseSource, /writeCourseHistoryLayer\('mentor', 'push'\)/);

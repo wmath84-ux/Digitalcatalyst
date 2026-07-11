@@ -1449,6 +1449,7 @@ const CoursePlayer: React.FC<{
   const isMentorOpenRef = useRef(isMentorOpen);
   const forceOverlaySidebarRef = useRef(forceOverlaySidebar);
   const courseHistoryRestoringRef = useRef(false);
+  const courseHistoryReadyRef = useRef(false);
 
   useEffect(() => {
     isSidebarOpenRef.current = isSidebarOpen;
@@ -1471,6 +1472,40 @@ const CoursePlayer: React.FC<{
     if (mode === 'push') window.history.pushState(nextState, '', window.location.href);
     else window.history.replaceState(nextState, '', window.location.href);
   }, [activeFile?.id, product.id]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+
+    courseHistoryReadyRef.current = false;
+    const timer = window.setTimeout(() => {
+      const baseState = {
+        ...(window.history.state || {}),
+        dcView: 'coursePlayer',
+        dcAppEntry: true,
+        dcCourseLayer: null,
+        dcCourseProductId: product.id,
+        dcCourseFileId: activeFile?.id || null,
+      };
+
+      if (window.history.state?.dcView === 'coursePlayer') {
+        window.history.replaceState(baseState, '', window.location.href);
+      } else {
+        window.history.pushState(baseState, '', window.location.href);
+      }
+
+      courseHistoryReadyRef.current = true;
+      if (isMentorOpenRef.current) {
+        window.history.pushState({ ...baseState, dcCourseLayer: 'mentor' }, '', window.location.href);
+      } else if (isSidebarOpenRef.current && forceOverlaySidebarRef.current) {
+        window.history.pushState({ ...baseState, dcCourseLayer: 'modules' }, '', window.location.href);
+      }
+    }, 0);
+
+    return () => {
+      window.clearTimeout(timer);
+      courseHistoryReadyRef.current = false;
+    };
+  }, [product.id]);
 
   const closeCourseLayerHistory = useCallback((layer: 'modules' | 'mentor') => {
     if (typeof window !== 'undefined' && window.history.state?.dcView === 'coursePlayer' && window.history.state?.dcCourseLayer === layer) {
@@ -1526,7 +1561,7 @@ const CoursePlayer: React.FC<{
   }, []);
 
   useEffect(() => {
-    if (courseHistoryRestoringRef.current) return;
+    if (!courseHistoryReadyRef.current || courseHistoryRestoringRef.current) return;
     if (isMentorOpen) {
       writeCourseHistoryLayer('mentor', 'push');
       return;
