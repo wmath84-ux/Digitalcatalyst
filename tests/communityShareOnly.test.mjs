@@ -40,3 +40,15 @@ test('mobile search, grouped stories, text truncation and stable like handling a
   assert.match(component, /community-feed-image-caption/);
   assert.match(component, /restoreFeedScrollAfterInteraction/);
 });
+
+
+test('status reel order stays stable and profile previews use non-overlay captions', () => {
+  assert.match(component, /statusReelOrderIdsRef/);
+  assert.match(component, /prepareStatusReelOrder/);
+  assert.match(component, /statusReelScrollFrameRef/);
+  assert.doesNotMatch(component, /const reelStatuses = \[\.\.\.orderedStoryStatuses\.slice\(selectedIndex\)/);
+  assert.match(component, /community-story-poll-card/);
+  assert.match(component, /community-instagram-story-avatar .*has-story/);
+  assert.match(component, /community-profile-post-footer/);
+  assert.match(component, /community-profile-post-detail/);
+});
