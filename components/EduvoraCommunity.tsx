@@ -53,7 +53,16 @@ type Creator = {
   isPublic?: boolean;
   isSuspended?: boolean;
 };
-type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; viewedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'status'; sourceType?: 'url'; text?: string; creatorId?: string; authorName?: string; authorAvatar?: string; mediaType?: 'image' | 'video' | 'audio' | 'drive'; mediaUrl?: string; videoUrl?: string; audioUrl?: string; driveUrl?: string };
+type StatusDiscussionReply = {
+  id: string;
+  authorId: string;
+  authorName: string;
+  authorAvatar?: string;
+  text: string;
+  emoji?: string;
+  createdAt: number;
+};
+type StatusCard = { id: number; title: string; body: string; gradient: string; likedBy: number; views: number; slots: string; type: PostType; ownerId?: string; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; docId?: string; createdAt?: number; likedByUsers?: Record<string, boolean>; viewedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; discussionReplies?: StatusDiscussionReply[]; discussionReplyCount?: number; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'status'; sourceType?: 'url'; text?: string; creatorId?: string; authorName?: string; authorAvatar?: string; mediaType?: 'image' | 'video' | 'audio' | 'drive'; mediaUrl?: string; videoUrl?: string; audioUrl?: string; driveUrl?: string };
 type PrivateSharedItem = {
   sourceType: 'status' | 'feed_message';
   sourceId: string;
@@ -393,6 +402,9 @@ const PRIVATE_CHAT_MESSAGES = 'messages';
 const PRIVATE_SHARE_DELETE_WINDOW_MS = 30 * 60 * 1000;
 const COMMUNITY_REPLY_MAX_LENGTH = 1000;
 const COMMUNITY_REPLY_PREVIEW_LENGTH = 140;
+const STATUS_DISCUSSION_MAX_LENGTH = 500;
+const STATUS_DISCUSSION_MAX_REPLIES = 80;
+const STATUS_REPLY_EMOJIS = ['❤️', '🔥', '👏', '😂', '😮', '🙏'];
 
 const getPrivateConversationId = (firstUid: string, secondUid: string) => {
   const first = firstUid.trim();
@@ -592,6 +604,37 @@ const mergeReplyLists = (remoteReplies: Reply[] = [], currentReplies: Reply[] = 
   return Array.from(merged.values()).sort((a, b) => (a.createdAt || a.id) - (b.createdAt || b.id));
 };
 
+const normalizeStatusDiscussionReply = (value: unknown): StatusDiscussionReply | null => {
+  if (!value || typeof value !== 'object') return null;
+  const data = value as Record<string, unknown>;
+  const text = String(data.text || '').trim().slice(0, STATUS_DISCUSSION_MAX_LENGTH);
+  const id = String(data.id || '').trim();
+  const authorId = String(data.authorId || '').trim();
+  if (!id || !authorId || !text) return null;
+  return {
+    id,
+    authorId,
+    authorName: String(data.authorName || 'Community member').trim() || 'Community member',
+    authorAvatar: normalizeCommunityAvatar(typeof data.authorAvatar === 'string' ? data.authorAvatar : ''),
+    text,
+    emoji: typeof data.emoji === 'string' && data.emoji.trim() ? data.emoji.trim().slice(0, 8) : undefined,
+    createdAt: typeof data.createdAt === 'number' ? data.createdAt : Date.now(),
+  };
+};
+
+const mergeStatusDiscussionReplies = (remoteReplies: unknown, currentReplies: unknown): StatusDiscussionReply[] => {
+  const merged = new Map<string, StatusDiscussionReply>();
+  const put = (value: unknown) => {
+    const reply = normalizeStatusDiscussionReply(value);
+    if (reply) merged.set(reply.id, { ...merged.get(reply.id), ...reply });
+  };
+  if (Array.isArray(currentReplies)) currentReplies.forEach(put);
+  if (Array.isArray(remoteReplies)) remoteReplies.forEach(put);
+  return Array.from(merged.values())
+    .sort((a, b) => a.createdAt - b.createdAt)
+    .slice(-STATUS_DISCUSSION_MAX_REPLIES);
+};
+
 const isUnexpired = (item: { expiresAt?: number; createdAt?: number }, ttlMs: number) => {
   const expiresAt = item.expiresAt || ((item.createdAt || Date.now()) + ttlMs);
   return expiresAt > Date.now();
@@ -770,6 +813,8 @@ const mapStatusDoc = (snapshotDoc: { id: string; data: () => Record<string, any>
     likedByUsers: data.likedByUsers || {},
     viewedByUsers: data.viewedByUsers || {},
     pollVoters: data.pollVoters || {},
+    discussionReplies: mergeStatusDiscussionReplies(data.discussionReplies, []),
+    discussionReplyCount: Number(data.discussionReplyCount) || (Array.isArray(data.discussionReplies) ? data.discussionReplies.length : 0),
     createdAt: asMillis(data.createdAt),
     storagePath: data.storagePath,
     uploadBytes: Number(data.uploadBytes) || 0,
@@ -2962,6 +3007,41 @@ const communityPolishCss = `
     padding: 2px !important;
     filter: none !important;
   }
+  .community-mobile-latest .community-instagram-story-avatar.is-add {
+    border: 1px solid #e5e7eb !important;
+    background: #f5f5f5 !important;
+    padding: 0 !important;
+    filter: none !important;
+  }
+  .community-story-text-frame.is-collapsed .community-story-text-copy {
+    max-height: min(34dvh, 15rem);
+    mask-image: linear-gradient(to bottom, #000 0%, #000 78%, transparent 100%);
+    -webkit-mask-image: linear-gradient(to bottom, #000 0%, #000 78%, transparent 100%);
+  }
+  .community-story-text-frame.is-expanded {
+    height: min(65dvh, 36rem);
+  }
+  .community-story-text-frame.is-expanded .community-story-text-copy {
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
+  .community-story-reply-sheet {
+    overscroll-behavior: contain;
+  }
+  .community-profile-post-detail-page {
+    overflow: hidden !important;
+    padding: 0 !important;
+  }
+  .community-profile-post-detail-page .community-content-stage {
+    height: 100%;
+    min-height: 0;
+  }
+  .community-profile-post-detail-scroll {
+    -webkit-overflow-scrolling: touch;
+  }
+  .community-profile-post-detail-composer {
+    box-shadow: 0 -10px 30px rgba(15,23,42,.06);
+  }
   html[data-color-experience] .eduvora-community-polish .community-instagram-profile-shell,
   html[data-color-experience] .eduvora-community-polish .community-profile-post-card,
   html[data-color-experience] .eduvora-community-polish .community-profile-post-detail {
@@ -3017,8 +3097,13 @@ const communityPolishCss = `
       border-radius: .7rem;
     }
     .community-profile-post-detail {
+      height: 100% !important;
+      border: 0 !important;
       border-radius: 0 !important;
       box-shadow: none !important;
+    }
+    .community-profile-post-detail-page {
+      padding-bottom: 0 !important;
     }
   }
 
@@ -3058,6 +3143,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const statusReelScrollFrameRef = useRef<number | null>(null);
   const statusReelActiveIndexRef = useRef(0);
   const [statusViewerPanelId, setStatusViewerPanelId] = useState<number | null>(null);
+  const [expandedStatusTextId, setExpandedStatusTextId] = useState<number | null>(null);
+  const [statusReplyComposerId, setStatusReplyComposerId] = useState<number | null>(null);
+  const [statusReplyDrafts, setStatusReplyDrafts] = useState<Record<number, string>>({});
+  const [statusReplySendingIds, setStatusReplySendingIds] = useState<Record<number, boolean>>({});
   const [messages, setMessages] = useState<FeedMessage[]>(() => readJsonArray<FeedMessage>(COMMUNITY_FEED_CACHE_KEY, []).map(normalizeFeedMessage).filter((message) => isUnexpired(message, POST_TTL_MS)));
   const [statusCards, setStatusCards] = useState<StatusCard[]>(() => readJsonArray<StatusCard>(COMMUNITY_STATUS_CACHE_KEY, []).filter((status) => isUnexpired(status, STORY_TTL_MS)));
   const [likedStatuses, setLikedStatuses] = useState<number[]>([]);
@@ -3219,12 +3308,24 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const feedScrollPositionsRef = useRef<Record<string, number>>({});
   const pendingRepliesRef = useRef<Record<number, Reply[]>>({});
   const replyInputRef = useRef<HTMLTextAreaElement>(null);
+  const profileReplyInputRef = useRef<HTMLTextAreaElement>(null);
+  const statusReplyInputRef = useRef<HTMLTextAreaElement>(null);
   const replyComposerRef = useRef<HTMLDivElement>(null);
   const notificationPanelRef = useRef<HTMLDivElement>(null);
   const notificationDropdownRef = useRef<HTMLDivElement>(null);
   const directChatMessagesEndRef = useRef<HTMLDivElement>(null);
-  const currentUserKey = guardedAuth.currentUser?.uid || currentUser?.id || currentUser?.uid || authEmail || `profile-${normalizeUsername(profile.username || profile.name) || 'local'}`;
-  const isOwnCommunityId = (id?: string) => id === currentUserKey || id === 'me';
+  const currentUserKey = guardedAuth.currentUser?.uid || currentUser?.uid || currentUser?.id || authEmail || `profile-${normalizeUsername(profile.username || profile.name) || 'local'}`;
+  const ownCommunityIdentityKeys = new Set([
+    currentUserKey,
+    guardedAuth.currentUser?.uid,
+    guardedAuth.currentUser?.email,
+    currentUser?.uid,
+    currentUser?.id,
+    currentUser?.email,
+    authEmail,
+    'me',
+  ].filter((value): value is string => Boolean(value)));
+  const isOwnCommunityId = (id?: string) => Boolean(id && ownCommunityIdentityKeys.has(String(id)));
   const getOwnDisplayAvatar = () => normalizeCommunityAvatar(profile.avatar);
   const getDraftDisplayAvatar = () => normalizeCommunityAvatar(profileDraft.avatar);
   const selectedMessage = messages.find((message) => message.id === selectedMessageId) || messages[0];
@@ -3307,8 +3408,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         };
       })
       .sort((left, right) => {
+        if (right.latestAt !== left.latestAt) return right.latestAt - left.latestAt;
         if (left.hasUnseen !== right.hasUnseen) return left.hasUnseen ? -1 : 1;
-        return right.latestAt - left.latestAt;
+        return left.ownerId.localeCompare(right.ownerId);
       });
   }, [statusCards, currentUserKey]);
 
@@ -3324,7 +3426,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const statusAvailableSlots = Math.max(0, Math.floor((STORAGE_LOCK_BYTES - storageUsedBytes) / MAX_STATUS_FILE_BYTES));
   const isCreatorTypeUsedToday = usedCreatorTypesToday.includes(postType);
   const isStatusTypeUsedToday = usedStatusTypesToday.includes(statusType);
-  const myStatuses = statusCards.filter((status) => isOwnCommunityId(status.ownerId));
+  const myStatuses = statusCards.filter((status) => isOwnCommunityId(status.ownerId || status.creatorId));
 
   const getMessageOwnerId = (message: FeedMessage) => String(message.ownerId || message.creatorId || '');
   const isMessageFromId = (message: FeedMessage, profileId: string) => getMessageOwnerId(message) === profileId || String(message.creatorId || '') === profileId;
@@ -4034,8 +4136,20 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         if (expiresAt <= Date.now()) deleteExpiredCommunityItem(COMMUNITY_STATUS, item.id, item.data().storagePath, Number(item.data().uploadBytes) || 0);
       });
       const firebaseStatuses = snapshot.docs.map((item) => mapStatusDoc(item)).filter((status) => isUnexpired(status, STORY_TTL_MS));
-      safeStoreCommunityJson(COMMUNITY_STATUS_CACHE_KEY, firebaseStatuses.slice(0, 60));
-      setStatusCards((current) => mergeUnexpiredByIdentity(firebaseStatuses, current, [], STORY_TTL_MS));
+      setStatusCards((current) => {
+        const stabilizedStatuses = firebaseStatuses.map((remoteStatus) => {
+          const currentMatch = current.find((item) => (remoteStatus.docId && item.docId === remoteStatus.docId) || item.id === remoteStatus.id);
+          const discussionReplies = mergeStatusDiscussionReplies(remoteStatus.discussionReplies, currentMatch?.discussionReplies);
+          return {
+            ...remoteStatus,
+            discussionReplies,
+            discussionReplyCount: Math.max(remoteStatus.discussionReplyCount || 0, currentMatch?.discussionReplyCount || 0, discussionReplies.length),
+          };
+        });
+        const mergedStatuses = mergeUnexpiredByIdentity(stabilizedStatuses, current, [], STORY_TTL_MS);
+        safeStoreCommunityJson(COMMUNITY_STATUS_CACHE_KEY, mergedStatuses.slice(0, 60));
+        return mergedStatuses;
+      });
     }, (error) => console.warn('community_status snapshot failed; using local fallback', error));
   }, [isCommunityAllowed]);
 
@@ -4531,7 +4645,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (targetMessage) loadRepliesForMessage(targetMessage);
     if (focusReply) {
       setExpandedReplyId(messageId);
-      window.setTimeout(() => replyInputRef.current?.focus(), 120);
+      window.setTimeout(() => profileReplyInputRef.current?.focus(), 120);
     } else {
       setExpandedReplyId(null);
     }
@@ -4583,6 +4697,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const openStatusReel = (statusId: number) => {
     prepareStatusReelOrder(statusId);
+    setExpandedStatusTextId(null);
+    setStatusReplyComposerId(null);
+    setStoryMenuStatusId(null);
     setSelectedStatusId(statusId);
     void recordStatusView(statusId);
     setActiveView('status');
@@ -4748,6 +4865,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const openPublishedStatusStory = (statusId: number) => {
     prepareStatusReelOrder(statusId);
+    setExpandedStatusTextId(null);
+    setStatusReplyComposerId(null);
+    setStoryMenuStatusId(null);
     setSelectedStatusId(statusId);
     setActiveView('status');
     setPage('statusReel');
@@ -5213,6 +5333,86 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setLikedStatuses((current) => alreadyLiked ? current.filter((id) => id !== statusId) : [...current, statusId]);
     setStatusCards((current) => current.map((status) => status.id === statusId ? { ...status, likedBy: Math.max(0, status.likedBy + (alreadyLiked ? -1 : 1)), likedByUsers: { ...(status.likedByUsers || {}), [currentUserKey]: !alreadyLiked } } : status));
     if (targetStatus?.docId) updateDoc(doc(db, COMMUNITY_STATUS, targetStatus.docId), { likedBy: increment(alreadyLiked ? -1 : 1), [`likedByUsers.${currentUserKey}`]: alreadyLiked ? deleteField() : true }).catch((error) => console.warn('Status like update failed', error));
+  };
+
+  const submitStatusDiscussion = async (status: StatusCard, quickText?: string) => {
+    const draft = safeText(quickText ?? statusReplyDrafts[status.id] ?? '', STATUS_DISCUSSION_MAX_LENGTH);
+    if (!draft || statusReplySendingIds[status.id]) return;
+    if (!guardedAuth.currentUser || !currentUserKey) {
+      redirectToAuth();
+      return;
+    }
+
+    if (!status.docId) {
+      setProfileFeedback({ type: 'error', message: 'This story is still publishing. Please try your reply again in a moment.' });
+      window.setTimeout(() => statusReplyInputRef.current?.focus(), 80);
+      return;
+    }
+
+    const now = Date.now();
+    const reply: StatusDiscussionReply = {
+      id: `${currentUserKey}-${now}-${Math.random().toString(36).slice(2, 7)}`,
+      authorId: currentUserKey,
+      authorName: profile.name || buildStableCommunityName(currentUserKey),
+      authorAvatar: getOwnDisplayAvatar(),
+      text: draft,
+      emoji: quickText && STATUS_REPLY_EMOJIS.includes(quickText) ? quickText : undefined,
+      createdAt: now,
+    };
+
+    const applyReply = (remove = false) => {
+      setStatusCards((current) => current.map((item) => {
+        if (item.id !== status.id) return item;
+        const replies = remove
+          ? (item.discussionReplies || []).filter((entry) => entry.id !== reply.id)
+          : mergeStatusDiscussionReplies([reply], item.discussionReplies);
+        return { ...item, discussionReplies: replies, discussionReplyCount: replies.length };
+      }));
+    };
+
+    setStatusReplySendingIds((current) => ({ ...current, [status.id]: true }));
+    setStatusReplyDrafts((current) => ({ ...current, [status.id]: '' }));
+    applyReply();
+
+    try {
+      await runTransaction(db, async (transaction) => {
+        const statusRef = doc(db, COMMUNITY_STATUS, status.docId!);
+        const snapshot = await transaction.get(statusRef);
+        if (!snapshot.exists()) throw new Error('Story no longer exists.');
+        const data = snapshot.data() as Record<string, unknown>;
+        const replies = mergeStatusDiscussionReplies([reply], data.discussionReplies);
+        transaction.update(statusRef, {
+          discussionReplies: stripUndefinedDeep(replies),
+          discussionReplyCount: replies.length,
+          updatedAt: now,
+        });
+      });
+
+      const ownerId = String(status.ownerId || status.creatorId || '');
+      if (ownerId && ownerId !== currentUserKey) {
+        addDoc(collection(db, COMMUNITY_NOTIFICATIONS), stripUndefinedDeep({
+          recipientId: ownerId,
+          actorId: currentUserKey,
+          actorName: reply.authorName,
+          actorUsername: normalizeUsername(profile.username || profile.name),
+          actorAvatar: reply.authorAvatar,
+          type: 'reply',
+          title: `${reply.authorName} replied to your story`,
+          body: draft,
+          targetPage: 'statusReel',
+          targetId: status.id,
+          createdAt: now,
+          read: false,
+        })).catch((error) => console.warn('Story reply notification failed', error));
+      }
+    } catch (error) {
+      applyReply(true);
+      setStatusReplyDrafts((current) => ({ ...current, [status.id]: quickText ? '' : draft }));
+      setProfileFeedback({ type: 'error', message: 'Story reply could not be sent. Please try again.' });
+      console.warn('Status discussion reply failed', error);
+    } finally {
+      setStatusReplySendingIds((current) => ({ ...current, [status.id]: false }));
+    }
   };
 
   const deleteOwnStatusStory = async (status: StatusCard) => {
@@ -5965,35 +6165,30 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
 
   const renderMobileStoryTray = () => {
-    const ownGroup = storyGroups.find((group) => isOwnCommunityId(group.ownerId));
-    const visibleGroups = storyGroups.filter((group) => !isOwnCommunityId(group.ownerId)).slice(0, 12);
+    const visibleGroups = storyGroups.slice(0, 12);
     return (
       <section className="community-instagram-story-tray md:hidden" aria-label="Community stories">
         <div className="community-instagram-story-row">
           <div className="community-instagram-story-item relative">
-            <button
-              type="button"
-              onClick={() => ownGroup?.nextStory ? openStatusReel(ownGroup.nextStory.id) : openStatusUploadFromTop()}
-              className={`community-instagram-story-avatar ${ownGroup ? 'has-story' : 'is-own'}`}
-              aria-label={ownGroup ? 'Open your active story' : 'Add your first story'}
-            >
+            <button type="button" onClick={openStatusUploadFromTop} className="community-instagram-story-avatar is-add" aria-label="Add a new story">
               <span className="community-instagram-story-avatar-inner">
                 <Avatar value={getOwnDisplayAvatar()} size="h-16 w-16" />
               </span>
             </button>
-            <button type="button" onClick={openStatusUploadFromTop} aria-label="Add story" className="community-instagram-story-plus">＋</button>
-            <span className="community-instagram-story-label">{ownGroup ? 'Your story' : 'Add story'}</span>
+            <span aria-hidden="true" className="community-instagram-story-plus">＋</span>
+            <span className="community-instagram-story-label">Add story</span>
           </div>
           {visibleGroups.map((group) => {
+            const ownGroup = isOwnCommunityId(group.ownerId);
             const identity = getStatusOwnerIdentity(group.nextStory);
             return (
               <button key={group.ownerId} type="button" onClick={() => openStatusReel(group.nextStory.id)} className="community-instagram-story-item">
-                <span className={`community-instagram-story-avatar ${group.hasUnseen ? 'is-unseen' : 'is-viewed'}`}>
+                <span className={`community-instagram-story-avatar has-story ${group.hasUnseen ? 'is-unseen' : 'is-viewed'}`}>
                   <span className="community-instagram-story-avatar-inner">
-                    <Avatar value={identity.avatar || group.nextStory.imagePreview || ''} size="h-16 w-16" />
+                    <Avatar value={(ownGroup ? getOwnDisplayAvatar() : identity.avatar) || group.nextStory.imagePreview || ''} size="h-16 w-16" />
                   </span>
                 </span>
-                <span className="community-instagram-story-label">{identity.name || group.nextStory.title}</span>
+                <span className="community-instagram-story-label">{ownGroup ? 'Your story' : (identity.name || group.nextStory.title)}</span>
               </button>
             );
           })}
@@ -6454,6 +6649,56 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
+  const getStatusStoryText = (card: StatusCard) => String(card.text || card.body || card.title || '').replace(/\r/g, '').trim();
+
+  const buildStatusTextBlocks = (value: string) => {
+    const clean = value.replace(/\r/g, '').trim();
+    const rawLines = clean.split(/\n+/).map((line) => line.trim()).filter(Boolean);
+    const lines = rawLines.length === 1 && clean.length > 170
+      ? clean.split(/(?<=[.!?])\s+/).map((line) => line.trim()).filter(Boolean)
+      : rawLines;
+    const bulletPattern = /^(?:[-*•✓✔→]|\d+[.)])\s*/;
+    const first = lines[0] || clean;
+    const firstIsHeading = lines.length > 1 && first.length <= 96 && !bulletPattern.test(first);
+    return {
+      heading: firstIsHeading ? first : 'Story update',
+      lines: firstIsHeading ? lines.slice(1) : lines,
+    };
+  };
+
+  const renderFormattedStatusText = (card: StatusCard) => {
+    const storyText = getStatusStoryText(card);
+    const blocks = buildStatusTextBlocks(storyText);
+    const longText = storyText.length > 260 || blocks.lines.length > 5;
+    const expanded = expandedStatusTextId === card.id;
+
+    return (
+      <div className="community-story-text-card flex h-full w-full items-center justify-center overflow-hidden bg-black px-4 pb-[8.5rem] pt-[8rem] text-white sm:px-6">
+        <div
+          role={longText ? 'button' : undefined}
+          tabIndex={longText ? 0 : undefined}
+          aria-expanded={longText ? expanded : undefined}
+          onClick={() => { if (longText) setExpandedStatusTextId(expanded ? null : card.id); }}
+          onKeyDown={(event) => { if (longText && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setExpandedStatusTextId(expanded ? null : card.id); } }}
+          className={`community-story-text-frame relative flex w-full max-w-[26rem] flex-col overflow-hidden p-6 text-left sm:p-8 ${expanded ? 'is-expanded' : 'is-collapsed'} ${longText ? 'cursor-pointer' : ''}`}
+        >
+          <div className="shrink-0">
+            <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/55">Eduvora story</p>
+            <h2 className="mt-3 break-words text-2xl font-black leading-tight tracking-[-0.035em] text-white sm:text-3xl">{blocks.heading}</h2>
+          </div>
+          <div className={`community-story-text-copy mt-4 min-h-0 space-y-3 pr-1 ${expanded ? 'flex-1 overflow-y-auto overscroll-contain custom-scrollbar' : 'overflow-hidden'}`}>
+            {(blocks.lines.length ? blocks.lines : [storyText]).map((line, index) => {
+              const bulletMatch = line.match(/^(?:[-*•✓✔→]|\d+[.)])\s*(.*)$/);
+              if (bulletMatch) return <p key={`${card.id}-line-${index}`} className="flex items-start gap-2 text-sm font-semibold leading-6 text-white/86 sm:text-base sm:leading-7"><span className="mt-0.5 shrink-0 text-[#93c5fd]">•</span><span className="break-words">{bulletMatch[1]}</span></p>;
+              return <p key={`${card.id}-line-${index}`} className="break-words text-sm font-semibold leading-6 text-white/82 sm:text-base sm:leading-7">{line}</p>;
+            })}
+          </div>
+          {longText ? <button type="button" onClick={(event) => { event.stopPropagation(); setExpandedStatusTextId(expanded ? null : card.id); }} className="mt-4 shrink-0 self-start rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black text-white backdrop-blur-md">{expanded ? 'Show less' : 'Read more'}</button> : null}
+        </div>
+      </div>
+    );
+  };
+
   const renderStatusReelContent = (card: StatusCard) => {
     const videoUrl = card.videoUrl || (card.mediaType === 'video' ? card.mediaUrl : '');
     const audioUrl = card.audioUrl || (card.mediaType === 'audio' ? card.mediaUrl : '');
@@ -6474,7 +6719,29 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (card.pollOptions) {
       return <div className="community-story-text-card community-story-poll-card flex h-full w-full items-center justify-center overflow-y-auto bg-black px-6 py-28 text-white"><div className="community-story-text-frame p-6 sm:p-8"><p className="text-xs font-black uppercase tracking-[0.22em] text-white/60">Community poll</p><h2 className="mt-3 text-3xl font-black leading-tight tracking-[-0.035em] text-white sm:text-4xl">{card.title}</h2>{card.body && card.body !== card.title ? <p className="mt-3 text-sm font-semibold leading-6 text-white/80">{card.body}</p> : null}<div className="mt-6">{renderStatusPoll(card)}</div></div></div>;
     }
-    return <div className="community-story-text-card flex h-full w-full items-center justify-center overflow-y-auto bg-black px-6 py-28 text-center text-white"><div className="community-story-text-frame p-7 sm:p-9"><p className="text-xs font-black uppercase tracking-[0.28em] text-white/55">Eduvora story</p><h2 className="mt-5 whitespace-pre-wrap break-words text-4xl font-black leading-[1.08] tracking-[-0.045em] text-white sm:text-5xl">{card.title}</h2>{card.body && card.body !== card.title ? <p className="mt-5 whitespace-pre-wrap break-words text-base font-semibold leading-7 text-white/78">{card.body}</p> : null}</div></div>;
+    return renderFormattedStatusText(card);
+  };
+
+  const renderStatusDiscussionSheet = (card: StatusCard) => {
+    if (statusReplyComposerId !== card.id) return null;
+    const draft = statusReplyDrafts[card.id] || '';
+    const replies = (card.discussionReplies || []).slice(-6);
+    const canSend = Boolean(draft.trim()) && !statusReplySendingIds[card.id];
+    return (
+      <div className="community-story-reply-sheet absolute inset-x-0 bottom-0 z-50 flex max-h-[62dvh] flex-col rounded-t-[1.75rem] border-t border-white/15 bg-[#0b0b0b]/98 px-4 pb-[calc(env(safe-area-inset-bottom)+0.8rem)] pt-2 text-white shadow-[0_-24px_70px_rgba(0,0,0,.65)] backdrop-blur-2xl" onClick={(event) => event.stopPropagation()}>
+        <div className="mx-auto h-1 w-10 shrink-0 rounded-full bg-white/28" />
+        <div className="mt-2 flex shrink-0 items-center justify-between gap-3">
+          <div><p className="text-sm font-black">Reply to story</p><p className="text-[11px] font-semibold text-white/55">Story discussion · {(card.discussionReplyCount || card.discussionReplies?.length || 0)} replies</p></div>
+          <button type="button" onClick={() => setStatusReplyComposerId(null)} aria-label="Close story reply composer" className="flex h-9 w-9 items-center justify-center rounded-full bg-white/10 text-lg">✕</button>
+        </div>
+        {replies.length ? <div className="mt-3 min-h-0 flex-1 space-y-2 overflow-y-auto overscroll-contain pr-1 custom-scrollbar">{replies.map((reply) => <div key={reply.id} className="flex items-start gap-2 rounded-2xl bg-white/7 p-2.5"><Avatar value={reply.authorAvatar} size="h-8 w-8" /><div className="min-w-0 flex-1"><p className="truncate text-[11px] font-black text-white/75">{reply.authorName}</p><p className={`mt-0.5 break-words font-semibold text-white ${reply.emoji ? 'text-2xl leading-none' : 'text-sm leading-5'}`}>{reply.text}</p></div></div>)}</div> : <p className="mt-3 rounded-2xl border border-dashed border-white/15 px-3 py-4 text-center text-xs font-semibold text-white/55">Start the story discussion.</p>}
+        <div className="mt-3 flex shrink-0 gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">{STATUS_REPLY_EMOJIS.map((emoji) => <button key={emoji} type="button" onClick={() => void submitStatusDiscussion(card, emoji)} disabled={statusReplySendingIds[card.id]} className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full border border-white/12 bg-white/8 text-xl transition active:scale-95 disabled:opacity-40">{emoji}</button>)}</div>
+        <div className="mt-2 flex shrink-0 items-end gap-2">
+          <textarea ref={statusReplyInputRef} value={draft} onChange={(event) => setStatusReplyDrafts((current) => ({ ...current, [card.id]: event.target.value.slice(0, STATUS_DISCUSSION_MAX_LENGTH) }))} placeholder="Write a reply…" maxLength={STATUS_DISCUSSION_MAX_LENGTH} rows={1} className="max-h-28 min-h-11 min-w-0 flex-1 resize-none rounded-2xl border border-white/15 bg-white/8 px-4 py-3 text-sm font-semibold text-white outline-none placeholder:text-white/40 focus:border-white/35" />
+          <button type="button" onClick={() => void submitStatusDiscussion(card)} disabled={!canSend} className="min-h-11 rounded-2xl bg-white px-4 text-sm font-black text-black disabled:opacity-35">{statusReplySendingIds[card.id] ? '…' : 'Send'}</button>
+        </div>
+      </div>
+    );
   };
 
   const renderStatusTile = (card: StatusCard) => {
@@ -6534,6 +6801,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     statusReelOrderIdsRef.current = reelIds;
     const reelStatuses = reelIds.map((id) => statusById.get(id)).filter((card): card is StatusCard => Boolean(card));
     const selectedReelIndex = Math.max(0, reelStatuses.findIndex((card) => card.id === selectedStatusId));
+    const storyInteractionLocked = expandedStatusTextId === selectedStatusId || statusReplyComposerId === selectedStatusId;
 
     const handleReelScroll = (event: React.UIEvent<HTMLDivElement>) => {
       const viewport = event.currentTarget;
@@ -6548,6 +6816,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         if (!visibleStatus || visibleStatus.id === selectedStatusId) return;
         setSelectedStatusId(visibleStatus.id);
         setStoryMenuStatusId(null);
+        setExpandedStatusTextId(null);
+        setStatusReplyComposerId(null);
         void recordStatusView(visibleStatus.id);
       });
     };
@@ -6562,7 +6832,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <button type="button" onClick={() => scrollStatusReel(-1)} aria-label="Previous story" className="community-status-scroll-button flex h-12 w-12 items-center justify-center rounded-full text-xl font-black">↑</button>
           <button type="button" onClick={() => scrollStatusReel(1)} aria-label="Next story" className="community-status-scroll-button flex h-12 w-12 items-center justify-center rounded-full text-xl font-black">↓</button>
         </div>
-        <div ref={statusReelScrollRef} className="community-status-reel-scroller h-full snap-y snap-mandatory overflow-y-auto overscroll-y-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" onScroll={handleReelScroll}>
+        <div ref={statusReelScrollRef} className={`community-status-reel-scroller h-full snap-y snap-mandatory overscroll-y-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden ${storyInteractionLocked ? 'overflow-y-hidden' : 'overflow-y-auto'}`} onScroll={handleReelScroll}>
           {reelStatuses.map((card) => {
             const owner = getStatusOwnerIdentity(card);
             const liked = Boolean(card.likedByUsers?.[currentUserKey]) || likedStatuses.includes(card.id);
@@ -6571,21 +6841,21 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
               <section key={card.id} className="community-story-slide relative flex h-[100dvh] min-h-[100dvh] snap-start snap-always items-center justify-center overflow-hidden bg-black">
                 <div className="community-status-reel-backdrop absolute inset-0" />
                 <article className="community-status-reel-card relative flex h-[100dvh] w-full max-w-[31rem] flex-col overflow-hidden border-0 bg-black shadow-[0_30px_100px_rgba(0,0,0,0.65)] md:h-[min(92dvh,880px)] md:rounded-[1.75rem]">
-                  <div className="community-story-topbar absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 px-4 pt-[calc(env(safe-area-inset-top)+3.25rem)] md:pt-14">
+                  <div className="community-story-topbar absolute inset-x-0 top-0 z-30 flex items-center gap-3 px-4 pt-[calc(env(safe-area-inset-top)+3.25rem)] md:pt-14">
                     <button type="button" onClick={() => { const ownerId = card.ownerId || card.creatorId; if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); setPage('profile'); setPageStack([]); } }} className="flex min-w-0 items-center gap-2 text-left text-white">
                       <Avatar value={owner.avatar} size="h-9 w-9" className="ring-2 ring-white/80" />
                       <span className="min-w-0"><span className="block max-w-[11rem] truncate text-sm font-black">{owner.name}</span><span className="block text-[11px] font-semibold text-white/70">{card.slots}</span></span>
                     </button>
-                    <div className="relative">
-                      <button type="button" onClick={() => setStoryMenuStatusId((current) => current === card.id ? null : card.id)} className="community-status-reel-control flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-xs font-black">•••</button>
-                      {storyMenuStatusId === card.id ? <div className="absolute right-0 top-12 w-48 overflow-hidden rounded-xl border border-white/15 bg-[#111]/95 p-1.5 text-white shadow-2xl backdrop-blur-xl"><button type="button" onClick={() => { setStoryMenuStatusId(null); openShareComposer({ sourceType: 'status', status: card }); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">↗ Share story</button>{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); setStatusViewerPanelId(card.id); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">👁 Story activity</button> : null}{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); void deleteOwnStatusStory(card); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#fb7185] hover:bg-white/10">Delete story</button> : null}</div> : null}
-                    </div>
+                  </div>
+                  <div className="absolute right-3 top-[calc(env(safe-area-inset-top)+1.05rem)] z-50">
+                    <button type="button" onClick={() => setStoryMenuStatusId((current) => current === card.id ? null : card.id)} aria-label="Story options" className="community-status-reel-control flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-xs font-black">•••</button>
+                    {storyMenuStatusId === card.id ? <div className="absolute right-0 top-12 w-48 overflow-hidden rounded-xl border border-white/15 bg-[#111]/95 p-1.5 text-white shadow-2xl backdrop-blur-xl"><button type="button" onClick={() => { setStoryMenuStatusId(null); openShareComposer({ sourceType: 'status', status: card }); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">↗ Share story</button>{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); setStatusViewerPanelId(card.id); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">👁 Story activity</button> : null}{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); void deleteOwnStatusStory(card); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#fb7185] hover:bg-white/10">Delete story</button> : null}</div> : null}
                   </div>
                   <div className="community-story-media flex min-h-0 flex-1 items-center justify-center">{renderStatusReelContent(card)}</div>
                   <div className="community-story-bottom absolute inset-x-0 bottom-0 z-30 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-24 text-white">
                     {card.imagePreview || card.videoUrl || card.mediaUrl ? <><h2 className="line-clamp-2 text-lg font-black leading-tight text-white">{card.title}</h2>{card.body && card.body !== card.title ? <p className="mt-1 line-clamp-3 text-sm font-semibold leading-5 text-white/85">{card.body}</p> : null}</> : null}
                     <div className="mt-4 flex items-end justify-between gap-3">
-                      <button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="min-h-11 flex-1 rounded-full border border-white/25 bg-black/35 px-4 text-left text-sm font-semibold text-white/80 backdrop-blur-md">Reply or discuss…</button>
+                      <button type="button" onClick={() => { setStatusReplyComposerId(card.id); setExpandedStatusTextId(null); window.setTimeout(() => statusReplyInputRef.current?.focus(), 100); }} className="min-h-11 flex-1 rounded-full border border-white/25 bg-black/35 px-4 text-left text-sm font-semibold text-white/80 backdrop-blur-md">Reply or discuss…{card.discussionReplyCount ? ` · ${card.discussionReplyCount}` : ''}</button>
                       <div className="flex items-center gap-2">
                         <button type="button" onClick={() => toggleStatusLike(card.id)} aria-label="Like story" className={`community-story-action flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 text-xl backdrop-blur-md ${liked ? 'is-liked' : ''}`}>{liked ? '♥' : '♡'}</button>
                         <button type="button" onClick={() => openShareComposer({ sourceType: 'status', status: card })} aria-label="Share story" className="community-story-action flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 text-xl backdrop-blur-md">↗</button>
@@ -6593,6 +6863,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                       </div>
                     </div>
                   </div>
+                  {renderStatusDiscussionSheet(card)}
                 </article>
               </section>
             );
@@ -7350,9 +7621,23 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     const imageSource = message.imagePreview ? normalizeMediaSource({ imagePreview: message.imagePreview, title: message.title }, { type: 'image', title: message.title }).url : '';
     const imageFallback = buildPostImageFallback({ title: message.title, body: message.body, postType: type });
 
+    const renderProfilePostMedia = () => message.imagePreview
+      ? <SafeImage src={imageSource || imageFallback} fallbackSrc={imageFallback} alt={message.title} className="max-h-[82dvh] h-auto w-full object-contain" fallbackTitle={message.title} fallbackBadge="Community image" fallbackIcon="💬" fallbackMessage="Image preview unavailable" aspect="auto" />
+      : message.pollOptions
+        ? <div className="w-full max-w-xl p-5 sm:p-8"><div className="rounded-[1.5rem] bg-white p-5 text-[#111] shadow-2xl"><span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#737373]">Community poll</span><h2 className="mt-3 text-3xl font-black leading-tight text-[#111]">{message.title}</h2>{message.body && message.body !== message.title ? <p className="mt-3 whitespace-pre-wrap text-sm font-medium leading-6 text-[#52525b]">{message.body}</p> : null}<div className="mt-5 space-y-2">{message.pollOptions.map((option, index) => { const votes = message.pollVotes || message.pollOptions!.map(() => 0); const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0)); const percent = Math.round((votes[index] / total) * 100); const selectedOption = message.pollVoters?.[currentUserKey]; return <button key={`${message.id}-${option}-${index}`} type="button" onClick={() => voteOnMessagePoll(message.id, index)} disabled={selectedOption !== undefined} className="relative w-full overflow-hidden rounded-xl border border-[#d4d4d8] bg-white px-4 py-3 text-left text-sm font-bold text-[#18181b] disabled:opacity-100"><span className="absolute inset-y-0 left-0 bg-[#e0e7ff]" style={{ width: selectedOption !== undefined ? `${percent}%` : '0%' }} /><span className="relative flex items-center justify-between gap-3"><span>{option}</span><span>{selectedOption !== undefined ? `${percent}%` : 'Vote'}</span></span></button>; })}</div></div></div>
+        : <div className="flex h-full min-h-[22rem] w-full items-center justify-center bg-[#111] p-6 text-center text-white"><div className="max-w-xl"><span className="text-xs font-black uppercase tracking-[0.22em] text-white/55">Text post</span><h2 className="mt-4 whitespace-pre-wrap text-4xl font-black leading-tight text-white sm:text-5xl">{message.title}</h2><p className="mt-5 whitespace-pre-wrap text-base font-medium leading-7 text-white/78">{message.body}</p></div></div>;
+
+    const renderProfileDiscussion = (scrollable: boolean) => (
+      <>
+        <div className="border-b border-[#efefef] p-4"><div className="flex items-start gap-3"><Avatar value={resolveAvatar(message)} size="h-9 w-9" /><p className="min-w-0 flex-1 whitespace-pre-wrap text-sm leading-6 text-[#262626]"><strong className="mr-1.5 font-extrabold text-[#111]">{resolveName(message)}</strong>{message.body || message.title}</p></div></div>
+        <div className={`${scrollable ? 'min-h-[8rem] flex-1 overflow-y-auto' : ''} space-y-3 p-3 custom-scrollbar`}>{message.replies.length ? message.replies.map((reply) => renderReplyBubble(message, reply)) : <div className="py-10 text-center"><div className="text-3xl">◯</div><h3 className="mt-3 text-lg font-black text-[#111]">No comments yet</h3><p className="mt-1 text-sm font-semibold text-[#737373]">Start the conversation.</p></div>}</div>
+        <div className="border-t border-[#efefef] bg-white"><div className="flex items-center gap-1 px-2.5 pt-2"><button type="button" onClick={() => toggleMessageLike(message.id)} aria-label={liked ? 'Unlike post' : 'Like post'} className={`community-instagram-action ${liked ? 'is-active' : ''}`}><span aria-hidden="true">{liked ? '♥' : '♡'}</span></button><button type="button" onClick={() => profileReplyInputRef.current?.focus()} aria-label="Comment" className="community-instagram-action"><span aria-hidden="true">◯</span></button><button type="button" onClick={() => openShareComposer({ sourceType: 'feed_message', message })} aria-label="Share" className="community-instagram-action"><span aria-hidden="true">↗</span></button></div><div className="px-4 pb-3"><p className="text-sm font-extrabold text-[#111]">{message.likeCount || 0} likes</p><p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[#a1a1aa]">{message.time}</p></div></div>
+      </>
+    );
+
     return (
-      <section className="community-profile-post-detail mx-auto min-h-0 max-w-6xl overflow-hidden border border-[#e5e7eb] bg-white shadow-[0_22px_70px_rgba(15,23,42,.12)] md:rounded-[1.5rem]">
-        <header className="community-profile-post-detail-header sticky top-0 z-20 flex min-h-14 items-center gap-3 border-b px-3 py-2 md:px-4">
+      <section className="community-profile-post-detail mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col overflow-hidden border border-[#e5e7eb] bg-white shadow-[0_22px_70px_rgba(15,23,42,.12)] md:rounded-[1.5rem]">
+        <header className="community-profile-post-detail-header z-20 flex min-h-14 shrink-0 items-center gap-3 border-b px-3 py-2 md:px-4">
           <button type="button" onClick={() => setProfileViewMode('overview')} aria-label="Back to profile" className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-[#111] hover:bg-[#f5f5f5]">←</button>
           <Avatar value={display.avatar || resolveAvatar(message)} size="h-10 w-10" />
           <button type="button" onClick={() => setProfileViewMode('overview')} className="min-w-0 flex-1 text-left"><strong className="block truncate text-sm text-[#111]">{display.name || resolveName(message)}</strong><span className="block truncate text-[11px] font-semibold text-[#737373]">@{display.username} · {message.time}</span></button>
@@ -7360,20 +7645,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           {isOwnCommunityId(getMessageOwnerId(message)) ? <button type="button" onClick={() => void deleteOwnFeedPost(message)} aria-label="Delete post" className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-[#dc2626] hover:bg-[#fff1f2]">⌫</button> : null}
         </header>
 
-        <div className="grid min-h-0 md:grid-cols-[minmax(0,1.15fr)_minmax(20rem,.85fr)]">
-          <div className="community-profile-post-detail-media flex min-h-[18rem] items-center justify-center overflow-hidden bg-black md:min-h-[calc(100dvh-11rem)]">
-            {message.imagePreview ? <SafeImage src={imageSource || imageFallback} fallbackSrc={imageFallback} alt={message.title} className="max-h-[82dvh] h-auto w-full object-contain" fallbackTitle={message.title} fallbackBadge="Community image" fallbackIcon="💬" fallbackMessage="Image preview unavailable" aspect="auto" /> : message.pollOptions ? <div className="w-full max-w-xl p-5 sm:p-8"><div className="rounded-[1.5rem] bg-white p-5 text-[#111] shadow-2xl"><span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#737373]">Community poll</span><h2 className="mt-3 text-3xl font-black leading-tight text-[#111]">{message.title}</h2>{message.body && message.body !== message.title ? <p className="mt-3 whitespace-pre-wrap text-sm font-medium leading-6 text-[#52525b]">{message.body}</p> : null}<div className="mt-5 space-y-2">{message.pollOptions.map((option, index) => { const votes = message.pollVotes || message.pollOptions!.map(() => 0); const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0)); const percent = Math.round((votes[index] / total) * 100); const selectedOption = message.pollVoters?.[currentUserKey]; return <button key={`${message.id}-${option}-${index}`} type="button" onClick={() => voteOnMessagePoll(message.id, index)} disabled={selectedOption !== undefined} className="relative w-full overflow-hidden rounded-xl border border-[#d4d4d8] bg-white px-4 py-3 text-left text-sm font-bold text-[#18181b] disabled:opacity-100"><span className="absolute inset-y-0 left-0 bg-[#e0e7ff]" style={{ width: selectedOption !== undefined ? `${percent}%` : '0%' }} /><span className="relative flex items-center justify-between gap-3"><span>{option}</span><span>{selectedOption !== undefined ? `${percent}%` : 'Vote'}</span></span></button>; })}</div></div></div> : <div className="flex h-full w-full items-center justify-center bg-[#111] p-6 text-center text-white"><div className="max-w-xl"><span className="text-xs font-black uppercase tracking-[0.22em] text-white/55">Text post</span><h2 className="mt-4 whitespace-pre-wrap text-4xl font-black leading-tight text-white sm:text-5xl">{message.title}</h2><p className="mt-5 whitespace-pre-wrap text-base font-medium leading-7 text-white/78">{message.body}</p></div></div>}
+        <div className="community-profile-post-detail-body grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.15fr)_minmax(20rem,.85fr)] md:grid-rows-[minmax(0,1fr)_auto]">
+          <div className="community-profile-post-detail-scroll min-h-0 overflow-y-auto overscroll-contain bg-black md:col-start-1 md:row-span-2 md:overflow-hidden">
+            <div className="community-profile-post-detail-media flex min-h-[18rem] items-center justify-center overflow-hidden bg-black md:h-full md:min-h-0">{renderProfilePostMedia()}</div>
+            <div className="bg-white md:hidden">{renderProfileDiscussion(false)}</div>
           </div>
 
-          <aside className="community-profile-post-detail-copy flex min-h-0 flex-col border-t border-[#e5e7eb] bg-white md:max-h-[calc(100dvh-11rem)] md:border-l md:border-t-0">
-            <div className="border-b border-[#efefef] p-4"><div className="flex items-start gap-3"><Avatar value={resolveAvatar(message)} size="h-9 w-9" /><p className="min-w-0 flex-1 whitespace-pre-wrap text-sm leading-6 text-[#262626]"><strong className="mr-1.5 font-extrabold text-[#111]">{resolveName(message)}</strong>{message.body || message.title}</p></div></div>
-            <div className="min-h-[8rem] flex-1 space-y-3 overflow-y-auto p-3 custom-scrollbar">{message.replies.length ? message.replies.map((reply) => renderReplyBubble(message, reply)) : <div className="py-10 text-center"><div className="text-3xl">◯</div><h3 className="mt-3 text-lg font-black text-[#111]">No comments yet</h3><p className="mt-1 text-sm font-semibold text-[#737373]">Start the conversation.</p></div>}</div>
-            <div className="border-t border-[#efefef] bg-white">
-              <div className="flex items-center gap-1 px-2.5 pt-2"><button type="button" onClick={() => toggleMessageLike(message.id)} aria-label={liked ? 'Unlike post' : 'Like post'} className={`community-instagram-action ${liked ? 'is-active' : ''}`}><span aria-hidden="true">{liked ? '♥' : '♡'}</span></button><button type="button" onClick={() => replyInputRef.current?.focus()} aria-label="Comment" className="community-instagram-action"><span aria-hidden="true">◯</span></button><button type="button" onClick={() => openShareComposer({ sourceType: 'feed_message', message })} aria-label="Share" className="community-instagram-action"><span aria-hidden="true">↗</span></button></div>
-              <div className="px-4 pb-2"><p className="text-sm font-extrabold text-[#111]">{message.likeCount || 0} likes</p><p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[#a1a1aa]">{message.time}</p></div>
-              <div ref={replyComposerRef} data-community-replybar="true" className="flex items-end gap-2 border-t border-[#efefef] px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)]"><Avatar value={getOwnDisplayAvatar()} size="h-8 w-8" /><textarea ref={replyInputRef} value={draft} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value.slice(0, COMMUNITY_REPLY_MAX_LENGTH) }))} onFocus={() => { loadRepliesForMessage(message); setExpandedReplyId(message.id); }} placeholder="Add a comment…" maxLength={COMMUNITY_REPLY_MAX_LENGTH} rows={1} className="min-h-10 min-w-0 flex-1 resize-none rounded-full border border-[#dbdbdb] bg-white px-4 py-2 text-sm font-semibold text-[#111] outline-none focus:border-[#a8a8a8]" /><button type="button" onClick={() => submitReply(message.id)} disabled={!canSendReply} className="min-h-10 rounded-full px-2 text-sm font-extrabold text-[#0095f6] disabled:opacity-35">{replySendingIds[message.id] ? '…' : 'Post'}</button></div>
-            </div>
-          </aside>
+          <aside className="community-profile-post-detail-copy hidden min-h-0 flex-col border-l border-[#e5e7eb] bg-white md:col-start-2 md:row-start-1 md:flex">{renderProfileDiscussion(true)}</aside>
+
+          <div ref={replyComposerRef} data-community-replybar="true" className="community-profile-post-detail-composer flex shrink-0 items-end gap-2 border-t border-[#efefef] bg-white px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:col-start-2 md:row-start-2 md:border-l"><Avatar value={getOwnDisplayAvatar()} size="h-8 w-8" /><textarea ref={profileReplyInputRef} value={draft} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value.slice(0, COMMUNITY_REPLY_MAX_LENGTH) }))} onFocus={() => { loadRepliesForMessage(message); setExpandedReplyId(message.id); }} placeholder="Add a comment…" maxLength={COMMUNITY_REPLY_MAX_LENGTH} rows={1} className="max-h-24 min-h-10 min-w-0 flex-1 resize-none rounded-full border border-[#dbdbdb] bg-white px-4 py-2 text-sm font-semibold text-[#111] outline-none focus:border-[#a8a8a8]" /><button type="button" onClick={() => submitReply(message.id)} disabled={!canSendReply} className="min-h-10 rounded-full px-2 text-sm font-extrabold text-[#0095f6] disabled:opacity-35">{replySendingIds[message.id] ? '…' : 'Post'}</button></div>
         </div>
       </section>
     );
@@ -7575,7 +7855,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <CommunitySidebar />
         <div className="community-center-shell flex min-w-0 flex-1 flex-col">
           <CommunityHeader />
-          <main ref={scrollContainerRef} className={`eduvora-community-main ${page === 'thread' || page === 'comments' || page === 'directChat' || page === 'directChatThread' || page === 'search' ? 'community-thread-page' : ''} min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-3 custom-scrollbar sm:px-4 lg:px-5 lg:pb-4 ${
+          <main ref={scrollContainerRef} className={`eduvora-community-main ${page === 'thread' || page === 'comments' || page === 'directChat' || page === 'directChatThread' || page === 'search' ? 'community-thread-page' : ''} ${page === 'profile' && profileViewMode === 'post' ? 'community-profile-post-detail-page' : ''} min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-3 custom-scrollbar sm:px-4 lg:px-5 lg:pb-4 ${
             shouldHideCommunityDockOnMobile
               ? 'pb-3 max-md:pb-4 max-md:overscroll-contain'
               : 'pb-[calc(env(safe-area-inset-bottom)+4.9rem)] max-md:pb-[calc(env(safe-area-inset-bottom)+4.7rem)] max-md:overscroll-contain'

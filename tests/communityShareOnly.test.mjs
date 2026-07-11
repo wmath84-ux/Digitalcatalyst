@@ -52,3 +52,31 @@ test('status reel order stays stable and profile previews use non-overlay captio
   assert.match(component, /community-profile-post-footer/);
   assert.match(component, /community-profile-post-detail/);
 });
+
+test('mobile story tray separates Add story and shows newest own story groups', () => {
+  assert.match(component, /community-instagram-story-avatar is-add/);
+  assert.match(component, /const visibleGroups = storyGroups\.slice\(0, 12\)/);
+  assert.match(component, /ownGroup \? 'Your story'/);
+  assert.doesNotMatch(component, /storyGroups\.filter\(\(group\) => !isOwnCommunityId/);
+  assert.match(component, /if \(right\.latestAt !== left\.latestAt\) return right\.latestAt - left\.latestAt/);
+});
+
+test('profile post detail owns one scroll area with locked header and composer', () => {
+  assert.match(component, /community-profile-post-detail-page/);
+  assert.match(component, /community-profile-post-detail-scroll/);
+  assert.match(component, /community-profile-post-detail-composer/);
+  assert.match(component, /flex h-full min-h-0 w-full max-w-6xl flex-col/);
+  assert.match(component, /profileReplyInputRef/);
+});
+
+test('text stories support formatted collapse and status-scoped replies', () => {
+  assert.match(component, /expandedStatusTextId/);
+  assert.match(component, /buildStatusTextBlocks/);
+  assert.match(component, /'Read more'/);
+  assert.match(component, /statusReplyComposerId/);
+  assert.match(component, /submitStatusDiscussion/);
+  assert.match(component, /discussionReplies/);
+  assert.match(component, /STATUS_REPLY_EMOJIS/);
+  assert.match(component, /targetPage: 'statusReel'/);
+  assert.match(component, /Story discussion/);
+});
