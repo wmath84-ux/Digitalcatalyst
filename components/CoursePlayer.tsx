@@ -2022,8 +2022,8 @@ const CoursePlayer: React.FC<{
               <div className="shrink-0 border-b border-[#E3E8F5] bg-white/90 px-4 py-4 shadow-sm lg:border-[#E3E8F5] lg:py-5">
                 <div className="rounded-[1.5rem] border border-[#D9E7F8] bg-gradient-to-br from-white via-[#F8FBFF] to-[#F1EEFF] p-4 shadow-[0_8px_24px_rgba(8,26,69,0.06)]">
                   <div className="mb-3 flex items-center gap-3">
-                    <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#5B4BFF] to-[#7B61FF] text-white shadow-[0_14px_34px_rgba(91,75,255,0.20)]">
-                      <ModuleIcon className="h-6 w-6" />
+                    <span className="course-panel-icon-contrast flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white shadow-[0_14px_34px_rgba(91,75,255,0.22)] ring-1 ring-[#dcd7ff]" style={{ background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)', color: '#FFFFFF' }}>
+                      <ModuleIcon className="h-6 w-6 text-white drop-shadow-sm" />
                     </span>
                     <div className="min-w-0">
                       <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#5B4BFF]">Course Panel</p>

@@ -368,15 +368,15 @@ const CommunityAiMentor: React.FC<CommunityAiMentorProps> = ({ isOpen, userId = 
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1750] flex min-h-0 justify-end overflow-hidden overscroll-none bg-[#081A45]/24 p-0 backdrop-blur-[3px] sm:p-3"
+      className="fixed inset-0 z-[1750] flex min-h-0 justify-end overflow-hidden overscroll-none bg-white/10 p-0 backdrop-blur-[1px] sm:bg-white/20 sm:p-3 sm:backdrop-blur-[2px]"
       style={{ height: 'var(--app-dvh, 100dvh)' }}
       role="dialog"
       aria-modal="true"
       aria-label="Community AI Mentor"
       ref={panelRef}
     >
-      <div className="relative flex h-full min-h-0 max-h-full w-full min-w-0 flex-col overflow-hidden bg-[#F8FBFF] text-[#081A45] shadow-[0_30px_90px_rgba(8,26,69,0.22)] sm:max-w-[520px] sm:rounded-[2rem] sm:border sm:border-[#D9E7F8]">
-        <header className="flex shrink-0 items-center gap-2 border-b border-[#D9E7F8] bg-white/92 px-3 py-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-2xl sm:px-4 sm:pt-3">
+      <div className="relative flex h-full min-h-0 max-h-full w-full min-w-0 flex-col overflow-hidden bg-[#F2F5F9] text-[#081A45] shadow-[0_30px_90px_rgba(8,26,69,0.18)] sm:max-w-[520px] sm:rounded-[2rem] sm:border sm:border-[#D9E7F8]">
+        <header className="flex shrink-0 items-center gap-2 border-b border-[#D9E7F8] bg-[#F7F9FC]/94 px-3 py-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-2xl sm:px-4 sm:pt-3">
           <button type="button" onClick={() => setIsHistoryOpen(value => !value)} aria-label="Open Community AI chat history" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-[#1769FF] shadow-sm">☰</button>
           <div className="min-w-0 flex-1"><p className="text-[0.68rem] font-black uppercase tracking-[0.24em] text-[#7B61FF]">Community guide</p><h2 className="truncate text-lg font-black">Community AI Mentor</h2><p className="truncate text-xs font-bold text-[#7C879A]">Helping with {context.title}</p></div>
           <button type="button" onClick={() => { setSettingsDraft(readSettings()); setSettingsNotice(''); setIsSettingsOpen(true); }} aria-label="AI settings" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-[#F1EEFF] text-[#7B61FF] shadow-sm">⚙</button>
@@ -389,11 +389,11 @@ const CommunityAiMentor: React.FC<CommunityAiMentorProps> = ({ isOpen, userId = 
           <main className="flex min-h-0 min-w-0 flex-1 flex-col">
             <div ref={messagesRef} className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5">
               <div className="rounded-[1.4rem] border border-[#D9E7F8] bg-gradient-to-r from-[#E8F2FF] to-[#F1EEFF] p-3 text-xs font-bold leading-5 text-[#536178]"><span className="font-black text-[#081A45]">Context:</span> {context.helperText}{context.visibleSnippet ? <span className="mt-1 block truncate text-[#7C879A]">Visible: {context.visibleSnippet}</span> : null}</div>
-              {messages.map(message => <div key={message.messageId} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[88%] rounded-[1.35rem] border p-3 shadow-sm sm:p-4 ${message.role === 'user' ? 'border-transparent bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white' : message.status === 'failed' ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D9E7F8] bg-white text-[#081A45]'}`}><MarkdownMessage text={message.text} />{message.role === 'assistant' && message.status !== 'failed' ? <button type="button" onClick={() => navigator.clipboard?.writeText(message.text).catch(() => undefined)} className="mt-3 rounded-full bg-[#EEF6FF] px-3 py-1.5 text-xs font-black text-[#1769FF]">Copy</button> : null}</div></div>)}
+              {messages.map(message => <div key={message.messageId} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[88%] rounded-[1.35rem] border p-3 shadow-sm sm:p-4 ${message.role === 'user' ? 'border-transparent bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white' : message.status === 'failed' ? 'border-[#FAD2CF] bg-[#FCE8E6] text-[#C5221F]' : 'border-[#D9E7F8] bg-[#FAFBFD] text-[#081A45]'}`}><MarkdownMessage text={message.text} />{message.role === 'assistant' && message.status !== 'failed' ? <button type="button" onClick={() => navigator.clipboard?.writeText(message.text).catch(() => undefined)} className="mt-3 rounded-full bg-[#EEF6FF] px-3 py-1.5 text-xs font-black text-[#1769FF]">Copy</button> : null}</div></div>)}
               {isSending ? <TypingIndicator /> : null}
             </div>
 
-            <div className="shrink-0 border-t border-[#D9E7F8] bg-white/92 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-2xl sm:p-4">
+            <div className="shrink-0 border-t border-[#D9E7F8] bg-[#F7F9FC]/94 p-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] backdrop-blur-2xl sm:p-4">
               {!userId ? <p className="mb-2 rounded-2xl border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400]">Login to save Community AI chats to Firebase. This chat stays local for now.</p> : null}
               {errorNotice ? <p className="mb-2 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-3 py-2 text-xs font-black text-[#C5221F]">{errorNotice}</p> : null}
               <div className="mb-2 flex gap-2 overflow-x-auto custom-scrollbar">{starterPrompts.map(prompt => <button key={prompt} type="button" onClick={() => sendMessage(prompt)} disabled={isSending} className="shrink-0 rounded-full border border-[#D9E7F8] bg-[#F8FBFF] px-3 py-2 text-xs font-black text-[#1769FF] disabled:opacity-50">{prompt}</button>)}</div>

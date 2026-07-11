@@ -4,6 +4,10 @@ import fs from 'node:fs';
 
 const component = fs.readFileSync(new URL('../components/EduvoraCommunity.tsx', import.meta.url), 'utf8');
 const rules = fs.readFileSync(new URL('../firestore.rules', import.meta.url), 'utf8');
+const uploader = fs.readFileSync(new URL('../components/common/PremiumImageUrlInput.tsx', import.meta.url), 'utf8');
+const cloudinaryUpload = fs.readFileSync(new URL('../utils/cloudinaryUpload.ts', import.meta.url), 'utf8');
+const aiMentor = fs.readFileSync(new URL('../components/CommunityAiMentor.tsx', import.meta.url), 'utf8');
+const coursePlayer = fs.readFileSync(new URL('../components/CoursePlayer.tsx', import.meta.url), 'utf8');
 
 test('community inbox is restricted to shared posts and stories', () => {
   assert.match(component, /Only Community posts and stories can be shared/);
@@ -108,4 +112,26 @@ test('shared inbox counts and mobile nested notifications are wired', () => {
   assert.match(component, /community-header-inbox-button[^]*<svg/);
   assert.match(rules, /'follow', 'share'/);
   assert.match(rules, /'sharedItemCount'/);
+});
+
+
+test('compact image uploader supports HEIC and auto-fills parent URL without internal preview', () => {
+  assert.match(uploader, /IMAGE_FILE_ACCEPT = 'image\/\*,\.heic,\.heif,image\/heic,image\/heif'/);
+  assert.match(uploader, /onChange\(hostedUrl\)/);
+  assert.match(uploader, /Upload image/);
+  assert.match(uploader, /Use URL/);
+  assert.doesNotMatch(uploader, /Your image preview appears here/);
+  assert.match(cloudinaryUpload, /HEIC_IMAGE_EXTENSIONS/);
+  assert.match(cloudinaryUpload, /isHeicImageFile/);
+  assert.match(cloudinaryUpload, /f_auto,q_auto/);
+});
+
+test('profile detail bottom gap, AI overlay and course icon contrast are optimized', () => {
+  assert.match(component, /community-mobile-latest \.eduvora-community-main\.community-profile-post-detail-page/);
+  assert.match(component, /padding-bottom: max\(env\(safe-area-inset-bottom\), 0\.35rem\)/);
+  assert.match(aiMentor, /bg-white\/10/);
+  assert.match(aiMentor, /bg-\[#F2F5F9\]/);
+  assert.doesNotMatch(aiMentor, /bg-\[#081A45\]\/24/);
+  assert.match(coursePlayer, /course-panel-icon-contrast/);
+  assert.match(coursePlayer, /linear-gradient\(135deg, #4F46E5 0%, #7C3AED 100%\)/);
 });

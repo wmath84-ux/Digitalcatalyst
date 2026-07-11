@@ -3030,12 +3030,20 @@ const communityPolishCss = `
   .community-story-reply-sheet {
     overscroll-behavior: contain;
   }
-  .community-profile-post-detail-page {
+  .community-profile-post-detail-page,
+  .community-mobile-latest .eduvora-community-main.community-profile-post-detail-page {
+    display: flex !important;
+    flex-direction: column !important;
+    height: 100% !important;
+    min-height: 0 !important;
     overflow: hidden !important;
     padding: 0 !important;
     margin: 0 !important;
+    background: #fff !important;
   }
   .community-profile-post-detail-page .community-content-stage {
+    display: flex !important;
+    flex: 1 1 auto !important;
     height: 100% !important;
     min-height: 0 !important;
     overflow: hidden !important;
@@ -3057,7 +3065,11 @@ const communityPolishCss = `
     position: relative;
     z-index: 25;
     margin: 0 !important;
+    padding-bottom: max(env(safe-area-inset-bottom), 0.35rem) !important;
     box-shadow: 0 -10px 30px rgba(15,23,42,.06);
+  }
+  .community-mobile-latest .community-profile-post-detail-composer {
+    padding-bottom: max(env(safe-area-inset-bottom), 0.35rem) !important;
   }
   .community-notification-page {
     overscroll-behavior: contain;
@@ -7811,7 +7823,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             <h4 className="mt-3 text-base font-black text-[#273247]">Profile photo</h4>
             <p className="mt-1 text-xs font-semibold leading-5 text-[#6B7482]">Use a clear square image for the best result.</p>
             <label className="mt-3 inline-flex min-h-11 cursor-pointer items-center justify-center rounded-2xl bg-[#273247] px-4 py-3 text-sm font-black text-white shadow-sm">
-              <input type="file" accept="image/*" onChange={handleAvatarUpload} className="hidden" />
+              <input type="file" accept="image/*,.heic,.heif,image/heic,image/heif" onChange={handleAvatarUpload} className="hidden" />
               Upload photo
             </label>
             <button type="button" onClick={() => setProfileDraft((current) => ({ ...current, avatar: '' }))} className="mt-2 rounded-xl px-3 py-2 text-xs font-black text-[#7A4A3A]">Remove photo</button>
@@ -8222,7 +8234,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <CommunitySidebar />
         <div className="community-center-shell flex min-w-0 flex-1 flex-col">
           <CommunityHeader />
-          <main ref={scrollContainerRef} className={`eduvora-community-main ${page === 'thread' || page === 'comments' || page === 'directChat' || page === 'directChatThread' || page === 'search' || page === 'notifications' ? 'community-thread-page' : ''} ${page === 'profile' && profileViewMode === 'post' ? 'community-profile-post-detail-page' : ''} min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-3 custom-scrollbar sm:px-4 lg:px-5 lg:pb-4 ${
+          <main ref={scrollContainerRef} className={`eduvora-community-main ${page === 'thread' || page === 'comments' || page === 'directChat' || page === 'directChatThread' || page === 'search' || page === 'notifications' ? 'community-thread-page' : ''} ${page === 'profile' && profileViewMode === 'post' ? 'community-profile-post-detail-page h-full' : ''} min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-3 custom-scrollbar sm:px-4 lg:px-5 lg:pb-4 ${
             shouldHideCommunityDockOnMobile
               ? 'pb-3 max-md:pb-4 max-md:overscroll-contain'
               : 'pb-[calc(env(safe-area-inset-bottom)+4.9rem)] max-md:pb-[calc(env(safe-area-inset-bottom)+4.7rem)] max-md:overscroll-contain'

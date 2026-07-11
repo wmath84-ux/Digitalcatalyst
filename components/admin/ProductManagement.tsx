@@ -2283,7 +2283,7 @@ const ProductForm: React.FC<{
                                                 <span>{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</span>
                                             </button>
                                         )}
-                                        <input ref={productImageInputRef} type="file" accept="image/*" multiple onChange={handleProductImagesUpload} className="hidden" />
+                                        <input ref={productImageInputRef} type="file" accept="image/*,.heic,.heif,image/heic,image/heif" multiple onChange={handleProductImagesUpload} className="hidden" />
                                         {isUploadingProductImage && (
                                             <div className="product-editor-progress" role="status" aria-live="polite">
                                                 <span style={{ width: `${productImageUploadProgress}%` }} />
