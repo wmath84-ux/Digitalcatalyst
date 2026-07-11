@@ -4280,8 +4280,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setExpandedReplyId(null);
     setShowStatusActions(false);
     setActiveView(view);
-    setPage('chat');
+    setPage(view === 'status' ? 'statusReel' : 'chat');
     setPageStack([]);
+    if (view === 'status' && orderedStoryStatuses.length) {
+      const firstStatus = orderedStoryStatuses[0];
+      setSelectedStatusId(firstStatus.id);
+      void recordStatusView(firstStatus.id);
+    }
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -6354,7 +6359,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const renderStatusReel = () => {
-    if (!orderedStoryStatuses.length) return <div className="mx-auto max-w-xl rounded-[2rem] border border-dashed border-[var(--community-border)] bg-white p-8 text-center text-sm font-bold text-[var(--community-muted)]">No active stories yet.</div>;
+    if (!orderedStoryStatuses.length) return <div className="community-status-reel-shell fixed inset-0 z-[1500] flex items-center justify-center overflow-hidden bg-black px-4 text-white"><button type="button" onClick={goBack} aria-label="Close story viewer" className="community-status-reel-control fixed left-3 top-[calc(env(safe-area-inset-top)+1.05rem)] z-50 flex h-10 w-10 items-center justify-center rounded-full border text-lg font-black shadow-xl">←</button><div className="w-full max-w-md rounded-[2rem] border border-white/15 bg-white/10 p-7 text-center shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white/10 text-3xl">⭕</div><h2 className="mt-5 text-3xl font-black tracking-[-0.04em] text-white">No active stories yet</h2><p className="mt-3 text-sm font-semibold leading-6 text-white/70">Create the first status story or return to the Community feed.</p><div className="mt-6 grid gap-3 sm:grid-cols-2"><button type="button" onClick={openStatusUploadFromTop} className="rounded-2xl bg-[#1769ff] px-5 py-3 text-sm font-black text-white shadow-lg">Create story</button><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="rounded-2xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-black text-white">Back to feed</button></div></div></div>;
     const selectedIndex = Math.max(0, orderedStoryStatuses.findIndex((card) => card.id === selectedStatus.id));
     const reelStatuses = [...orderedStoryStatuses.slice(selectedIndex), ...orderedStoryStatuses.slice(0, selectedIndex)];
 
@@ -6647,7 +6652,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const navItems = [
     { label: 'Feed', icon: '📢', active: activeView === 'feed' && page === 'chat', action: () => switchView('feed') },
-    { label: 'Status', icon: '⭕', active: activeView === 'status' && page === 'chat', action: () => { setActiveView('status'); setPage('chat'); setPageStack([]); setShowStatusActions((value) => window.matchMedia('(min-width: 768px) and (max-width: 1023px)').matches ? !value : false); } },
+    { label: 'Status', icon: '⭕', active: activeView === 'status' && page === 'statusReel', action: () => switchView('status') },
     { label: 'Creators', icon: '✍️', active: page === 'creators', action: () => pushPage('creators') },
     { label: 'Follow', icon: '🤝', active: page === 'network', action: () => pushPage('network') },
     { label: 'Following', icon: '👥', active: page === 'following', action: () => pushPage('following') },
