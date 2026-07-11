@@ -221,7 +221,7 @@ service cloud.firestore {
         && request.resource.data.actorId == request.auth.uid
         && request.resource.data.recipientId is string
         && request.resource.data.recipientId != ''
-        && request.resource.data.type in ['reply', 'masterTag', 'status', 'creator', 'follow']
+        && request.resource.data.type in ['reply', 'masterTag', 'status', 'creator', 'follow', 'share']
         && request.resource.data.title is string
         && request.resource.data.body is string
         && request.resource.data.createdAt is number
@@ -263,20 +263,26 @@ service cloud.firestore {
         && request.resource.data.createdAt == request.time
         && request.resource.data.updatedAt is timestamp
         && request.resource.data.lastMessageType == 'shared_item'
+        && (!request.resource.data.keys().hasAny(['sharedItemCount'])
+          || (request.resource.data.sharedItemCount is int
+            && request.resource.data.sharedItemCount >= 0))
         && request.resource.data.keys().hasOnly([
           'participants', 'participantMap', 'participantNames', 'participantAvatars',
           'createdAt', 'updatedAt', 'lastMessage', 'lastMessageType',
-          'lastMessageAt', 'lastSenderId', 'unreadCounts', 'pinnedMessageId'
+          'lastMessageAt', 'lastSenderId', 'unreadCounts', 'sharedItemCount', 'pinnedMessageId'
         ]);
 
       allow update: if isShareParticipant()
         && request.resource.data.participants == resource.data.participants
         && request.resource.data.participantMap == resource.data.participantMap
         && request.resource.data.createdAt == resource.data.createdAt
+        && (!request.resource.data.keys().hasAny(['sharedItemCount'])
+          || (request.resource.data.sharedItemCount is int
+            && request.resource.data.sharedItemCount >= 0))
         && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
           'participantNames', 'participantAvatars', 'updatedAt', 'lastMessage',
           'lastMessageType', 'lastMessageAt', 'lastSenderId', 'unreadCounts',
-          'pinnedMessageId'
+          'sharedItemCount', 'pinnedMessageId'
         ]);
 
       allow delete: if isAdmin();

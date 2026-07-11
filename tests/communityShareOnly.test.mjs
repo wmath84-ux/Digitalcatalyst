@@ -65,7 +65,7 @@ test('profile post detail owns one scroll area with locked header and composer',
   assert.match(component, /community-profile-post-detail-page/);
   assert.match(component, /community-profile-post-detail-scroll/);
   assert.match(component, /community-profile-post-detail-composer/);
-  assert.match(component, /flex h-full min-h-0 w-full max-w-6xl flex-col/);
+  assert.match(component, /community-profile-post-detail mx-auto flex h-full max-h-full min-h-0/);
   assert.match(component, /profileReplyInputRef/);
 });
 
@@ -79,4 +79,33 @@ test('text stories support formatted collapse and status-scoped replies', () => 
   assert.match(component, /STATUS_REPLY_EMOJIS/);
   assert.match(component, /targetPage: 'statusReel'/);
   assert.match(component, /Story discussion/);
+});
+
+
+test('legacy status grids are unreachable and profile text detail renders once in white', () => {
+  assert.doesNotMatch(component, /statusMine/);
+  assert.doesNotMatch(component, /statusCards\.map\(renderStatusTile\)/);
+  assert.doesNotMatch(component, /myStatuses\.map\(renderStatusTile\)/);
+  assert.match(component, /if \(page === 'chat' && activeView === 'status'\) setActiveView\('feed'\)/);
+  assert.match(component, /community-profile-text-detail/);
+  assert.match(component, /const hasVisualPost = Boolean/);
+  assert.match(component, /type === 'text' \? \(/);
+  assert.doesNotMatch(component, /Text post<\/span><h2[^]*bg-\[#111\]/);
+});
+
+test('shared inbox counts and mobile nested notifications are wired', () => {
+  assert.match(component, /sharedItemCount\?: number/);
+  assert.match(component, /setSharedItemCounts/);
+  assert.match(component, /sharedCount\} shared/);
+  assert.match(component, /type: 'share'/);
+  assert.match(component, /targetPage: 'directChatThread'/);
+  assert.match(component, /'notifications'/);
+  assert.match(component, /const renderNotificationPage/);
+  assert.match(component, /pushPage\('notifications'\)/);
+  assert.match(component, /const allNotifications = useMemo/);
+  assert.match(component, /allNotifications\.filter\(\(notification\) => !notification\.read\)\.length/);
+  assert.match(component, /community-header-search-button[^]*<svg/);
+  assert.match(component, /community-header-inbox-button[^]*<svg/);
+  assert.match(rules, /'follow', 'share'/);
+  assert.match(rules, /'sharedItemCount'/);
 });

@@ -24,7 +24,7 @@ interface EduvoraCommunityProps {
 
 type CommunityView = 'feed' | 'status';
 type FeedFilter = 'all' | 'following' | 'followers' | 'mine' | 'admin';
-type CommunityPage = 'chat' | 'adminPosts' | 'thread' | 'comments' | 'search' | 'profile' | 'creators' | 'network' | 'following' | 'tagMaster' | 'masterTags' | 'masterTagDetail' | 'statusUpload' | 'statusMine' | 'statusReel' | 'directChat' | 'directChatThread' | 'statusDetail';
+type CommunityPage = 'chat' | 'adminPosts' | 'thread' | 'comments' | 'search' | 'profile' | 'creators' | 'network' | 'following' | 'tagMaster' | 'masterTags' | 'masterTagDetail' | 'statusUpload' | 'statusReel' | 'directChat' | 'directChatThread' | 'statusDetail' | 'notifications';
 type PostType = 'text' | 'image' | 'poll';
 type Reply = { id: number; author: string; text: string; time: string; avatar?: string; docId?: string; createdAt?: number; ownerId?: string; senderId?: string; clientMessageId?: string; status?: 'sending' | 'sent' | 'failed' | 'deleted' | 'hidden'; replyToMessageId?: string; replyToSenderName?: string; replyToTextPreview?: string; replyToType?: 'feed_message'; replyToDeleted?: boolean };
 type FeedMessage = { id: number; admin: string; badge: string; avatar: string; title: string; body: string; time: string; reactions: string[]; replies: Reply[]; creatorId?: string; ownerId?: string; authorName?: string; authorAvatar?: string; postType?: PostType; type?: PostType; imagePreview?: string; imageLayout?: 'thumbnail' | 'original'; pollOptions?: string[]; pollVotes?: number[]; likeCount?: number; docId?: string; createdAt?: number; reactionCounts?: Record<string, number>; replyCount?: number; likedByUsers?: Record<string, boolean>; pollVoters?: Record<string, number>; reactionUsers?: Record<string, string>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'creator' | 'admin'; sourceType?: 'url' };
@@ -134,11 +134,12 @@ type PrivateConversation = {
   lastMessageAt: number;
   lastSenderId: string;
   unreadCounts: Record<string, number>;
+  sharedItemCount?: number;
   pinnedMessageId?: string;
 };
 type MasterTagRequest = { id: number; author: string; avatar: string; category: string; title: string; detail: string; time: string; likes: number; reactions: Record<string, number>; ownerId?: string; docId?: string; likedByUsers?: Record<string, boolean>; reactionUsers?: Record<string, string>; storagePath?: string; uploadBytes?: number; expiresAt?: number; source?: 'creator' | 'admin'; targetMasterId?: string; targetMasterName?: string; targetMasterAvatar?: string; targetMasterUsername?: string; targetMasterRole?: string; targetMasterSubject?: string; tagType?: string; visibility?: 'public' | 'followers' | 'private'; isExternalMaster?: boolean; normalizedSearchText?: string; searchTokens?: string[]; status?: 'active' | 'hidden' | 'reported' | 'deleted'; verifiedMaster?: boolean; createdAt?: number };
 type CommunitySupportTicket = { id: string; customerName: string; customerEmail: string; subject: string; message: string; date: string; status: 'Open' | 'Resolved' | 'Pending'; customerUid?: string; source?: 'contact' | 'masterTag'; communityThreadId?: number; customerAvatar?: string; category?: string; adminReply?: string; repliedAt?: string; inboxMessage?: string; inboxRead?: boolean };
-type CommunityNotification = { id: string; title: string; body: string; time: string; read: boolean; type: 'reply' | 'masterTag' | 'status' | 'creator' | 'follow'; targetPage?: CommunityPage; targetId?: number | string };
+type CommunityNotification = { id: string; title: string; body: string; time: string; read: boolean; type: 'reply' | 'masterTag' | 'status' | 'creator' | 'follow' | 'share'; targetPage?: CommunityPage; targetId?: number | string; createdAt?: number; actorAvatar?: string };
 type CommunityProfile = { name: string; username: string; avatar: string; bio: string };
 type ProfileFeedback = { type: 'success' | 'error'; message: string } | null;
 type ProfilePanel = 'privacy' | 'notifications' | 'connected' | 'logout';
@@ -147,7 +148,7 @@ type ProfileRelationTab = 'followers' | 'following';
 type ProfileContentTab = 'posts' | 'stories';
 type FollowEdge = { followerId: string; followingId: string };
 type PrivacySettings = { profileVisible: boolean; showActivity: boolean; allowMessages: boolean; allowFollowRequests: boolean };
-type NotificationPreferences = { replies: boolean; masterTags: boolean; statuses: boolean; creatorPosts: boolean; follows: boolean };
+type NotificationPreferences = { replies: boolean; masterTags: boolean; statuses: boolean; creatorPosts: boolean; follows: boolean; shares: boolean };
 type NotificationFilter = 'all' | CommunityNotification['type'];
 
 const stripUndefinedDeep = <T,>(value: T): T => {
@@ -261,7 +262,7 @@ const buildProfileFromUser = (user?: User | null, uid?: string | null): Communit
   };
 };
 const defaultPrivacySettings: PrivacySettings = { profileVisible: true, showActivity: true, allowMessages: true, allowFollowRequests: true };
-const defaultNotificationPreferences: NotificationPreferences = { replies: true, masterTags: true, statuses: true, creatorPosts: true, follows: true };
+const defaultNotificationPreferences: NotificationPreferences = { replies: true, masterTags: true, statuses: true, creatorPosts: true, follows: true, shares: true };
 
 const defaultCommunityStyle = {
   desktopLayout: 'latest',
@@ -838,6 +839,7 @@ const mapPrivateConversationDoc = (snapshotDoc: { id: string; data: () => Record
     lastMessageAt: asMillis(data.lastMessageAt || data.updatedAt),
     lastSenderId: data.lastSenderId || '',
     unreadCounts: data.unreadCounts || {},
+    sharedItemCount: typeof data.sharedItemCount === 'number' ? Math.max(0, data.sharedItemCount) : undefined,
     pinnedMessageId: data.pinnedMessageId,
   };
 };
@@ -3031,16 +3033,38 @@ const communityPolishCss = `
   .community-profile-post-detail-page {
     overflow: hidden !important;
     padding: 0 !important;
+    margin: 0 !important;
   }
   .community-profile-post-detail-page .community-content-stage {
-    height: 100%;
+    height: 100% !important;
+    min-height: 0 !important;
+    overflow: hidden !important;
+  }
+  .community-profile-post-detail-page .community-profile-post-detail {
+    height: 100% !important;
+    max-height: 100% !important;
+    margin: 0 auto !important;
+  }
+  .community-profile-post-detail-body {
     min-height: 0;
+    overflow: hidden;
   }
   .community-profile-post-detail-scroll {
     -webkit-overflow-scrolling: touch;
+    overscroll-behavior: contain;
   }
   .community-profile-post-detail-composer {
+    position: relative;
+    z-index: 25;
+    margin: 0 !important;
     box-shadow: 0 -10px 30px rgba(15,23,42,.06);
+  }
+  .community-notification-page {
+    overscroll-behavior: contain;
+  }
+  .community-notification-page-header {
+    position: relative;
+    z-index: 20;
   }
   html[data-color-experience] .eduvora-community-polish .community-instagram-profile-shell,
   html[data-color-experience] .eduvora-community-polish .community-profile-post-card,
@@ -3104,6 +3128,28 @@ const communityPolishCss = `
     }
     .community-profile-post-detail-page {
       padding-bottom: 0 !important;
+    }
+    .community-mobile-latest .community-header-search-button,
+    .community-mobile-latest .community-header-inbox-button {
+      width: 2.75rem !important;
+      height: 2.75rem !important;
+      min-width: 2.75rem !important;
+      min-height: 2.75rem !important;
+      border: 1px solid #dbe5f2 !important;
+      background: #ffffff !important;
+      color: #0f172a !important;
+      box-shadow: 0 6px 18px rgba(15,23,42,.08) !important;
+    }
+    .community-mobile-latest .community-header-search-button svg,
+    .community-mobile-latest .community-header-inbox-button svg {
+      width: 1.3rem !important;
+      height: 1.3rem !important;
+      stroke-width: 2.25 !important;
+    }
+    .community-mobile-latest .community-notification-page {
+      height: 100% !important;
+      border: 0 !important;
+      border-radius: 0 !important;
     }
   }
 
@@ -3193,6 +3239,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [communitySearchQuery, setCommunitySearchQuery] = useState('');
   const [selectedChatId, setSelectedChatId] = useState('');
   const [privateConversations, setPrivateConversations] = useState<PrivateConversation[]>([]);
+  const [sharedItemCounts, setSharedItemCounts] = useState<Record<string, number>>({});
   const [privateMessages, setPrivateMessages] = useState<PrivateChatMessage[]>([]);
   const [chatDraft, setChatDraft] = useState('');
   const [chatPollQuestion, setChatPollQuestion] = useState('');
@@ -3537,69 +3584,181 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const notificationTypeLabels: Array<{ value: NotificationFilter; label: string }> = [
     { value: 'all', label: 'All' },
-    { value: 'follow', label: 'Follow' },
+    { value: 'follow', label: 'Follows' },
     { value: 'reply', label: 'Replies' },
     { value: 'status', label: 'Status' },
+    { value: 'share', label: 'Shares' },
     { value: 'creator', label: 'Posts' },
+    { value: 'masterTag', label: 'Master tags' },
   ];
 
-  const notifications = useMemo<CommunityNotification[]>(() => {
-    const feedReplyAlerts = messages.flatMap((message) => message.replies.slice(-2).map((reply) => ({
-      id: `reply-${message.id}-${reply.id}`,
-      title: `${reply.author} replied in ${message.title}`,
-      body: reply.text,
-      time: reply.time,
-      read: Boolean(notificationReads[`reply-${message.id}-${reply.id}`]),
-      type: 'reply' as const,
-      targetPage: 'thread' as CommunityPage,
-      targetId: message.id,
-    })));
+  const allNotifications = useMemo<CommunityNotification[]>(() => {
+    const preferenceAllows = (type: CommunityNotification['type']) => {
+      if (type === 'reply') return notificationPreferences.replies;
+      if (type === 'masterTag') return notificationPreferences.masterTags;
+      if (type === 'status') return notificationPreferences.statuses;
+      if (type === 'creator') return notificationPreferences.creatorPosts;
+      if (type === 'share') return notificationPreferences.shares;
+      return notificationPreferences.follows;
+    };
+
+    const feedReplyAlerts = messages
+      .filter((message) => isOwnCommunityId(message.ownerId || message.creatorId))
+      .flatMap((message) => message.replies
+        .filter((reply) => !isOwnCommunityId(reply.ownerId || reply.senderId))
+        .slice(-6)
+        .map((reply) => {
+          const id = `reply-${message.id}-${reply.id}`;
+          return {
+            id,
+            title: `${reply.author} replied to your post`,
+            body: reply.text,
+            time: reply.time,
+            read: Boolean(notificationReads[id]),
+            type: 'reply' as const,
+            targetPage: 'thread' as CommunityPage,
+            targetId: message.id,
+            createdAt: reply.createdAt || message.createdAt || message.id,
+            actorAvatar: normalizeCommunityAvatar(reply.avatar),
+          };
+        }));
+
+    const statusDiscussionAlerts = statusCards
+      .filter((status) => isOwnCommunityId(status.ownerId || status.creatorId))
+      .flatMap((status) => (status.discussionReplies || [])
+        .filter((reply) => !isOwnCommunityId(reply.authorId))
+        .slice(-6)
+        .map((reply) => {
+          const id = `status-reply-${status.id}-${reply.id}`;
+          return {
+            id,
+            title: `${reply.authorName} replied to your story`,
+            body: reply.text,
+            time: formatCommunityReplyTime(new Date(reply.createdAt).toISOString()),
+            read: Boolean(notificationReads[id]),
+            type: 'reply' as const,
+            targetPage: 'statusReel' as CommunityPage,
+            targetId: status.id,
+            createdAt: reply.createdAt,
+            actorAvatar: normalizeCommunityAvatar(reply.authorAvatar),
+          };
+        }));
+
     const masterTagAlerts = supportTickets
       .filter((ticket) => ticket.source === 'masterTag' && (!ticket.customerUid || ticket.customerUid === currentUserKey) && isSupportTicketNeedsAttention(ticket))
-      .slice(0, 6)
-      .map((ticket) => ({
-        id: `master-${ticket.id}-${ticket.repliedAt || ticket.date}`,
-        title: ticket.adminReply ? 'Master replied to your tag' : 'Master tag inbox update',
-        body: ticket.adminReply || ticket.inboxMessage || ticket.subject,
-        time: formatCommunityReplyTime(ticket.repliedAt || ticket.date),
-        read: Boolean(notificationReads[`master-${ticket.id}-${ticket.repliedAt || ticket.date}`]) || !isSupportTicketNeedsAttention(ticket),
-        type: 'masterTag' as const,
-        targetPage: 'masterTagDetail' as CommunityPage,
-        targetId: ticket.communityThreadId,
-      }));
-    const statusAlerts = statusCards.filter((status) => status.likedBy > 0 || (status.views > 0 && isOwnCommunityId(status.ownerId))).slice(0, 5).map((status) => ({
-      id: `status-${status.id}-${status.likedBy}-${status.views}`,
-      title: status.likedBy > 0 ? 'Your status is getting love' : 'Your status has new views',
-      body: `${status.title} · ❤️ ${status.likedBy} · 👁️ ${status.views}`,
-      time: status.slots.split('·').pop()?.trim() || 'Just now',
-      read: Boolean(notificationReads[`status-${status.id}-${status.likedBy}-${status.views}`]),
-      type: 'status' as const,
-      targetPage: 'statusReel' as CommunityPage,
-      targetId: status.id,
-    }));
-    const creatorAlerts = messages.filter((message) => message.creatorId && !isOwnCommunityId(message.creatorId)).slice(0, 4).map((message) => ({
-      id: `creator-${message.id}`,
-      title: `${message.admin} posted in community`,
-      body: message.title,
-      time: message.time,
-      read: Boolean(notificationReads[`creator-${message.id}`]),
-      type: 'creator' as const,
-      targetPage: 'thread' as CommunityPage,
-      targetId: message.id,
-    }));
-    return [
-      ...(notificationPreferences.follows ? firebaseNotifications : []),
-      ...(notificationPreferences.replies ? feedReplyAlerts : []),
+      .slice(0, 12)
+      .map((ticket) => {
+        const id = `master-${ticket.id}-${ticket.repliedAt || ticket.date}`;
+        return {
+          id,
+          title: ticket.adminReply ? 'Master replied to your tag' : 'Master tag inbox update',
+          body: ticket.adminReply || ticket.inboxMessage || ticket.subject,
+          time: formatCommunityReplyTime(ticket.repliedAt || ticket.date),
+          read: Boolean(notificationReads[id]) || !isSupportTicketNeedsAttention(ticket),
+          type: 'masterTag' as const,
+          targetPage: 'masterTagDetail' as CommunityPage,
+          targetId: ticket.communityThreadId,
+          createdAt: Date.parse(ticket.repliedAt || ticket.date) || 0,
+        };
+      });
+
+    const statusAlerts = statusCards
+      .filter((status) => isOwnCommunityId(status.ownerId || status.creatorId) && (status.likedBy > 0 || status.views > 0))
+      .slice(0, 10)
+      .map((status) => {
+        const id = `status-${status.id}-${status.likedBy}-${status.views}`;
+        return {
+          id,
+          title: status.likedBy > 0 ? 'Your status is getting love' : 'Your status has new views',
+          body: `${status.title} · ❤️ ${status.likedBy} · 👁️ ${status.views}`,
+          time: status.slots.split('·').pop()?.trim() || 'Just now',
+          read: Boolean(notificationReads[id]),
+          type: 'status' as const,
+          targetPage: 'statusReel' as CommunityPage,
+          targetId: status.id,
+          createdAt: status.createdAt || status.id,
+          actorAvatar: normalizeCommunityAvatar(status.authorAvatar),
+        };
+      });
+
+    const creatorAlerts = messages
+      .filter((message) => message.creatorId && !isOwnCommunityId(message.creatorId))
+      .sort((left, right) => (right.createdAt || right.id) - (left.createdAt || left.id))
+      .slice(0, 8)
+      .map((message) => {
+        const id = `creator-${message.id}`;
+        return {
+          id,
+          title: `${message.admin} posted in community`,
+          body: message.title,
+          time: message.time,
+          read: Boolean(notificationReads[id]),
+          type: 'creator' as const,
+          targetPage: 'thread' as CommunityPage,
+          targetId: message.id,
+          createdAt: message.createdAt || message.id,
+          actorAvatar: normalizeCommunityAvatar(message.authorAvatar || message.avatar),
+        };
+      });
+
+    const shareAlerts = privateConversations
+      .filter((conversation) => {
+        const unread = Math.max(0, Number(conversation.unreadCounts?.[currentUserKey]) || 0);
+        return unread > 0 && conversation.lastSenderId && !isOwnCommunityId(conversation.lastSenderId);
+      })
+      .map((conversation) => {
+        const otherId = conversation.participants.find((participantId) => !isOwnCommunityId(participantId)) || conversation.lastSenderId;
+        const senderName = conversation.participantNames?.[otherId] || 'Community member';
+        const unread = Math.max(0, Number(conversation.unreadCounts?.[currentUserKey]) || 0);
+        const sharedCount = sharedItemCounts[conversation.id] ?? conversation.sharedItemCount ?? unread;
+        const id = `share-${conversation.id}-${conversation.updatedAt}-${unread}`;
+        return {
+          id,
+          title: `${senderName} shared ${unread === 1 ? 'an item' : `${unread} items`} with you`,
+          body: `${Math.max(unread, sharedCount)} shared ${Math.max(unread, sharedCount) === 1 ? 'post or story' : 'posts and stories'} in this conversation`,
+          time: formatCommunityTime(conversation.lastMessageAt || conversation.updatedAt),
+          read: Boolean(notificationReads[id]),
+          type: 'share' as const,
+          targetPage: 'directChatThread' as CommunityPage,
+          targetId: conversation.id,
+          createdAt: conversation.lastMessageAt || conversation.updatedAt,
+          actorAvatar: normalizeCommunityAvatar(conversation.participantAvatars?.[otherId]),
+        };
+      });
+
+    const candidates = [
+      ...firebaseNotifications.filter((notification) => preferenceAllows(notification.type)),
+      ...(notificationPreferences.replies ? [...feedReplyAlerts, ...statusDiscussionAlerts] : []),
       ...(notificationPreferences.masterTags ? masterTagAlerts : []),
       ...(notificationPreferences.statuses ? statusAlerts : []),
+      ...(notificationPreferences.shares ? shareAlerts : []),
       ...(notificationPreferences.creatorPosts ? creatorAlerts : []),
-    ].filter((notification) => notificationFilter === 'all' || notification.type === notificationFilter).slice(0, 30);
-  }, [currentUserKey, firebaseNotifications, messages, notificationFilter, notificationPreferences, notificationReads, statusCards, supportTickets]);
-  const unreadNotificationCount = supportTickets.filter((ticket) => {
-    if (ticket.source !== 'masterTag') return false;
-    if (ticket.customerUid && ticket.customerUid !== currentUserKey) return false;
-    return isSupportTicketNeedsAttention(ticket);
-  }).length;
+    ];
+
+    const deduped = new Map<string, CommunityNotification>();
+    candidates.forEach((notification) => {
+      const semanticKey = [
+        notification.type,
+        notification.targetPage || '',
+        String(notification.targetId ?? ''),
+        normalizeSearchText(notification.body).slice(0, 100),
+      ].join(':');
+      const existing = deduped.get(semanticKey);
+      if (!existing || (notification.createdAt || 0) > (existing.createdAt || 0)) deduped.set(semanticKey, notification);
+    });
+
+    return Array.from(deduped.values())
+      .sort((left, right) => (right.createdAt || 0) - (left.createdAt || 0))
+      .slice(0, 60);
+  }, [currentUserKey, firebaseNotifications, messages, notificationPreferences, notificationReads, privateConversations, sharedItemCounts, statusCards, supportTickets]);
+
+  const notifications = useMemo(
+    () => allNotifications.filter((notification) => notificationFilter === 'all' || notification.type === notificationFilter),
+    [allNotifications, notificationFilter],
+  );
+
+  const unreadNotificationCount = allNotifications.filter((notification) => !notification.read).length;
+
 
   const updateSupportTicketReadState = (ticketIds: string[], inboxRead: boolean) => {
     if (!ticketIds.length) return;
@@ -3723,6 +3882,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         lastMessageAt: serverTimestamp(),
         lastSenderId: '',
         unreadCounts: baseUnreadCounts,
+        sharedItemCount: 0,
       });
     });
   };
@@ -3808,6 +3968,36 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [isCommunityAllowed, currentUserKey, guardedAuth.currentUser?.uid]);
 
   useEffect(() => {
+    if (!PRIVATE_CHAT_ENABLED || !isCommunityAllowed || !guardedAuth.currentUser || !currentUserKey || !privateConversations.length) {
+      if (!privateConversations.length) setSharedItemCounts({});
+      return undefined;
+    }
+
+    let cancelled = false;
+    const hydrateSharedCounts = async () => {
+      const entries = await Promise.all(privateConversations.slice(0, 60).map(async (conversation): Promise<[string, number]> => {
+        if (typeof conversation.sharedItemCount === 'number') return [conversation.id, Math.max(0, conversation.sharedItemCount)];
+        try {
+          const snapshot = await getDocs(query(
+            collection(db, PRIVATE_CHATS, conversation.id, PRIVATE_CHAT_MESSAGES),
+            orderBy('createdAt', 'desc'),
+            limit(150),
+          ));
+          const count = snapshot.docs.reduce((total, item) => total + (normalizePrivateChatMessageType(item.data().type) === 'shared_item' ? 1 : 0), 0);
+          return [conversation.id, count];
+        } catch (error) {
+          console.warn('Shared-item count hydration failed', error);
+          return [conversation.id, conversation.lastMessage ? 1 : 0];
+        }
+      }));
+      if (!cancelled) setSharedItemCounts(Object.fromEntries(entries));
+    };
+
+    void hydrateSharedCounts();
+    return () => { cancelled = true; };
+  }, [guardedAuth.currentUser?.uid, isCommunityAllowed, currentUserKey, privateConversations]);
+
+  useEffect(() => {
     if (!PRIVATE_CHAT_ENABLED || !isCommunityAllowed || !activeConversationId) {
       setPrivateMessages([]);
       return undefined;
@@ -3826,6 +4016,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         .sort((a, b) => a.createdAt - b.createdAt);
 
       setPrivateMessages(liveMessages);
+      setSharedItemCounts((current) => ({ ...current, [activeConversationId]: liveMessages.length }));
 
       if (guardedAuth.currentUser && activeConversationId) {
         updateDoc(doc(db, PRIVATE_CHATS, activeConversationId), {
@@ -3856,6 +4047,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     activeViewRef.current = activeView;
     pageStackRef.current = pageStack;
   }, [page, activeView, pageStack]);
+
+  useEffect(() => {
+    if (page === 'chat' && activeView === 'status') setActiveView('feed');
+  }, [page, activeView]);
 
   const restoreSocialFeedScroll = () => {
     if (!socialDesktopLayoutRef.current) return;
@@ -4348,17 +4543,19 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         const data = item.data() as Record<string, unknown>;
         const createdAt = typeof data.createdAt === 'number' ? data.createdAt : Date.now();
         const rawType = String(data.type || 'creator');
-        const type = (['reply', 'masterTag', 'status', 'creator', 'follow'].includes(rawType) ? rawType : 'creator') as CommunityNotification['type'];
+        const type = (['reply', 'masterTag', 'status', 'creator', 'follow', 'share'].includes(rawType) ? rawType : 'creator') as CommunityNotification['type'];
 
         return {
           id: item.id,
           title: typeof data.title === 'string' ? data.title : 'Community notification',
           body: typeof data.body === 'string' ? data.body : '',
           time: formatCommunityReplyTime(new Date(createdAt).toISOString()),
-          read: Boolean(notificationReads[item.id]),
+          read: Boolean(data.read) || Boolean(notificationReads[item.id]),
           type,
           targetPage: typeof data.targetPage === 'string' ? data.targetPage as CommunityPage : 'network',
           targetId: typeof data.targetId === 'string' || typeof data.targetId === 'number' ? data.targetId : undefined,
+          createdAt,
+          actorAvatar: normalizeCommunityAvatar(typeof data.actorAvatar === 'string' ? data.actorAvatar : ''),
         };
       });
 
@@ -4480,9 +4677,19 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [isNotificationPanelOpen]);
 
   const markAllNotificationsRead = () => {
-    setNotificationReads((current) => ({ ...current, ...Object.fromEntries(notifications.map((notification) => [notification.id, true])) }));
+    setNotificationReads((current) => ({ ...current, ...Object.fromEntries(allNotifications.map((notification) => [notification.id, true])) }));
     const ticketIds = supportTickets.filter((ticket) => isSupportTicketNeedsAttention(ticket)).map((ticket) => ticket.id);
     updateSupportTicketReadState(ticketIds, true);
+  };
+
+  const openNotificationCenter = () => {
+    const mobileViewport = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+    if (mobileViewport) {
+      setIsNotificationPanelOpen(false);
+      if (page !== 'notifications') pushPage('notifications');
+      return;
+    }
+    setIsNotificationPanelOpen((open) => !open);
   };
 
   const openNotification = (notification: CommunityNotification) => {
@@ -4491,14 +4698,45 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       const matchingTicket = supportTickets.find((ticket) => notification.id.includes(`${ticket.id}-`) || notification.id === `master-${ticket.id}`);
       if (matchingTicket) updateSupportTicketReadState([matchingTicket.id], true);
     }
+
     setIsNotificationPanelOpen(false);
-    if (!notification.targetPage) return;
-    if ((notification.targetPage === 'thread' || notification.type === 'reply' || notification.type === 'creator') && typeof notification.targetId === 'number') {
-      setSelectedMessageId(notification.targetId);
+    const openedFromNotificationPage = page === 'notifications';
+    const mobileViewport = typeof window !== 'undefined' && window.matchMedia('(max-width: 767px)').matches;
+    const numericTargetId = typeof notification.targetId === 'number'
+      ? notification.targetId
+      : typeof notification.targetId === 'string' && /^\d+$/.test(notification.targetId)
+        ? Number(notification.targetId)
+        : null;
+
+    if (notification.type === 'share' && typeof notification.targetId === 'string') {
+      const conversation = privateConversations.find((item) => item.id === notification.targetId);
+      const otherId = conversation?.participants.find((participantId) => !isOwnCommunityId(participantId));
+      if (!conversation || !otherId) {
+        setProfileFeedback({ type: 'error', message: 'This shared conversation is no longer available.' });
+        return;
+      }
+      setSelectedChatId(otherId);
+      setPrivateChatError('');
+      setPrivateMessageMenuId('');
+      setPage('directChatThread');
+      setPageStack(openedFromNotificationPage ? ['notifications'] : ['directChat']);
+      updateDoc(doc(db, PRIVATE_CHATS, conversation.id), {
+        [`unreadCounts.${currentUserKey}`]: 0,
+      }).catch((error) => console.warn('Shared notification read update failed', error));
+      return;
+    }
+
+    if ((notification.targetPage === 'thread' || notification.type === 'reply' || notification.type === 'creator') && numericTargetId !== null) {
+      const targetMessage = messages.find((message) => message.id === numericTargetId);
+      if (!targetMessage) {
+        setProfileFeedback({ type: 'error', message: 'This Community post has expired or is no longer available.' });
+        return;
+      }
+      setSelectedMessageId(numericTargetId);
       setActiveView('feed');
-      if (window.matchMedia('(max-width: 767px)').matches) {
+      if (mobileViewport) {
         setPage('thread');
-        setPageStack([]);
+        setPageStack(openedFromNotificationPage ? ['notifications'] : ['chat']);
       } else if (shouldUseSocialDesktopThread()) {
         pushPage('thread', { preserveScroll: true });
       } else {
@@ -4507,21 +4745,44 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       }
       return;
     }
-    if (notification.targetPage === 'statusReel' && typeof notification.targetId === 'number') {
-      prepareStatusReelOrder(notification.targetId);
-      setSelectedStatusId(notification.targetId);
+
+    if (notification.targetPage === 'statusReel' && numericTargetId !== null) {
+      const targetStatus = statusCards.find((status) => status.id === numericTargetId);
+      if (!targetStatus) {
+        setProfileFeedback({ type: 'error', message: 'This story has expired or is no longer available.' });
+        return;
+      }
+      prepareStatusReelOrder(numericTargetId);
+      setSelectedStatusId(numericTargetId);
       setActiveView('status');
       setPage('statusReel');
-      setPageStack(['chat']);
-      void recordStatusView(notification.targetId);
+      setPageStack(openedFromNotificationPage ? ['notifications'] : ['chat']);
+      void recordStatusView(numericTargetId);
       return;
     }
-    if (notification.targetPage === 'masterTagDetail' && typeof notification.targetId === 'number') {
-      setSelectedMasterTagId(notification.targetId);
+
+    if (notification.targetPage === 'masterTagDetail') {
+      if (numericTargetId !== null) setSelectedMasterTagId(numericTargetId);
       setPage('masterTagDetail');
-      setPageStack(['tagMaster']);
+      setPageStack(openedFromNotificationPage ? ['notifications'] : ['masterTags']);
+      return;
+    }
+
+    if (notification.targetPage === 'profile' && typeof notification.targetId === 'string') {
+      setSelectedProfileId(notification.targetId);
+      setProfileViewMode('overview');
+      setProfileContentTab('posts');
+      setPage('profile');
+      setPageStack(openedFromNotificationPage ? ['notifications'] : ['chat']);
+      return;
+    }
+
+    if (notification.targetPage === 'network' || notification.type === 'follow') {
+      setPage('network');
+      setPageStack(openedFromNotificationPage ? ['notifications'] : ['chat']);
     }
   };
+
 
   const prepareStatusReelOrder = (statusId: number) => {
     const source = orderedStoryStatuses.length ? orderedStoryStatuses : statusCards;
@@ -4540,15 +4801,28 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setIsNotificationPanelOpen(false);
     setExpandedReplyId(null);
     setShowStatusActions(false);
-    setActiveView(view);
-    setPage(view === 'status' ? 'statusReel' : 'chat');
-    setPageStack([]);
-    if (view === 'status' && orderedStoryStatuses.length) {
+
+    if (view === 'status') {
       const firstStatus = orderedStoryStatuses[0];
-      prepareStatusReelOrder(firstStatus.id);
-      setSelectedStatusId(firstStatus.id);
-      void recordStatusView(firstStatus.id);
+      if (firstStatus) {
+        prepareStatusReelOrder(firstStatus.id);
+        setSelectedStatusId(firstStatus.id);
+        setActiveView('status');
+        setPage('statusReel');
+        setPageStack(['chat']);
+        void recordStatusView(firstStatus.id);
+      } else {
+        setActiveView('feed');
+        setPage('statusUpload');
+        setPageStack(['chat']);
+      }
+      scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+      return;
     }
+
+    setActiveView('feed');
+    setPage('chat');
+    setPageStack([]);
     scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
@@ -4878,15 +5152,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const openStatusUploadFromTop = () => {
-    setActiveView('status');
     setShowStatusActions(false);
     pushPage('statusUpload');
   };
 
   const openMyStatusesFromTop = () => {
-    setActiveView('status');
     setShowStatusActions(false);
-    pushPage('statusMine');
+    const newestOwnStatus = [...myStatuses].sort((left, right) => (right.createdAt || right.id) - (left.createdAt || left.id))[0];
+    if (newestOwnStatus) {
+      openStatusReel(newestOwnStatus.id);
+      return;
+    }
+    openStatusUploadFromTop();
   };
 
 
@@ -5424,13 +5701,19 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
     setStatusCards((current) => current.filter((item) => item.id !== status.id));
     if (selectedStatusId === status.id) {
-      setSelectedStatusId((current) => {
-        const nextStatus = statusCards.find((item) => item.id !== current);
-        return nextStatus?.id || 0;
-      });
-      setPage('chat');
-      setActiveView('status');
-      setPageStack([]);
+      const nextStatus = orderedStoryStatuses.find((item) => item.id !== status.id);
+      if (nextStatus) {
+        prepareStatusReelOrder(nextStatus.id);
+        setSelectedStatusId(nextStatus.id);
+        setPage('statusReel');
+        setActiveView('status');
+        setPageStack(['chat']);
+      } else {
+        setSelectedStatusId(0);
+        setPage('chat');
+        setActiveView('feed');
+        setPageStack([]);
+      }
     }
 
     try {
@@ -5663,10 +5946,27 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         lastMessageType: 'shared_item',
         lastMessageAt: serverTimestamp(),
         lastSenderId: currentUserKey,
+        sharedItemCount: typeof existingConversation?.sharedItemCount === 'number' ? increment(1) : Math.max(0, sharedItemCounts[conversationId] || 0) + 1,
         [`unreadCounts.${receiver.id}`]: increment(1),
         [`unreadCounts.${currentUserKey}`]: 0,
       });
 
+      addDoc(collection(db, COMMUNITY_NOTIFICATIONS), stripUndefinedDeep({
+        recipientId: receiver.id,
+        actorId: currentUserKey,
+        actorName: profile.name || buildStableCommunityName(currentUserKey),
+        actorUsername: normalizeUsername(profile.username || profile.name),
+        actorAvatar: getOwnDisplayAvatar(),
+        type: 'share',
+        title: `${profile.name || 'Someone'} shared ${shareTarget.sourceType === 'status' ? 'a story' : 'a post'} with you`,
+        body: sharedItem.title || sharedItem.previewText || 'Open your Shared inbox to view it.',
+        targetPage: 'directChatThread',
+        targetId: conversationId,
+        createdAt,
+        read: false,
+      })).catch((error) => console.warn('Share notification failed', error));
+
+      setSharedItemCounts((current) => ({ ...current, [conversationId]: (current[conversationId] || existingConversation?.sharedItemCount || 0) + 1 }));
       setSelectedChatId(receiver.id);
       setShareFeedback(`Sent to ${getCreatorDisplayName(receiver)}.`);
     } catch (error) {
@@ -5700,7 +6000,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         lastMessageType: 'shared_item',
         lastMessageAt: latestRemaining?.createdAt || serverTimestamp(),
         lastSenderId: latestRemaining?.senderId || '',
+        sharedItemCount: remaining.length,
       }, { merge: true });
+      setSharedItemCounts((current) => ({ ...current, [message.conversationId]: remaining.length }));
     } catch (error) {
       console.warn('Delete shared message failed', error);
       setPrivateMessages(previousMessages);
@@ -6744,28 +7046,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
-  const renderStatusTile = (card: StatusCard) => {
-    const owner = getStatusOwnerIdentity(card);
-    return (
-      <article key={card.id} role="button" tabIndex={0} onClick={() => openStatusReel(card.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openStatusReel(card.id); }} className="community-status-tile group relative aspect-[9/14] cursor-pointer overflow-hidden rounded-[1.65rem] border p-2.5 text-left shadow-[0_16px_44px_rgba(8,26,69,0.12)] ring-1 ring-white transition duration-300 hover:-translate-y-1 hover:shadow-[0_24px_70px_rgba(23,105,255,0.18)]">
-        <div className={`community-status-card-surface community-status-tone-${card.type} absolute inset-2 rounded-[1.25rem] transition duration-300 group-hover:scale-[1.015]`} />
-        <div className="community-status-card-vignette absolute inset-2 rounded-[1.25rem]" />
-        <div className="relative flex h-full flex-col justify-between p-2 text-[#302A26]">
-          <div className="flex items-center gap-2">
-            <Avatar value={owner.avatar} size="h-9 w-9" className="ring-2 ring-white/80" />
-            <span className="community-status-owner-chip min-w-0 truncate rounded-full border px-2.5 py-1 text-[10px] font-black shadow-sm">{owner.name}</span>
-          </div>
-          <div>
-            {card.imagePreview ? <div className="mb-4 aspect-square w-full max-w-[9rem] overflow-hidden rounded-2xl bg-[#171F2D] shadow-inner">{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'thumbnail')}</div> : <div className="mb-5 flex h-14 w-14 items-center justify-center rounded-2xl border border-[#DED3C5] bg-white/80 text-2xl">{card.type === 'poll' ? '▤' : '✦'}</div>}
-            <h3 className="line-clamp-3 text-xl font-black tracking-tight sm:text-2xl">{card.title}</h3>
-            <p className="mt-2 line-clamp-3 text-sm font-bold text-[#695D55]">{card.body}</p>
-            <div className="mt-3 flex flex-wrap gap-2"><span className="community-status-metric-chip rounded-full border px-3 py-1 text-[11px] font-black shadow-sm">❤️ {card.likedBy}</span><button type="button" onClick={(event) => { event.stopPropagation(); setStatusViewerPanelId(card.id); }} className="community-status-metric-chip rounded-full border px-3 py-1 text-[11px] font-black shadow-sm">👁️ {card.views}</button></div>
-          </div>
-        </div>
-      </article>
-    );
-  };
-
   const renderStatusViewerModal = () => {
     const card = statusCards.find((status) => status.id === statusViewerPanelId);
     if (!card) return null;
@@ -6886,7 +7166,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       .map((conversation) => {
         const otherId = conversation.participants.find((participantId) => participantId !== currentUserKey) || '';
         const creator = allCreators.find((item) => item.id === otherId);
-        return { conversation, otherId, creator };
+        const sharedCount = Math.max(0, sharedItemCounts[conversation.id] ?? conversation.sharedItemCount ?? (conversation.lastMessage ? 1 : 0));
+        return { conversation, otherId, creator, sharedCount };
       })
       .filter(({ otherId, creator }) => Boolean(otherId && creator))
       .filter(({ creator }) => !normalizedQuery || scoreCreatorSearch(creator!, normalizedQuery) > 0)
@@ -6918,7 +7199,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         </div>
 
         <div className="min-h-0 flex-1 overflow-y-auto p-2.5 custom-scrollbar sm:p-3">
-          {conversationRows.length ? conversationRows.map(({ conversation, otherId, creator }) => {
+          {conversationRows.length ? conversationRows.map(({ conversation, otherId, creator, sharedCount }) => {
             const unread = conversation.unreadCounts?.[currentUserKey] || 0;
             return (
               <button key={conversation.id} type="button" onClick={() => openChatCreator(otherId)} className={`community-share-conversation-row flex w-full items-center gap-3 rounded-[1.25rem] px-3 py-3 text-left sm:px-4 ${unread ? 'is-unread' : ''}`}>
@@ -6928,10 +7209,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 </span>
                 <span className="min-w-0 flex-1">
                   <span className="flex items-center justify-between gap-3">
-                    <strong className="truncate text-sm font-black text-[#0f172a]">{creator!.name}</strong>
+                    <span className="flex min-w-0 items-center gap-2">
+                      <strong className="truncate text-sm font-black text-[#0f172a]">{creator!.name}</strong>
+                      <span className="shrink-0 rounded-full bg-[#eaf2ff] px-2 py-0.5 text-[10px] font-black text-[#2563eb]">{sharedCount} shared</span>
+                    </span>
                     <time className="shrink-0 text-[10px] font-bold text-[#94a3b8]">{formatCommunityTime(conversation.lastMessageAt)}</time>
                   </span>
-                  <span className={`mt-1 block truncate text-xs ${unread ? 'font-black text-[#334155]' : 'font-semibold text-[#64748b]'}`}>{conversation.lastMessage || 'Shared a Community item'}</span>
+                  <span className={`mt-1 block truncate text-xs ${unread ? 'font-black text-[#334155]' : 'font-semibold text-[#64748b]'}`}>{conversation.lastMessage || 'Shared a Community item'}{unread ? ` · ${unread} unread` : ''}</span>
                 </span>
                 {unread ? <span className="community-share-unread-badge min-w-6 rounded-full px-2 py-1 text-center text-[10px] font-black text-white">{unread > 99 ? '99+' : unread}</span> : <span className="text-lg text-[#94a3b8]">›</span>}
               </button>
@@ -7108,6 +7392,69 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const networkVisibleCreators = networkTab === 'forYou' ? visibleForYouCreators.filter((creator) => !normalizeSearchText(debouncedNetworkSearch) || scoreCreatorSearch(creator, debouncedNetworkSearch) > 0) : filteredCreators;
 
 
+  const getNotificationIcon = (type: CommunityNotification['type']) => {
+    if (type === 'reply') return '💬';
+    if (type === 'status') return '⭕';
+    if (type === 'share') return '↗';
+    if (type === 'follow') return '👥';
+    if (type === 'masterTag') return '🏷️';
+    return '✦';
+  };
+
+  const renderNotificationPage = () => (
+    <section className="community-notification-page mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col overflow-hidden bg-[#f8fafc] md:h-[calc(100dvh-8rem)] md:rounded-[2rem] md:border md:border-[#dbe5f2] md:shadow-[0_24px_70px_rgba(15,23,42,.10)]">
+      <header className="community-notification-page-header flex shrink-0 items-center gap-3 border-b border-[#e2e8f0] bg-white px-3 py-3 sm:px-5">
+        <button type="button" onClick={goBack} aria-label="Back from notifications" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-[#f1f5f9] text-xl font-black text-[#0f172a] transition hover:bg-[#e2e8f0]">←</button>
+        <div className="min-w-0 flex-1">
+          <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#2563eb]">Community activity</p>
+          <h2 className="truncate text-xl font-black tracking-[-0.03em] text-[#0f172a]">Notifications</h2>
+          <p className="text-xs font-semibold text-[#64748b]">{unreadNotificationCount ? `${unreadNotificationCount} unread update${unreadNotificationCount === 1 ? '' : 's'}` : 'You are all caught up'}</p>
+        </div>
+        <button type="button" onClick={markAllNotificationsRead} disabled={!unreadNotificationCount} className="shrink-0 rounded-full border border-[#dbe5f2] bg-white px-3 py-2 text-[11px] font-black text-[#2563eb] shadow-sm disabled:opacity-40">Mark all read</button>
+      </header>
+
+      <div className="shrink-0 border-b border-[#e2e8f0] bg-white px-3 py-3 sm:px-5">
+        <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          {notificationTypeLabels.map((item) => {
+            const count = item.value === 'all' ? allNotifications.length : allNotifications.filter((notification) => notification.type === item.value).length;
+            return <button key={item.value} type="button" onClick={() => setNotificationFilter(item.value)} className={`shrink-0 rounded-full px-3.5 py-2 text-xs font-black transition ${notificationFilter === item.value ? 'bg-[#0f172a] text-white shadow-sm' : 'bg-[#f1f5f9] text-[#475569] hover:bg-[#e2e8f0]'}`}>{item.label} <span className={notificationFilter === item.value ? 'text-white/75' : 'text-[#94a3b8]'}>{count}</span></button>;
+          })}
+        </div>
+      </div>
+
+      <div className="min-h-0 flex-1 overflow-y-auto p-2.5 custom-scrollbar sm:p-4">
+        {profileFeedback?.type === 'error' ? <div className="mb-3 rounded-2xl border border-[#fecaca] bg-[#fff1f2] px-4 py-3 text-sm font-bold text-[#b91c1c]">{profileFeedback.message}</div> : null}
+        {notifications.length ? (
+          <div className="space-y-2">
+            {notifications.map((notification) => (
+              <button key={notification.id} type="button" onClick={() => openNotification(notification)} className={`group flex w-full items-start gap-3 rounded-[1.35rem] border p-3.5 text-left transition sm:p-4 ${notification.read ? 'border-[#e2e8f0] bg-white hover:bg-[#f8fafc]' : 'border-[#bfdbfe] bg-[#eff6ff] shadow-[0_10px_28px_rgba(37,99,235,.08)] hover:bg-[#dbeafe]'}`}>
+                <span className="relative flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-full bg-white text-xl shadow-sm ring-1 ring-[#dbe5f2]">
+                  {notification.actorAvatar ? <Avatar value={notification.actorAvatar} size="h-12 w-12" /> : <span aria-hidden="true">{getNotificationIcon(notification.type)}</span>}
+                  {!notification.read ? <span className="absolute bottom-0 right-0 h-3 w-3 rounded-full border-2 border-white bg-[#2563eb]" /> : null}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-start justify-between gap-3">
+                    <strong className="min-w-0 text-sm font-black leading-5 text-[#0f172a] sm:text-[0.95rem]">{notification.title}</strong>
+                    <time className="shrink-0 text-[10px] font-bold uppercase tracking-[0.08em] text-[#94a3b8]">{notification.time}</time>
+                  </span>
+                  <span className="mt-1.5 line-clamp-3 block text-xs font-semibold leading-5 text-[#475569] sm:text-sm">{notification.body}</span>
+                  <span className="mt-2 inline-flex rounded-full bg-white px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#2563eb] shadow-sm">{notificationTypeLabels.find((item) => item.value === notification.type)?.label || 'Update'}</span>
+                </span>
+                <span className="self-center text-lg text-[#94a3b8] transition group-hover:translate-x-0.5">›</span>
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div className="flex min-h-[18rem] flex-col items-center justify-center px-6 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-[1.4rem] bg-[#eaf2ff] text-3xl">🔕</div>
+            <h3 className="mt-4 text-xl font-black text-[#0f172a]">No notifications here</h3>
+            <p className="mt-2 max-w-sm text-sm font-semibold leading-6 text-[#64748b]">Replies, follows, story activity, shared items, posts and master-tag updates will appear in this page.</p>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+
   const NotificationDropdown = () => (
     <div ref={notificationDropdownRef} className="fixed right-[clamp(0.75rem,3vw,2.5rem)] top-[calc(env(safe-area-inset-top)+5.75rem)] z-[2147483647] w-[min(22rem,calc(100vw-1.5rem))] overflow-hidden rounded-[1.75rem] border border-[#E3ECF8] bg-white/95 shadow-[0_28px_90px_rgba(8,27,92,0.22)] backdrop-blur-2xl isolate">
       <div className="flex items-center justify-between gap-3 border-b border-[#E3ECF8] bg-gradient-to-br from-[#EEF2FF] to-white p-4"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Notifications</p><h2 className="text-lg font-black text-[#081B5C]">Community updates</h2></div><button type="button" onClick={markAllNotificationsRead} disabled={!unreadNotificationCount} className="rounded-full bg-white px-3 py-2 text-[11px] font-black text-[#4F46E5] shadow-sm disabled:opacity-45">Mark all as read</button></div>
@@ -7128,7 +7475,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     document.body,
   ) : null;
 
-  const notificationDropdownPortal = isNotificationPanelOpen && typeof document !== 'undefined' ? createPortal(<NotificationDropdown />, document.body) : null;
+  const notificationDropdownPortal = isNotificationPanelOpen && typeof document !== 'undefined' && window.matchMedia('(min-width: 768px)').matches ? createPortal(<NotificationDropdown />, document.body) : null;
 
   const communityStyle = {
     ...defaultCommunityStyle,
@@ -7176,7 +7523,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   ];
 
   const activeNavItem = navItems.find((item) => item.active) || navItems[0];
-  const activeHeaderTitle = page === 'search' ? 'Search' : page === 'directChat' ? 'Shared' : page === 'directChatThread' ? getCreatorDisplayName(activeChatCreator) : page === 'comments' ? 'Comments' : activeNavItem.label === 'Feed' ? 'Community' : activeNavItem.label;
+  const activeHeaderTitle = page === 'search' ? 'Search' : page === 'directChat' ? 'Shared' : page === 'directChatThread' ? getCreatorDisplayName(activeChatCreator) : page === 'comments' ? 'Comments' : page === 'notifications' ? 'Notifications' : activeNavItem.label === 'Feed' ? 'Community' : activeNavItem.label;
   const showCreateCta = (page === 'chat' && activeView === 'status') || page === 'statusUpload';
   const communityAiButtonRef = useRef<HTMLButtonElement>(null);
   const openCommunityAiMentor = () => setIsCommunityAiOpen(true);
@@ -7228,11 +7575,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           {page === 'chat' && activeView === 'status' ? <div className="hidden items-center gap-1 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 md:flex"><button type="button" onClick={openStatusUploadFromTop} className="min-h-9 rounded-xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-3 text-[11px] font-black text-white">Create</button><button type="button" onClick={openMyStatusesFromTop} className="min-h-9 rounded-xl bg-white px-3 text-[11px] font-black text-[#081A45]">Your status</button><button type="button" onClick={() => setShowStatusRulesModal(true)} className="min-h-9 rounded-xl bg-white px-3 text-[11px] font-black text-[#1769FF]">Rules</button></div> : null}
           {showCreateCta ? <button type="button" onClick={handleHeaderCreate} className="hidden rounded-2xl bg-gradient-to-r from-[#7B61FF] to-[#1769FF] px-4 py-3 text-xs font-black text-white shadow-[0_16px_38px_rgba(23,105,255,0.22)] transition hover:-translate-y-0.5 hidden">Create</button> : null}
           <button type="button" onClick={() => pushPage('network')} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-3 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] xl:flex">⌕ Search</button>
-          <button type="button" onClick={() => { setCommunitySearchQuery(''); pushPage('search'); }} aria-label="Search Community users" className="community-header-search-button flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#D9E7F8] bg-white text-lg text-[#111] shadow-sm transition hover:bg-[#f5f5f5]">⌕</button>
-          <button type="button" onClick={() => pushPage('directChat')} aria-label="Open shared inbox" className="community-header-inbox-button relative flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#D9E7F8] bg-white text-lg text-[#111] shadow-sm transition hover:bg-[#f5f5f5]">✉{privateShareUnreadCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#ff3040] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{privateShareUnreadCount > 9 ? '9+' : privateShareUnreadCount}</span> : null}</button>
+          <button type="button" onClick={() => { setCommunitySearchQuery(''); pushPage('search'); }} aria-label="Search Community users" className="community-header-search-button flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#cbd5e1] bg-white text-[#0f172a] shadow-sm transition hover:-translate-y-0.5 hover:border-[#93c5fd] hover:bg-[#eff6ff] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-[1.35rem] w-[1.35rem]" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg></button>
+          <button type="button" onClick={() => pushPage('directChat')} aria-label="Open shared inbox" className="community-header-inbox-button relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#cbd5e1] bg-white text-[#0f172a] shadow-sm transition hover:-translate-y-0.5 hover:border-[#93c5fd] hover:bg-[#eff6ff] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-[1.35rem] w-[1.35rem]" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 6.5h17v11h-17z" /><path d="m4 7 8 6 8-6" /></svg>{privateShareUnreadCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#ff3040] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{privateShareUnreadCount > 9 ? '9+' : privateShareUnreadCount}</span> : null}</button>
           <button type="button" onClick={() => { setSelectedProfileId(null); setProfileViewMode('overview'); pushPage('profile'); }} className="community-mobile-profile-button flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#D9E7F8] bg-white text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF]" aria-label="Open profile"><Avatar value={getOwnDisplayAvatar()} size="h-8 w-8" /></button>
           <span className="hidden rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400] lg:inline-flex">🪙 {eduCoins}</span>
-          <div ref={notificationPanelRef} className="relative"><button type="button" onClick={() => setIsNotificationPanelOpen((open) => !open)} aria-expanded={isNotificationPanelOpen} aria-label="Community notifications" className="community-mobile-notification-button relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16"><span aria-hidden="true">🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button></div>
+          <div ref={notificationPanelRef} className="relative"><button type="button" onClick={openNotificationCenter} aria-expanded={isNotificationPanelOpen || page === 'notifications'} aria-label="Community notifications" className="community-mobile-notification-button relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16"><span aria-hidden="true">🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button></div>
         </div>
       </div>
     </header>
@@ -7346,7 +7693,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <section className="community-social-rail-card">
           <div className="community-social-rail-title">
             <h3>Requests</h3>
-            <button type="button" onClick={() => setIsNotificationPanelOpen(true)}>View all</button>
+            <button type="button" onClick={openNotificationCenter}>View all</button>
           </div>
           <div className="community-social-rail-list">
             {requestItems.length ? requestItems.map((notification) => (
@@ -7511,7 +7858,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const ToggleRow = ({ label, description, checked, onChange }: { label: string; description: string; checked: boolean; onChange: (checked: boolean) => void }) => <label className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] p-4"><span className="min-w-0"><span className="block text-sm font-black text-[#081B5C]">{label}</span><span className="mt-1 block text-xs font-bold leading-5 text-[#64748B]">{description}</span></span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 shrink-0 accent-[#4F7BFF]" /></label>;
 
-  const renderProfileSettingsPanel = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Settings</p><h3 className="text-2xl font-black text-[#081B5C]">Account controls</h3></div><button type="button" onClick={() => setProfileViewMode('overview')} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Back</button></div><div className="mt-5 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">{([['privacy','Privacy'],['notifications','Notifications'],['connected','Account'],['logout','Logout']] as Array<[ProfilePanel,string]>).map(([panel,label]) => <button key={panel} type="button" onClick={() => setActiveProfilePanel(panel)} className={`shrink-0 rounded-full px-4 py-2 text-xs font-black ${activeProfilePanel === panel ? 'bg-[#4F7BFF] text-white' : 'bg-[#F8FBFF] text-[#081B5C]'}`}>{label}</button>)}</div>{activeProfilePanel === 'privacy' && <div className="mt-5 space-y-3"><ToggleRow label="Public profile" description="Allow your profile card to be visible inside the community." checked={privacySettings.profileVisible} onChange={(value) => setPrivacySettings((current) => ({ ...current, profileVisible: value }))} /><ToggleRow label="Show activity" description="Show your creator posts, replies, statuses, and master-tag activity in summaries." checked={privacySettings.showActivity} onChange={(value) => setPrivacySettings((current) => ({ ...current, showActivity: value }))} /><ToggleRow label="Allow messages" description="Let creators receive status shares and future direct-message requests from you." checked={privacySettings.allowMessages} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowMessages: value }))} /><ToggleRow label="Allow follow requests" description="Keep your profile available for follow-request features when they launch." checked={privacySettings.allowFollowRequests} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowFollowRequests: value }))} /></div>}{activeProfilePanel === 'notifications' && <div className="mt-5 space-y-3"><ToggleRow label="Replies" description="Show reply alerts in the bell dropdown." checked={notificationPreferences.replies} onChange={(value) => setNotificationPreferences((current) => ({ ...current, replies: value }))} /><ToggleRow label="Master-tag replies" description="Show admin/master responses to your tag requests." checked={notificationPreferences.masterTags} onChange={(value) => setNotificationPreferences((current) => ({ ...current, masterTags: value }))} /><ToggleRow label="Status interactions" description="Show likes and views for your statuses." checked={notificationPreferences.statuses} onChange={(value) => setNotificationPreferences((current) => ({ ...current, statuses: value }))} /><ToggleRow label="Creator posts" description="Show new post alerts from community creators." checked={notificationPreferences.creatorPosts} onChange={(value) => setNotificationPreferences((current) => ({ ...current, creatorPosts: value }))} /><ToggleRow label="Follows" description="Show alerts when someone follows your community profile." checked={notificationPreferences.follows} onChange={(value) => setNotificationPreferences((current) => ({ ...current, follows: value }))} /></div>}{activeProfilePanel === 'connected' && <div className="mt-5 space-y-3"><div className="rounded-2xl bg-[#F8FBFF] p-4 text-sm font-bold text-[#64748B]">Signed in email: <span className="font-black text-[#081B5C]">{authEmail || currentUser?.email || 'Local community session'}</span></div>{['Google', 'Email password', 'Social account'].map((account) => <button key={account} type="button" disabled className="flex w-full justify-between rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] px-4 py-3 text-sm font-black text-[#64748B] opacity-70"><span>{account}</span><span>Connected through app login</span></button>)}</div>}{activeProfilePanel === 'logout' && <div className="mt-5 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] p-4"><p className="text-sm font-bold leading-6 text-[#5F6368]">Sign out of Firebase and return to the app auth flow.</p><button type="button" onClick={handleLogout} className="mt-4 w-full rounded-2xl bg-[#C5221F] px-5 py-3 font-black text-white">Log out and go to auth</button></div>}</section>;
+  const renderProfileSettingsPanel = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Settings</p><h3 className="text-2xl font-black text-[#081B5C]">Account controls</h3></div><button type="button" onClick={() => setProfileViewMode('overview')} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Back</button></div><div className="mt-5 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">{([['privacy','Privacy'],['notifications','Notifications'],['connected','Account'],['logout','Logout']] as Array<[ProfilePanel,string]>).map(([panel,label]) => <button key={panel} type="button" onClick={() => setActiveProfilePanel(panel)} className={`shrink-0 rounded-full px-4 py-2 text-xs font-black ${activeProfilePanel === panel ? 'bg-[#4F7BFF] text-white' : 'bg-[#F8FBFF] text-[#081B5C]'}`}>{label}</button>)}</div>{activeProfilePanel === 'privacy' && <div className="mt-5 space-y-3"><ToggleRow label="Public profile" description="Allow your profile card to be visible inside the community." checked={privacySettings.profileVisible} onChange={(value) => setPrivacySettings((current) => ({ ...current, profileVisible: value }))} /><ToggleRow label="Show activity" description="Show your creator posts, replies, statuses, and master-tag activity in summaries." checked={privacySettings.showActivity} onChange={(value) => setPrivacySettings((current) => ({ ...current, showActivity: value }))} /><ToggleRow label="Allow messages" description="Let creators receive status shares and future direct-message requests from you." checked={privacySettings.allowMessages} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowMessages: value }))} /><ToggleRow label="Allow follow requests" description="Keep your profile available for follow-request features when they launch." checked={privacySettings.allowFollowRequests} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowFollowRequests: value }))} /></div>}{activeProfilePanel === 'notifications' && <div className="mt-5 space-y-3"><ToggleRow label="Replies" description="Show reply alerts in the bell dropdown." checked={notificationPreferences.replies} onChange={(value) => setNotificationPreferences((current) => ({ ...current, replies: value }))} /><ToggleRow label="Master-tag replies" description="Show admin/master responses to your tag requests." checked={notificationPreferences.masterTags} onChange={(value) => setNotificationPreferences((current) => ({ ...current, masterTags: value }))} /><ToggleRow label="Status interactions" description="Show likes and views for your statuses." checked={notificationPreferences.statuses} onChange={(value) => setNotificationPreferences((current) => ({ ...current, statuses: value }))} /><ToggleRow label="Creator posts" description="Show new post alerts from community creators." checked={notificationPreferences.creatorPosts} onChange={(value) => setNotificationPreferences((current) => ({ ...current, creatorPosts: value }))} /><ToggleRow label="Follows" description="Show alerts when someone follows your community profile." checked={notificationPreferences.follows} onChange={(value) => setNotificationPreferences((current) => ({ ...current, follows: value }))} /><ToggleRow label="Shared items" description="Show alerts when someone shares a Community post or story with you." checked={notificationPreferences.shares} onChange={(value) => setNotificationPreferences((current) => ({ ...current, shares: value }))} /></div>}{activeProfilePanel === 'connected' && <div className="mt-5 space-y-3"><div className="rounded-2xl bg-[#F8FBFF] p-4 text-sm font-bold text-[#64748B]">Signed in email: <span className="font-black text-[#081B5C]">{authEmail || currentUser?.email || 'Local community session'}</span></div>{['Google', 'Email password', 'Social account'].map((account) => <button key={account} type="button" disabled className="flex w-full justify-between rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] px-4 py-3 text-sm font-black text-[#64748B] opacity-70"><span>{account}</span><span>Connected through app login</span></button>)}</div>}{activeProfilePanel === 'logout' && <div className="mt-5 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] p-4"><p className="text-sm font-bold leading-6 text-[#5F6368]">Sign out of Firebase and return to the app auth flow.</p><button type="button" onClick={handleLogout} className="mt-4 w-full rounded-2xl bg-[#C5221F] px-5 py-3 font-black text-white">Log out and go to auth</button></div>}</section>;
 
   const renderProfileGrid = (profilePosts: FeedMessage[], profileStories: StatusCard[]) => {
     if (profileContentTab === 'stories') {
@@ -7615,28 +7962,44 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (!message) return <div className="mx-auto max-w-4xl rounded-[2rem] border border-dashed border-[#D9E7F8] bg-white p-10 text-center"><h2 className="text-2xl font-black text-[#081B5C]">Post unavailable</h2><button type="button" onClick={() => setProfileViewMode('overview')} className="mt-5 rounded-2xl bg-[#1769FF] px-5 py-3 text-sm font-black text-white">Back to profile</button></div>;
 
     const type = message.postType || message.type || 'text';
+    const hasVisualPost = Boolean(message.imagePreview || message.pollOptions?.length);
     const liked = Boolean(message.likedByUsers?.[currentUserKey]) || likedMessages.includes(message.id);
     const draft = replyDrafts[message.id] || '';
     const canSendReply = Boolean(draft.trim()) && !replySendingIds[message.id] && !(typeof navigator !== 'undefined' && !navigator.onLine);
     const imageSource = message.imagePreview ? normalizeMediaSource({ imagePreview: message.imagePreview, title: message.title }, { type: 'image', title: message.title }).url : '';
     const imageFallback = buildPostImageFallback({ title: message.title, body: message.body, postType: type });
 
-    const renderProfilePostMedia = () => message.imagePreview
-      ? <SafeImage src={imageSource || imageFallback} fallbackSrc={imageFallback} alt={message.title} className="max-h-[82dvh] h-auto w-full object-contain" fallbackTitle={message.title} fallbackBadge="Community image" fallbackIcon="💬" fallbackMessage="Image preview unavailable" aspect="auto" />
-      : message.pollOptions
-        ? <div className="w-full max-w-xl p-5 sm:p-8"><div className="rounded-[1.5rem] bg-white p-5 text-[#111] shadow-2xl"><span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#737373]">Community poll</span><h2 className="mt-3 text-3xl font-black leading-tight text-[#111]">{message.title}</h2>{message.body && message.body !== message.title ? <p className="mt-3 whitespace-pre-wrap text-sm font-medium leading-6 text-[#52525b]">{message.body}</p> : null}<div className="mt-5 space-y-2">{message.pollOptions.map((option, index) => { const votes = message.pollVotes || message.pollOptions!.map(() => 0); const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0)); const percent = Math.round((votes[index] / total) * 100); const selectedOption = message.pollVoters?.[currentUserKey]; return <button key={`${message.id}-${option}-${index}`} type="button" onClick={() => voteOnMessagePoll(message.id, index)} disabled={selectedOption !== undefined} className="relative w-full overflow-hidden rounded-xl border border-[#d4d4d8] bg-white px-4 py-3 text-left text-sm font-bold text-[#18181b] disabled:opacity-100"><span className="absolute inset-y-0 left-0 bg-[#e0e7ff]" style={{ width: selectedOption !== undefined ? `${percent}%` : '0%' }} /><span className="relative flex items-center justify-between gap-3"><span>{option}</span><span>{selectedOption !== undefined ? `${percent}%` : 'Vote'}</span></span></button>; })}</div></div></div>
-        : <div className="flex h-full min-h-[22rem] w-full items-center justify-center bg-[#111] p-6 text-center text-white"><div className="max-w-xl"><span className="text-xs font-black uppercase tracking-[0.22em] text-white/55">Text post</span><h2 className="mt-4 whitespace-pre-wrap text-4xl font-black leading-tight text-white sm:text-5xl">{message.title}</h2><p className="mt-5 whitespace-pre-wrap text-base font-medium leading-7 text-white/78">{message.body}</p></div></div>;
+    const renderProfilePostMedia = () => {
+      if (message.imagePreview) {
+        return <SafeImage src={imageSource || imageFallback} fallbackSrc={imageFallback} alt={message.title} className="max-h-[82dvh] h-auto w-full object-contain" fallbackTitle={message.title} fallbackBadge="Community image" fallbackIcon="💬" fallbackMessage="Image preview unavailable" aspect="auto" />;
+      }
+      if (message.pollOptions?.length) {
+        return <div className="w-full max-w-xl p-5 sm:p-8"><div className="rounded-[1.5rem] bg-white p-5 text-[#111] shadow-2xl"><span className="text-[10px] font-black uppercase tracking-[0.18em] text-[#737373]">Community poll</span><h2 className="mt-3 text-3xl font-black leading-tight text-[#111]">{message.title}</h2>{message.body && message.body !== message.title ? <p className="mt-3 whitespace-pre-wrap text-sm font-medium leading-6 text-[#52525b]">{message.body}</p> : null}<div className="mt-5 space-y-2">{message.pollOptions.map((option, index) => { const votes = message.pollVotes || message.pollOptions!.map(() => 0); const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0)); const percent = Math.round((votes[index] / total) * 100); const selectedOption = message.pollVoters?.[currentUserKey]; return <button key={`${message.id}-${option}-${index}`} type="button" onClick={() => voteOnMessagePoll(message.id, index)} disabled={selectedOption !== undefined} className="relative w-full overflow-hidden rounded-xl border border-[#d4d4d8] bg-white px-4 py-3 text-left text-sm font-bold text-[#18181b] disabled:opacity-100"><span className="absolute inset-y-0 left-0 bg-[#e0e7ff]" style={{ width: selectedOption !== undefined ? `${percent}%` : '0%' }} /><span className="relative flex items-center justify-between gap-3"><span>{option}</span><span>{selectedOption !== undefined ? `${percent}%` : 'Vote'}</span></span></button>; })}</div></div></div>;
+      }
+      return null;
+    };
 
     const renderProfileDiscussion = (scrollable: boolean) => (
       <>
-        <div className="border-b border-[#efefef] p-4"><div className="flex items-start gap-3"><Avatar value={resolveAvatar(message)} size="h-9 w-9" /><p className="min-w-0 flex-1 whitespace-pre-wrap text-sm leading-6 text-[#262626]"><strong className="mr-1.5 font-extrabold text-[#111]">{resolveName(message)}</strong>{message.body || message.title}</p></div></div>
-        <div className={`${scrollable ? 'min-h-[8rem] flex-1 overflow-y-auto' : ''} space-y-3 p-3 custom-scrollbar`}>{message.replies.length ? message.replies.map((reply) => renderReplyBubble(message, reply)) : <div className="py-10 text-center"><div className="text-3xl">◯</div><h3 className="mt-3 text-lg font-black text-[#111]">No comments yet</h3><p className="mt-1 text-sm font-semibold text-[#737373]">Start the conversation.</p></div>}</div>
+        <div className="border-b border-[#efefef] bg-white p-4 sm:p-5">
+          {type === 'text' ? (
+            <article className="community-profile-text-detail rounded-[1.35rem] border border-[#ececec] bg-white p-4 text-[#111] shadow-[0_12px_34px_rgba(15,23,42,.05)] sm:p-6">
+              <span className="text-[10px] font-black uppercase tracking-[0.2em] text-[#737373]">Text post</span>
+              <h2 className="mt-3 whitespace-pre-wrap break-words text-2xl font-black leading-tight tracking-[-0.025em] text-[#111] sm:text-3xl">{message.title}</h2>
+              {message.body && message.body !== message.title ? <p className="mt-4 whitespace-pre-wrap break-words text-[0.95rem] font-medium leading-7 text-[#3f3f46]">{message.body}</p> : null}
+              <div className="mt-5 flex items-center gap-2 border-t border-[#f1f1f1] pt-4"><Avatar value={resolveAvatar(message)} size="h-8 w-8" /><span className="min-w-0 flex-1 truncate text-xs font-extrabold text-[#262626]">{resolveName(message)}</span><span className="shrink-0 text-[10px] font-bold uppercase tracking-[0.08em] text-[#a1a1aa]">{message.time}</span></div>
+            </article>
+          ) : (
+            <div className="flex items-start gap-3"><Avatar value={resolveAvatar(message)} size="h-9 w-9" /><p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-sm leading-6 text-[#262626]"><strong className="mr-1.5 font-extrabold text-[#111]">{resolveName(message)}</strong>{message.body || message.title}</p></div>
+          )}
+        </div>
+        <div className={`${scrollable ? 'min-h-[8rem] flex-1 overflow-y-auto' : ''} space-y-3 bg-white p-3 custom-scrollbar`}>{message.replies.length ? message.replies.map((reply) => renderReplyBubble(message, reply)) : <div className="py-10 text-center"><div className="text-3xl">◯</div><h3 className="mt-3 text-lg font-black text-[#111]">No comments yet</h3><p className="mt-1 text-sm font-semibold text-[#737373]">Start the conversation.</p></div>}</div>
         <div className="border-t border-[#efefef] bg-white"><div className="flex items-center gap-1 px-2.5 pt-2"><button type="button" onClick={() => toggleMessageLike(message.id)} aria-label={liked ? 'Unlike post' : 'Like post'} className={`community-instagram-action ${liked ? 'is-active' : ''}`}><span aria-hidden="true">{liked ? '♥' : '♡'}</span></button><button type="button" onClick={() => profileReplyInputRef.current?.focus()} aria-label="Comment" className="community-instagram-action"><span aria-hidden="true">◯</span></button><button type="button" onClick={() => openShareComposer({ sourceType: 'feed_message', message })} aria-label="Share" className="community-instagram-action"><span aria-hidden="true">↗</span></button></div><div className="px-4 pb-3"><p className="text-sm font-extrabold text-[#111]">{message.likeCount || 0} likes</p><p className="mt-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-[#a1a1aa]">{message.time}</p></div></div>
       </>
     );
 
     return (
-      <section className="community-profile-post-detail mx-auto flex h-full min-h-0 w-full max-w-6xl flex-col overflow-hidden border border-[#e5e7eb] bg-white shadow-[0_22px_70px_rgba(15,23,42,.12)] md:rounded-[1.5rem]">
+      <section className={`community-profile-post-detail mx-auto flex h-full max-h-full min-h-0 w-full ${hasVisualPost ? 'max-w-6xl' : 'max-w-3xl'} flex-col overflow-hidden border border-[#e5e7eb] bg-white shadow-[0_22px_70px_rgba(15,23,42,.12)] md:rounded-[1.5rem]`}>
         <header className="community-profile-post-detail-header z-20 flex min-h-14 shrink-0 items-center gap-3 border-b px-3 py-2 md:px-4">
           <button type="button" onClick={() => setProfileViewMode('overview')} aria-label="Back to profile" className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-[#111] hover:bg-[#f5f5f5]">←</button>
           <Avatar value={display.avatar || resolveAvatar(message)} size="h-10 w-10" />
@@ -7645,15 +8008,20 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           {isOwnCommunityId(getMessageOwnerId(message)) ? <button type="button" onClick={() => void deleteOwnFeedPost(message)} aria-label="Delete post" className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-[#dc2626] hover:bg-[#fff1f2]">⌫</button> : null}
         </header>
 
-        <div className="community-profile-post-detail-body grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] md:grid-cols-[minmax(0,1.15fr)_minmax(20rem,.85fr)] md:grid-rows-[minmax(0,1fr)_auto]">
-          <div className="community-profile-post-detail-scroll min-h-0 overflow-y-auto overscroll-contain bg-black md:col-start-1 md:row-span-2 md:overflow-hidden">
-            <div className="community-profile-post-detail-media flex min-h-[18rem] items-center justify-center overflow-hidden bg-black md:h-full md:min-h-0">{renderProfilePostMedia()}</div>
-            <div className="bg-white md:hidden">{renderProfileDiscussion(false)}</div>
-          </div>
+        <div className={`community-profile-post-detail-body grid min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] ${hasVisualPost ? 'md:grid-cols-[minmax(0,1.15fr)_minmax(20rem,.85fr)] md:grid-rows-[minmax(0,1fr)_auto]' : ''}`}>
+          {hasVisualPost ? (
+            <>
+              <div className="community-profile-post-detail-scroll min-h-0 overflow-y-auto overscroll-contain bg-black md:col-start-1 md:row-span-2 md:overflow-hidden">
+                <div className="community-profile-post-detail-media flex min-h-[18rem] items-center justify-center overflow-hidden bg-black md:h-full md:min-h-0">{renderProfilePostMedia()}</div>
+                <div className="bg-white md:hidden">{renderProfileDiscussion(false)}</div>
+              </div>
+              <aside className="community-profile-post-detail-copy hidden min-h-0 flex-col border-l border-[#e5e7eb] bg-white md:col-start-2 md:row-start-1 md:flex">{renderProfileDiscussion(true)}</aside>
+            </>
+          ) : (
+            <div className="community-profile-post-detail-scroll min-h-0 overflow-y-auto overscroll-contain bg-white custom-scrollbar">{renderProfileDiscussion(false)}</div>
+          )}
 
-          <aside className="community-profile-post-detail-copy hidden min-h-0 flex-col border-l border-[#e5e7eb] bg-white md:col-start-2 md:row-start-1 md:flex">{renderProfileDiscussion(true)}</aside>
-
-          <div ref={replyComposerRef} data-community-replybar="true" className="community-profile-post-detail-composer flex shrink-0 items-end gap-2 border-t border-[#efefef] bg-white px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+0.5rem)] md:col-start-2 md:row-start-2 md:border-l"><Avatar value={getOwnDisplayAvatar()} size="h-8 w-8" /><textarea ref={profileReplyInputRef} value={draft} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value.slice(0, COMMUNITY_REPLY_MAX_LENGTH) }))} onFocus={() => { loadRepliesForMessage(message); setExpandedReplyId(message.id); }} placeholder="Add a comment…" maxLength={COMMUNITY_REPLY_MAX_LENGTH} rows={1} className="max-h-24 min-h-10 min-w-0 flex-1 resize-none rounded-full border border-[#dbdbdb] bg-white px-4 py-2 text-sm font-semibold text-[#111] outline-none focus:border-[#a8a8a8]" /><button type="button" onClick={() => submitReply(message.id)} disabled={!canSendReply} className="min-h-10 rounded-full px-2 text-sm font-extrabold text-[#0095f6] disabled:opacity-35">{replySendingIds[message.id] ? '…' : 'Post'}</button></div>
+          <div ref={replyComposerRef} data-community-replybar="true" className={`community-profile-post-detail-composer flex shrink-0 items-end gap-2 border-t border-[#efefef] bg-white px-3 py-2 pb-[calc(env(safe-area-inset-bottom)+0.35rem)] ${hasVisualPost ? 'md:col-start-2 md:row-start-2 md:border-l' : ''}`}><Avatar value={getOwnDisplayAvatar()} size="h-8 w-8" /><textarea ref={profileReplyInputRef} value={draft} onChange={(event) => setReplyDrafts((current) => ({ ...current, [message.id]: event.target.value.slice(0, COMMUNITY_REPLY_MAX_LENGTH) }))} onFocus={() => { loadRepliesForMessage(message); setExpandedReplyId(message.id); }} placeholder="Add a comment…" maxLength={COMMUNITY_REPLY_MAX_LENGTH} rows={1} className="max-h-24 min-h-10 min-w-0 flex-1 resize-none rounded-full border border-[#dbdbdb] bg-white px-4 py-2 text-sm font-semibold text-[#111] outline-none focus:border-[#a8a8a8]" /><button type="button" onClick={() => submitReply(message.id)} disabled={!canSendReply} className="min-h-10 rounded-full px-2 text-sm font-extrabold text-[#0095f6] disabled:opacity-35">{replySendingIds[message.id] ? '…' : 'Post'}</button></div>
         </div>
       </section>
     );
@@ -7809,6 +8177,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {page === 'thread' && selectedMessage ? renderMessageDetails(selectedMessage, true) : null}
       {page === 'comments' && selectedMessage ? renderCommentsPage(selectedMessage) : null}
       {page === 'search' && renderCommunitySearchPage()}
+      {page === 'notifications' && renderNotificationPage()}
       {page === 'profile' && renderProfilePage()}
       {page === 'creators' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2rem] border border-[#D9E7F8] bg-white shadow-[0_24px_70px_rgba(23,105,255,0.12)]"><div className="relative bg-gradient-to-br from-[#EEF6FF] via-white to-[#F1EEFF] p-5 text-[#081A45] sm:p-7"><p className="text-xs font-black uppercase tracking-[0.24em] text-[#1769FF]">Creator studio</p><h2 className="mt-2 text-3xl font-black tracking-tight sm:text-5xl">Create a clean post</h2><p className="mt-3 max-w-2xl text-sm font-bold leading-6 text-[#536178]">Share one text, image, or poll per day. Image posts use a saved URL.</p></div><div className="bg-gradient-to-br from-[#F8FBFF] via-white to-[#EEF6FF] p-4 sm:p-6">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(postType, setPostType)}</div>{renderUploadFields(postType, postDraft, setPostDraft)}<button type="button" onClick={submitCreatorPost} disabled={isPublishingCreator || isCreatorTypeUsedToday || !postDraft.trim() || (postType === 'poll' && postPollOptions.filter((option) => option.trim()).length < 2) || (postType === 'image' && (!postImagePreview || postImageUrlStatus !== 'valid'))} className="mt-5 w-full rounded-[1.35rem] bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-6 py-4 text-base font-black text-white shadow-[0_18px_44px_rgba(23,105,255,0.24)] disabled:opacity-45">{isPublishingCreator ? 'Publishing…' : isCreatorTypeUsedToday ? `${postType} used today` : 'Publish post'}</button></div></div>}
       {page === 'network' && renderFollowPage()}
@@ -7816,9 +8185,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       {page === 'adminPosts' && renderFeedLayout(adminPosts, 'ADMIN POST', 'Official admin posts from Firebase. Like, react, vote, and reply here.')}
       {page === 'tagMaster' && renderTagMasterPage()}{page === 'masterTags' && renderMasterTagsPage()}{page === 'masterTagDetail' && renderMasterTagDetailPage()}
       {page === 'directChat' && renderChatPage()}{page === 'directChatThread' && renderChatThreadPage()}{page === 'statusDetail' && renderStatusDetailPage()}
-      {page === 'chat' && activeView === 'status' && <div className="community-status-grid-shell mx-auto max-w-[1800px] rounded-[2rem] p-4"><div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{statusCards.map(renderStatusTile)}</div></div>}
       {page === 'statusUpload' && <div className="mx-auto max-w-6xl overflow-hidden rounded-[2.5rem] border border-[#E3ECF8] bg-white shadow-[0_30px_90px_rgba(79,123,255,0.16)]"><div className="bg-gradient-to-br from-[#DCEEFF] via-[#EAF5FF] to-[#F8FBFF] p-6 text-[#081B5C] sm:p-8"><p className="text-sm font-black uppercase tracking-[0.3em] text-[#4F7BFF]">Story studio</p><h2 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl">Upload your status</h2></div><div className="p-5 sm:p-7">{limitMessage ? <div className="mb-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F]">{limitMessage}</div> : null}<div className="mb-5">{renderTypeComposer(statusType, setStatusType, 'orange', true)}</div>{renderUploadFields(statusType, statusDraft, setStatusDraft, true)}<button type="button" onClick={submitStatus} disabled={isPublishingStatus || isStatusTypeUsedToday || (statusType === 'image' && (!statusImagePreview || statusImageUrlStatus !== 'valid')) || (statusType === 'poll' && statusPollOptions.filter((option) => option.trim()).length < 2)} className="mt-5 w-full rounded-[1.55rem] bg-gradient-to-r from-[#6C4CF6] to-[#4F7BFF] px-6 py-4 text-base font-black text-white disabled:opacity-45">{isPublishingStatus ? 'Publishing status story...' : isStatusTypeUsedToday ? `${statusType} story used today` : 'Publish status story'}</button></div></div>}
-      {page === 'statusMine' && <div className="community-status-grid-shell mx-auto max-w-[1800px] space-y-5 rounded-[2rem] p-4"><div className="rounded-[2rem] border border-[#E3ECF8] bg-white p-6"><h2 className="text-4xl font-black tracking-tight text-[#081B5C]">View your status</h2><p className="mt-2 text-sm font-bold text-[#64748B]">Tap a card to open reel view.</p></div>{myStatuses.length ? <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">{myStatuses.map(renderStatusTile)}</div> : <div className="rounded-[2rem] border border-dashed border-[#E3ECF8] bg-white p-10 text-center font-black text-[#64748B]">No status uploaded yet.</div>}</div>}
     </div>
   );
 
@@ -7855,7 +8222,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <CommunitySidebar />
         <div className="community-center-shell flex min-w-0 flex-1 flex-col">
           <CommunityHeader />
-          <main ref={scrollContainerRef} className={`eduvora-community-main ${page === 'thread' || page === 'comments' || page === 'directChat' || page === 'directChatThread' || page === 'search' ? 'community-thread-page' : ''} ${page === 'profile' && profileViewMode === 'post' ? 'community-profile-post-detail-page' : ''} min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-3 custom-scrollbar sm:px-4 lg:px-5 lg:pb-4 ${
+          <main ref={scrollContainerRef} className={`eduvora-community-main ${page === 'thread' || page === 'comments' || page === 'directChat' || page === 'directChatThread' || page === 'search' || page === 'notifications' ? 'community-thread-page' : ''} ${page === 'profile' && profileViewMode === 'post' ? 'community-profile-post-detail-page' : ''} min-h-0 min-w-0 flex-1 overflow-x-hidden overflow-y-auto px-3 pt-3 custom-scrollbar sm:px-4 lg:px-5 lg:pb-4 ${
             shouldHideCommunityDockOnMobile
               ? 'pb-3 max-md:pb-4 max-md:overscroll-contain'
               : 'pb-[calc(env(safe-area-inset-bottom)+4.9rem)] max-md:pb-[calc(env(safe-area-inset-bottom)+4.7rem)] max-md:overscroll-contain'
