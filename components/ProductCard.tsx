@@ -47,7 +47,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
     }
 
     return (
-        <div className={`group relative bg-white/70 backdrop-blur-xl rounded-2xl shadow-sm hover:shadow-sm transition-all duration-300 ease-out border border-gray-100 flex flex-col overflow-hidden hover:-translate-y-2 product-card-shine ${animationClass}`}>
+        <article className={`group relative flex flex-col overflow-hidden rounded-3xl border border-[#DDE5EF] bg-white shadow-[0_10px_32px_rgba(16,33,63,0.06)] transition duration-300 ease-out hover:-translate-y-1 hover:border-[#B7CAE4] hover:shadow-[0_20px_48px_rgba(16,33,63,0.12)] ${animationClass}`}>
             {/* Image Container */}
             <div className="relative w-full overflow-hidden aspect-[4/3] bg-gray-100">
                 <SafeImage
@@ -176,7 +176,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                     </div>
                 )}
             </div>
-        </div>
+        </article>
     );
 };
 

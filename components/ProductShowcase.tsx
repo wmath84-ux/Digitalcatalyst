@@ -148,12 +148,12 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
   const clearSearch = () => setSearchQuery('');
   const clearAll = () => { setSearchQuery(''); setActiveFilter('All'); setSortBy('recommended'); };
   return (
-    <section id="products" ref={sectionRef} className={`store-scroll-scope min-h-[100dvh] touch-pan-y ${isMobileHome ? 'pb-36 pt-8 sm:py-14' : 'py-14 sm:py-24'} bg-gradient-to-br from-[#F8FBFF] via-[#EEF6FF] to-indigo-100/60 backdrop-blur-xl ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}>
+    <section id="products" ref={sectionRef} className={`store-scroll-scope min-h-[100dvh] touch-pan-y ${isMobileHome ? 'pb-36 pt-8 sm:py-14' : 'py-14 sm:py-24'} bg-[#F7F9FC] ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}>
       <div className="container mx-auto px-4 sm:px-6">
         <div className={`${isMobileHome ? 'mb-5 sm:mb-8' : 'mb-8 sm:mb-12'} mx-auto max-w-3xl text-center animate-child animate-delay-1`}>
-          <p className="text-xs font-black uppercase tracking-[0.32em] text-[#1769FF]">Premium marketplace</p>
-          <h2 className="mt-2 text-3xl font-extrabold tracking-tight text-[#081A45] sm:text-4xl">All Products</h2>
-          <p className="mt-3 text-base text-[#536178] sm:mt-4 sm:text-lg">{isMobileHome ? 'Find courses, notes, PDFs, and learning tools instantly.' : 'Search by title, subject, class, tags, keyword, format, or course description.'}</p>
+          <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#1557B0]">Learning marketplace</p>
+          <h2 className="mt-3 text-balance text-3xl font-black tracking-tight text-[#10213F] sm:text-5xl">Find your next learning resource</h2>
+          <p className="mx-auto mt-3 max-w-2xl text-pretty text-base leading-7 text-[#526179] sm:mt-4 sm:text-lg">{isMobileHome ? 'Find courses, notes, PDFs, and learning tools instantly.' : 'Browse focused notes, courses, PDFs, and study tools by subject, class, or format.'}</p>
         </div>
 
         <div className={`store-search-sticky sticky top-1 z-20 mx-auto max-w-6xl border border-blue-100/90 bg-white/90 shadow-[0_18px_55px_rgba(23,105,255,0.10)] backdrop-blur-xl animate-child animate-delay-2 transition-all duration-300 sm:top-3 lg:top-4 ${isStoreFilterCompact ? 'rounded-[1.25rem] p-2 sm:rounded-[1.5rem] sm:p-3' : 'rounded-[1.6rem] p-3 sm:rounded-[2rem] sm:p-4'}`}>
