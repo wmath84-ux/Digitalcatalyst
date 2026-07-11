@@ -11,10 +11,19 @@ import { validateProductImageUpload } from '../../utils/productImageUpload.js';
 import { isCloudinaryImageUploadConfigured, uploadImageToCloudinary } from '../../utils/cloudinaryUpload';
 import PremiumImageUrlInput, { PremiumImageUrlStatus } from '../common/PremiumImageUrlInput';
 import PremiumMediaUrlInput from '../common/PremiumMediaUrlInput';
-import './productEditorWorkspace.css'; // PRODUCT_EDITOR_WORKSPACE_V1
+import './productEditorWorkspace.css'; // PRODUCT_EDITOR_WIZARD_V2
 import { buildUrlMediaSource, getFriendlyStorageErrorMessage, getStorageDisabledMessage, isStorageUploadEnabled } from '../../utils/mediaMode';
 
 type ProductViewState = 'list' | 'add' | 'edit';
+
+const PRODUCT_EDITOR_WIZARD_STEPS = [
+    { key: 'details', label: 'Basic details', shortLabel: 'Details', helper: 'Name, descriptions, SKU and rating' },
+    { key: 'images', label: 'Product images', shortLabel: 'Images', helper: 'Upload, generate and order the gallery' },
+    { key: 'pricing', label: 'Pricing & purchase', shortLabel: 'Pricing', helper: 'Cash, EduCoin, coupon and checkout' },
+    { key: 'organization', label: 'Organization', shortLabel: 'Organize', helper: 'Category, format, tags and discovery' },
+    { key: 'content', label: 'Course content', shortLabel: 'Content', helper: 'Modules, lessons, files and paid updates' },
+    { key: 'review', label: 'Publish & review', shortLabel: 'Review', helper: 'Availability and final confirmation' },
+] as const;
 
 type ProductAdminInitialState = Omit<Product, 'id'> & {
     isCoinRedeemEnabled?: boolean;
@@ -1871,7 +1880,11 @@ const ProductForm: React.FC<{
     const [productImageUploadError, setProductImageUploadError] = useState('');
     const [productImageUploadProgress, setProductImageUploadProgress] = useState(0);
     const [productImageUrlStatus, setProductImageUrlStatus] = useState<PremiumImageUrlStatus>('empty');
+    const [activeWizardStep, setActiveWizardStep] = useState(0);
+    const [furthestWizardStep, setFurthestWizardStep] = useState(0);
+    const [wizardError, setWizardError] = useState('');
     const productImageInputRef = useRef<HTMLInputElement>(null);
+    const wizardTopRef = useRef<HTMLDivElement>(null);
     const draftProductIdRef = useRef<number | string>(product?.id || `draft-${Date.now()}`);
     const cloudinaryImageReady = isCloudinaryImageUploadConfigured();
     const editorContentCount = countModuleContent(modules || []);
@@ -1887,9 +1900,50 @@ const ProductForm: React.FC<{
             ? 'Save Product'
             : 'Update Product';
 
-    const scrollToEditorSection = (sectionId: string) => {
-        if (typeof document === 'undefined') return;
-        document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const wizardLastStep = PRODUCT_EDITOR_WIZARD_STEPS.length - 1;
+    const currentWizardStep = PRODUCT_EDITOR_WIZARD_STEPS[activeWizardStep];
+
+    const focusWizardTop = () => {
+        if (typeof window === 'undefined') return;
+        window.requestAnimationFrame(() => wizardTopRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    };
+
+    const validateWizardStep = (stepIndex: number): string => {
+        if (stepIndex === 0) {
+            if (!formData.title.trim()) return 'Add a product title before continuing.';
+            if (!formData.description.trim()) return 'Add a short product description before continuing.';
+        }
+
+        if (stepIndex === 1 && imageUrlDraft.trim() && productImageUrlStatus !== 'valid') {
+            return 'Finish validating the pending HTTPS image URL or clear it before continuing.';
+        }
+
+        if (stepIndex === 2 && !String(formData.price || '').trim()) {
+            return 'Add the regular product price before continuing.';
+        }
+
+        return '';
+    };
+
+    const openWizardStep = (stepIndex: number) => {
+        const nextStep = Math.max(0, Math.min(wizardLastStep, stepIndex));
+        setActiveWizardStep(nextStep);
+        setFurthestWizardStep(current => Math.max(current, nextStep));
+        setWizardError('');
+        focusWizardTop();
+    };
+
+    const handlePreviousWizardStep = () => openWizardStep(activeWizardStep - 1);
+
+    const handleNextWizardStep = () => {
+        const validationError = validateWizardStep(activeWizardStep);
+        if (validationError) {
+            setWizardError(validationError);
+            focusWizardTop();
+            return;
+        }
+
+        openWizardStep(activeWizardStep + 1);
     };
 
     useEffect(() => {
@@ -2018,6 +2072,23 @@ const ProductForm: React.FC<{
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
         if (isSavingProduct) return;
+
+        if (activeWizardStep !== wizardLastStep) {
+            handleNextWizardStep();
+            return;
+        }
+
+        for (let stepIndex = 0; stepIndex < wizardLastStep; stepIndex += 1) {
+            const validationError = validateWizardStep(stepIndex);
+            if (validationError) {
+                setActiveWizardStep(stepIndex);
+                setWizardError(validationError);
+                focusWizardTop();
+                return;
+            }
+        }
+
+        setWizardError('');
         const resolvedPaymentLink = formData.paymentLink.trim() || product?.paymentLink?.trim() || DEFAULT_PRODUCT_PAYMENT_LINK;
 
         const features = ((formData.featuresText || '').split('\n') || []).map(item => item.trim()).filter(Boolean);
@@ -2079,12 +2150,12 @@ const ProductForm: React.FC<{
     };
 
     return (
-        <div data-product-editor-workspace="PRODUCT_EDITOR_WORKSPACE_V1" className="product-editor-workspace min-h-screen text-slate-900">
-            <form onSubmit={handleSubmit} className="product-editor-form">
-                <header className="product-editor-header">
-                    <div className="product-editor-header-main">
+        <div ref={wizardTopRef} data-product-editor-workspace="PRODUCT_EDITOR_WIZARD_V2" className="product-editor-workspace product-editor-wizard text-slate-900">
+            <form onSubmit={handleSubmit} className="product-editor-form" noValidate>
+                <header className="product-editor-header product-editor-wizard-header">
+                    <div className="product-editor-header-main product-editor-wizard-header-main">
                         <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                            <button type="button" onClick={onCancel} className="product-editor-back-button" aria-label="Back to product list">
+                            <button type="button" onClick={onCancel} disabled={isSavingProduct} className="product-editor-back-button" aria-label="Cancel editing and return to product list">
                                 <span aria-hidden="true">←</span>
                                 <span className="hidden sm:inline">Products</span>
                             </button>
@@ -2095,280 +2166,307 @@ const ProductForm: React.FC<{
                                     <span className={`product-editor-state-pill ${formData.inStock ? 'is-stocked' : 'is-unavailable'}`}>{formData.inStock ? 'In stock' : 'Out of stock'}</span>
                                 </div>
                                 <h1 className="product-editor-title">{mode === 'add' ? 'New digital product' : formData.title || 'Product editor'}</h1>
-                                <p className="product-editor-subtitle">Organize storefront details, pricing, media and learning content from one workspace.</p>
+                                <p className="product-editor-subtitle">Step {activeWizardStep + 1} of {PRODUCT_EDITOR_WIZARD_STEPS.length} · {currentWizardStep.helper}</p>
                             </div>
                         </div>
 
-                        <div className="product-editor-header-actions">
-                            <button type="button" onClick={onCancel} className="product-editor-secondary-action">Cancel</button>
-                            <button type="submit" disabled={isSavingProduct || isUploadingProductImage} className="product-editor-primary-action">
-                                {editorSaveLabel}
-                            </button>
+                        <div className="product-editor-header-actions product-editor-wizard-actions">
+                            <button type="button" onClick={onCancel} disabled={isSavingProduct} className="product-editor-secondary-action">Cancel</button>
+                            {activeWizardStep > 0 && (
+                                <button type="button" onClick={handlePreviousWizardStep} disabled={isSavingProduct} className="product-editor-secondary-action">Previous</button>
+                            )}
+                            {activeWizardStep < wizardLastStep ? (
+                                <button type="button" onClick={handleNextWizardStep} disabled={isUploadingProductImage} className="product-editor-primary-action">Next</button>
+                            ) : (
+                                <button type="submit" disabled={isSavingProduct || isUploadingProductImage} className="product-editor-primary-action">{editorSaveLabel}</button>
+                            )}
                         </div>
                     </div>
 
-                    <nav className="product-editor-section-nav" aria-label="Product editor sections">
-                        <button type="button" onClick={() => scrollToEditorSection('product-editor-overview')}>Overview</button>
-                        <button type="button" onClick={() => scrollToEditorSection('product-editor-media')}>Media</button>
-                        <button type="button" onClick={() => scrollToEditorSection('product-editor-pricing')}>Pricing</button>
-                        <button type="button" onClick={() => scrollToEditorSection('product-editor-metadata')}>Organization</button>
-                        <button type="button" onClick={() => scrollToEditorSection('product-editor-curriculum')}>Course content</button>
-                        <button type="button" onClick={() => scrollToEditorSection('product-editor-publishing')}>Publishing</button>
-                    </nav>
+                    <div className="product-editor-wizard-progress" aria-label="Product setup progress">
+                        <div className="product-editor-wizard-progress-track" aria-hidden="true">
+                            <span style={{ width: `${((activeWizardStep + 1) / PRODUCT_EDITOR_WIZARD_STEPS.length) * 100}%` }} />
+                        </div>
+                        <ol>
+                            {PRODUCT_EDITOR_WIZARD_STEPS.map((step, index) => (
+                                <li key={step.key} className={index === activeWizardStep ? 'is-current' : index < activeWizardStep ? 'is-complete' : ''}>
+                                    <button
+                                        type="button"
+                                        onClick={() => index <= furthestWizardStep && openWizardStep(index)}
+                                        disabled={index > furthestWizardStep || isSavingProduct}
+                                        aria-current={index === activeWizardStep ? 'step' : undefined}
+                                    >
+                                        <span>{index < activeWizardStep ? '✓' : index + 1}</span>
+                                        <strong className="hidden sm:block">{step.shortLabel}</strong>
+                                    </button>
+                                </li>
+                            ))}
+                        </ol>
+                    </div>
                 </header>
 
-                <main className="product-editor-main">
-                    <div className="product-editor-layout">
-                        <section className="product-editor-canvas" aria-label="Product editing canvas">
-                            <section id="product-editor-overview" className={`${glassCard} product-editor-card product-editor-overview scroll-mt-36`}>
-                                <div className="product-editor-card-heading">
-                                    <div>
-                                        <p className="product-editor-eyebrow">Overview</p>
-                                        <h2>Product identity</h2>
-                                        <p>Write the storefront information customers see first.</p>
-                                    </div>
-                                    <span className="product-editor-step-badge">01</span>
+                <main className="product-editor-main product-editor-wizard-main">
+                    {wizardError && <p className="product-editor-wizard-error" role="alert">{wizardError}</p>}
+
+                    {activeWizardStep === 0 && (
+                        <section className={`${glassCard} product-editor-card product-editor-wizard-panel`} aria-labelledby="product-wizard-details-title">
+                            <div className="product-editor-card-heading">
+                                <div>
+                                    <p className="product-editor-eyebrow">Step 1 · Basic details</p>
+                                    <h2 id="product-wizard-details-title">Describe the product</h2>
+                                    <p>Start with the storefront information customers need to understand the product.</p>
                                 </div>
+                                <span className="product-editor-step-badge">01</span>
+                            </div>
 
-                                <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
-                                    <div className="md:col-span-2">
-                                        <label className={labelClass}>Product Title</label>
-                                        <input required value={formData.title} onChange={event => setFormData(prev => ({ ...prev, title: event.target.value }))} className={fieldClass} placeholder="Masterclass, template pack, guide..." />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className={labelClass}>Short Description</label>
-                                        <textarea required rows={3} value={formData.description} onChange={event => setFormData(prev => ({ ...prev, description: event.target.value }))} className={fieldClass} placeholder="A concise storefront summary." />
-                                    </div>
-                                    <div className="md:col-span-2">
-                                        <label className={labelClass}>Long Description</label>
-                                        <textarea rows={7} value={formData.longDescription} onChange={event => setFormData(prev => ({ ...prev, longDescription: event.target.value }))} className={fieldClass} placeholder="Deep product narrative, outcomes, curriculum promise..." />
-                                    </div>
-                                    <div>
-                                        <label className={labelClass}>SKU</label>
-                                        <input value={formData.sku} onChange={event => setFormData(prev => ({ ...prev, sku: event.target.value }))} className={fieldClass} placeholder="DC-COURSE-001" />
-                                    </div>
-                                    <div>
-                                        <label className={labelClass}>Manual Rating</label>
-                                        <input type="number" min="0" max="5" step="0.1" value={formData.manualRating} onChange={event => setFormData(prev => ({ ...prev, manualRating: event.target.value }))} className={fieldClass} placeholder="4.8" />
-                                    </div>
+                            <div className="product-editor-form-grid">
+                                <div className="is-wide">
+                                    <label className={labelClass}>Product Title</label>
+                                    <input autoFocus required value={formData.title} onChange={event => setFormData(prev => ({ ...prev, title: event.target.value }))} className={fieldClass} placeholder="Masterclass, template pack, guide..." />
                                 </div>
-                            </section>
-
-                            <section id="product-editor-media" className={`${glassCard} product-editor-card product-editor-media scroll-mt-36`}>
-                                <div className="product-editor-card-heading">
-                                    <div>
-                                        <p className="product-editor-eyebrow">Media gallery</p>
-                                        <h2>Product images</h2>
-                                        <p>Add, generate and reorder images. The first image remains the primary storefront image.</p>
-                                    </div>
-                                    <span className="product-editor-step-badge">02</span>
+                                <div className="is-wide">
+                                    <label className={labelClass}>Short Description</label>
+                                    <textarea required rows={3} value={formData.description} onChange={event => setFormData(prev => ({ ...prev, description: event.target.value }))} className={fieldClass} placeholder="A concise storefront summary." />
                                 </div>
+                                <div className="is-wide">
+                                    <label className={labelClass}>Long Description</label>
+                                    <textarea rows={8} value={formData.longDescription} onChange={event => setFormData(prev => ({ ...prev, longDescription: event.target.value }))} className={fieldClass} placeholder="Deep product narrative, outcomes, curriculum promise..." />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>SKU</label>
+                                    <input value={formData.sku} onChange={event => setFormData(prev => ({ ...prev, sku: event.target.value }))} className={fieldClass} placeholder="DC-COURSE-001" />
+                                </div>
+                                <div>
+                                    <label className={labelClass}>Manual Rating</label>
+                                    <input type="number" min="0" max="5" step="0.1" value={formData.manualRating} onChange={event => setFormData(prev => ({ ...prev, manualRating: event.target.value }))} className={fieldClass} placeholder="4.8" />
+                                </div>
+                            </div>
+                        </section>
+                    )}
 
-                                <div className="product-editor-media-layout">
-                                    <div className="product-editor-media-tools">
-                                        <div className="product-editor-segmented-control" role="group" aria-label="Choose image source">
-                                            <button type="button" onClick={() => setImageMode('url')} className={imageMode === 'url' ? 'is-active' : ''}>Image URL</button>
-                                            <button type="button" onClick={() => setImageMode('upload')} className={imageMode === 'upload' ? 'is-active' : ''}>Cloudinary</button>
-                                            <button type="button" onClick={() => setImageMode('ai')} className={imageMode === 'ai' ? 'is-active' : ''}>AI image</button>
-                                        </div>
+                    {activeWizardStep === 1 && (
+                        <section className={`${glassCard} product-editor-card product-editor-wizard-panel`} aria-labelledby="product-wizard-images-title">
+                            <div className="product-editor-card-heading">
+                                <div>
+                                    <p className="product-editor-eyebrow">Step 2 · Product images</p>
+                                    <h2 id="product-wizard-images-title">Build the media gallery</h2>
+                                    <p>Add URLs, upload to Cloudinary, generate an image, then arrange the exact storefront order.</p>
+                                </div>
+                                <span className="product-editor-step-badge">02</span>
+                            </div>
 
-                                        <div className="product-editor-media-source">
-                                            {imageMode === 'url' ? (
-                                                <div className="space-y-3">
-                                                    <PremiumImageUrlInput value={imageUrlDraft} onChange={setImageUrlDraft} onStatusChange={setProductImageUrlStatus} label="Add product image URL" previewAlt="New product image" aspect="square" compact helperText="Add one public HTTPS image at a time. Distinct images are kept in gallery order; the first image is primary." />
-                                                    <button type="button" onClick={addImageUrlDraft} disabled={productImageUrlStatus !== 'valid'} className="product-editor-full-action">Add image to gallery</button>
-                                                </div>
-                                            ) : imageMode === 'upload' ? (
-                                                <div className="product-editor-upload-zone">
-                                                    <span className="product-editor-upload-icon" aria-hidden="true">⇧</span>
-                                                    <p className="font-black text-slate-900">Upload product images</p>
-                                                    <p className="mt-2 text-xs font-bold text-slate-600">Select one or more valid images. Files upload to Cloudinary and keep their selected order.</p>
-                                                    <button type="button" onClick={() => productImageInputRef.current?.click()} disabled={!cloudinaryImageReady || isUploadingProductImage} className="product-editor-full-action mt-4">{cloudinaryImageReady ? (isUploadingProductImage ? 'Uploading…' : 'Choose image(s)') : 'Cloudinary env not configured'}</button>
-                                                    {!cloudinaryImageReady ? <p className="mt-3 text-xs font-bold text-rose-600">Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to enable upload.</p> : null}
-                                                </div>
-                                            ) : (
-                                                <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="product-editor-ai-zone">
-                                                    <span className="text-2xl" aria-hidden="true">✦</span>
-                                                    <span>{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</span>
-                                                </button>
-                                            )}
-                                            <input ref={productImageInputRef} type="file" accept="image/*" multiple onChange={handleProductImagesUpload} className="hidden" />
-                                            {isUploadingProductImage && (
-                                                <div className="product-editor-progress" role="status" aria-live="polite">
-                                                    <span style={{ width: `${productImageUploadProgress}%` }} />
-                                                    <p>Uploading image(s) to Cloudinary... {productImageUploadProgress}% complete.</p>
-                                                </div>
-                                            )}
-                                            {productImageUploadError && (
-                                                <p className="product-editor-error" role="alert">{productImageUploadError}</p>
-                                            )}
-                                        </div>
-
-                                        <div>
-                                            <label className={labelClass}>Image Seed</label>
-                                            <input value={formData.imageSeed} onChange={event => setFormData(prev => ({ ...prev, imageSeed: event.target.value }))} className={fieldClass} placeholder="Fallback image seed" />
-                                        </div>
+                            <div className="product-editor-media-layout">
+                                <div className="product-editor-media-tools">
+                                    <div className="product-editor-segmented-control" role="group" aria-label="Choose image source">
+                                        <button type="button" onClick={() => setImageMode('url')} className={imageMode === 'url' ? 'is-active' : ''}>Image URL</button>
+                                        <button type="button" onClick={() => setImageMode('upload')} className={imageMode === 'upload' ? 'is-active' : ''}>Cloudinary</button>
+                                        <button type="button" onClick={() => setImageMode('ai')} className={imageMode === 'ai' ? 'is-active' : ''}>AI image</button>
                                     </div>
 
-                                    <div className="product-editor-gallery-panel">
-                                        <div className="product-editor-gallery-heading">
-                                            <div>
-                                                <h3>Gallery order</h3>
-                                                <p>{images.length} image{images.length === 1 ? '' : 's'} selected</p>
+                                    <div className="product-editor-media-source">
+                                        {imageMode === 'url' ? (
+                                            <div className="space-y-3">
+                                                <PremiumImageUrlInput value={imageUrlDraft} onChange={setImageUrlDraft} onStatusChange={setProductImageUrlStatus} label="Add product image URL" previewAlt="New product image" aspect="square" compact helperText="Add one public HTTPS image at a time. Distinct images are kept in gallery order; the first image is primary." />
+                                                <button type="button" onClick={addImageUrlDraft} disabled={productImageUrlStatus !== 'valid'} className="product-editor-full-action">Add image to gallery</button>
                                             </div>
-                                            {images.length > 0 && <span>First image = Primary</span>}
-                                        </div>
-
-                                        {images.length ? (
-                                            <div className="product-editor-gallery-grid">
-                                                {images.map((image, index) => (
-                                                    <article key={image} className={`product-editor-gallery-item ${index === 0 ? 'is-primary' : ''}`}>
-                                                        <div className="product-editor-gallery-image"><img src={image} alt={`Product image ${index + 1}`} className="h-full w-full object-contain" /></div>
-                                                        <div className="product-editor-gallery-meta">
-                                                            <span>{index === 0 ? 'Primary image' : `Image ${index + 1}`}</span>
-                                                            <div className="product-editor-gallery-actions">
-                                                                <button type="button" onClick={() => moveProductImage(index, -1)} disabled={index === 0} aria-label={`Move image ${index + 1} left`}>←</button>
-                                                                <button type="button" onClick={() => moveProductImage(index, 1)} disabled={index === images.length - 1} aria-label={`Move image ${index + 1} right`}>→</button>
-                                                                <button type="button" onClick={() => setImages((current) => current.filter((_, imageIndex) => imageIndex !== index))} className="is-danger" aria-label={`Remove image ${index + 1}`}>×</button>
-                                                            </div>
-                                                        </div>
-                                                    </article>
-                                                ))}
+                                        ) : imageMode === 'upload' ? (
+                                            <div className="product-editor-upload-zone">
+                                                <span className="product-editor-upload-icon" aria-hidden="true">⇧</span>
+                                                <p className="font-black text-slate-900">Upload product images</p>
+                                                <p className="mt-2 text-xs font-bold text-slate-600">Select one or more valid images. Files upload to Cloudinary and keep their selected order.</p>
+                                                <button type="button" onClick={() => productImageInputRef.current?.click()} disabled={!cloudinaryImageReady || isUploadingProductImage} className="product-editor-full-action mt-4">{cloudinaryImageReady ? (isUploadingProductImage ? 'Uploading…' : 'Choose image(s)') : 'Cloudinary env not configured'}</button>
+                                                {!cloudinaryImageReady ? <p className="mt-3 text-xs font-bold text-rose-600">Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to enable upload.</p> : null}
                                             </div>
                                         ) : (
-                                            <div className="product-editor-empty-gallery">
-                                                <span aria-hidden="true">▧</span>
-                                                <strong>No product images yet</strong>
-                                                <p>Add a URL, upload files, or generate an image. The first image becomes primary.</p>
+                                            <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="product-editor-ai-zone">
+                                                <span className="text-2xl" aria-hidden="true">✦</span>
+                                                <span>{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</span>
+                                            </button>
+                                        )}
+                                        <input ref={productImageInputRef} type="file" accept="image/*" multiple onChange={handleProductImagesUpload} className="hidden" />
+                                        {isUploadingProductImage && (
+                                            <div className="product-editor-progress" role="status" aria-live="polite">
+                                                <span style={{ width: `${productImageUploadProgress}%` }} />
+                                                <p>Uploading image(s) to Cloudinary... {productImageUploadProgress}% complete.</p>
                                             </div>
                                         )}
-
-                                        <p className="product-editor-info-note">All distinct images are saved in gallery order. The primary image is mirrored into every productImages display slot; extra images appear in the product detail gallery.</p>
+                                        {productImageUploadError && <p className="product-editor-error" role="alert">{productImageUploadError}</p>}
                                     </div>
-                                </div>
-                            </section>
 
-                            <section id="product-editor-curriculum" className={`${glassCard} product-editor-card product-editor-curriculum scroll-mt-36`}>
-                                <div className="product-editor-card-heading product-editor-card-heading-with-action">
                                     <div>
-                                        <p className="product-editor-eyebrow">Course builder</p>
-                                        <h2>Modules and learning content</h2>
-                                        <p>Organize videos, PDFs, Open Docs, quizzes, audio, sheets, e-books and links in a clear hierarchy.</p>
-                                    </div>
-                                    <div className="flex flex-wrap items-center gap-3">
-                                        <span className="product-editor-count-pill">{modules.length} root module{modules.length === 1 ? '' : 's'} · {editorContentCount} item{editorContentCount === 1 ? '' : 's'}</span>
-                                        <button type="button" onClick={addRootModule} className="product-editor-secondary-primary-action">+ Add module</button>
+                                        <label className={labelClass}>Image Seed</label>
+                                        <input value={formData.imageSeed} onChange={event => setFormData(prev => ({ ...prev, imageSeed: event.target.value }))} className={fieldClass} placeholder="Fallback image seed" />
                                     </div>
                                 </div>
 
-                                <div className="product-editor-module-list">
-                                    {(modules || []).length > 0 ? (modules || []).map(module => (
-                                        <ModuleEditor key={module.id} module={module} allModules={modules || []} level={0} onUpdate={setModules} onAddChild={addChildModule} onDelete={deleteModule} productId={draftProductIdRef.current} />
-                                    )) : (
-                                        <button type="button" onClick={addRootModule} className="product-editor-empty-module">
-                                            <span aria-hidden="true">＋</span>
-                                            <strong>Start with your first module</strong>
-                                            <p>Every module starts with safe empty file and submodule arrays.</p>
-                                        </button>
+                                <div className="product-editor-gallery-panel">
+                                    <div className="product-editor-gallery-heading">
+                                        <div><h3>Gallery order</h3><p>{images.length} image{images.length === 1 ? '' : 's'} selected</p></div>
+                                        {images.length > 0 && <span>First image = Primary</span>}
+                                    </div>
+
+                                    {images.length ? (
+                                        <div className="product-editor-gallery-grid">
+                                            {images.map((image, index) => (
+                                                <article key={image} className={`product-editor-gallery-item ${index === 0 ? 'is-primary' : ''}`}>
+                                                    <div className="product-editor-gallery-image"><img src={image} alt={`Product image ${index + 1}`} className="h-full w-full object-contain" /></div>
+                                                    <div className="product-editor-gallery-meta">
+                                                        <span>{index === 0 ? 'Primary image' : `Image ${index + 1}`}</span>
+                                                        <div className="product-editor-gallery-actions">
+                                                            <button type="button" onClick={() => moveProductImage(index, -1)} disabled={index === 0} aria-label={`Move image ${index + 1} left`}>←</button>
+                                                            <button type="button" onClick={() => moveProductImage(index, 1)} disabled={index === images.length - 1} aria-label={`Move image ${index + 1} right`}>→</button>
+                                                            <button type="button" onClick={() => setImages((current) => current.filter((_, imageIndex) => imageIndex !== index))} className="is-danger" aria-label={`Remove image ${index + 1}`}>×</button>
+                                                        </div>
+                                                    </div>
+                                                </article>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="product-editor-empty-gallery">
+                                            <span aria-hidden="true">▧</span>
+                                            <strong>No product images yet</strong>
+                                            <p>Add a URL, upload files, or generate an image. The first image becomes primary.</p>
+                                        </div>
                                     )}
+                                    <p className="product-editor-info-note">All distinct images save in gallery order. The primary image is mirrored into product display slots.</p>
                                 </div>
-                            </section>
+                            </div>
                         </section>
+                    )}
 
-                        <aside className="product-editor-sidebar" aria-label="Product settings and live summary">
-                            <section className="product-editor-summary-card">
-                                <div className="product-editor-summary-image">
-                                    {editorPrimaryImage ? <img src={editorPrimaryImage} alt={formData.title || 'Product preview'} /> : <span aria-hidden="true">▧</span>}
+                    {activeWizardStep === 2 && (
+                        <section className={`${glassCard} product-editor-card product-editor-wizard-panel`} aria-labelledby="product-wizard-pricing-title">
+                            <div className="product-editor-card-heading">
+                                <div>
+                                    <p className="product-editor-eyebrow">Step 3 · Pricing & purchase</p>
+                                    <h2 id="product-wizard-pricing-title">Configure checkout options</h2>
+                                    <p>Set cash pricing, EduCoin redemption, coupon access and the Razorpay destination.</p>
                                 </div>
-                                <div className="min-w-0">
-                                    <p className="product-editor-eyebrow">Live summary</p>
-                                    <h2>{formData.title || 'Untitled product'}</h2>
-                                    <p className="product-editor-summary-description">{formData.description || 'Add a short description to preview the storefront summary.'}</p>
-                                </div>
-                                <div className="product-editor-summary-price">
-                                    <strong>{editorPriceLabel}</strong>
-                                    {formData.salePrice && formData.price ? <span>₹{formData.price}</span> : null}
-                                    {discountPercent > 0 && <em>{discountPercent}% off</em>}
-                                </div>
-                                <div className="product-editor-summary-stats">
-                                    <div><strong>{images.length}</strong><span>Images</span></div>
-                                    <div><strong>{modules.length}</strong><span>Modules</span></div>
-                                    <div><strong>{editorContentCount}</strong><span>Content</span></div>
-                                </div>
-                            </section>
+                                <span className="product-editor-step-badge">03</span>
+                            </div>
 
-                            <section id="product-editor-publishing" className={`${glassCard} product-editor-card product-editor-side-card scroll-mt-36`}>
-                                <div className="product-editor-side-heading">
-                                    <div><p className="product-editor-eyebrow">Publishing</p><h2>Availability</h2></div>
-                                    <span className="product-editor-step-badge">06</span>
+                            {discountPercent > 0 && <p className="product-editor-discount-pill">{discountPercent}% discount active</p>}
+                            <div className="product-editor-form-grid product-editor-pricing-grid">
+                                <div><label className={labelClass}>Regular Price</label><input autoFocus required type="number" value={formData.price} onChange={event => setFormData(prev => ({ ...prev, price: event.target.value }))} className={fieldClass} placeholder="999" /></div>
+                                <div><label className={labelClass}>Sale Price</label><input type="number" value={formData.salePrice} onChange={event => setFormData(prev => ({ ...prev, salePrice: event.target.value }))} className={fieldClass} placeholder="499" /></div>
+                                <div className="product-editor-coin-panel">
+                                    <label className={labelClass}>EduCoin Price</label>
+                                    <input type="number" min="0" value={formData.coinPrice} onChange={(event) => setFormData((previous) => ({ ...previous, coinPrice: event.target.value }))} className={fieldClass} placeholder="Example: 299" />
+                                    <p>Leave empty or set 0 to disable EduCoin purchase.</p>
+                                    <label className="product-editor-inline-toggle"><input type="checkbox" checked={formData.isCoinRedeemEnabled !== false} onChange={(event) => setFormData((previous) => ({ ...previous, isCoinRedeemEnabled: event.target.checked }))} /><span>Enable Pay with EduCoin</span></label>
                                 </div>
-                                <div className="product-editor-toggle-list">
+                                <div className="product-editor-purchase-toggle">
                                     <label>
-                                        <span><strong>Visible</strong><small>Show on storefront</small></span>
-                                        <input type="checkbox" checked={formData.isVisible} onChange={event => setFormData(prev => ({ ...prev, isVisible: event.target.checked }))} />
-                                    </label>
-                                    <label>
-                                        <span><strong>In stock</strong><small>Purchasable now</small></span>
-                                        <input type="checkbox" checked={formData.inStock} onChange={event => setFormData(prev => ({ ...prev, inStock: event.target.checked }))} />
-                                    </label>
-                                    <label>
-                                        <span><strong>Free via coupon</strong><small>Enable free access flow</small></span>
+                                        <span><strong>Free via coupon</strong><small>Enable the existing free-access flow</small></span>
                                         <input type="checkbox" checked={formData.isFree} onChange={event => setFormData(prev => ({ ...prev, isFree: event.target.checked }))} />
                                     </label>
                                 </div>
+                                <div><label className={labelClass}>Coupon Code</label><select value={formData.couponCode} onChange={event => setFormData(prev => ({ ...prev, couponCode: event.target.value }))} className={fieldClass}><option value="">No coupon</option>{(coupons || []).map(coupon => <option key={coupon.id} value={coupon.code}>{coupon.code}</option>)}</select></div>
+                                <div className="is-wide"><label className={labelClass}>Razorpay Payment Page Link</label><input value={formData.paymentLink} onChange={event => setFormData(prev => ({ ...prev, paymentLink: event.target.value }))} className={fieldClass} placeholder="https://pages.razorpay.com/..." /></div>
+                            </div>
+                        </section>
+                    )}
+
+                    {activeWizardStep === 3 && (
+                        <section className={`${glassCard} product-editor-card product-editor-wizard-panel`} aria-labelledby="product-wizard-organization-title">
+                            <div className="product-editor-card-heading">
+                                <div>
+                                    <p className="product-editor-eyebrow">Step 4 · Organization & discovery</p>
+                                    <h2 id="product-wizard-organization-title">Organize and improve search</h2>
+                                    <p>Keep the catalog structured and help customers find this product through relevant metadata.</p>
+                                </div>
+                                <span className="product-editor-step-badge">04</span>
+                            </div>
+
+                            <div className="product-editor-form-grid">
+                                <div><label className={labelClass}>Category</label><input autoFocus value={formData.category} onChange={event => setFormData(prev => ({ ...prev, category: event.target.value }))} className={fieldClass} placeholder="Design, Finance, Coding..." /></div>
+                                <div><label className={labelClass}>Department</label><select value={formData.department} onChange={event => setFormData(prev => ({ ...prev, department: event.target.value as ProductFormData['department'] }))} className={fieldClass}><option>Unisex</option><option>Men</option><option>Women</option></select></div>
+                                <div><label className={labelClass}>Dimensions</label><input value={formData.dimensions} onChange={event => setFormData(prev => ({ ...prev, dimensions: event.target.value }))} className={fieldClass} placeholder="1024x768, A4, 16:9" /></div>
+                                <div><label className={labelClass}>File Format</label><input value={formData.fileFormat} onChange={event => setFormData(prev => ({ ...prev, fileFormat: event.target.value }))} className={fieldClass} placeholder="PDF + MP4 + Docs" /></div>
+                                <div>
+                                    <label className={labelClass}>Storefront Aspect Ratio</label>
+                                    <select value={formData.aspectRatio} onChange={event => setFormData(prev => ({ ...prev, aspectRatio: event.target.value }))} className={fieldClass}>
+                                        <option value="aspect-[4/3]">Landscape 4:3</option>
+                                        <option value="aspect-video">Widescreen 16:9</option>
+                                        <option value="aspect-square">Square 1:1</option>
+                                        <option value="aspect-[3/4]">Portrait 3:4</option>
+                                    </select>
+                                </div>
+                                <div><label className={labelClass}>Tags (comma separated)</label><input value={formData.tagsText} onChange={event => setFormData(prev => ({ ...prev, tagsText: event.target.value }))} className={fieldClass} placeholder="premium, beginner, template" /></div>
+                                <div className="is-wide"><label className={labelClass}>Features (one per line)</label><textarea rows={5} value={formData.featuresText} onChange={event => setFormData(prev => ({ ...prev, featuresText: event.target.value }))} className={fieldClass} placeholder="Downloadable notes&#10;Practice quizzes&#10;Lifetime access" /></div>
+                                <div className="is-wide"><label className={labelClass}>Search Keywords</label><textarea rows={4} value={formData.searchKeywordsText} onChange={event => setFormData(prev => ({ ...prev, searchKeywordsText: event.target.value }))} className={fieldClass} placeholder="class 10, physics, pcm, neet, pdf, notes" /><p className="mt-2 text-xs font-bold text-slate-500">Add words students may search for, like class 10, physics, pcm, neet, pdf, notes.</p></div>
+                            </div>
+                        </section>
+                    )}
+
+                    {activeWizardStep === 4 && (
+                        <section className={`${glassCard} product-editor-card product-editor-wizard-panel product-editor-curriculum`} aria-labelledby="product-wizard-content-title">
+                            <div className="product-editor-card-heading product-editor-card-heading-with-action">
+                                <div>
+                                    <p className="product-editor-eyebrow">Step 5 · Course content</p>
+                                    <h2 id="product-wizard-content-title">Build modules and learning content</h2>
+                                    <p>All existing video, PDF, Open Docs, quiz, audio, Drive, link, upload and paid-update tools remain available here.</p>
+                                </div>
+                                <div className="flex flex-wrap items-center gap-3">
+                                    <span className="product-editor-count-pill">{modules.length} root module{modules.length === 1 ? '' : 's'} · {editorContentCount} item{editorContentCount === 1 ? '' : 's'}</span>
+                                    <button type="button" onClick={addRootModule} className="product-editor-secondary-primary-action">+ Add module</button>
+                                </div>
+                            </div>
+
+                            <div className="product-editor-module-list">
+                                {(modules || []).length > 0 ? (modules || []).map(module => (
+                                    <ModuleEditor key={module.id} module={module} allModules={modules || []} level={0} onUpdate={setModules} onAddChild={addChildModule} onDelete={deleteModule} productId={draftProductIdRef.current} />
+                                )) : (
+                                    <button type="button" onClick={addRootModule} className="product-editor-empty-module">
+                                        <span aria-hidden="true">＋</span>
+                                        <strong>Start with your first module</strong>
+                                        <p>Every module starts with safe empty file and submodule arrays.</p>
+                                    </button>
+                                )}
+                            </div>
+                        </section>
+                    )}
+
+                    {activeWizardStep === 5 && (
+                        <section className="product-editor-review-layout" aria-labelledby="product-wizard-review-title">
+                            <section className={`${glassCard} product-editor-card product-editor-wizard-panel`}>
+                                <div className="product-editor-card-heading">
+                                    <div>
+                                        <p className="product-editor-eyebrow">Step 6 · Publish & review</p>
+                                        <h2 id="product-wizard-review-title">Confirm the final product</h2>
+                                        <p>Review the live summary, choose availability, then use the single final save action in the header.</p>
+                                    </div>
+                                    <span className="product-editor-step-badge">06</span>
+                                </div>
+
+                                <div className="product-editor-review-checklist">
+                                    <div className={formData.title.trim() && formData.description.trim() ? 'is-ready' : 'is-missing'}><span>{formData.title.trim() && formData.description.trim() ? '✓' : '!'}</span><div><strong>Basic details</strong><small>{formData.title.trim() && formData.description.trim() ? 'Title and description are ready.' : 'Title and short description are required.'}</small></div><button type="button" onClick={() => openWizardStep(0)}>Edit</button></div>
+                                    <div className={images.length > 0 ? 'is-ready' : ''}><span>{images.length}</span><div><strong>Product images</strong><small>{images.length > 0 ? 'Gallery is ready; the first image is primary.' : 'No image selected. You can still save with the fallback seed.'}</small></div><button type="button" onClick={() => openWizardStep(1)}>Edit</button></div>
+                                    <div className={String(formData.price || '').trim() ? 'is-ready' : 'is-missing'}><span>{String(formData.price || '').trim() ? '✓' : '!'}</span><div><strong>Pricing & purchase</strong><small>{String(formData.price || '').trim() ? `${editorPriceLabel} configured.` : 'Regular price is required.'}</small></div><button type="button" onClick={() => openWizardStep(2)}>Edit</button></div>
+                                    <div className={modules.length > 0 ? 'is-ready' : ''}><span>{modules.length}</span><div><strong>Course content</strong><small>{modules.length} root module{modules.length === 1 ? '' : 's'} and {editorContentCount} content item{editorContentCount === 1 ? '' : 's'}.</small></div><button type="button" onClick={() => openWizardStep(4)}>Edit</button></div>
+                                </div>
                             </section>
 
-                            <section id="product-editor-pricing" className={`${glassCard} product-editor-card product-editor-side-card scroll-mt-36`}>
-                                <div className="product-editor-side-heading">
-                                    <div><p className="product-editor-eyebrow">Pricing & access</p><h2>Purchase options</h2></div>
-                                    <span className="product-editor-step-badge">03</span>
-                                </div>
-                                {discountPercent > 0 && <p className="product-editor-discount-pill">{discountPercent}% discount active</p>}
-                                <div className="mt-5 space-y-4">
-                                    <div><label className={labelClass}>Regular Price</label><input required type="number" value={formData.price} onChange={event => setFormData(prev => ({ ...prev, price: event.target.value }))} className={fieldClass} placeholder="999" /></div>
-                                    <div><label className={labelClass}>Sale Price</label><input type="number" value={formData.salePrice} onChange={event => setFormData(prev => ({ ...prev, salePrice: event.target.value }))} className={fieldClass} placeholder="499" /></div>
-                                    <div className="product-editor-coin-panel">
-                                        <label className={labelClass}>EduCoin Price</label>
-                                        <input type="number" min="0" value={formData.coinPrice} onChange={(event) => setFormData((previous) => ({ ...previous, coinPrice: event.target.value }))} className={fieldClass} placeholder="Example: 299" />
-                                        <p>Leave empty or set 0 to disable EduCoin purchase.</p>
-                                        <label className="product-editor-inline-toggle"><input type="checkbox" checked={formData.isCoinRedeemEnabled !== false} onChange={(event) => setFormData((previous) => ({ ...previous, isCoinRedeemEnabled: event.target.checked }))} /><span>Enable Pay with EduCoin</span></label>
-                                    </div>
-                                    <div><label className={labelClass}>Coupon Code</label><select value={formData.couponCode} onChange={event => setFormData(prev => ({ ...prev, couponCode: event.target.value }))} className={fieldClass}><option value="">No coupon</option>{(coupons || []).map(coupon => <option key={coupon.id} value={coupon.code}>{coupon.code}</option>)}</select></div>
-                                    <div><label className={labelClass}>Razorpay Payment Page Link</label><input value={formData.paymentLink} onChange={event => setFormData(prev => ({ ...prev, paymentLink: event.target.value }))} className={fieldClass} placeholder="https://pages.razorpay.com/..." /></div>
-                                </div>
-                            </section>
+                            <aside className="product-editor-review-sidebar">
+                                <section className="product-editor-summary-card">
+                                    <div className="product-editor-summary-image">{editorPrimaryImage ? <img src={editorPrimaryImage} alt={formData.title || 'Product preview'} /> : <span aria-hidden="true">▧</span>}</div>
+                                    <div className="min-w-0"><p className="product-editor-eyebrow">Live summary</p><h2>{formData.title || 'Untitled product'}</h2><p className="product-editor-summary-description">{formData.description || 'Add a short description to preview the storefront summary.'}</p></div>
+                                    <div className="product-editor-summary-price"><strong>{editorPriceLabel}</strong>{formData.salePrice && formData.price ? <span>₹{formData.price}</span> : null}{discountPercent > 0 && <em>{discountPercent}% off</em>}</div>
+                                    <div className="product-editor-summary-stats"><div><strong>{images.length}</strong><span>Images</span></div><div><strong>{modules.length}</strong><span>Modules</span></div><div><strong>{editorContentCount}</strong><span>Content</span></div></div>
+                                </section>
 
-                            <section id="product-editor-metadata" className={`${glassCard} product-editor-card product-editor-side-card scroll-mt-36`}>
-                                <details open className="product-editor-details">
-                                    <summary>
-                                        <span><small className="product-editor-eyebrow">Organization & SEO</small><strong>Catalog metadata</strong></span>
-                                        <span aria-hidden="true">⌄</span>
-                                    </summary>
-                                    <div className="product-editor-details-body">
-                                        <div><label className={labelClass}>Category</label><input value={formData.category} onChange={event => setFormData(prev => ({ ...prev, category: event.target.value }))} className={fieldClass} placeholder="Design, Finance, Coding..." /></div>
-                                        <div><label className={labelClass}>Department</label><select value={formData.department} onChange={event => setFormData(prev => ({ ...prev, department: event.target.value as ProductFormData['department'] }))} className={fieldClass}><option>Unisex</option><option>Men</option><option>Women</option></select></div>
-                                        <div><label className={labelClass}>Dimensions</label><input value={formData.dimensions} onChange={event => setFormData(prev => ({ ...prev, dimensions: event.target.value }))} className={fieldClass} placeholder="1024x768, A4, 16:9" /></div>
-                                        <div><label className={labelClass}>File Format</label><input value={formData.fileFormat} onChange={event => setFormData(prev => ({ ...prev, fileFormat: event.target.value }))} className={fieldClass} placeholder="PDF + MP4 + Docs" /></div>
-                                        <div><label className={labelClass}>Features (one per line)</label><textarea rows={4} value={formData.featuresText} onChange={event => setFormData(prev => ({ ...prev, featuresText: event.target.value }))} className={fieldClass} /></div>
-                                        <div><label className={labelClass}>Tags (comma separated)</label><input value={formData.tagsText} onChange={event => setFormData(prev => ({ ...prev, tagsText: event.target.value }))} className={fieldClass} placeholder="premium, beginner, template" /></div>
-                                        <div><label className={labelClass}>Search Keywords</label><textarea rows={3} value={formData.searchKeywordsText} onChange={event => setFormData(prev => ({ ...prev, searchKeywordsText: event.target.value }))} className={fieldClass} placeholder="class 10, physics, pcm, neet, pdf, notes" /><p className="mt-2 text-xs font-bold text-slate-500">Add words students may search for, like class 10, physics, pcm, neet, pdf, notes.</p></div>
+                                <section className={`${glassCard} product-editor-card product-editor-side-card`}>
+                                    <div className="product-editor-side-heading"><div><p className="product-editor-eyebrow">Publishing</p><h2>Availability</h2></div></div>
+                                    <div className="product-editor-toggle-list">
+                                        <label><span><strong>Visible</strong><small>Show on storefront</small></span><input type="checkbox" checked={formData.isVisible} onChange={event => setFormData(prev => ({ ...prev, isVisible: event.target.checked }))} /></label>
+                                        <label><span><strong>In stock</strong><small>Purchasable now</small></span><input type="checkbox" checked={formData.inStock} onChange={event => setFormData(prev => ({ ...prev, inStock: event.target.checked }))} /></label>
+                                        <label><span><strong>Free via coupon</strong><small>Enable free access flow</small></span><input type="checkbox" checked={formData.isFree} onChange={event => setFormData(prev => ({ ...prev, isFree: event.target.checked }))} /></label>
                                     </div>
-                                </details>
-                            </section>
-                        </aside>
-                    </div>
+                                </section>
+                            </aside>
+                        </section>
+                    )}
                 </main>
-
-                <footer className="product-editor-savebar">
-                    <div>
-                        <strong>{isSavingProduct ? 'Saving product' : 'Ready to save'}</strong>
-                        <span>{isUploadingProductImage ? `Image upload ${productImageUploadProgress}%` : 'All current fields, media and course content will be saved together.'}</span>
-                    </div>
-                    <div className="product-editor-savebar-actions">
-                        <button type="button" onClick={onCancel} className="product-editor-secondary-action">Cancel</button>
-                        <button type="submit" disabled={isSavingProduct || isUploadingProductImage} className="product-editor-primary-action">{editorSaveLabel}</button>
-                    </div>
-                </footer>
             </form>
         </div>
     );
@@ -2381,13 +2479,20 @@ const ProductManagement: React.FC<{
     onAddProduct: (product: Omit<Product, 'id'>) => Promise<boolean>;
     onUpdateProduct: (product: Product) => Promise<boolean>;
     onDeleteProduct: (id: number) => Promise<boolean>;
-}> = ({ products, users, coupons, onAddProduct, onUpdateProduct, onDeleteProduct }) => {
+    onEditorStateChange?: (isOpen: boolean) => void;
+}> = ({ products, users, coupons, onAddProduct, onUpdateProduct, onDeleteProduct, onEditorStateChange }) => {
     const [viewState, setViewState] = useState<ProductViewState>('list');
     const [editingProduct, setEditingProduct] = useState<ProductWithRating | null>(null);
     const [newProductForEmail, setNewProductForEmail] = useState<ProductWithRating | null>(null);
     const [productPendingDelete, setProductPendingDelete] = useState<ProductWithRating | null>(null);
     const [isDeletingProduct, setIsDeletingProduct] = useState(false);
     const safeProducts = products || [];
+
+    useEffect(() => {
+        onEditorStateChange?.(viewState !== 'list');
+    }, [onEditorStateChange, viewState]);
+
+    useEffect(() => () => onEditorStateChange?.(false), [onEditorStateChange]);
 
     const openAddView = () => {
         setEditingProduct(null);

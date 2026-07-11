@@ -116,7 +116,13 @@ const FirebaseAdminSetup: React.FC = () => {
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     const [currentView, setCurrentView] = useState<AdminView>('dashboard');
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
+    const [isProductEditorOpen, setIsProductEditorOpen] = useState(false);
     const supportUnreadCount = props.tickets.filter((ticket) => isSupportTicketNeedsAttention(ticket)).length;
+    const isProductEditorShellOpen = currentView === 'products' && isProductEditorOpen;
+
+    useEffect(() => {
+        if (currentView !== 'products') setIsProductEditorOpen(false);
+    }, [currentView]);
 
     const viewMeta: Record<AdminView, { title: string; subtitle: string }> = {
         dashboard: { title: 'Dashboard', subtitle: 'Overview of your store operations' },
@@ -146,7 +152,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             case 'adminPosts': return <AdminPostManagement />;
             case 'economy': return <CoinEconomyManagement economySettings={props.economySettings} products={props.products} websiteSettings={props.websiteSettings} />;
             case 'rewardSettings': return <EduCoinRewardSettings economySettings={props.economySettings} />;
-            case 'products': return <ProductManagement products={props.products} users={props.users} coupons={props.coupons} onAddProduct={props.onAddProduct} onUpdateProduct={props.onUpdateProduct} onDeleteProduct={props.onDeleteProduct} />;
+            case 'products': return <ProductManagement products={props.products} users={props.users} coupons={props.coupons} onAddProduct={props.onAddProduct} onUpdateProduct={props.onUpdateProduct} onDeleteProduct={props.onDeleteProduct} onEditorStateChange={setIsProductEditorOpen} />;
             case 'newsBlog': return <NewsBlogManagement settings={props.websiteSettings} onSettingsChange={props.onWebsiteSettingsChange} />;
             case 'reviews': return <AdminReviewManagement products={props.products} reviews={props.reviews} />;
             case 'reports': return <Reports products={props.products} reviews={props.reviews} />;
@@ -237,43 +243,47 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                     />
 
                     <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#fbfbfb]">
-                        <header className="z-30 flex shrink-0 items-center justify-between border-b border-[#ece8e8] bg-white px-3 py-2.5 md:hidden">
-                            <div className="flex min-w-0 items-center gap-3">
+                        {!isProductEditorShellOpen && (
+                            <header className="z-30 flex shrink-0 items-center justify-between border-b border-[#ece8e8] bg-white px-3 py-2.5 md:hidden">
+                                <div className="flex min-w-0 items-center gap-3">
+                                    <button
+                                        type="button"
+                                        aria-label="Open admin navigation"
+                                        onClick={() => setIsMobileSidebarOpen(true)}
+                                        className="-ml-1 rounded-lg p-2 text-[#4f5258] transition-colors hover:bg-[#f7f4f4]"
+                                    >
+                                        <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                                    </button>
+                                    <div className="min-w-0">
+                                        <p className="truncate text-sm font-bold text-[#24262a]">{currentViewMeta.title}</p>
+                                        <p className="truncate text-[10px] font-medium text-[#a09a9d]">Admin / {currentViewMeta.title}</p>
+                                    </div>
+                                </div>
+                                <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#fbe4e6] text-xs font-black text-[#dc4d5c]">
+                                    {props.currentAdminUser.email.charAt(0).toUpperCase()}
+                                </div>
+                            </header>
+                        )}
+
+                        {!isProductEditorShellOpen && (
+                            <header className="hidden shrink-0 items-center justify-between border-b border-[#efebeb] bg-white px-7 py-4 md:flex lg:px-9">
+                                <div className="min-w-0">
+                                    <h1 className="truncate text-[22px] font-bold tracking-[-0.02em] text-[#25272b]">{currentViewMeta.title}</h1>
+                                    <p className="mt-1 truncate text-[11px] font-medium text-[#a29c9f]">Admin / {currentViewMeta.title} · {currentViewMeta.subtitle}</p>
+                                </div>
                                 <button
                                     type="button"
-                                    aria-label="Open admin navigation"
-                                    onClick={() => setIsMobileSidebarOpen(true)}
-                                    className="-ml-1 rounded-lg p-2 text-[#4f5258] transition-colors hover:bg-[#f7f4f4]"
+                                    onClick={() => setCurrentView('products')}
+                                    className="shipnow-shell-action ml-5 inline-flex shrink-0 items-center gap-2 rounded-lg bg-[#202124] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-black"
                                 >
-                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                    Manage Products
                                 </button>
-                                <div className="min-w-0">
-                                    <p className="truncate text-sm font-bold text-[#24262a]">{currentViewMeta.title}</p>
-                                    <p className="truncate text-[10px] font-medium text-[#a09a9d]">Admin / {currentViewMeta.title}</p>
-                                </div>
-                            </div>
-                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#fbe4e6] text-xs font-black text-[#dc4d5c]">
-                                {props.currentAdminUser.email.charAt(0).toUpperCase()}
-                            </div>
-                        </header>
+                            </header>
+                        )}
 
-                        <header className="hidden shrink-0 items-center justify-between border-b border-[#efebeb] bg-white px-7 py-4 md:flex lg:px-9">
-                            <div className="min-w-0">
-                                <h1 className="truncate text-[22px] font-bold tracking-[-0.02em] text-[#25272b]">{currentViewMeta.title}</h1>
-                                <p className="mt-1 truncate text-[11px] font-medium text-[#a29c9f]">Admin / {currentViewMeta.title} · {currentViewMeta.subtitle}</p>
-                            </div>
-                            <button
-                                type="button"
-                                onClick={() => setCurrentView('products')}
-                                className="shipnow-shell-action ml-5 inline-flex shrink-0 items-center gap-2 rounded-lg bg-[#202124] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-black"
-                            >
-                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
-                                Manage Products
-                            </button>
-                        </header>
-
-                        <main className="shipnow-admin-content shipnow-admin-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#fbfbfb] p-3 sm:p-5 md:p-6 lg:p-8">
-                            <div className="mx-auto w-full max-w-[1380px]">
+                        <main className={`shipnow-admin-content shipnow-admin-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#fbfbfb] ${isProductEditorShellOpen ? 'p-0' : 'p-3 sm:p-5 md:p-6 lg:p-8'}`}>
+                            <div className={isProductEditorShellOpen ? 'w-full max-w-none' : 'mx-auto w-full max-w-[1380px]'}>
                                 {currentView === 'analytics' ? renderView() : (
                                     <div
                                         data-admin-view={currentView}
@@ -286,14 +296,16 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                             </div>
                         </main>
 
-                        <footer className="hidden shrink-0 items-center justify-between border-t border-[#efebeb] bg-white px-8 py-3 text-[10px] font-medium text-[#999396] lg:flex">
-                            <span>Copyright © 2026 Digital Catalyst</span>
-                            <div className="flex items-center gap-5">
-                                <button type="button" onClick={props.onSwitchToHome} className="hover:text-[#dc4d5c]">Open Website</button>
-                                <span>Admin workspace</span>
-                                <span>Secure session</span>
-                            </div>
-                        </footer>
+                        {!isProductEditorShellOpen && (
+                            <footer className="hidden shrink-0 items-center justify-between border-t border-[#efebeb] bg-white px-8 py-3 text-[10px] font-medium text-[#999396] lg:flex">
+                                <span>Copyright © 2026 Digital Catalyst</span>
+                                <div className="flex items-center gap-5">
+                                    <button type="button" onClick={props.onSwitchToHome} className="hover:text-[#dc4d5c]">Open Website</button>
+                                    <span>Admin workspace</span>
+                                    <span>Secure session</span>
+                                </div>
+                            </footer>
+                        )}
                     </div>
                 </div>
             </div>
