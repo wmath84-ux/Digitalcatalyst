@@ -19,6 +19,7 @@ import CoinEconomyManagement from './CoinEconomyManagement';
 import EduCoinRewardSettings from './EduCoinRewardSettings';
 import NewsletterSubscribers from './NewsletterSubscribers';
 import AdminPostManagement from './AdminPostManagement';
+import AdminOverview from './AdminOverview';
 import { auth, db } from '../../firebase';
 import { doc, getDoc } from 'firebase/firestore';
 
@@ -116,6 +117,28 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const supportUnreadCount = props.tickets.filter((ticket) => isSupportTicketNeedsAttention(ticket)).length;
 
+    const viewMeta: Record<AdminView, { title: string; subtitle: string }> = {
+        dashboard: { title: 'Dashboard', subtitle: 'Overview of your store operations' },
+        firebaseAdmin: { title: 'Firebase Admin', subtitle: 'Verify Firebase permissions and upload access' },
+        adminPosts: { title: 'Admin Post', subtitle: 'Publish and manage official community updates' },
+        economy: { title: 'EduCoin Economy', subtitle: 'Control coin pricing and product economy' },
+        rewardSettings: { title: 'Reward Logic', subtitle: 'Configure learning rewards and earning rules' },
+        products: { title: 'Products', subtitle: 'Create, update, and organize store products' },
+        newsBlog: { title: 'News & Blog', subtitle: 'Manage articles, news, and blog content' },
+        reviews: { title: 'Reviews', subtitle: 'Moderate customer ratings and feedback' },
+        reports: { title: 'Reports', subtitle: 'Review store and product performance reports' },
+        users: { title: 'Customers', subtitle: 'Manage registered customer accounts' },
+        admins: { title: 'Admin Users', subtitle: 'Control administrator access and roles' },
+        orders: { title: 'Orders', subtitle: 'Track purchases, payments, and fulfillment' },
+        coupons: { title: 'Coupons', subtitle: 'Create and manage promotional offers' },
+        support: { title: 'Support', subtitle: 'Respond to customer and community requests' },
+        subscribers: { title: 'Subscribers', subtitle: 'Manage newsletter subscribers' },
+        analytics: { title: 'Analytics', subtitle: 'Measure store, audience, and sales activity' },
+        websiteSettings: { title: 'Store Config', subtitle: 'Configure storefront content and behavior' },
+    };
+
+    const currentViewMeta = viewMeta[currentView];
+
     const renderView = () => {
         switch (currentView) {
             case 'firebaseAdmin': return <FirebaseAdminSetup />;
@@ -134,159 +157,138 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             case 'subscribers': return <NewsletterSubscribers subscribers={props.newsletterSubscribers} onUpdate={props.onSubscribersUpdate} />;
             case 'analytics': return <Analytics orders={props.orders} products={props.products} users={props.users} reviews={props.reviews} />;
             case 'websiteSettings': return <WebsiteSettingsComponent settings={props.websiteSettings} products={props.products} onSettingsChange={props.onWebsiteSettingsChange} />;
-            case 'dashboard': default: 
-                const completedOrders = props.orders.filter(o => o.status === 'Completed');
-                const parseCurrency = (value: string) => parseFloat(value.replace('₹', '').replace(/,/g, '') || '0');
-                const totalRevenue = completedOrders.reduce((sum, order) => sum + parseCurrency(order.total), 0);
-                const allReviews = Object.values(props.reviews).flat();
-                const reviewRatings = allReviews
-                    .map((review) => {
-                        if (!review || typeof review !== 'object' || !('rating' in review)) return NaN;
-                        return Number((review as { rating?: unknown }).rating);
-                    })
-                    .filter((rating): rating is number => Number.isFinite(rating));
-                const totalReviews = allReviews.length;
-
-                const now = new Date();
-                const currentMonth = now.getMonth();
-                const currentYear = now.getFullYear();
-
-                const currentMonthRevenue = completedOrders.reduce((sum, order) => {
-                    const orderDate = new Date(order.date);
-                    if (Number.isNaN(orderDate.getTime()) || orderDate.getMonth() !== currentMonth || orderDate.getFullYear() !== currentYear) return sum;
-                    return sum + parseCurrency(order.total);
-                }, 0);
-
-                const revenueSubtitle = completedOrders.length === 0
-                    ? 'No completed orders yet'
-                    : currentMonthRevenue > 0
-                        ? `₹${currentMonthRevenue.toLocaleString('en-IN')} completed revenue this month`
-                        : 'No completed revenue this month';
-
-                const unavailableProducts = props.products.filter(product => product.inStock === false).length;
-                const availableProducts = props.products.length - unavailableProducts;
-                const productsSubtitle = props.products.length === 0
-                    ? 'No products added'
-                    : `${availableProducts} available • ${unavailableProducts} out of stock`;
-
-                const weekStart = new Date(now);
-                weekStart.setDate(now.getDate() - 7);
-                const newUsersThisWeek = props.users.filter(user => {
-                    const createdAt = new Date(user.createdAt);
-                    return !Number.isNaN(createdAt.getTime()) && createdAt >= weekStart;
-                }).length;
-                const usersSubtitle = props.users.length === 0
-                    ? 'No users yet'
-                    : newUsersThisWeek > 0 ? `${newUsersThisWeek} new users this week` : 'No new users this week';
-
-                const averageRating = reviewRatings.length > 0
-                    ? reviewRatings.reduce((sum, rating) => sum + rating, 0) / reviewRatings.length
-                    : 0;
-                const reviewsSubtitle = reviewRatings.length > 0 ? `${averageRating.toFixed(1)} average rating` : 'No reviews yet';
-                
+            case 'dashboard': default:
                 return (
-                    <div className="space-y-6 animate-fade-in sm:space-y-10">
-                        <div className="flex flex-col items-start justify-between gap-3 md:flex-row md:items-end">
-                            <div>
-                                <h1 className="text-3xl sm:text-4xl font-extrabold text-slate-800 tracking-tight">
-                                    Hello, <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-indigo-600">{props.currentAdminUser.email.split('@')[0]}</span> 👋
-                                </h1>
-                                <p className="mt-2 text-base text-slate-700 sm:text-lg">Here's what's happening in your store today.</p>
-                            </div>
-                            <div className="mt-4 md:mt-0 hidden md:block">
-                                <span className="inline-flex items-center px-4 py-2 rounded-full text-sm font-medium bg-white/80 backdrop-blur-xl border border-slate-300/70 text-slate-700 shadow-sm">
-                                    <span className="w-2 h-2 bg-green-500 rounded-full mr-2 animate-pulse"></span>
-                                    System Operational
-                                </span>
-                            </div>
-                        </div>
-
-                        <div className="grid grid-cols-2 gap-3 md:grid-cols-2 md:gap-6 lg:grid-cols-4">
-                            <DashboardCard 
-                                title="Total Revenue" 
-                                value={`₹${totalRevenue.toLocaleString('en-IN')}`} 
-                                subtitle={revenueSubtitle}
-                                gradient="bg-gradient-to-br from-emerald-500 to-teal-600"
-                                icon={<svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1.41 16.09V20h-2.67v-1.93c-1.71-.36-3.15-1.46-3.27-3.4h1.97c.1 1.05.95 1.83 2.63 1.83 1.76 0 2.69-.84 2.69-2.03 0-1.21-.75-1.9-2.61-2.36-2.25-.57-4.23-1.39-4.23-3.93 0-1.98 1.47-3.21 3.22-3.53V3h2.67v1.93c1.5.27 2.81 1.23 3.05 3.07h-1.97c-.15-.93-.98-1.53-2.37-1.53-1.58 0-2.38.81-2.38 1.83 0 1.1.75 1.7 2.61 2.19 2.28.59 4.25 1.45 4.25 4.05 0 2.1-1.56 3.36-3.4 3.55z"/></svg>}
-                            />
-                            <DashboardCard 
-                                title="Total Products" 
-                                value={props.products.length} 
-                                subtitle={productsSubtitle}
-                                gradient="bg-gradient-to-br from-blue-500 to-indigo-600"
-                                icon={<svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>}
-                            />
-                            <DashboardCard 
-                                title="Active Users" 
-                                value={props.users.length} 
-                                subtitle={usersSubtitle}
-                                gradient="bg-gradient-to-br from-violet-500 to-purple-600"
-                                icon={<svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z" /></svg>}
-                            />
-                            <DashboardCard 
-                                title="Total Reviews" 
-                                value={totalReviews} 
-                                subtitle={reviewsSubtitle}
-                                gradient="bg-gradient-to-br from-amber-400 to-orange-500"
-                                icon={<svg className="w-24 h-24" fill="currentColor" viewBox="0 0 24 24"><path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" /></svg>}
-                            />
-                        </div>
-
-                        <div className="rounded-2xl border border-slate-200/80 bg-white/80 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-8">
-                            <h2 className="mb-3 text-xl font-bold text-slate-800 sm:mb-4 sm:text-2xl">Quick Actions</h2>
-                            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3 sm:gap-4">
-                                <button onClick={() => setCurrentView('products')} className="flex items-center justify-center gap-3 rounded-xl bg-blue-50 p-3 font-semibold text-blue-700 transition-colors hover:bg-blue-100 sm:justify-start sm:p-4">
-                                    <span className="bg-blue-200 p-2 rounded-lg">📦</span> Manage Products
-                                </button>
-                                <button onClick={() => setCurrentView('orders')} className="flex items-center justify-center gap-3 rounded-xl bg-green-50 p-3 font-semibold text-green-700 transition-colors hover:bg-green-100 sm:justify-start sm:p-4">
-                                    <span className="bg-green-200 p-2 rounded-lg">💰</span> View Orders
-                                </button>
-                                <button onClick={() => setCurrentView('support')} className="flex items-center justify-center gap-3 rounded-xl bg-purple-50 p-3 font-semibold text-purple-700 transition-colors hover:bg-purple-100 sm:justify-start sm:p-4">
-                                    <span className="bg-purple-200 p-2 rounded-lg">💬</span> Support Tickets
-                                </button>
-                            </div>
-                        </div>
-                    </div>
+                    <AdminOverview
+                        products={props.products}
+                        reviews={props.reviews}
+                        users={props.users}
+                        orders={props.orders}
+                        tickets={props.tickets}
+                        currentAdminUser={props.currentAdminUser}
+                        onNavigate={setCurrentView}
+                    />
                 );
         }
     }
 
     return (
-        <div className="admin-mobile-scope tagmaster-admin-theme flex h-[100dvh] min-h-[100dvh] w-full max-w-full overflow-hidden bg-[#d8e0ef] bg-[radial-gradient(circle_at_10%_10%,rgba(79,70,229,0.16),transparent_30%),radial-gradient(circle_at_90%_0%,rgba(14,165,233,0.13),transparent_28%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] font-sans">
-            <Sidebar 
-                onNavigate={setCurrentView} 
-                onLogout={props.onLogout} 
-                onSwitchToHome={props.onSwitchToHome} 
-                currentView={currentView} 
-                isOpen={isMobileSidebarOpen}
-                onClose={() => setIsMobileSidebarOpen(false)}
-                supportUnreadCount={supportUnreadCount}
-            />
-            
-            <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-                {/* Mobile Header */}
-                <header className="z-30 flex shrink-0 items-center justify-between border-b border-slate-300/70 bg-white/85 px-3 py-2.5 shadow-sm backdrop-blur-xl md:hidden">
-                    <div className="flex items-center gap-3">
-                        <button 
-                            onClick={() => setIsMobileSidebarOpen(true)}
-                            className="-ml-1 rounded-xl p-2 text-slate-700 transition-colors hover:bg-white/80"
-                        >
-                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-                        </button>
-                        <span className="text-sm font-bold text-slate-800">Admin Panel</span>
-                    </div>
-                    <div className="w-8 h-8 bg-gradient-to-br from-blue-700 to-indigo-800 rounded-full flex items-center justify-center text-white text-xs font-bold">
-                        {props.currentAdminUser.email.charAt(0).toUpperCase()}
-                    </div>
-                </header>
+        <>
+            <style>{`
+                .shipnow-admin-content {
+                    color: #202124;
+                }
+                .shipnow-admin-content table {
+                    border-collapse: separate;
+                    border-spacing: 0;
+                }
+                .shipnow-admin-content thead th {
+                    background: #faf9f9;
+                    color: #777176;
+                    font-size: 0.7rem;
+                    font-weight: 700;
+                    letter-spacing: 0.02em;
+                    text-transform: none;
+                }
+                .shipnow-admin-content tbody td {
+                    border-color: #f0eded;
+                }
+                .shipnow-admin-content input,
+                .shipnow-admin-content select,
+                .shipnow-admin-content textarea {
+                    border-color: #e5e1e1;
+                }
+                .shipnow-admin-content input:focus,
+                .shipnow-admin-content select:focus,
+                .shipnow-admin-content textarea:focus {
+                    border-color: #e85b68;
+                    box-shadow: 0 0 0 3px rgba(232, 91, 104, 0.10);
+                    outline: none;
+                }
+                .shipnow-admin-scrollbar {
+                    scrollbar-color: #d9d3d3 transparent;
+                    scrollbar-width: thin;
+                }
+                .shipnow-admin-scrollbar::-webkit-scrollbar {
+                    height: 6px;
+                    width: 6px;
+                }
+                .shipnow-admin-scrollbar::-webkit-scrollbar-thumb {
+                    background: #d9d3d3;
+                    border-radius: 999px;
+                }
+            `}</style>
 
-                <main className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-white/20 p-3 backdrop-blur-sm custom-scrollbar sm:p-6 lg:p-10">
-                    <div className="mx-auto w-full max-w-7xl">
-                        {renderView()}
+            <div
+                data-admin-shell="SHIPNOW_ADMIN_SHELL_V1"
+                className="admin-mobile-scope tagmaster-admin-theme h-[100dvh] min-h-[100dvh] w-full max-w-full overflow-hidden bg-[#f4e7e6] font-sans md:p-5 lg:p-7"
+            >
+                <div className="mx-auto flex h-full w-full max-w-[1540px] overflow-hidden bg-[#fbfbfb] shadow-[0_24px_70px_rgba(113,71,74,0.13)] md:rounded-[24px] md:border md:border-white/80">
+                    <Sidebar
+                        onNavigate={setCurrentView}
+                        onLogout={props.onLogout}
+                        onSwitchToHome={props.onSwitchToHome}
+                        currentView={currentView}
+                        isOpen={isMobileSidebarOpen}
+                        onClose={() => setIsMobileSidebarOpen(false)}
+                        supportUnreadCount={supportUnreadCount}
+                        adminEmail={props.currentAdminUser.email}
+                    />
+
+                    <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#fbfbfb]">
+                        <header className="z-30 flex shrink-0 items-center justify-between border-b border-[#ece8e8] bg-white px-3 py-2.5 md:hidden">
+                            <div className="flex min-w-0 items-center gap-3">
+                                <button
+                                    type="button"
+                                    aria-label="Open admin navigation"
+                                    onClick={() => setIsMobileSidebarOpen(true)}
+                                    className="-ml-1 rounded-lg p-2 text-[#4f5258] transition-colors hover:bg-[#f7f4f4]"
+                                >
+                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+                                </button>
+                                <div className="min-w-0">
+                                    <p className="truncate text-sm font-bold text-[#24262a]">{currentViewMeta.title}</p>
+                                    <p className="truncate text-[10px] font-medium text-[#a09a9d]">Admin / {currentViewMeta.title}</p>
+                                </div>
+                            </div>
+                            <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#fbe4e6] text-xs font-black text-[#dc4d5c]">
+                                {props.currentAdminUser.email.charAt(0).toUpperCase()}
+                            </div>
+                        </header>
+
+                        <header className="hidden shrink-0 items-center justify-between border-b border-[#efebeb] bg-white px-7 py-4 md:flex lg:px-9">
+                            <div className="min-w-0">
+                                <h1 className="truncate text-[22px] font-bold tracking-[-0.02em] text-[#25272b]">{currentViewMeta.title}</h1>
+                                <p className="mt-1 truncate text-[11px] font-medium text-[#a29c9f]">Admin / {currentViewMeta.title} · {currentViewMeta.subtitle}</p>
+                            </div>
+                            <button
+                                type="button"
+                                onClick={() => setCurrentView('products')}
+                                className="shipnow-shell-action ml-5 inline-flex shrink-0 items-center gap-2 rounded-lg bg-[#202124] px-4 py-2.5 text-xs font-bold text-white shadow-sm transition hover:bg-black"
+                            >
+                                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
+                                Manage Products
+                            </button>
+                        </header>
+
+                        <main className="shipnow-admin-content shipnow-admin-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#fbfbfb] p-3 sm:p-5 md:p-6 lg:p-8">
+                            <div className="mx-auto w-full max-w-[1380px]">
+                                {renderView()}
+                            </div>
+                        </main>
+
+                        <footer className="hidden shrink-0 items-center justify-between border-t border-[#efebeb] bg-white px-8 py-3 text-[10px] font-medium text-[#999396] lg:flex">
+                            <span>Copyright © 2026 Digital Catalyst</span>
+                            <div className="flex items-center gap-5">
+                                <button type="button" onClick={props.onSwitchToHome} className="hover:text-[#dc4d5c]">Open Website</button>
+                                <span>Admin workspace</span>
+                                <span>Secure session</span>
+                            </div>
+                        </footer>
                     </div>
-                </main>
+                </div>
             </div>
-        </div>
+        </>
     );
 };
 

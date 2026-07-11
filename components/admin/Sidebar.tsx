@@ -10,6 +10,7 @@ interface SidebarProps {
     isOpen: boolean;
     onClose: () => void;
     supportUnreadCount?: number;
+    adminEmail: string;
 }
 
 const NavLink: React.FC<{
@@ -26,33 +27,28 @@ const NavLink: React.FC<{
         <button
             onClick={() => onClick(view)}
             title={label}
-            className={`group/nav w-full text-left px-3 py-3 rounded-2xl transition-all duration-300 flex items-center justify-center md:group-hover/sidebar:justify-between relative overflow-hidden ${
+            className={`group/nav relative flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-[12px] font-semibold transition-colors ${
                 isActive
-                    ? 'bg-white/80 text-slate-950 shadow-[0_12px_30px_rgba(51,65,85,0.12)] border border-white/70 backdrop-blur-sm'
-                    : 'text-slate-700 hover:bg-white/80 hover:shadow-sm hover:text-slate-950'
+                    ? 'bg-[#fde7e9] text-[#d94857]'
+                    : 'text-[#62656d] hover:bg-[#f7f5f5] hover:text-[#24262a]'
             }`}
         >
-            <div className="flex min-w-0 items-center gap-3 relative z-10">
-                <span className={`shrink-0 transition-colors ${isActive ? 'text-indigo-700' : 'text-slate-600 group-hover/nav:text-indigo-700'}`}>
-                    {icon}
-                </span>
-                <span className="truncate font-medium tracking-wide md:w-0 md:opacity-0 md:transition-all md:duration-200 md:group-hover/sidebar:w-auto md:group-hover/sidebar:opacity-100">{label}</span>
-            </div>
-            {isActive && <div className="absolute left-0 top-0 bottom-0 w-1 bg-indigo-700 rounded-r-full"></div>}
+            <span className={`flex h-5 w-5 shrink-0 items-center justify-center transition-colors ${isActive ? 'text-[#d94857]' : 'text-[#73767d] group-hover/nav:text-[#d94857]'}`}>
+                {icon}
+            </span>
+            <span className="min-w-0 flex-1 truncate">{label}</span>
             {badge ? (
-                <span className="relative z-10 inline-flex min-w-5 items-center justify-center rounded-full bg-rose-500 px-1.5 py-0.5 text-[10px] font-black leading-none text-white shadow-sm ring-2 ring-white">
+                <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-[#ef4f5f] px-1.5 py-0.5 text-[9px] font-black leading-none text-white">
                     {badge}
                 </span>
-            ) : isFeatured && (
-                <span className="relative z-10 hidden text-[10px] font-bold bg-gradient-to-r from-yellow-400 to-orange-500 text-white px-2 py-0.5 rounded-full shadow-sm md:group-hover/sidebar:inline-flex">
-                    NEW
-                </span>
-            )}
+            ) : isFeatured ? (
+                <span className="rounded-full bg-[#fff0d9] px-1.5 py-0.5 text-[8px] font-black text-[#b97214]">NEW</span>
+            ) : null}
         </button>
     );
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, onSwitchToHome, isOpen, onClose, supportUnreadCount = 0 }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, onSwitchToHome, isOpen, onClose, supportUnreadCount = 0, adminEmail }) => {
     const navItems: { label: string; view: AdminView; isFeatured?: boolean; icon: React.ReactNode; badge?: string | number | null }[] = [
         { label: 'Dashboard', view: 'dashboard', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> },
         { label: 'Admin Post', view: 'adminPosts', isFeatured: true, icon: <span className="text-lg">📣</span> },
@@ -75,9 +71,9 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
     ];
 
     // Mobile overlay classes vs Desktop static classes
-    const containerClasses = isOpen 
-        ? "fixed inset-y-0 left-0 z-50 w-[min(17rem,calc(100vw-1.5rem))] bg-gradient-to-b from-[#cbd5e8] via-[#dbe3f1] to-[#c8d3e6] shadow-[0_18px_55px_rgba(51,65,85,0.18)] transition-transform transform translate-x-0"
-        : "hidden md:group/sidebar md:flex md:h-full md:w-20 md:hover:w-72 md:shrink-0 md:flex-col md:overflow-hidden bg-gradient-to-b from-[#cbd5e8] via-[#dbe3f1] to-[#c8d3e6] shadow-[0_18px_55px_rgba(51,65,85,0.16)] md:transition-[width] md:duration-300 md:ease-out";
+    const containerClasses = isOpen
+        ? "fixed inset-y-0 left-0 z-50 w-[min(16rem,calc(100vw-1.25rem))] translate-x-0 bg-white shadow-[0_24px_70px_rgba(43,32,34,0.20)]"
+        : "hidden md:flex md:h-full md:w-[248px] md:shrink-0 md:flex-col md:overflow-hidden md:border-r md:border-[#eeeaea] md:bg-white";
 
     return (
         <>
@@ -89,57 +85,71 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
                 ></div>
             )}
 
-            <aside className={`${containerClasses} flex h-full max-h-[100dvh] flex-col overflow-hidden text-slate-900`}>
-                <div className="shrink-0 border-b border-white/60 px-3 py-3 sm:px-4 sm:py-5">
-                    <div className="flex items-center justify-center gap-3 md:group-hover/sidebar:justify-between">
-                        <div className="flex min-w-0 items-center gap-3">
-                            <img src="/icons/icon-192x192.svg" alt="Digital Catalyst logo" className="h-9 w-9 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:h-10 sm:w-10" />
-                            <div className="min-w-0 md:w-0 md:opacity-0 md:transition-all md:duration-200 md:group-hover/sidebar:w-auto md:group-hover/sidebar:opacity-100">
-                                <div className="truncate text-base font-bold tracking-tight sm:text-lg">Digital Catalyst</div>
-                                <div className="truncate text-xs text-slate-700 font-medium uppercase tracking-widest">Admin Panel</div>
+            <aside className={`${containerClasses} flex h-full max-h-[100dvh] flex-col overflow-hidden text-[#25272b]`}>
+                <div className="shrink-0 border-b border-[#f0eded] px-4 pb-3 pt-4">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex min-w-0 items-center gap-2.5">
+                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[#ef4f5f] shadow-sm">
+                                <img src="/icons/icon-192x192.svg" alt="Digital Catalyst logo" className="h-6 w-6 rounded-md" />
+                            </div>
+                            <div className="min-w-0">
+                                <div className="truncate text-sm font-black tracking-[-0.02em] text-[#202124]">DIGITAL CATALYST</div>
+                                <div className="truncate text-[9px] font-bold uppercase tracking-[0.18em] text-[#aaa4a6]">Admin workspace</div>
                             </div>
                         </div>
-                        {/* Mobile Close Button */}
-                        <button onClick={onClose} className="md:hidden text-slate-700 hover:text-slate-900 p-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                            </svg>
+                        <button type="button" aria-label="Close admin navigation" onClick={onClose} className="rounded-lg p-2 text-[#7a7477] hover:bg-[#f8f5f5] md:hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                         </button>
                     </div>
+
+                    <div className="mt-4 flex items-center gap-2.5 rounded-lg border border-[#eeeaea] bg-[#faf9f9] p-2.5">
+                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#fde7e9] text-[11px] font-black text-[#d94857]">
+                            {adminEmail.charAt(0).toUpperCase()}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                            <p className="truncate text-[11px] font-bold text-[#2b2d31]">{adminEmail.split('@')[0]}</p>
+                            <p className="truncate text-[9px] font-medium text-[#989295]">{adminEmail}</p>
+                        </div>
+                        <svg className="h-3.5 w-3.5 shrink-0 text-[#aaa4a6]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m19 9-7 7-7-7" /></svg>
+                    </div>
                 </div>
-                
-                <div className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 py-2 custom-scrollbar sm:py-3">
-                    {navItems.map(item => (
-                        <NavLink
-                            key={item.view}
-                            label={item.label}
-                            view={item.view}
-                            currentView={currentView}
-                            onClick={(v) => { onNavigate(v); onClose(); }} // Close sidebar on navigation (mobile)
-                            isFeatured={item.isFeatured}
-                            icon={item.icon}
-                            badge={item.badge}
-                        />
-                    ))}
+
+                <div className="shipnow-admin-scrollbar min-h-0 flex-1 overflow-y-auto px-3 py-3">
+                    <p className="mb-2 px-3 text-[9px] font-black uppercase tracking-[0.16em] text-[#b0aaac]">Navigation</p>
+                    <div className="space-y-0.5">
+                        {navItems.map(item => (
+                            <NavLink
+                                key={item.view}
+                                label={item.label}
+                                view={item.view}
+                                currentView={currentView}
+                                onClick={(view) => { onNavigate(view); onClose(); }}
+                                isFeatured={item.isFeatured}
+                                icon={item.icon}
+                                badge={item.badge}
+                            />
+                        ))}
+                    </div>
                 </div>
-                
-                <div className="shrink-0 space-y-2 border-t border-white/60 p-2 pt-3 sm:p-3 sm:pt-4">
-                    <button
-                        onClick={onSwitchToHome}
-                        title="Go to Website"
-                        className="group/footer flex w-full items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-left text-blue-800 transition-colors hover:bg-white/80 hover:text-slate-950 md:group-hover/sidebar:justify-start sm:px-4 sm:py-3"
-                    >
-                        <svg className="w-5 h-5 shrink-0 group-hover/footer:scale-110 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-                        <span className="truncate font-medium md:w-0 md:opacity-0 md:transition-all md:duration-200 md:group-hover/sidebar:w-auto md:group-hover/sidebar:opacity-100">Go to Website</span>
-                    </button>
-                    <button
-                        onClick={onLogout}
-                        title="Sign Out"
-                        className="group/footer flex w-full items-center justify-center gap-3 rounded-2xl px-3 py-2.5 text-left text-red-700 transition-colors hover:bg-white/80 hover:text-red-800 md:group-hover/sidebar:justify-start sm:px-4 sm:py-3"
-                    >
-                        <svg className="w-5 h-5 shrink-0 group-hover/footer:-translate-x-1 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
-                        <span className="truncate font-medium md:w-0 md:opacity-0 md:transition-all md:duration-200 md:group-hover/sidebar:w-auto md:group-hover/sidebar:opacity-100">Sign Out</span>
-                    </button>
+
+                <div className="shrink-0 border-t border-[#f0eded] p-3">
+                    <div className="mb-2 rounded-xl bg-[#242426] p-3.5 text-white shadow-sm">
+                        <p className="text-[13px] font-black leading-tight">Your store, fully controlled.</p>
+                        <p className="mt-1.5 text-[9px] font-medium leading-4 text-white/65">Manage products, customers, orders, content, and support without leaving this workspace.</p>
+                        <button type="button" onClick={onSwitchToHome} className="mt-3 w-full rounded-lg bg-white px-3 py-2 text-[10px] font-black text-[#242426] transition hover:bg-[#fde7e9]">
+                            Open Store
+                        </button>
+                    </div>
+                    <div className="grid grid-cols-2 gap-1.5">
+                        <button type="button" onClick={onSwitchToHome} className="flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[10px] font-bold text-[#666168] transition hover:bg-[#f7f5f5] hover:text-[#d94857]">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4m-4-10h6m0 0v6m0-6L10 14" /></svg>
+                            Website
+                        </button>
+                        <button type="button" onClick={onLogout} className="flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[10px] font-bold text-[#8c4d54] transition hover:bg-[#fdebed] hover:text-[#d94857]">
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m17 16 4-4m0 0-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1" /></svg>
+                            Sign Out
+                        </button>
+                    </div>
                 </div>
             </aside>
         </>
