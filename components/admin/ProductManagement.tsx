@@ -11,6 +11,7 @@ import { validateProductImageUpload } from '../../utils/productImageUpload.js';
 import { isCloudinaryImageUploadConfigured, uploadImageToCloudinary } from '../../utils/cloudinaryUpload';
 import PremiumImageUrlInput, { PremiumImageUrlStatus } from '../common/PremiumImageUrlInput';
 import PremiumMediaUrlInput from '../common/PremiumMediaUrlInput';
+import './productEditorWorkspace.css'; // PRODUCT_EDITOR_WORKSPACE_V1
 import { buildUrlMediaSource, getFriendlyStorageErrorMessage, getStorageDisabledMessage, isStorageUploadEnabled } from '../../utils/mediaMode';
 
 type ProductViewState = 'list' | 'add' | 'edit';
@@ -887,7 +888,7 @@ const CourseAccessControls: React.FC<{
     const isPaidUpdate = accessLevel === 'paidUpdate';
 
     return (
-        <div className={`rounded-2xl border border-blue-100 bg-blue-50/70 ${compact ? 'p-3' : 'p-4'}`}>
+        <div className={`product-editor-access-controls rounded-2xl border border-blue-100 bg-blue-50/70 ${compact ? 'p-3' : 'p-4'}`}>
             <label className={labelClass}>Course Player Access</label>
             <select
                 value={accessLevel}
@@ -994,7 +995,7 @@ const AdminOpenDocsBuilder: React.FC<{
     };
 
     return (
-        <div className="fixed inset-0 z-[9999] h-[100dvh] w-screen overflow-hidden bg-slate-950/75 p-0 backdrop-blur-xl sm:p-4">
+        <div className="product-editor-docs-builder fixed inset-0 z-[9999] h-[100dvh] w-screen overflow-hidden bg-slate-950/75 p-0 backdrop-blur-xl sm:p-4">
             <div className="flex h-full min-h-0 overflow-hidden bg-[#f8fbff] text-slate-900 shadow-[0_30px_90px_rgba(15,23,42,0.28)] sm:rounded-[2rem] sm:border sm:border-white/40">
                 <aside className="flex w-[86vw] max-w-[320px] shrink-0 flex-col border-r border-slate-200 bg-white/90 p-3 backdrop-blur-xl sm:w-80 sm:p-4">
                     <button type="button" onClick={onBack} className="mb-3 rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left text-sm font-black text-slate-700 shadow-sm hover:bg-slate-50">← Back to Add Content</button>
@@ -1450,7 +1451,7 @@ const ContentComposer: React.FC<{
     };
 
     return (
-        <div className="mt-5 rounded-[1.75rem] border border-cyan-400/20 bg-cyan-400/5 p-5 backdrop-blur-xl">
+        <div className="product-editor-content-composer mt-5 rounded-[1.75rem] border border-cyan-400/20 bg-cyan-400/5 p-5 backdrop-blur-xl">
             <div className="mb-5 flex items-center justify-between gap-4">
                 <div>
                     <p className="text-xs font-black uppercase tracking-[0.24em] text-cyan-700">Content Studio</p>
@@ -1753,7 +1754,7 @@ const ModuleEditor: React.FC<{
     };
 
     return (
-        <div className={`rounded-[1.75rem] border p-5 ${level === 0 ? 'border-white/50 bg-white/80' : 'border-white/50 bg-white/80'}`}>
+        <div data-product-module-level={level} className={`product-editor-module-card rounded-[1.75rem] border p-5 ${level === 0 ? 'border-white/50 bg-white/80' : 'border-white/50 bg-white/80'}`}>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
                 <div className="flex-1">
                     <label className={labelClass}>Module Title</label>
@@ -1766,7 +1767,7 @@ const ModuleEditor: React.FC<{
                         />
                     </div>
                 </div>
-                <div className="flex gap-2 pt-6">
+                <div className="product-editor-module-actions flex flex-wrap gap-2 pt-6">
                     <button type="button" onClick={() => setIsAddingContent(true)} className="rounded-2xl bg-white px-4 py-3 text-sm font-black text-slate-900 hover:bg-cyan-100">+ Content</button>
                     <button type="button" onClick={() => onAddChild(module.id)} className="rounded-2xl border border-white/50 px-4 py-3 text-sm font-black text-slate-600 hover:bg-white/80 hover:shadow-sm">+ Submodule</button>
                     <button type="button" onClick={() => onDelete(module.id)} aria-label={`Delete module ${module.title || ''}`} className="rounded-2xl border border-red-300/70 bg-red-50 px-4 py-3 text-sm font-black text-red-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-red-100 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-red-200">🗑 Delete</button>
@@ -1783,7 +1784,7 @@ const ModuleEditor: React.FC<{
                             : 'bg-emerald-100 text-emerald-800 border-emerald-200';
 
                     return (
-                        <div key={file.id} className="rounded-2xl border border-white/50 bg-white/80 p-4">
+                        <div key={file.id} className="product-editor-content-item rounded-2xl border border-white/50 bg-white/80 p-4">
                             <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="min-w-0">
                                     <div className="flex flex-wrap items-center gap-2">
@@ -1839,7 +1840,7 @@ const ModuleEditor: React.FC<{
             )}
 
             {childModules.length > 0 && (
-                <div className="mt-5 space-y-4 border-l border-white/50 pl-4">
+                <div className="product-editor-nested-modules mt-5 space-y-4 border-l border-white/50 pl-4">
                     {(childModules || []).map(child => (
                         <ModuleEditor key={child.id} module={child} allModules={allModules} level={level + 1} onUpdate={onUpdate} onAddChild={onAddChild} onDelete={onDelete} productId={productId} />
                     ))}
@@ -1873,6 +1874,23 @@ const ProductForm: React.FC<{
     const productImageInputRef = useRef<HTMLInputElement>(null);
     const draftProductIdRef = useRef<number | string>(product?.id || `draft-${Date.now()}`);
     const cloudinaryImageReady = isCloudinaryImageUploadConfigured();
+    const editorContentCount = countModuleContent(modules || []);
+    const editorPrimaryImage = images[0] || (productImageUrlStatus === 'valid' ? imageUrlDraft.trim() : '');
+    const editorPriceLabel = formData.salePrice
+        ? `₹${formData.salePrice}`
+        : formData.price
+            ? `₹${formData.price}`
+            : '₹0';
+    const editorSaveLabel = isSavingProduct
+        ? 'Saving to Firebase...'
+        : mode === 'add'
+            ? 'Save Product'
+            : 'Update Product';
+
+    const scrollToEditorSection = (sectionId: string) => {
+        if (typeof document === 'undefined') return;
+        document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    };
 
     useEffect(() => {
         const regular = parseFloat(formData.price) || 0;
@@ -2061,26 +2079,57 @@ const ProductForm: React.FC<{
     };
 
     return (
-        <div className="min-h-screen bg-[#d8e0ef] bg-[radial-gradient(circle_at_12%_8%,rgba(79,70,229,0.14),transparent_28%),radial-gradient(circle_at_88%_12%,rgba(14,165,233,0.12),transparent_26%),linear-gradient(135deg,#d8e0ef,#e6ebf4_48%,#d5deec)] text-slate-900">
-            <form onSubmit={handleSubmit}>
-                <main className="mx-auto max-w-7xl px-4 py-8 sm:px-6 lg:px-8">
-                    <div className="mb-8 rounded-[1.75rem] border border-white/50 bg-white/70 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:p-6">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                            <button type="button" onClick={onCancel} className="w-full rounded-2xl border border-white/60 bg-white/70 px-4 py-3 text-sm font-black text-slate-600 transition hover:bg-white/90 hover:shadow-sm sm:w-auto">← Back to List</button>
+        <div data-product-editor-workspace="PRODUCT_EDITOR_WORKSPACE_V1" className="product-editor-workspace min-h-screen text-slate-900">
+            <form onSubmit={handleSubmit} className="product-editor-form">
+                <header className="product-editor-header">
+                    <div className="product-editor-header-main">
+                        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
+                            <button type="button" onClick={onCancel} className="product-editor-back-button" aria-label="Back to product list">
+                                <span aria-hidden="true">←</span>
+                                <span className="hidden sm:inline">Products</span>
+                            </button>
                             <div className="min-w-0">
-                                <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-400">{mode === 'add' ? 'Create Product' : 'Edit Product'}</p>
-                                <h1 className="mt-1 break-words text-2xl font-black text-slate-900 sm:text-3xl">{mode === 'add' ? 'New digital product' : formData.title || 'Product editor'}</h1>
+                                <div className="flex flex-wrap items-center gap-2">
+                                    <p className="product-editor-eyebrow">{mode === 'add' ? 'Create Product' : 'Edit Product'}</p>
+                                    <span className={`product-editor-state-pill ${formData.isVisible ? 'is-visible' : 'is-hidden'}`}>{formData.isVisible ? 'Visible' : 'Hidden'}</span>
+                                    <span className={`product-editor-state-pill ${formData.inStock ? 'is-stocked' : 'is-unavailable'}`}>{formData.inStock ? 'In stock' : 'Out of stock'}</span>
+                                </div>
+                                <h1 className="product-editor-title">{mode === 'add' ? 'New digital product' : formData.title || 'Product editor'}</h1>
+                                <p className="product-editor-subtitle">Organize storefront details, pricing, media and learning content from one workspace.</p>
                             </div>
+                        </div>
+
+                        <div className="product-editor-header-actions">
+                            <button type="button" onClick={onCancel} className="product-editor-secondary-action">Cancel</button>
+                            <button type="submit" disabled={isSavingProduct || isUploadingProductImage} className="product-editor-primary-action">
+                                {editorSaveLabel}
+                            </button>
                         </div>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-8 lg:grid-cols-3">
-                        <section className="space-y-8 lg:col-span-2">
-                            <div className={glassCard}>
-                                <div className="mb-6">
-                                    <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-300">Main Settings</p>
-                                    <h2 className="mt-2 text-2xl font-black text-slate-900">Product identity</h2>
+                    <nav className="product-editor-section-nav" aria-label="Product editor sections">
+                        <button type="button" onClick={() => scrollToEditorSection('product-editor-overview')}>Overview</button>
+                        <button type="button" onClick={() => scrollToEditorSection('product-editor-media')}>Media</button>
+                        <button type="button" onClick={() => scrollToEditorSection('product-editor-pricing')}>Pricing</button>
+                        <button type="button" onClick={() => scrollToEditorSection('product-editor-metadata')}>Organization</button>
+                        <button type="button" onClick={() => scrollToEditorSection('product-editor-curriculum')}>Course content</button>
+                        <button type="button" onClick={() => scrollToEditorSection('product-editor-publishing')}>Publishing</button>
+                    </nav>
+                </header>
+
+                <main className="product-editor-main">
+                    <div className="product-editor-layout">
+                        <section className="product-editor-canvas" aria-label="Product editing canvas">
+                            <section id="product-editor-overview" className={`${glassCard} product-editor-card product-editor-overview scroll-mt-36`}>
+                                <div className="product-editor-card-heading">
+                                    <div>
+                                        <p className="product-editor-eyebrow">Overview</p>
+                                        <h2>Product identity</h2>
+                                        <p>Write the storefront information customers see first.</p>
+                                    </div>
+                                    <span className="product-editor-step-badge">01</span>
                                 </div>
+
                                 <div className="grid grid-cols-1 gap-5 md:grid-cols-2">
                                     <div className="md:col-span-2">
                                         <label className={labelClass}>Product Title</label>
@@ -2103,146 +2152,221 @@ const ProductForm: React.FC<{
                                         <input type="number" min="0" max="5" step="0.1" value={formData.manualRating} onChange={event => setFormData(prev => ({ ...prev, manualRating: event.target.value }))} className={fieldClass} placeholder="4.8" />
                                     </div>
                                 </div>
-                            </div>
+                            </section>
 
-                            <div className={glassCard}>
-                                <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+                            <section id="product-editor-media" className={`${glassCard} product-editor-card product-editor-media scroll-mt-36`}>
+                                <div className="product-editor-card-heading">
                                     <div>
-                                        <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-300">Curriculum Builder</p>
-                                        <h2 className="mt-2 text-2xl font-black text-slate-900">Course content / files</h2>
-                                        <p className="mt-2 text-sm text-slate-600">Organize Video, PDF, Open Docs, Quiz, audio, sheets, e-books, and links in spacious modules.</p>
+                                        <p className="product-editor-eyebrow">Media gallery</p>
+                                        <h2>Product images</h2>
+                                        <p>Add, generate and reorder images. The first image remains the primary storefront image.</p>
                                     </div>
-                                    <button type="button" onClick={addRootModule} className="rounded-2xl bg-white px-5 py-3 font-black text-slate-900 hover:bg-cyan-100">+ Add Module</button>
+                                    <span className="product-editor-step-badge">02</span>
                                 </div>
-                                <div className="space-y-5">
+
+                                <div className="product-editor-media-layout">
+                                    <div className="product-editor-media-tools">
+                                        <div className="product-editor-segmented-control" role="group" aria-label="Choose image source">
+                                            <button type="button" onClick={() => setImageMode('url')} className={imageMode === 'url' ? 'is-active' : ''}>Image URL</button>
+                                            <button type="button" onClick={() => setImageMode('upload')} className={imageMode === 'upload' ? 'is-active' : ''}>Cloudinary</button>
+                                            <button type="button" onClick={() => setImageMode('ai')} className={imageMode === 'ai' ? 'is-active' : ''}>AI image</button>
+                                        </div>
+
+                                        <div className="product-editor-media-source">
+                                            {imageMode === 'url' ? (
+                                                <div className="space-y-3">
+                                                    <PremiumImageUrlInput value={imageUrlDraft} onChange={setImageUrlDraft} onStatusChange={setProductImageUrlStatus} label="Add product image URL" previewAlt="New product image" aspect="square" compact helperText="Add one public HTTPS image at a time. Distinct images are kept in gallery order; the first image is primary." />
+                                                    <button type="button" onClick={addImageUrlDraft} disabled={productImageUrlStatus !== 'valid'} className="product-editor-full-action">Add image to gallery</button>
+                                                </div>
+                                            ) : imageMode === 'upload' ? (
+                                                <div className="product-editor-upload-zone">
+                                                    <span className="product-editor-upload-icon" aria-hidden="true">⇧</span>
+                                                    <p className="font-black text-slate-900">Upload product images</p>
+                                                    <p className="mt-2 text-xs font-bold text-slate-600">Select one or more valid images. Files upload to Cloudinary and keep their selected order.</p>
+                                                    <button type="button" onClick={() => productImageInputRef.current?.click()} disabled={!cloudinaryImageReady || isUploadingProductImage} className="product-editor-full-action mt-4">{cloudinaryImageReady ? (isUploadingProductImage ? 'Uploading…' : 'Choose image(s)') : 'Cloudinary env not configured'}</button>
+                                                    {!cloudinaryImageReady ? <p className="mt-3 text-xs font-bold text-rose-600">Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to enable upload.</p> : null}
+                                                </div>
+                                            ) : (
+                                                <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="product-editor-ai-zone">
+                                                    <span className="text-2xl" aria-hidden="true">✦</span>
+                                                    <span>{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</span>
+                                                </button>
+                                            )}
+                                            <input ref={productImageInputRef} type="file" accept="image/*" multiple onChange={handleProductImagesUpload} className="hidden" />
+                                            {isUploadingProductImage && (
+                                                <div className="product-editor-progress" role="status" aria-live="polite">
+                                                    <span style={{ width: `${productImageUploadProgress}%` }} />
+                                                    <p>Uploading image(s) to Cloudinary... {productImageUploadProgress}% complete.</p>
+                                                </div>
+                                            )}
+                                            {productImageUploadError && (
+                                                <p className="product-editor-error" role="alert">{productImageUploadError}</p>
+                                            )}
+                                        </div>
+
+                                        <div>
+                                            <label className={labelClass}>Image Seed</label>
+                                            <input value={formData.imageSeed} onChange={event => setFormData(prev => ({ ...prev, imageSeed: event.target.value }))} className={fieldClass} placeholder="Fallback image seed" />
+                                        </div>
+                                    </div>
+
+                                    <div className="product-editor-gallery-panel">
+                                        <div className="product-editor-gallery-heading">
+                                            <div>
+                                                <h3>Gallery order</h3>
+                                                <p>{images.length} image{images.length === 1 ? '' : 's'} selected</p>
+                                            </div>
+                                            {images.length > 0 && <span>First image = Primary</span>}
+                                        </div>
+
+                                        {images.length ? (
+                                            <div className="product-editor-gallery-grid">
+                                                {images.map((image, index) => (
+                                                    <article key={image} className={`product-editor-gallery-item ${index === 0 ? 'is-primary' : ''}`}>
+                                                        <div className="product-editor-gallery-image"><img src={image} alt={`Product image ${index + 1}`} className="h-full w-full object-contain" /></div>
+                                                        <div className="product-editor-gallery-meta">
+                                                            <span>{index === 0 ? 'Primary image' : `Image ${index + 1}`}</span>
+                                                            <div className="product-editor-gallery-actions">
+                                                                <button type="button" onClick={() => moveProductImage(index, -1)} disabled={index === 0} aria-label={`Move image ${index + 1} left`}>←</button>
+                                                                <button type="button" onClick={() => moveProductImage(index, 1)} disabled={index === images.length - 1} aria-label={`Move image ${index + 1} right`}>→</button>
+                                                                <button type="button" onClick={() => setImages((current) => current.filter((_, imageIndex) => imageIndex !== index))} className="is-danger" aria-label={`Remove image ${index + 1}`}>×</button>
+                                                            </div>
+                                                        </div>
+                                                    </article>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="product-editor-empty-gallery">
+                                                <span aria-hidden="true">▧</span>
+                                                <strong>No product images yet</strong>
+                                                <p>Add a URL, upload files, or generate an image. The first image becomes primary.</p>
+                                            </div>
+                                        )}
+
+                                        <p className="product-editor-info-note">All distinct images are saved in gallery order. The primary image is mirrored into every productImages display slot; extra images appear in the product detail gallery.</p>
+                                    </div>
+                                </div>
+                            </section>
+
+                            <section id="product-editor-curriculum" className={`${glassCard} product-editor-card product-editor-curriculum scroll-mt-36`}>
+                                <div className="product-editor-card-heading product-editor-card-heading-with-action">
+                                    <div>
+                                        <p className="product-editor-eyebrow">Course builder</p>
+                                        <h2>Modules and learning content</h2>
+                                        <p>Organize videos, PDFs, Open Docs, quizzes, audio, sheets, e-books and links in a clear hierarchy.</p>
+                                    </div>
+                                    <div className="flex flex-wrap items-center gap-3">
+                                        <span className="product-editor-count-pill">{modules.length} root module{modules.length === 1 ? '' : 's'} · {editorContentCount} item{editorContentCount === 1 ? '' : 's'}</span>
+                                        <button type="button" onClick={addRootModule} className="product-editor-secondary-primary-action">+ Add module</button>
+                                    </div>
+                                </div>
+
+                                <div className="product-editor-module-list">
                                     {(modules || []).length > 0 ? (modules || []).map(module => (
                                         <ModuleEditor key={module.id} module={module} allModules={modules || []} level={0} onUpdate={setModules} onAddChild={addChildModule} onDelete={deleteModule} productId={draftProductIdRef.current} />
                                     )) : (
-                                        <button type="button" onClick={addRootModule} className="w-full rounded-[1.75rem] border border-dashed border-cyan-300/30 bg-cyan-400/5 p-10 text-center transition hover:bg-cyan-400/10">
-                                            <span className="block text-4xl">🧱</span>
-                                            <span className="mt-3 block text-lg font-black text-slate-900">Start with your first module</span>
-                                            <span className="mt-1 block text-sm text-slate-600">Every new module is initialized with empty files and submodules to prevent undefined map crashes.</span>
+                                        <button type="button" onClick={addRootModule} className="product-editor-empty-module">
+                                            <span aria-hidden="true">＋</span>
+                                            <strong>Start with your first module</strong>
+                                            <p>Every module starts with safe empty file and submodule arrays.</p>
                                         </button>
                                     )}
                                 </div>
-                            </div>
+                            </section>
                         </section>
 
-                        <aside className="space-y-8 lg:col-span-1">
-                            <div className={glassCard}>
-                                <h2 className="text-xl font-black text-slate-900">Publish Status</h2>
-                                <div className="mt-5 space-y-4">
-                                    <label className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/80 p-4">
-                                        <span><span className="block font-black text-slate-900">Visible</span><span className="text-sm text-slate-600">Show on storefront</span></span>
-                                        <input type="checkbox" checked={formData.isVisible} onChange={event => setFormData(prev => ({ ...prev, isVisible: event.target.checked }))} className="h-5 w-5 accent-cyan-300" />
+                        <aside className="product-editor-sidebar" aria-label="Product settings and live summary">
+                            <section className="product-editor-summary-card">
+                                <div className="product-editor-summary-image">
+                                    {editorPrimaryImage ? <img src={editorPrimaryImage} alt={formData.title || 'Product preview'} /> : <span aria-hidden="true">▧</span>}
+                                </div>
+                                <div className="min-w-0">
+                                    <p className="product-editor-eyebrow">Live summary</p>
+                                    <h2>{formData.title || 'Untitled product'}</h2>
+                                    <p className="product-editor-summary-description">{formData.description || 'Add a short description to preview the storefront summary.'}</p>
+                                </div>
+                                <div className="product-editor-summary-price">
+                                    <strong>{editorPriceLabel}</strong>
+                                    {formData.salePrice && formData.price ? <span>₹{formData.price}</span> : null}
+                                    {discountPercent > 0 && <em>{discountPercent}% off</em>}
+                                </div>
+                                <div className="product-editor-summary-stats">
+                                    <div><strong>{images.length}</strong><span>Images</span></div>
+                                    <div><strong>{modules.length}</strong><span>Modules</span></div>
+                                    <div><strong>{editorContentCount}</strong><span>Content</span></div>
+                                </div>
+                            </section>
+
+                            <section id="product-editor-publishing" className={`${glassCard} product-editor-card product-editor-side-card scroll-mt-36`}>
+                                <div className="product-editor-side-heading">
+                                    <div><p className="product-editor-eyebrow">Publishing</p><h2>Availability</h2></div>
+                                    <span className="product-editor-step-badge">06</span>
+                                </div>
+                                <div className="product-editor-toggle-list">
+                                    <label>
+                                        <span><strong>Visible</strong><small>Show on storefront</small></span>
+                                        <input type="checkbox" checked={formData.isVisible} onChange={event => setFormData(prev => ({ ...prev, isVisible: event.target.checked }))} />
                                     </label>
-                                    <label className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/80 p-4">
-                                        <span><span className="block font-black text-slate-900">In Stock</span><span className="text-sm text-slate-600">Purchasable now</span></span>
-                                        <input type="checkbox" checked={formData.inStock} onChange={event => setFormData(prev => ({ ...prev, inStock: event.target.checked }))} className="h-5 w-5 accent-emerald-300" />
+                                    <label>
+                                        <span><strong>In stock</strong><small>Purchasable now</small></span>
+                                        <input type="checkbox" checked={formData.inStock} onChange={event => setFormData(prev => ({ ...prev, inStock: event.target.checked }))} />
                                     </label>
-                                    <label className="flex items-center justify-between rounded-2xl border border-white/50 bg-white/80 p-4">
-                                        <span><span className="block font-black text-slate-900">Free via coupon</span><span className="text-sm text-slate-600">Enable free access flow</span></span>
-                                        <input type="checkbox" checked={formData.isFree} onChange={event => setFormData(prev => ({ ...prev, isFree: event.target.checked }))} className="h-5 w-5 accent-blue-300" />
+                                    <label>
+                                        <span><strong>Free via coupon</strong><small>Enable free access flow</small></span>
+                                        <input type="checkbox" checked={formData.isFree} onChange={event => setFormData(prev => ({ ...prev, isFree: event.target.checked }))} />
                                     </label>
                                 </div>
-                            </div>
+                            </section>
 
-                            <div className={glassCard}>
-                                <h2 className="text-xl font-black text-slate-900">Pricing</h2>
-                                {discountPercent > 0 && <p className="mt-3 rounded-full border border-emerald-300/30 bg-emerald-400/10 px-4 py-2 text-sm font-black text-emerald-700">{discountPercent}% discount active</p>}
+                            <section id="product-editor-pricing" className={`${glassCard} product-editor-card product-editor-side-card scroll-mt-36`}>
+                                <div className="product-editor-side-heading">
+                                    <div><p className="product-editor-eyebrow">Pricing & access</p><h2>Purchase options</h2></div>
+                                    <span className="product-editor-step-badge">03</span>
+                                </div>
+                                {discountPercent > 0 && <p className="product-editor-discount-pill">{discountPercent}% discount active</p>}
                                 <div className="mt-5 space-y-4">
                                     <div><label className={labelClass}>Regular Price</label><input required type="number" value={formData.price} onChange={event => setFormData(prev => ({ ...prev, price: event.target.value }))} className={fieldClass} placeholder="999" /></div>
                                     <div><label className={labelClass}>Sale Price</label><input type="number" value={formData.salePrice} onChange={event => setFormData(prev => ({ ...prev, salePrice: event.target.value }))} className={fieldClass} placeholder="499" /></div>
-                                    <div className="mt-4">
-                                      <label className="mb-2 block text-sm font-semibold text-slate-700">EduCoin Price</label>
-                                      <input type="number" min="0" value={formData.coinPrice} onChange={(event) => setFormData((previous) => ({ ...previous, coinPrice: event.target.value }))} className="w-full rounded-2xl border border-slate-200 px-4 py-3 text-sm outline-none focus:border-blue-500 focus:ring-4 focus:ring-blue-100" placeholder="Example: 299" />
-                                      <p className="mt-1 text-xs font-bold text-slate-500">Leave empty or set 0 to disable EduCoin purchase.</p>
-                                      <label className="mt-3 flex items-center gap-2 text-sm font-semibold text-slate-700"><input type="checkbox" checked={formData.isCoinRedeemEnabled !== false} onChange={(event) => setFormData((previous) => ({ ...previous, isCoinRedeemEnabled: event.target.checked }))} />Enable Pay with EduCoin</label>
+                                    <div className="product-editor-coin-panel">
+                                        <label className={labelClass}>EduCoin Price</label>
+                                        <input type="number" min="0" value={formData.coinPrice} onChange={(event) => setFormData((previous) => ({ ...previous, coinPrice: event.target.value }))} className={fieldClass} placeholder="Example: 299" />
+                                        <p>Leave empty or set 0 to disable EduCoin purchase.</p>
+                                        <label className="product-editor-inline-toggle"><input type="checkbox" checked={formData.isCoinRedeemEnabled !== false} onChange={(event) => setFormData((previous) => ({ ...previous, isCoinRedeemEnabled: event.target.checked }))} /><span>Enable Pay with EduCoin</span></label>
                                     </div>
                                     <div><label className={labelClass}>Coupon Code</label><select value={formData.couponCode} onChange={event => setFormData(prev => ({ ...prev, couponCode: event.target.value }))} className={fieldClass}><option value="">No coupon</option>{(coupons || []).map(coupon => <option key={coupon.id} value={coupon.code}>{coupon.code}</option>)}</select></div>
                                     <div><label className={labelClass}>Razorpay Payment Page Link</label><input value={formData.paymentLink} onChange={event => setFormData(prev => ({ ...prev, paymentLink: event.target.value }))} className={fieldClass} placeholder="https://pages.razorpay.com/..." /></div>
                                 </div>
-                            </div>
+                            </section>
 
-                            <div className={glassCard}>
-                                <h2 className="text-xl font-black text-slate-900">Categories & Metadata</h2>
-                                <div className="mt-5 space-y-4">
-                                    <div><label className={labelClass}>Category</label><input value={formData.category} onChange={event => setFormData(prev => ({ ...prev, category: event.target.value }))} className={fieldClass} placeholder="Design, Finance, Coding..." /></div>
-                                    <div><label className={labelClass}>Department</label><select value={formData.department} onChange={event => setFormData(prev => ({ ...prev, department: event.target.value as ProductFormData['department'] }))} className={fieldClass}><option>Unisex</option><option>Men</option><option>Women</option></select></div>
-                                    <div><label className={labelClass}>Dimensions</label><input value={formData.dimensions} onChange={event => setFormData(prev => ({ ...prev, dimensions: event.target.value }))} className={fieldClass} placeholder="1024x768, A4, 16:9" /></div>
-                                    <div><label className={labelClass}>File Format</label><input value={formData.fileFormat} onChange={event => setFormData(prev => ({ ...prev, fileFormat: event.target.value }))} className={fieldClass} placeholder="PDF + MP4 + Docs" /></div>
-                                    <div><label className={labelClass}>Features (one per line)</label><textarea rows={4} value={formData.featuresText} onChange={event => setFormData(prev => ({ ...prev, featuresText: event.target.value }))} className={fieldClass} /></div>
-                                    <div><label className={labelClass}>Tags (comma separated)</label><input value={formData.tagsText} onChange={event => setFormData(prev => ({ ...prev, tagsText: event.target.value }))} className={fieldClass} placeholder="premium, beginner, template" /></div>
-                                    <div><label className={labelClass}>Search Keywords</label><textarea rows={3} value={formData.searchKeywordsText} onChange={event => setFormData(prev => ({ ...prev, searchKeywordsText: event.target.value }))} className={fieldClass} placeholder="class 10, physics, pcm, neet, pdf, notes" /><p className="mt-2 text-xs font-bold text-slate-500">Add words students may search for, like class 10, physics, pcm, neet, pdf, notes.</p></div>
-                                </div>
-                            </div>
-
-                            <div className={glassCard}>
-                                <h2 className="text-xl font-black text-slate-900">Image URL</h2>
-                                <div className="mt-5 grid grid-cols-3 gap-2">
-                                    <button type="button" onClick={() => setImageMode('url')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'url' ? 'bg-blue-600 text-white' : 'border border-white/50 text-slate-600'}`}>Image URL</button>
-                                    <button type="button" onClick={() => setImageMode('upload')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'upload' ? 'bg-cyan-100 text-cyan-800' : 'border border-white/50 text-slate-600'}`}>Cloudinary</button>
-                                    <button type="button" onClick={() => setImageMode('ai')} className={`rounded-2xl px-3 py-3 text-sm font-black ${imageMode === 'ai' ? 'bg-purple-300 text-slate-900' : 'border border-white/50 text-slate-600'}`}>AI Image</button>
-                                </div>
-                                <div className="mt-4">
-                                    {imageMode === 'url' ? (
-                                        <div className="space-y-3">
-                                            <PremiumImageUrlInput value={imageUrlDraft} onChange={setImageUrlDraft} onStatusChange={setProductImageUrlStatus} label="Add product image URL" previewAlt="New product image" aspect="square" compact helperText="Add one public HTTPS image at a time. Distinct images are kept in gallery order; the first image is primary." />
-                                            <button type="button" onClick={addImageUrlDraft} disabled={productImageUrlStatus !== 'valid'} className="w-full rounded-2xl bg-blue-600 px-4 py-3 text-sm font-black text-white disabled:cursor-not-allowed disabled:bg-slate-200 disabled:text-slate-500">Add image to gallery</button>
-                                        </div>
-                                    ) : imageMode === 'upload' ? (
-                                        <div className="rounded-3xl border border-dashed border-cyan-300/60 bg-cyan-50/70 p-5 text-center"><p className="font-black text-cyan-800">Upload product image</p><p className="mt-2 text-xs font-bold text-cyan-700">Select one or more images. Each valid file uploads to Cloudinary and is appended to this product's ordered Firestore gallery.</p><button type="button" onClick={() => productImageInputRef.current?.click()} disabled={!cloudinaryImageReady || isUploadingProductImage} className="mt-3 w-full rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-500 p-4 font-black text-slate-900 disabled:cursor-not-allowed disabled:bg-none disabled:bg-slate-200 disabled:text-slate-500">{cloudinaryImageReady ? (isUploadingProductImage ? 'Uploading…' : 'Choose image(s)') : 'Cloudinary env not configured'}</button>{!cloudinaryImageReady ? <p className="mt-3 text-xs font-bold text-rose-600">Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to enable upload.</p> : null}</div>
-                                    ) : (
-                                        <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-3xl border border-dashed border-purple-300/40 bg-purple-400/5 p-8 text-center font-black text-purple-700 hover:bg-purple-400/10 disabled:opacity-60">{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</button>
-                                    )}
-                                    <input ref={productImageInputRef} type="file" accept="image/*" multiple onChange={handleProductImagesUpload} className="hidden" />
-                                    {isUploadingProductImage && (
-                                        <p className="mt-3 text-sm font-bold text-cyan-700">Uploading image(s) to Cloudinary... {productImageUploadProgress}% complete.</p>
-                                    )}
-                                    {productImageUploadError && (
-                                        <p className="mt-3 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm font-bold text-red-700">{productImageUploadError}</p>
-                                    )}
-                                </div>
-                                <div className="mt-4">
-                                    {images.length ? (
-                                        <div className="grid grid-cols-2 gap-3">
-                                            {images.map((image, index) => (
-                                                <div key={image} className="group relative overflow-hidden rounded-2xl border border-white/50 bg-white/80 p-2">
-                                                    <div className="aspect-square overflow-hidden rounded-xl bg-slate-50"><img src={image} alt={`Product image ${index + 1}`} className="h-full w-full object-contain" /></div>
-                                                    <div className="mt-2 flex items-center justify-between gap-1">
-                                                        <span className="truncate text-[11px] font-black text-slate-600">{index === 0 ? 'Primary' : `Image ${index + 1}`}</span>
-                                                        <span className="flex gap-1">
-                                                            <button type="button" onClick={() => moveProductImage(index, -1)} disabled={index === 0} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-black disabled:opacity-30" aria-label={`Move image ${index + 1} left`}>←</button>
-                                                            <button type="button" onClick={() => moveProductImage(index, 1)} disabled={index === images.length - 1} className="rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs font-black disabled:opacity-30" aria-label={`Move image ${index + 1} right`}>→</button>
-                                                            <button type="button" onClick={() => setImages((current) => current.filter((_, imageIndex) => imageIndex !== index))} className="rounded-lg bg-red-500 px-2 py-1 text-xs font-black text-white" aria-label={`Remove image ${index + 1}`}>×</button>
-                                                        </span>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="rounded-2xl border border-dashed border-slate-300 bg-white/60 p-6 text-center text-sm font-bold text-slate-500">
-                                            No product image selected. Add URLs, upload files, or generate images; the first image becomes primary.
-                                        </div>
-                                    )}
-                                </div>
-                                <div className="mt-4"><label className={labelClass}>Image Seed</label><input value={formData.imageSeed} onChange={event => setFormData(prev => ({ ...prev, imageSeed: event.target.value }))} className={fieldClass} placeholder="Fallback image seed" /></div>
-                                <div className="mt-4 rounded-3xl border border-emerald-100 bg-emerald-50/70 p-4 text-sm font-bold text-emerald-700">
-                                    All distinct images are saved in gallery order. The first image is primary and is mirrored into productImages display slots; extra images appear only in the product detail gallery.
-                                </div>
-
-                            </div>
+                            <section id="product-editor-metadata" className={`${glassCard} product-editor-card product-editor-side-card scroll-mt-36`}>
+                                <details open className="product-editor-details">
+                                    <summary>
+                                        <span><small className="product-editor-eyebrow">Organization & SEO</small><strong>Catalog metadata</strong></span>
+                                        <span aria-hidden="true">⌄</span>
+                                    </summary>
+                                    <div className="product-editor-details-body">
+                                        <div><label className={labelClass}>Category</label><input value={formData.category} onChange={event => setFormData(prev => ({ ...prev, category: event.target.value }))} className={fieldClass} placeholder="Design, Finance, Coding..." /></div>
+                                        <div><label className={labelClass}>Department</label><select value={formData.department} onChange={event => setFormData(prev => ({ ...prev, department: event.target.value as ProductFormData['department'] }))} className={fieldClass}><option>Unisex</option><option>Men</option><option>Women</option></select></div>
+                                        <div><label className={labelClass}>Dimensions</label><input value={formData.dimensions} onChange={event => setFormData(prev => ({ ...prev, dimensions: event.target.value }))} className={fieldClass} placeholder="1024x768, A4, 16:9" /></div>
+                                        <div><label className={labelClass}>File Format</label><input value={formData.fileFormat} onChange={event => setFormData(prev => ({ ...prev, fileFormat: event.target.value }))} className={fieldClass} placeholder="PDF + MP4 + Docs" /></div>
+                                        <div><label className={labelClass}>Features (one per line)</label><textarea rows={4} value={formData.featuresText} onChange={event => setFormData(prev => ({ ...prev, featuresText: event.target.value }))} className={fieldClass} /></div>
+                                        <div><label className={labelClass}>Tags (comma separated)</label><input value={formData.tagsText} onChange={event => setFormData(prev => ({ ...prev, tagsText: event.target.value }))} className={fieldClass} placeholder="premium, beginner, template" /></div>
+                                        <div><label className={labelClass}>Search Keywords</label><textarea rows={3} value={formData.searchKeywordsText} onChange={event => setFormData(prev => ({ ...prev, searchKeywordsText: event.target.value }))} className={fieldClass} placeholder="class 10, physics, pcm, neet, pdf, notes" /><p className="mt-2 text-xs font-bold text-slate-500">Add words students may search for, like class 10, physics, pcm, neet, pdf, notes.</p></div>
+                                    </div>
+                                </details>
+                            </section>
                         </aside>
                     </div>
                 </main>
 
-                <footer className="mx-auto w-full max-w-7xl px-4 pb-8 sm:px-6 lg:px-8">
-                    <div className="rounded-[1.75rem] border border-white/50 bg-white/75 p-4 shadow-[0_18px_45px_rgba(15,23,42,0.08)] backdrop-blur-xl sm:flex sm:items-center sm:justify-between sm:gap-4 sm:p-5">
-                        <div className="mb-4 sm:mb-0">
-                            <p className="text-xs font-black uppercase tracking-[0.28em] text-cyan-400">Ready to publish</p>
-                            <p className="mt-1 text-sm font-semibold text-slate-600">Review all product details above, then save your changes.</p>
-                        </div>
-                        <button type="submit" disabled={isSavingProduct || isUploadingProductImage} className="w-full rounded-2xl bg-gradient-to-r from-cyan-300 to-blue-400 px-7 py-4 font-black text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition hover:-translate-y-0.5 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto sm:min-w-48">{isSavingProduct ? 'Saving to Firebase...' : mode === 'add' ? 'Save Product' : 'Update Product'}</button>
+                <footer className="product-editor-savebar">
+                    <div>
+                        <strong>{isSavingProduct ? 'Saving product' : 'Ready to save'}</strong>
+                        <span>{isUploadingProductImage ? `Image upload ${productImageUploadProgress}%` : 'All current fields, media and course content will be saved together.'}</span>
+                    </div>
+                    <div className="product-editor-savebar-actions">
+                        <button type="button" onClick={onCancel} className="product-editor-secondary-action">Cancel</button>
+                        <button type="submit" disabled={isSavingProduct || isUploadingProductImage} className="product-editor-primary-action">{editorSaveLabel}</button>
                     </div>
                 </footer>
             </form>
