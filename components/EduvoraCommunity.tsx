@@ -4078,48 +4078,30 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     && window.matchMedia('(min-width: 1024px)').matches
   );
 
-  useEffect(() => {
+  const communityPageNames: CommunityPage[] = ['chat', 'adminPosts', 'thread', 'comments', 'search', 'profile', 'creators', 'network', 'following', 'tagMaster', 'masterTags', 'masterTagDetail', 'statusUpload', 'statusReel', 'directChat', 'directChatThread', 'statusDetail', 'notifications'];
+
+  const isCommunityPageName = (value: unknown): value is CommunityPage =>
+    typeof value === 'string' && communityPageNames.includes(value as CommunityPage);
+
+  const readCommunityHistoryStack = (value: unknown): CommunityPage[] =>
+    Array.isArray(value) ? value.filter(isCommunityPageName).slice(-24) : [];
+
+  const writeCommunityHistory = (nextPage: CommunityPage, mode: 'push' | 'replace' = 'replace', stack: CommunityPage[] = pageStackRef.current) => {
     if (typeof window === 'undefined') return;
-
-    const onCommunityPopState = (event: PopStateEvent) => {
-      const state = event.state || {};
-      if (state.dcView !== 'community') {
-        if (pageRef.current !== 'chat' || activeViewRef.current !== 'feed') {
-          activeViewRef.current = 'feed';
-          pageRef.current = 'chat';
-          pageStackRef.current = [];
-          setActiveView('feed');
-          setPage('chat');
-          setPageStack([]);
-          window.history.pushState({ ...(window.history.state || {}), dcView: 'community', dcCommunityPage: 'chat' }, '', window.location.href);
-        }
-        return;
-      }
-
-      const targetPage = state.dcCommunityPage as CommunityPage | undefined;
-      if (targetPage) {
-        pageRef.current = targetPage;
-        setPage(targetPage);
-        if (targetPage === 'chat') {
-          activeViewRef.current = 'feed';
-          setActiveView('feed');
-          restoreSocialFeedScroll();
-        }
-      } else {
-        activeViewRef.current = 'feed';
-        pageRef.current = 'chat';
-        pageStackRef.current = [];
-        setActiveView('feed');
-        setPage('chat');
-        setPageStack([]);
-      }
+    const cleanStack = stack.filter(isCommunityPageName).slice(-24);
+    const nextState = {
+      ...(window.history.state || {}),
+      dcView: 'community',
+      dcCommunityPage: nextPage,
+      dcCommunityStack: cleanStack,
+      dcCommunityRoot: nextPage === 'chat' && cleanStack.length === 0,
     };
 
-    window.addEventListener('popstate', onCommunityPopState);
-    return () => window.removeEventListener('popstate', onCommunityPopState);
-  }, []);
+    if (mode === 'push') window.history.pushState(nextState, '', window.location.href);
+    else window.history.replaceState(nextState, '', window.location.href);
+  };
 
-  const pushPage = (nextPage: CommunityPage, options: { preserveScroll?: boolean } = {}) => {
+  const clearTransientCommunityUi = () => {
     setIsNotificationPanelOpen(false);
     setShowStatusActions(false);
     setShareTarget(null);
@@ -4128,20 +4110,64 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     setShareSendingId('');
     setShareFeedback('');
     setExpandedReplyId(null);
+  };
+
+  const resetCommunityToFeed = () => {
+    activeViewRef.current = 'feed';
+    pageRef.current = 'chat';
+    pageStackRef.current = [];
+    setActiveView('feed');
+    setPage('chat');
+    setPageStack([]);
+    restoreSocialFeedScroll();
+  };
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+
+    const onCommunityPopState = (event: PopStateEvent) => {
+      const state = event.state || {};
+      if (state.dcView !== 'community') return;
+
+      clearTransientCommunityUi();
+      const targetPage = isCommunityPageName(state.dcCommunityPage) ? state.dcCommunityPage : 'chat';
+      const targetStack = readCommunityHistoryStack(state.dcCommunityStack);
+
+      pageRef.current = targetPage;
+      pageStackRef.current = targetPage === 'chat' ? [] : targetStack;
+      setPage(targetPage);
+      setPageStack(targetPage === 'chat' ? [] : targetStack);
+
+      if (targetPage === 'chat') {
+        activeViewRef.current = 'feed';
+        setActiveView('feed');
+        restoreSocialFeedScroll();
+      }
+    };
+
+    window.addEventListener('popstate', onCommunityPopState);
+    return () => window.removeEventListener('popstate', onCommunityPopState);
+  }, []);
+
+  const pushPage = (nextPage: CommunityPage, options: { preserveScroll?: boolean } = {}) => {
+    clearTransientCommunityUi();
 
     if (page === 'chat' && activeView === 'feed' && scrollContainerRef.current) {
       feedScrollPositionsRef.current.chatFeed = scrollContainerRef.current.scrollTop;
     }
 
-    const nextStack = [...pageStackRef.current, pageRef.current];
+    if (nextPage === pageRef.current) {
+      writeCommunityHistory(nextPage, 'replace', pageStackRef.current);
+      if (!options.preserveScroll) requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }));
+      return;
+    }
+
+    const nextStack = [...pageStackRef.current, pageRef.current].filter(isCommunityPageName).slice(-24);
     pageStackRef.current = nextStack;
     setPageStack(nextStack);
     setPage(nextPage);
     pageRef.current = nextPage;
-
-    if (typeof window !== 'undefined') {
-      window.history.pushState({ ...(window.history.state || {}), dcView: 'community', dcCommunityPage: nextPage }, '', window.location.href);
-    }
+    writeCommunityHistory(nextPage, 'push', nextStack);
 
     if (!options.preserveScroll) {
       requestAnimationFrame(() => scrollContainerRef.current?.scrollTo({ top: 0, behavior: 'smooth' }));
@@ -4149,28 +4175,22 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const goBack = (options: { fromBrowser?: boolean } = {}): boolean => {
-    if (isCommunityAiOpen) { setIsCommunityAiOpen(false); return true; }
-    if (isNotificationPanelOpen) { setIsNotificationPanelOpen(false); return true; }
-    if (showStatusRulesModal) { setShowStatusRulesModal(false); return true; }
-    if (imageLightbox) { setImageLightbox(null); return true; }
-    if (shareTarget) { setShareTarget(null); setShareRecipientSearch(''); setShareCaption(''); setShareSendingId(''); setShareFeedback(''); return true; }
-    if (isMasterTagDetailOpen) { setIsMasterTagDetailOpen(false); return true; }
-    if (profileViewMode !== 'overview') { setProfileViewMode('overview'); setProfileSelectedPostId(null); setExpandedReplyId(null); return true; }
-    if (pageRef.current === 'profile' && selectedProfileId) { setSelectedProfileId(null); return true; }
-
-    setIsNotificationPanelOpen(false);
-    setExpandedReplyId(null);
-
-    const replaceCommunityHistory = (nextPage: CommunityPage) => {
-      if (typeof window === 'undefined') return;
-      window.history.replaceState(
-        { ...(window.history.state || {}), dcView: 'community', dcCommunityPage: nextPage },
-        '',
-        window.location.href
-      );
+    const keepCommunityAfterBrowserBack = () => {
+      if (options.fromBrowser) writeCommunityHistory(pageRef.current, 'push', pageStackRef.current);
     };
 
-    const stack = pageStackRef.current;
+    if (isCommunityAiOpen) { setIsCommunityAiOpen(false); keepCommunityAfterBrowserBack(); return true; }
+    if (isNotificationPanelOpen) { setIsNotificationPanelOpen(false); keepCommunityAfterBrowserBack(); return true; }
+    if (showStatusRulesModal) { setShowStatusRulesModal(false); keepCommunityAfterBrowserBack(); return true; }
+    if (imageLightbox) { setImageLightbox(null); keepCommunityAfterBrowserBack(); return true; }
+    if (shareTarget) { setShareTarget(null); setShareRecipientSearch(''); setShareCaption(''); setShareSendingId(''); setShareFeedback(''); keepCommunityAfterBrowserBack(); return true; }
+    if (isMasterTagDetailOpen) { setIsMasterTagDetailOpen(false); keepCommunityAfterBrowserBack(); return true; }
+    if (profileViewMode !== 'overview') { setProfileViewMode('overview'); setProfileSelectedPostId(null); setExpandedReplyId(null); keepCommunityAfterBrowserBack(); return true; }
+    if (pageRef.current === 'profile' && selectedProfileId) { setSelectedProfileId(null); keepCommunityAfterBrowserBack(); return true; }
+
+    clearTransientCommunityUi();
+    const historyMode: 'push' | 'replace' = options.fromBrowser ? 'push' : 'replace';
+    const stack = pageStackRef.current.filter(isCommunityPageName);
 
     if (stack.length) {
       const previous = stack[stack.length - 1];
@@ -4180,20 +4200,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       setPage(previous);
       setPageStack(nextStack);
       pageRef.current = previous;
-      replaceCommunityHistory(previous);
-      if (previous === 'chat') restoreSocialFeedScroll();
+      writeCommunityHistory(previous, historyMode, nextStack);
+      if (previous === 'chat') {
+        activeViewRef.current = 'feed';
+        setActiveView('feed');
+        restoreSocialFeedScroll();
+      }
       return true;
     }
 
     if (pageRef.current !== 'chat' || activeViewRef.current !== 'feed') {
-      activeViewRef.current = 'feed';
-      pageRef.current = 'chat';
-      pageStackRef.current = [];
-      setActiveView('feed');
-      setPage('chat');
-      setPageStack([]);
-      replaceCommunityHistory('chat');
-      restoreSocialFeedScroll();
+      resetCommunityToFeed();
+      writeCommunityHistory('chat', historyMode, []);
       return true;
     }
 
