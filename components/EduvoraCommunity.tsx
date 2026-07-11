@@ -2439,6 +2439,205 @@ const communityPolishCss = `
     .community-mobile-latest .community-status-grid-shell { padding: .5rem !important; border-radius: 0 !important; }
   }
 
+
+  /* Mobile Community structural rescue: real story tray, media feed, and five-tab navigation */
+  @media (max-width: 767px) {
+    .community-mobile-latest .community-content-stage {
+      width: 100%;
+      min-width: 0;
+    }
+    .community-mobile-latest .community-mobile-feed-stream {
+      margin: 0 !important;
+      padding: 0 0 calc(env(safe-area-inset-bottom) + 4.6rem) !important;
+      gap: 0 !important;
+      background: #ffffff !important;
+    }
+    .community-mobile-latest .community-mobile-feed-stream > :not([hidden]) ~ :not([hidden]) {
+      margin-top: 0 !important;
+    }
+    .community-mobile-latest .community-instagram-story-tray {
+      margin: 0 !important;
+      border-bottom: 1px solid #efefef;
+      background: #ffffff;
+      padding: 0.7rem 0 0.62rem;
+    }
+    .community-mobile-latest .community-instagram-story-row {
+      display: flex;
+      gap: 0.72rem;
+      overflow-x: auto;
+      overscroll-behavior-x: contain;
+      padding: 0 0.75rem;
+      scrollbar-width: none;
+    }
+    .community-mobile-latest .community-instagram-story-row::-webkit-scrollbar {
+      display: none;
+    }
+    .community-mobile-latest .community-instagram-story-item {
+      display: flex;
+      width: 4.35rem;
+      flex: 0 0 4.35rem;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.28rem;
+      color: #262626;
+      text-align: center;
+    }
+    .community-mobile-latest .community-instagram-story-avatar {
+      position: relative;
+      display: grid;
+      height: 4.05rem;
+      width: 4.05rem;
+      place-items: center;
+      border-radius: 999px;
+      background: linear-gradient(135deg, #f9ce34, #ee2a7b 48%, #6228d7);
+      padding: 2px;
+    }
+    .community-mobile-latest .community-instagram-story-avatar-inner,
+    .community-mobile-latest .community-instagram-story-avatar.is-own {
+      display: grid;
+      height: 100%;
+      width: 100%;
+      place-items: center;
+      border: 2px solid #ffffff;
+      border-radius: 999px;
+      background: #ffffff;
+      overflow: hidden;
+    }
+    .community-mobile-latest .community-instagram-story-avatar.is-own {
+      padding: 0;
+      background: #f5f5f5;
+    }
+    .community-mobile-latest .community-instagram-story-plus {
+      position: absolute;
+      right: -0.05rem;
+      bottom: -0.05rem;
+      display: grid;
+      height: 1.25rem;
+      width: 1.25rem;
+      place-items: center;
+      border: 2px solid #ffffff;
+      border-radius: 999px;
+      background: #0095f6;
+      color: #ffffff;
+      font-size: 0.72rem;
+      font-weight: 900;
+      line-height: 1;
+    }
+    .community-mobile-latest .community-instagram-story-label {
+      display: block;
+      width: 100%;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 0.64rem;
+      font-weight: 650;
+      line-height: 1.15;
+    }
+    .community-mobile-latest .community-instagram-post {
+      border-bottom: 1px solid #efefef;
+      color: #262626;
+    }
+    .community-mobile-latest .community-instagram-post-header {
+      min-height: 3.55rem;
+    }
+    .community-mobile-latest .community-instagram-more:hover,
+    .community-mobile-latest .community-instagram-more:focus-visible {
+      background: #f5f5f5;
+    }
+    .community-mobile-latest .community-instagram-post-media {
+      min-height: 15rem;
+      max-height: 72dvh;
+    }
+    .community-mobile-latest .community-instagram-post-media > button {
+      height: 100%;
+      width: 100%;
+      min-height: 15rem;
+      max-height: 72dvh;
+    }
+    .community-mobile-latest .community-instagram-post-media img,
+    .community-mobile-latest .community-instagram-post-image {
+      width: 100% !important;
+      height: auto !important;
+      max-height: 72dvh !important;
+      object-fit: contain !important;
+    }
+    .community-mobile-latest .community-instagram-text-post {
+      min-height: 12rem;
+      border-block: 1px solid #efefef;
+      background:
+        radial-gradient(circle at 92% 8%, rgba(0,149,246,0.1), transparent 34%),
+        linear-gradient(145deg, #ffffff, #fafafa);
+    }
+    .community-mobile-latest .community-instagram-action {
+      display: flex;
+      height: 2.7rem;
+      min-width: 2.7rem;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      color: #111111;
+      font-size: 1.7rem;
+      line-height: 1;
+      transition: transform 140ms ease, background 140ms ease;
+    }
+    .community-mobile-latest .community-instagram-action:active {
+      transform: scale(0.9);
+    }
+    .community-mobile-latest .community-instagram-action.is-active {
+      color: #ed4956;
+    }
+    .community-mobile-latest .community-instagram-mobile-poll button:disabled {
+      cursor: default;
+      opacity: 1;
+    }
+    .community-mobile-latest .community-mobile-feed-filters {
+      position: sticky;
+      top: 0;
+      z-index: 35;
+      border-bottom-color: #efefef !important;
+    }
+    .community-mobile-latest #community-bottom-dock {
+      inset-inline: 0 !important;
+      bottom: 0 !important;
+      overflow: visible !important;
+      border-inline: 0 !important;
+      border-bottom: 0 !important;
+      border-radius: 0 !important;
+    }
+    .community-mobile-latest .community-mobile-profile-button {
+      display: flex !important;
+    }
+    .community-mobile-latest .community-mobile-ai-button {
+      display: none !important;
+    }
+    .community-mobile-latest .community-desktop-header-actions {
+      gap: 0.15rem !important;
+    }
+    .community-mobile-latest .community-desktop-thread {
+      height: calc(100dvh - 3.5rem) !important;
+      border-radius: 0 !important;
+    }
+    .community-mobile-latest .community-desktop-thread-header {
+      min-height: 3.65rem;
+      padding: 0.5rem 0.75rem !important;
+      border-bottom-color: #efefef !important;
+    }
+    .community-mobile-latest .community-thread-delete-button,
+    .community-mobile-latest .community-thread-reply-button {
+      min-height: 2.5rem !important;
+      border-radius: 999px !important;
+      padding-inline: 0.72rem !important;
+    }
+    .community-mobile-latest .community-reply-bubble {
+      max-width: 82% !important;
+      border-radius: 1.15rem !important;
+      box-shadow: none !important;
+    }
+    .community-mobile-latest .community-content-stage > :is(section, div) {
+      max-width: 100%;
+    }
+  }
+
   .community-status-reel-shell { background: #000 !important; color: #fff !important; }
   .community-status-reel-shell .community-status-reel-backdrop { background: radial-gradient(circle at 50% 20%, rgba(255,255,255,.08), transparent 34%), #000 !important; }
   .community-status-reel-shell .community-status-reel-card { background: #050505 !important; color: #fff !important; }
@@ -5414,10 +5613,138 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     </div>
   );
 
+
+  const renderMobileStoryTray = () => {
+    const storyPreview = statusCards.slice(0, 10);
+    return (
+      <section className="community-instagram-story-tray md:hidden" aria-label="Community stories">
+        <div className="community-instagram-story-row">
+          <button type="button" onClick={openStatusUploadFromTop} className="community-instagram-story-item">
+            <span className="community-instagram-story-avatar is-own">
+              <Avatar value={getOwnDisplayAvatar()} size="h-16 w-16" />
+              <span className="community-instagram-story-plus" aria-hidden="true">＋</span>
+            </span>
+            <span className="community-instagram-story-label">Your story</span>
+          </button>
+          {storyPreview.map((status) => {
+            const identity = getStatusOwnerIdentity(status);
+            return (
+              <button key={status.id} type="button" onClick={() => openStatusReel(status.id)} className="community-instagram-story-item">
+                <span className="community-instagram-story-avatar">
+                  <span className="community-instagram-story-avatar-inner">
+                    <Avatar value={identity.avatar || status.imagePreview || ''} size="h-16 w-16" />
+                  </span>
+                </span>
+                <span className="community-instagram-story-label">{identity.name || status.title}</span>
+              </button>
+            );
+          })}
+        </div>
+      </section>
+    );
+  };
+
   const MessageSummaryCard: React.FC<{ message: FeedMessage; isActive?: boolean }> = ({ message, isActive = false }) => {
     const liked = Boolean(message.likedByUsers?.[currentUserKey]) || likedMessages.includes(message.id);
+    const ownerId = getMessageOwnerId(message);
+    const ownerName = resolveName(message);
+    const replyTotal = message.replyCount || message.replies.length;
+    const postTypeLabel = message.postType || message.type || 'post';
+
     return (
-      <article className={`community-desktop-feed-card overflow-hidden rounded-[1.35rem] border bg-white shadow-sm transition duration-300 ${isActive ? 'community-desktop-feed-card-active border-[#1769FF] bg-[#F8FBFF] shadow-[0_14px_34px_rgba(26,115,232,0.10)] ring-2 ring-[#E8F2FF]' : 'border-[#D9E7F8] hover:border-[#BFD7FF] hover:bg-[#F8FBFF]'}`}>
+      <>
+        <article className="community-instagram-post overflow-hidden bg-white md:hidden">
+          <header className="community-instagram-post-header flex items-center gap-3 px-3 py-2.5">
+            <button
+              type="button"
+              onClick={() => {
+                if (!ownerId) return;
+                setSelectedProfileId(ownerId);
+                setProfileViewMode('overview');
+                setProfileContentTab('posts');
+                pushPage('profile');
+              }}
+              className="flex min-w-0 flex-1 items-center gap-2.5 text-left"
+            >
+              <Avatar value={resolveAvatar(message)} size="h-10 w-10" />
+              <span className="min-w-0 flex-1">
+                <span className="flex items-center gap-1.5">
+                  <strong className="truncate text-[0.86rem] font-extrabold text-[#111111]">{ownerName}</strong>
+                  {isOfficialAdminMessage(message) ? <BlueVerifiedTick /> : null}
+                </span>
+                <span className="block truncate text-[0.68rem] font-semibold text-[#737373]">{message.time} · {postTypeLabel}</span>
+              </span>
+            </button>
+            <button type="button" onClick={() => openMessage(message.id)} aria-label="Open post options and details" className="community-instagram-more flex h-10 w-10 items-center justify-center rounded-full text-lg font-black text-[#262626]">•••</button>
+          </header>
+
+          {message.imagePreview ? (
+            <div className="community-instagram-post-media flex w-full items-center justify-center overflow-hidden bg-black">
+              {renderUploadedImage(message.imagePreview, message.title, message.imageLayout || 'original', 'community-instagram-post-image')}
+            </div>
+          ) : (
+            <button type="button" onClick={() => openMessage(message.id)} className="community-instagram-text-post block w-full px-4 py-7 text-left">
+              <span className="block text-[0.68rem] font-black uppercase tracking-[0.16em] text-[#737373]">{postTypeLabel}</span>
+              <strong className="mt-2 block text-xl font-black leading-tight tracking-[-0.025em] text-[#111111]">{message.title}</strong>
+              <span className="mt-3 block whitespace-pre-wrap text-[0.92rem] font-medium leading-6 text-[#262626]">{message.body || message.badge}</span>
+            </button>
+          )}
+
+          <div className="community-instagram-post-actions flex items-center gap-1 px-2.5 pt-2">
+            <button type="button" onClick={() => toggleMessageLike(message.id)} aria-label={liked ? 'Unlike post' : 'Like post'} className={`community-instagram-action ${liked ? 'is-active' : ''}`}>
+              <span aria-hidden="true">{liked ? '♥' : '♡'}</span>
+            </button>
+            <button type="button" onClick={() => { openMessage(message.id); setExpandedReplyId(message.id); }} aria-label="Open comments" className="community-instagram-action">
+              <span aria-hidden="true">◯</span>
+            </button>
+            <button type="button" onClick={() => openMessage(message.id)} aria-label="Open post" className="community-instagram-action">
+              <span aria-hidden="true">↗</span>
+            </button>
+            <span className="flex-1" />
+            <button type="button" onClick={() => openMessage(message.id)} aria-label="View full post" className="community-instagram-action">
+              <span aria-hidden="true">▢</span>
+            </button>
+          </div>
+
+          <div className="community-instagram-post-copy px-3 pb-3">
+            <p className="text-[0.78rem] font-extrabold text-[#111111]">{message.likeCount || 0} likes</p>
+            {message.imagePreview ? (
+              <button type="button" onClick={() => openMessage(message.id)} className="mt-1 block w-full text-left text-[0.82rem] leading-5 text-[#262626]">
+                <strong className="mr-1.5 font-extrabold">{ownerName}</strong>
+                <span>{message.body || message.title}</span>
+              </button>
+            ) : null}
+
+            {message.pollOptions ? (
+              <div className="community-instagram-mobile-poll mt-3 space-y-2">
+                {message.pollOptions.map((option, index) => {
+                  const votes = message.pollVotes || message.pollOptions!.map(() => 0);
+                  const total = Math.max(1, votes.reduce((sum, count) => sum + count, 0));
+                  const percent = Math.round(((votes[index] || 0) / total) * 100);
+                  const selectedOption = message.pollVoters?.[currentUserKey];
+                  return (
+                    <button
+                      key={`${message.id}-${option}-${index}`}
+                      type="button"
+                      onClick={() => voteOnMessagePoll(message.id, index)}
+                      disabled={selectedOption !== undefined}
+                      className="relative w-full overflow-hidden rounded-xl border border-[#dbdbdb] bg-white px-3 py-2.5 text-left text-xs font-bold text-[#262626]"
+                    >
+                      <span className="absolute inset-y-0 left-0 bg-[#efefef]" style={{ width: selectedOption !== undefined ? `${percent}%` : '0%' }} />
+                      <span className="relative flex items-center justify-between gap-3"><span className="truncate">{option}</span><span>{selectedOption !== undefined ? `${percent}%` : 'Vote'}</span></span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            <button type="button" onClick={() => { openMessage(message.id); setExpandedReplyId(message.id); }} className="mt-1.5 block text-left text-[0.78rem] font-semibold text-[#737373]">
+              {replyTotal ? `View all ${replyTotal} comments` : 'Add the first comment'}
+            </button>
+            <p className="mt-1 text-[0.62rem] font-bold uppercase tracking-[0.08em] text-[#a0a0a0]">{message.time}</p>
+          </div>
+        </article>
+      <article className={`community-desktop-feed-card hidden md:block overflow-hidden rounded-[1.35rem] border bg-white shadow-sm transition duration-300 ${isActive ? 'community-desktop-feed-card-active border-[#1769FF] bg-[#F8FBFF] shadow-[0_14px_34px_rgba(26,115,232,0.10)] ring-2 ring-[#E8F2FF]' : 'border-[#D9E7F8] hover:border-[#BFD7FF] hover:bg-[#F8FBFF]'}`}>
         <button type="button" onClick={() => openMessage(message.id)} className={`community-desktop-feed-card-main flex w-full items-start gap-3 border-l-4 px-3 py-3 text-left transition sm:px-4 ${isActive ? 'border-[#1769FF]' : 'border-transparent'}`}>
           <Avatar value={resolveAvatar(message)} size="h-11 w-11" />
           <span className="min-w-0 flex-1">
@@ -5465,6 +5792,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           {REACTION_EMOJIS.slice(0, 3).map((emoji) => <button key={emoji} type="button" onClick={() => reactToMessage(message, emoji)} className="rounded-full border border-[#D9E7F8] bg-white px-2 py-1.5 text-[11px] font-black text-[#081A45]">{emoji} {(message.reactionCounts || {})[emoji] || 0}</button>)}
         </div>
       </article>
+      </>
     );
   };
 
@@ -5679,6 +6007,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
     return (
       <>
+        {isMainFeed ? renderMobileStoryTray() : null}
         {filterHeader}
         <div className="community-desktop-feed-layout mx-auto grid h-[calc(100dvh-8.5rem)] max-h-[calc(100dvh-8.5rem)] min-h-0 w-full min-w-0 max-w-[1600px] gap-4 overflow-hidden lg:gap-5 md:grid-cols-[minmax(0,clamp(18rem,28vw,25rem))_minmax(0,1fr)]">
           <aside className="community-desktop-feed-list hidden h-full min-h-0 min-w-0 overflow-y-auto rounded-[2rem] border border-[#D9E7F8] bg-white p-3 shadow-[0_20px_60px_rgba(23,105,255,0.08)] ring-1 ring-[#EEF6FF] backdrop-blur-xl custom-scrollbar md:block">
@@ -5767,11 +6096,36 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
 
   const renderStatusReelContent = (card: StatusCard) => {
-    const hasDetail = shouldShowStatusDetail(card);
-    const title = card.title.length > 64 ? `${card.title.slice(0, 64)}...` : card.title;
-    const preview = hasDetail ? `${card.body.slice(0, card.imagePreview ? 96 : 150)}...` : card.body;
+    if (card.imagePreview) {
+      return (
+        <div className="community-story-visual flex h-full w-full items-center justify-center overflow-hidden bg-black">
+          {renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'original', 'community-story-visual-image')}
+        </div>
+      );
+    }
 
-    return <div className="min-h-0 flex-1 overflow-hidden"><div className="min-h-0 max-h-[62dvh] overflow-y-auto pr-1 custom-scrollbar">{card.imagePreview ? <div className={`mb-4 ${card.imageLayout === 'original' ? 'h-[min(34dvh,320px)] w-full' : 'mx-auto aspect-square w-full max-w-[320px]'} flex items-center justify-center overflow-hidden rounded-[2rem] bg-[#171F2D] shadow-2xl`}>{renderUploadedImage(card.imagePreview, card.title, card.imageLayout || 'original')}</div> : null}<h2 className="line-clamp-3 text-2xl font-black tracking-tight text-[var(--status-card-ink)] sm:text-4xl">{title}</h2>{card.body ? <p className="mt-3 whitespace-pre-wrap text-sm font-semibold leading-6 text-[var(--status-card-body)] sm:text-base sm:leading-7">{preview}</p> : null}{hasDetail ? <button type="button" onClick={() => { setSelectedStatusId(card.id); pushPage('statusDetail'); }} className="mt-4 rounded-full border border-[var(--status-card-border)] bg-white px-4 py-2 text-sm font-black text-[var(--status-card-ink)] transition hover:bg-[#FFF9F0]">View more</button> : null}{renderStatusPoll(card)}</div></div>;
+    if (card.pollOptions) {
+      return (
+        <div className="community-story-text-card flex h-full w-full items-center justify-center overflow-y-auto bg-gradient-to-br from-[#171717] via-[#262626] to-[#111111] px-6 py-28 text-white">
+          <div className="w-full max-w-sm">
+            <p className="text-xs font-black uppercase tracking-[0.22em] text-white/60">Community poll</p>
+            <h2 className="mt-3 text-3xl font-black leading-tight tracking-[-0.035em]">{card.title}</h2>
+            {card.body ? <p className="mt-3 text-sm font-semibold leading-6 text-white/80">{card.body}</p> : null}
+            <div className="mt-6">{renderStatusPoll(card)}</div>
+          </div>
+        </div>
+      );
+    }
+
+    return (
+      <div className={`community-story-text-card community-status-tone-${card.type} flex h-full w-full items-center justify-center overflow-y-auto px-7 py-28 text-center`}>
+        <div className="max-w-sm">
+          <p className="text-xs font-black uppercase tracking-[0.22em] opacity-60">Eduvora story</p>
+          <h2 className="mt-4 text-4xl font-black leading-[1.05] tracking-[-0.045em]">{card.title}</h2>
+          {card.body ? <p className="mt-5 whitespace-pre-wrap text-base font-semibold leading-7 opacity-85">{card.body}</p> : null}
+        </div>
+      </div>
+    );
   };
 
   const renderStatusTile = (card: StatusCard) => {
@@ -6348,6 +6702,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     { label: 'Profile', icon: '👤', active: page === 'profile' && !selectedProfileId, action: () => { setSelectedProfileId(null); pushPage('profile'); } },
   ];
 
+  const mobilePrimaryNavItems = [
+    navItems[0],
+    navItems[1],
+    { label: 'Create', icon: '＋', active: page === 'creators', action: () => pushPage('creators') },
+    navItems[4],
+    navItems[6],
+  ];
+
   const activeNavItem = navItems.find((item) => item.active) || navItems[0];
   const showCreateCta = (page === 'chat' && activeView === 'status') || page === 'statusUpload';
   const communityAiButtonRef = useRef<HTMLButtonElement>(null);
@@ -6583,38 +6945,32 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     <nav
       ref={communityDockScrollRef}
       id="community-bottom-dock"
-      className={`fixed inset-x-4 bottom-[calc(env(safe-area-inset-bottom)+0.35rem)] z-[1300] flex items-center gap-1 overflow-x-auto rounded-[1.05rem] border border-[#D9E7F8] bg-white p-1 shadow-[0_10px_24px_rgba(8,26,69,0.12)] transition-all duration-300 custom-scrollbar lg:hidden ${
+      aria-label="Mobile Community navigation"
+      className={`fixed inset-x-0 bottom-0 z-[1300] grid grid-cols-5 border-t border-[#dbdbdb] bg-white/98 px-1 pt-1 pb-[calc(env(safe-area-inset-bottom)+0.25rem)] shadow-[0_-1px_10px_rgba(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 lg:hidden ${
         shouldHideCommunityDockOnMobile
-          ? 'max-md:pointer-events-none max-md:translate-y-[calc(100%+2rem)] max-md:opacity-0'
+          ? 'max-md:pointer-events-none max-md:translate-y-[calc(100%+1rem)] max-md:opacity-0'
           : 'max-md:translate-y-0 max-md:opacity-100'
       }`}
       onScroll={preserveCommunityDockScroll}
-      style={{ backgroundColor: '#FFFFFF', backdropFilter: 'none' }}
     >
-      {navItems.map((item) => (
-        <button
-          key={item.label}
-          type="button"
-          onPointerDown={preserveCommunityDockScroll}
-          onClick={() => {
-            preserveCommunityDockScroll();
-            item.action();
-            requestAnimationFrame(() => {
-              if (communityDockScrollRef.current) {
-                communityDockScrollRef.current.scrollLeft = communityDockScrollLeftRef.current;
-              }
-            });
-          }}
-          className={`community-mobile-dock-item min-w-[56px] flex-1 rounded-[0.95rem] px-1.5 py-1 text-center transition ${
-            item.active
-              ? 'bg-[var(--community-dock-active-bg)] text-[var(--community-dock-active-text)]'
-              : 'bg-[var(--community-dock-item-bg)] text-[var(--community-dock-text)]'
-          }`}
-        >
-          <span className="community-mobile-dock-icon block text-base leading-none">{item.icon}</span>
-          <span className="community-mobile-dock-label text-[8px] font-black leading-tight">{item.label}</span>
-        </button>
-      ))}
+      {mobilePrimaryNavItems.map((item) => {
+        const isCreate = item.label === 'Create';
+        return (
+          <button
+            key={item.label}
+            type="button"
+            onPointerDown={preserveCommunityDockScroll}
+            onClick={item.action}
+            aria-current={item.active ? 'page' : undefined}
+            className={`community-mobile-dock-item flex min-h-[3.45rem] min-w-0 flex-col items-center justify-center gap-0.5 rounded-lg px-1 text-center transition active:scale-95 ${
+              item.active ? 'text-[#111111]' : 'text-[#737373]'
+            }`}
+          >
+            <span className={`community-mobile-dock-icon flex items-center justify-center leading-none ${isCreate ? 'h-8 w-8 rounded-lg border-2 border-[#111111] text-xl font-medium text-[#111111]' : 'h-8 text-[1.25rem]'}`}>{item.icon}</span>
+            <span className="community-mobile-dock-label max-w-full truncate text-[0.52rem] font-bold leading-none">{item.label}</span>
+          </button>
+        );
+      })}
     </nav>
   );
 
