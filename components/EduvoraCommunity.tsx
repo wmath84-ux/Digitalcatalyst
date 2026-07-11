@@ -4086,7 +4086,55 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const readCommunityHistoryStack = (value: unknown): CommunityPage[] =>
     Array.isArray(value) ? value.filter(isCommunityPageName).slice(-24) : [];
 
-  const writeCommunityHistory = (nextPage: CommunityPage, mode: 'push' | 'replace' = 'replace', stack: CommunityPage[] = pageStackRef.current) => {
+  const communityProfileViewModes: ProfileViewMode[] = ['overview', 'edit', 'settings', 'relations', 'post'];
+  const communityProfileRelationTabs: ProfileRelationTab[] = ['followers', 'following'];
+
+  const isCommunityProfileViewMode = (value: unknown): value is ProfileViewMode =>
+    typeof value === 'string' && communityProfileViewModes.includes(value as ProfileViewMode);
+
+  const isCommunityProfileRelationTab = (value: unknown): value is ProfileRelationTab =>
+    typeof value === 'string' && communityProfileRelationTabs.includes(value as ProfileRelationTab);
+
+  const readCommunityOptionalString = (value: unknown) =>
+    typeof value === 'string' && value.trim() ? value : null;
+
+  const readCommunityOptionalNumber = (value: unknown) => {
+    const numeric = Number(value);
+    return Number.isFinite(numeric) && numeric > 0 ? numeric : null;
+  };
+
+  const buildCommunityProfileHistoryState = (overrides: Partial<{
+    selectedProfileId: string | null;
+    profileViewMode: ProfileViewMode;
+    profileRelationTab: ProfileRelationTab;
+    profileSelectedPostId: number | null;
+    profileContentTab: ProfileContentTab;
+  }> = {}) => ({
+    dcCommunityProfileViewMode: overrides.profileViewMode || profileViewMode,
+    dcCommunitySelectedProfileId: overrides.selectedProfileId === undefined ? selectedProfileId : overrides.selectedProfileId,
+    dcCommunityProfileRelationTab: overrides.profileRelationTab || profileRelationTab,
+    dcCommunityProfileSelectedPostId: overrides.profileSelectedPostId === undefined ? profileSelectedPostId : overrides.profileSelectedPostId,
+    dcCommunityProfileContentTab: overrides.profileContentTab || profileContentTab,
+  });
+
+  const applyCommunityProfileHistoryState = (state: Record<string, unknown>) => {
+    const nextMode = isCommunityProfileViewMode(state.dcCommunityProfileViewMode) ? state.dcCommunityProfileViewMode : 'overview';
+    const nextRelationTab = isCommunityProfileRelationTab(state.dcCommunityProfileRelationTab) ? state.dcCommunityProfileRelationTab : 'followers';
+    const nextContentTab = state.dcCommunityProfileContentTab === 'stories' ? 'stories' : 'posts';
+
+    setSelectedProfileId(readCommunityOptionalString(state.dcCommunitySelectedProfileId));
+    setProfileRelationTab(nextRelationTab);
+    setProfileSelectedPostId(nextMode === 'post' ? readCommunityOptionalNumber(state.dcCommunityProfileSelectedPostId) : null);
+    setProfileContentTab(nextContentTab);
+    setProfileViewMode(nextMode);
+  };
+
+  const writeCommunityHistory = (
+    nextPage: CommunityPage,
+    mode: 'push' | 'replace' = 'replace',
+    stack: CommunityPage[] = pageStackRef.current,
+    extraState: Record<string, unknown> = {}
+  ) => {
     if (typeof window === 'undefined') return;
     const cleanStack = stack.filter(isCommunityPageName).slice(-24);
     const nextState = {
@@ -4095,6 +4143,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       dcCommunityPage: nextPage,
       dcCommunityStack: cleanStack,
       dcCommunityRoot: nextPage === 'chat' && cleanStack.length === 0,
+      ...extraState,
     };
 
     if (mode === 'push') window.history.pushState(nextState, '', window.location.href);
@@ -4122,6 +4171,42 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     restoreSocialFeedScroll();
   };
 
+  const keepProfileHistoryActive = () => {
+    setPage('profile');
+    pageRef.current = 'profile';
+  };
+
+  const pushProfileHistory = (
+    mode: ProfileViewMode,
+    overrides: Parameters<typeof buildCommunityProfileHistoryState>[0] = {}
+  ) => {
+    keepProfileHistoryActive();
+    writeCommunityHistory('profile', 'push', pageStackRef.current, buildCommunityProfileHistoryState({
+      ...overrides,
+      profileViewMode: mode,
+    }));
+  };
+
+  const closeProfileSubPage = () => {
+    if (
+      typeof window !== 'undefined' &&
+      window.history.state?.dcView === 'community' &&
+      window.history.state?.dcCommunityPage === 'profile' &&
+      window.history.state?.dcCommunityProfileViewMode
+    ) {
+      window.history.back();
+      return;
+    }
+
+    setProfileViewMode('overview');
+    setProfileSelectedPostId(null);
+    setExpandedReplyId(null);
+    writeCommunityHistory('profile', 'replace', pageStackRef.current, buildCommunityProfileHistoryState({
+      profileViewMode: 'overview',
+      profileSelectedPostId: null,
+    }));
+  };
+
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
@@ -4137,6 +4222,13 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       pageStackRef.current = targetPage === 'chat' ? [] : targetStack;
       setPage(targetPage);
       setPageStack(targetPage === 'chat' ? [] : targetStack);
+
+      if (targetPage === 'profile') {
+        applyCommunityProfileHistoryState(state);
+      } else {
+        setProfileViewMode('overview');
+        setProfileSelectedPostId(null);
+      }
 
       if (targetPage === 'chat') {
         activeViewRef.current = 'feed';
@@ -4185,7 +4277,24 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     if (imageLightbox) { setImageLightbox(null); keepCommunityAfterBrowserBack(); return true; }
     if (shareTarget) { setShareTarget(null); setShareRecipientSearch(''); setShareCaption(''); setShareSendingId(''); setShareFeedback(''); keepCommunityAfterBrowserBack(); return true; }
     if (isMasterTagDetailOpen) { setIsMasterTagDetailOpen(false); keepCommunityAfterBrowserBack(); return true; }
-    if (profileViewMode !== 'overview') { setProfileViewMode('overview'); setProfileSelectedPostId(null); setExpandedReplyId(null); keepCommunityAfterBrowserBack(); return true; }
+    if (profileViewMode !== 'overview') {
+      if (
+        !options.fromBrowser &&
+        typeof window !== 'undefined' &&
+        window.history.state?.dcView === 'community' &&
+        window.history.state?.dcCommunityPage === 'profile' &&
+        window.history.state?.dcCommunityProfileViewMode
+      ) {
+        window.history.back();
+        return true;
+      }
+
+      setProfileViewMode('overview');
+      setProfileSelectedPostId(null);
+      setExpandedReplyId(null);
+      keepCommunityAfterBrowserBack();
+      return true;
+    }
     if (pageRef.current === 'profile' && selectedProfileId) { setSelectedProfileId(null); keepCommunityAfterBrowserBack(); return true; }
 
     clearTransientCommunityUi();
@@ -4941,11 +5050,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const openProfilePostDetail = (messageId: number, focusReply = false) => {
     const targetMessage = messages.find((message) => message.id === messageId);
-    setPage('profile');
-    pageRef.current = 'profile';
+    keepProfileHistoryActive();
     setSelectedMessageId(messageId);
     setProfileSelectedPostId(messageId);
     setProfileViewMode('post');
+    pushProfileHistory('post', { profileSelectedPostId: messageId });
     if (targetMessage) loadRepliesForMessage(targetMessage);
     if (focusReply) {
       setExpandedReplyId(messageId);
@@ -7152,7 +7261,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 <div className="community-status-reel-backdrop absolute inset-0" />
                 <article className="community-status-reel-card relative flex h-[100dvh] w-full max-w-[31rem] flex-col overflow-hidden border-0 bg-black shadow-[0_30px_100px_rgba(0,0,0,0.65)] md:h-[min(92dvh,880px)] md:rounded-[1.75rem]">
                   <div className="community-story-topbar absolute inset-x-0 top-0 z-30 flex items-center gap-3 px-4 pt-[calc(env(safe-area-inset-top)+3.25rem)] md:pt-14">
-                    <button type="button" onClick={() => { const ownerId = card.ownerId || card.creatorId; if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); setPage('profile'); setPageStack([]); } }} className="flex min-w-0 items-center gap-2 text-left text-white">
+                    <button type="button" onClick={() => { const ownerId = card.ownerId || card.creatorId; if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); } }} className="flex min-w-0 items-center gap-2 text-left text-white">
                       <Avatar value={owner.avatar} size="h-9 w-9" className="ring-2 ring-white/80" />
                       <span className="min-w-0"><span className="block max-w-[11rem] truncate text-sm font-black">{owner.name}</span><span className="block text-[11px] font-semibold text-white/70">{card.slots}</span></span>
                     </button>
@@ -7822,12 +7931,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const renderProfileAccountCard = () => (
     <section className="mx-auto overflow-hidden rounded-[1.75rem] border border-[#DCE3EE] bg-[#FFFEFB] font-sans shadow-[0_18px_52px_rgba(23,32,51,0.10)]">
       <header className="sticky top-0 z-20 flex items-center gap-3 border-b border-[#E8EDF3] bg-[#FFFEFB]/95 px-3 py-3 backdrop-blur-xl sm:px-5">
-        <button type="button" onClick={() => setProfileViewMode('overview')} aria-label="Back to profile" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D7DFEA] bg-white text-lg font-black text-[#273247] shadow-sm">←</button>
+        <button type="button" onClick={closeProfileSubPage} aria-label="Back to profile" className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D7DFEA] bg-white text-lg font-black text-[#273247] shadow-sm">←</button>
         <div className="min-w-0 flex-1">
           <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8A6520]">Your public identity</p>
           <h3 className="truncate text-xl font-black tracking-[-0.025em] text-[#172033] sm:text-2xl">Edit community profile</h3>
         </div>
-        <button type="button" onClick={() => setProfileViewMode('overview')} className="rounded-xl px-3 py-2 text-xs font-black text-[#3157A4]">Done</button>
+        <button type="button" onClick={closeProfileSubPage} className="rounded-xl px-3 py-2 text-xs font-black text-[#3157A4]">Done</button>
       </header>
 
       <div className="space-y-5 p-3 pb-5 sm:p-6">
@@ -7888,7 +7997,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const ToggleRow = ({ label, description, checked, onChange }: { label: string; description: string; checked: boolean; onChange: (checked: boolean) => void }) => <label className="flex min-w-0 items-center justify-between gap-3 rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] p-4"><span className="min-w-0"><span className="block text-sm font-black text-[#081B5C]">{label}</span><span className="mt-1 block text-xs font-bold leading-5 text-[#64748B]">{description}</span></span><input type="checkbox" checked={checked} onChange={(event) => onChange(event.target.checked)} className="h-5 w-5 shrink-0 accent-[#4F7BFF]" /></label>;
 
-  const renderProfileSettingsPanel = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Settings</p><h3 className="text-2xl font-black text-[#081B5C]">Account controls</h3></div><button type="button" onClick={() => setProfileViewMode('overview')} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Back</button></div><div className="mt-5 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">{([['privacy','Privacy'],['notifications','Notifications'],['connected','Account'],['logout','Logout']] as Array<[ProfilePanel,string]>).map(([panel,label]) => <button key={panel} type="button" onClick={() => setActiveProfilePanel(panel)} className={`shrink-0 rounded-full px-4 py-2 text-xs font-black ${activeProfilePanel === panel ? 'bg-[#4F7BFF] text-white' : 'bg-[#F8FBFF] text-[#081B5C]'}`}>{label}</button>)}</div>{activeProfilePanel === 'privacy' && <div className="mt-5 space-y-3"><ToggleRow label="Public profile" description="Allow your profile card to be visible inside the community." checked={privacySettings.profileVisible} onChange={(value) => setPrivacySettings((current) => ({ ...current, profileVisible: value }))} /><ToggleRow label="Show activity" description="Show your creator posts, replies, statuses, and master-tag activity in summaries." checked={privacySettings.showActivity} onChange={(value) => setPrivacySettings((current) => ({ ...current, showActivity: value }))} /><ToggleRow label="Allow messages" description="Let creators receive status shares and future direct-message requests from you." checked={privacySettings.allowMessages} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowMessages: value }))} /><ToggleRow label="Allow follow requests" description="Keep your profile available for follow-request features when they launch." checked={privacySettings.allowFollowRequests} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowFollowRequests: value }))} /></div>}{activeProfilePanel === 'notifications' && <div className="mt-5 space-y-3"><ToggleRow label="Replies" description="Show reply alerts in the bell dropdown." checked={notificationPreferences.replies} onChange={(value) => setNotificationPreferences((current) => ({ ...current, replies: value }))} /><ToggleRow label="Master-tag replies" description="Show admin/master responses to your tag requests." checked={notificationPreferences.masterTags} onChange={(value) => setNotificationPreferences((current) => ({ ...current, masterTags: value }))} /><ToggleRow label="Status interactions" description="Show likes and views for your statuses." checked={notificationPreferences.statuses} onChange={(value) => setNotificationPreferences((current) => ({ ...current, statuses: value }))} /><ToggleRow label="Creator posts" description="Show new post alerts from community creators." checked={notificationPreferences.creatorPosts} onChange={(value) => setNotificationPreferences((current) => ({ ...current, creatorPosts: value }))} /><ToggleRow label="Follows" description="Show alerts when someone follows your community profile." checked={notificationPreferences.follows} onChange={(value) => setNotificationPreferences((current) => ({ ...current, follows: value }))} /><ToggleRow label="Shared items" description="Show alerts when someone shares a Community post or story with you." checked={notificationPreferences.shares} onChange={(value) => setNotificationPreferences((current) => ({ ...current, shares: value }))} /></div>}{activeProfilePanel === 'connected' && <div className="mt-5 space-y-3"><div className="rounded-2xl bg-[#F8FBFF] p-4 text-sm font-bold text-[#64748B]">Signed in email: <span className="font-black text-[#081B5C]">{authEmail || currentUser?.email || 'Local community session'}</span></div>{['Google', 'Email password', 'Social account'].map((account) => <button key={account} type="button" disabled className="flex w-full justify-between rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] px-4 py-3 text-sm font-black text-[#64748B] opacity-70"><span>{account}</span><span>Connected through app login</span></button>)}</div>}{activeProfilePanel === 'logout' && <div className="mt-5 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] p-4"><p className="text-sm font-bold leading-6 text-[#5F6368]">Sign out of Firebase and return to the app auth flow.</p><button type="button" onClick={handleLogout} className="mt-4 w-full rounded-2xl bg-[#C5221F] px-5 py-3 font-black text-white">Log out and go to auth</button></div>}</section>;
+  const renderProfileSettingsPanel = () => <section className="rounded-[2rem] border border-[#E3ECF8] bg-white p-5 shadow-[0_18px_54px_rgba(79,123,255,0.10)]"><div className="flex items-center justify-between gap-3"><div><p className="text-xs font-black uppercase tracking-[0.22em] text-[#4F7BFF]">Settings</p><h3 className="text-2xl font-black text-[#081B5C]">Account controls</h3></div><button type="button" onClick={closeProfileSubPage} className="rounded-2xl border border-[#E3ECF8] bg-white px-4 py-2 text-sm font-black text-[#081B5C]">Back</button></div><div className="mt-5 flex gap-2 overflow-x-auto pb-1 custom-scrollbar">{([['privacy','Privacy'],['notifications','Notifications'],['connected','Account'],['logout','Logout']] as Array<[ProfilePanel,string]>).map(([panel,label]) => <button key={panel} type="button" onClick={() => setActiveProfilePanel(panel)} className={`shrink-0 rounded-full px-4 py-2 text-xs font-black ${activeProfilePanel === panel ? 'bg-[#4F7BFF] text-white' : 'bg-[#F8FBFF] text-[#081B5C]'}`}>{label}</button>)}</div>{activeProfilePanel === 'privacy' && <div className="mt-5 space-y-3"><ToggleRow label="Public profile" description="Allow your profile card to be visible inside the community." checked={privacySettings.profileVisible} onChange={(value) => setPrivacySettings((current) => ({ ...current, profileVisible: value }))} /><ToggleRow label="Show activity" description="Show your creator posts, replies, statuses, and master-tag activity in summaries." checked={privacySettings.showActivity} onChange={(value) => setPrivacySettings((current) => ({ ...current, showActivity: value }))} /><ToggleRow label="Allow messages" description="Let creators receive status shares and future direct-message requests from you." checked={privacySettings.allowMessages} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowMessages: value }))} /><ToggleRow label="Allow follow requests" description="Keep your profile available for follow-request features when they launch." checked={privacySettings.allowFollowRequests} onChange={(value) => setPrivacySettings((current) => ({ ...current, allowFollowRequests: value }))} /></div>}{activeProfilePanel === 'notifications' && <div className="mt-5 space-y-3"><ToggleRow label="Replies" description="Show reply alerts in the bell dropdown." checked={notificationPreferences.replies} onChange={(value) => setNotificationPreferences((current) => ({ ...current, replies: value }))} /><ToggleRow label="Master-tag replies" description="Show admin/master responses to your tag requests." checked={notificationPreferences.masterTags} onChange={(value) => setNotificationPreferences((current) => ({ ...current, masterTags: value }))} /><ToggleRow label="Status interactions" description="Show likes and views for your statuses." checked={notificationPreferences.statuses} onChange={(value) => setNotificationPreferences((current) => ({ ...current, statuses: value }))} /><ToggleRow label="Creator posts" description="Show new post alerts from community creators." checked={notificationPreferences.creatorPosts} onChange={(value) => setNotificationPreferences((current) => ({ ...current, creatorPosts: value }))} /><ToggleRow label="Follows" description="Show alerts when someone follows your community profile." checked={notificationPreferences.follows} onChange={(value) => setNotificationPreferences((current) => ({ ...current, follows: value }))} /><ToggleRow label="Shared items" description="Show alerts when someone shares a Community post or story with you." checked={notificationPreferences.shares} onChange={(value) => setNotificationPreferences((current) => ({ ...current, shares: value }))} /></div>}{activeProfilePanel === 'connected' && <div className="mt-5 space-y-3"><div className="rounded-2xl bg-[#F8FBFF] p-4 text-sm font-bold text-[#64748B]">Signed in email: <span className="font-black text-[#081B5C]">{authEmail || currentUser?.email || 'Local community session'}</span></div>{['Google', 'Email password', 'Social account'].map((account) => <button key={account} type="button" disabled className="flex w-full justify-between rounded-2xl border border-[#E3ECF8] bg-[#F8FBFF] px-4 py-3 text-sm font-black text-[#64748B] opacity-70"><span>{account}</span><span>Connected through app login</span></button>)}</div>}{activeProfilePanel === 'logout' && <div className="mt-5 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] p-4"><p className="text-sm font-bold leading-6 text-[#5F6368]">Sign out of Firebase and return to the app auth flow.</p><button type="button" onClick={handleLogout} className="mt-4 w-full rounded-2xl bg-[#C5221F] px-5 py-3 font-black text-white">Log out and go to auth</button></div>}</section>;
 
   const renderProfileGrid = (profilePosts: FeedMessage[], profileStories: StatusCard[]) => {
     if (profileContentTab === 'stories') {
@@ -7962,7 +8071,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           <p className="mt-0.5 truncate text-xs font-bold text-[#7C879A]">@{creator.username}</p>
           <div className="mt-1 flex min-w-0 gap-2 text-[11px] font-black"><span className="truncate text-[#1769FF]">{compactCount(followerCounts[creator.id] ?? creator.followerCount ?? creator.followers)} Followers</span><span className="truncate text-[#7B61FF]">{compactCount(followingCounts[creator.id] ?? creator.followingCount)} Following</span></div>
         </div>
-        <div className="flex shrink-0 items-center gap-1.5"><button type="button" onClick={() => { setSelectedProfileId(creator.id); setProfileViewMode('overview'); setProfileContentTab('posts'); }} className="rounded-full border border-[#D9E7F8] bg-white px-3 py-2 text-xs font-black text-[#081A45]">View</button><button type="button" onClick={() => toggleFollowCreator(creator)} disabled={Boolean(followLoadingIds[creator.id]) || self || creator.isSuspended || creator.isPublic === false} className={`rounded-full px-3 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${followed ? 'border border-[#D9E7F8] bg-[#F8FBFF] text-[#1769FF]' : 'bg-white text-[#1769FF] ring-1 ring-[#BFD7FF]'}`}>{self ? 'You' : followLoadingIds[creator.id] ? '…' : followed ? '✓' : 'Follow'}</button></div>
+        <div className="flex shrink-0 items-center gap-1.5"><button type="button" onClick={() => { setSelectedProfileId(creator.id); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); }} className="rounded-full border border-[#D9E7F8] bg-white px-3 py-2 text-xs font-black text-[#081A45]">View</button><button type="button" onClick={() => toggleFollowCreator(creator)} disabled={Boolean(followLoadingIds[creator.id]) || self || creator.isSuspended || creator.isPublic === false} className={`rounded-full px-3 py-2 text-xs font-black transition disabled:cursor-not-allowed disabled:opacity-60 ${followed ? 'border border-[#D9E7F8] bg-[#F8FBFF] text-[#1769FF]' : 'bg-white text-[#1769FF] ring-1 ring-[#BFD7FF]'}`}>{self ? 'You' : followLoadingIds[creator.id] ? '…' : followed ? '✓' : 'Follow'}</button></div>
       </article>
     );
   };
@@ -7973,7 +8082,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       <div className="mx-auto max-w-5xl overflow-hidden rounded-[2rem] border border-[#E3ECF8] bg-white shadow-[0_20px_60px_rgba(79,123,255,0.10)]">
         <div className="sticky top-0 z-10 border-b border-[#E3ECF8] bg-white/95 p-4 backdrop-blur-xl">
           <div className="flex items-center gap-3">
-            <button type="button" onClick={() => setProfileViewMode('overview')} className="rounded-full px-3 py-2 text-sm font-black text-[#081B5C]">←</button>
+            <button type="button" onClick={closeProfileSubPage} className="rounded-full px-3 py-2 text-sm font-black text-[#081B5C]">←</button>
             <Avatar value={display.avatar} size="h-11 w-11" />
             <div className="min-w-0 flex-1"><h2 className="truncate text-xl font-black text-[#081B5C]">{display.name}</h2><p className="truncate text-xs font-bold text-[#7C879A]">@{display.username}</p></div>
           </div>
@@ -7989,7 +8098,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const renderProfilePostDetailPage = (profileId: string, display: { name: string; username: string; avatar: string }) => {
     const profilePosts = messages.filter((message) => isMessageFromId(message, profileId)).sort((a, b) => (b.createdAt || b.id) - (a.createdAt || a.id));
     const message = messages.find((item) => item.id === profileSelectedPostId) || profilePosts[0];
-    if (!message) return <div className="mx-auto max-w-4xl rounded-[2rem] border border-dashed border-[#D9E7F8] bg-white p-10 text-center"><h2 className="text-2xl font-black text-[#081B5C]">Post unavailable</h2><button type="button" onClick={() => setProfileViewMode('overview')} className="mt-5 rounded-2xl bg-[#1769FF] px-5 py-3 text-sm font-black text-white">Back to profile</button></div>;
+    if (!message) return <div className="mx-auto max-w-4xl rounded-[2rem] border border-dashed border-[#D9E7F8] bg-white p-10 text-center"><h2 className="text-2xl font-black text-[#081B5C]">Post unavailable</h2><button type="button" onClick={closeProfileSubPage} className="mt-5 rounded-2xl bg-[#1769FF] px-5 py-3 text-sm font-black text-white">Back to profile</button></div>;
 
     const type = message.postType || message.type || 'text';
     const hasVisualPost = Boolean(message.imagePreview || message.pollOptions?.length);
@@ -8031,9 +8140,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return (
       <section className={`community-profile-post-detail mx-auto flex h-full max-h-full min-h-0 w-full ${hasVisualPost ? 'max-w-6xl' : 'max-w-3xl'} flex-col overflow-hidden border border-[#e5e7eb] bg-white shadow-[0_22px_70px_rgba(15,23,42,.12)] md:rounded-[1.5rem]`}>
         <header className="community-profile-post-detail-header z-20 flex min-h-14 shrink-0 items-center gap-3 border-b px-3 py-2 md:px-4">
-          <button type="button" onClick={() => setProfileViewMode('overview')} aria-label="Back to profile" className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-[#111] hover:bg-[#f5f5f5]">←</button>
+          <button type="button" onClick={closeProfileSubPage} aria-label="Back to profile" className="flex h-10 w-10 items-center justify-center rounded-full text-xl text-[#111] hover:bg-[#f5f5f5]">←</button>
           <Avatar value={display.avatar || resolveAvatar(message)} size="h-10 w-10" />
-          <button type="button" onClick={() => setProfileViewMode('overview')} className="min-w-0 flex-1 text-left"><strong className="block truncate text-sm text-[#111]">{display.name || resolveName(message)}</strong><span className="block truncate text-[11px] font-semibold text-[#737373]">@{display.username} · {message.time}</span></button>
+          <button type="button" onClick={closeProfileSubPage} className="min-w-0 flex-1 text-left"><strong className="block truncate text-sm text-[#111]">{display.name || resolveName(message)}</strong><span className="block truncate text-[11px] font-semibold text-[#737373]">@{display.username} · {message.time}</span></button>
           <button type="button" onClick={() => openShareComposer({ sourceType: 'feed_message', message })} aria-label="Share post" className="flex h-10 w-10 items-center justify-center rounded-full text-lg font-black text-[#111] hover:bg-[#f5f5f5]">↗</button>
           {isOwnCommunityId(getMessageOwnerId(message)) ? <button type="button" onClick={() => void deleteOwnFeedPost(message)} aria-label="Delete post" className="flex h-10 w-10 items-center justify-center rounded-full text-sm font-black text-[#dc2626] hover:bg-[#fff1f2]">⌫</button> : null}
         </header>
@@ -8057,25 +8166,25 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     );
   };
 
-  const keepProfilePageActive = () => {
-    setPage('profile');
-    pageRef.current = 'profile';
-  };
+  const keepProfilePageActive = keepProfileHistoryActive;
   const openOwnProfileEdit = () => {
     keepProfilePageActive();
     setSelectedProfileId(null);
     setProfileDraft(profile);
     setProfileViewMode('edit');
+    pushProfileHistory('edit', { selectedProfileId: null });
   };
   const openOwnProfileSettings = () => {
     keepProfilePageActive();
     setSelectedProfileId(null);
     setProfileViewMode('settings');
+    pushProfileHistory('settings', { selectedProfileId: null });
   };
   const openProfileRelations = (tab: ProfileRelationTab) => {
     keepProfilePageActive();
     setProfileRelationTab(tab);
     setProfileViewMode('relations');
+    pushProfileHistory('relations', { profileRelationTab: tab });
   };
 
   const renderInstagramProfile = (profileId: string, display: { name: string; username: string; avatar: string; bio?: string; verified?: boolean }, options: { own: boolean; followed?: boolean; creator?: Creator | null }) => {

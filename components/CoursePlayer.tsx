@@ -1375,6 +1375,15 @@ const CoursePlayer: React.FC<{
   }, [stopYoutubeTickTimer]);
 
   const handlePlayerBack = () => {
+    if (isMentorOpenRef.current) {
+      closeCourseMentor();
+      return;
+    }
+    if (isSidebarOpenRef.current && forceOverlaySidebarRef.current) {
+      closeCourseSidebar();
+      return;
+    }
+
     void flushYoutubeCoins('closed');
     onBack();
   };
@@ -1436,6 +1445,96 @@ const CoursePlayer: React.FC<{
   const useDesktopSidebar = !forceOverlaySidebar && !isDesktopSidebarCollapsed;
   const compactPlayerChrome = viewport.isShortHeight || viewport.isTinyPlayer || viewport.isLandscapeCompact;
   const shouldUseMobileVideoFullscreen = viewport.width < 1024 || viewport.isLandscapeCompact;
+  const isSidebarOpenRef = useRef(isSidebarOpen);
+  const isMentorOpenRef = useRef(isMentorOpen);
+  const forceOverlaySidebarRef = useRef(forceOverlaySidebar);
+  const courseHistoryRestoringRef = useRef(false);
+
+  useEffect(() => {
+    isSidebarOpenRef.current = isSidebarOpen;
+    isMentorOpenRef.current = isMentorOpen;
+    forceOverlaySidebarRef.current = forceOverlaySidebar;
+  }, [isSidebarOpen, isMentorOpen, forceOverlaySidebar]);
+
+  const writeCourseHistoryLayer = useCallback((layer: 'modules' | 'mentor' | null, mode: 'push' | 'replace' = 'push') => {
+    if (typeof window === 'undefined') return;
+    const currentLayer = window.history.state?.dcCourseLayer || null;
+    if (mode === 'push' && currentLayer === layer) return;
+    const nextState = {
+      ...(window.history.state || {}),
+      dcView: 'coursePlayer',
+      dcCourseLayer: layer,
+      dcCourseProductId: product.id,
+      dcCourseFileId: activeFile?.id || null,
+    };
+
+    if (mode === 'push') window.history.pushState(nextState, '', window.location.href);
+    else window.history.replaceState(nextState, '', window.location.href);
+  }, [activeFile?.id, product.id]);
+
+  const closeCourseLayerHistory = useCallback((layer: 'modules' | 'mentor') => {
+    if (typeof window !== 'undefined' && window.history.state?.dcView === 'coursePlayer' && window.history.state?.dcCourseLayer === layer) {
+      window.history.back();
+    }
+  }, []);
+
+  const closeCourseSidebar = useCallback(() => {
+    setIsSidebarOpen(false);
+    closeCourseLayerHistory('modules');
+  }, [closeCourseLayerHistory]);
+
+  const openCourseSidebar = useCallback(() => {
+    setIsMentorOpen(false);
+    setIsSidebarOpen(true);
+  }, []);
+
+  const toggleCourseSidebar = useCallback(() => {
+    if (isSidebarOpenRef.current) closeCourseSidebar();
+    else openCourseSidebar();
+  }, [closeCourseSidebar, openCourseSidebar]);
+
+  const closeCourseMentor = useCallback(() => {
+    setIsMentorOpen(false);
+    closeCourseLayerHistory('mentor');
+  }, [closeCourseLayerHistory]);
+
+  const openCourseMentor = useCallback(() => {
+    if (forceOverlaySidebarRef.current) setIsSidebarOpen(false);
+    setIsMentorOpen(true);
+  }, []);
+
+  const toggleCourseMentor = useCallback(() => {
+    if (isMentorOpenRef.current) closeCourseMentor();
+    else openCourseMentor();
+  }, [closeCourseMentor, openCourseMentor]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return undefined;
+    const handleCoursePopState = (event: PopStateEvent) => {
+      const state = event.state || {};
+      if (state.dcView !== 'coursePlayer') return;
+
+      courseHistoryRestoringRef.current = true;
+      const layer = state.dcCourseLayer === 'mentor' || state.dcCourseLayer === 'modules' ? state.dcCourseLayer : null;
+      setIsMentorOpen(layer === 'mentor');
+      if (forceOverlaySidebarRef.current) setIsSidebarOpen(layer === 'modules');
+      window.setTimeout(() => { courseHistoryRestoringRef.current = false; }, 0);
+    };
+
+    window.addEventListener('popstate', handleCoursePopState);
+    return () => window.removeEventListener('popstate', handleCoursePopState);
+  }, []);
+
+  useEffect(() => {
+    if (courseHistoryRestoringRef.current) return;
+    if (isMentorOpen) {
+      writeCourseHistoryLayer('mentor', 'push');
+      return;
+    }
+    if (isSidebarOpen && forceOverlaySidebar) {
+      writeCourseHistoryLayer('modules', 'push');
+    }
+  }, [forceOverlaySidebar, isMentorOpen, isSidebarOpen, writeCourseHistoryLayer]);
 
   const captureVideoFullscreenSnapshot = useCallback((requestedMobileLandscape = false) => {
     if (!activeFile || (activeFile.type !== 'youtube' && activeFile.type !== 'video')) return;
@@ -1775,8 +1874,8 @@ const CoursePlayer: React.FC<{
     setActiveFile(file);
     setYoutubeRewardNotice('');
     setYoutubeWatchSeconds(0);
-    setIsSidebarOpen(false);
-    setIsMentorOpen(false);
+    closeCourseSidebar();
+    closeCourseMentor();
   };
 
   const requestPdfDownload = (file: ProductFile) => {
@@ -1816,13 +1915,13 @@ const CoursePlayer: React.FC<{
 
     const handleEscape = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        setIsSidebarOpen(false);
+        closeCourseSidebar();
       }
     };
 
     window.addEventListener('keydown', handleEscape);
     return () => window.removeEventListener('keydown', handleEscape);
-  }, [isSidebarOpen, useDesktopSidebar]);
+  }, [closeCourseSidebar, isSidebarOpen, useDesktopSidebar]);
 
   const YoutubeRewardChip = ({ compact = false }: { compact?: boolean }) => {
     if (activeFile?.type !== 'youtube') return null;
@@ -1958,7 +2057,7 @@ const CoursePlayer: React.FC<{
             <h1 className="truncate text-sm font-black leading-tight text-[#071735] sm:text-lg" title={activeFile?.name || product.title}>{activeFile?.name || product.title}</h1>
           </div>
           <YoutubeRewardChip compact />
-          <button onClick={() => setIsMentorOpen(value => !value)} className={`${viewport.isTinyPlayer ? 'h-10 px-2 text-xs' : 'h-11 px-3 text-xs sm:text-sm'} shrink-0 rounded-2xl border border-[#ded8ff] bg-white/85 font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff] focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50`}>🧠 AI</button>
+          <button onClick={() => toggleCourseMentor()} className={`${viewport.isTinyPlayer ? 'h-10 px-2 text-xs' : 'h-11 px-3 text-xs sm:text-sm'} shrink-0 rounded-2xl border border-[#ded8ff] bg-white/85 font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff] focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50`}>🧠 AI</button>
           {productAccess?.hasPaidLockedUpdates && onPurchaseLatestUpdate && !viewport.isTinyPlayer && (
             <button onClick={() => onPurchaseLatestUpdate(product)} className="hidden h-11 shrink-0 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-black text-emerald-700 shadow-[0_10px_30px_rgba(16,185,129,0.10)] transition hover:-translate-y-0.5 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 sm:inline-flex sm:items-center">
               Latest Update
@@ -1967,7 +2066,7 @@ const CoursePlayer: React.FC<{
         </div>
         <button
           type="button"
-          onClick={() => setIsSidebarOpen(value => !value)}
+          onClick={toggleCourseSidebar}
           className={`${isSidebarOpen ? 'border-[#5B4BFF] bg-[#5B4BFF] text-white shadow-[0_16px_34px_rgba(91,75,255,0.28)]' : 'border-[#C9C2FF] bg-[#F1EEFF] text-[#071735] shadow-[0_14px_30px_rgba(91,75,255,0.16)]'} inline-flex min-h-11 min-w-11 shrink-0 items-center justify-center gap-2 rounded-2xl px-3 font-black transition hover:-translate-y-0.5 hover:shadow-[0_18px_38px_rgba(91,75,255,0.22)] active:translate-y-0 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/60 focus:ring-offset-2 focus:ring-offset-white`}
           aria-label={isSidebarOpen ? 'Close modules' : 'Open modules'}
           aria-expanded={isSidebarOpen}
@@ -1978,7 +2077,7 @@ const CoursePlayer: React.FC<{
         </button>
       </header>
 
-      <div onClick={() => setIsSidebarOpen(false)} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition ${useDesktopSidebar ? 'lg:hidden' : ''} ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
+      <div onClick={closeCourseSidebar} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition ${useDesktopSidebar ? 'lg:hidden' : ''} ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
       <main className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${compactPlayerChrome ? 'gap-1 p-1.5' : 'gap-2 p-2 sm:gap-3 sm:p-3 lg:p-3'}`} style={{ paddingLeft: 'max(0.375rem, env(safe-area-inset-left))', paddingRight: 'max(0.375rem, env(safe-area-inset-right))', paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}>
         <div className={`${forceOverlaySidebar ? 'hidden' : 'hidden lg:grid'} shrink-0 grid-cols-[minmax(18rem,1fr)_auto_minmax(18rem,1fr)] items-center gap-4 rounded-[1.75rem] border border-[#E3E8F5] bg-white/90 px-5 py-4 text-[#071735] shadow-[0_18px_45px_rgba(8,26,69,0.08)] backdrop-blur-2xl`}>
@@ -2000,7 +2099,7 @@ const CoursePlayer: React.FC<{
             <button onClick={() => setIsDesktopSidebarCollapsed(value => !value)} className="shrink-0 rounded-2xl border border-[#D9E7F8] bg-white px-5 py-3 text-base font-black text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.06)] transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]">
               {isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize modules'}
             </button>
-            <button onClick={() => setIsMentorOpen(value => !value)} className="rounded-2xl border border-[#C9C2FF] bg-[#F1EEFF] px-6 py-3 text-base font-black text-[#5B4BFF] shadow-[0_14px_34px_rgba(91,75,255,0.14)] transition hover:-translate-y-0.5 hover:bg-white">
+            <button onClick={() => toggleCourseMentor()} className="rounded-2xl border border-[#C9C2FF] bg-[#F1EEFF] px-6 py-3 text-base font-black text-[#5B4BFF] shadow-[0_14px_34px_rgba(91,75,255,0.14)] transition hover:-translate-y-0.5 hover:bg-white">
               🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}
             </button>
           </div>
@@ -2032,7 +2131,7 @@ const CoursePlayer: React.FC<{
                   </div>
                   <div className="flex items-start gap-3">
                     <h2 className="line-clamp-2 min-w-0 flex-1 text-xl font-black leading-tight text-[#071735] sm:text-[25px]">{product.title}</h2>
-                    <button type="button" onClick={() => setIsSidebarOpen(false)} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#071735] shadow-sm transition hover:bg-[#F1EEFF] focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50 lg:hidden" aria-label="Close modules">×</button>
+                    <button type="button" onClick={closeCourseSidebar} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#071735] shadow-sm transition hover:bg-[#F1EEFF] focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50 lg:hidden" aria-label="Close modules">×</button>
                   </div>
                 </div>
               </div>
@@ -2073,7 +2172,7 @@ const CoursePlayer: React.FC<{
                     activeFileType={activeFile?.type || null}
                     activeContentName={activeFile?.name || null}
                     userId={currentUserId}
-                    onClose={() => setIsMentorOpen(false)}
+                    onClose={closeCourseMentor}
                   />
                 </div>
               </div>

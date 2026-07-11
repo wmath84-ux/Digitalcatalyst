@@ -11,7 +11,7 @@ test('community popstate lets the app leave community at the root', () => {
 });
 
 test('community consumes nested browser back without deleting the previous app entry', () => {
-  assert.match(source, /const writeCommunityHistory = \(nextPage: CommunityPage, mode: 'push' \| 'replace' = 'replace'/);
+  assert.match(source, /const writeCommunityHistory = \(\s*nextPage: CommunityPage,\s*mode: 'push' \| 'replace' = 'replace'/s);
   assert.match(source, /const historyMode: 'push' \| 'replace' = options\.fromBrowser \? 'push' : 'replace';/);
   assert.match(source, /writeCommunityHistory\('chat', historyMode, \[\]\);/);
   assert.match(source, /if \(options\.fromBrowser\) writeCommunityHistory\(pageRef\.current, 'push', pageStackRef\.current\);/);

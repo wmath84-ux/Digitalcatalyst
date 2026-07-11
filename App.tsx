@@ -1405,6 +1405,10 @@ const App: React.FC = () => {
         setIsReadingDrawerOpen(false);
         setSelectedArticle(null);
         setSelectedAnnouncement(null);
+        const nextViewAfterReading = normalizeHistoryView(event.state?.dcView);
+        if (!historyOverlay && (!nextViewAfterReading || nextViewAfterReading === currentViewRef.current)) {
+          return;
+        }
       }
 
       if (pendingReadingNavigationRef.current) {
