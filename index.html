@@ -1545,6 +1545,74 @@
         border-color: var(--border-soft, #cbd5e1) !important;
         color: var(--primary, var(--color-primary, #315bca)) !important;
       }
+
+      html.store-page-scroll-enabled,
+      body.store-page-scroll-enabled {
+        min-height: 100%;
+        height: auto;
+        overflow-x: hidden;
+        overflow-y: auto;
+        overscroll-behavior-y: auto;
+        touch-action: pan-y;
+      }
+
+      .store-page-active,
+      .store-scroll-scope {
+        min-height: 100dvh;
+        overflow: visible;
+        touch-action: pan-y;
+      }
+
+      .store-search-sticky {
+        isolation: isolate;
+        transform: translateZ(0);
+        will-change: transform;
+      }
+
+      .dock-count-badge {
+        z-index: 8;
+        min-width: 1.25rem;
+        background-color: #185adb !important;
+        background-image: linear-gradient(135deg, #1769ff, #6d28d9) !important;
+        border-color: #ffffff !important;
+        color: #ffffff !important;
+        line-height: 1rem;
+        text-align: center;
+        opacity: 1 !important;
+        text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
+      }
+
+      html .checkout-contrast-panel,
+      html:is([data-color-experience="immersive"], [data-color-experience="warm"], [data-color-experience="modern-white"]) .checkout-contrast-panel {
+        background-color: #1e3a8a !important;
+        background-image: linear-gradient(145deg, #1d4ed8 0%, #5b21b6 52%, #0891b2 100%) !important;
+        color: #ffffff !important;
+      }
+
+      html .checkout-contrast-panel :where(h1, h2, h3, h4, p, span, strong, small, div),
+      html:is([data-color-experience="immersive"], [data-color-experience="warm"], [data-color-experience="modern-white"]) .checkout-contrast-panel :where(h1, h2, h3, h4, p, span, strong, small, div) {
+        color: #ffffff !important;
+      }
+
+      html .checkout-contrast-panel :where([class*="text-white/"]),
+      html:is([data-color-experience="immersive"], [data-color-experience="warm"], [data-color-experience="modern-white"]) .checkout-contrast-panel :where([class*="text-white/"]) {
+        color: rgba(255, 255, 255, 0.82) !important;
+      }
+
+      @media (display-mode: standalone), (max-width: 767px) {
+        html.store-page-scroll-enabled,
+        body.store-page-scroll-enabled {
+          -webkit-overflow-scrolling: touch;
+        }
+
+        .store-page-active {
+          padding-bottom: calc(8rem + env(safe-area-inset-bottom));
+        }
+
+        .store-search-sticky {
+          top: calc(env(safe-area-inset-top) + 0.25rem) !important;
+        }
+      }
     </style>
   <script type="importmap">
 {

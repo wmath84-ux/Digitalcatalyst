@@ -1045,6 +1045,22 @@ const App: React.FC = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [currentView, setCurrentView] = useState('home');
+
+  useEffect(() => {
+    if (typeof document === 'undefined' || currentView !== 'allProducts') return undefined;
+    const root = document.documentElement;
+    const body = document.body;
+    const rootAlreadyEnabled = root.classList.contains('store-page-scroll-enabled');
+    const bodyAlreadyEnabled = body.classList.contains('store-page-scroll-enabled');
+
+    root.classList.add('store-page-scroll-enabled');
+    body.classList.add('store-page-scroll-enabled');
+
+    return () => {
+      if (!rootAlreadyEnabled) root.classList.remove('store-page-scroll-enabled');
+      if (!bodyAlreadyEnabled) body.classList.remove('store-page-scroll-enabled');
+    };
+  }, [currentView]);
   const [networkBanner, setNetworkBanner] = useState(() => (typeof navigator !== 'undefined' && !navigator.onLine ? 'You are offline. Some features may not work until internet is back.' : ''));
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup'>('login');
   const [isAuthStateReady, setIsAuthStateReady] = useState(false);
@@ -4549,7 +4565,7 @@ const App: React.FC = () => {
 
   const renderContent = (appUser: User | null = currentUser) => {
     switch (currentView) {
-      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onCoinPurchase={(product, quantity, options) => handleProductCoinPurchase(product, quantity, options)} />;
+      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onOpenPurchases={handleNavigateToPurchases} onCoinPurchase={(product, quantity, options) => handleProductCoinPurchase(product, quantity, options)} />;
       case 'coursePlayer':
         if (isAuthRestoring || authRestoreError) return renderAuthRestoreStatus();
         return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} currentUser={appUser} onBack={() => handleNavigateBack('myPurchases')} onQuizReward={handleQuizReward} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onEducoinUnlockComplete={handleEducoinUpdateUnlockComplete} /> : renderAuthRestoreStatus();
@@ -4800,7 +4816,7 @@ const App: React.FC = () => {
                 </div>
               </div>
             )}
-            <main key={currentView} className={`${websiteSettings.animations.enabled ? appleOpenClass : ''} ${currentView === 'home' ? 'mobile-app-home' : ''}`}>{renderContent(effectiveAppUser)}</main>
+            <main key={currentView} className={`${websiteSettings.animations.enabled ? appleOpenClass : ''} ${currentView === 'home' ? 'mobile-app-home' : ''} ${currentView === 'allProducts' ? 'store-page-active' : ''}`}>{renderContent(effectiveAppUser)}</main>
             <div className="mobile-app-chrome"><InstallAppButton enabled={canShowInstallPrompt} /></div>
             {currentView === 'home' && (
               <div className={shouldHideFooterOnMobile ? 'max-md:hidden' : ''}>

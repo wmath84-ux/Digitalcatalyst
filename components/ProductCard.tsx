@@ -62,7 +62,13 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                     fallbackMessage="Image preview unavailable"
                     aspect="video"
                 />
-                
+                <button
+                    type="button"
+                    onClick={() => onViewDetails()}
+                    aria-label={`Open ${product.title}`}
+                    className="absolute inset-0 z-10 cursor-pointer focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-[-4px] focus-visible:outline-indigo-500/70"
+                />
+
                 {/* Badges */}
                 <div className="absolute left-2 top-2 z-20 flex max-w-[72%] flex-col items-start gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
                     {isPurchased && (
@@ -118,7 +124,9 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                 </div>
 
                 <h3 className="mb-2 line-clamp-2 text-base font-bold leading-tight text-gray-900 transition-colors group-hover:text-primary sm:text-lg" title={product.title}>
-                    {product.title}
+                    <button type="button" onClick={() => onViewDetails()} className="block w-full text-left focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-indigo-500">
+                        {product.title}
+                    </button>
                 </h3>
                 <p className="mb-3 line-clamp-2 flex-grow text-sm leading-6 text-slate-600 sm:mb-4">{product.description}</p>
 

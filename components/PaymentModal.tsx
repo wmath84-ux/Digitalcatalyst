@@ -325,7 +325,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
           <div className="overflow-hidden rounded-[1.5rem] border border-white/20 bg-white/10 shadow-[0_28px_100px_rgba(0,0,0,0.30)] backdrop-blur-2xl sm:rounded-[2.5rem]">
             <div className="grid lg:grid-cols-[0.95fr_1.05fr]">
-              <aside className="relative overflow-hidden bg-gradient-to-br from-indigo-700/95 via-purple-600/95 to-cyan-500/95 p-4 text-white sm:p-10">
+              <aside className="checkout-contrast-panel relative overflow-hidden bg-gradient-to-br from-indigo-700/95 via-purple-600/95 to-cyan-500/95 p-4 text-white sm:p-10">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.28),transparent_24%),radial-gradient(circle_at_82%_75%,rgba(255,255,255,0.18),transparent_24%)]" />
                 <div className="relative flex h-full min-h-0 flex-col justify-between gap-5 sm:min-h-[360px] sm:gap-10">
                   <div>

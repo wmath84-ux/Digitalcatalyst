@@ -58,6 +58,7 @@ interface ProductDetailPageProps {
   currentUser?: User | null;
   productAccess?: ProductAccessState | null;
   onPurchaseLatestUpdate?: (product: ProductWithRating) => void;
+  onOpenPurchases?: () => void;
   onCoinPurchase?: (
   product: ProductWithRating,
   quantity: number,
@@ -76,7 +77,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     settings, economySettings, activeCoinDiscount = null, onConsumeCoinDiscount, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews, 
     onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, onModalOpened, coupons,
     scrollToSection, onSectionScrolled, allProducts, onViewProduct, onBuyNow, wishlist, onGoHome, onStartEarning, onInsufficientCoins,
-    isPurchased = false, currentUser = null, productAccess = null, onPurchaseLatestUpdate, onCoinPurchase
+    isPurchased = false, currentUser = null, productAccess = null, onPurchaseLatestUpdate, onOpenPurchases, onCoinPurchase
 }) => {
   const [modalOpen, setModalOpen] = useState(false);
   const [isCoinButtonChecking, setIsCoinButtonChecking] = useState(false);
@@ -583,7 +584,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 )}
 
                 <div className="mt-5 space-y-3 sm:mt-6">
-                  <button disabled={isPurchased} onClick={handleBuyClick} className="product-checkout-primary w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3.5 text-base font-black text-white shadow-[0_16px_40px_rgba(79,70,229,0.25)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
+                  <button onClick={() => { if (isPurchased) { onOpenPurchases?.(); return; } handleBuyClick(); }} className="product-checkout-primary w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3.5 text-base font-black text-white shadow-[0_16px_40px_rgba(79,70,229,0.25)] transition hover:-translate-y-0.5 active:scale-95 sm:px-8 sm:py-4 sm:text-lg">
                     {isPurchased ? 'Purchased' : 'Pay with Razorpay'}
                   </button>
                   {canShowProductCoinCheckout && (
@@ -605,7 +606,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                       </span>
                     </button>
                   )}
-                  <button disabled={isPurchased} onClick={() => onAddToCart(product.id, 1)} className="product-checkout-secondary w-full rounded-2xl border border-indigo-200/70 bg-white/85 px-6 py-3.5 text-base font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4">
+                  <button onClick={() => { if (isPurchased) { onOpenPurchases?.(); return; } onAddToCart(product.id, 1); }} className="product-checkout-secondary w-full rounded-2xl border border-indigo-200/70 bg-white/85 px-6 py-3.5 text-base font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 sm:px-8 sm:py-4">
                     {isPurchased ? 'Already in My Purchases' : 'Add to Cart'}
                   </button>
                 </div>

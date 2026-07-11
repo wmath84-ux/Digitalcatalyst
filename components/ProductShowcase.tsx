@@ -93,13 +93,18 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
     };
 
     updateStoreSearchChrome();
+    const visualViewport = window.visualViewport;
     window.addEventListener('scroll', updateStoreSearchChrome, { passive: true });
     window.addEventListener('resize', updateStoreSearchChrome);
+    visualViewport?.addEventListener('scroll', updateStoreSearchChrome, { passive: true });
+    visualViewport?.addEventListener('resize', updateStoreSearchChrome);
 
     return () => {
       window.cancelAnimationFrame(rafId);
       window.removeEventListener('scroll', updateStoreSearchChrome);
       window.removeEventListener('resize', updateStoreSearchChrome);
+      visualViewport?.removeEventListener('scroll', updateStoreSearchChrome);
+      visualViewport?.removeEventListener('resize', updateStoreSearchChrome);
     };
   }, []);
 
@@ -143,7 +148,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
   const clearSearch = () => setSearchQuery('');
   const clearAll = () => { setSearchQuery(''); setActiveFilter('All'); setSortBy('recommended'); };
   return (
-    <section id="products" ref={sectionRef} className={`${isMobileHome ? 'pb-36 pt-8 sm:py-14' : 'py-14 sm:py-24'} bg-gradient-to-br from-[#F8FBFF] via-[#EEF6FF] to-indigo-100/60 backdrop-blur-xl ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}>
+    <section id="products" ref={sectionRef} className={`store-scroll-scope min-h-[100dvh] touch-pan-y ${isMobileHome ? 'pb-36 pt-8 sm:py-14' : 'py-14 sm:py-24'} bg-gradient-to-br from-[#F8FBFF] via-[#EEF6FF] to-indigo-100/60 backdrop-blur-xl ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}>
       <div className="container mx-auto px-4 sm:px-6">
         <div className={`${isMobileHome ? 'mb-5 sm:mb-8' : 'mb-8 sm:mb-12'} mx-auto max-w-3xl text-center animate-child animate-delay-1`}>
           <p className="text-xs font-black uppercase tracking-[0.32em] text-[#1769FF]">Premium marketplace</p>
@@ -151,7 +156,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
           <p className="mt-3 text-base text-[#536178] sm:mt-4 sm:text-lg">{isMobileHome ? 'Find courses, notes, PDFs, and learning tools instantly.' : 'Search by title, subject, class, tags, keyword, format, or course description.'}</p>
         </div>
 
-        <div className={`sticky top-1 z-20 mx-auto max-w-6xl border border-blue-100/90 bg-white/90 shadow-[0_18px_55px_rgba(23,105,255,0.10)] backdrop-blur-xl animate-child animate-delay-2 transition-all duration-300 sm:top-3 lg:top-4 ${isStoreFilterCompact ? 'rounded-[1.25rem] p-2 sm:rounded-[1.5rem] sm:p-3' : 'rounded-[1.6rem] p-3 sm:rounded-[2rem] sm:p-4'}`}>
+        <div className={`store-search-sticky sticky top-1 z-20 mx-auto max-w-6xl border border-blue-100/90 bg-white/90 shadow-[0_18px_55px_rgba(23,105,255,0.10)] backdrop-blur-xl animate-child animate-delay-2 transition-all duration-300 sm:top-3 lg:top-4 ${isStoreFilterCompact ? 'rounded-[1.25rem] p-2 sm:rounded-[1.5rem] sm:p-3' : 'rounded-[1.6rem] p-3 sm:rounded-[2rem] sm:p-4'}`}>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             {!hideInternalSearch && (
               <div className="relative min-h-[52px] flex-1">

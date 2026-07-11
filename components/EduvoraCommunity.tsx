@@ -2764,6 +2764,141 @@ const communityPolishCss = `
       scroll-behavior: auto !important;
     }
   }
+  /* Modern story viewer and share-only messaging surfaces. */
+  .community-status-reel-shell {
+    background: radial-gradient(circle at 18% 15%, #243048 0%, #090d16 42%, #020407 100%) !important;
+  }
+  .community-status-reel-shell .community-story-bottom {
+    background: linear-gradient(to top, rgba(0, 0, 0, 0.96), rgba(0, 0, 0, 0.70), transparent) !important;
+  }
+  .community-status-reel-shell .community-status-reel-card {
+    background: #030507 !important;
+  }
+  .community-status-scroll-button {
+    border: 1px solid rgba(255, 255, 255, 0.24) !important;
+    background: rgba(15, 23, 42, 0.78) !important;
+    color: #ffffff !important;
+    box-shadow: 0 18px 50px rgba(0, 0, 0, 0.38) !important;
+    backdrop-filter: blur(18px);
+  }
+  .community-status-scroll-button:hover {
+    transform: translateY(-2px);
+    background: #1769ff !important;
+  }
+  .community-share-inbox,
+  .community-share-thread {
+    border-color: #dbe7f7 !important;
+    background: rgba(255, 255, 255, 0.98) !important;
+    box-shadow: 0 28px 80px rgba(15, 23, 42, 0.14) !important;
+  }
+  .community-share-inbox-header,
+  .community-share-thread-header,
+  .community-share-composer {
+    border-color: #e2e8f0 !important;
+    background: rgba(255, 255, 255, 0.96) !important;
+    backdrop-filter: blur(18px);
+  }
+  .community-share-tools {
+    border-color: #e2e8f0 !important;
+    background: #f8fbff !important;
+  }
+  .community-share-search {
+    border: 1px solid #dbe7f7 !important;
+    background: #ffffff !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.92) !important;
+  }
+  .community-share-icon-button {
+    border: 1px solid #e2e8f0 !important;
+    background: #f8fafc !important;
+    color: #0f172a !important;
+  }
+  .community-share-filter {
+    border: 1px solid #dbe7f7 !important;
+    background: #ffffff !important;
+    color: #64748b !important;
+  }
+  .community-share-filter.is-active {
+    border-color: #1769ff !important;
+    background: #1769ff !important;
+    color: #ffffff !important;
+    box-shadow: 0 10px 24px rgba(23, 105, 255, 0.22) !important;
+  }
+  .community-share-conversation-row {
+    border: 1px solid transparent !important;
+    background: #ffffff !important;
+    transition: transform 180ms ease, border-color 180ms ease, background 180ms ease, box-shadow 180ms ease;
+  }
+  .community-share-conversation-row:hover {
+    transform: translateY(-1px);
+    border-color: #dbe7f7 !important;
+    background: #f8fbff !important;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.08) !important;
+  }
+  .community-share-conversation-row.is-unread {
+    border-color: #cfe0ff !important;
+    background: #eef5ff !important;
+  }
+  .community-share-avatar {
+    box-shadow: 0 0 0 3px #ffffff, 0 0 0 5px #dbe7f7 !important;
+  }
+  .community-share-online-dot {
+    background: #1769ff !important;
+  }
+  .community-share-unread-total,
+  .community-share-unread-badge {
+    background: #1769ff !important;
+    color: #ffffff !important;
+    box-shadow: 0 8px 20px rgba(23, 105, 255, 0.24) !important;
+  }
+  .community-share-thread-canvas {
+    background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 48%, #eef2ff 100%) !important;
+  }
+  .community-share-message-bubble {
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.09) !important;
+  }
+  .community-share-message-bubble.is-mine {
+    border-color: #bfd7ff !important;
+    background: #dceaff !important;
+  }
+  .community-share-message-bubble.is-theirs {
+    border-color: #e2e8f0 !important;
+    background: #ffffff !important;
+  }
+  .community-share-preview {
+    border-color: #e2e8f0 !important;
+    background: #ffffff !important;
+  }
+  .community-share-message-menu:hover {
+    background: rgba(15, 23, 42, 0.06) !important;
+  }
+  .community-share-composer-button {
+    border-color: #dbe7f7 !important;
+    background: #ffffff !important;
+    box-shadow: 0 10px 28px rgba(15, 23, 42, 0.08) !important;
+  }
+  @media (min-width: 1024px) {
+    .community-status-reel-shell .community-story-slide {
+      padding: 3.5dvh 6rem !important;
+    }
+    .community-status-reel-shell .community-status-reel-card {
+      height: min(92dvh, 880px) !important;
+      width: min(29rem, calc(100vw - 12rem)) !important;
+      border: 1px solid rgba(255, 255, 255, 0.18) !important;
+      border-radius: 2rem !important;
+      box-shadow: 0 36px 120px rgba(0, 0, 0, 0.72) !important;
+    }
+    .community-status-reel-shell .community-story-progress {
+      max-width: 29rem !important;
+    }
+  }
+  @media (max-width: 767px) {
+    .community-share-inbox,
+    .community-share-thread {
+      border-radius: 0 !important;
+      box-shadow: none !important;
+    }
+  }
+
 `;
 
 const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenticated = false, settings, currentUser = null }) => {
@@ -2795,6 +2930,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const pageStackRef = useRef<CommunityPage[]>([]);
   const [selectedMessageId, setSelectedMessageId] = useState(0);
   const [selectedStatusId, setSelectedStatusId] = useState(0);
+  const statusReelScrollRef = useRef<HTMLDivElement>(null);
   const [statusViewerPanelId, setStatusViewerPanelId] = useState<number | null>(null);
   const [messages, setMessages] = useState<FeedMessage[]>(() => readJsonArray<FeedMessage>(COMMUNITY_FEED_CACHE_KEY, []).map(normalizeFeedMessage).filter((message) => isUnexpired(message, POST_TTL_MS)));
   const [statusCards, setStatusCards] = useState<StatusCard[]>(() => readJsonArray<StatusCard>(COMMUNITY_STATUS_CACHE_KEY, []).filter((status) => isUnexpired(status, STORY_TTL_MS)));
@@ -2832,6 +2968,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [privateMessageMenuId, setPrivateMessageMenuId] = useState('');
   const [storyMenuStatusId, setStoryMenuStatusId] = useState<number | null>(null);
   const [inboxSearch, setInboxSearch] = useState('');
+  const [shareInboxFilter, setShareInboxFilter] = useState<'all' | 'unread'>('all');
   const [communitySearchQuery, setCommunitySearchQuery] = useState('');
   const [selectedChatId, setSelectedChatId] = useState('');
   const [privateConversations, setPrivateConversations] = useState<PrivateConversation[]>([]);
@@ -6210,12 +6347,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return <div className="fixed inset-0 z-[1900] flex items-end justify-center bg-black/55 backdrop-blur-sm sm:items-center sm:p-4" onClick={() => setStatusViewerPanelId(null)}><section className="max-h-[86dvh] w-full max-w-md overflow-hidden rounded-t-[1.75rem] bg-white shadow-2xl sm:rounded-[1.75rem]" onClick={(event) => event.stopPropagation()}><div className="mx-auto mt-2 h-1 w-10 rounded-full bg-[#d1d5db] sm:hidden" /><header className="flex items-center justify-between border-b border-[#efefef] px-4 py-3"><div><h3 className="text-lg font-black text-[#111]">Story activity</h3><p className="text-xs font-semibold text-[#737373]">{card.views} views · {card.likedBy} likes</p></div><button type="button" onClick={() => setStatusViewerPanelId(null)} className="flex h-10 w-10 items-center justify-center rounded-full text-xl hover:bg-[#f5f5f5]">✕</button></header><div className="max-h-[68dvh] overflow-y-auto px-3 py-2 custom-scrollbar"><div className="grid grid-cols-2 gap-2 p-1"><div className="rounded-xl bg-[#fff1f2] p-3 text-center"><strong className="block text-2xl text-[#e11d48]">{likedUsers.length}</strong><span className="text-xs font-bold text-[#9f1239]">Liked</span></div><div className="rounded-xl bg-[#eff6ff] p-3 text-center"><strong className="block text-2xl text-[#2563eb]">{viewedUsers.length}</strong><span className="text-xs font-bold text-[#1d4ed8]">Viewed</span></div></div><h4 className="px-2 pb-1 pt-4 text-sm font-black text-[#111]">Liked by</h4>{likedUsers.length ? likedUsers.map(renderViewerRow) : <p className="rounded-xl bg-[#fafafa] p-5 text-center text-sm font-semibold text-[#737373]">No likes yet.</p>}<h4 className="px-2 pb-1 pt-4 text-sm font-black text-[#111]">Viewed only</h4>{viewedOnlyUsers.length ? viewedOnlyUsers.map(renderViewerRow) : <p className="rounded-xl bg-[#fafafa] p-5 text-center text-sm font-semibold text-[#737373]">No view-only users yet.</p>}</div></section></div>;
   };
 
+  const scrollStatusReel = (direction: -1 | 1) => {
+    const viewport = statusReelScrollRef.current;
+    if (!viewport) return;
+    viewport.scrollBy({ top: direction * viewport.clientHeight, behavior: 'smooth' });
+  };
+
   const renderStatusReel = () => {
     if (!orderedStoryStatuses.length) return <div className="mx-auto max-w-xl rounded-[2rem] border border-dashed border-[var(--community-border)] bg-white p-8 text-center text-sm font-bold text-[var(--community-muted)]">No active stories yet.</div>;
     const selectedIndex = Math.max(0, orderedStoryStatuses.findIndex((card) => card.id === selectedStatus.id));
     const reelStatuses = [...orderedStoryStatuses.slice(selectedIndex), ...orderedStoryStatuses.slice(0, selectedIndex)];
 
-    return <div className="community-status-reel-shell fixed inset-0 z-[1500] overflow-hidden bg-black"><div className="community-story-progress fixed inset-x-0 top-0 z-40 flex gap-1 px-3 pt-[calc(env(safe-area-inset-top)+0.55rem)] md:left-1/2 md:max-w-[31rem] md:-translate-x-1/2">{reelStatuses.map((card, index) => <span key={`progress-${card.id}`} className={`h-[3px] flex-1 overflow-hidden rounded-full bg-white/25 ${card.id === selectedStatusId ? 'is-active' : index < selectedIndex ? 'is-complete' : ''}`}><span className="block h-full rounded-full bg-white" /></span>)}</div><button type="button" onClick={goBack} aria-label="Close story viewer" className="community-status-reel-control fixed left-3 top-[calc(env(safe-area-inset-top)+1.05rem)] z-50 flex h-10 w-10 items-center justify-center rounded-full border text-lg font-black shadow-xl">←</button><div className="h-full snap-y snap-mandatory overflow-y-auto overscroll-y-contain scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" onScroll={(event) => { const viewport = event.currentTarget; const index = Math.round(viewport.scrollTop / Math.max(1, viewport.clientHeight)); const visibleStatus = reelStatuses[Math.min(reelStatuses.length - 1, Math.max(0, index))]; if (visibleStatus && visibleStatus.id !== selectedStatusId) { setSelectedStatusId(visibleStatus.id); setStoryMenuStatusId(null); void recordStatusView(visibleStatus.id); } }}>{reelStatuses.map((card) => { const owner = getStatusOwnerIdentity(card); const liked = Boolean(card.likedByUsers?.[currentUserKey]) || likedStatuses.includes(card.id); const ownStory = isOwnCommunityId(card.ownerId || card.creatorId); return <section key={card.id} className="community-story-slide relative flex h-[100dvh] snap-start items-center justify-center overflow-hidden bg-black" onMouseEnter={() => { setSelectedStatusId(card.id); void recordStatusView(card.id); }}><div className="community-status-reel-backdrop absolute inset-0" /><article className="community-status-reel-card relative flex h-[100dvh] w-full max-w-[31rem] flex-col overflow-hidden border-0 bg-black shadow-[0_30px_100px_rgba(0,0,0,0.65)] md:h-[min(92dvh,880px)] md:rounded-[1.75rem]"><div className="community-story-topbar absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 px-4 pt-[calc(env(safe-area-inset-top)+3.25rem)] md:pt-14"><button type="button" onClick={() => { const ownerId = card.ownerId || card.creatorId; if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); setPage('profile'); setPageStack([]); } }} className="flex min-w-0 items-center gap-2 text-left text-white"><Avatar value={owner.avatar} size="h-9 w-9" className="ring-2 ring-white/80" /><span className="min-w-0"><span className="block max-w-[11rem] truncate text-sm font-black">{owner.name}</span><span className="block text-[11px] font-semibold text-white/70">{card.slots}</span></span></button><div className="relative"><button type="button" onClick={() => setStoryMenuStatusId((current) => current === card.id ? null : card.id)} className="community-status-reel-control flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-xs font-black">•••</button>{storyMenuStatusId === card.id ? <div className="absolute right-0 top-12 w-48 overflow-hidden rounded-xl border border-white/15 bg-[#111]/95 p-1.5 text-white shadow-2xl backdrop-blur-xl"><button type="button" onClick={() => { setStoryMenuStatusId(null); openShareComposer({ sourceType: 'status', status: card }); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">↗ Share story</button>{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); setStatusViewerPanelId(card.id); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">👁 Story activity</button> : null}{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); void deleteOwnStatusStory(card); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#fb7185] hover:bg-white/10">Delete story</button> : null}</div> : null}</div></div><div className="community-story-media flex min-h-0 flex-1 items-center justify-center">{renderStatusReelContent(card)}</div><div className="community-story-bottom absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black via-black/72 to-transparent px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-24 text-white"><h2 className="line-clamp-2 text-lg font-black leading-tight">{card.title}</h2>{card.body ? <p className="mt-1 line-clamp-3 text-sm font-semibold leading-5 text-white/85">{card.body}</p> : null}<div className="mt-4 flex items-end justify-between gap-3"><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="min-h-11 flex-1 rounded-full border border-white/25 bg-black/35 px-4 text-left text-sm font-semibold text-white/80 backdrop-blur-md">Reply or discuss…</button><div className="flex items-center gap-2"><button type="button" onClick={() => toggleStatusLike(card.id)} aria-label="Like story" className={`community-story-action flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 text-xl backdrop-blur-md ${liked ? 'is-liked' : ''}`}>♡</button><button type="button" onClick={() => openShareComposer({ sourceType: 'status', status: card })} aria-label="Share story" className="community-story-action flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 text-xl backdrop-blur-md">↗</button>{ownStory ? <button type="button" onClick={() => setStatusViewerPanelId(card.id)} aria-label="Story activity" className="community-story-action flex h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 px-3 text-xs font-black backdrop-blur-md">👁 {card.views}</button> : null}</div></div></div></article></section>; })}</div></div>;
+    return <div className="community-status-reel-shell fixed inset-0 z-[1500] overflow-hidden bg-black"><div className="community-story-progress fixed inset-x-0 top-0 z-40 flex gap-1 px-3 pt-[calc(env(safe-area-inset-top)+0.55rem)] md:left-1/2 md:max-w-[31rem] md:-translate-x-1/2">{reelStatuses.map((card, index) => <span key={`progress-${card.id}`} className={`h-[3px] flex-1 overflow-hidden rounded-full bg-white/25 ${card.id === selectedStatusId ? 'is-active' : index < selectedIndex ? 'is-complete' : ''}`}><span className="block h-full rounded-full bg-white" /></span>)}</div><button type="button" onClick={goBack} aria-label="Close story viewer" className="community-status-reel-control fixed left-3 top-[calc(env(safe-area-inset-top)+1.05rem)] z-50 flex h-10 w-10 items-center justify-center rounded-full border text-lg font-black shadow-xl">←</button><div className="community-status-desktop-scroll fixed right-6 top-1/2 z-50 hidden -translate-y-1/2 flex-col gap-3 lg:flex"><button type="button" onClick={() => scrollStatusReel(-1)} aria-label="Previous story" className="community-status-scroll-button flex h-12 w-12 items-center justify-center rounded-full text-xl font-black">↑</button><button type="button" onClick={() => scrollStatusReel(1)} aria-label="Next story" className="community-status-scroll-button flex h-12 w-12 items-center justify-center rounded-full text-xl font-black">↓</button></div><div ref={statusReelScrollRef} className="community-status-reel-scroller h-full snap-y snap-mandatory overflow-y-auto overscroll-y-contain scroll-smooth [scrollbar-width:none] [&::-webkit-scrollbar]:hidden" onScroll={(event) => { const viewport = event.currentTarget; const index = Math.round(viewport.scrollTop / Math.max(1, viewport.clientHeight)); const visibleStatus = reelStatuses[Math.min(reelStatuses.length - 1, Math.max(0, index))]; if (visibleStatus && visibleStatus.id !== selectedStatusId) { setSelectedStatusId(visibleStatus.id); setStoryMenuStatusId(null); void recordStatusView(visibleStatus.id); } }}>{reelStatuses.map((card) => { const owner = getStatusOwnerIdentity(card); const liked = Boolean(card.likedByUsers?.[currentUserKey]) || likedStatuses.includes(card.id); const ownStory = isOwnCommunityId(card.ownerId || card.creatorId); return <section key={card.id} className="community-story-slide relative flex h-[100dvh] snap-start items-center justify-center overflow-hidden bg-black" onMouseEnter={() => { setSelectedStatusId(card.id); void recordStatusView(card.id); }}><div className="community-status-reel-backdrop absolute inset-0" /><article className="community-status-reel-card relative flex h-[100dvh] w-full max-w-[31rem] flex-col overflow-hidden border-0 bg-black shadow-[0_30px_100px_rgba(0,0,0,0.65)] md:h-[min(92dvh,880px)] md:rounded-[1.75rem]"><div className="community-story-topbar absolute inset-x-0 top-0 z-30 flex items-center justify-between gap-3 px-4 pt-[calc(env(safe-area-inset-top)+3.25rem)] md:pt-14"><button type="button" onClick={() => { const ownerId = card.ownerId || card.creatorId; if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); setPage('profile'); setPageStack([]); } }} className="flex min-w-0 items-center gap-2 text-left text-white"><Avatar value={owner.avatar} size="h-9 w-9" className="ring-2 ring-white/80" /><span className="min-w-0"><span className="block max-w-[11rem] truncate text-sm font-black">{owner.name}</span><span className="block text-[11px] font-semibold text-white/70">{card.slots}</span></span></button><div className="relative"><button type="button" onClick={() => setStoryMenuStatusId((current) => current === card.id ? null : card.id)} className="community-status-reel-control flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-xs font-black">•••</button>{storyMenuStatusId === card.id ? <div className="absolute right-0 top-12 w-48 overflow-hidden rounded-xl border border-white/15 bg-[#111]/95 p-1.5 text-white shadow-2xl backdrop-blur-xl"><button type="button" onClick={() => { setStoryMenuStatusId(null); openShareComposer({ sourceType: 'status', status: card }); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">↗ Share story</button>{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); setStatusViewerPanelId(card.id); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">👁 Story activity</button> : null}{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); void deleteOwnStatusStory(card); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#fb7185] hover:bg-white/10">Delete story</button> : null}</div> : null}</div></div><div className="community-story-media flex min-h-0 flex-1 items-center justify-center">{renderStatusReelContent(card)}</div><div className="community-story-bottom absolute inset-x-0 bottom-0 z-30 bg-gradient-to-t from-black via-black/72 to-transparent px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-24 text-white"><h2 className="line-clamp-2 text-lg font-black leading-tight">{card.title}</h2>{card.body ? <p className="mt-1 line-clamp-3 text-sm font-semibold leading-5 text-white/85">{card.body}</p> : null}<div className="mt-4 flex items-end justify-between gap-3"><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="min-h-11 flex-1 rounded-full border border-white/25 bg-black/35 px-4 text-left text-sm font-semibold text-white/80 backdrop-blur-md">Reply or discuss…</button><div className="flex items-center gap-2"><button type="button" onClick={() => toggleStatusLike(card.id)} aria-label="Like story" className={`community-story-action flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 text-xl backdrop-blur-md ${liked ? 'is-liked' : ''}`}>♡</button><button type="button" onClick={() => openShareComposer({ sourceType: 'status', status: card })} aria-label="Share story" className="community-story-action flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 text-xl backdrop-blur-md">↗</button>{ownStory ? <button type="button" onClick={() => setStatusViewerPanelId(card.id)} aria-label="Story activity" className="community-story-action flex h-11 min-w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 px-3 text-xs font-black backdrop-blur-md">👁 {card.views}</button> : null}</div></div></div></article></section>; })}</div></div>;
   };
 
   const openChatCreator = (creatorId: string) => {
@@ -6227,7 +6370,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   const renderPrivateChatInbox = () => {
     const normalizedQuery = normalizeSearchText(inboxSearch);
-    const conversationRows = privateConversations
+    const allConversationRows = privateConversations
       .map((conversation) => {
         const otherId = conversation.participants.find((participantId) => participantId !== currentUserKey) || '';
         const creator = allCreators.find((item) => item.id === otherId);
@@ -6236,8 +6379,62 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       .filter(({ otherId, creator }) => Boolean(otherId && creator))
       .filter(({ creator }) => !normalizedQuery || scoreCreatorSearch(creator!, normalizedQuery) > 0)
       .sort((left, right) => right.conversation.updatedAt - left.conversation.updatedAt);
+    const conversationRows = shareInboxFilter === 'unread'
+      ? allConversationRows.filter(({ conversation }) => (conversation.unreadCounts?.[currentUserKey] || 0) > 0)
+      : allConversationRows;
 
-    return <div className="community-share-inbox mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col overflow-hidden bg-white md:h-[calc(100dvh-8rem)] md:rounded-[1.5rem] md:border md:border-[#e5e7eb]"><header className="flex items-center gap-3 border-b border-[#efefef] px-3 py-2"><button type="button" onClick={goBack} className="flex h-11 w-11 items-center justify-center rounded-full text-xl hover:bg-[#f5f5f5]">←</button><div className="min-w-0 flex-1"><h2 className="text-lg font-black text-[#111]">Shared</h2><p className="text-xs font-semibold text-[#737373]">Posts and stories only · no private text chat</p></div></header><div className="border-b border-[#efefef] p-3"><label className="flex min-h-11 items-center gap-2 rounded-xl bg-[#efefef] px-3"><span>⌕</span><input value={inboxSearch} onChange={(event) => setInboxSearch(event.target.value)} placeholder="Search shared conversations" className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[#111] outline-none" /></label></div><div className="min-h-0 flex-1 overflow-y-auto p-2 custom-scrollbar">{conversationRows.length ? conversationRows.map(({ conversation, otherId, creator }) => { const unread = conversation.unreadCounts?.[currentUserKey] || 0; return <button key={conversation.id} type="button" onClick={() => openChatCreator(otherId)} className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left hover:bg-[#f7f7f7]"><Avatar value={creator!.avatar} size="h-13 w-13" /><span className="min-w-0 flex-1"><strong className="block truncate text-sm text-[#111]">{creator!.name}</strong><span className="block truncate text-xs font-semibold text-[#737373]">{conversation.lastMessage || 'Shared Community items'} · {formatCommunityTime(conversation.lastMessageAt)}</span></span>{unread ? <span className="min-w-5 rounded-full bg-[#0095f6] px-1.5 py-0.5 text-center text-[10px] font-black text-white">{unread > 9 ? '9+' : unread}</span> : null}</button>; }) : <div className="px-6 py-16 text-center"><div className="text-5xl">↗</div><h3 className="mt-4 text-xl font-black text-[#111]">No shared items yet</h3><p className="mt-2 text-sm font-semibold leading-6 text-[#737373]">Use the Share button on a Community post or story to start a private share thread.</p><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="mt-5 rounded-xl bg-[#0095f6] px-5 py-3 text-sm font-black text-white">Open feed</button></div>}</div></div>;
+    return (
+      <div className="community-share-inbox mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col overflow-hidden md:h-[calc(100dvh-8rem)] md:rounded-[2rem] md:border">
+        <header className="community-share-inbox-header flex items-center gap-3 border-b px-4 py-3 sm:px-5">
+          <button type="button" onClick={goBack} aria-label="Back" className="community-share-icon-button flex h-11 w-11 items-center justify-center rounded-full text-xl">←</button>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-xl font-black tracking-[-0.03em] text-[#0f172a]">Messages</h2>
+            <p className="text-xs font-semibold text-[#64748b]">Shared Community posts and stories</p>
+          </div>
+          {privateShareUnreadCount > 0 ? <span className="community-share-unread-total rounded-full px-3 py-1 text-xs font-black">{privateShareUnreadCount > 99 ? '99+' : privateShareUnreadCount} unread</span> : null}
+        </header>
+
+        <div className="community-share-tools border-b px-4 py-3 sm:px-5">
+          <label className="community-share-search flex min-h-12 items-center gap-3 rounded-2xl px-4">
+            <span aria-hidden="true">⌕</span>
+            <input value={inboxSearch} onChange={(event) => setInboxSearch(event.target.value)} placeholder="Search conversations" className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[#0f172a] outline-none" />
+          </label>
+          <div className="mt-3 flex items-center gap-2">
+            <button type="button" onClick={() => setShareInboxFilter('all')} className={`community-share-filter rounded-full px-4 py-2 text-xs font-black ${shareInboxFilter === 'all' ? 'is-active' : ''}`}>All <span>{allConversationRows.length}</span></button>
+            <button type="button" onClick={() => setShareInboxFilter('unread')} className={`community-share-filter rounded-full px-4 py-2 text-xs font-black ${shareInboxFilter === 'unread' ? 'is-active' : ''}`}>Unread <span>{privateShareUnreadCount}</span></button>
+          </div>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto p-2.5 custom-scrollbar sm:p-3">
+          {conversationRows.length ? conversationRows.map(({ conversation, otherId, creator }) => {
+            const unread = conversation.unreadCounts?.[currentUserKey] || 0;
+            return (
+              <button key={conversation.id} type="button" onClick={() => openChatCreator(otherId)} className={`community-share-conversation-row flex w-full items-center gap-3 rounded-[1.25rem] px-3 py-3 text-left sm:px-4 ${unread ? 'is-unread' : ''}`}>
+                <span className="relative shrink-0">
+                  <Avatar value={creator!.avatar} size="h-12 w-12" className="community-share-avatar" />
+                  {unread ? <span className="community-share-online-dot absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-white" /> : null}
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-center justify-between gap-3">
+                    <strong className="truncate text-sm font-black text-[#0f172a]">{creator!.name}</strong>
+                    <time className="shrink-0 text-[10px] font-bold text-[#94a3b8]">{formatCommunityTime(conversation.lastMessageAt)}</time>
+                  </span>
+                  <span className={`mt-1 block truncate text-xs ${unread ? 'font-black text-[#334155]' : 'font-semibold text-[#64748b]'}`}>{conversation.lastMessage || 'Shared a Community item'}</span>
+                </span>
+                {unread ? <span className="community-share-unread-badge min-w-6 rounded-full px-2 py-1 text-center text-[10px] font-black text-white">{unread > 99 ? '99+' : unread}</span> : <span className="text-lg text-[#94a3b8]">›</span>}
+              </button>
+            );
+          }) : (
+            <div className="px-6 py-16 text-center">
+              <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.4rem] bg-[#eaf2ff] text-3xl">↗</div>
+              <h3 className="mt-4 text-xl font-black text-[#0f172a]">{shareInboxFilter === 'unread' ? 'No unread shares' : 'No shared items yet'}</h3>
+              <p className="mx-auto mt-2 max-w-sm text-sm font-semibold leading-6 text-[#64748b]">Use the Share button on a Community post or story to start a private share thread.</p>
+              <button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="mt-5 rounded-2xl bg-[#1769ff] px-5 py-3 text-sm font-black text-white">Open Community feed</button>
+            </div>
+          )}
+        </div>
+      </div>
+    );
   };
 
   const renderPrivateMessageBubble = (message: PrivateChatMessage) => {
@@ -6256,12 +6453,77 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       if (targetMessage) return openMessage(targetMessage.id);
       setPrivateChatError('This post is unavailable. The shared preview remains here.');
     };
-    return <div key={message.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}><article className={`relative w-[min(82%,22rem)] overflow-visible rounded-2xl border ${mine ? 'border-[#dbeafe] bg-[#eff6ff]' : 'border-[#e5e7eb] bg-white'} p-2 shadow-sm`}><div className="flex items-center justify-between gap-2 px-1 pb-2"><span className="text-[10px] font-bold text-[#737373]">{mine ? 'You shared' : `${message.senderName} shared`} · {formatCommunityTime(message.createdAt)}</span><div className="relative"><button type="button" onClick={() => setPrivateMessageMenuId((current) => current === message.id ? '' : message.id)} aria-label="Shared item options" className="flex h-8 w-8 items-center justify-center rounded-full text-sm font-black hover:bg-black/5">•••</button>{privateMessageMenuId === message.id ? <div className="absolute right-0 top-9 z-30 w-48 overflow-hidden rounded-xl border border-[#e5e7eb] bg-white p-1.5 shadow-xl">{canDelete ? <button type="button" onClick={() => void deleteSharedMessageForEveryone(message)} className="w-full rounded-lg px-3 py-2 text-left text-xs font-black text-[#dc2626] hover:bg-[#fff1f2]">Delete for everyone</button> : <p className="px-3 py-2 text-xs font-semibold leading-5 text-[#737373]">Delete is available to the sender for 30 minutes.</p>}</div> : null}</div></div><button type="button" onClick={openSharedItem} className="block w-full overflow-hidden rounded-xl border border-[#e5e7eb] bg-white text-left">{sharedItem.imageUrl ? <div className="max-h-64 overflow-hidden bg-black">{renderUploadedImage(sharedItem.imageUrl, sharedItem.title, sharedItem.imageLayout || 'original')}</div> : null}<div className="p-3"><span className="text-[10px] font-black uppercase tracking-[0.14em] text-[#0095f6]">{sharedItem.sourceType === 'status' ? 'Story' : 'Post'}</span><h4 className="mt-1 line-clamp-2 text-sm font-black text-[#111]">{sharedItem.title}</h4><p className="mt-1 line-clamp-3 text-xs font-semibold leading-5 text-[#737373]">{sharedItem.previewText || 'Shared Community item'}</p>{!messages.some((item) => String(item.docId || item.id) === sharedItem.sourceId) && sharedItem.sourceType === 'feed_message' ? <span className="mt-2 block text-[10px] font-bold text-[#a3a3a3]">Open to check current availability</span> : null}</div></button></article></div>;
+
+    return (
+      <div key={message.id} className={`flex ${mine ? 'justify-end' : 'justify-start'}`}>
+        <article className={`community-share-message-bubble relative w-[min(86%,24rem)] overflow-visible rounded-[1.45rem] border p-2.5 ${mine ? 'is-mine' : 'is-theirs'}`}>
+          <div className="flex items-center justify-between gap-2 px-1 pb-2">
+            <span className="text-[10px] font-bold text-[#64748b]">{mine ? 'You shared' : `${message.senderName} shared`} · {formatCommunityTime(message.createdAt)}</span>
+            <div className="relative">
+              <button type="button" onClick={() => setPrivateMessageMenuId((current) => current === message.id ? '' : message.id)} aria-label="Shared item options" className="community-share-message-menu flex h-8 w-8 items-center justify-center rounded-full text-sm font-black">•••</button>
+              {privateMessageMenuId === message.id ? (
+                <div className="absolute right-0 top-9 z-30 w-48 overflow-hidden rounded-xl border border-[#e2e8f0] bg-white p-1.5 shadow-xl">
+                  {canDelete ? <button type="button" onClick={() => void deleteSharedMessageForEveryone(message)} className="w-full rounded-lg px-3 py-2 text-left text-xs font-black text-[#dc2626] hover:bg-[#fff1f2]">Delete for everyone</button> : <p className="px-3 py-2 text-xs font-semibold leading-5 text-[#64748b]">Delete is available to the sender for 30 minutes.</p>}
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <button type="button" onClick={openSharedItem} className="community-share-preview block w-full overflow-hidden rounded-[1.1rem] border text-left">
+            {sharedItem.imageUrl ? <div className="max-h-72 overflow-hidden bg-black">{renderUploadedImage(sharedItem.imageUrl, sharedItem.title, sharedItem.imageLayout || 'original')}</div> : null}
+            <div className="p-3.5">
+              <span className="text-[10px] font-black uppercase tracking-[0.16em] text-[#1769ff]">{sharedItem.sourceType === 'status' ? 'Story' : 'Post'}</span>
+              <h4 className="mt-1.5 line-clamp-2 text-sm font-black text-[#0f172a]">{sharedItem.title}</h4>
+              <p className="mt-1.5 line-clamp-3 text-xs font-semibold leading-5 text-[#64748b]">{sharedItem.previewText || 'Shared Community item'}</p>
+              {!messages.some((item) => String(item.docId || item.id) === sharedItem.sourceId) && sharedItem.sourceType === 'feed_message' ? <span className="mt-2 block text-[10px] font-bold text-[#94a3b8]">Open to check current availability</span> : null}
+            </div>
+          </button>
+        </article>
+      </div>
+    );
   };
 
   const renderShareThread = (mobile = false) => {
     if (!activeChatCreator) return renderPrivateChatInbox();
-    return <div className={`community-share-thread mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col overflow-hidden bg-white ${mobile ? '' : 'md:h-[calc(100dvh-8rem)] md:rounded-[1.5rem] md:border md:border-[#e5e7eb]'}`}><header className="flex items-center gap-3 border-b border-[#efefef] px-3 py-2"><button type="button" onClick={goBack} className="flex h-11 w-11 items-center justify-center rounded-full text-xl hover:bg-[#f5f5f5]">←</button><button type="button" onClick={() => { setSelectedProfileId(activeChatCreator.id); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); }} className="flex min-w-0 flex-1 items-center gap-3 text-left"><Avatar value={activeChatCreator.avatar} size="h-10 w-10" /><span className="min-w-0"><strong className="block truncate text-sm text-[#111]">{activeChatCreator.name}</strong><span className="block truncate text-xs font-semibold text-[#737373]">@{activeChatCreator.username}</span></span></button></header>{privateChatError ? <div className="border-b border-[#fecaca] bg-[#fef2f2] px-3 py-2 text-xs font-bold text-[#b91c1c]">{privateChatError}</div> : null}<div className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-[#fafafa] px-3 py-4 custom-scrollbar">{activePrivateMessages.length ? activePrivateMessages.map(renderPrivateMessageBubble) : <div className="flex h-full items-center justify-center px-8 text-center"><div><div className="text-5xl">↗</div><h3 className="mt-4 text-xl font-black text-[#111]">No shared items</h3><p className="mt-2 text-sm font-semibold leading-6 text-[#737373]">Open a post or story and tap Share to send it here.</p></div></div>}<div ref={directChatMessagesEndRef} /></div><footer className="shrink-0 border-t border-[#efefef] bg-white px-4 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] text-center text-xs font-semibold text-[#737373]">Only Community posts and stories can be shared.</footer></div>;
+    return (
+      <div className={`community-share-thread mx-auto flex h-full min-h-0 w-full max-w-4xl flex-col overflow-hidden ${mobile ? '' : 'md:h-[calc(100dvh-8rem)] md:rounded-[2rem] md:border'}`}>
+        <header className="community-share-thread-header flex items-center gap-3 border-b px-3 py-3 sm:px-5">
+          <button type="button" onClick={goBack} aria-label="Back to messages" className="community-share-icon-button flex h-11 w-11 items-center justify-center rounded-full text-xl">←</button>
+          <button type="button" onClick={() => { setSelectedProfileId(activeChatCreator.id); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); }} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+            <Avatar value={activeChatCreator.avatar} size="h-11 w-11" className="community-share-avatar" />
+            <span className="min-w-0">
+              <strong className="block truncate text-sm font-black text-[#0f172a]">{activeChatCreator.name}</strong>
+              <span className="block truncate text-xs font-semibold text-[#64748b]">@{activeChatCreator.username} · shared items only</span>
+            </span>
+          </button>
+          <button type="button" onClick={() => { setSelectedProfileId(activeChatCreator.id); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); }} className="community-share-icon-button flex h-11 w-11 items-center justify-center rounded-full text-lg" aria-label="Open profile">ⓘ</button>
+        </header>
+
+        {privateChatError ? <div className="border-b border-[#fecaca] bg-[#fef2f2] px-4 py-2.5 text-xs font-bold text-[#b91c1c]">{privateChatError}</div> : null}
+
+        <div className="community-share-thread-canvas min-h-0 flex-1 space-y-3 overflow-y-auto px-3 py-5 custom-scrollbar sm:px-5 sm:py-6">
+          <div className="mx-auto mb-2 w-fit rounded-full bg-white/85 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#64748b] shadow-sm">Shared Community items</div>
+          {activePrivateMessages.length ? activePrivateMessages.map(renderPrivateMessageBubble) : (
+            <div className="flex h-full items-center justify-center px-8 text-center">
+              <div>
+                <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.4rem] bg-white text-3xl shadow-sm">↗</div>
+                <h3 className="mt-4 text-xl font-black text-[#0f172a]">No shared items</h3>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#64748b]">Open a post or story and tap Share to send it here.</p>
+              </div>
+            </div>
+          )}
+          <div ref={directChatMessagesEndRef} />
+        </div>
+
+        <footer className="community-share-composer shrink-0 border-t px-3 py-3 pb-[calc(env(safe-area-inset-bottom)+0.75rem)] sm:px-5">
+          <button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="community-share-composer-button flex min-h-12 w-full items-center gap-3 rounded-2xl border px-3 text-left">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#eaf2ff] text-xl font-black text-[#1769ff]">＋</span>
+            <span className="min-w-0 flex-1 truncate text-sm font-semibold text-[#64748b]">Share a post or story from the feed</span>
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-[#1769ff] text-lg text-white">↗</span>
+          </button>
+          <p className="mt-2 text-center text-[10px] font-bold text-[#94a3b8]">Only Community posts and stories can be shared. Private text chat remains disabled.</p>
+        </footer>
+      </div>
+    );
   };
 
   const ShareComposerModal = () => {

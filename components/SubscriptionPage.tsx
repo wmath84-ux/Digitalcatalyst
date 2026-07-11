@@ -119,25 +119,25 @@ const SubscriptionPage: React.FC<{
   }, []);
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-[#F8FAFD] pb-32 text-[#202124]">
+    <div className="subscription-page-modern relative min-h-screen overflow-x-hidden bg-[#F8FAFD] pb-32 text-[#202124]">
       <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_50%_45%,rgba(255,255,255,0.96)_0%,rgba(232,240,254,0.88)_24%,rgba(211,227,253,0.86)_54%,rgba(194,231,255,0.42)_100%)]" />
       <div className="pointer-events-none absolute left-1/2 top-24 h-72 w-[46rem] -translate-x-1/2 rounded-full bg-[#C2E7FF]/55 blur-3xl" />
 
-      <main className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-5 py-8 sm:px-8 lg:px-10">
+      <main className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-6 sm:px-8 sm:py-8 lg:px-10">
         <button onClick={onBack} className="w-fit rounded-full border border-[#D2E3FC] bg-white/95 px-5 py-2.5 text-sm font-semibold text-[#5F6368] shadow-[0_14px_35px_rgba(26,115,232,0.14)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-[#E8F0FE]">
           ← Back
         </button>
 
-        <section className="flex flex-1 flex-col items-center justify-center py-10">
+        <section className="flex flex-1 flex-col items-center justify-center py-8 sm:py-10">
           <div className="text-center">
-            <p className="text-sm font-medium uppercase tracking-[0.32em] text-[#1967D2]">Premium learning access</p>
-            <h1 className="mt-3 text-3xl font-light tracking-wide text-[#202124] sm:text-4xl">Pricing table example</h1>
+            <p className="text-xs font-black uppercase tracking-[0.28em] text-[#1967D2]">Premium learning access</p>
+            <h1 className="mt-3 text-3xl font-black tracking-[-0.04em] text-[#202124] sm:text-5xl">Choose your learning plan</h1>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-[#5F6368]">
-              Choose your trusted subscription plan and unlock premium notes, courses, and resources in one clean learning space.
+              Unlock premium notes, courses, and resources with a clear one-time purchase and instant access.
             </p>
           </div>
 
-          <div className="mt-10 grid w-full max-w-4xl gap-8 md:grid-cols-3 md:gap-10">
+          <div className="mt-8 grid w-full max-w-5xl gap-5 sm:mt-10 md:grid-cols-3 md:items-stretch">
             {}
             {plans.map((plan, index) => {
               const allUnlocked = (plan.unlockProductIds || []).every((id: number) => purchasedProductIds.includes(id));
@@ -164,7 +164,7 @@ const SubscriptionPage: React.FC<{
               };
 
               return (
-                <article key={plan.id} className={`group relative flex min-h-[25rem] flex-col rounded-[2.2rem] border border-[#D2E3FC] bg-white/95 px-5 pb-6 pt-5 text-center shadow-[0_30px_90px_rgba(26,115,232,0.16)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 ${isHighlighted ? 'scale-[1.03]' : ''}`}>
+                <article key={plan.id} className={`subscription-plan-card group relative flex min-h-0 flex-col rounded-[2rem] border border-[#D2E3FC] bg-white/95 px-5 pb-5 pt-6 text-center shadow-[0_24px_70px_rgba(26,115,232,0.13)] backdrop-blur-xl transition duration-300 hover:-translate-y-1 sm:px-6 sm:pb-6 ${isHighlighted ? 'md:-translate-y-2 md:hover:-translate-y-3' : ''}`}>
                   {isHighlighted && <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-[#1A73E8] px-4 py-1 text-[10px] font-bold uppercase tracking-[0.18em] text-white shadow-[0_10px_24px_rgba(26,115,232,0.22)]">{plan.badge || 'Best Value'}</span>}
                   
                   <h2 className="text-base font-medium text-[#202124]">{plan.name}</h2>
@@ -174,7 +174,7 @@ const SubscriptionPage: React.FC<{
                     <span className="mt-2 text-2xl font-light">₹</span>
                     <span className="text-5xl font-light leading-none tracking-tight">{finalPlanPrice.toFixed(0)}</span>
                   </div>
-                  <p className="mt-2 text-xs font-medium text-[#5F6368]">Price Example</p>
+                  <p className="mt-2 text-xs font-bold text-[#5F6368]">One-time secure access</p>
                   
                   {}
                   {(activeDiscount || validAppliedCoupon) && (
@@ -186,14 +186,14 @@ const SubscriptionPage: React.FC<{
                     </div>
                   )}
                   
-                  <p className="mx-auto mt-4 min-h-10 max-w-[12rem] text-[11px] leading-5 text-[#5F6368]">{plan.description}</p>
+                  <p className="mx-auto mt-4 max-w-[15rem] text-sm font-semibold leading-6 text-[#5F6368]">{plan.description}</p>
 
                   <div className="mt-4 rounded-[1.5rem] border border-[#D2E3FC] bg-[#F8FAFD]/95 p-3 text-left shadow-inner sm:p-4">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                       <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#1967D2]">Have a coupon?</p>
                       <span className="rounded-full bg-[#E6F4EA] px-2.5 py-1 text-[10px] font-black text-[#137333]">Live coupons</span>
                     </div>
-                    <div className="mt-3 grid gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+                    <div className="mt-3 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                       <input
                         type="text"
                         value={couponInputs[planId] || ''}
@@ -201,14 +201,14 @@ const SubscriptionPage: React.FC<{
                         onKeyDown={event => { if (event.key === 'Enter' && !validAppliedCoupon) handleApplyCoupon(planId, couponInputs[planId] || ''); }}
                         placeholder="Coupon code"
                         disabled={allUnlocked}
-                        className="h-12 w-full min-w-0 rounded-2xl border border-[#DADCE0] bg-white px-4 text-sm font-black uppercase tracking-[0.08em] outline-none transition placeholder:normal-case placeholder:tracking-normal placeholder:text-[#9AA0A6] focus:border-[#1A73E8] focus:ring-2 focus:ring-[#D2E3FC] disabled:cursor-not-allowed disabled:bg-[#F8FAFD] sm:h-11"
+                        className="h-11 w-full min-w-0 rounded-xl border border-[#DADCE0] bg-white px-3 text-sm font-black uppercase tracking-[0.08em] outline-none transition placeholder:normal-case placeholder:tracking-normal placeholder:text-[#9AA0A6] focus:border-[#1A73E8] focus:ring-2 focus:ring-[#D2E3FC] disabled:cursor-not-allowed disabled:bg-[#F8FAFD]"
                         aria-label={`Coupon code for ${plan.name}`}
                       />
                       <button
                         type="button"
                         disabled={allUnlocked}
                         onClick={() => validAppliedCoupon ? handleRemoveCoupon(planId) : handleApplyCoupon(planId, couponInputs[planId] || '')}
-                        className={`h-12 rounded-2xl px-5 text-sm font-black transition active:scale-95 sm:h-11 disabled:cursor-not-allowed disabled:bg-[#DADCE0] disabled:text-[#5F6368] ${validAppliedCoupon ? 'bg-[#FCE8E6] text-[#C5221F] hover:bg-[#FAD2CF]' : 'bg-[#1A73E8] text-white hover:-translate-y-0.5'}`}
+                        className={`h-11 rounded-xl px-4 text-sm font-black transition active:scale-95 disabled:cursor-not-allowed disabled:bg-[#DADCE0] disabled:text-[#5F6368] ${validAppliedCoupon ? 'bg-[#FCE8E6] text-[#C5221F] hover:bg-[#FAD2CF]' : 'bg-[#1A73E8] text-white hover:-translate-y-0.5'}`}
                       >
                         {validAppliedCoupon ? 'Remove' : 'Apply'}
                       </button>
@@ -217,7 +217,7 @@ const SubscriptionPage: React.FC<{
                     {validAppliedCoupon && <p className="mt-2 text-xs font-black text-[#137333]">{validAppliedCoupon.code} applied. You saved ₹{couponDiscount.toFixed(2)}.</p>}
                   </div>
 
-                  <ul className="mx-auto mt-4 flex-1 space-y-2 text-left text-[11px] leading-4 text-[#5F6368]">
+                  <ul className="mx-auto mt-5 flex-1 space-y-2.5 text-left text-xs font-semibold leading-5 text-[#5F6368]">
                     {unlockedProducts.length ? unlockedProducts.slice(0, 5).map((title, productIndex) => (
                       <li key={title} className="flex items-start gap-2">
                         <span className={productIndex === 3 ? 'text-[#C5221F]' : 'text-[#137333]'}>{productIndex === 3 ? '×' : '✓'}</span>
@@ -227,13 +227,13 @@ const SubscriptionPage: React.FC<{
                   </ul>
 
                   {}
-                  <div className="mt-5 space-y-2">
-                    <button disabled={allUnlocked} onClick={handlePlanCheckout} className={`mx-auto block rounded-full px-7 py-2.5 text-[11px] font-bold text-white shadow-[0_10px_20px_rgba(26,115,232,0.22)] transition active:scale-95 ${allUnlocked ? 'cursor-not-allowed bg-[#DADCE0]' : 'bg-[#1A73E8] hover:-translate-y-0.5 hover:bg-[#1967D2]'}`}>
-                      {allUnlocked ? 'Already Active' : validAppliedCoupon || activeDiscount ? 'Apply & Activate' : 'Get this plan'}
+                  <div className="mt-5 space-y-2.5">
+                    <button disabled={allUnlocked} onClick={handlePlanCheckout} className={`block w-full rounded-2xl px-5 py-3.5 text-sm font-black text-white shadow-[0_14px_30px_rgba(26,115,232,0.24)] transition active:scale-95 ${allUnlocked ? 'cursor-not-allowed bg-[#DADCE0]' : 'bg-[#1A73E8] hover:-translate-y-0.5 hover:bg-[#1967D2]'}`}>
+                      {allUnlocked ? 'Plan active' : `Purchase ${plan.name} · ₹${finalPlanPrice.toFixed(0)}`}
                     </button>
                     
                     {coinPrice > 0 && (
-                      <button disabled={allUnlocked || !canPayWithCoins} onClick={() => onActivatePlanWithCoins?.(plan)} className="mx-auto block rounded-full border border-[#D2E3FC] bg-[#E8F0FE] px-5 py-2 text-[11px] font-bold text-[#1967D2] shadow-sm transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
+                      <button disabled={allUnlocked || !canPayWithCoins} onClick={() => onActivatePlanWithCoins?.(plan)} className="block w-full rounded-2xl border border-[#D2E3FC] bg-[#E8F0FE] px-5 py-3 text-xs font-black text-[#1967D2] shadow-sm transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">
                         {canPayWithCoins ? `Pay ${coinPrice} EduCoins` : `Need ${missingCoins} more coins`}
                       </button>
                     )}
