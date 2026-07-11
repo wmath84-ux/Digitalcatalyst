@@ -1,6 +1,7 @@
 import React from 'react';
 import { ActiveCoinDiscount, Coupon, ProductWithRating, WebsiteSettings, User } from '../App';
 import { EconomySettings, resolveCoinPrice } from '../utils/economy';
+import LiquidMetalButton from './ui/LiquidMetalButton';
 
 interface Plan { 
   id: string; 
@@ -228,9 +229,9 @@ const SubscriptionPage: React.FC<{
 
                   {}
                   <div className="mt-5 space-y-2.5">
-                    <button disabled={allUnlocked} onClick={handlePlanCheckout} className={`block w-full rounded-2xl px-5 py-3.5 text-sm font-black text-white shadow-[0_14px_30px_rgba(26,115,232,0.24)] transition active:scale-95 ${allUnlocked ? 'cursor-not-allowed bg-[#DADCE0]' : 'bg-[#1A73E8] hover:-translate-y-0.5 hover:bg-[#1967D2]'}`}>
+                    <LiquidMetalButton tone="blue" disabled={allUnlocked} onClick={handlePlanCheckout} className={`block w-full rounded-2xl px-5 py-3.5 text-sm font-black ${allUnlocked ? 'cursor-not-allowed' : ''}`}>
                       {allUnlocked ? 'Plan active' : `Purchase ${plan.name} · ₹${finalPlanPrice.toFixed(0)}`}
-                    </button>
+                    </LiquidMetalButton>
                     
                     {coinPrice > 0 && (
                       <button disabled={allUnlocked || !canPayWithCoins} onClick={() => onActivatePlanWithCoins?.(plan)} className="block w-full rounded-2xl border border-[#D2E3FC] bg-[#E8F0FE] px-5 py-3 text-xs font-black text-[#1967D2] shadow-sm transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50">

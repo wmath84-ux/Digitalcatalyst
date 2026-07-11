@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { WebsiteSettings } from '../../App';
 import UserAvatar from '../common/UserAvatar';
 import { RememberedAuthAccount } from '../../utils/rememberedAuth';
+import LiquidMetalButton from '../ui/LiquidMetalButton';
 
 type AuthMode = 'login' | 'signup';
 
@@ -222,7 +223,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
                             </div>
                         )}
                         {error && <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl p-3">{error}</p>}
-                        <button type="submit" disabled={isSubmitting || isGoogleLoading} className="w-full rounded-2xl bg-gradient-to-r from-slate-950 via-blue-900 to-indigo-800 px-6 py-3.5 font-black text-white shadow-[0_14px_34px_rgba(30,64,175,0.22)] transition-all hover:-translate-y-0.5 hover:shadow-sm disabled:cursor-not-allowed disabled:opacity-70 sm:px-8 sm:py-4">{isSubmitting ? 'Please wait...' : mode === 'login' ? 'Login to learning store' : 'Create account'}</button>
+                        <LiquidMetalButton tone="dark" type="submit" disabled={isSubmitting || isGoogleLoading} className="w-full rounded-2xl px-6 py-3.5 font-black disabled:cursor-not-allowed disabled:opacity-70 sm:px-8 sm:py-4">{isSubmitting ? 'Please wait...' : mode === 'login' ? 'Login to learning store' : 'Create account'}</LiquidMetalButton>
                     </form>
                     <p className="mt-5 text-xs text-slate-700 text-center">Firebase Auth secures this session; purchases restore from your account after login.</p>
             </div>

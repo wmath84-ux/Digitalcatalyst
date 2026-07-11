@@ -5,6 +5,7 @@ import { RememberedAuthAccount } from '../utils/rememberedAuth';
 import { ProductImageSlot, getProductImage, getProductImageFallback } from '../utils/productImages';
 import SafeImage from './common/SafeImage';
 import { ensureUserCoinWallet, watchUserCoinWallet } from '../utils/coinWallet';
+import LiquidMetalButton from './ui/LiquidMetalButton';
 
 interface MobileAppHomeProps {
   settings: WebsiteSettings;
@@ -160,7 +161,7 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
             <h1 className="mt-4 text-[28px] font-black leading-[1.03] tracking-tight text-[#081A44]">Welcome to Digital Catalyst</h1>
             <p className="mt-3 text-[13px] font-semibold leading-5 text-[#64708F]">Learn, buy and access premium notes, courses and digital products.</p>
             <div className="mt-4 flex flex-col gap-2">
-              <button type="button" onClick={onNavigateToAllProducts} className="rounded-2xl bg-[#0B63FF] px-4 py-3 text-sm font-black text-white shadow-[0_14px_30px_rgba(11,99,255,0.30)]">🛍️ Explore Products</button>
+              <LiquidMetalButton tone="blue" type="button" onClick={onNavigateToAllProducts} className="rounded-2xl px-4 py-3 text-sm font-black">🛍️ Explore Products</LiquidMetalButton>
               <button type="button" onClick={onNavigateToPurchases} className="rounded-2xl border border-[#D8E6FF] bg-white/82 px-4 py-3 text-sm font-black text-[#081A44]">📄 My Purchases</button>
             </div>
           </div>

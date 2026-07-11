@@ -10,6 +10,7 @@ import FeaturedProducts from './FeaturedProducts';
 import ShareModal from './ShareModal';
 import { getProductImage, getProductImageFallback } from '../utils/productImages';
 import SafeImage from './common/SafeImage';
+import LiquidMetalButton from './ui/LiquidMetalButton';
 
 const ProductAnalyticsChart: React.FC = () => {
     return (
@@ -584,9 +585,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 )}
 
                 <div className="mt-5 space-y-3 sm:mt-6">
-                  <button onClick={() => { if (isPurchased) { onOpenPurchases?.(); return; } handleBuyClick(); }} className="product-checkout-primary w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-6 py-3.5 text-base font-black text-white shadow-[0_16px_40px_rgba(79,70,229,0.25)] transition hover:-translate-y-0.5 active:scale-95 sm:px-8 sm:py-4 sm:text-lg">
+                  <LiquidMetalButton tone="blue" onClick={() => { if (isPurchased) { onOpenPurchases?.(); return; } handleBuyClick(); }} className="product-checkout-primary w-full rounded-2xl px-6 py-3.5 text-base font-black sm:px-8 sm:py-4 sm:text-lg">
                     {isPurchased ? 'Purchased' : 'Pay with Razorpay'}
-                  </button>
+                  </LiquidMetalButton>
                   {canShowProductCoinCheckout && (
                     <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
                       🪙 {coinCheckoutLabel}

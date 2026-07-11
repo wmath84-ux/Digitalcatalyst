@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import LiquidMetalButton from './ui/LiquidMetalButton';
 
 type BeforeInstallPromptEvent = Event & {
   prompt: () => Promise<void>;
@@ -93,13 +94,14 @@ const InstallAppButton: React.FC<InstallAppButtonProps> = ({ enabled = true }) =
         </div>
       </div>
       <div className="mt-4 flex gap-2">
-        <button
+        <LiquidMetalButton
+          tone="blue"
           type="button"
           onClick={handleInstallClick}
-          className="flex-1 rounded-full bg-gradient-to-r from-blue-600 to-indigo-600 px-4 py-2.5 text-sm font-bold text-white shadow-[0_10px_30px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 hover:opacity-95"
+          className="flex-1 rounded-full px-4 py-2.5 text-sm font-bold"
         >
           {installPrompt ? 'Install App' : 'Add to Home Screen'}
-        </button>
+        </LiquidMetalButton>
         <button
           type="button"
           onClick={handleLaterClick}

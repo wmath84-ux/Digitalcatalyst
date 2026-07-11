@@ -1,4 +1,5 @@
 import React, { useRef, useEffect } from 'react';
+import LiquidMetalButton from './ui/LiquidMetalButton';
 import { WebsiteSettings } from '../App';
 
 interface HeroProps {
@@ -78,13 +79,13 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
           </p>
 
           <div className="animate-child animate-delay-4 mt-8 flex flex-col items-center justify-center gap-3 sm:mt-10 sm:flex-row sm:gap-4">
-            <button
+            <LiquidMetalButton
+              tone="blue"
               onClick={onNavigateToAllProducts}
-              className="group relative w-full overflow-hidden rounded-full border border-[#D2E3FC] bg-white/95 px-6 py-3.5 text-base font-bold text-[#202124] shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:scale-105 hover:border-[#1A73E8] hover:shadow-sm sm:w-auto sm:px-9 sm:py-4 sm:text-lg"
+              className="w-full rounded-full px-6 py-3.5 text-base font-bold sm:w-auto sm:px-9 sm:py-4 sm:text-lg"
             >
-              <span className="absolute inset-0 bg-gradient-to-r from-[#1A73E8]/18 via-[#D3E3FD]/55 to-[#C2E7FF]/45 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-              <span className="relative">Explore Products</span>
-            </button>
+              Explore Products
+            </LiquidMetalButton>
             <button
               onClick={onNavigateToPolicies}
               className="w-full rounded-full border border-[#D2E3FC] bg-white/95 px-6 py-3.5 text-base font-semibold text-[#202124] shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl transition-all duration-300 hover:scale-105 hover:border-[#1A73E8] hover:bg-white/80 hover:shadow-sm sm:w-auto sm:px-9 sm:py-4 sm:text-lg"
