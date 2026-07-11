@@ -114,10 +114,10 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
   const resolvedPhotoURL = currentUser?.profilePhotoSet === true ? String(currentUser.photoURL || '').trim() : '';
   const loggedOutAuthMode: 'login' | 'signup' = rememberedAccount ? 'login' : 'signup';
   const loggedOutAuthLabel = rememberedAccount ? `Continue as ${rememberedAccount.name || rememberedAccount.email.split('@')[0]}` : 'Login';
-  const authButtonClass = "rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-5 py-2 text-sm font-black text-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 transition-all duration-300 hover:-translate-y-0.5 hover:opacity-90";
+  const authButtonClass = "rounded-xl bg-[#1557B0] px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(21,87,176,0.18)] transition hover:bg-[#10213F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#C8D7EE]";
   return (
     <>
-      <header className="sticky top-0 z-50 w-full max-w-full border-b border-[#D9E7F8] bg-[rgba(248,251,255,0.92)] shadow-none backdrop-blur-[18px] md:border-indigo-100/70 md:bg-background/90 md:shadow-[0_12px_34px_rgba(79,70,229,0.08)] md:backdrop-blur-md">
+      <header className="sticky top-0 z-50 w-full max-w-full border-b border-[#DDE5EF] bg-[rgba(255,255,255,0.94)] shadow-[0_6px_24px_rgba(16,33,63,0.05)] backdrop-blur-xl">
         <div className="container mx-auto flex h-16 w-full max-w-full items-center px-3 py-0 md:block md:h-auto md:px-6 md:py-4">
           <div className="flex min-w-0 flex-1 items-center justify-between gap-2 md:gap-3">
             <button onClick={onHomeClick} className="flex min-w-0 cursor-pointer items-center space-x-2 overflow-hidden md:space-x-3" aria-label="Back to Homepage">
@@ -127,7 +127,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
             
             <nav className="hidden md:flex items-center justify-center gap-x-7 lg:gap-x-9">
               {navItems.map((item) => (
-                  <button key={item.name} onClick={item.action} className="text-text-muted hover:text-primary transition-colors duration-300">
+                  <button key={item.name} onClick={item.action} className="rounded-lg px-2 py-2 text-sm font-semibold text-[#526179] transition hover:bg-[#F1F5FA] hover:text-[#1557B0] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#C8D7EE]">
                     {item.name}
                   </button>
               ))}

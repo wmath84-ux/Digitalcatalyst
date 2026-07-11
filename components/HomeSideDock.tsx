@@ -57,16 +57,6 @@ const clampPercent = (value: unknown, fallback: number) => {
   return Math.min(100, Math.max(0, number));
 };
 
-const hexToRgba = (hex: string, opacityPercent: number) => {
-  const fallback = defaultDockStyle.backgroundColor.replace('#', '');
-  const normalized = /^#?[0-9a-f]{6}$/i.test(hex || '') ? hex.replace('#', '') : fallback;
-  const red = Number.parseInt(normalized.slice(0, 2), 16);
-  const green = Number.parseInt(normalized.slice(2, 4), 16);
-  const blue = Number.parseInt(normalized.slice(4, 6), 16);
-
-  return `rgba(${red}, ${green}, ${blue}, ${clampPercent(opacityPercent, defaultDockStyle.backgroundOpacity) / 100})`;
-};
-
 const HomeSideDock: React.FC<HomeSideDockProps> = ({
   settings,
   isLoggedIn,
@@ -172,11 +162,6 @@ const HomeSideDock: React.FC<HomeSideDockProps> = ({
     ...((settings.content as any).dockStyle || {}),
   };
 
-  const panelBackground = hexToRgba(
-    dockStyle.backgroundColor,
-    Math.max(88, Number(dockStyle.backgroundOpacity || 0)),
-  );
-
   const tileOpacity =
     clampPercent(dockStyle.itemOpacity, defaultDockStyle.itemOpacity) / 100;
 
@@ -204,7 +189,7 @@ const HomeSideDock: React.FC<HomeSideDockProps> = ({
 
   return (
     <aside
-      className="fixed inset-y-0 left-0 z-[80] hidden overflow-visible bg-gradient-to-b from-[#EEF6FF] via-[#F8FBFF] to-[#E8F2FF] p-2 transition-[width] duration-300 ease-out lg:flex"
+      className="fixed inset-y-0 left-0 z-[80] hidden overflow-visible bg-[var(--color-background)] p-2 transition-[width] duration-300 ease-out lg:flex"
       style={{ width: visualWidth }}
       data-sidebar-state={sidebarState}
       data-hover-expanded={hoverExpanded ? 'true' : 'false'}
@@ -217,8 +202,7 @@ const HomeSideDock: React.FC<HomeSideDockProps> = ({
       aria-label="Main desktop navigation"
     >
       <div
-        className="flex h-full w-full min-w-0 flex-col overflow-hidden rounded-[1.75rem] border border-[#D9E7F8] shadow-[0_18px_48px_rgba(8,26,69,0.12)] ring-1 ring-white/80 backdrop-blur-2xl"
-        style={{ backgroundColor: panelBackground }}
+        className="flex h-full w-full min-w-0 flex-col overflow-hidden rounded-[1.75rem] border border-[#DDE5EF] bg-[var(--color-background)] shadow-[0_18px_48px_rgba(8,26,69,0.08)]"
       >
         <div className={`shrink-0 border-b border-[#D9E7F8] p-3 ${isVisuallyExpanded ? '' : 'flex flex-col items-center'}`}>
           <div className={`flex min-w-0 items-center ${isVisuallyExpanded ? 'justify-between gap-3' : 'flex-col gap-2'}`}>
