@@ -22,6 +22,7 @@ import AdminPostManagement from './AdminPostManagement';
 import AdminOverview from './AdminOverview';
 import { auth, db } from '../../firebase';
 import { doc, getDoc } from 'firebase/firestore';
+import './adminShipNowPages.css'; // ADMIN_SHIPNOW_PAGES_THEME_V1
 
 interface AdminDashboardProps {
     products: ProductWithRating[];
@@ -273,7 +274,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
                         <main className="shipnow-admin-content shipnow-admin-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#fbfbfb] p-3 sm:p-5 md:p-6 lg:p-8">
                             <div className="mx-auto w-full max-w-[1380px]">
-                                {renderView()}
+                                {currentView === 'analytics' ? renderView() : (
+                                    <div
+                                        data-admin-view={currentView}
+                                        data-admin-page-theme="ADMIN_SHIPNOW_PAGES_THEME_V1"
+                                        className="shipnow-admin-page-theme"
+                                    >
+                                        {renderView()}
+                                    </div>
+                                )}
                             </div>
                         </main>
 
