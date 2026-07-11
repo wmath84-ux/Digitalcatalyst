@@ -49,7 +49,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
     return (
         <article className={`group relative flex flex-col overflow-hidden rounded-3xl border border-[#DDE5EF] bg-white shadow-[0_10px_32px_rgba(16,33,63,0.06)] transition duration-300 ease-out hover:-translate-y-1 hover:border-[#B7CAE4] hover:shadow-[0_20px_48px_rgba(16,33,63,0.12)] ${animationClass}`}>
             {/* Image Container */}
-            <div className="relative w-full overflow-hidden aspect-[4/3] bg-gray-100">
+            <div className="relative aspect-[4/3] w-full overflow-hidden border-b border-[#E4EAF2] bg-[#F7F9FC]">
                 <SafeImage
                     src={displayImage}
                     fallbackSrc={getProductImageFallback(product)}
@@ -112,7 +112,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
             </div>
 
             {/* Content */}
-            <div className="flex flex-grow flex-col p-4 sm:p-5">
+            <div className="flex flex-grow flex-col p-5 sm:p-6">
                 <div className="mb-1 flex items-center justify-between gap-2">
                     {settings.features.showReviews && product.rating > 0 && (
                         <div className="flex items-center gap-1 text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">

@@ -50,7 +50,7 @@ const Hero: React.FC<HeroProps> = ({ settings, onNavigateToPolicies, onNavigateT
 
   return (
     <section ref={sectionRef} className="stagger-animate-container relative overflow-hidden bg-[#F7F9FC] text-[#10213F]">
-      <div className="container mx-auto grid min-h-[78vh] items-center gap-12 px-4 py-16 sm:px-6 sm:py-24 lg:grid-cols-[minmax(0,1.15fr)_minmax(360px,0.85fr)] lg:gap-16">
+      <div className="container mx-auto grid min-h-[78vh] items-center gap-10 px-4 py-16 sm:px-6 sm:py-20 md:grid-cols-[minmax(0,1.08fr)_minmax(340px,0.92fr)] lg:gap-16">
         <div className="max-w-3xl">
           <div className="animate-child animate-delay-1 inline-flex items-center gap-2 rounded-full border border-[#C8D7EE] bg-[#FFFFFF] px-4 py-2 text-xs font-bold uppercase tracking-[0.16em] text-[#1557B0]">
             <span className="h-2 w-2 rounded-full bg-[#1557B0]" />

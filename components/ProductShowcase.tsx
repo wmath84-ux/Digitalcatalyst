@@ -156,7 +156,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
           <p className="mx-auto mt-3 max-w-2xl text-pretty text-base leading-7 text-[#526179] sm:mt-4 sm:text-lg">{isMobileHome ? 'Find courses, notes, PDFs, and learning tools instantly.' : 'Browse focused notes, courses, PDFs, and study tools by subject, class, or format.'}</p>
         </div>
 
-        <div className={`store-search-sticky sticky top-1 z-20 mx-auto max-w-6xl border border-blue-100/90 bg-white/90 shadow-[0_18px_55px_rgba(23,105,255,0.10)] backdrop-blur-xl animate-child animate-delay-2 transition-all duration-300 sm:top-3 lg:top-4 ${isStoreFilterCompact ? 'rounded-[1.25rem] p-2 sm:rounded-[1.5rem] sm:p-3' : 'rounded-[1.6rem] p-3 sm:rounded-[2rem] sm:p-4'}`}>
+        <div className={`store-search-sticky sticky top-1 z-20 mx-auto max-w-6xl border border-[#DDE5EF] bg-white/95 shadow-[0_16px_48px_rgba(16,33,63,0.08)] backdrop-blur-xl animate-child animate-delay-2 transition-all duration-300 sm:top-3 lg:top-4 ${isStoreFilterCompact ? 'rounded-2xl p-2 sm:p-3' : 'rounded-3xl p-3 sm:p-4'}`}>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             {!hideInternalSearch && (
               <div className="relative min-h-[52px] flex-1">

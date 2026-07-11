@@ -127,7 +127,7 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
             
             <nav className="hidden md:flex items-center justify-center gap-x-7 lg:gap-x-9">
               {navItems.map((item) => (
-                  <button key={item.name} onClick={item.action} className="text-text-muted hover:text-primary transition-colors duration-300">
+                  <button key={item.name} onClick={item.action} className="rounded-lg px-2 py-2 text-sm font-semibold text-[#526179] transition hover:bg-[#F1F5FA] hover:text-[#1557B0] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#C8D7EE]">
                     {item.name}
                   </button>
               ))}
