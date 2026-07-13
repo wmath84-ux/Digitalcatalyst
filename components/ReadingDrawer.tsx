@@ -115,8 +115,8 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
     const current = bullets;
     bullets = [];
     nodes.push(
-      <ul key={`ul-${nodes.length}`} className="my-6 space-y-3 rounded-[1.5rem] border p-5 shadow-sm backdrop-blur-xl" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
-        {current.map((item, index) => <li key={index} className="flex gap-3"><span className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: chatPalette.activeBlue }} /><span><InlineMarkdown text={item} /></span></li>)}
+      <ul key={`ul-${nodes.length}`} className="my-8 space-y-4 rounded-[1.5rem] border p-6 shadow-sm backdrop-blur-xl" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
+        {current.map((item, index) => <li key={index} className="flex gap-4"><span className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: chatPalette.activeBlue }} /><span className="text-base leading-7 sm:text-lg sm:leading-8" style={{ color: chatPalette.secondaryText }}><InlineMarkdown text={item} /></span></li>)}
       </ul>
     );
   };
@@ -126,7 +126,7 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
     const text = paragraph.join(' ').trim();
     paragraph = [];
     if (text) {
-      nodes.push(<p key={`p-${nodes.length}`} className="my-5 text-lg leading-9" style={{ color: chatPalette.secondaryText }}><InlineMarkdown text={text} /></p>);
+      nodes.push(<p key={`p-${nodes.length}`} className="my-6 text-lg leading-9" style={{ color: chatPalette.secondaryText }}><InlineMarkdown text={text} /></p>);
       const paragraphCount = nodes.filter(node => React.isValidElement(node) && node.type === 'p').length;
       if (includeInArticleAd && paragraphCount === 2) {
         nodes.push(
@@ -138,7 +138,7 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
             visibleWordCount={articleWordCount}
             isContentLoaded={true}
             disabled={articleAdDisabled}
-            className="my-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
+            className="my-10 rounded-[2rem] border p-6 shadow-sm backdrop-blur-xl"
             style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}
           />
         );
@@ -156,13 +156,13 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
     if (line.startsWith('## ')) {
       flushParagraph();
       flushBullets();
-      nodes.push(<h2 key={`h2-${nodes.length}`} className="mb-4 mt-12 text-3xl font-black tracking-tight" style={{ color: chatPalette.primaryText }}><InlineMarkdown text={line.slice(3).trim()} /></h2>);
+      nodes.push(<h2 key={`h2-${nodes.length}`} className="mb-6 mt-16 text-3xl font-black tracking-tight" style={{ color: chatPalette.primaryText }}><InlineMarkdown text={line.slice(3).trim()} /></h2>);
       return;
     }
     if (line.startsWith('### ')) {
       flushParagraph();
       flushBullets();
-      nodes.push(<h3 key={`h3-${nodes.length}`} className="mb-3 mt-8 text-2xl font-black" style={{ color: chatPalette.primaryText }}><InlineMarkdown text={line.slice(4).trim()} /></h3>);
+      nodes.push(<h3 key={`h3-${nodes.length}`} className="mb-4 mt-10 text-2xl font-black" style={{ color: chatPalette.primaryText }}><InlineMarkdown text={line.slice(4).trim()} /></h3>);
       return;
     }
     if (line.startsWith('- ')) {
@@ -189,16 +189,16 @@ const SponsoredPartnerCard: React.FC<{
   promoCtaLabel = 'Explore Feature',
   onExploreFeature,
 }) => (
-  <aside className="my-12 overflow-hidden rounded-[2rem] border bg-gradient-to-r from-[#EAF2FF] via-[#F8FAFD] to-[#CFE1FF] p-1 shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-    <div className="rounded-[1.75rem] p-6 backdrop-blur-2xl sm:p-8" style={{ backgroundColor: chatPalette.cardSurface }}>
-      <div className="flex flex-col gap-6 lg:flex-row lg:items-center lg:justify-between">
+  <aside className="my-16 overflow-hidden rounded-[2rem] border bg-gradient-to-br from-[#EAF2FF] via-[#F8FAFD] to-[#CFE1FF] p-[1px] shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
+    <div className="rounded-[1.9rem] p-8 backdrop-blur-3xl sm:p-10" style={{ backgroundColor: chatPalette.cardSurface }}>
+      <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>Sponsored Partner</p>
+          <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: chatPalette.linkText }}>Premium Resource</p>
           <h3 className="mt-3 text-2xl font-black" style={{ color: chatPalette.primaryText }}>{promoTitle}</h3>
-          <p className="mt-3 max-w-2xl text-sm leading-6" style={{ color: chatPalette.secondaryText }}>{promoDescription}</p>
+          <p className="mt-3 max-w-lg text-sm leading-7" style={{ color: chatPalette.secondaryText }}>{promoDescription}</p>
         </div>
-        <button type="button" onClick={onExploreFeature} className="rounded-full px-6 py-3 text-sm font-black shadow-sm transition hover:scale-105" style={{ backgroundColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
-          {promoCtaLabel}
+        <button type="button" onClick={onExploreFeature} className="shrink-0 rounded-full px-8 py-4 text-sm font-black shadow-lg transition hover:scale-105 active:scale-95" style={{ backgroundColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
+          {promoCtaLabel} →
         </button>
       </div>
     </div>
@@ -206,20 +206,20 @@ const SponsoredPartnerCard: React.FC<{
 );
 
 const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: string; imageSeed?: string; fallbackImage?: string; onClick: () => void; }> = ({ title, meta, excerpt, badge, imageSeed, fallbackImage, onClick }) => (
-  <button onClick={onClick} className="group relative overflow-hidden rounded-[1.75rem] border text-left shadow-[0_12px_36px_rgba(60,64,67,0.10)] backdrop-blur-2xl transition duration-300 hover:-translate-y-1 hover:shadow-[0_18px_48px_rgba(60,64,67,0.14)]" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
+  <button onClick={onClick} className="group relative flex flex-col overflow-hidden rounded-[2rem] border text-left shadow-[0_12px_36px_rgba(60,64,67,0.10)] backdrop-blur-xl transition duration-300 hover:-translate-y-2 hover:shadow-[0_24px_50px_rgba(60,64,67,0.18)]" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
     {imageSeed && (
-      <div className="aspect-video overflow-hidden rounded-t-[1.75rem]" style={{ backgroundColor: chatPalette.searchBlue }}>
-        <SafeImage src={imageSeed || ''} fallbackSrc={fallbackImage || ''} alt={title} wrapperClassName="h-full w-full rounded-t-[1.75rem]" className="h-full w-full rounded-t-[1.75rem] object-cover opacity-90 transition duration-700 group-hover:scale-110 group-hover:opacity-100" fallbackTitle={title} fallbackBadge={badge} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
+      <div className="aspect-[16/9] w-full overflow-hidden" style={{ backgroundColor: chatPalette.searchBlue }}>
+        <SafeImage src={imageSeed || ''} fallbackSrc={fallbackImage || ''} alt={title} wrapperClassName="h-full w-full" className="h-full w-full object-cover opacity-95 transition duration-700 group-hover:scale-105" fallbackTitle={title} fallbackBadge={badge} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
       </div>
     )}
-    <div className="p-5">
+    <div className="flex flex-1 flex-col p-6">
       <div className="flex items-center justify-between gap-4">
-        <span className="rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.28em]" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>{badge}</span>
+        <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em]" style={{ backgroundColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>{badge}</span>
         <span className="text-xs font-semibold" style={{ color: chatPalette.secondaryText }}>{meta}</span>
       </div>
-      <h3 className="mt-4 text-xl font-black leading-tight transition" style={{ color: chatPalette.primaryText }}>{title}</h3>
-      <p className="mt-3 line-clamp-3 text-sm leading-6" style={{ color: chatPalette.secondaryText }}>{excerpt}</p>
-      <div className="mt-5 text-sm font-black" style={{ color: chatPalette.linkText }}>Read comfortably →</div>
+      <h3 className="mt-4 flex-1 text-xl font-black leading-tight transition" style={{ color: chatPalette.primaryText }}>{title}</h3>
+      <p className="mt-3 line-clamp-3 text-sm leading-7" style={{ color: chatPalette.secondaryText }}>{excerpt}</p>
+      <div className="mt-5 inline-flex items-center gap-2 text-sm font-black" style={{ color: chatPalette.linkText }}>Read article <span className="text-lg">→</span></div>
     </div>
   </button>
 );
