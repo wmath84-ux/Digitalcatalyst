@@ -1,5 +1,6 @@
 
 import React, { useRef, useEffect } from 'react';
+import { NewsPalette } from '../utils/colorPalettes';
 import { NewsArticle, WebsiteSettings } from '../App';
 import GoogleAd from './GoogleAd';
 import { hasUnsafePublicPlaceholder } from '../utils/reviewStableMode';
@@ -24,14 +25,14 @@ const defaultReadingStyle = {
 };
 
 const chatPalette = {
-  appCanvas: '#F8FAFD',
-  searchBlue: '#EAF2FF',
-  activeBlue: '#CFE1FF',
-  bubbleGray: '#F8FAFD',
-  cardBorder: '#DDE6F7',
-  primaryText: '#07133F',
-  secondaryText: '#4F5B76',
-  linkText: '#0057D8',
+  appCanvas: NewsPalette.softCyanSurface,
+  searchBlue: NewsPalette.softCyanSurface,
+  activeBlue: NewsPalette.primaryCyan,
+  bubbleGray: NewsPalette.mainCard,
+  cardBorder: NewsPalette.border,
+  primaryText: NewsPalette.headingText,
+  secondaryText: NewsPalette.bodyText,
+  linkText: NewsPalette.primaryCyan,
 };
 
 const clampPercent = (value: unknown, fallback: number) => {
@@ -50,10 +51,12 @@ const hexToRgba = (hex: string, opacityPercent: number, fallback = defaultReadin
 
 const escapeSvgText = (value = '') => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[char] || char));
 const buildPremiumArticleImage = (article: NewsArticle) => {
-  const badge = escapeSvgText(article.type === 'news' ? 'NEWS' : 'BLOG');
+  const isNews = article.type === 'news';
+  const palette = NewsPalette;
+  const badge = escapeSvgText(isNews ? 'NEWS' : 'BLOG');
   const category = escapeSvgText(article.category || 'Eduvora');
   const title = escapeSvgText((article.title || 'Premium Reading').slice(0, 82));
-  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1769FF"/><stop offset="0.55" stop-color="#7B61FF"/><stop offset="1" stop-color="#081A45"/></linearGradient><radialGradient id="r" cx="22%" cy="18%" r="70%"><stop stop-color="#FFFFFF" stop-opacity="0.34"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></radialGradient></defs><rect width="1200" height="675" rx="42" fill="url(#g)"/><rect width="1200" height="675" fill="url(#r)"/><circle cx="1010" cy="125" r="170" fill="#ffffff" opacity="0.12"/><circle cx="180" cy="575" r="210" fill="#ffffff" opacity="0.10"/><path d="M70 470 C230 380 310 525 470 430 S760 300 1125 400" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="18" stroke-linecap="round"/><rect x="78" y="74" width="220" height="58" rx="29" fill="#ffffff" opacity="0.95"/><text x="188" y="112" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="900" fill="#1769FF" letter-spacing="5">${badge}</text><text x="82" y="230" font-family="Inter,Arial,sans-serif" font-size="32" font-weight="800" fill="#E8F2FF" letter-spacing="2">${category}</text><foreignObject x="78" y="265" width="900" height="230"><div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Inter,Arial,sans-serif;font-size:56px;line-height:1.05;font-weight:900;color:white;letter-spacing:-1.8px;">${title}</div></foreignObject><text x="82" y="590" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" fill="#E8F2FF">Premium reading cover · URL image fallback</text></svg>`)}`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${palette.gradientStart}"/><stop offset="0.55" stop-color="${palette.gradientEnd}"/><stop offset="1" stop-color="${palette.gradientEnd}"/></linearGradient><radialGradient id="r" cx="22%" cy="18%" r="70%"><stop stop-color="#FFFFFF" stop-opacity="0.34"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></radialGradient></defs><rect width="1200" height="675" rx="42" fill="url(#g)"/><rect width="1200" height="675" fill="url(#r)"/><circle cx="1010" cy="125" r="170" fill="#ffffff" opacity="0.12"/><circle cx="180" cy="575" r="210" fill="#ffffff" opacity="0.10"/><path d="M70 470 C230 380 310 525 470 430 S760 300 1125 400" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="18" stroke-linecap="round"/><rect x="78" y="74" width="220" height="58" rx="29" fill="#ffffff" opacity="0.95"/><text x="188" y="112" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="900" fill="${palette.primaryCyan}" letter-spacing="5">${badge}</text><text x="82" y="230" font-family="Inter,Arial,sans-serif" font-size="32" font-weight="800" fill="#E8F2FF" letter-spacing="2">${category}</text><foreignObject x="78" y="265" width="900" height="230"><div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Inter,Arial,sans-serif;font-size:56px;line-height:1.05;font-weight:900;color:white;letter-spacing:-1.8px;">${title}</div></foreignObject><text x="82" y="590" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" fill="#E8F2FF">Premium reading cover · URL image fallback</text></svg>`)}`;
 };
 const getArticleCoverImage = (article: NewsArticle, size = '800/600') => resolveNewsCover(article) || buildPremiumArticleImage(article);
 
@@ -136,7 +139,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
     accentColor: defaultReadingStyle.accentColor,
     accentOpacity: defaultReadingStyle.accentOpacity,
   };
-  const sectionBackground = `radial-gradient(circle at 0% 12%, rgba(194, 231, 255, 0.50), transparent 30%), radial-gradient(circle at 100% 15%, rgba(178, 158, 255, 0.22), transparent 28%), linear-gradient(135deg, ${hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity)}, rgba(237, 244, 255, 0.92), rgba(248, 250, 253, 0.98))`;
+  const sectionBackground = `radial-gradient(circle at 0% 12%, ${NewsPalette.primaryCyan}33, transparent 30%), radial-gradient(circle at 100% 15%, ${NewsPalette.brightAccent}22, transparent 28%), linear-gradient(135deg, ${NewsPalette.softCyanSurface}, ${NewsPalette.mainCard})`;
   const cardBackground = `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;
 
   if (newsArticles.length === 0) return null;

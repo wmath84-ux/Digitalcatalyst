@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { NewsPalette, BlogPalette } from '../utils/colorPalettes';
 import { Announcement, NewsArticle, User, WebsiteSettings } from '../App';
 import { EconomySettings } from '../utils/economy';
 import GoogleAd from './GoogleAd';
@@ -42,17 +43,37 @@ const defaultReadingStyle = {
   accentOpacity: 66,
 };
 
-const chatPalette = {
-  appCanvas: 'var(--bg-main, var(--color-background, #F8FAFD))',
-  searchBlue: 'var(--bg-section, #EAF2FF)',
-  activeBlue: 'var(--tag-blue, var(--color-accent, #CFE1FF))',
-  bubbleGray: 'var(--bg-card, #F8FAFD)',
-  cardSurface: 'var(--bg-card, #FFFFFF)',
-  cardBorder: 'var(--border-soft, #DDE6F7)',
-  primaryText: 'var(--text-heading, var(--color-text, #07133F))',
-  secondaryText: 'var(--text-body, var(--color-text-muted, #4F5B76))',
-  linkText: 'var(--primary, var(--color-primary, #0057D8))',
-  green: 'var(--immersive-success, #1e8e3e)',
+const getPalette = (listType: ReadingListType) => {
+  if (listType === 'news') {
+    return {
+      appCanvas: NewsPalette.softCyanSurface,
+      searchBlue: NewsPalette.softCyanSurface,
+      activeBlue: NewsPalette.primaryCyan,
+      bubbleGray: NewsPalette.mainCard,
+      cardSurface: NewsPalette.mainCard,
+      cardBorder: NewsPalette.border,
+      primaryText: NewsPalette.headingText,
+      secondaryText: NewsPalette.bodyText,
+      linkText: NewsPalette.primaryCyan,
+      green: '#1e8e3e',
+      gradientStart: NewsPalette.gradientStart,
+      gradientEnd: NewsPalette.gradientEnd,
+    };
+  }
+  return {
+    appCanvas: BlogPalette.softLavenderSurface,
+    searchBlue: BlogPalette.softLavenderSurface,
+    activeBlue: BlogPalette.primaryViolet,
+    bubbleGray: BlogPalette.warmCard,
+    cardSurface: BlogPalette.warmCard,
+    cardBorder: BlogPalette.border,
+    primaryText: BlogPalette.headingText,
+    secondaryText: BlogPalette.bodyText,
+    linkText: BlogPalette.primaryViolet,
+    green: '#1e8e3e',
+    gradientStart: BlogPalette.gradientStart,
+    gradientEnd: BlogPalette.gradientEnd,
+  };
 };
 
 const clampPercent = (value: unknown, fallback: number) => {
@@ -79,28 +100,34 @@ const isExternalArticle = (article: NewsArticle | null) => {
 const getArticleUrl = (article: NewsArticle) => ((article as NewsArticle & { externalUrl?: string }).externalUrl || article.content).trim();
 const escapeSvgText = (value = '') => value.replace(/[&<>"']/g, (char) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[char] || char));
 const buildPremiumArticleImage = (article: NewsArticle) => {
-  const badge = escapeSvgText(article.type === 'news' ? 'NEWS' : 'BLOG');
+  const isNews = article.type === 'news';
+  const palette = isNews ? NewsPalette : BlogPalette;
+  const gradientStart = isNews ? '#071A2B' : '#2A1238';
+  const gradientEnd = isNews ? '#009FB7' : '#7C3AED';
+  const badge = escapeSvgText(isNews ? 'NEWS' : 'BLOG');
   const category = escapeSvgText(article.category || 'Eduvora');
   const title = escapeSvgText((article.title || 'Premium Reading').slice(0, 82));
-  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#1769FF"/><stop offset="0.55" stop-color="#7B61FF"/><stop offset="1" stop-color="#081A45"/></linearGradient><radialGradient id="r" cx="22%" cy="18%" r="70%"><stop stop-color="#FFFFFF" stop-opacity="0.34"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></radialGradient></defs><rect width="1200" height="675" rx="42" fill="url(#g)"/><rect width="1200" height="675" fill="url(#r)"/><circle cx="1010" cy="125" r="170" fill="#ffffff" opacity="0.12"/><circle cx="180" cy="575" r="210" fill="#ffffff" opacity="0.10"/><path d="M70 470 C230 380 310 525 470 430 S760 300 1125 400" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="18" stroke-linecap="round"/><rect x="78" y="74" width="220" height="58" rx="29" fill="#ffffff" opacity="0.95"/><text x="188" y="112" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="900" fill="#1769FF" letter-spacing="5">${badge}</text><text x="82" y="230" font-family="Inter,Arial,sans-serif" font-size="32" font-weight="800" fill="#E8F2FF" letter-spacing="2">${category}</text><foreignObject x="78" y="265" width="900" height="230"><div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Inter,Arial,sans-serif;font-size:56px;line-height:1.05;font-weight:900;color:white;letter-spacing:-1.8px;">${title}</div></foreignObject><text x="82" y="590" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" fill="#E8F2FF">Premium reading cover · URL image fallback</text></svg>`)}`;
+  return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${gradientStart}"/><stop offset="0.55" stop-color="${gradientEnd}"/><stop offset="1" stop-color="${gradientEnd}"/></linearGradient><radialGradient id="r" cx="22%" cy="18%" r="70%"><stop stop-color="#FFFFFF" stop-opacity="0.34"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></radialGradient></defs><rect width="1200" height="675" rx="42" fill="url(#g)"/><rect width="1200" height="675" fill="url(#r)"/><circle cx="1010" cy="125" r="170" fill="#ffffff" opacity="0.12"/><circle cx="180" cy="575" r="210" fill="#ffffff" opacity="0.10"/><path d="M70 470 C230 380 310 525 470 430 S760 300 1125 400" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="18" stroke-linecap="round"/><rect x="78" y="74" width="220" height="58" rx="29" fill="#ffffff" opacity="0.95"/><text x="188" y="112" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="900" fill="${isNews ? NewsPalette.primaryCyan : BlogPalette.primaryViolet}" letter-spacing="5">${badge}</text><text x="82" y="230" font-family="Inter,Arial,sans-serif" font-size="32" font-weight="800" fill="#E8F2FF" letter-spacing="2">${category}</text><foreignObject x="78" y="265" width="900" height="230"><div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Inter,Arial,sans-serif;font-size:56px;line-height:1.05;font-weight:900;color:white;letter-spacing:-1.8px;">${title}</div></foreignObject><text x="82" y="590" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" fill="#E8F2FF">Premium reading cover · URL image fallback</text></svg>`)}`;
 };
 const getArticleImage = (article: NewsArticle, size = '900/540') => resolveNewsCover(article) || buildPremiumArticleImage(article);
 const getArticleType = (article: NewsArticle): ReadingListType => article.type === 'news' ? 'news' : 'blog';
 const shouldShowPremiumLearningCta = (article: NewsArticle | null) => Boolean((article as (NewsArticle & { showPremiumLearningCta?: boolean }) | null)?.showPremiumLearningCta);
 const stripMarkdown = (value = '') => value.replace(/[#*_`>-]/g, ' ').replace(/\s+/g, ' ').trim();
 
-const InlineMarkdown: React.FC<{ text: string }> = ({ text }) => {
+const InlineMarkdown: React.FC<{ text: string; listType: ReadingListType }> = ({ text, listType }) => {
+  const palette = getPalette(listType);
   const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
   return (
     <>
       {parts.map((part, index) => part.startsWith('**') && part.endsWith('**')
-        ? <strong key={index} className="font-black" style={{ color: chatPalette.primaryText }}>{part.slice(2, -2)}</strong>
+        ? <strong key={index} className="font-black" style={{ color: palette.primaryText }}>{part.slice(2, -2)}</strong>
         : <React.Fragment key={index}>{part}</React.Fragment>)}
     </>
   );
 };
 
-const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean; articleWordCount?: number; articleAdDisabled?: boolean }> = ({ content, includeInArticleAd = false, articleWordCount = 0, articleAdDisabled = false }) => {
+const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean; articleWordCount?: number; articleAdDisabled?: boolean; listType: ReadingListType }> = ({ content, includeInArticleAd = false, articleWordCount = 0, articleAdDisabled = false, listType }) => {
+  const palette = getPalette(listType);
   if (/<\/?[a-z][\s\S]*>/i.test(content)) {
     return <div className="reading-rich-html" dangerouslySetInnerHTML={{ __html: content }} />;
   }
@@ -115,8 +142,8 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
     const current = bullets;
     bullets = [];
     nodes.push(
-      <ul key={`ul-${nodes.length}`} className="my-8 space-y-4 rounded-[1.5rem] border p-6 shadow-sm backdrop-blur-xl" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
-        {current.map((item, index) => <li key={index} className="flex gap-4"><span className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: chatPalette.activeBlue }} /><span className="text-base leading-7 sm:text-lg sm:leading-8" style={{ color: chatPalette.secondaryText }}><InlineMarkdown text={item} /></span></li>)}
+      <ul key={`ul-${nodes.length}`} className="my-8 space-y-4 rounded-[1.5rem] border p-6 shadow-sm backdrop-blur-xl" style={{ backgroundColor: palette.cardSurface, borderColor: palette.cardBorder }}>
+        {current.map((item, index) => <li key={index} className="flex gap-4"><span className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: palette.activeBlue }} /><span className="text-base leading-7 sm:text-lg sm:leading-8" style={{ color: palette.secondaryText }}><InlineMarkdown text={item} listType={listType} /></span></li>)}
       </ul>
     );
   };
@@ -126,7 +153,7 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
     const text = paragraph.join(' ').trim();
     paragraph = [];
     if (text) {
-      nodes.push(<p key={`p-${nodes.length}`} className="my-6 text-lg leading-9" style={{ color: chatPalette.secondaryText }}><InlineMarkdown text={text} /></p>);
+      nodes.push(<p key={`p-${nodes.length}`} className="my-6 text-lg leading-9" style={{ color: palette.secondaryText }}><InlineMarkdown text={text} listType={listType} /></p>);
       const paragraphCount = nodes.filter(node => React.isValidElement(node) && node.type === 'p').length;
       if (includeInArticleAd && paragraphCount === 2) {
         nodes.push(
@@ -139,7 +166,7 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
             isContentLoaded={true}
             disabled={articleAdDisabled}
             className="my-10 rounded-[2rem] border p-6 shadow-sm backdrop-blur-xl"
-            style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}
+            style={{ backgroundColor: palette.cardSurface, borderColor: palette.cardBorder }}
           />
         );
       }
@@ -156,13 +183,13 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
     if (line.startsWith('## ')) {
       flushParagraph();
       flushBullets();
-      nodes.push(<h2 key={`h2-${nodes.length}`} className="mb-6 mt-16 text-3xl font-black tracking-tight" style={{ color: chatPalette.primaryText }}><InlineMarkdown text={line.slice(3).trim()} /></h2>);
+      nodes.push(<h2 key={`h2-${nodes.length}`} className="mb-6 mt-16 text-3xl font-black tracking-tight" style={{ color: palette.primaryText }}><InlineMarkdown text={line.slice(3).trim()} listType={listType} /></h2>);
       return;
     }
     if (line.startsWith('### ')) {
       flushParagraph();
       flushBullets();
-      nodes.push(<h3 key={`h3-${nodes.length}`} className="mb-4 mt-10 text-2xl font-black" style={{ color: chatPalette.primaryText }}><InlineMarkdown text={line.slice(4).trim()} /></h3>);
+      nodes.push(<h3 key={`h3-${nodes.length}`} className="mb-4 mt-10 text-2xl font-black" style={{ color: palette.primaryText }}><InlineMarkdown text={line.slice(4).trim()} listType={listType} /></h3>);
       return;
     }
     if (line.startsWith('- ')) {
@@ -183,46 +210,54 @@ const SponsoredPartnerCard: React.FC<{
   promoDescription?: string;
   promoCtaLabel?: string;
   onExploreFeature: () => void;
+  listType: ReadingListType;
 }> = ({
   promoTitle = "Level up tonight's study sprint",
   promoDescription = 'Discover a handpicked premium resource built for sharper notes, faster revision, and calmer exam weeks.',
   promoCtaLabel = 'Explore Feature',
   onExploreFeature,
-}) => (
-  <aside className="my-16 overflow-hidden rounded-[2rem] border bg-gradient-to-br from-[#EAF2FF] via-[#F8FAFD] to-[#CFE1FF] p-[1px] shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
-    <div className="rounded-[1.9rem] p-8 backdrop-blur-3xl sm:p-10" style={{ backgroundColor: chatPalette.cardSurface }}>
-      <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
-        <div>
-          <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: chatPalette.linkText }}>Premium Resource</p>
-          <h3 className="mt-3 text-2xl font-black" style={{ color: chatPalette.primaryText }}>{promoTitle}</h3>
-          <p className="mt-3 max-w-lg text-sm leading-7" style={{ color: chatPalette.secondaryText }}>{promoDescription}</p>
+  listType,
+}) => {
+  const palette = getPalette(listType);
+  return (
+    <aside className="my-16 overflow-hidden rounded-[2rem] border bg-gradient-to-br from-[#EAF2FF] via-[#F8FAFD] to-[#CFE1FF] p-[1px] shadow-[0_8px_30px_rgb(0,0,0,0.06)]">
+      <div className="rounded-[1.9rem] p-8 backdrop-blur-3xl sm:p-10" style={{ backgroundColor: palette.cardSurface }}>
+        <div className="flex flex-col gap-8 lg:flex-row lg:items-center lg:justify-between">
+          <div>
+            <p className="text-[10px] font-black uppercase tracking-[0.3em]" style={{ color: palette.linkText }}>Premium Resource</p>
+            <h3 className="mt-3 text-2xl font-black" style={{ color: palette.primaryText }}>{promoTitle}</h3>
+            <p className="mt-3 max-w-lg text-sm leading-7" style={{ color: palette.secondaryText }}>{promoDescription}</p>
+          </div>
+          <button type="button" onClick={onExploreFeature} className="shrink-0 rounded-full px-8 py-4 text-sm font-black shadow-lg transition hover:scale-105 active:scale-95" style={{ backgroundColor: palette.activeBlue, color: palette.primaryText }}>
+            {promoCtaLabel} →
+          </button>
         </div>
-        <button type="button" onClick={onExploreFeature} className="shrink-0 rounded-full px-8 py-4 text-sm font-black shadow-lg transition hover:scale-105 active:scale-95" style={{ backgroundColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
-          {promoCtaLabel} →
-        </button>
       </div>
-    </div>
-  </aside>
-);
+    </aside>
+  );
+};
 
-const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: string; imageSeed?: string; fallbackImage?: string; onClick: () => void; }> = ({ title, meta, excerpt, badge, imageSeed, fallbackImage, onClick }) => (
-  <button onClick={onClick} className="group relative flex flex-col overflow-hidden rounded-[2rem] border text-left shadow-[0_12px_36px_rgba(60,64,67,0.10)] backdrop-blur-xl transition duration-300 hover:-translate-y-2 hover:shadow-[0_24px_50px_rgba(60,64,67,0.18)]" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
-    {imageSeed && (
-      <div className="aspect-[16/9] w-full overflow-hidden" style={{ backgroundColor: chatPalette.searchBlue }}>
-        <SafeImage src={imageSeed || ''} fallbackSrc={fallbackImage || ''} alt={title} wrapperClassName="h-full w-full" className="h-full w-full object-cover opacity-95 transition duration-700 group-hover:scale-105" fallbackTitle={title} fallbackBadge={badge} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
+const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: string; imageSeed?: string; fallbackImage?: string; onClick: () => void; listType: ReadingListType; }> = ({ title, meta, excerpt, badge, imageSeed, fallbackImage, onClick, listType }) => {
+  const palette = getPalette(listType);
+  return (
+    <button onClick={onClick} className="group relative flex flex-col overflow-hidden rounded-[2rem] border text-left shadow-[0_12px_36px_rgba(60,64,67,0.10)] backdrop-blur-xl transition duration-300 hover:-translate-y-2 hover:shadow-[0_24px_50px_rgba(60,64,67,0.18)]" style={{ backgroundColor: palette.cardSurface, borderColor: palette.cardBorder }}>
+      {imageSeed && (
+        <div className="aspect-[16/9] w-full overflow-hidden" style={{ backgroundColor: palette.searchBlue }}>
+          <SafeImage src={imageSeed || ''} fallbackSrc={fallbackImage || ''} alt={title} wrapperClassName="h-full w-full" className="h-full w-full object-cover opacity-95 transition duration-700 group-hover:scale-105" fallbackTitle={title} fallbackBadge={badge} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
+        </div>
+      )}
+      <div className="flex flex-1 flex-col p-6">
+        <div className="flex items-center justify-between gap-4">
+          <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em]" style={{ backgroundColor: palette.activeBlue, color: palette.primaryText }}>{badge}</span>
+          <span className="text-xs font-semibold" style={{ color: palette.secondaryText }}>{meta}</span>
+        </div>
+        <h3 className="mt-4 flex-1 text-xl font-black leading-tight transition" style={{ color: palette.primaryText }}>{title}</h3>
+        <p className="mt-3 line-clamp-3 text-sm leading-7" style={{ color: palette.secondaryText }}>{excerpt}</p>
+        <div className="mt-5 inline-flex items-center gap-2 text-sm font-black" style={{ color: palette.linkText }}>Read article <span className="text-lg">→</span></div>
       </div>
-    )}
-    <div className="flex flex-1 flex-col p-6">
-      <div className="flex items-center justify-between gap-4">
-        <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em]" style={{ backgroundColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>{badge}</span>
-        <span className="text-xs font-semibold" style={{ color: chatPalette.secondaryText }}>{meta}</span>
-      </div>
-      <h3 className="mt-4 flex-1 text-xl font-black leading-tight transition" style={{ color: chatPalette.primaryText }}>{title}</h3>
-      <p className="mt-3 line-clamp-3 text-sm leading-7" style={{ color: chatPalette.secondaryText }}>{excerpt}</p>
-      <div className="mt-5 inline-flex items-center gap-2 text-sm font-black" style={{ color: chatPalette.linkText }}>Read article <span className="text-lg">→</span></div>
-    </div>
-  </button>
-);
+    </button>
+  );
+};
 
 const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings, isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -358,6 +393,8 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
     else await navigator.clipboard?.writeText(`${shareData.text} ${shareData.url}`);
   };
 
+  const chatPalette = useMemo(() => getPalette(listType), [listType]);
+
   const rewardMinutes = Math.floor(rewardSecondsLeft / 60);
   const rewardSeconds = String(rewardSecondsLeft % 60).padStart(2, '0');
   const storedReadingStyle = ((settings.content as any).readingStyle || {}) as Partial<typeof defaultReadingStyle>;
@@ -395,7 +432,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
       <div className="absolute inset-y-0 right-0 flex w-full justify-end">
         <section data-reading-panel="true" onPointerDown={(event) => event.stopPropagation()} className="relative h-full w-full overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw]" style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder }}>
           <div className="sticky top-0 z-30 h-1" style={{ backgroundColor: chatPalette.cardSurface }}>
-            <div className="h-full rounded-r-full shadow-sm transition-all duration-150" style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${accentStrongBackground}, rgba(194, 231, 255, 0.92), rgba(11, 87, 208, 0.72))` }} />
+            <div className="h-full rounded-r-full shadow-sm transition-all duration-150" style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${chatPalette.gradientStart}, ${chatPalette.gradientEnd})` }} />
           </div>
 
           <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(circle at top left, ${accentSoftBackground}, transparent 30%), radial-gradient(circle at 82% 12%, rgba(178, 158, 255, 0.20), transparent 28%), radial-gradient(circle at bottom right, rgba(194, 231, 255, 0.38), transparent 30%)` }} />
@@ -452,7 +489,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                     )}
                     {visibleArticles.map((article, index) => (
                       <React.Fragment key={`article-${article.id}`}>
-                        <HubCard title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(stripMarkdown(article.content))} min`} excerpt={article.excerpt} badge={article.type === 'news' ? 'News' : article.category || 'Blog'} imageSeed={getArticleImage(article)} fallbackImage={buildPremiumArticleImage(article)} onClick={() => onSelectArticle(article)} />
+                        <HubCard title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(stripMarkdown(article.content))} min`} excerpt={article.excerpt} badge={article.type === 'news' ? 'News' : article.category || 'Blog'} imageSeed={getArticleImage(article)} fallbackImage={buildPremiumArticleImage(article)} onClick={() => onSelectArticle(article)} listType={listType} />
                         {(index + 1) % 3 === 0 && index < visibleArticles.length - 1 && (
                           <GoogleAd
                             variant="inFeed"
@@ -466,7 +503,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                         )}
                       </React.Fragment>
                     ))}
-                    {listType === 'news' && announcements.map((announcement) => <HubCard key={`announcement-${announcement.id}`} title={announcement.title} meta={formatDate(announcement.date)} excerpt={announcement.content} badge="Announcement" onClick={() => onSelectAnnouncement(announcement)} />)}
+                    {listType === 'news' && announcements.map((announcement) => <HubCard key={`announcement-${announcement.id}`} title={announcement.title} meta={formatDate(announcement.date)} excerpt={announcement.content} badge="Announcement" onClick={() => onSelectAnnouncement(announcement)} listType={listType} />)}
                   </div>
                 </div>
               )}
@@ -519,8 +556,9 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                           includeInArticleAd
                           articleWordCount={selectedArticleWordCount}
                           articleAdDisabled={selectedArticleAdDisabled}
+                          listType={listType}
                         />
-                        {shouldShowPremiumLearningCta(selectedArticle) && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} />}
+                        {shouldShowPremiumLearningCta(selectedArticle) && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} listType={listType} />}
                         <GoogleAd
                           variant="multiplex"
                           label="Related Content"
@@ -544,7 +582,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                   <div className="mt-12 space-y-7 rounded-[2rem] border p-6 text-lg leading-9 shadow-sm backdrop-blur-2xl sm:p-8" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
                     {selectedAnnouncement.content.split('\n').filter(Boolean).map((paragraph, index) => (
                       <React.Fragment key={index}>
-                        {index === 1 && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} />}
+                        {index === 1 && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} listType={listType} />}
                         <p>{paragraph}</p>
                       </React.Fragment>
                     ))}
