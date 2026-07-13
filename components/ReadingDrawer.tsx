@@ -426,12 +426,12 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
       <div
         className="absolute inset-0 backdrop-blur-sm"
         style={{ backgroundColor: readingBackground }}
-        onPointerDown={() => window.matchMedia('(min-width: 768px) and (hover: hover) and (pointer: fine)').matches && onClose()}
+        onPointerDown={() => window.matchMedia('(min-width: 768px)').matches && onClose()}
       />
-      <div className="absolute inset-y-0 right-0 flex w-full justify-end">
+      <div className="absolute inset-y-0 right-0 flex w-full justify-end pointer-events-none">
         <section
           onPointerDown={(event) => event.stopPropagation()}
-          className="relative h-full w-full overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw]"
+          className="relative h-full w-full overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw] pointer-events-auto"
           style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder }}
         >
           <div className="sticky top-0 z-30 h-1" style={{ backgroundColor: chatPalette.cardSurface }}>
