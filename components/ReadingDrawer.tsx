@@ -418,19 +418,22 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
 
   return (
     <div
-      className="fixed inset-0 z-[1200] backdrop-blur-sm"
-      style={{ backgroundColor: readingBackground }}
+      className="fixed inset-0 z-[1200]"
       role="dialog"
       aria-modal="true"
       aria-labelledby="reading-drawer-title"
-      onPointerDown={(event) => {
-        const target = event.target as HTMLElement;
-        const isDesktopPointer = window.matchMedia('(min-width: 768px) and (hover: hover) and (pointer: fine)').matches;
-        if (isDesktopPointer && !target.closest('[data-reading-panel="true"]')) onClose();
-      }}
     >
+      <div
+        className="absolute inset-0 backdrop-blur-sm"
+        style={{ backgroundColor: readingBackground }}
+        onPointerDown={() => window.matchMedia('(min-width: 768px) and (hover: hover) and (pointer: fine)').matches && onClose()}
+      />
       <div className="absolute inset-y-0 right-0 flex w-full justify-end">
-        <section data-reading-panel="true" onPointerDown={(event) => event.stopPropagation()} className="relative h-full w-full overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw]" style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder }}>
+        <section
+          onPointerDown={(event) => event.stopPropagation()}
+          className="relative h-full w-full overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw]"
+          style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder }}
+        >
           <div className="sticky top-0 z-30 h-1" style={{ backgroundColor: chatPalette.cardSurface }}>
             <div className="h-full rounded-r-full shadow-sm transition-all duration-150" style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${chatPalette.gradientStart}, ${chatPalette.gradientEnd})` }} />
           </div>
