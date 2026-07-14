@@ -5,6 +5,8 @@ import { EconomySettings, resolveCoinPrice, resolveMaxDiscountPercentage } from 
 import { db } from '../firebase';
 import UserAvatar from './common/UserAvatar';
 import { creditUserCoinWallet, ensureUserCoinWallet, watchUserCoinWallet } from '../utils/coinWallet';
+import MembershipUpgradeCard from './MembershipUpgradeCard';
+import { getUserEduCoinMultiplier, getUserSubscriptionTier, hasPremiumMembership, normalizeSubscriptionPageContent } from '../utils/subscriptionAccess';
 
 interface ProfilePageProps {
   settings: WebsiteSettings;
@@ -24,6 +26,7 @@ interface ProfilePageProps {
   onSyncCurrentUser: (updater: (user: User) => User, transaction?: Omit<CoinTransaction, 'id' | 'createdAt'>) => User | null;
   onClaimMilestoneReward: (reward: { id: string; title: string; requirement: number; unlockProductIds?: number[]; coinReward?: number; currentValue?: number }) => boolean;
   onOpenVerifiedCourse?: (course: ProductWithRating) => void;
+  onUpgrade: () => void;
 }
 
 interface LearningProgress {
@@ -113,6 +116,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   onSyncCurrentUser,
   onClaimMilestoneReward,
   onOpenVerifiedCourse,
+  onUpgrade,
 }) => {
   const [redeeming, setRedeeming] = React.useState<string | null>(null);
   const [redeemedCouponCode, setRedeemedCouponCode] = React.useState<string | null>(null);
@@ -189,6 +193,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const eduPoints = profileCoinWallet.coinBalance;
   const totalLifetimeCoins = profileCoinWallet.totalCoinsEarned || eduPoints;
   const profileStyle = { ...fallbackProfileStyle, ...((settings.content as any).profileStyle || {}) };
+  const subscriptionTier = getUserSubscriptionTier(currentUser);
+  const hasPremiumAccess = hasPremiumMembership(currentUser);
+  const earningMultiplier = getUserEduCoinMultiplier(currentUser);
+  const subscriptionPage = normalizeSubscriptionPageContent(settings.content.subscriptionPage);
   const profileStreakConfigs = (((settings.content as any).profileStreaks || fallbackStreakConfigs) as ProfileStreakConfig[])
     .filter(streak => streak.active !== false && !streak.draft && !streak.archived && Number(streak.goal) > 0)
     .slice(0, 4);
@@ -354,7 +362,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   };
 
   const handleStreakClaim = async (streak: typeof streakCards[number]) => {
-    if (!currentUser || !profileUid || !streak.claimable) return;
+    if (!currentUser || !hasPremiumAccess || !profileUid || !streak.claimable) return;
     const coinReward = Math.max(0, Number(streak.coinReward || 0));
     const userId = currentUser.uid || (currentUser.id ? String(currentUser.id) : '');
     if (!userId || coinReward <= 0) return;
@@ -373,14 +381,15 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
       });
 
       if (!result.success) return;
+      const creditedReward = Math.max(0, result.balanceAfter - result.balanceBefore);
 
       const entry: CoinTransaction = {
         id: `streak-${streak.id}-${Date.now()}`,
-        amount: coinReward,
+        amount: creditedReward,
         type: 'credit',
         source: 'profile_streak',
         title: `🔥 ${streak.title}`,
-        description: `Claimed ${coinReward} EduCoins for ${streak.title}`,
+        description: `Claimed ${creditedReward} EduCoins for ${streak.title}`,
         createdAt: new Date().toISOString(),
       };
       const updated: User = {
@@ -409,6 +418,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
 
   const handleMilestoneClaim = (reward: MilestoneReward) => {
+    if (!hasPremiumAccess) return;
     const claimed = onClaimMilestoneReward(reward);
     if (!claimed) return;
     if (reward.downloadContent) {
@@ -434,6 +444,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   };
 
   const handleRewardToggle = (reward: typeof dynamicClaimCards[number]) => {
+    if (!hasPremiumAccess) return;
     const { isActive, isRedeemed } = getRewardButtonState(reward);
     if (isRedeemed || !reward.claimable) return;
     if (isActive) {
@@ -448,6 +459,44 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     { label: 'Video Watch Time', value: `${Math.floor(watchTimeMinutes / 60)}h ${watchTimeMinutes % 60}m`, icon: '⏱️' },
     { label: 'Badges Unlocked', value: `${badges.filter(badge => badge.unlocked).length}/${badges.length}`, icon: '🏅' },
   ];
+
+  if (!hasPremiumAccess) {
+    return (
+      <div className="min-h-[100dvh] w-full overflow-x-hidden text-[#202124]" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}, ${profileStyle.backgroundTint}, #C2E7FF)` }}>
+        <main className="mx-auto w-full max-w-6xl px-4 py-5 pb-28 sm:px-6 sm:py-8">
+          <button onClick={onBack} className="mb-5 rounded-2xl border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-sm font-black text-[#202124] shadow-sm transition hover:bg-[#E8F0FE]">← Back</button>
+
+          <section className="overflow-hidden rounded-[2rem] border border-[#D2E3FC] bg-white/95 shadow-[0_22px_70px_rgba(26,115,232,0.14)]">
+            <div className="bg-gradient-to-br from-[#174EA6] via-[#1A73E8] to-[#7B61FF] p-5 text-white sm:p-8">
+              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                <UserAvatar name={currentUser?.name} email={currentUser?.email} photoURL={currentUser?.profilePhotoSet ? currentUser.photoURL : ''} size={112} className="!h-24 !w-24 rounded-[1.5rem] border-4 border-white/80 text-3xl shadow-xl" imageClassName="rounded-[1.25rem]" />
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.22em] text-[#C2E7FF]">Learning Profile</p>
+                  <h1 className="mt-2 text-3xl font-black sm:text-5xl">{currentUser?.name || 'Student'}</h1>
+                  <p className="mt-2 text-sm font-semibold text-white/85">{currentUser?.email || 'student@learninghub.dev'}</p>
+                </div>
+              </div>
+            </div>
+          </section>
+
+          <MembershipUpgradeCard message={subscriptionPage.profileUpgrade} onUpgrade={onUpgrade} compact className="mt-5" />
+
+          <section className="mt-5 grid gap-4 sm:grid-cols-2">
+            <div className="rounded-3xl border border-[#D2E3FC] bg-white/95 p-5 shadow-sm"><p className="text-sm font-bold text-[#5F6368]">Courses Owned</p><p className="mt-2 text-3xl font-black">{purchasedProducts.length}</p></div>
+            <div className="rounded-3xl border border-[#D2E3FC] bg-white/95 p-5 shadow-sm"><p className="text-sm font-bold text-[#5F6368]">Video Watch Time</p><p className="mt-2 text-3xl font-black">{Math.floor(watchTimeMinutes / 60)}h {watchTimeMinutes % 60}m</p></div>
+          </section>
+
+          <section className="mt-5 rounded-[2rem] border border-[#D2E3FC] bg-white/95 p-5 shadow-sm sm:p-6">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.2em] text-[#1967D2]">Purchased Learning</p><h2 className="mt-2 text-2xl font-black">Continue Your Courses</h2></div><button type="button" onClick={onExplore} className="rounded-2xl bg-[#1769FF] px-4 py-2.5 text-sm font-black text-white">Explore Store</button></div>
+            {courseAccessError && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-bold text-red-700">{courseAccessError}</p>}
+            <div className="mt-5 grid gap-3">
+              {learningProgress.length ? learningProgress.map(course => <article key={course.id} className="rounded-2xl border border-[#D2E3FC] bg-[#F8FAFD] p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black">{course.title}</h3><p className="mt-1 text-sm font-semibold text-[#5F6368]">{course.category} • {course.completion}% complete</p></div><button type="button" onClick={() => handleContinueLearning(course)} className="rounded-xl border border-[#1769FF] bg-white px-4 py-2 text-sm font-black text-[#1769FF]">Continue</button></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-[#DADCE0]"><div className="h-full rounded-full bg-gradient-to-r from-[#1769FF] to-[#7B61FF]" style={{ width: `${course.completion}%` }} /></div></article>) : <p className="rounded-2xl border border-dashed border-[#D2E3FC] p-4 text-sm font-semibold text-[#5F6368]">No purchased courses yet. You can browse the store and buy learning content without a subscription.</p>}
+            </div>
+          </section>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-[100dvh] w-full max-w-full overflow-x-clip text-[#202124]" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}, ${profileStyle.backgroundTint}, #C2E7FF)`, '--profile-card-opacity': String(Number(profileStyle.cardOpacity) / 100) } as React.CSSProperties}>
@@ -525,7 +574,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-5">
                   <UserAvatar name={currentUser?.name} email={currentUser?.email} photoURL={currentUser?.profilePhotoSet ? currentUser.photoURL : ''} size={144} className="!h-20 !w-20 rounded-[1.5rem] border-4 border-[#D2E3FC] text-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 sm:!h-36 sm:!w-36 sm:rounded-[2rem] sm:text-5xl" imageClassName="rounded-[1.5rem] sm:rounded-[2rem]" />
                   <div className="pb-2">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C2E7FF] sm:text-sm sm:tracking-[0.35em]">Level {level} Scholar</p>
+                    <div className="flex flex-wrap items-center gap-2"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C2E7FF] sm:text-sm sm:tracking-[0.35em]">Level {level} Scholar</p><span className="rounded-full border border-white/60 bg-white/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white">{subscriptionTier === 'elite' ? 'Elite Member' : 'Pro Member'} • {earningMultiplier}× EduCoins</span></div>
                     <h1 className="mt-1 text-3xl font-black tracking-tight text-white drop-shadow sm:mt-2 sm:text-6xl">{currentUser?.name || 'Student'}</h1>
                     <p className="mt-1 max-w-2xl break-words text-xs font-semibold text-[#F8FAFD] sm:mt-2 sm:text-base">
                       {currentUser?.email || 'student@learninghub.dev'} {currentUser?.mobile ? `• +91 ${currentUser.mobile}` : ''}

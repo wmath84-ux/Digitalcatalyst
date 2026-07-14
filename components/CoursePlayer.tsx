@@ -15,6 +15,8 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { isDirectAudioUrl, isDirectVideoUrl, isGoogleDriveUrl, normalizeDriveUrl, normalizeMediaSource } from '../utils/mediaCompat';
 import MediaFallbackCard from './common/MediaFallbackCard';
+import MembershipUpgradeCard from './MembershipUpgradeCard';
+import { getUserEduCoinMultiplier, hasPremiumMembership, normalizeSubscriptionPageContent } from '../utils/subscriptionAccess';
 
 declare global {
   interface Window {
@@ -1175,7 +1177,7 @@ const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void
   );
 };
 
-const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ file, economySettings, onQuizReward }) => {
+const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings; canEarnEduCoins: boolean; eduCoinMultiplier: number; onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean; }> = ({ file, economySettings, canEarnEduCoins, eduCoinMultiplier, onQuizReward }) => {
   const questions = useMemo(() => (Array.isArray(file.quiz?.questions) ? file.quiz?.questions : []).filter(Boolean).map((q: any) => ({ ...q, prompt: String(q.prompt || q.question || q.title || q.text || '').trim(), options: Array.isArray(q.options) ? q.options : Array.isArray(q.choices) ? q.choices : Array.isArray(q.answers) ? q.answers : [] })).filter(q => q.prompt && q.options.length), [file.id, file.quiz]);
   const [answers, setAnswers] = useState<QuizAnswerState>({});
   const [currentQuestion, setCurrentQuestion] = useState(0);
@@ -1201,9 +1203,10 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
 
   const submitQuiz = () => {
     const coins = score * Math.max(0, Number(economySettings.coinPerQuizCorrect));
+    const creditedCoins = canEarnEduCoins ? Math.max(0, Math.floor(coins * eduCoinMultiplier)) : 0;
     setSubmitted(true);
-    setRewardCoins(coins);
-    if (coins > 0 && onQuizReward) setRewardClaimed(onQuizReward(file.id, file.name, score, coins));
+    setRewardCoins(creditedCoins);
+    if (canEarnEduCoins && coins > 0 && onQuizReward) setRewardClaimed(onQuizReward(file.id, file.name, score, coins));
   };
 
   return (
@@ -1264,7 +1267,7 @@ const QuizPlayer: React.FC<{ file: ProductFile; economySettings: EconomySettings
         {submitted && (
           <div className={`${compactQuiz ? 'rounded-[1.15rem] p-3' : desktopQuizLayout ? 'col-start-1 row-start-4 rounded-3xl p-4' : 'rounded-3xl p-5'} shrink-0 border border-emerald-200/70 bg-emerald-50/80 shadow-sm backdrop-blur-xl`}>
             <p className={`${compactQuiz ? 'text-base' : 'text-xl'} font-black text-emerald-800`}>Quiz submitted: {score}/{questions.length}</p>
-            <p className={`${compactQuiz ? 'mt-1 text-xs' : 'mt-2 text-sm'} font-bold text-emerald-700`}>{rewardClaimed ? `✦ +${rewardCoins} EduCoins credited to your wallet.` : rewardCoins > 0 ? 'Reward already claimed for this quiz.' : 'No coin reward this time — revise and try another quiz.'}</p>
+            <p className={`${compactQuiz ? 'mt-1 text-xs' : 'mt-2 text-sm'} font-bold text-emerald-700`}>{!canEarnEduCoins ? 'Upgrade to Pro or Elite to earn EduCoins from quizzes.' : rewardClaimed ? `✦ +${rewardCoins} EduCoins credited to your wallet.` : rewardCoins > 0 ? 'Reward already claimed for this quiz.' : 'No coin reward this time — revise and try another quiz.'}</p>
           </div>
         )}
 
@@ -1286,11 +1289,12 @@ const CoursePlayer: React.FC<{
   product: ProductWithRating;
   currentUser?: User | null;
   onBack: () => void;
+  onUpgrade: () => void;
   onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean;
   productAccess?: ProductAccessState | null;
   onPurchaseLatestUpdate?: (product: ProductWithRating, updateId?: string) => void;
   onEducoinUnlockComplete?: (product: ProductWithRating, updateIds: string[]) => void;
-}> = ({ settings, economySettings, product, currentUser = null, onBack, onQuizReward, productAccess = null, onPurchaseLatestUpdate, onEducoinUnlockComplete }) => {
+}> = ({ settings, economySettings, product, currentUser = null, onBack, onUpgrade, onQuizReward, productAccess = null, onPurchaseLatestUpdate, onEducoinUnlockComplete }) => {
   const viewport = useViewportSize();
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
@@ -1325,6 +1329,9 @@ const CoursePlayer: React.FC<{
   const [youtubeWatchSeconds, setYoutubeWatchSeconds] = useState(0);
 
   const currentUserId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
+  const hasPremiumAccess = hasPremiumMembership(currentUser);
+  const eduCoinMultiplier = getUserEduCoinMultiplier(currentUser);
+  const subscriptionPage = normalizeSubscriptionPageContent(settings.content.subscriptionPage);
   const courseContent = useMemo(() => ensureCourseIntroModule(product), [product]);
 
 
@@ -1336,6 +1343,7 @@ const CoursePlayer: React.FC<{
   }, []);
 
   const flushYoutubeCoins = useCallback(async (nextStatus: 'paused' | 'closed' | 'credited' = 'closed') => {
+    if (!hasPremiumAccess) return 0;
     const session = youtubeSessionRef.current;
     if (!session || session.isFlushing) return 0;
 
@@ -1372,7 +1380,7 @@ const CoursePlayer: React.FC<{
     } finally {
       session.isFlushing = false;
     }
-  }, [stopYoutubeTickTimer]);
+  }, [hasPremiumAccess, stopYoutubeTickTimer]);
 
   const handlePlayerBack = () => {
     if (isMentorOpenRef.current) {
@@ -1779,7 +1787,7 @@ const CoursePlayer: React.FC<{
   }, [activeFile?.type, captureVideoFullscreenSnapshot, shouldUseMobileVideoFullscreen, tryLockMobileVideoOrientation, tryUnlockMobileVideoOrientation]);
 
   useEffect(() => {
-    if (activeFile?.type !== 'youtube') return undefined;
+    if (!hasPremiumAccess || activeFile?.type !== 'youtube') return undefined;
 
     const youtubeVideoId = getYouTubeVideoIdFromFile(activeFile);
     if (!youtubeVideoId || !currentUserId || !youtubeFrameId) return undefined;
@@ -1870,11 +1878,12 @@ const CoursePlayer: React.FC<{
       youtubeSessionRef.current = null;
       stopYoutubeTickTimer();
     };
-  }, [activeFile, currentUserId, flushYoutubeCoins, product.id, stopYoutubeTickTimer, youtubeFrameId]);
+  }, [activeFile, currentUserId, flushYoutubeCoins, hasPremiumAccess, product.id, stopYoutubeTickTimer, youtubeFrameId]);
 
   const unlockContentWithEducoins = async (item: CourseModule | ProductFile) => {
     const requiredCoins = getRequiredEducoins(item);
     if (!currentUserId) { setEducoinNotice('Please login to unlock content with EduCoins.'); return; }
+    if (!hasPremiumAccess) { setEducoinNotice('Upgrade to Pro or Elite to unlock paid modules with EduCoins.'); return; }
     if (requiredCoins <= 0) return;
     const updateId = resolveCoursePlayerUpdateId(product.id, item);
     if (productAccess?.ownedUpdateIds.includes(updateId)) { setEducoinNotice('This content is already unlocked.'); return; }
@@ -1959,7 +1968,7 @@ const CoursePlayer: React.FC<{
   }, [closeCourseSidebar, isSidebarOpen, useDesktopSidebar]);
 
   const YoutubeRewardChip = ({ compact = false }: { compact?: boolean }) => {
-    if (activeFile?.type !== 'youtube') return null;
+    if (!hasPremiumAccess || activeFile?.type !== 'youtube') return null;
 
     const mobileProgressLabel = `${completedYoutubeCoins}/${EDUCOIN_SECONDS_PER_COIN}s`;
 
@@ -2073,7 +2082,7 @@ const CoursePlayer: React.FC<{
       case 'doc':
       case 'ebook': return <SmartDocsWorkspace file={activeFile} productId={product.id} />;
       case 'link': return isHostedDocsFile(activeFile) ? <HostedDocumentViewer file={activeFile} /> : <ExternalResourceCard file={activeFile} />;
-      case 'quiz': return <QuizPlayer file={activeFile} economySettings={economySettings} onQuizReward={onQuizReward} />;
+      case 'quiz': return <QuizPlayer file={activeFile} economySettings={economySettings} canEarnEduCoins={hasPremiumAccess} eduCoinMultiplier={eduCoinMultiplier} onQuizReward={onQuizReward} />;
       default: return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
     }
   };
@@ -2198,17 +2207,23 @@ const CoursePlayer: React.FC<{
             {renderMedia()}
             {isMentorOpen && (
               <div className="absolute inset-0 z-50 flex items-stretch justify-end bg-slate-950/20 p-2 backdrop-blur-[2px] sm:p-3" aria-label="AI Mentor overlay">
-                <div className="h-full w-full max-w-full sm:max-w-[34rem] lg:max-w-[40rem]">
-                  <AiMentor
-                    productTitle={product.title}
-                    productId={product.id}
-                    courseId={product.id}
-                    activeFileId={activeFile?.id || null}
-                    activeFileType={activeFile?.type || null}
-                    activeContentName={activeFile?.name || null}
-                    userId={currentUserId}
-                    onClose={closeCourseMentor}
-                  />
+                <div className="h-full w-full max-w-full overflow-y-auto sm:max-w-[34rem] lg:max-w-[40rem]">
+                  {hasPremiumAccess ? (
+                    <AiMentor
+                      productTitle={product.title}
+                      productId={product.id}
+                      courseId={product.id}
+                      activeFileId={activeFile?.id || null}
+                      activeFileType={activeFile?.type || null}
+                      activeContentName={activeFile?.name || null}
+                      userId={currentUserId}
+                      onClose={closeCourseMentor}
+                    />
+                  ) : (
+                    <div className="flex min-h-full items-center justify-center p-2">
+                      <MembershipUpgradeCard message={subscriptionPage.aiMentorLocked} onUpgrade={onUpgrade} onBack={closeCourseMentor} compact />
+                    </div>
+                  )}
                 </div>
               </div>
             )}

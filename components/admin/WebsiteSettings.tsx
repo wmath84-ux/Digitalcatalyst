@@ -6,6 +6,13 @@ import { FaqItem } from '../Faq';
 import { UpcomingFeatureItem } from '../UpcomingFeatures';
 import { defaultDockStyle, dockCustomizationItems } from '../BottomGlassDock';
 import PremiumImageUrlInput from '../common/PremiumImageUrlInput';
+import {
+    MembershipMessage,
+    normalizeSubscriptionPageContent,
+    normalizeSubscriptionPlans,
+    SubscriptionPageContent,
+    SubscriptionPlanConfig,
+} from '../../utils/subscriptionAccess';
 
 const sectionNames: Record<HomepageSection['id'], string> = {
     hero: 'Hero Section',
@@ -261,7 +268,7 @@ interface WebsiteSettingsProps {
     onSettingsChange: (settings: WebsiteSettings) => Promise<boolean>;
 }
 
-type EditableSubscriptionPlan = { id: string; name: string; price: number; coinPrice?: number; description: string; unlockProductIds: number[]; badge?: string; };
+type EditableSubscriptionPlan = SubscriptionPlanConfig;
 type EditableReward = { id: string; title: string; cost: number; };
 const streakMetricOptions: ProfileStreakMetric[] = ['dailyLogin', 'studyMinutes', 'watchMinutes', 'pdfsRead', 'coursesOwned', 'completedCourses', 'quizWins', 'articlesRead', 'lifetimeCoins', 'coinTransactions', 'milestonesClaimed', 'badgesUnlocked'];
 const milestoneMetricOptions: ProfileMilestoneMetric[] = ['lifetimeCoins', 'studyMinutes', 'watchMinutes', 'coursesOwned', 'completedCourses', 'quizWins', 'articlesRead', 'pdfsRead', 'streakClaims', 'badgesUnlocked'];
@@ -284,7 +291,7 @@ const getRewardStatus = (reward: { active?: boolean; draft?: boolean; archived?:
 const statusClass = (status: string) => status === 'Active' ? 'bg-emerald-100 text-emerald-700' : status === 'Draft' ? 'bg-amber-100 text-amber-700' : status === 'Archived' ? 'bg-slate-200 text-slate-600' : 'bg-rose-100 text-rose-700';
 
 const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, products = [], onSettingsChange }) => {
-    const [activeTab, setActiveTab] = useState<'theme' | 'layout' | 'content' | 'reading' | 'profile' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
+    const [activeTab, setActiveTab] = useState<'theme' | 'layout' | 'content' | 'subscriptions' | 'reading' | 'profile' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
     const [localSettings, setLocalSettings] = useState<WebsiteSettings>(settings);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'failed'>('idle');
 
@@ -333,11 +340,8 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         handleNestedChange('content', field, value);
     };
 
-    const subscriptionPlans = (((localSettings.content as any).subscriptionPlans || []) as EditableSubscriptionPlan[]).map(plan => ({
-        ...plan,
-        coinPrice: Number(plan.coinPrice || 0),
-        unlockProductIds: plan.unlockProductIds || [],
-    }));
+    const subscriptionPlans = normalizeSubscriptionPlans((localSettings.content as any).subscriptionPlans) as EditableSubscriptionPlan[];
+    const subscriptionPage = normalizeSubscriptionPageContent((localSettings.content as any).subscriptionPage);
     const redeemRewards = (((localSettings.content as any).redeemRewards || []) as EditableReward[]);
     const eduCoinRules = ((localSettings.content as any).eduCoinRules || { purchase: 25, redeemRate: 10 }) as { purchase: number; redeemRate: number };
     const dockItems = (((localSettings.content as any).dockItems || []) as string[]);
@@ -397,15 +401,13 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         updateContentValue('subscriptionPlans', nextPlans);
     };
 
-    const addPlan = () => {
-        updateContentValue('subscriptionPlans', [
-            ...subscriptionPlans,
-            { id: `plan-${Date.now()}`, name: 'New Plan', price: 299, coinPrice: 0, description: 'Describe this plan', unlockProductIds: [] },
-        ]);
+
+    const updateSubscriptionPage = (updates: Partial<SubscriptionPageContent>) => {
+        updateContentValue('subscriptionPage', { ...subscriptionPage, ...updates });
     };
 
-    const removePlan = (planIndex: number) => {
-        updateContentValue('subscriptionPlans', subscriptionPlans.filter((_, index) => index !== planIndex));
+    const updateMembershipMessage = (field: 'aiMentorLocked' | 'communityLocked' | 'profileUpgrade', updates: Partial<MembershipMessage>) => {
+        updateSubscriptionPage({ [field]: { ...subscriptionPage[field], ...updates } } as Partial<SubscriptionPageContent>);
     };
 
     const togglePlanProduct = (planIndex: number, productId: number) => {
@@ -746,53 +748,10 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             </div>
                         </div>
 
-                        <div className="mt-5 rounded-xl border bg-white p-4">
-                            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                                <div>
-                                    <h4 className="font-bold text-gray-800">Subscription Plans</h4>
-                                    <p className="text-sm text-slate-600">Plan name, price, description, badge, and products to unlock.</p>
-                                </div>
-                                <button type="button" onClick={addPlan} className="rounded-lg bg-blue-600 px-4 py-2 text-sm font-bold text-white">+ Add Plan</button>
-                            </div>
-                            <div className="mt-4 space-y-4">
-                                {subscriptionPlans.map((plan, planIndex) => (
-                                    <div key={plan.id || planIndex} className="rounded-2xl border border-slate-200 bg-slate-100/80 p-4">
-                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-5">
-                                            <label className="text-sm font-semibold text-gray-700">Plan Name
-                                                <input value={plan.name} onChange={e => updatePlan(planIndex, { name: e.target.value })} className="mt-1 w-full rounded border p-2" />
-                                            </label>
-                                            <label className="text-sm font-semibold text-gray-700">Price (₹)
-                                                <input type="number" min="0" value={plan.price} onChange={e => updatePlan(planIndex, { price: Number(e.target.value) || 0 })} className="mt-1 w-full rounded border p-2" />
-                                            </label>
-                                            <label className="text-sm font-semibold text-gray-700">Badge Text
-                                                <input value={plan.badge || ''} onChange={e => updatePlan(planIndex, { badge: e.target.value })} placeholder="Popular / Best Value" className="mt-1 w-full rounded border p-2" />
-                                            </label>
-                                            <label className="text-sm font-semibold text-gray-700">EduCoin Price (0 disables)
-                                                <input type="number" min="0" value={plan.coinPrice || 0} onChange={e => updatePlan(planIndex, { coinPrice: Number(e.target.value) || 0 })} className="mt-1 w-full rounded border p-2" />
-                                            </label>
-                                            <button type="button" onClick={() => removePlan(planIndex)} className="mt-6 rounded border border-red-200 px-3 py-2 text-sm font-bold text-red-600">Remove Plan</button>
-                                        </div>
-                                        <label className="mt-3 block text-sm font-semibold text-gray-700">Description
-                                            <textarea value={plan.description} onChange={e => updatePlan(planIndex, { description: e.target.value })} rows={2} className="mt-1 w-full rounded border p-2" />
-                                        </label>
-                                        <div className="mt-3">
-                                            <p className="text-sm font-semibold text-gray-700">Products unlocked by this plan</p>
-                                            {products.length ? (
-                                                <div className="mt-2 grid grid-cols-1 gap-2 md:grid-cols-2">
-                                                    {products.map(product => (
-                                                        <label key={product.id} className="flex items-center gap-2 rounded-lg border bg-white p-2 text-sm text-gray-700">
-                                                            <input type="checkbox" checked={(plan.unlockProductIds || []).includes(product.id)} onChange={() => togglePlanProduct(planIndex, product.id)} />
-                                                            <span className="font-semibold">{product.title}</span>
-                                                        </label>
-                                                    ))}
-                                                </div>
-                                            ) : (
-                                                <input value={(plan.unlockProductIds || []).join(', ')} onChange={e => updatePlan(planIndex, { unlockProductIds: e.target.value.split(',').map(value => Number(value.trim())).filter(Boolean) })} placeholder="Product IDs e.g. 1, 2, 3" className="mt-2 w-full rounded border p-2" />
-                                            )}
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
+                        <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
+                            <h4 className="font-bold text-gray-800">Subscription Access</h4>
+                            <p className="mt-1 text-sm text-slate-600">Use the dedicated Subscriptions tab to manage Pro/Elite plans, page copy, benefits, earning power, locked messages, CTAs, and product access.</p>
+                            <button type="button" onClick={() => setActiveTab('subscriptions')} className="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white">Open Subscription Customizer</button>
                         </div>
 
                     </div>
@@ -809,6 +768,65 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                 </div>
             );
 
+
+            case 'subscriptions': return (
+                <div className="space-y-6">
+                    <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5">
+                        <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">Subscription Page</p>
+                        <h2 className="mt-2 text-2xl font-black text-slate-900">Pro & Elite Access Customizer</h2>
+                        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Normal users stay free and can browse, buy, and consume purchased content. Community, AI Mentor, EduCoin earning, badges, streaks, and milestones unlock only after Pro or Elite activation.</p>
+                    </div>
+
+                    <div className="rounded-2xl border bg-white p-4">
+                        <h3 className="text-lg font-black text-slate-900">Page Header & Billing Labels</h3>
+                        <div className="mt-3 grid gap-3 md:grid-cols-2">
+                            <label className="text-sm font-semibold text-slate-700">Eyebrow<input value={subscriptionPage.eyebrow} onChange={e => updateSubscriptionPage({ eyebrow: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                            <label className="text-sm font-semibold text-slate-700">Main Title<input value={subscriptionPage.title} onChange={e => updateSubscriptionPage({ title: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                            <label className="md:col-span-2 text-sm font-semibold text-slate-700">Subtitle<textarea value={subscriptionPage.subtitle} onChange={e => updateSubscriptionPage({ subtitle: e.target.value })} rows={3} className="mt-1 w-full rounded-lg border p-2" /></label>
+                            <label className="text-sm font-semibold text-slate-700">Monthly Label<input value={subscriptionPage.monthlyLabel} onChange={e => updateSubscriptionPage({ monthlyLabel: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                            <label className="text-sm font-semibold text-slate-700">Yearly Label<input value={subscriptionPage.yearlyLabel} onChange={e => updateSubscriptionPage({ yearlyLabel: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                            <label className="text-sm font-semibold text-slate-700">Yearly Badge<input value={subscriptionPage.yearlyBadge} onChange={e => updateSubscriptionPage({ yearlyBadge: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                        </div>
+                    </div>
+
+                    <div className="space-y-4">
+                        {subscriptionPlans.map((plan, planIndex) => (
+                            <div key={plan.accessTier} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                                    <div><p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">{plan.accessTier} membership</p><h3 className="text-xl font-black text-slate-900">{plan.name}</h3></div>
+                                    <label className="flex items-center gap-2 rounded-full bg-indigo-50 px-3 py-2 text-sm font-bold text-indigo-700"><input type="checkbox" checked={plan.featured === true} onChange={e => updatePlan(planIndex, { featured: e.target.checked })} /> Featured plan</label>
+                                </div>
+                                <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+                                    <label className="text-sm font-semibold text-slate-700">Plan Name<input value={plan.name} onChange={e => updatePlan(planIndex, { name: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                                    <label className="text-sm font-semibold text-slate-700">Price (₹)<input type="number" min="0" value={plan.price} onChange={e => updatePlan(planIndex, { price: Number(e.target.value) || 0 })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                                    <label className="text-sm font-semibold text-slate-700">EduCoin Price<input type="number" min="0" value={plan.coinPrice || 0} onChange={e => updatePlan(planIndex, { coinPrice: Number(e.target.value) || 0 })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                                    <label className="text-sm font-semibold text-slate-700">Earning Multiplier<input type="number" min="1" max="5" step="0.25" value={plan.earningMultiplier} onChange={e => updatePlan(planIndex, { earningMultiplier: Math.max(1, Number(e.target.value) || 1) })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                                    <label className="text-sm font-semibold text-slate-700">Badge Text<input value={plan.badge || ''} onChange={e => updatePlan(planIndex, { badge: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                                    <label className="text-sm font-semibold text-slate-700">Audience Label<input value={plan.audienceLabel} onChange={e => updatePlan(planIndex, { audienceLabel: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                                    <label className="text-sm font-semibold text-slate-700">CTA Label<input value={plan.ctaLabel} onChange={e => updatePlan(planIndex, { ctaLabel: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                                </div>
+                                <label className="mt-3 block text-sm font-semibold text-slate-700">Description<textarea value={plan.description} onChange={e => updatePlan(planIndex, { description: e.target.value })} rows={3} className="mt-1 w-full rounded-lg border p-2" /></label>
+                                <label className="mt-3 block text-sm font-semibold text-slate-700">Benefits (one per line)<textarea value={plan.benefits.join('\n')} onChange={e => updatePlan(planIndex, { benefits: e.target.value.split('\n').map(item => item.trim()).filter(Boolean) })} rows={8} className="mt-1 w-full rounded-lg border p-2 font-mono text-sm" /></label>
+                                <div className="mt-4">
+                                    <p className="text-sm font-black text-slate-800">Selected premium products/content</p>
+                                    {products.length ? <div className="mt-2 grid gap-2 md:grid-cols-2">{products.map(product => <label key={product.id} className="flex items-center gap-2 rounded-lg border bg-slate-50 p-2 text-sm font-semibold"><input type="checkbox" checked={plan.unlockProductIds.includes(product.id)} onChange={() => togglePlanProduct(planIndex, product.id)} /><span>{product.title}</span></label>)}</div> : <input value={plan.unlockProductIds.join(', ')} onChange={e => updatePlan(planIndex, { unlockProductIds: e.target.value.split(',').map(value => Number(value.trim())).filter(Boolean) })} className="mt-2 w-full rounded-lg border p-2" />}
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    <div className="grid gap-4 xl:grid-cols-3">
+                        {([
+                            ['aiMentorLocked', 'AI Mentor Locked Message'],
+                            ['communityLocked', 'Community Locked Message'],
+                            ['profileUpgrade', 'Normal User Profile Message'],
+                        ] as const).map(([field, label]) => {
+                            const message = subscriptionPage[field];
+                            return <div key={field} className="rounded-2xl border bg-white p-4"><h3 className="font-black text-slate-900">{label}</h3><label className="mt-3 block text-sm font-semibold text-slate-700">Eyebrow<input value={message.eyebrow} onChange={e => updateMembershipMessage(field, { eyebrow: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label><label className="mt-3 block text-sm font-semibold text-slate-700">Title<input value={message.title} onChange={e => updateMembershipMessage(field, { title: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label><label className="mt-3 block text-sm font-semibold text-slate-700">Message<textarea value={message.description} onChange={e => updateMembershipMessage(field, { description: e.target.value })} rows={10} className="mt-1 w-full rounded-lg border p-2" /></label><label className="mt-3 block text-sm font-semibold text-slate-700">CTA Label<input value={message.ctaLabel} onChange={e => updateMembershipMessage(field, { ctaLabel: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label></div>;
+                        })}
+                    </div>
+                </div>
+            );
 
             case 'profile': return (
                 <div className="space-y-5">
@@ -1157,6 +1175,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                 <TabButton label="Theme" isActive={activeTab === 'theme'} onClick={() => setActiveTab('theme')} />
                 <TabButton label="Layout" isActive={activeTab === 'layout'} onClick={() => setActiveTab('layout')} />
                 <TabButton label="Content" isActive={activeTab === 'content'} onClick={() => setActiveTab('content')} />
+                <TabButton label="Subscriptions" isActive={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')} />
                 <TabButton label="Reading" isActive={activeTab === 'reading'} onClick={() => setActiveTab('reading')} />
                 <TabButton label="Profile" isActive={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
                 <TabButton label="Dock" isActive={activeTab === 'dock'} onClick={() => setActiveTab('dock')} />

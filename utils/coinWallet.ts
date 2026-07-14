@@ -11,6 +11,7 @@ import {
 } from 'firebase/firestore';
 import { db } from '../firebase';
 import { normalizeCoinPrice as normalizeCoinPriceEligibility } from './economy';
+import { getUserEduCoinMultiplier, hasPremiumMembership } from './subscriptionAccess';
 
 export const EDUCOIN_SECONDS_PER_COIN = 120;
 
@@ -182,7 +183,7 @@ export const creditWatchSessionCoins = async ({
 }: CreditWatchSessionInput): Promise<number> => {
   if (!sessionId || !userId) return 0;
 
-  const completedCoins = completedCoinsFromSeconds(validWatchedSeconds);
+  const completedCoinBlocks = completedCoinsFromSeconds(validWatchedSeconds);
   const sessionRef = doc(db, 'watchSessions', sessionId);
   const userRef = doc(db, 'users', userId);
   const transactionRef = doc(collection(db, 'coinTransactions'));
@@ -193,19 +194,36 @@ export const creditWatchSessionCoins = async ({
       transaction.get(userRef),
     ]);
 
-    if (!userSnap.exists()) {
-      transaction.set(userRef, {
-        coinBalance: 0,
-        totalCoinsEarned: 0,
-        totalCoinsSpent: 0,
-        createdAt: serverTimestamp(),
-        updatedAt: serverTimestamp(),
-      });
-    }
-
+    const userData = userSnap.exists() ? userSnap.data() : {};
+    const earningMultiplier = getUserEduCoinMultiplier(userData);
+    const completedCoins = hasPremiumMembership(userData)
+      ? Math.max(0, Math.floor(completedCoinBlocks * earningMultiplier))
+      : 0;
     const sessionData = sessionSnap.exists() ? sessionSnap.data() : {};
     const creditedCoins = safeNumber(sessionData.creditedCoins, 0);
     const coinsToCredit = Math.max(0, completedCoins - creditedCoins);
+
+    if (!hasPremiumMembership(userData)) {
+      transaction.set(
+        sessionRef,
+        {
+          sessionId,
+          userId,
+          courseId,
+          videoId,
+          youtubeVideoId: youtubeVideoId || '',
+          validWatchedSeconds,
+          earnedCoins: 0,
+          creditedCoins: 0,
+          lastPlaybackPosition,
+          status: 'closed' satisfies WatchSessionStatus,
+          endedAt: serverTimestamp(),
+          updatedAt: serverTimestamp(),
+        },
+        { merge: true }
+      );
+      return 0;
+    }
 
     if (coinsToCredit <= 0) {
       transaction.set(
@@ -219,6 +237,7 @@ export const creditWatchSessionCoins = async ({
           validWatchedSeconds,
           earnedCoins: completedCoins,
           creditedCoins,
+          earningMultiplier,
           lastPlaybackPosition,
           status: 'credited' satisfies WatchSessionStatus,
           endedAt: serverTimestamp(),
@@ -226,12 +245,10 @@ export const creditWatchSessionCoins = async ({
         },
         { merge: true }
       );
-
       return 0;
     }
 
-    const userData = userSnap.exists() ? userSnap.data() : {};
-    const balanceBefore = safeNumber(userData.coinBalance, 0);
+    const balanceBefore = safeNumber(userData.coinBalance, safeNumber(userData.eduCoins, 0));
     const balanceAfter = balanceBefore + coinsToCredit;
 
     transaction.set(
@@ -245,6 +262,7 @@ export const creditWatchSessionCoins = async ({
         validWatchedSeconds,
         earnedCoins: completedCoins,
         creditedCoins: creditedCoins + coinsToCredit,
+        earningMultiplier,
         lastPlaybackPosition,
         status: 'credited' satisfies WatchSessionStatus,
         endedAt: serverTimestamp(),
@@ -264,6 +282,7 @@ export const creditWatchSessionCoins = async ({
       videoId,
       youtubeVideoId: youtubeVideoId || '',
       sessionId,
+      earningMultiplier,
       status: 'success',
       createdAt: serverTimestamp(),
     });
@@ -272,8 +291,10 @@ export const creditWatchSessionCoins = async ({
       userRef,
       {
         coinBalance: balanceAfter,
+        eduCoins: balanceAfter,
         totalCoinsEarned: safeNumber(userData.totalCoinsEarned, 0) + coinsToCredit,
         totalCoinsSpent: safeNumber(userData.totalCoinsSpent, 0),
+        totalLifetimeCoins: safeNumber(userData.totalLifetimeCoins, safeNumber(userData.totalCoinsEarned, 0)) + coinsToCredit,
         updatedAt: serverTimestamp(),
       },
       { merge: true }
@@ -321,7 +342,7 @@ export interface CreditUserCoinWalletInput {
 
 export interface CreditUserCoinWalletResult {
   success: boolean;
-  reason?: 'login_required' | 'invalid_amount' | 'already_claimed';
+  reason?: 'login_required' | 'invalid_amount' | 'already_claimed' | 'membership_required';
   currentBalance: number;
   balanceBefore: number;
   balanceAfter: number;
@@ -349,9 +370,9 @@ export const creditUserCoinWallet = async ({
     };
   }
 
-  const coinsToCredit = normalizeCoinPrice(amount);
+  const baseCoinsToCredit = normalizeCoinPrice(amount);
 
-  if (coinsToCredit <= 0) {
+  if (baseCoinsToCredit <= 0) {
     return {
       success: false,
       reason: 'invalid_amount',
@@ -371,7 +392,6 @@ export const creditUserCoinWallet = async ({
     const userSnap = await transaction.get(userRef);
     const userData = userSnap.exists() ? userSnap.data() : {};
     const existingStreakClaims = (userData.profileStreakClaims || {}) as Record<string, string>;
-
     const balanceBefore = safeNumber(
       userData.coinBalance,
       safeNumber(userData.eduCoins, 0)
@@ -382,6 +402,21 @@ export const creditUserCoinWallet = async ({
     );
     const totalCoinsSpent = safeNumber(userData.totalCoinsSpent, 0);
     const totalLifetimeCoins = safeNumber(userData.totalLifetimeCoins, totalCoinsEarned);
+
+    if (!hasPremiumMembership(userData)) {
+      return {
+        success: false,
+        reason: 'membership_required' as const,
+        currentBalance: balanceBefore,
+        balanceBefore,
+        balanceAfter: balanceBefore,
+        totalCoinsEarned,
+        totalLifetimeCoins,
+      };
+    }
+
+    const earningMultiplier = getUserEduCoinMultiplier(userData);
+    const coinsToCredit = Math.max(0, Math.floor(baseCoinsToCredit * earningMultiplier));
 
     if (
       profileStreakClaim &&
@@ -401,7 +436,9 @@ export const creditUserCoinWallet = async ({
     const balanceAfter = balanceBefore + coinsToCredit;
     const nextTotalCoinsEarned = totalCoinsEarned + coinsToCredit;
     const nextTotalLifetimeCoins = totalLifetimeCoins + coinsToCredit;
-    const resolvedDescription = description || `${coinsToCredit} EduCoins credited`;
+    const resolvedDescription = description
+      ? `${description}${earningMultiplier > 1 ? ` (${earningMultiplier}× Elite earning: ${coinsToCredit} EduCoins)` : ''}`
+      : `${coinsToCredit} EduCoins credited`;
     const resolvedTitle = title || source;
     const optionalPayload = {
       ...(profileStreakClaim
@@ -420,6 +457,7 @@ export const creditUserCoinWallet = async ({
       balanceBefore,
       balanceAfter,
       description: resolvedDescription,
+      earningMultiplier,
       status: 'success',
       createdAt: serverTimestamp(),
       ...optionalPayload,
@@ -433,6 +471,7 @@ export const creditUserCoinWallet = async ({
       source,
       title: resolvedTitle,
       description: resolvedDescription,
+      earningMultiplier,
       balanceBefore,
       balanceAfter,
       status: 'success',
@@ -485,7 +524,7 @@ export interface SpendUserCoinWalletInput {
 
 export interface SpendUserCoinWalletResult {
   success: boolean;
-  reason?: 'login_required' | 'invalid_amount' | 'not_enough_coins';
+  reason?: 'login_required' | 'invalid_amount' | 'not_enough_coins' | 'membership_required';
   currentBalance: number;
   balanceBefore: number;
   balanceAfter: number;
@@ -542,6 +581,18 @@ export const spendUserCoinWallet = async ({
       safeNumber(userData.totalLifetimeCoins, safeNumber(userData.eduCoins, balanceBefore))
     );
     const totalCoinsSpent = safeNumber(userData.totalCoinsSpent, 0);
+
+    if (!hasPremiumMembership(userData)) {
+      return {
+        success: false,
+        reason: 'membership_required' as const,
+        currentBalance: balanceBefore,
+        balanceBefore,
+        balanceAfter: balanceBefore,
+        totalCoinsEarned,
+        totalCoinsSpent,
+      };
+    }
 
     if (balanceBefore < coinsToSpend) {
       return {
@@ -624,7 +675,7 @@ export const redeemProductWithEduCoins = async ({
   productTitle,
 }: RedeemProductInput): Promise<{
   success: boolean;
-  reason?: 'login_required' | 'product_not_found' | 'redeem_disabled' | 'already_unlocked' | 'not_enough_coins';
+  reason?: 'login_required' | 'product_not_found' | 'redeem_disabled' | 'already_unlocked' | 'not_enough_coins' | 'membership_required';
   requiredCoins?: number;
   currentBalance?: number;
 }> => {
@@ -687,6 +738,15 @@ export const redeemProductWithEduCoins = async ({
 
     const userData = userSnap.exists() ? userSnap.data() : {};
     const balanceBefore = safeNumber(userData.coinBalance, 0);
+
+    if (!hasPremiumMembership(userData)) {
+      return {
+        success: false,
+        reason: 'membership_required' as const,
+        requiredCoins: coinPrice,
+        currentBalance: balanceBefore,
+      };
+    }
 
     if (balanceBefore < coinPrice) {
       return {
