@@ -4,6 +4,7 @@ import { buildImageFallbackDataUrl, type ImageFallbackAspect } from '../../utils
 interface SafeImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src' | 'aspect'> {
   src?: string | null;
   fallbackSrc?: string;
+  fallbackCandidates?: string[];
   fallbackTitle?: string;
   fallbackBadge?: string;
   fallbackMessage?: string;
@@ -13,9 +14,12 @@ interface SafeImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>,
   loadTimeoutMs?: number;
 }
 
+const cleanImageSource = (value?: string | null) => typeof value === 'string' ? value.trim() : '';
+
 const SafeImage: React.FC<SafeImageProps> = ({
   src,
   fallbackSrc,
+  fallbackCandidates = [],
   alt = '',
   className = '',
   wrapperClassName,
@@ -50,23 +54,32 @@ const SafeImage: React.FC<SafeImageProps> = ({
     aspect: fallbackAspect,
   }), [fallbackSrc, fallbackTitle, fallbackBadge, fallbackMessage, fallbackIcon, alt, fallbackAspect]);
 
-  const normalizedSrc = typeof src === 'string' ? src.trim() : '';
-  const [activeSrc, setActiveSrc] = useState(normalizedSrc || generatedFallback);
+  const normalizedSrc = cleanImageSource(src);
+  const fallbackCandidateKey = Array.isArray(fallbackCandidates) ? fallbackCandidates.join('|') : '';
+  const candidateSources = useMemo(() => {
+    const orderedSources = [normalizedSrc, ...(Array.isArray(fallbackCandidates) ? fallbackCandidates : []), generatedFallback]
+      .map(cleanImageSource)
+      .filter(Boolean);
+    return Array.from(new Set(orderedSources));
+  }, [normalizedSrc, fallbackCandidateKey, generatedFallback]);
+
+  const [candidateIndex, setCandidateIndex] = useState(0);
   const [loaded, setLoaded] = useState(false);
+  const activeSrc = candidateSources[candidateIndex] || generatedFallback;
 
   useEffect(() => {
-    setActiveSrc(normalizedSrc || generatedFallback);
+    setCandidateIndex(0);
     setLoaded(false);
-  }, [normalizedSrc, generatedFallback]);
+  }, [candidateSources]);
 
   useEffect(() => {
-    if (loaded || activeSrc === generatedFallback || loadTimeoutMs <= 0) return undefined;
+    if (loaded || candidateIndex >= candidateSources.length - 1 || loadTimeoutMs <= 0) return undefined;
     const timer = window.setTimeout(() => {
-      setActiveSrc(generatedFallback);
+      setCandidateIndex((currentIndex) => Math.min(currentIndex + 1, candidateSources.length - 1));
       setLoaded(false);
     }, loadTimeoutMs);
     return () => window.clearTimeout(timer);
-  }, [activeSrc, generatedFallback, loadTimeoutMs, loaded]);
+  }, [candidateIndex, candidateSources.length, loadTimeoutMs, loaded]);
 
   const image = (
     <img
@@ -82,8 +95,8 @@ const SafeImage: React.FC<SafeImageProps> = ({
         onLoad?.(event);
       }}
       onError={(event) => {
-        if (activeSrc !== generatedFallback) {
-          setActiveSrc(generatedFallback);
+        if (candidateIndex < candidateSources.length - 1) {
+          setCandidateIndex((currentIndex) => Math.min(currentIndex + 1, candidateSources.length - 1));
           setLoaded(false);
         } else {
           setLoaded(true);

@@ -1,5 +1,5 @@
 import { Product } from '../App';
-import { buildProductImageFallback, resolveProductImage } from './mediaCompat';
+import { buildProductImageFallback, resolveProductImage, resolveProductImageCandidates } from './mediaCompat';
 
 export type ProductImageSlot = 'card' | 'detailMobile' | 'detailDesktop' | 'homeTopRated' | 'homeList' | 'purchaseSquare' | 'purchaseCard' | 'galleryThumb';
 
@@ -32,11 +32,14 @@ const isGeneratedProductImageFallback = (url: string): boolean => {
   return !value || value.startsWith('data:image/svg+xml');
 };
 
-export const getProductImage = (product: Product, slot: ProductImageSlot): string => {
+export const getProductImageCandidates = (product: Product, slot: ProductImageSlot): string[] => {
   const fallbackSlots = PRODUCT_IMAGE_SLOT_FALLBACKS[slot] || [slot];
-  for (const candidateSlot of fallbackSlots) {
-    const resolved = resolveProductImage(product, candidateSlot);
-    if (!isGeneratedProductImageFallback(resolved)) return resolved;
-  }
-  return resolveProductImage(product, slot);
+  const candidates = fallbackSlots.flatMap((candidateSlot) => resolveProductImageCandidates(product, candidateSlot));
+  const uniqueCandidates = Array.from(new Set(candidates.filter((value) => !isGeneratedProductImageFallback(value))));
+  return uniqueCandidates.length ? uniqueCandidates : [resolveProductImage(product, slot)];
+};
+
+export const getProductImage = (product: Product, slot: ProductImageSlot): string => {
+  const candidates = getProductImageCandidates(product, slot);
+  return candidates[0] || resolveProductImage(product, slot);
 };

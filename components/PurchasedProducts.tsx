@@ -1,7 +1,7 @@
 
 import React, { useEffect, useRef } from 'react';
 import { ProductWithRating, WebsiteSettings } from '../App';
-import { getProductImage, getProductImageFallback } from '../utils/productImages';
+import { getProductImage, getProductImageCandidates, getProductImageFallback } from '../utils/productImages';
 import SafeImage from './common/SafeImage';
 
 const PurchasedProductCard: React.FC<{
@@ -14,14 +14,34 @@ const PurchasedProductCard: React.FC<{
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${delay}` : '';
     const buttonText = 'Access Files';
     const isMobileHome = variant === 'mobileHome';
-    const purchaseImage = getProductImage(product, isMobileHome ? 'purchaseSquare' : 'purchaseCard');
+    const purchaseImageSlot = isMobileHome ? 'purchaseSquare' : 'purchaseCard';
+    const purchaseImageCandidates = getProductImageCandidates(product, purchaseImageSlot);
+    const purchaseImage = purchaseImageCandidates[0] || getProductImage(product, purchaseImageSlot);
     const purchaseImageFallback = getProductImageFallback(product);
+    const purchaseImageKey = `${product.id}-${purchaseImage}-${purchaseImageFallback}`;
 
     return (
         <div className={`relative bg-white/70 backdrop-blur-xl ${isMobileHome ? 'rounded-lg' : 'rounded-xl'} shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden border border-gray-200 flex flex-col transform hover:-translate-y-2 transition-all duration-300 ease-in-out hover:shadow-sm product-card-shine ${animationClass}`}>
             <div className="purchased-product-media-frame aspect-[4/3] overflow-hidden relative bg-gray-100">
-                <img src={purchaseImageFallback} alt="" aria-hidden="true" className="purchased-product-fallback-image absolute inset-0 h-full w-full object-contain" loading="eager" decoding="async" />
-                <SafeImage src={purchaseImage} fallbackSrc={purchaseImageFallback} alt={product.title} className="relative z-10 h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Purchased'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="video" loading="eager" fetchPriority={delay <= 8 ? 'high' : 'auto'} decoding="async" loadTimeoutMs={8000} />
+                <img src={purchaseImageFallback} alt="" aria-hidden="true" className="purchased-product-fallback-image absolute inset-0 h-full w-full object-contain" loading="eager" decoding="async" referrerPolicy="no-referrer" />
+                <SafeImage
+                    key={purchaseImageKey}
+                    src={purchaseImage || purchaseImageFallback}
+                    fallbackCandidates={purchaseImageCandidates.slice(1)}
+                    fallbackSrc={purchaseImageFallback}
+                    alt={product.title}
+                    className="relative z-10 h-full w-full object-contain"
+                    fallbackTitle={product.title}
+                    fallbackBadge={product.category || 'Purchased'}
+                    fallbackIcon="🎓"
+                    fallbackMessage="Image preview unavailable"
+                    aspect="video"
+                    loading="eager"
+                    fetchPriority={delay <= 8 ? 'high' : 'auto'}
+                    decoding="async"
+                    referrerPolicy="no-referrer"
+                    loadTimeoutMs={3500}
+                />
                 <div className="pointer-events-none absolute inset-0 z-[11] bg-white/10"></div>
                 <div className="absolute right-3 top-3 z-20 rounded-full bg-[#059669] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(5,150,105,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs">
                     PURCHASED

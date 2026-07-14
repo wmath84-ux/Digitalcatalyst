@@ -65,6 +65,39 @@ export const normalizeDriveUrl = (url = '') => {
   return fileId ? `https://drive.google.com/file/d/${fileId}/preview` : '';
 };
 
+export const getGoogleDriveImageThumbnailUrl = (url = '', size = 1600) => {
+  const fileId = extractGoogleDriveFileId(url);
+  const safeSize = Math.max(320, Math.min(2400, Number(size) || 1600));
+  return fileId ? `https://drive.google.com/thumbnail?id=${encodeURIComponent(fileId)}&sz=w${safeSize}` : '';
+};
+
+
+export const getGoogleDriveImageViewUrl = (url = '', size = 1600) => {
+  const fileId = extractGoogleDriveFileId(url);
+  const safeSize = Math.max(320, Math.min(2400, Number(size) || 1600));
+  return fileId ? `https://lh3.googleusercontent.com/d/${encodeURIComponent(fileId)}=w${safeSize}` : '';
+};
+
+export const getRenderableImageUrlCandidates = (url = '', options: { size?: number } = {}) => {
+  const trimmed = cleanUrl(url);
+  if (!trimmed) return [];
+  if (isDataImageUrl(trimmed)) return [trimmed];
+  const safeSize = Math.max(320, Math.min(2400, Number(options.size) || 1600));
+  if (isGoogleDriveUrl(trimmed)) {
+    const fileId = extractGoogleDriveFileId(trimmed);
+    const candidates = [
+      getGoogleDriveImageThumbnailUrl(trimmed, safeSize),
+      getGoogleDriveImageViewUrl(trimmed, safeSize),
+      fileId ? `https://drive.google.com/uc?export=view&id=${encodeURIComponent(fileId)}` : '',
+      trimmed,
+    ];
+    return Array.from(new Set(candidates.map(cleanUrl).filter(Boolean)));
+  }
+  return [trimmed];
+};
+
+export const resolveRenderableImageUrl = (url = '', options: { size?: number } = {}) => getRenderableImageUrlCandidates(url, options)[0] || '';
+
 export const detectMediaProvider = (url = '', type: NormalizedMediaType = 'unknown'): NormalizedMediaProvider => {
   const trimmed = cleanUrl(url);
   if (!trimmed) return 'unknown';
@@ -169,12 +202,49 @@ export const buildProductImageFallback = (product: { title?: string; category?: 
 export const buildPostImageFallback = (post: { title?: string; body?: string; type?: string; postType?: string }) => buildPremiumImageFallback({ title: post.title || post.body || 'Community post', badge: post.type || post.postType || 'Post', icon: '💬' });
 export const buildArticleImageFallback = (article: { title?: string; category?: string; type?: string }) => buildPremiumImageFallback({ title: article.title || 'Premium Reading', badge: article.type === 'news' ? 'News' : article.category || 'Blog', icon: '📰' });
 
-export const resolveProductImage = (product: AnyMediaRecord, slot = 'card') => {
+
+const getProductImageRawCandidates = (product: AnyMediaRecord, slot = 'card') => {
   const slotCandidates = PRODUCT_IMAGE_SLOT_FALLBACKS[slot] || [slot, 'card'];
-  const candidate = slotCandidates.map((name) => product?.productImages?.[name]).find(Boolean) || (Array.isArray(product?.images) ? product.images.find(Boolean) : '') || product?.imageUrl || product?.coverImage || '';
-  const normalized = normalizeMediaSource(candidate, { type: 'image', title: product?.title });
-  return normalized.url || buildProductImageFallback(product || {});
+  const productImages = product?.productImages && typeof product.productImages === 'object' ? product.productImages : {};
+  const imageArray = Array.isArray(product?.images) ? product.images : [];
+  const productImageValues = Object.values(productImages || {});
+  const directFields = [
+    product?.imageUrl,
+    product?.thumbnailUrl,
+    product?.thumbnail,
+    product?.thumbnailImage,
+    product?.image,
+    product?.coverImage,
+    product?.previewImage,
+    product?.imagePreview,
+    product?.posterImage,
+    product?.mediaUrl,
+    product?.url,
+  ];
+  const seedUrl = isValidHttpsUrl(product?.imageSeed) || isDataImageUrl(product?.imageSeed) ? product.imageSeed : '';
+  return [
+    ...slotCandidates.map((name) => productImages?.[name]),
+    ...productImageValues,
+    ...imageArray,
+    ...directFields,
+    seedUrl,
+  ].map((value) => cleanUrl(value)).filter(Boolean);
 };
+
+export const resolveProductImageCandidates = (product: AnyMediaRecord, slot = 'card') => {
+  const size = slot === 'purchaseSquare' || slot === 'homeTopRated' || slot === 'galleryThumb' ? 1200 : 1600;
+  const renderableCandidates = getProductImageRawCandidates(product, slot).flatMap((candidate) => {
+    const normalized = normalizeMediaSource(candidate, { type: 'image', title: product?.title });
+    return getRenderableImageUrlCandidates(normalized.url || candidate, { size });
+  });
+  return Array.from(new Set(renderableCandidates.map(cleanUrl).filter(Boolean)));
+};
+
+export const resolveProductImage = (product: AnyMediaRecord, slot = 'card') => {
+  const renderable = resolveProductImageCandidates(product, slot)[0] || '';
+  return renderable || buildProductImageFallback(product || {});
+};
+
 
 export const resolvePostImage = (post: AnyMediaRecord) => {
   const normalized = normalizeMediaSource(post, { type: 'image', title: post?.title || post?.body });
