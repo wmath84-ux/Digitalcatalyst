@@ -196,6 +196,20 @@ const SubscriptionPage: React.FC<{
               const couponBadgeText = validAppliedCoupon ? `${validAppliedCoupon.code} applied` : activeDiscount ? `EduCoin ₹${eduCoinDiscount} off` : availableCoupon ? formatCouponBadge(availableCoupon) : '';
               const couponBadgeTone = validAppliedCoupon || activeDiscount || availableCoupon;
               const priceLabel = finalPlanPrice <= 0 ? 'Free access' : 'One-time secure access';
+              const includedCount = unlockedProducts.length;
+              const planDetailLines = [
+                includedCount > 0
+                  ? `Unlocks ${includedCount} selected learning ${includedCount === 1 ? 'item' : 'items'} with this plan.`
+                  : 'Admin can connect learning items to this plan anytime.',
+                'Activated access is saved in your purchased learning library.',
+                'Use the listed course/product access without buying each item separately.',
+                coinPrice > 0
+                  ? `EduCoin option available: activate with ${coinPrice} EduCoins when your balance is enough.`
+                  : 'Standard checkout activation is available for this plan.',
+                coupons.length > 0
+                  ? (validAppliedCoupon ? `${validAppliedCoupon.code} coupon is applied before checkout.` : 'Valid coupon codes can be applied before checkout.')
+                  : 'Clean one-time plan pricing is shown before checkout.',
+              ];
               
               const handlePlanCheckout = () => {
                 onActivatePlan(plan, validAppliedCoupon?.code || null);
@@ -204,7 +218,7 @@ const SubscriptionPage: React.FC<{
               return (
                 <article
                   key={plan.id}
-                  className={`subscription-plan-card group relative flex min-h-[560px] flex-col border bg-white px-5 pb-5 pt-7 text-left shadow-[8px_8px_0_rgba(17,17,17,0.06)] outline-none motion-safe:transition motion-safe:duration-200 hover:-translate-y-1 sm:px-6 ${isHighlighted ? 'border-2 border-[#181818] lg:-translate-y-2 lg:hover:-translate-y-3' : 'border-[#181818]'}`}
+                  className={`subscription-plan-card group relative flex min-h-[620px] flex-col border bg-white px-5 pb-5 pt-7 text-left shadow-[8px_8px_0_rgba(17,17,17,0.06)] outline-none motion-safe:transition motion-safe:duration-200 hover:-translate-y-1 sm:px-6 ${isHighlighted ? 'border-2 border-[#181818] lg:-translate-y-2 lg:hover:-translate-y-3' : 'border-[#181818]'}`}
                 >
                   {isHighlighted && (
                     <span className="absolute -top-3 left-1/2 -translate-x-1/2 border border-[#181818] bg-[#F4F35B] px-4 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-[#111111]">
@@ -288,9 +302,19 @@ const SubscriptionPage: React.FC<{
                   </div>
 
                   <div className="mt-5 border-t border-[#181818] pt-5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#676767]">Everything included:</p>
+                    <p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#676767]">Plan details:</p>
                     <ul className="mt-4 space-y-3 text-[12px] font-bold leading-5 text-[#111111]">
-                      {unlockedProducts.length ? unlockedProducts.slice(0, 5).map((title) => (
+                      {planDetailLines.map((detail) => (
+                        <li key={detail} className="flex items-start gap-2.5">
+                          <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[#181818] text-[9px] leading-none">✓</span>
+                          <span>{detail}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    <p className="mt-5 text-[10px] font-black uppercase tracking-[0.14em] text-[#676767]">Included courses/products:</p>
+                    <ul className="mt-4 space-y-3 text-[12px] font-bold leading-5 text-[#111111]">
+                      {unlockedProducts.length ? unlockedProducts.map((title) => (
                         <li key={title} className="flex items-start gap-2.5">
                           <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border border-[#181818] text-[9px] leading-none">✓</span>
                           <span>{title}</span>
