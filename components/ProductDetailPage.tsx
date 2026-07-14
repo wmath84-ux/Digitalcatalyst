@@ -585,9 +585,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 )}
 
                 <div className="mt-5 space-y-3 sm:mt-6">
-                  <LiquidMetalButton tone="blue" onClick={() => { if (isPurchased) { onOpenPurchases?.(); return; } handleBuyClick(); }} className="product-checkout-primary w-full rounded-2xl px-6 py-3.5 text-base font-black sm:px-8 sm:py-4 sm:text-lg">
-                    {isPurchased ? 'Purchased' : 'Pay with Razorpay'}
-                  </LiquidMetalButton>
+                  {isPurchased ? (
+                    <button type="button" onClick={() => { onOpenPurchases?.(); }} className="product-checkout-primary product-checkout-purchased w-full rounded-[4px] border border-[#181818] bg-[#F4F35B] px-6 py-3.5 text-base font-black text-[#111111] shadow-none transition hover:-translate-y-0.5 active:translate-y-0 sm:px-8 sm:py-4 sm:text-lg">
+                      Purchased
+                    </button>
+                  ) : (
+                    <LiquidMetalButton tone="blue" onClick={handleBuyClick} className="product-checkout-primary w-full rounded-2xl px-6 py-3.5 text-base font-black sm:px-8 sm:py-4 sm:text-lg">
+                      Pay with Razorpay
+                    </LiquidMetalButton>
+                  )}
                   {canShowProductCoinCheckout && (
                     <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
                       🪙 {coinCheckoutLabel}

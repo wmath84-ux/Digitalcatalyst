@@ -19,9 +19,10 @@ const PurchasedProductCard: React.FC<{
 
     return (
         <div className={`relative bg-white/70 backdrop-blur-xl ${isMobileHome ? 'rounded-lg' : 'rounded-xl'} shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden border border-gray-200 flex flex-col transform hover:-translate-y-2 transition-all duration-300 ease-in-out hover:shadow-sm product-card-shine ${animationClass}`}>
-            <div className="purchased-product-media-frame aspect-[4/3] overflow-hidden relative bg-gray-100" style={{ backgroundImage: `url("${purchaseImageFallback}")`, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
-                <SafeImage src={purchaseImage} fallbackSrc={purchaseImageFallback} alt={product.title} className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Purchased'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="video" loading="eager" fetchPriority={delay <= 8 ? 'high' : 'auto'} decoding="async" loadTimeoutMs={16000} />
-                <div className="absolute inset-0 bg-white/20"></div>
+            <div className="purchased-product-media-frame aspect-[4/3] overflow-hidden relative bg-gray-100">
+                <img src={purchaseImageFallback} alt="" aria-hidden="true" className="purchased-product-fallback-image absolute inset-0 h-full w-full object-contain" loading="eager" decoding="async" />
+                <SafeImage src={purchaseImage} fallbackSrc={purchaseImageFallback} alt={product.title} className="relative z-10 h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Purchased'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="video" loading="eager" fetchPriority={delay <= 8 ? 'high' : 'auto'} decoding="async" loadTimeoutMs={8000} />
+                <div className="pointer-events-none absolute inset-0 z-[11] bg-white/10"></div>
                 <div className="absolute right-3 top-3 z-20 rounded-full bg-[#059669] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(5,150,105,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs">
                     PURCHASED
                 </div>

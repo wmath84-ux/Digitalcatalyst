@@ -27,4 +27,16 @@ const PRODUCT_IMAGE_SLOT_FALLBACKS: Record<ProductImageSlot, ProductImageSlot[]>
   galleryThumb: ['galleryThumb', 'homeTopRated', 'purchaseSquare', 'card'],
 };
 
-export const getProductImage = (product: Product, slot: ProductImageSlot): string => resolveProductImage(product, slot);
+const isGeneratedProductImageFallback = (url: string): boolean => {
+  const value = String(url || '').trim();
+  return !value || value.startsWith('data:image/svg+xml');
+};
+
+export const getProductImage = (product: Product, slot: ProductImageSlot): string => {
+  const fallbackSlots = PRODUCT_IMAGE_SLOT_FALLBACKS[slot] || [slot];
+  for (const candidateSlot of fallbackSlots) {
+    const resolved = resolveProductImage(product, candidateSlot);
+    if (!isGeneratedProductImageFallback(resolved)) return resolved;
+  }
+  return resolveProductImage(product, slot);
+};

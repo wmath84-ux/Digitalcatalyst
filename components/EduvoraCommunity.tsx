@@ -6608,10 +6608,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const renderMobileStoryTray = () => {
     const visibleGroups = storyGroups.slice(0, 12);
     return (
-      <section className="community-instagram-story-tray md:hidden" aria-label="Community stories">
-        <div className="community-instagram-story-row">
-          <div className="community-instagram-story-item relative">
-            <button type="button" onClick={openStatusUploadFromTop} className="community-instagram-story-avatar is-add" aria-label="Add a new story">
+      <section className="community-instagram-story-tray community-feed-unboxed md:hidden" aria-label="Community stories">
+        <div className="community-instagram-story-row community-feed-unboxed">
+          <div className="community-instagram-story-item community-feed-unboxed relative">
+            <button type="button" onClick={openStatusUploadFromTop} className="community-instagram-story-avatar is-add community-story-avatar-unboxed" aria-label="Add a new story">
               <span className="community-instagram-story-avatar-inner">
                 <Avatar value={getOwnDisplayAvatar()} size="h-16 w-16" />
               </span>
@@ -6623,7 +6623,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             const ownGroup = isOwnCommunityId(group.ownerId);
             const identity = getStatusOwnerIdentity(group.nextStory);
             return (
-              <button key={group.ownerId} type="button" onClick={() => openStatusReel(group.nextStory.id)} className="community-instagram-story-item">
+              <button key={group.ownerId} type="button" onClick={() => openStatusReel(group.nextStory.id)} className="community-instagram-story-item community-feed-unboxed">
                 <span className={`community-instagram-story-avatar has-story ${group.hasUnseen ? 'is-unseen' : 'is-viewed'}`}>
                   <span className="community-instagram-story-avatar-inner">
                     <Avatar value={(ownGroup ? getOwnDisplayAvatar() : identity.avatar) || group.nextStory.imagePreview || ''} size="h-16 w-16" />
@@ -6651,8 +6651,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     return (
       <>
         <article className="community-instagram-post overflow-hidden bg-white md:hidden">
-          <header className="community-instagram-post-header flex items-center gap-3 px-3 py-2.5">
-            <button type="button" onClick={() => { if (!ownerId) return; setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); }} className="flex min-w-0 flex-1 items-center gap-2.5 text-left">
+          <header className="community-instagram-post-header community-feed-unboxed flex items-center gap-3 px-3 py-2.5">
+            <button type="button" onClick={() => { if (!ownerId) return; setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); }} className="community-post-author-button flex min-w-0 flex-1 items-center gap-2.5 text-left">
               <Avatar value={resolveAvatar(message)} size="h-10 w-10" />
               <span className="min-w-0 flex-1">
                 <span className="flex items-center gap-1.5"><strong className="truncate text-[0.86rem] font-extrabold text-[#111111]">{ownerName}</strong>{isOfficialAdminMessage(message) ? <BlueVerifiedTick /> : null}</span>
@@ -6703,7 +6703,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 })}
               </div>
             ) : null}
-            <button type="button" onClick={() => openComments(message.id)} className="mt-1.5 block text-left text-[0.78rem] font-semibold text-[#737373]">{replyTotal ? `View all ${replyTotal} comments` : 'Add the first comment'}</button>
+            <button type="button" onClick={() => openComments(message.id)} className="community-comment-prompt-unboxed mt-1.5 block text-left text-[0.78rem] font-semibold text-[#737373]">{replyTotal ? `View all ${replyTotal} comments` : 'Add the first comment'}</button>
             <p className="mt-1 text-[0.62rem] font-bold uppercase tracking-[0.08em] text-[#a0a0a0]">{message.time}</p>
           </div>
         </article>
