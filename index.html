@@ -20,7 +20,7 @@
           const storedMode = JSON.parse(localStorage.getItem('siteColorExperience') || 'null');
           const cachedSettings = JSON.parse(localStorage.getItem('websiteSettings') || 'null');
           const cachedMode = cachedSettings?.theme?.colorExperience;
-          const supportedModes = ['original', 'immersive', 'warm', 'modern-white'];
+          const supportedModes = ['original', 'immersive', 'warm', 'modern-white', 'classic'];
           const mode = supportedModes.includes(storedMode)
             ? storedMode
             : supportedModes.includes(cachedMode)
@@ -1478,6 +1478,282 @@
       @media (max-width: 640px) {
         html:is([data-color-experience="immersive"], [data-color-experience="warm"], [data-color-experience="modern-white"]) :where(article, form, dialog) {
           box-shadow: 0 10px 26px rgba(15, 23, 42, 0.07) !important;
+        }
+      }
+    </style>
+    <style id="classic-trust-color-experience">
+      html[data-color-experience="classic"] {
+        --classic-canvas: #FFFEF8;
+        --classic-section: #FFFDF5;
+        --classic-surface: #FFFFFF;
+        --classic-surface-soft: #F7F6EE;
+        --classic-control: #F2F2EE;
+        --classic-ink: #111111;
+        --classic-body: #343434;
+        --classic-muted: #676767;
+        --classic-border: #181818;
+        --classic-border-soft: rgba(24, 24, 24, 0.26);
+        --classic-accent: #F4F35B;
+        --classic-accent-soft: #FFFDBA;
+        --classic-danger: #9F1D1D;
+        --classic-danger-soft: #FFF0F0;
+        --classic-success: #166534;
+        --classic-success-soft: #F0FFF4;
+        --classic-grid-dot: rgba(17, 17, 17, 0.055);
+        --classic-grid-line: rgba(17, 17, 17, 0.045);
+        --immersive-canvas: var(--classic-canvas);
+        --immersive-section: var(--classic-section);
+        --immersive-surface: var(--classic-surface);
+        --immersive-surface-soft: var(--classic-surface-soft);
+        --immersive-control: var(--classic-control);
+        --immersive-primary: var(--classic-ink);
+        --immersive-primary-strong: #000000;
+        --immersive-primary-soft: var(--classic-accent);
+        --immersive-ink: var(--classic-ink);
+        --immersive-body: var(--classic-body);
+        --immersive-muted: var(--classic-muted);
+        --immersive-border: var(--classic-border);
+        --immersive-border-strong: var(--classic-border);
+        --immersive-success: var(--classic-success);
+        --immersive-success-soft: var(--classic-success-soft);
+        --immersive-warning: #6B5D00;
+        --immersive-warning-soft: var(--classic-accent-soft);
+        --immersive-danger: var(--classic-danger);
+        --immersive-danger-soft: var(--classic-danger-soft);
+        --immersive-ring: rgba(244, 243, 91, 0.55);
+        --immersive-shadow-soft: 0 2px 0 rgba(17, 17, 17, 0.08);
+        --immersive-shadow-card: 0 3px 0 rgba(17, 17, 17, 0.10);
+        --bg-main: var(--classic-canvas);
+        --bg-section: var(--classic-section);
+        --bg-card: var(--classic-surface);
+        --bg-glass: var(--classic-surface);
+        --text-heading: var(--classic-ink);
+        --text-title: var(--classic-ink);
+        --text-body: var(--classic-body);
+        --text-muted: var(--classic-muted);
+        --primary: var(--classic-ink);
+        --primary-hover: #000000;
+        --accent-violet: var(--classic-accent);
+        --tag-blue: var(--classic-accent);
+        --border-soft: var(--classic-border);
+        --border-active: var(--classic-border);
+        --shadow-card: var(--immersive-shadow-card);
+        --shadow-soft: var(--immersive-shadow-soft);
+        --shadow-blue: var(--immersive-shadow-card);
+        --premium-background: var(--classic-canvas);
+        --mobile-bg: var(--classic-canvas);
+        --mobile-bg-soft: var(--classic-section);
+        --mobile-card: var(--classic-surface);
+        --mobile-heading: var(--classic-ink);
+        --mobile-body: var(--classic-body);
+        --mobile-muted: var(--classic-muted);
+        --mobile-primary: var(--classic-ink);
+        --mobile-violet: var(--classic-accent);
+        --mobile-border: var(--classic-border);
+        --mobile-border-active: var(--classic-border);
+        --mobile-page-gradient: var(--classic-canvas);
+        --tagmaster-ink: var(--classic-ink);
+        --tagmaster-muted: var(--classic-body);
+        --tagmaster-blue: var(--classic-ink);
+        --tagmaster-blue-strong: #000000;
+        --tagmaster-blue-deep: #000000;
+        --tagmaster-blue-soft: var(--classic-accent);
+        --tagmaster-blue-mid: var(--classic-section);
+        --tagmaster-blue-border: var(--classic-border);
+        --tagmaster-blue-border-strong: var(--classic-border);
+        --tagmaster-border: var(--classic-border);
+        --tagmaster-surface: var(--classic-surface);
+        --tagmaster-page: var(--classic-canvas);
+        color-scheme: light;
+        background-color: var(--classic-canvas);
+      }
+
+      html[data-color-experience="classic"],
+      html[data-color-experience="classic"] body,
+      html[data-color-experience="classic"] #root {
+        background-color: var(--classic-canvas) !important;
+        color: var(--classic-body) !important;
+      }
+
+      html[data-color-experience="classic"] body {
+        font-family: var(--font-sans, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace);
+        background-image:
+          radial-gradient(circle at 1px 1px, var(--classic-grid-dot) 1px, transparent 0),
+          linear-gradient(var(--classic-grid-line) 1px, transparent 1px),
+          linear-gradient(90deg, var(--classic-grid-line) 1px, transparent 1px) !important;
+        background-size: 20px 20px, 72px 72px, 72px 72px !important;
+      }
+
+      html[data-color-experience="classic"] ::selection {
+        background: var(--classic-accent) !important;
+        color: var(--classic-ink) !important;
+      }
+
+      html[data-color-experience="classic"] :where(h1, h2, h3, h4, h5, h6, .admin-page-title, .admin-section-title) {
+        color: var(--classic-ink) !important;
+        font-family: var(--font-sans, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace) !important;
+        letter-spacing: -0.04em;
+      }
+
+      html[data-color-experience="classic"] :where(p, li, dd, label, small, span) {
+        color: inherit;
+      }
+
+      html[data-color-experience="classic"] :where(.text-slate-950, .text-slate-900, .text-gray-900, .text-gray-800, .text-[#081A45], .text-[#0f172a], .text-[#111827], .text-[#25272b]) {
+        color: var(--classic-ink) !important;
+      }
+
+      html[data-color-experience="classic"] :where(.text-slate-700, .text-slate-600, .text-slate-500, .text-gray-600, .text-gray-500, .text-[#536178], .text-[#64748B], .text-[#6B7280], .text-[#a29c9f]) {
+        color: var(--classic-muted) !important;
+      }
+
+      html[data-color-experience="classic"] :where(.text-blue-600, .text-blue-700, .text-indigo-600, .text-indigo-700, .text-purple-600, .text-violet-600, .text-primary, [class*="text-[#1769FF]"], [class*="text-[#2563EB]"]) {
+        color: var(--classic-ink) !important;
+      }
+
+      html[data-color-experience="classic"] :where(input, textarea, select) {
+        background: var(--classic-surface) !important;
+        border: 1px solid var(--classic-border) !important;
+        border-radius: 4px !important;
+        color: var(--classic-ink) !important;
+        box-shadow: none !important;
+        font-family: var(--font-sans, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace) !important;
+      }
+
+      html[data-color-experience="classic"] :where(input, textarea, select)::placeholder {
+        color: var(--classic-muted) !important;
+      }
+
+      html[data-color-experience="classic"] :where(input, textarea, select):focus-visible,
+      html[data-color-experience="classic"] :where(button, a, [role="button"]):focus-visible {
+        outline: 2px solid var(--classic-accent) !important;
+        outline-offset: 2px !important;
+        box-shadow: 0 0 0 4px rgba(244, 243, 91, 0.45) !important;
+      }
+
+      html[data-color-experience="classic"] :where(article, form, dialog, aside, header, footer, nav, .common-modal-content, .coming-soon-content, .share-modal-content, .cart-sidebar, .shipnow-admin-page-theme, .shipnow-admin-page-theme > div, .product-checkout-panel) {
+        background: var(--classic-surface) !important;
+        border-color: var(--classic-border) !important;
+        border-radius: 4px !important;
+        box-shadow: var(--immersive-shadow-soft) !important;
+        color: var(--classic-body) !important;
+      }
+
+      html[data-color-experience="classic"] :where([class~="bg-white"], [class*="bg-white/"], [class*="bg-[#FFFFFF]"], [class*="bg-[#FBFDFF]"], [class*="bg-[#fbfbfb]"]) {
+        background-color: var(--classic-surface) !important;
+      }
+
+      html[data-color-experience="classic"] :where([class~="bg-slate-50"], [class*="bg-slate-50/"], [class~="bg-gray-50"], [class*="bg-gray-50/"], [class~="bg-blue-50"], [class*="bg-blue-50/"], [class~="bg-indigo-50"], [class*="bg-indigo-50/"], [class*="bg-[#F8FBFF]"], [class*="bg-[#F8FAFD]"], [class*="bg-[#F5F7FA]"], [class*="bg-[#f7f4f4]"]) {
+        background-color: var(--classic-surface-soft) !important;
+      }
+
+      html[data-color-experience="classic"] :where([class*="border-slate"], [class*="border-gray"], [class*="border-blue"], [class*="border-indigo"], [class*="border-violet"], [class*="border-purple"], [class*="border-[#DDE5EF]"], [class*="border-[#E4EAF2]"], [class*="border-[#efebeb]"], [class*="border-[#ece8e8]"]) {
+        border-color: var(--classic-border) !important;
+      }
+
+      html[data-color-experience="classic"] :where([class*="shadow-["], .shadow-sm, .shadow, .shadow-md, .shadow-lg, .shadow-xl, .shadow-2xl):not(.no-premium-shadow) {
+        box-shadow: var(--immersive-shadow-soft) !important;
+      }
+
+      html[data-color-experience="classic"] :where([class*="backdrop-blur"]) {
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+
+      html[data-color-experience="classic"] :where([class*="bg-gradient-"], [class*="bg-[linear-gradient"], [class*="bg-[radial-gradient"], [class*="bg-[conic-gradient"]) {
+        background-image: none !important;
+      }
+
+      html[data-color-experience="classic"] :where(button, a[role="button"], .shipnow-shell-action, .product-checkout-primary, .product-checkout-update) {
+        border-radius: 4px !important;
+        border: 1px solid var(--classic-border) !important;
+        box-shadow: none !important;
+        font-family: var(--font-sans, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace) !important;
+        font-weight: 800;
+      }
+
+      html[data-color-experience="classic"] :where(button, a[role="button"]):not(:disabled):hover {
+        transform: translateY(-1px);
+      }
+
+      html[data-color-experience="classic"] :where(button, a[role="button"]):active {
+        transform: translateY(0) scale(0.99);
+      }
+
+      html[data-color-experience="classic"] :where(button[class*="bg-blue"], button[class*="bg-indigo"], button[class*="bg-purple"], button[class*="bg-violet"], button[class*="bg-slate-950"], button[class*="bg-[#202124]"], button[class*="bg-gradient"], a[class*="bg-blue"], a[class*="bg-indigo"], a[class*="bg-purple"], a[class*="bg-violet"], a[class*="bg-slate-950"], a[class*="bg-gradient"], .product-checkout-primary, .shipnow-shell-action) {
+        background: var(--classic-accent) !important;
+        border-color: var(--classic-border) !important;
+        color: var(--classic-ink) !important;
+      }
+
+      html[data-color-experience="classic"] :where(button[class*="text-white"], a[class*="text-white"], .shipnow-shell-action) :where(span, svg),
+      html[data-color-experience="classic"] :where(button[class*="text-white"], a[class*="text-white"], .shipnow-shell-action) {
+        color: var(--classic-ink) !important;
+      }
+
+      html[data-color-experience="classic"] :where(button:disabled, [aria-disabled="true"]) {
+        background: var(--classic-control) !important;
+        color: var(--classic-muted) !important;
+        border-color: var(--classic-border-soft) !important;
+        opacity: 1 !important;
+      }
+
+      html[data-color-experience="classic"] :where(.rounded-3xl, .rounded-2xl, .rounded-xl, .rounded-lg, [class*="rounded-[2rem]"], [class*="rounded-[1.5rem]"], [class*="rounded-[24px]"]):not(img):not(video):not(canvas):not(.community-profile-avatar):not(.user-avatar) {
+        border-radius: 4px !important;
+      }
+
+      html[data-color-experience="classic"] :where(.rounded-full):is(button, a, span, div):not(.community-story-ring):not(.user-avatar):not([class*="h-8"][class*="w-8"]):not([class*="h-9"][class*="w-9"]):not([class*="h-10"][class*="w-10"]):not([class*="h-11"][class*="w-11"]):not([class*="h-12"][class*="w-12"]) {
+        border-radius: 4px !important;
+      }
+
+      html[data-color-experience="classic"] :where(.tagmaster-admin-theme, .shipnow-admin-content, .eduvora-community-polish, .eduvora-community-main, .mobile-app-home, main) {
+        background-color: var(--classic-canvas) !important;
+        color: var(--classic-body) !important;
+      }
+
+      html[data-color-experience="classic"] .eduvora-community-polish {
+        --community-page-bg: var(--classic-canvas) !important;
+        --community-surface: var(--classic-surface) !important;
+        --community-card: var(--classic-surface) !important;
+        --community-soft: var(--classic-section) !important;
+        --community-primary: var(--classic-ink) !important;
+        --community-secondary: #000000 !important;
+        --community-accent: var(--classic-accent) !important;
+        --community-heading: var(--classic-ink) !important;
+        --community-body: var(--classic-body) !important;
+        --community-muted: var(--classic-muted) !important;
+        --community-border: var(--classic-border) !important;
+        --community-active-bg: var(--classic-accent) !important;
+        --community-active-text: var(--classic-ink) !important;
+        --community-dock-bg: var(--classic-surface) !important;
+        --community-dock-item-bg: var(--classic-surface-soft) !important;
+        --community-dock-active-bg: var(--classic-accent) !important;
+        --community-dock-text: var(--classic-body) !important;
+        --community-dock-active-text: var(--classic-ink) !important;
+        --community-outgoing-bubble: var(--classic-accent) !important;
+        --community-incoming-bubble: var(--classic-surface) !important;
+        --community-shadow: var(--immersive-shadow-soft) !important;
+      }
+
+      html[data-color-experience="classic"] :where(.bg-green-50, .bg-emerald-50, [class*="bg-green"], [class*="bg-emerald"]) {
+        background-color: var(--classic-success-soft) !important;
+        color: var(--classic-success) !important;
+      }
+
+      html[data-color-experience="classic"] :where(.bg-red-50, .bg-rose-50, [class*="bg-red"], [class*="bg-rose"]) {
+        background-color: var(--classic-danger-soft) !important;
+        color: var(--classic-danger) !important;
+      }
+
+      html[data-color-experience="classic"] :where(.bg-yellow-50, .bg-amber-50, .bg-orange-50, [class*="bg-yellow"], [class*="bg-amber"], [class*="bg-orange"]) {
+        background-color: var(--classic-accent-soft) !important;
+        color: var(--classic-ink) !important;
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        html[data-color-experience="classic"] :where(button, a[role="button"]) {
+          transition: none !important;
+          transform: none !important;
         }
       }
     </style>

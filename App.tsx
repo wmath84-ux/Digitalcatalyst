@@ -620,7 +620,7 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
 // Comprehensive settings for the entire website, manageable from the admin panel
 export interface WebsiteSettings {
     theme: {
-        colorExperience: 'original' | 'immersive' | 'warm' | 'modern-white';
+        colorExperience: 'original' | 'immersive' | 'warm' | 'modern-white' | 'classic';
         primaryColor: string;
         accentColor: string;
         backgroundColor: string;
@@ -1831,11 +1831,12 @@ const App: React.FC = () => {
       requestedColorExperience === 'original' ||
       requestedColorExperience === 'immersive' ||
       requestedColorExperience === 'warm' ||
-      requestedColorExperience === 'modern-white'
+      requestedColorExperience === 'modern-white' ||
+      requestedColorExperience === 'classic'
         ? requestedColorExperience
         : 'immersive';
 
-    const experiencePalettes: Record<'immersive' | 'warm' | 'modern-white', ThemePalette> = {
+    const experiencePalettes: Record<'immersive' | 'warm' | 'modern-white' | 'classic', ThemePalette> = {
       immersive: {
         primaryColor: '#315BCA',
         accentColor: '#315BCA',
@@ -1856,6 +1857,13 @@ const App: React.FC = () => {
         backgroundColor: '#F7F8FA',
         textColor: '#111827',
         textMutedColor: '#64748B',
+      },
+      classic: {
+        primaryColor: '#111111',
+        accentColor: '#F4F35B',
+        backgroundColor: '#FFFEF8',
+        textColor: '#111111',
+        textMutedColor: '#676767',
       },
     };
 
@@ -1879,9 +1887,12 @@ const App: React.FC = () => {
       'roboto-merriweather': { sans: 'Roboto, ui-sans-serif, system-ui, sans-serif', serif: 'Merriweather, ui-serif, Georgia, serif' },
       'montserrat-oswald': { sans: 'Montserrat, ui-sans-serif, system-ui, sans-serif', serif: 'Oswald, ui-sans-serif, system-ui, sans-serif' },
     };
-    root.style.setProperty('--font-sans', fonts[adminTheme.fontPairing].sans);
-    root.style.setProperty('--font-serif', fonts[adminTheme.fontPairing].serif);
-    root.style.setProperty('--style-corner-radius', adminTheme.cornerRadius);
+    const selectedFonts = fonts[adminTheme.fontPairing] || fonts['inter-lato'];
+    const classicFontSans = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace';
+    const classicFontSerif = 'ui-serif, Georgia, Cambria, \"Times New Roman\", Times, serif';
+    root.style.setProperty('--font-sans', colorExperience === 'classic' ? classicFontSans : selectedFonts.sans);
+    root.style.setProperty('--font-serif', colorExperience === 'classic' ? classicFontSerif : selectedFonts.serif);
+    root.style.setProperty('--style-corner-radius', colorExperience === 'classic' ? '0.25rem' : adminTheme.cornerRadius);
 
     const shadows = {
       light: '0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.05)',
@@ -1890,17 +1901,21 @@ const App: React.FC = () => {
     };
     root.style.setProperty('--style-shadow-base', shadows[adminTheme.shadowIntensity as keyof typeof shadows] || shadows.medium);
 
-    const experienceShadowLg = colorExperience === 'warm'
-      ? '0 16px 42px rgb(73 52 43 / 0.10)'
-      : colorExperience === 'modern-white'
-        ? '0 16px 42px rgb(17 24 39 / 0.08)'
-        : '0 16px 42px rgb(15 23 42 / 0.10)';
+    const experienceShadowLg = colorExperience === 'classic'
+      ? '0 2px 0 rgb(17 17 17 / 0.10)'
+      : colorExperience === 'warm'
+        ? '0 16px 42px rgb(73 52 43 / 0.10)'
+        : colorExperience === 'modern-white'
+          ? '0 16px 42px rgb(17 24 39 / 0.08)'
+          : '0 16px 42px rgb(15 23 42 / 0.10)';
 
-    const experienceShadowXl = colorExperience === 'warm'
-      ? '0 22px 60px rgb(73 52 43 / 0.13)'
-      : colorExperience === 'modern-white'
-        ? '0 22px 60px rgb(17 24 39 / 0.10)'
-        : '0 22px 60px rgb(15 23 42 / 0.12)';
+    const experienceShadowXl = colorExperience === 'classic'
+      ? '0 3px 0 rgb(17 17 17 / 0.12)'
+      : colorExperience === 'warm'
+        ? '0 22px 60px rgb(73 52 43 / 0.13)'
+        : colorExperience === 'modern-white'
+          ? '0 22px 60px rgb(17 24 39 / 0.10)'
+          : '0 22px 60px rgb(15 23 42 / 0.12)';
 
     root.style.setProperty('--style-shadow-lg', colorExperience === 'original' ? shadows.heavy : experienceShadowLg);
     root.style.setProperty('--style-shadow-xl', colorExperience === 'original' ? shadows.heavy : experienceShadowXl);

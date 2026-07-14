@@ -502,7 +502,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             <h2 className="text-xl font-black text-slate-950">Choose the complete website colour mode</h2>
                             <p className="text-sm font-semibold leading-6 text-slate-600">This selection controls every public page, Community screen, modal, card, button, form and Admin page. Choose a mode, then click Save Changes.</p>
                         </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
                             <button
                                 type="button"
                                 aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'original'}
@@ -554,6 +554,19 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             >
                                 <span className="block text-base font-black">Modern White</span>
                                 <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'modern-white' ? 'text-white/85' : 'text-slate-500'}`}>Uses crisp white cards, soft neutral pages and modern blue actions like current premium apps.</span>
+                            </button>
+                            <button
+                                type="button"
+                                aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'classic'}
+                                onClick={() => handleNestedChange('theme', 'colorExperience', 'classic')}
+                                className={`rounded border p-4 text-left font-mono transition ${
+                                    (localSettings.theme.colorExperience || 'immersive') === 'classic'
+                                        ? 'border-[#181818] bg-[#F4F35B] text-[#111111] shadow-[0_2px_0_rgba(17,17,17,0.18)]'
+                                        : 'border-[#181818] bg-[#FFFEF8] text-[#111111] hover:bg-[#FFFDBA]'
+                                }`}
+                            >
+                                <span className="block text-base font-black">Classic Trust</span>
+                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'classic' ? 'text-[#111111]' : 'text-[#676767]'}`}>Subscription-page look: sharp cards, black borders, pale-yellow active states, warm paper background and editorial monospace typography.</span>
                             </button>
                         </div>
                     </section>
