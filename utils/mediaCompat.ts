@@ -35,6 +35,21 @@ export const isDataImageUrl = (url = '') => /^data:image\//i.test(cleanUrl(url))
 export const isLegacyBase64Image = (url = '') => isDataImageUrl(url) || (/^[A-Za-z0-9+/=]{120,}$/.test(cleanUrl(url)) && cleanUrl(url).length > 120);
 export const isFirebaseStorageUrl = (url = '') => /firebasestorage\.googleapis\.com|storage\.googleapis\.com/i.test(cleanUrl(url));
 export const isGoogleDriveUrl = (url = '') => /https:\/\/(?:drive|docs)\.google\.com\//i.test(cleanUrl(url));
+export const isGitHubBlobImageUrl = (url = '') => {
+  const trimmed = cleanUrl(url);
+  return /^https:\/\/github\.com\/[^/]+\/[^/]+\/blob\/[^?#]+\/(?:.+)\.(?:png|jpe?g|gif|webp|avif|svg)(?:$|[?#])/i.test(trimmed);
+};
+
+export const normalizeGitHubRawImageUrl = (url = '') => {
+  const trimmed = cleanUrl(url);
+  if (!trimmed) return '';
+  const match = trimmed.match(/^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/(.+)$/i);
+  if (!match) return '';
+  const [, owner, repo, ref, rawPathWithSuffix] = match;
+  const rawPath = rawPathWithSuffix.split(/[?#]/)[0];
+  return owner && repo && ref && rawPath ? `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${rawPath}` : '';
+};
+
 export const isYouTubeUrl = (url = '') => /(?:youtube(?:-nocookie)?\.com|youtu\.be)/i.test(cleanUrl(url));
 export const isAiGeneratedImageUrl = (url = '') => /image\.pollinations\.ai|pollinations\.ai|replicate\.delivery|oaidalleapiprodscus\.blob\.core\.windows\.net/i.test(cleanUrl(url));
 export const isDirectAudioUrl = (url = '') => /\.(mp3|m4a|aac|wav|ogg|oga|opus)(?:$|[?#])/i.test(cleanUrl(url));
@@ -92,6 +107,10 @@ export const getRenderableImageUrlCandidates = (url = '', options: { size?: numb
       trimmed,
     ];
     return Array.from(new Set(candidates.map(cleanUrl).filter(Boolean)));
+  }
+  if (isGitHubBlobImageUrl(trimmed)) {
+    const rawUrl = normalizeGitHubRawImageUrl(trimmed);
+    return Array.from(new Set([rawUrl, trimmed].map(cleanUrl).filter(Boolean)));
   }
   return [trimmed];
 };
