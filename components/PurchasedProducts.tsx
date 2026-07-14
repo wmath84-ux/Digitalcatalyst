@@ -4,6 +4,8 @@ import { ProductWithRating, WebsiteSettings } from '../App';
 import { getProductImage, getProductImageCandidates, getProductImageFallback } from '../utils/productImages';
 import SafeImage from './common/SafeImage';
 
+const PURCHASED_IMAGE_LOAD_TIMEOUT_MS = 14000;
+
 const PurchasedProductCard: React.FC<{
   settings: WebsiteSettings;
   product: ProductWithRating;
@@ -15,7 +17,7 @@ const PurchasedProductCard: React.FC<{
     const buttonText = 'Access Files';
     const isMobileHome = variant === 'mobileHome';
     const purchaseImageSlot = isMobileHome ? 'purchaseSquare' : 'purchaseCard';
-    const purchaseImageCandidates = getProductImageCandidates(product, purchaseImageSlot);
+    const purchaseImageCandidates = getProductImageCandidates(product, purchaseImageSlot).filter(Boolean);
     const purchaseImage = purchaseImageCandidates[0] || getProductImage(product, purchaseImageSlot);
     const purchaseImageFallback = getProductImageFallback(product);
     const purchaseImageKey = `${product.id}-${purchaseImage}-${purchaseImageFallback}`;
@@ -37,10 +39,10 @@ const PurchasedProductCard: React.FC<{
                     fallbackMessage="Image preview unavailable"
                     aspect="video"
                     loading="eager"
-                    fetchPriority={delay <= 8 ? 'high' : 'auto'}
+                    fetchPriority={delay <= 6 ? 'high' : 'auto'}
                     decoding="async"
                     referrerPolicy="no-referrer"
-                    loadTimeoutMs={3500}
+                    loadTimeoutMs={PURCHASED_IMAGE_LOAD_TIMEOUT_MS}
                 />
                 <div className="pointer-events-none absolute inset-0 z-[11] bg-white/10"></div>
                 <div className="absolute right-3 top-3 z-20 rounded-full bg-[#059669] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(5,150,105,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs">

@@ -66,11 +66,12 @@ const SafeImage: React.FC<SafeImageProps> = ({
   const [candidateIndex, setCandidateIndex] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const activeSrc = candidateSources[candidateIndex] || generatedFallback;
+  const candidateSourcesKey = candidateSources.join('|');
 
   useEffect(() => {
     setCandidateIndex(0);
     setLoaded(false);
-  }, [candidateSources]);
+  }, [candidateSourcesKey]);
 
   useEffect(() => {
     if (loaded || candidateIndex >= candidateSources.length - 1 || loadTimeoutMs <= 0) return undefined;
@@ -79,7 +80,7 @@ const SafeImage: React.FC<SafeImageProps> = ({
       setLoaded(false);
     }, loadTimeoutMs);
     return () => window.clearTimeout(timer);
-  }, [candidateIndex, candidateSources.length, loadTimeoutMs, loaded]);
+  }, [activeSrc, candidateIndex, candidateSources.length, loadTimeoutMs, loaded]);
 
   const image = (
     <img

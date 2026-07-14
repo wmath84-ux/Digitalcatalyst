@@ -132,6 +132,29 @@ const inferMediaType = (media: unknown, fallback: NormalizedMediaType): Normaliz
   return fallback;
 };
 
+const pickImageCandidateUrl = (value: unknown): string => {
+  if (typeof value === 'string') return cleanUrl(value);
+  if (!value || typeof value !== 'object') return '';
+
+  const record = value as AnyMediaRecord;
+  return cleanUrl(
+    record.url
+    || record.secure_url
+    || record.imageUrl
+    || record.src
+    || record.downloadURL
+    || record.hostedUrl
+    || record.previewUrl
+    || record.imagePreview
+    || record.thumbnailUrl
+    || record.thumbnail
+    || record.thumbnailImage
+    || record.coverImage
+    || record.fileUrl
+    || ''
+  );
+};
+
 const pickMediaUrl = (media: unknown): string => {
   if (typeof media === 'string') return cleanUrl(media);
   if (!media) return '';
@@ -228,7 +251,7 @@ const getProductImageRawCandidates = (product: AnyMediaRecord, slot = 'card') =>
     ...imageArray,
     ...directFields,
     seedUrl,
-  ].map((value) => cleanUrl(value)).filter(Boolean);
+  ].map(pickImageCandidateUrl).filter(Boolean);
 };
 
 export const resolveProductImageCandidates = (product: AnyMediaRecord, slot = 'card') => {
