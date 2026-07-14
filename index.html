@@ -1757,6 +1757,96 @@
         }
       }
     </style>
+
+    <style id="classic-trust-workspace-extension">
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(.tagmaster-admin-theme, .shipnow-admin-content, .eduvora-community-polish, .eduvora-community-main, .mobile-app-home, .course-player-theme, main) {
+        background-color: var(--classic-canvas) !important;
+        color: var(--classic-body) !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(.tagmaster-admin-theme, .shipnow-admin-content, .eduvora-community-polish, .eduvora-community-main, .mobile-app-home) :where(article, section, form, aside, header, nav, footer, input, textarea, select, [class*="rounded-"]):not(img):not(video):not(canvas):not(.community-profile-avatar):not(.user-avatar) {
+        border-radius: 4px !important;
+        border-color: var(--classic-border) !important;
+        box-shadow: var(--immersive-shadow-soft) !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(button[class*="bg-[#081A44]"], button[class*="bg-[#081A45]"], button[class*="bg-[#273247]"], button[class*="bg-[#0B63FF]"], button[class*="bg-[#1769FF]"], button[class*="bg-[#5B4BFF]"], button[class*="bg-[#7B61FF]"], button[class*="bg-blue-600"], button[class*="bg-indigo-600"], button[class*="bg-purple-600"], button[class*="bg-violet-600"], button[class*="bg-slate-950"], button[class*="from-indigo"], button[class*="from-blue"], button[class*="from-purple"], button[class*="from-violet"], button[class*="from-[#1769FF]"], button[class*="from-[#5B4BFF]"], a[class*="bg-[#081A44]"], a[class*="bg-[#0B63FF]"], a[class*="from-indigo"], label[class*="bg-[#273247]"], label[class*="bg-blue-600"], .product-checkout-primary, .product-checkout-update, .shipnow-shell-action) {
+        background: var(--classic-accent) !important;
+        background-image: none !important;
+        border: 1px solid var(--classic-border) !important;
+        color: var(--classic-ink) !important;
+        opacity: 1 !important;
+        text-shadow: none !important;
+        box-shadow: 0 2px 0 rgba(17, 17, 17, 0.14) !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(button[class*="bg-[#081A44]"], button[class*="bg-[#081A45]"], button[class*="bg-[#273247]"], button[class*="bg-[#0B63FF]"], button[class*="bg-[#1769FF]"], button[class*="bg-[#5B4BFF]"], button[class*="bg-[#7B61FF]"], button[class*="from-indigo"], button[class*="from-blue"], button[class*="from-purple"], button[class*="from-violet"], label[class*="bg-[#273247]"], label[class*="bg-blue-600"], .product-checkout-primary, .product-checkout-update, .shipnow-shell-action) :where(span, svg, path) {
+        color: var(--classic-ink) !important;
+        stroke: currentColor !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(button:disabled, button[disabled], [aria-disabled="true"], .product-checkout-primary:disabled, .product-checkout-secondary:disabled) {
+        background: var(--classic-control) !important;
+        background-image: none !important;
+        border-color: var(--classic-border) !important;
+        color: var(--classic-muted) !important;
+        opacity: 1 !important;
+        box-shadow: none !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] .product-checkout-secondary,
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(button[class*="bg-white"], a[class*="bg-white"]):not(:disabled) {
+        border-color: var(--classic-border) !important;
+        color: var(--classic-ink) !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] .checkout-contrast-panel {
+        background: var(--classic-section) !important;
+        background-image: none !important;
+        border-right: 1px solid var(--classic-border) !important;
+        color: var(--classic-ink) !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] .checkout-contrast-panel :where(h1, h2, h3, h4, p, span, strong, small, div) {
+        color: var(--classic-ink) !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] .checkout-contrast-panel :where([class*="bg-white/"]) {
+        background: var(--classic-surface) !important;
+        border: 1px solid var(--classic-border) !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] .community-ai-mentor-overlay {
+        background: transparent !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] .community-ai-mentor-panel {
+        background: var(--classic-section) !important;
+        border-color: var(--classic-border) !important;
+        color: var(--classic-ink) !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where([class*="from-[#1769FF]"], [class*="from-[#5B4BFF]"], [class*="from-[#0B63FF]"], [class*="from-indigo"], [class*="from-purple"], [class*="from-violet"]):not(button):not(a):not(.checkout-contrast-panel) {
+        background: var(--classic-accent) !important;
+        background-image: none !important;
+        color: var(--classic-ink) !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(.course-panel-icon-contrast, .course-panel-icon-contrast *) {
+        color: var(--classic-ink) !important;
+        stroke: currentColor !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] .dock-count-badge {
+        background: var(--classic-accent) !important;
+        background-image: none !important;
+        border-color: var(--classic-border) !important;
+        color: var(--classic-ink) !important;
+        text-shadow: none !important;
+      }
+    </style>
     <style id="mobile-interaction-and-checkout-contrast">
       @media (hover: none) and (pointer: coarse) {
         #root,

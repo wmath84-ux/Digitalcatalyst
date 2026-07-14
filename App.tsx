@@ -621,6 +621,7 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
 export interface WebsiteSettings {
     theme: {
         colorExperience: 'original' | 'immersive' | 'warm' | 'modern-white' | 'classic';
+        classicWorkspaceTheme?: boolean;
         primaryColor: string;
         accentColor: string;
         backgroundColor: string;
@@ -669,7 +670,7 @@ export interface WebsiteSettings {
         ],
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
-        dockItems: ['Home','Store','Purchases','Wishlist','Cart','News','Community','Blog','Free','Profile','Subscriptions'],
+        dockItems: ['Home','Store','Purchased','Wishlist','Cart','News','Community','Blog','Free','Profile','Subscriptions'],
         dockStyle?: {
             backgroundColor: string;
             backgroundOpacity: number;
@@ -807,6 +808,7 @@ const defaultWebsiteSettings: WebsiteSettings = {
         textColor: '#081A45',
         textMutedColor: '#536178',
         fontPairing: 'inter-lato',
+        classicWorkspaceTheme: true,
         cornerRadius: '0.75rem', // lg
         shadowIntensity: 'medium',
     },
@@ -873,7 +875,7 @@ const defaultWebsiteSettings: WebsiteSettings = {
         ],
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
-        dockItems: ['Home','Store','Purchases','Wishlist','Cart','News','Community','Blog','Free','Profile','Subscriptions'],
+        dockItems: ['Home','Store','Purchased','Wishlist','Cart','News','Community','Blog','Free','Profile','Subscriptions'],
         dockStyle: {
             backgroundColor: '#FBFDFF',
             backgroundOpacity: 92,
@@ -1872,6 +1874,7 @@ const App: React.FC = () => {
       : experiencePalettes[colorExperience];
 
     root.dataset.colorExperience = colorExperience;
+    root.dataset.classicWorkspaceTheme = colorExperience === 'classic' && adminTheme.classicWorkspaceTheme !== false ? 'on' : 'off';
     root.style.setProperty('--color-primary', mergedPalette.primaryColor);
     root.style.setProperty('--color-accent', mergedPalette.accentColor);
     root.style.setProperty('--color-background', mergedPalette.backgroundColor);

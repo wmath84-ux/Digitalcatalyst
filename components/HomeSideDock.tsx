@@ -123,7 +123,7 @@ const HomeSideDock: React.FC<HomeSideDockProps> = ({
   const defaultItems: NavigationItem[] = [
     { id: 'Home', label: 'Home', action: onHomeClick, icon: '🏠', badge: null },
     { id: 'Store', label: 'Store', action: onNavigateToAllProducts, icon: '🛍️', badge: null },
-    { id: 'Purchases', label: 'Purchases', action: onNavigateToPurchases, icon: '📚', badge: purchasedProducts.length || null },
+    { id: 'Purchased', label: 'Purchased', action: onNavigateToPurchases, icon: '📚', badge: purchasedProducts.length || null },
     { id: 'Wishlist', label: 'Wishlist', action: onNavigateToWishlist, icon: '❤️', badge: wishlistCount || null },
     { id: 'Cart', label: 'Cart', action: onCartClick, icon: '🛒', badge: cartCount || null },
     { id: 'News', label: 'News', action: onOpenAnnouncementsModal, icon: '📢', badge: null },
@@ -152,6 +152,7 @@ const HomeSideDock: React.FC<HomeSideDockProps> = ({
   ) as Record<string, NavigationItem>;
 
   itemMap.EduCoins = profileItem;
+  itemMap.Purchases = itemMap.Purchased;
 
   const items = configuredItems
     .map(label => itemMap[label])

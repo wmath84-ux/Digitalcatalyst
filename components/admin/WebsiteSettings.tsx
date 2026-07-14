@@ -388,6 +388,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
             Number(milestone.coinReward || 0) < 0 ? `${milestone.title || milestone.id} cannot have negative coins.` : '',
         ].filter(Boolean)),
     ];
+    const classicWorkspaceTheme = localSettings.theme.classicWorkspaceTheme !== false;
     const defaultDockItems = dockCustomizationItems;
     const selectedDockItems = dockItems.length ? dockItems : defaultDockItems;
 
@@ -568,6 +569,25 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                 <span className="block text-base font-black">Classic Trust</span>
                                 <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'classic' ? 'text-[#111111]' : 'text-[#676767]'}`}>Subscription-page look: sharp cards, black borders, pale-yellow active states, warm paper background and editorial monospace typography.</span>
                             </button>
+                        </div>
+                        <div className="mt-4 rounded border border-[#181818] bg-[#FFFEF8] p-4 font-mono">
+                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                    <p className="text-xs font-black uppercase tracking-[0.2em] text-[#676767]">Classic Trust workspace layer</p>
+                                    <h3 className="mt-1 text-base font-black text-[#111111]">Apply to Community + Admin pages</h3>
+                                    <p className="mt-1 max-w-2xl text-xs font-semibold leading-5 text-[#676767]">When Classic Trust is selected, this switch forces the same sharp edges, pale-yellow action states, black borders and readable controls inside Community, Admin, course player and checkout workspace screens.</p>
+                                </div>
+                                <button
+                                    type="button"
+                                    role="switch"
+                                    aria-checked={classicWorkspaceTheme}
+                                    onClick={() => handleNestedChange('theme', 'classicWorkspaceTheme', !classicWorkspaceTheme)}
+                                    className={`inline-flex min-h-11 shrink-0 items-center gap-3 rounded border border-[#181818] px-3 py-2 text-sm font-black transition ${classicWorkspaceTheme ? 'bg-[#F4F35B] text-[#111111]' : 'bg-white text-[#676767]'}`}
+                                >
+                                    <span className={`relative h-5 w-10 rounded border border-[#181818] bg-white after:absolute after:top-0.5 after:h-4 after:w-4 after:rounded-sm after:bg-[#111111] after:transition-transform ${classicWorkspaceTheme ? 'after:left-[1.25rem]' : 'after:left-0.5'}`} />
+                                    {classicWorkspaceTheme ? 'Applied' : 'Off'}
+                                </button>
+                            </div>
                         </div>
                     </section>
                     <div className="mb-4">

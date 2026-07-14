@@ -24,6 +24,7 @@ interface BottomGlassDockProps {
 
 const dockToneClasses: Record<string, string> = {
   Store: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
+  Purchased: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
   Purchases: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
   Wishlist: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border)] hover:border-[var(--mobile-border-active)]',
   Cart: 'from-[#FEF7E0] to-[var(--mobile-bg-soft)] hover:border-[var(--mobile-border-active)]',
@@ -37,7 +38,7 @@ const dockToneClasses: Record<string, string> = {
 };
 
 
-export const dockCustomizationItems = ['Home', 'Store', 'Purchases', 'Wishlist', 'Cart', 'News', 'Community', 'Blog', 'Free', 'Profile', 'Subscriptions'];
+export const dockCustomizationItems = ['Home', 'Store', 'Purchased', 'Wishlist', 'Cart', 'News', 'Community', 'Blog', 'Free', 'Profile', 'Subscriptions'];
 
 export const defaultDockStyle = {
   backgroundColor: '#FFFFFF',
@@ -68,7 +69,7 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
   const defaultItems = useMemo(() => ([
     { label: 'Home', action: onHomeClick, icon: '🏠', badge: null },
     { label: 'Store', action: onNavigateToAllProducts, icon: '🛍️', badge: null },
-    { label: 'Purchases', action: onNavigateToPurchases, icon: '📚', badge: purchasedProducts.length || null },
+    { label: 'Purchased', action: onNavigateToPurchases, icon: '📚', badge: purchasedProducts.length || null },
     { label: 'Wishlist', action: onNavigateToWishlist, icon: '❤️', badge: wishlistCount || null },
     { label: 'Cart', action: onCartClick, icon: '🛒', badge: cartCount || null },
     { label: 'News', action: onOpenAnnouncementsModal, icon: '📢', badge: null },
@@ -90,6 +91,7 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
   const configured = configuredWithHome.filter((label, index, labels) => labels.indexOf(label) === index);
   const map: any = Object.fromEntries(defaultItems.map(i => [i.label, i]));
   map['Home'] = map['Home'] || { label: 'Home', action: onHomeClick, icon: '🏠', badge: null };
+  map['Purchases'] = map['Purchased'];
   map['EduCoins'] = map['Profile'] || { label: isLoggedIn ? 'Profile' : authButtonLabel, action: () => {
     if (typeof onProfileClick === 'function') {
       onProfileClick();

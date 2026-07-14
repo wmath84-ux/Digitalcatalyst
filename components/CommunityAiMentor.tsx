@@ -368,14 +368,14 @@ const CommunityAiMentor: React.FC<CommunityAiMentorProps> = ({ isOpen, userId = 
 
   return createPortal(
     <div
-      className="fixed inset-0 z-[1750] flex min-h-0 justify-end overflow-hidden overscroll-none bg-white/10 p-0 backdrop-blur-[1px] sm:bg-white/20 sm:p-3 sm:backdrop-blur-[2px]"
+      className="community-ai-mentor-overlay fixed inset-0 z-[1750] flex min-h-0 justify-end overflow-hidden overscroll-none bg-white/10 p-0 backdrop-blur-[1px] sm:bg-white/20 sm:p-3 sm:backdrop-blur-[2px]"
       style={{ height: 'var(--app-dvh, 100dvh)' }}
       role="dialog"
       aria-modal="true"
       aria-label="Community AI Mentor"
       ref={panelRef}
     >
-      <div className="relative flex h-full min-h-0 max-h-full w-full min-w-0 flex-col overflow-hidden bg-[#F2F5F9] text-[#081A45] shadow-[0_30px_90px_rgba(8,26,69,0.18)] sm:max-w-[520px] sm:rounded-[2rem] sm:border sm:border-[#D9E7F8]">
+      <div className="community-ai-mentor-panel relative flex h-full min-h-0 max-h-full w-full min-w-0 flex-col overflow-hidden bg-[#F2F5F9] text-[#081A45] shadow-[0_30px_90px_rgba(8,26,69,0.18)] sm:max-w-[520px] sm:rounded-[2rem] sm:border sm:border-[#D9E7F8]">
         <header className="flex shrink-0 items-center gap-2 border-b border-[#D9E7F8] bg-[#F7F9FC]/94 px-3 py-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-2xl sm:px-4 sm:pt-3">
           <button type="button" onClick={() => setIsHistoryOpen(value => !value)} aria-label="Open Community AI chat history" className="flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-[#1769FF] shadow-sm">☰</button>
           <div className="min-w-0 flex-1"><p className="text-[0.68rem] font-black uppercase tracking-[0.24em] text-[#7B61FF]">Community guide</p><h2 className="truncate text-lg font-black">Community AI Mentor</h2><p className="truncate text-xs font-bold text-[#7C879A]">Helping with {context.title}</p></div>
