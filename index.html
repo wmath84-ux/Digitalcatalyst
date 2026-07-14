@@ -1980,6 +1980,96 @@
         }
       }
     </style>
+    <style id="classic-trust-final-visual-regression-fixes">
+      /* Final Classic Trust regressions: keep purchased actions readable, remove unwanted mobile feed boxes, and keep purchased media from showing blank while loading. */
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(.product-checkout-primary, .product-checkout-panel .product-checkout-primary, button.product-checkout-primary) {
+        background: var(--classic-accent, #F4F35B) !important;
+        background-image: none !important;
+        border: 1px solid var(--classic-border, #181818) !important;
+        color: var(--classic-ink, #111111) !important;
+        opacity: 1 !important;
+        filter: none !important;
+        text-shadow: none !important;
+        box-shadow: 0 2px 0 rgba(17, 17, 17, 0.14) !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(.product-checkout-primary, .product-checkout-panel .product-checkout-primary, button.product-checkout-primary) :where(span, svg, path) {
+        color: var(--classic-ink, #111111) !important;
+        fill: currentColor !important;
+        stroke: currentColor !important;
+        text-shadow: none !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(.product-checkout-primary)::before,
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(.product-checkout-primary)::after {
+        opacity: 0 !important;
+        display: none !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(.product-checkout-primary:disabled, .product-checkout-panel .product-checkout-primary:disabled) {
+        background: var(--classic-control, #F2F2EE) !important;
+        background-image: none !important;
+        border-color: var(--classic-border, #181818) !important;
+        color: var(--classic-ink, #111111) !important;
+        opacity: 1 !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] .purchased-product-media-frame {
+        background-color: var(--classic-surface-soft, #F7F6EE) !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] .purchased-product-media-frame > img {
+        position: relative;
+        z-index: 2;
+        background: transparent !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(.community-mobile-latest .community-instagram-story-tray, .community-mobile-latest .community-instagram-story-row) {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        outline: 0 !important;
+        -webkit-backdrop-filter: none !important;
+        backdrop-filter: none !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(.community-mobile-latest .community-instagram-story-item) {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        outline: 0 !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] :where(.community-mobile-latest .community-instagram-story-avatar, .community-mobile-latest .community-instagram-story-avatar-inner) {
+        box-shadow: none !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] .community-mobile-latest article:has(.community-desktop-feed-card-actions) > :first-child {
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        outline: 0 !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] .community-mobile-latest article:has(.community-desktop-feed-card-actions) :where(.community-thread-reply-button, button[aria-label*="comment" i], a[aria-label*="comment" i]) {
+        background: transparent !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+        outline: 0 !important;
+        min-height: auto !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+        color: var(--classic-body, #1f2937) !important;
+      }
+
+      html[data-color-experience="classic"][data-classic-workspace-theme="on"] .community-mobile-latest article:has(.community-desktop-feed-card-actions) :where(input[placeholder*="comment" i], textarea[placeholder*="comment" i]) {
+        background: transparent !important;
+        border-color: transparent !important;
+        box-shadow: none !important;
+        padding-left: 0 !important;
+        padding-right: 0 !important;
+      }
+    </style>
   <script type="importmap">
 {
   "imports": {

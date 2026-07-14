@@ -14,11 +14,13 @@ const PurchasedProductCard: React.FC<{
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${delay}` : '';
     const buttonText = 'Access Files';
     const isMobileHome = variant === 'mobileHome';
+    const purchaseImage = getProductImage(product, isMobileHome ? 'purchaseSquare' : 'purchaseCard');
+    const purchaseImageFallback = getProductImageFallback(product);
 
     return (
         <div className={`relative bg-white/70 backdrop-blur-xl ${isMobileHome ? 'rounded-lg' : 'rounded-xl'} shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden border border-gray-200 flex flex-col transform hover:-translate-y-2 transition-all duration-300 ease-in-out hover:shadow-sm product-card-shine ${animationClass}`}>
-            <div className="aspect-[4/3] overflow-hidden relative bg-gray-100">
-                <SafeImage src={getProductImage(product, 'purchaseCard')} fallbackSrc={getProductImageFallback(product)} alt={product.title} className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Purchased'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="video" loading={delay <= 4 ? 'eager' : 'lazy'} fetchPriority={delay <= 4 ? 'high' : 'auto'} decoding="async" loadTimeoutMs={12000} />
+            <div className="purchased-product-media-frame aspect-[4/3] overflow-hidden relative bg-gray-100" style={{ backgroundImage: `url("${purchaseImageFallback}")`, backgroundSize: 'contain', backgroundPosition: 'center', backgroundRepeat: 'no-repeat' }}>
+                <SafeImage src={purchaseImage} fallbackSrc={purchaseImageFallback} alt={product.title} className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Purchased'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="video" loading="eager" fetchPriority={delay <= 8 ? 'high' : 'auto'} decoding="async" loadTimeoutMs={16000} />
                 <div className="absolute inset-0 bg-white/20"></div>
                 <div className="absolute right-3 top-3 z-20 rounded-full bg-[#059669] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(5,150,105,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs">
                     PURCHASED

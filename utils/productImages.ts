@@ -22,8 +22,8 @@ const PRODUCT_IMAGE_SLOT_FALLBACKS: Record<ProductImageSlot, ProductImageSlot[]>
   detailDesktop: ['detailDesktop', 'detailMobile', 'card', 'purchaseCard'],
   homeTopRated: ['homeTopRated', 'purchaseSquare', 'galleryThumb', 'card'],
   homeList: ['homeList', 'card', 'detailMobile', 'purchaseCard'],
-  purchaseSquare: ['purchaseSquare', 'homeTopRated', 'galleryThumb', 'card'],
-  purchaseCard: ['purchaseCard', 'card', 'detailMobile', 'detailDesktop'],
+  purchaseSquare: ['purchaseSquare', 'purchaseCard', 'homeTopRated', 'galleryThumb', 'card', 'detailMobile'],
+  purchaseCard: ['purchaseCard', 'purchaseSquare', 'card', 'detailMobile', 'detailDesktop', 'homeTopRated', 'galleryThumb'],
   galleryThumb: ['galleryThumb', 'homeTopRated', 'purchaseSquare', 'card'],
 };
 
