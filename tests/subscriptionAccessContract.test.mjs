@@ -17,6 +17,8 @@ test('subscription access model contains exactly normal, pro and elite tiers', (
   assert.match(accessSource, /accessTier: 'pro'/);
   assert.match(accessSource, /accessTier: 'elite'/);
   assert.match(accessSource, /earningMultiplier: 2/);
+  assert.match(accessSource, /monthlyPrice: 499/);
+  assert.match(accessSource, /yearlyPrice: 499 \* 12/);
   assert.match(accessSource, /return DEFAULT_SUBSCRIPTION_PLANS\.map/);
 });
 
@@ -73,6 +75,8 @@ test('admin has a dedicated subscription customizer for page copy, plans and loc
   assert.match(settingsSource, /'subscriptions'/);
   assert.match(settingsSource, /Pro & Elite Access Customizer/);
   assert.match(settingsSource, /Page Header & Billing Labels/);
+  assert.match(settingsSource, /Monthly Price \(₹\)/);
+  assert.match(settingsSource, /Yearly Price \(₹\)/);
   assert.match(settingsSource, /Earning Multiplier/);
   assert.match(settingsSource, /Selected premium products\/content/);
   assert.match(settingsSource, /AI Mentor Locked Message/);
@@ -83,8 +87,21 @@ test('admin has a dedicated subscription customizer for page copy, plans and loc
 test('subscription cards use admin data and prevent normal EduCoin checkout', () => {
   assert.match(subscriptionSource, /normalizeSubscriptionPlans\(settings\.content\.subscriptionPlans\)/);
   assert.match(subscriptionSource, /normalizeSubscriptionPageContent\(settings\.content\.subscriptionPage\)/);
+  assert.match(subscriptionSource, /getSubscriptionBillingPrice\(plan, billingCycle\)/);
+  assert.match(subscriptionSource, /onActivatePlan\(plan, billingCycle/);
   assert.match(subscriptionSource, /const canUseEduCoins = currentTier !== 'normal'/);
   assert.match(subscriptionSource, /EduCoin use unlocks with Pro/);
   assert.match(subscriptionSource, /plan\.benefits\.map/);
   assert.match(subscriptionSource, /plan\.unlockProductIds/);
+});
+
+test('subscription billing cycle is stored in user and order metadata', () => {
+  assert.match(accessSource, /export type SubscriptionBillingCycle = 'monthly' \| 'yearly'/);
+  assert.match(accessSource, /getSubscriptionPeriodMonths/);
+  assert.match(accessSource, /getSubscriptionBillingPrice/);
+  assert.match(accessSource, /const monthlyPrice = Math\.max\(0, Number\(record\.monthlyPrice/);
+  assert.match(appSource, /subscriptionBillingCycle: nextTier === requestedTier \? billingCycle/);
+  assert.match(appSource, /subscriptionExpiresAt: expiresAtDate\.toISOString\(\)/);
+  assert.match(appSource, /subscriptionBillingCycle: billingCycle/);
+  assert.match(appSource, /subscriptionPeriodMonths: getSubscriptionPeriodMonths\(billingCycle\)/);
 });

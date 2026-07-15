@@ -1,5 +1,6 @@
 export type SubscriptionTier = 'normal' | 'pro' | 'elite';
 export type PremiumSubscriptionTier = Exclude<SubscriptionTier, 'normal'>;
+export type SubscriptionBillingCycle = 'monthly' | 'yearly';
 
 export interface MembershipMessage {
   eyebrow: string;
@@ -24,7 +25,13 @@ export interface SubscriptionPlanConfig {
   id: string;
   name: string;
   accessTier: PremiumSubscriptionTier;
+  /**
+   * Legacy/current checkout price. Kept for old Firestore settings and existing admin saves.
+   * New UI treats this as the monthly price fallback.
+   */
   price: number;
+  monthlyPrice?: number;
+  yearlyPrice?: number;
   coinPrice?: number;
   description: string;
   audienceLabel: string;
@@ -95,6 +102,8 @@ export const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionPlanConfig[] = [
     name: 'Pro Plan',
     accessTier: 'pro',
     price: 499,
+    monthlyPrice: 499,
+    yearlyPrice: 499 * 12,
     coinPrice: 1200,
     description: 'For serious learners who want guidance, community, rewards, and stronger consistency.',
     audienceLabel: 'For serious learners',
@@ -118,6 +127,8 @@ export const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionPlanConfig[] = [
     name: 'Elite Plan',
     accessTier: 'elite',
     price: 999,
+    monthlyPrice: 999,
+    yearlyPrice: 999 * 12,
     coinPrice: 2200,
     description: 'For students who want maximum support, higher earning power, and the strongest unlock benefits.',
     audienceLabel: 'For maximum learning power',
@@ -163,6 +174,27 @@ export const inferPremiumTier = (plan: Partial<SubscriptionPlanConfig> | Record<
 
   const identity = `${String((plan as any)?.id || '')} ${String((plan as any)?.name || '')}`.toLowerCase();
   return identity.includes('elite') ? 'elite' : 'pro';
+};
+
+export const normalizeSubscriptionBillingCycle = (value: unknown): SubscriptionBillingCycle => {
+  const normalized = String(value ?? '').trim().toLowerCase();
+  return normalized === 'yearly' || normalized === 'annual' || normalized === 'annually' ? 'yearly' : 'monthly';
+};
+
+export const getSubscriptionBillingLabel = (billingCycle: SubscriptionBillingCycle): string => (
+  billingCycle === 'yearly' ? 'year' : 'month'
+);
+
+export const getSubscriptionPeriodMonths = (billingCycle: SubscriptionBillingCycle): number => (
+  billingCycle === 'yearly' ? 12 : 1
+);
+
+export const getSubscriptionBillingPrice = (plan: Partial<SubscriptionPlanConfig> | Record<string, unknown>, billingCycle: SubscriptionBillingCycle): number => {
+  const record = (plan && typeof plan === 'object' ? plan : {}) as Record<string, unknown>;
+  const legacyPrice = Math.max(0, Number(record.price) || 0);
+  const monthlyPrice = Math.max(0, Number(record.monthlyPrice ?? record.price) || legacyPrice);
+  const yearlyPrice = Math.max(0, Number(record.yearlyPrice) || (monthlyPrice * 12));
+  return billingCycle === 'yearly' ? yearlyPrice : monthlyPrice;
 };
 
 export const getSubscriptionTierRank = (tier: SubscriptionTier): number => tier === 'elite' ? 2 : tier === 'pro' ? 1 : 0;
@@ -236,12 +268,16 @@ export const normalizeSubscriptionPlans = (value: unknown): SubscriptionPlanConf
       const unlockProductIds = Array.isArray(record.unlockProductIds)
         ? record.unlockProductIds.map(item => Number(item)).filter(item => Number.isFinite(item) && item > 0)
         : fallback.unlockProductIds;
+      const monthlyPrice = Math.max(0, Number(record.monthlyPrice ?? record.price ?? fallback.monthlyPrice ?? fallback.price) || 0);
+      const yearlyPrice = Math.max(0, Number(record.yearlyPrice ?? fallback.yearlyPrice ?? (monthlyPrice * 12)) || 0);
 
       return {
         id: cleanText(record.id, accessTier),
         name: cleanText(record.name, fallback.name),
         accessTier,
-        price: Math.max(0, Number(record.price) || 0),
+        price: monthlyPrice,
+        monthlyPrice,
+        yearlyPrice,
         coinPrice: Math.max(0, Number(record.coinPrice) || 0),
         description: cleanText(record.description, fallback.description),
         audienceLabel: cleanText(record.audienceLabel, fallback.audienceLabel),

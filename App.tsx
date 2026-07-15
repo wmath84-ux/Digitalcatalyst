@@ -52,12 +52,15 @@ import {
   DEFAULT_SUBSCRIPTION_PAGE_CONTENT,
   DEFAULT_SUBSCRIPTION_PLANS,
   getHigherSubscriptionTier,
+  getSubscriptionBillingPrice,
+  getSubscriptionPeriodMonths,
   getUserEduCoinMultiplier,
   getUserSubscriptionTier,
   hasPremiumMembership,
   inferPremiumTier,
   normalizeSubscriptionPageContent,
   normalizeSubscriptionPlans,
+  SubscriptionBillingCycle,
   SubscriptionPageContent,
   SubscriptionPlanConfig,
   SubscriptionTier,
@@ -367,7 +370,9 @@ export interface User {
     subscriptionTier?: SubscriptionTier;
     subscriptionPlanId?: string;
     subscriptionPlanName?: string;
+    subscriptionBillingCycle?: SubscriptionBillingCycle;
     subscriptionActivatedAt?: string;
+    subscriptionExpiresAt?: string;
     eduCoinMultiplier?: number;
     eliteStatus?: boolean;
 }
@@ -533,6 +538,8 @@ export interface OrderPaymentBreakdown {
     coinOnlyPurchase?: boolean;
     paymentLabel?: string;
     unlockedProductIds?: number[];
+    subscriptionBillingCycle?: SubscriptionBillingCycle;
+    subscriptionPeriodMonths?: number;
 }
 
 export interface Order {
@@ -2423,7 +2430,9 @@ const App: React.FC = () => {
           subscriptionTier: getUserSubscriptionTier(data),
           subscriptionPlanId: data.subscriptionPlanId || '',
           subscriptionPlanName: data.subscriptionPlanName || '',
+          subscriptionBillingCycle: data.subscriptionBillingCycle === 'yearly' ? 'yearly' : data.subscriptionBillingCycle === 'monthly' ? 'monthly' : undefined,
           subscriptionActivatedAt: data.subscriptionActivatedAt || '',
+          subscriptionExpiresAt: data.subscriptionExpiresAt || '',
           eduCoinMultiplier: getUserEduCoinMultiplier(data),
           eliteStatus: getUserSubscriptionTier(data) === 'elite',
       };
@@ -4152,7 +4161,7 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
-  const unlockSubscriptionPlan = (plan: SubscriptionPlanConfig, paymentLabel = 'Fiat checkout') => {
+  const unlockSubscriptionPlan = (plan: SubscriptionPlanConfig, paymentLabel = 'Fiat checkout', billingCycle: SubscriptionBillingCycle = 'monthly') => {
     if (!currentUser) return false;
     const requestedTier = inferPremiumTier(plan);
     const nextTier = getHigherSubscriptionTier(getUserSubscriptionTier(currentUser), requestedTier);
@@ -4160,13 +4169,18 @@ const App: React.FC = () => {
       ? Math.max(1, Number(plan.earningMultiplier || (requestedTier === 'elite' ? 2 : 1)))
       : getUserEduCoinMultiplier(currentUser);
     const newPurchasedIds = mergePurchasedProductIds(purchasedProductIds, plan.unlockProductIds || []);
-    const activatedAt = new Date().toISOString();
+    const activatedAtDate = new Date();
+    const activatedAt = activatedAtDate.toISOString();
+    const expiresAtDate = new Date(activatedAtDate);
+    expiresAtDate.setMonth(expiresAtDate.getMonth() + getSubscriptionPeriodMonths(billingCycle));
     const synced = syncCurrentUser(user => ({
       ...user,
       subscriptionTier: nextTier,
       subscriptionPlanId: nextTier === requestedTier ? String(plan.id) : user.subscriptionPlanId,
       subscriptionPlanName: nextTier === requestedTier ? plan.name : user.subscriptionPlanName,
+      subscriptionBillingCycle: nextTier === requestedTier ? billingCycle : user.subscriptionBillingCycle,
       subscriptionActivatedAt: activatedAt,
+      subscriptionExpiresAt: expiresAtDate.toISOString(),
       eduCoinMultiplier: nextMultiplier,
       eliteStatus: nextTier === 'elite',
     }));
@@ -4180,10 +4194,10 @@ const App: React.FC = () => {
     return true;
   };
 
-  const handleActivateSubscription = (plan: SubscriptionPlanConfig, appliedCouponCode?: string | null) => {
+  const handleActivateSubscription = (plan: SubscriptionPlanConfig, billingCycle: SubscriptionBillingCycle = 'monthly', appliedCouponCode?: string | null) => {
     if (!hasFirebaseUser) { openAuthPage('login'); return; }
 
-    const planPrice = Number(plan.price || 0);
+    const planPrice = getSubscriptionBillingPrice(plan, billingCycle);
     const couponToApply = appliedCouponCode ? coupons.find(c => c.code.trim().toUpperCase() === appliedCouponCode.trim().toUpperCase()) : null;
     let couponDiscount = 0;
 
@@ -4230,8 +4244,9 @@ const App: React.FC = () => {
     const paymentParts = [`₹${finalPrice.toFixed(2)}`];
     if (couponToApply) paymentParts.push(`${couponToApply.code} coupon`);
     if (coinDiscount > 0) paymentParts.push(`${activeCoinDiscount?.coins || 0} EduCoins`);
+    paymentParts.push(billingCycle === 'yearly' ? 'yearly access' : 'monthly access');
     const paymentLabel = paymentParts.join(' + ');
-    if (!unlockSubscriptionPlan(plan, paymentLabel)) return;
+    if (!unlockSubscriptionPlan(plan, paymentLabel, billingCycle)) return;
     addGlobalOrder({
       id: `DC-SUB-${Date.now()}`,
       customerName: effectiveAppUser?.name || effectiveAppUser?.email?.split('@')[0] || 'Valued Customer',
@@ -4239,9 +4254,9 @@ const App: React.FC = () => {
       date: new Date().toISOString().split('T')[0],
       total: paymentLabel,
       status: 'Completed',
-      items: [{ id: Number(plan.id) || Date.now(), name: `${plan.name} Subscription`, quantity: 1, price: `₹${planPrice.toFixed(2)}` }],
+      items: [{ id: Number(plan.id) || Date.now(), name: `${plan.name} ${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} Subscription`, quantity: 1, price: `₹${planPrice.toFixed(2)}` }],
       shippingAddress: 'N/A (Digital Subscription)',
-      billingAddress: 'Subscription Checkout',
+      billingAddress: `Subscription Checkout · ${billingCycle}`,
       paymentBreakdown: {
         purchaseKind: 'subscription',
         baseTotal: planPrice,
@@ -4255,17 +4270,19 @@ const App: React.FC = () => {
         coinOnlyPurchase: false,
         paymentLabel,
         unlockedProductIds: plan.unlockProductIds || [],
+        subscriptionBillingCycle: billingCycle,
+        subscriptionPeriodMonths: getSubscriptionPeriodMonths(billingCycle),
       },
     });
   };
 
-  const handleActivateSubscriptionWithCoins = (plan: SubscriptionPlanConfig) => {
+  const handleActivateSubscriptionWithCoins = (plan: SubscriptionPlanConfig, billingCycle: SubscriptionBillingCycle = 'monthly') => {
     if (!hasFirebaseUser) { openAuthPage('login'); return; }
     const coinPrice = activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(plan.id) ? activeCoinDiscount.coins : resolveCoinPrice(plan.coinPrice, economySettings, 'subscription', plan.id);
     if (!coinPrice || !deductEduCoins(coinPrice, { source: 'Subscription EduCoin purchase', description: `Activated ${plan.name} with EduCoins` })) return;
     if (activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(plan.id)) setActiveCoinDiscount(null);
     const paymentLabel = `${coinPrice} EduCoins`;
-    if (!unlockSubscriptionPlan(plan, paymentLabel)) return;
+    if (!unlockSubscriptionPlan(plan, paymentLabel, billingCycle)) return;
     addGlobalOrder({
       id: `DC-SUB-${Date.now()}`,
       customerName: effectiveAppUser?.name || effectiveAppUser?.email?.split('@')[0] || 'Valued Customer',
@@ -4273,18 +4290,20 @@ const App: React.FC = () => {
       date: new Date().toISOString().split('T')[0],
       total: `🪙 ${coinPrice}`,
       status: 'Completed',
-      items: [{ id: Number(plan.id) || Date.now(), name: `${plan.name} Subscription`, quantity: 1, price: `🪙 ${coinPrice}` }],
+      items: [{ id: Number(plan.id) || Date.now(), name: `${plan.name} ${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} Subscription`, quantity: 1, price: `🪙 ${coinPrice}` }],
       shippingAddress: 'N/A (Digital Subscription)',
-      billingAddress: 'EduCoin Wallet',
+      billingAddress: `EduCoin Wallet · ${billingCycle}`,
       paymentBreakdown: {
         purchaseKind: 'subscription',
-        baseTotal: Number(plan.price || 0),
+        baseTotal: getSubscriptionBillingPrice(plan, billingCycle),
         finalPrice: 0,
         eduCoinsUsed: coinPrice,
-        eduCoinDiscount: Number(plan.price || 0),
+        eduCoinDiscount: getSubscriptionBillingPrice(plan, billingCycle),
         coinOnlyPurchase: true,
         paymentLabel,
         unlockedProductIds: plan.unlockProductIds || [],
+        subscriptionBillingCycle: billingCycle,
+        subscriptionPeriodMonths: getSubscriptionPeriodMonths(billingCycle),
       },
     });
   };

@@ -2,10 +2,13 @@ import React from 'react';
 import { ActiveCoinDiscount, Coupon, ProductWithRating, WebsiteSettings, User } from '../App';
 import { EconomySettings, resolveCoinPrice } from '../utils/economy';
 import {
+  getSubscriptionBillingLabel,
+  getSubscriptionBillingPrice,
   getSubscriptionTierRank,
   getUserSubscriptionTier,
   normalizeSubscriptionPageContent,
   normalizeSubscriptionPlans,
+  SubscriptionBillingCycle,
   SubscriptionPlanConfig,
 } from '../utils/subscriptionAccess';
 
@@ -17,9 +20,9 @@ const SubscriptionPage: React.FC<{
   products: ProductWithRating[];
   purchasedProductIds: number[];
   onBack: () => void;
-  onActivatePlan: (plan: SubscriptionPlanConfig, appliedCouponCode?: string | null) => void;
+  onActivatePlan: (plan: SubscriptionPlanConfig, billingCycle: SubscriptionBillingCycle, appliedCouponCode?: string | null) => void;
   currentUser?: User | null;
-  onActivatePlanWithCoins?: (plan: SubscriptionPlanConfig) => void;
+  onActivatePlanWithCoins?: (plan: SubscriptionPlanConfig, billingCycle: SubscriptionBillingCycle) => void;
   coupons: Coupon[];
 }> = ({
   economySettings,
@@ -159,7 +162,12 @@ const SubscriptionPage: React.FC<{
               const canPayWithCoins = canUseEduCoins && coinPrice > 0 && coinBalance >= coinPrice;
               const missingCoins = Math.max(0, coinPrice - coinBalance);
               const planId = String(plan.id);
-              const planPrice = Math.max(0, Number(plan.price || 0));
+              const billingCycle = billingPreview;
+              const planPrice = getSubscriptionBillingPrice(plan, billingCycle);
+              const billingLabel = getSubscriptionBillingLabel(billingCycle);
+              const alternateBillingCycle: SubscriptionBillingCycle = billingCycle === 'monthly' ? 'yearly' : 'monthly';
+              const alternatePrice = getSubscriptionBillingPrice(plan, alternateBillingCycle);
+              const alternateLabel = getSubscriptionBillingLabel(alternateBillingCycle);
               const activeDiscount = activeCoinDiscount?.subscriptionId === planId ? activeCoinDiscount : null;
               const appliedCouponCode = appliedCouponCodes[planId];
               const appliedCoupon = appliedCouponCode ? coupons.find(coupon => coupon.code.trim().toUpperCase() === appliedCouponCode.toUpperCase()) : undefined;
@@ -186,7 +194,8 @@ const SubscriptionPage: React.FC<{
                       {(couponDiscount + eduCoinDiscount) > 0 && <span className="mb-1 text-sm font-bold text-[#676767] line-through">₹{planPrice.toFixed(0)}</span>}
                       <span className="text-4xl font-black leading-none tracking-[-0.05em] sm:text-5xl">₹{finalPlanPrice.toFixed(0)}</span>
                     </div>
-                    <p className="mt-2 text-[11px] font-bold lowercase tracking-[0.03em] text-[#676767]">One-time secure access</p>
+                    <p className="mt-2 text-[11px] font-bold lowercase tracking-[0.03em] text-[#676767]">per {billingLabel} secure access</p>
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.10em] text-[#676767]">Switch to {alternateBillingCycle}: ₹{alternatePrice.toFixed(0)} / {alternateLabel}</p>
                   </div>
 
                   <p className="mx-auto mt-5 max-w-sm text-center text-[12px] font-bold leading-5 text-[#676767]">{plan.description}</p>
@@ -215,12 +224,12 @@ const SubscriptionPage: React.FC<{
                   )}
 
                   <div className="mt-auto space-y-2.5 pt-6">
-                    <button type="button" disabled={disabled} onClick={() => onActivatePlan(plan, validAppliedCoupon?.code || null)} className={`block h-11 w-full border border-[#181818] px-4 text-center text-[12px] font-black uppercase tracking-[0.08em] outline-none transition hover:-translate-y-0.5 active:translate-y-0.5 disabled:cursor-not-allowed disabled:border-[#9B9B94] disabled:bg-[#F2F2EE] disabled:text-[#676767] ${isHighlighted ? 'bg-[#F4F35B] hover:bg-[#111111] hover:text-white' : 'bg-white hover:bg-[#F4F35B]'}`}>
-                      {disabled ? `${currentTier === 'elite' ? 'Elite' : 'Pro'} access active` : `${plan.ctaLabel} · ₹${finalPlanPrice.toFixed(0)}`}
+                    <button type="button" disabled={disabled} onClick={() => onActivatePlan(plan, billingCycle, validAppliedCoupon?.code || null)} className={`block h-11 w-full border border-[#181818] px-4 text-center text-[12px] font-black uppercase tracking-[0.08em] outline-none transition hover:-translate-y-0.5 active:translate-y-0.5 disabled:cursor-not-allowed disabled:border-[#9B9B94] disabled:bg-[#F2F2EE] disabled:text-[#676767] ${isHighlighted ? 'bg-[#F4F35B] hover:bg-[#111111] hover:text-white' : 'bg-white hover:bg-[#F4F35B]'}`}>
+                      {disabled ? `${currentTier === 'elite' ? 'Elite' : 'Pro'} access active` : `${plan.ctaLabel} · ₹${finalPlanPrice.toFixed(0)} / ${billingLabel}`}
                     </button>
 
                     {coinPrice > 0 && (
-                      <button type="button" disabled={disabled || !canPayWithCoins} onClick={() => onActivatePlanWithCoins?.(plan)} className="block h-10 w-full border border-[#181818] bg-white px-4 text-center text-[11px] font-black uppercase tracking-[0.06em] outline-none transition hover:bg-[#F4F35B] disabled:cursor-not-allowed disabled:border-[#9B9B94] disabled:bg-[#F2F2EE] disabled:text-[#676767]">
+                      <button type="button" disabled={disabled || !canPayWithCoins} onClick={() => onActivatePlanWithCoins?.(plan, billingCycle)} className="block h-10 w-full border border-[#181818] bg-white px-4 text-center text-[11px] font-black uppercase tracking-[0.06em] outline-none transition hover:bg-[#F4F35B] disabled:cursor-not-allowed disabled:border-[#9B9B94] disabled:bg-[#F2F2EE] disabled:text-[#676767]">
                         {disabled ? 'Membership active' : !canUseEduCoins ? 'EduCoin use unlocks with Pro' : canPayWithCoins ? `Pay ${coinPrice} EduCoins` : `Need ${missingCoins} more coins`}
                       </button>
                     )}
