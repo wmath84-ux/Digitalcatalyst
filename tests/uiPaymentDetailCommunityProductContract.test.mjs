@@ -18,7 +18,7 @@ test('product detail shows purchased stamp and latest update count badge', () =>
   assert.match(product, /product-owned-stamp/);
   assert.match(product, /OWNED/);
   assert.match(product, /Purchase the latest update/);
-  assert.match(product, /text-emerald-700/);
+  assert.match(product, /text-red-700/);
   assert.match(product, /new paid content item/);
 });
 

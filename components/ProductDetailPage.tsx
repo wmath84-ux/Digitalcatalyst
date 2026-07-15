@@ -589,13 +589,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <div className="relative mt-5 overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/85 p-4 sm:mt-6 sm:rounded-3xl sm:p-5">
                   {isPurchased && (
                     <div className="product-owned-stamp pointer-events-none absolute right-3 top-2 z-10 h-28 w-28 rotate-[-8deg] sm:right-5 sm:top-3 sm:h-32 sm:w-32" aria-label="Purchased and owned">
-                      <div className="absolute inset-2 rounded-full border-[3px] border-double border-blue-900 bg-white/95 shadow-[0_14px_34px_rgba(30,64,175,0.24)]" />
-                      <div className="absolute inset-4 rounded-full border-2 border-dashed border-blue-700" />
+                      <div className="absolute inset-2 rounded-full border-[3px] border-double border-red-900 bg-white/95 shadow-[0_14px_34px_rgba(185,28,28,0.24)]" />
+                      <div className="absolute inset-4 rounded-full border-2 border-dashed border-red-700" />
                       <span className="sr-only">OWNED</span>
-                      <div className="absolute inset-x-0 top-[42%] -translate-y-1/2 bg-gradient-to-r from-blue-950 via-blue-700 to-blue-950 py-2 text-center text-[12px] font-black uppercase tracking-[0.12em] text-white shadow-md sm:text-sm">Owned</div>
-                      <span className="absolute inset-x-0 top-5 text-center text-[9px] font-black uppercase tracking-[0.22em] text-blue-900 sm:top-6 sm:text-[10px]">Purchased</span>
-                      <span className="absolute inset-x-0 bottom-5 text-center text-[8px] font-black uppercase tracking-[0.16em] text-blue-900 sm:bottom-6 sm:text-[9px]">Verified access</span>
-                      <span className="absolute left-1/2 top-[71%] -translate-x-1/2 text-[10px] tracking-[0.18em] text-blue-700">★ ★ ★</span>
+                      <div className="absolute inset-x-0 top-[42%] -translate-y-1/2 bg-gradient-to-r from-red-950 via-red-700 to-red-950 py-2 text-center text-[12px] font-black uppercase tracking-[0.12em] text-white shadow-md sm:text-sm">Owned</div>
+                      <span className="absolute inset-x-0 top-5 text-center text-[9px] font-black uppercase tracking-[0.22em] text-red-900 sm:top-6 sm:text-[10px]">Purchased</span>
+                      <span className="absolute inset-x-0 bottom-5 text-center text-[8px] font-black uppercase tracking-[0.16em] text-red-900 sm:bottom-6 sm:text-[9px]">Verified access</span>
+                      <span className="absolute left-1/2 top-[71%] -translate-x-1/2 text-[10px] tracking-[0.18em] text-red-700">★ ★ ★</span>
                     </div>
                   )}
                   <div className="flex items-end justify-between gap-4">
@@ -654,7 +654,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                             {lockedPaidUpdateCount} paid update{lockedPaidUpdateCount === 1 ? '' : 's'} · See what changes and unlocks
                           </span>
                         </span>
-                        <span className="flex h-12 min-w-12 items-center justify-center rounded-full border border-white/40 bg-white text-xl font-black text-emerald-700 shadow-[0_10px_24px_rgba(0,0,0,0.14)]">
+                        <span className="flex h-12 min-w-12 items-center justify-center rounded-full border border-white/40 bg-white text-xl font-black text-red-700 shadow-[0_10px_24px_rgba(0,0,0,0.14)]">
                           {lockedPaidUpdateCount}
                         </span>
                       </span>

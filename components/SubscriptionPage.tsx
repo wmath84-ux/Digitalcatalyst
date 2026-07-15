@@ -181,12 +181,12 @@ const SubscriptionPage: React.FC<{
                 <article key={plan.id} className={`subscription-plan-card group relative flex min-h-[660px] flex-col overflow-visible border bg-white px-5 pb-5 pt-7 text-left shadow-[8px_8px_0_rgba(17,17,17,0.06)] transition hover:-translate-y-1 sm:px-6 ${isHighlighted ? 'border-2 border-[#181818] md:-translate-y-2 md:hover:-translate-y-3' : 'border-[#181818]'}`}>
                   {isHighlighted && <span className="absolute -top-3 left-1/2 -translate-x-1/2 border border-[#181818] bg-[#F4F35B] px-4 py-1 text-[10px] font-black uppercase tracking-[0.12em]">{plan.badge || 'Most Popular'}</span>}
                   {disabled && (
-                    <div className="pointer-events-none absolute right-2 top-2 z-20 h-24 w-24 rotate-[-8deg] sm:h-28 sm:w-28" aria-label="Subscription purchased and active">
-                      <div className="absolute inset-2 rounded-full border-[3px] border-double border-blue-900 bg-white/95 shadow-[0_12px_30px_rgba(30,64,175,0.22)]" />
-                      <div className="absolute inset-4 rounded-full border-2 border-dashed border-blue-700" />
-                      <div className="absolute inset-x-0 top-[43%] -translate-y-1/2 bg-gradient-to-r from-blue-950 via-blue-700 to-blue-950 py-1.5 text-center text-[10px] font-black uppercase tracking-[0.1em] text-white shadow-md sm:text-xs">Owned</div>
-                      <span className="absolute inset-x-0 top-4 text-center text-[8px] font-black uppercase tracking-[0.18em] text-blue-900 sm:top-5 sm:text-[9px]">Purchased</span>
-                      <span className="absolute inset-x-0 bottom-4 text-center text-[7px] font-black uppercase tracking-[0.14em] text-blue-900 sm:bottom-5 sm:text-[8px]">Active plan</span>
+                    <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rotate-[-8deg] sm:h-28 sm:w-28" aria-label="Subscription purchased and active">
+                      <div className="absolute inset-2 rounded-full border-[3px] border-double border-red-900 bg-white/95 shadow-[0_12px_30px_rgba(185,28,28,0.22)]" />
+                      <div className="absolute inset-4 rounded-full border-2 border-dashed border-red-700" />
+                      <div className="absolute inset-x-0 top-[43%] -translate-y-1/2 bg-gradient-to-r from-red-950 via-red-700 to-red-950 py-1.5 text-center text-[10px] font-black uppercase tracking-[0.1em] text-white shadow-md sm:text-xs">Owned</div>
+                      <span className="absolute inset-x-0 top-4 text-center text-[8px] font-black uppercase tracking-[0.18em] text-red-900 sm:top-5 sm:text-[9px]">Purchased</span>
+                      <span className="absolute inset-x-0 bottom-4 text-center text-[7px] font-black uppercase tracking-[0.14em] text-red-900 sm:bottom-5 sm:text-[8px]">Active plan</span>
                     </div>
                   )}
 

@@ -3246,9 +3246,9 @@ const communityPolishCss = `
   }
   .community-share-unread-total,
   .community-share-unread-badge {
-    background: #1769ff !important;
+    background: #dc2626 !important;
     color: #ffffff !important;
-    box-shadow: 0 8px 20px rgba(23, 105, 255, 0.24) !important;
+    box-shadow: 0 8px 20px rgba(220, 38, 38, 0.24) !important;
   }
   .community-share-thread-canvas {
     background: linear-gradient(180deg, #eff6ff 0%, #f8fafc 48%, #eef2ff 100%) !important;

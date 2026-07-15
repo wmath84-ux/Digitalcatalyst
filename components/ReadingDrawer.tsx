@@ -267,6 +267,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
   const lastReadingActivityRef = useRef(0);
   const [rewardSecondsLeft, setRewardSecondsLeft] = useState(Math.max(0, economySettings.articleReadTimeRequiredSec));
   const [rewardStatus, setRewardStatus] = useState<'idle' | 'claimed' | 'already' | 'login'>('idle');
+  const articleReadingRewardDisabled = economySettings.coinPerArticleRead <= 0 && economySettings.articleReadTimeRequiredSec <= 0;
 
   useEffect(() => {
     if (!isOpen) return;
@@ -280,16 +281,17 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
   useEffect(() => {
     if (!isOpen || view !== 'article' || !selectedArticle) return;
     const readIds = [...(currentUser?.rewardedArticleIds || []), ...(currentUser?.readArticles || [])];
-    if (!currentUser) setRewardStatus('login');
+    if (articleReadingRewardDisabled) setRewardStatus('already');
+    else if (!currentUser) setRewardStatus('login');
     else if (readIds.includes(selectedArticle.id)) setRewardStatus('already');
     else setRewardStatus('idle');
     setRewardSecondsLeft(Math.max(0, economySettings.articleReadTimeRequiredSec));
     lastReadingActivityRef.current = Date.now();
     rewardIssuedRef.current = null;
-  }, [currentUser, economySettings.articleReadTimeRequiredSec, isOpen, selectedArticle, view]);
+  }, [articleReadingRewardDisabled, currentUser, economySettings.articleReadTimeRequiredSec, isOpen, selectedArticle, view]);
 
   useEffect(() => {
-    if (!isOpen || view !== 'article' || !selectedArticle || !onReadingReward || rewardStatus !== 'idle') return;
+    if (articleReadingRewardDisabled || !isOpen || view !== 'article' || !selectedArticle || !onReadingReward || rewardStatus !== 'idle') return;
     const markReadingActivity = () => { lastReadingActivityRef.current = Date.now(); };
     const timer = window.setInterval(() => {
       const isActiveTab = document.visibilityState === 'visible' && document.hasFocus();
@@ -317,7 +319,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
       window.removeEventListener('mousemove', markReadingActivity);
       window.removeEventListener('keydown', markReadingActivity);
     };
-  }, [economySettings.articleReadScrollRequiredPercent, isOpen, onReadingReward, rewardStatus, selectedArticle, view]);
+  }, [articleReadingRewardDisabled, economySettings.articleReadScrollRequiredPercent, isOpen, onReadingReward, rewardStatus, selectedArticle, view]);
 
   const activeMeta = useMemo(() => {
     if (view === 'article' && selectedArticle) {
@@ -376,6 +378,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
       view === 'article' &&
       selectedArticle &&
       onReadingReward &&
+      !articleReadingRewardDisabled &&
       rewardStatus === 'idle' &&
       rewardSecondsLeft === 0 &&
       nextProgress >= economySettings.articleReadScrollRequiredPercent &&
@@ -511,7 +514,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                 </div>
               )}
 
-              {view === 'article' && selectedArticle && (
+              {view === 'article' && selectedArticle && !articleReadingRewardDisabled && (
                 <article className="mx-auto max-w-6xl">
                   <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
                     <div className="min-w-0">

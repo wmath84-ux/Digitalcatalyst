@@ -18,13 +18,13 @@ test('community shell is edge-to-edge with responsive typography', () => {
 });
 
 test('product and subscription use premium owned seal and polished button states', () => {
-  assert.match(product,/border-double border-blue-900/);
+  assert.match(product,/border-double border-red-900/);
   assert.match(product,/>Owned</);
   assert.match(product,/Purchased · Open My Purchases/);
   assert.match(product,/Unlock new update features/);
   assert.match(product,/paid update/);
   assert.match(subscription,/Subscription purchased and active/);
-  assert.match(subscription,/border-double border-blue-900/);
+  assert.match(subscription,/border-double border-red-900/);
   assert.match(subscription,/subscription active/);
 });
 

@@ -1027,6 +1027,7 @@ const GLOBAL_PRODUCTS_COLLECTION = 'siteProducts';
 const GLOBAL_COUPONS_COLLECTION = 'siteCoupons';
 const GLOBAL_TICKETS_COLLECTION = 'siteSupportTickets';
 const GLOBAL_ORDERS_COLLECTION = 'siteOrders';
+const ADMIN_ORDER_LATEST_CUSTOMER_RESET_DOC = ['settings', 'adminOrderLatestCustomerResetV1'] as const;
 const GLOBAL_REVIEWS_DOC = ['siteData', 'productReviews'] as const;
 const GLOBAL_WEBSITE_SETTINGS_DOC = ['settings', 'website'] as const;
 const ENABLE_DEMO_SEED_DATA = isDemoMode();
@@ -1065,6 +1066,45 @@ const syncArrayCollectionToFirestore = async <T extends Record<string, any>>(
 
 const logGlobalSyncWarning = (scope: string, error: unknown) => {
   console.warn(`${scope} global sync failed; local data remains available.`, error);
+};
+
+const getOrderDateValue = (order: Order) => {
+  const parsed = new Date(order.date).getTime();
+  const idTime = Number(String(order.id || '').replace(/\D/g, '').slice(-13));
+  return Number.isFinite(parsed) ? parsed : Number.isFinite(idTime) ? idTime : 0;
+};
+
+const getOrderCustomerKey = (order: Order) => {
+  const uid = String(order.customerUid || '').trim().toLowerCase();
+  const email = String(order.customerEmail || '').trim().toLowerCase();
+  const name = String(order.customerName || '').trim().toLowerCase();
+  if (uid) return `uid:${uid}`;
+  if (email) return `email:${email}`;
+  return name ? `name:${name}` : '';
+};
+
+const isSameLatestCustomerOrder = (order: Order, latestOrder: Order) => {
+  const latestUid = String(latestOrder.customerUid || '').trim().toLowerCase();
+  const orderUid = String(order.customerUid || '').trim().toLowerCase();
+  const latestEmail = String(latestOrder.customerEmail || '').trim().toLowerCase();
+  const orderEmail = String(order.customerEmail || '').trim().toLowerCase();
+  if (latestUid && orderUid && latestUid === orderUid) return true;
+  if (latestEmail && orderEmail && latestEmail === orderEmail) return true;
+  return getOrderCustomerKey(order) !== '' && getOrderCustomerKey(order) === getOrderCustomerKey(latestOrder);
+};
+
+const buildLatestCustomerOrderResetPlan = (sourceOrders: Order[]) => {
+  const sorted = [...sourceOrders].sort((a, b) => getOrderDateValue(b) - getOrderDateValue(a));
+  const latestOrder = sorted.find(order => getOrderCustomerKey(order));
+  if (!latestOrder) return null;
+  const keepOrders = sorted.filter(order => isSameLatestCustomerOrder(order, latestOrder));
+  const removeOrders = sorted.filter(order => !isSameLatestCustomerOrder(order, latestOrder));
+  return {
+    latestOrder,
+    latestCustomerKey: getOrderCustomerKey(latestOrder),
+    keepOrders,
+    removeOrders,
+  };
 };
 
 const App: React.FC = () => {
@@ -1175,6 +1215,7 @@ const App: React.FC = () => {
   const [rememberedAuthAccount, setRememberedAuthAccount] = useState<RememberedAuthAccount | null>(() => getRememberedAuthAccount());
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(initialAdminUsers);
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
+  const [adminOrderLatestCustomerResetStatus, setAdminOrderLatestCustomerResetStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
   const [productToBuyAfterLogin, setProductToBuyAfterLogin] = useState<ProductWithRating | null>(null);
   const [resumeCartCheckoutAfterLogin, setResumeCartCheckoutAfterLogin] = useState(false);
   const [autoOpenPaymentModalFor, setAutoOpenPaymentModalFor] = useState<number | null>(null);
@@ -2092,6 +2133,87 @@ const App: React.FC = () => {
     void setDoc(doc(db, GLOBAL_ORDERS_COLLECTION, String(orderWithCustomerUid.id)), stripUndefinedDeep(orderWithCustomerUid), { merge: false })
       .catch(error => logGlobalSyncWarning('Order create', error));
   };
+
+  useEffect(() => {
+    if (!currentAdminUser || adminOrderLatestCustomerResetStatus !== 'idle' || orders.length < 2) return;
+
+    const resetPlan = buildLatestCustomerOrderResetPlan(orders);
+    if (!resetPlan || resetPlan.removeOrders.length === 0) {
+      setAdminOrderLatestCustomerResetStatus('done');
+      return;
+    }
+
+    let cancelled = false;
+    setAdminOrderLatestCustomerResetStatus('running');
+
+    const runLatestCustomerOrderReset = async () => {
+      const resetRef = doc(db, ...ADMIN_ORDER_LATEST_CUSTOMER_RESET_DOC);
+      try {
+        const existingReset = await getDoc(resetRef);
+        const existingStatus = existingReset.exists() ? String(existingReset.data()?.status || '') : '';
+        if (existingStatus === 'complete') {
+          if (!cancelled) {
+            setOrders(resetPlan.keepOrders);
+            safeSetItem('siteOrders', resetPlan.keepOrders);
+            setAdminOrderLatestCustomerResetStatus('done');
+          }
+          return;
+        }
+
+        const removedOrderSummaries = resetPlan.removeOrders.map(order => ({
+          id: order.id,
+          customerUid: order.customerUid || null,
+          customerEmail: order.customerEmail || '',
+          customerName: order.customerName || '',
+          date: order.date,
+          total: order.total,
+          status: order.status,
+        }));
+
+        await setDoc(resetRef, stripUndefinedDeep({
+          status: 'pending_delete',
+          version: 'latest-customer-only-v1',
+          latestCustomerKey: resetPlan.latestCustomerKey,
+          latestOrderId: resetPlan.latestOrder.id,
+          latestOrderEmail: resetPlan.latestOrder.customerEmail,
+          keptOrderIds: resetPlan.keepOrders.map(order => order.id),
+          removedOrderCount: resetPlan.removeOrders.length,
+          removedOrderSummaries,
+          startedAt: new Date().toISOString(),
+        }), { merge: true });
+
+        for (let index = 0; index < resetPlan.removeOrders.length; index += 450) {
+          const batch = writeBatch(db);
+          resetPlan.removeOrders.slice(index, index + 450).forEach(order => {
+            batch.delete(doc(db, GLOBAL_ORDERS_COLLECTION, String(order.id)));
+          });
+          await batch.commit();
+        }
+
+        await setDoc(resetRef, stripUndefinedDeep({
+          status: 'complete',
+          completedAt: new Date().toISOString(),
+          keptOrderCount: resetPlan.keepOrders.length,
+          removedOrderCount: resetPlan.removeOrders.length,
+        }), { merge: true });
+
+        if (!cancelled) {
+          setOrders(resetPlan.keepOrders);
+          safeSetItem('siteOrders', resetPlan.keepOrders);
+          setAdminOrderLatestCustomerResetStatus('done');
+        }
+      } catch (error) {
+        logGlobalSyncWarning('One-time latest customer order reset', error);
+        if (!cancelled) setAdminOrderLatestCustomerResetStatus('failed');
+      }
+    };
+
+    void runLatestCustomerOrderReset();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adminOrderLatestCustomerResetStatus, currentAdminUser, orders]);
 
   const updateCouponUsage = (couponCode: string) => {
     const normalizedCouponCode = couponCode.trim().toUpperCase();
