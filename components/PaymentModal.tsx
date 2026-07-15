@@ -27,6 +27,9 @@ interface PaymentModalProps {
   onClose: () => void;
   onConfirm: (payment?: PaymentVerificationDetails) => void | Promise<void>;
   productTitle?: string;
+  productImage?: string;
+  itemDescription?: string;
+  unlockDetails?: string[];
   cartItems?: ({ product: ProductWithRating } & CartItem)[];
   paymentLink?: string;
   currentUser?: User | null;
@@ -61,6 +64,9 @@ interface PendingCheckoutSession {
 const PaymentModal: React.FC<PaymentModalProps> = ({
   economySettings = DEFAULT_ECONOMY_SETTINGS,
   productTitle,
+  productImage,
+  itemDescription,
+  unlockDetails: providedUnlockDetails,
   originalPrice,
   salePrice,
   couponDiscount,
@@ -481,20 +487,21 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       : checkoutType === 'cart'
         ? 'Cart checkout'
         : 'Digital product';
-  const paymentDetailSubtitle = checkoutType === 'latest-update'
-    ? 'Get the latest improvements, new explanations, and additional practice content.'
+  const paymentDetailSubtitle = itemDescription || (checkoutType === 'latest-update'
+    ? 'This checkout unlocks only the new paid update, features, explanations, or additional content for a product you already own.'
     : checkoutType === 'subscription'
       ? 'Premium membership benefits unlock after verified payment.'
       : checkoutType === 'cart'
         ? 'Review every item, discount, and wallet adjustment before paying.'
-        : 'Digital product access is delivered instantly after payment verification.';
-  const unlockDetails = checkoutType === 'subscription'
-    ? ['AI Mentor and premium learning access', 'Community access where included by plan', 'EduCoin benefits linked to your plan', 'Access remains active for the selected billing cycle']
+        : 'Unlock the complete digital product with lifetime access from My Purchases.');
+  const defaultUnlockDetails = checkoutType === 'subscription'
+    ? ['Selected membership access and plan benefits', 'AI Mentor and Community access where included', 'EduCoin benefits linked to the selected plan', 'Access remains active for the selected billing cycle']
     : checkoutType === 'latest-update'
-      ? ['Latest updated notes & explanations', 'New practice questions & solved examples', 'Access in My Purchases after payment', 'Instant access after successful payment']
+      ? ['Only the selected latest paid update', 'New features, files, explanations, or practice content', 'Update access attached to the product you already own', 'Instant access after verified payment']
       : checkoutType === 'cart'
         ? ['All selected products unlock after verification', 'Each item appears in My Purchases', 'Coupon and EduCoin discounts are preserved', 'Safe recovery if payment status needs checking']
-        : ['Lifetime access from My Purchases', 'Single-quantity digital purchase', 'Coupon and EduCoin discounts are preserved', 'Instant access after verified payment'];
+        : ['Complete digital product access', 'Lifetime access from My Purchases', 'All included files and course content', 'Instant access after verified payment'];
+  const unlockDetails = providedUnlockDetails?.length ? providedUnlockDetails : defaultUnlockDetails;
   const primaryItemTitle = productTitle || (isCartMode ? 'Selected cart items' : 'Digital Catalyst checkout');
 
   const priceBreakdownRows = (
@@ -555,14 +562,20 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         <header className="flex items-start gap-4">
           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-2xl text-blue-700">📄</span>
           <div>
-            <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Payment details</h2>
+            <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl"><span className="sr-only">Payment details</span>{checkoutType === 'latest-update' ? 'Update purchase details' : checkoutType === 'subscription' ? 'Subscription payment details' : checkoutType === 'cart' ? 'Cart payment details' : 'Product payment details'}</h2>
             <p className="mt-1 text-sm font-semibold text-slate-600">Review what you’re buying and what you’ll get.</p>
           </div>
         </header>
 
         <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
           <div className="flex gap-4">
-            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 text-center text-xs font-black uppercase leading-4 text-white shadow-sm">{checkoutType === 'subscription' ? 'PRO' : checkoutType === 'cart' ? 'CART' : '10th'}</span>
+            <span className="relative flex h-20 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm sm:h-24 sm:w-28">
+              {productImage ? (
+                <img src={productImage} alt={primaryItemTitle} className="h-full w-full object-contain" />
+              ) : (
+                <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-600 to-cyan-500 text-center text-xs font-black uppercase leading-4 text-white">{checkoutType === 'subscription' ? 'PRO' : checkoutType === 'cart' ? 'CART' : checkoutType === 'latest-update' ? 'UPDATE' : 'PRODUCT'}</span>
+              )}
+            </span>
             <div className="min-w-0">
               <h3 className="text-lg font-black leading-tight text-slate-950">{primaryItemTitle}</h3>
               <span className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">{checkoutTypeLabel}</span>
@@ -609,7 +622,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       </div>
       {summaryCard}
       <div className="grid gap-3">
-        <button disabled={isCompleting} onClick={() => handlePayNow(false)} className="rounded-2xl bg-gradient-to-r from-emerald-600 to-green-700 px-5 py-4 text-base font-black text-white shadow-[0_16px_40px_rgba(16,185,129,0.24)] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-5 sm:text-lg">
+        <button disabled={isCompleting} onClick={() => handlePayNow(false)} className="rounded-2xl bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-600 px-5 py-4 text-base font-black text-white shadow-[0_16px_40px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-5 sm:text-lg">
           🔒 Open verified Razorpay checkout
           <span className="mt-1 block text-xs font-bold text-white/80">Pay securely to get instant access</span>
         </button>

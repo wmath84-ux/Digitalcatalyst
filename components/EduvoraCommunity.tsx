@@ -8342,6 +8342,33 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           100% { transform: translateX(320px); opacity: 0; }
         }
         ${communityPolishCss}
+        .eduvora-community-polish,
+        .eduvora-community-app {
+          border-radius: 0 !important;
+        }
+        .eduvora-community-main {
+          padding-left: clamp(0.65rem, 1.2vw, 1.15rem) !important;
+          padding-right: clamp(0.65rem, 1.2vw, 1.15rem) !important;
+          padding-top: clamp(0.55rem, 1vw, 0.9rem) !important;
+        }
+        .eduvora-community-polish h1,
+        .eduvora-community-polish h2 {
+          text-wrap: balance;
+        }
+        @media (max-width: 767px) {
+          .eduvora-community-polish { font-size: 14px; }
+          .eduvora-community-main {
+            padding-left: 0.55rem !important;
+            padding-right: 0.55rem !important;
+            padding-top: 0.5rem !important;
+          }
+          .eduvora-community-polish h1 { font-size: clamp(1.45rem, 7vw, 2rem) !important; }
+          .eduvora-community-polish h2 { font-size: clamp(1.05rem, 5vw, 1.45rem) !important; }
+          .eduvora-community-polish p,
+          .eduvora-community-polish button,
+          .eduvora-community-polish input,
+          .eduvora-community-polish textarea { line-height: 1.45; }
+        }
         @media (min-width: 1024px) {
           .community-desktop-social.eduvora-community-polish {
             padding: 0 !important;
@@ -8349,7 +8376,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           .community-desktop-social .eduvora-community-app {
             height: 100% !important;
             width: 100% !important;
-            border-radius: 1.05rem !important;
+            border: 0 !important;
+            border-radius: 0 !important;
+            box-shadow: none !important;
           }
           .community-desktop-social .community-center-shell {
             flex-basis: auto !important;
@@ -8370,7 +8399,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       />
       {page === 'statusReel' ? renderStatusReel() : null}
       <ShareComposerModal />
-      <div className="eduvora-community-app mx-auto flex h-full w-full min-w-0 max-w-none overflow-hidden border border-[var(--community-border)] bg-[var(--community-surface)] shadow-[var(--community-shadow)] sm:rounded-[1.05rem] lg:rounded-[1.2rem]">
+      <div className="eduvora-community-app flex h-full w-full min-w-0 max-w-none overflow-hidden border-0 bg-[var(--community-surface)] shadow-none rounded-none">
         <CommunitySidebar />
         <div className="community-center-shell flex min-w-0 flex-1 flex-col">
           <CommunityHeader />

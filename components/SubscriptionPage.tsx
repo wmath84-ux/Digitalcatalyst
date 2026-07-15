@@ -178,8 +178,17 @@ const SubscriptionPage: React.FC<{
               const disabled = currentPlanOrHigher;
 
               return (
-                <article key={plan.id} className={`subscription-plan-card group relative flex min-h-[660px] flex-col border bg-white px-5 pb-5 pt-7 text-left shadow-[8px_8px_0_rgba(17,17,17,0.06)] transition hover:-translate-y-1 sm:px-6 ${isHighlighted ? 'border-2 border-[#181818] md:-translate-y-2 md:hover:-translate-y-3' : 'border-[#181818]'}`}>
+                <article key={plan.id} className={`subscription-plan-card group relative flex min-h-[660px] flex-col overflow-visible border bg-white px-5 pb-5 pt-7 text-left shadow-[8px_8px_0_rgba(17,17,17,0.06)] transition hover:-translate-y-1 sm:px-6 ${isHighlighted ? 'border-2 border-[#181818] md:-translate-y-2 md:hover:-translate-y-3' : 'border-[#181818]'}`}>
                   {isHighlighted && <span className="absolute -top-3 left-1/2 -translate-x-1/2 border border-[#181818] bg-[#F4F35B] px-4 py-1 text-[10px] font-black uppercase tracking-[0.12em]">{plan.badge || 'Most Popular'}</span>}
+                  {disabled && (
+                    <div className="pointer-events-none absolute right-2 top-2 z-20 h-24 w-24 rotate-[-8deg] sm:h-28 sm:w-28" aria-label="Subscription purchased and active">
+                      <div className="absolute inset-2 rounded-full border-[3px] border-double border-blue-900 bg-white/95 shadow-[0_12px_30px_rgba(30,64,175,0.22)]" />
+                      <div className="absolute inset-4 rounded-full border-2 border-dashed border-blue-700" />
+                      <div className="absolute inset-x-0 top-[43%] -translate-y-1/2 bg-gradient-to-r from-blue-950 via-blue-700 to-blue-950 py-1.5 text-center text-[10px] font-black uppercase tracking-[0.1em] text-white shadow-md sm:text-xs">Owned</div>
+                      <span className="absolute inset-x-0 top-4 text-center text-[8px] font-black uppercase tracking-[0.18em] text-blue-900 sm:top-5 sm:text-[9px]">Purchased</span>
+                      <span className="absolute inset-x-0 bottom-4 text-center text-[7px] font-black uppercase tracking-[0.14em] text-blue-900 sm:bottom-5 sm:text-[8px]">Active plan</span>
+                    </div>
+                  )}
 
                   <div className="flex flex-wrap items-start gap-2">
                     <span className="border border-[#181818] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em]">{plan.accessTier}</span>
@@ -224,8 +233,8 @@ const SubscriptionPage: React.FC<{
                   )}
 
                   <div className="mt-auto space-y-2.5 pt-6">
-                    <button type="button" disabled={disabled} onClick={() => onActivatePlan(plan, billingCycle, validAppliedCoupon?.code || null)} className={`block h-11 w-full border border-[#181818] px-4 text-center text-[12px] font-black uppercase tracking-[0.08em] outline-none transition hover:-translate-y-0.5 active:translate-y-0.5 disabled:cursor-not-allowed disabled:border-[#9B9B94] disabled:bg-[#F2F2EE] disabled:text-[#676767] ${isHighlighted ? 'bg-[#F4F35B] hover:bg-[#111111] hover:text-white' : 'bg-white hover:bg-[#F4F35B]'}`}>
-                      {disabled ? `${currentTier === 'elite' ? 'Elite' : 'Pro'} access active` : `${plan.ctaLabel} · ₹${finalPlanPrice.toFixed(0)} / ${billingLabel}`}
+                    <button type="button" disabled={disabled} onClick={() => onActivatePlan(plan, billingCycle, validAppliedCoupon?.code || null)} className={`block min-h-12 w-full rounded-xl border px-4 py-3 text-center text-[12px] font-black uppercase tracking-[0.08em] outline-none transition active:scale-[0.99] ${disabled ? 'cursor-not-allowed border-slate-300 bg-gradient-to-r from-slate-100 to-white text-slate-500 shadow-sm' : 'border-blue-700 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-600 text-white shadow-[0_12px_30px_rgba(37,99,235,0.24)] hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(37,99,235,0.30)]'}`}>
+                      {disabled ? `${currentTier === 'elite' ? 'Elite' : 'Pro'} subscription active` : `${plan.ctaLabel} · ₹${finalPlanPrice.toFixed(0)} / ${billingLabel}`}
                     </button>
 
                     {coinPrice > 0 && (

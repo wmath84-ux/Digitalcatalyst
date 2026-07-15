@@ -38,6 +38,7 @@ import SubscriptionPage from './components/SubscriptionPage';
 import EduCoinGuidePage from './components/EduCoinGuidePage';
 import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
+import { getProductImage } from './utils/productImages';
 import { auth, db } from './firebase';
 import { browserLocalPersistence, createUserWithEmailAndPassword, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, normalizeCoinPrice, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
@@ -4861,6 +4862,14 @@ const App: React.FC = () => {
         settings={websiteSettings}
         economySettings={economySettings}
         productTitle={`${latestUpdateCheckout.product.title} · ${summary.title}`}
+        productImage={getProductImage(latestUpdateCheckout.product, 'detailMobile')}
+        itemDescription={`This payment unlocks only “${summary.title}” for the product you already own. Review the new paid content before checkout.`}
+        unlockDetails={[
+          summary.title,
+          'New features, files, explanations, or practice content included in this update',
+          'Update access remains attached to the owned product in My Purchases',
+          'Only this paid update unlocks after verified payment',
+        ]}
         originalPrice={summary.price}
         salePrice={null}
         couponDiscount={0}
@@ -4898,7 +4907,7 @@ const App: React.FC = () => {
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent(effectiveAppUser)}</div>;
     if (currentView === 'community') return (
-      <div key="community" className="fixed inset-0 z-[1200] min-h-0 min-w-0 overflow-y-auto bg-[var(--color-background)] p-4 sm:p-8">
+      <div key="community" className="fixed inset-0 z-[1200] min-h-0 min-w-0 overflow-hidden bg-[var(--color-background)] p-0">
         {hasPremiumMembership(effectiveAppUser) ? (
           <EduvoraCommunity settings={websiteSettings} onClose={() => handleNavigateBack('home')} isAuthenticated={isLoggedIn} currentUser={effectiveAppUser} />
         ) : (

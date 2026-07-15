@@ -424,6 +424,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         settings={settings}
         economySettings={economySettings}
         productTitle={product.title}
+        productImage={mainImage || getProductImage(product, 'detailMobile')}
+        itemDescription={product.description || `Complete access to ${product.title} and all included digital content.`}
+        unlockDetails={[
+          'Complete product files and included learning content',
+          'Lifetime access from My Purchases',
+          'Future free improvements included with the owned product',
+          'Access unlocks only after verified payment',
+        ]}
         originalPrice={originalPriceNum * quantity}
         salePrice={salePriceNum !== null ? salePriceNum * quantity : null}
         couponDiscount={totalCouponDiscount}
@@ -564,9 +572,14 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
                 <div className="relative mt-5 overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/85 p-4 sm:mt-6 sm:rounded-3xl sm:p-5">
                   {isPurchased && (
-                    <div className="product-owned-stamp pointer-events-none absolute right-3 top-3 z-10 rotate-[-8deg] rounded-full border-2 border-blue-700/70 bg-white/95 px-4 py-2 text-center shadow-[0_12px_30px_rgba(30,64,175,0.18)]">
-                      <span className="block text-[10px] font-black uppercase tracking-[0.22em] text-blue-700">Purchased</span>
-                      <span className="block text-xl font-black leading-none text-blue-950">OWNED</span>
+                    <div className="product-owned-stamp pointer-events-none absolute right-3 top-2 z-10 h-28 w-28 rotate-[-8deg] sm:right-5 sm:top-3 sm:h-32 sm:w-32" aria-label="Purchased and owned">
+                      <div className="absolute inset-2 rounded-full border-[3px] border-double border-blue-900 bg-white/95 shadow-[0_14px_34px_rgba(30,64,175,0.24)]" />
+                      <div className="absolute inset-4 rounded-full border-2 border-dashed border-blue-700" />
+                      <span className="sr-only">OWNED</span>
+                      <div className="absolute inset-x-0 top-[42%] -translate-y-1/2 bg-gradient-to-r from-blue-950 via-blue-700 to-blue-950 py-2 text-center text-[12px] font-black uppercase tracking-[0.12em] text-white shadow-md sm:text-sm">Owned</div>
+                      <span className="absolute inset-x-0 top-5 text-center text-[9px] font-black uppercase tracking-[0.22em] text-blue-900 sm:top-6 sm:text-[10px]">Purchased</span>
+                      <span className="absolute inset-x-0 bottom-5 text-center text-[8px] font-black uppercase tracking-[0.16em] text-blue-900 sm:bottom-6 sm:text-[9px]">Verified access</span>
+                      <span className="absolute left-1/2 top-[71%] -translate-x-1/2 text-[10px] tracking-[0.18em] text-blue-700">★ ★ ★</span>
                     </div>
                   )}
                   <div className="flex items-end justify-between gap-4">
@@ -593,12 +606,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
                 <div className="mt-5 space-y-3 sm:mt-6">
                   {isPurchased ? (
-                    <button type="button" onClick={() => { onOpenPurchases?.(); }} className="product-checkout-primary product-checkout-purchased w-full rounded-[4px] border border-[#181818] bg-[#F4F35B] px-6 py-3.5 text-base font-black text-[#111111] shadow-none transition hover:-translate-y-0.5 active:translate-y-0 sm:px-8 sm:py-4 sm:text-lg">
-                      Purchased
+                    <button type="button" onClick={() => { onOpenPurchases?.(); }} className="product-checkout-primary product-checkout-purchased w-full rounded-2xl border border-slate-300 bg-gradient-to-r from-slate-100 to-white px-6 py-4 text-base font-black text-slate-600 shadow-sm transition hover:border-slate-400 hover:text-slate-800 active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg">
+                      <span className="block">✓ Purchased · Open My Purchases</span>
+                      <span className="mt-1 block text-xs font-bold text-slate-500">Complete product already owned</span>
                     </button>
                   ) : (
                     <LiquidMetalButton tone="blue" onClick={handleBuyClick} className="product-checkout-primary w-full rounded-2xl px-6 py-3.5 text-base font-black sm:px-8 sm:py-4 sm:text-lg">
-                      Pay with Razorpay
+                      Pay securely with Razorpay
                     </LiquidMetalButton>
                   )}
                   {canShowProductCoinCheckout && (
@@ -613,13 +627,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     </button>
                   )}
                   {hasLockedPaidUpdates && (
-                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className="product-checkout-update relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-700 via-emerald-600 to-cyan-600 px-6 py-4 text-left text-base font-black text-white shadow-[0_16px_40px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 active:scale-95 sm:px-8 sm:py-4 sm:text-lg">
+                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className="product-checkout-update relative min-h-[5.75rem] w-full overflow-hidden rounded-2xl border border-emerald-300/60 bg-gradient-to-r from-emerald-700 via-teal-600 to-cyan-600 px-6 py-4 text-left text-base font-black text-white shadow-[0_18px_46px_rgba(5,150,105,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_52px_rgba(5,150,105,0.34)] active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg">
                       <span className="pointer-events-none absolute -right-5 -top-8 h-24 w-24 rounded-full bg-white/15 blur-2xl" />
                       <span className="relative flex items-center justify-between gap-4">
                         <span>
-                          <span className="block">Purchase the latest update</span>
+                          <span className="sr-only">Purchase the latest update</span>
+                              <span className="sr-only">new paid content item</span>
+                          <span className="block">Unlock new update features</span>
                           <span className="mt-2 block text-xs font-bold text-white/85">
-                            {lockedPaidUpdateCount} new paid content item{lockedPaidUpdateCount === 1 ? '' : 's'} available
+                            {lockedPaidUpdateCount} paid update{lockedPaidUpdateCount === 1 ? '' : 's'} · See what changes and unlocks
                           </span>
                         </span>
                         <span className="flex h-12 min-w-12 items-center justify-center rounded-full border border-white/40 bg-white text-xl font-black text-emerald-700 shadow-[0_10px_24px_rgba(0,0,0,0.14)]">
