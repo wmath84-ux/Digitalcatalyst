@@ -467,8 +467,60 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     </div>
   );
 
+  const formatCheckoutMoney = (value: number) => `₹${Math.max(0, Number(value) || 0).toFixed(2)}`;
+  const originalAmount = Math.max(0, Number(originalPrice) || 0);
+  const saleAmount = salePrice !== null && salePrice !== undefined ? Math.max(0, Number(salePrice) || 0) : originalAmount;
+  const couponSavings = Math.max(0, Number(couponDiscount) || 0);
+  const coinSavings = Math.max(0, Number(eduCoinDiscount) || 0);
+  const totalSavings = couponSavings + coinSavings;
+  const finalPayable = Math.max(0, Number(finalPrice) || 0);
+  const checkoutTypeLabel = checkoutType === 'subscription'
+    ? `${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} subscription`
+    : checkoutType === 'latest-update'
+      ? 'Latest course update'
+      : checkoutType === 'cart'
+        ? 'Cart checkout'
+        : 'Digital product';
+  const paymentDetailSubtitle = checkoutType === 'latest-update'
+    ? 'Get the latest improvements, new explanations, and additional practice content.'
+    : checkoutType === 'subscription'
+      ? 'Premium membership benefits unlock after verified payment.'
+      : checkoutType === 'cart'
+        ? 'Review every item, discount, and wallet adjustment before paying.'
+        : 'Digital product access is delivered instantly after payment verification.';
+  const unlockDetails = checkoutType === 'subscription'
+    ? ['AI Mentor and premium learning access', 'Community access where included by plan', 'EduCoin benefits linked to your plan', 'Access remains active for the selected billing cycle']
+    : checkoutType === 'latest-update'
+      ? ['Latest updated notes & explanations', 'New practice questions & solved examples', 'Access in My Purchases after payment', 'Instant access after successful payment']
+      : checkoutType === 'cart'
+        ? ['All selected products unlock after verification', 'Each item appears in My Purchases', 'Coupon and EduCoin discounts are preserved', 'Safe recovery if payment status needs checking']
+        : ['Lifetime access from My Purchases', 'Single-quantity digital purchase', 'Coupon and EduCoin discounts are preserved', 'Instant access after verified payment'];
+  const primaryItemTitle = productTitle || (isCartMode ? 'Selected cart items' : 'Digital Catalyst checkout');
+
+  const priceBreakdownRows = (
+    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+      <h4 className="text-base font-black text-slate-950">Price breakdown</h4>
+      <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600">
+        <div className="flex justify-between gap-4"><span>Original price</span><span className="font-bold text-slate-900">{formatCheckoutMoney(originalAmount)}</span></div>
+        {saleAmount !== originalAmount && <div className="flex justify-between gap-4"><span>Sale price</span><span className="font-bold text-slate-900">{formatCheckoutMoney(saleAmount)}</span></div>}
+        <div className="flex justify-between gap-4"><span>Coupon discount</span><span className="font-black text-emerald-700">- {formatCheckoutMoney(couponSavings)}</span></div>
+        <div className="flex justify-between gap-4"><span>EduCoin discount</span><span className="font-black text-emerald-700">- {formatCheckoutMoney(coinSavings)}</span></div>
+        {appliedEduCoins > 0 && <div className="flex justify-between gap-4 text-amber-700"><span>EduCoins applied</span><span className="font-black">{appliedEduCoins} coins</span></div>}
+        {totalSavings > 0 && <div className="flex justify-between gap-4 text-emerald-700"><span>Total savings</span><span className="font-black">- {formatCheckoutMoney(totalSavings)}</span></div>}
+      </div>
+      <div className="mt-3 flex items-center justify-between gap-4 border-t border-dashed border-slate-200 pt-3">
+        <span className="text-lg font-black text-slate-950">Final payable</span>
+        <span className="text-2xl font-black text-slate-950">{formatCheckoutMoney(finalPayable)}</span>
+      </div>
+    </div>
+  );
+
   const summaryCard = (
-    <div className="space-y-3 rounded-[1.25rem] border border-white/70 bg-white/75 p-4 shadow-[0_18px_55px_rgba(15,23,42,0.06)] backdrop-blur-xl sm:rounded-[1.75rem] sm:p-5">
+    <div className="space-y-4 rounded-[1.25rem] border border-slate-200 bg-white p-4 shadow-[0_18px_55px_rgba(15,23,42,0.06)] sm:rounded-[1.75rem] sm:p-5">
+      <div className="flex items-center justify-between gap-4">
+        <h3 className="text-lg font-black text-slate-950">Order summary</h3>
+        <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">Verified</span>
+      </div>
       <div className="flex justify-between text-xs font-black uppercase tracking-widest text-slate-500"><span>Item</span><span>Price</span></div>
       {isCartMode ? (
         <div className="max-h-36 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
@@ -480,44 +532,98 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           ))}
         </div>
       ) : (
-        <div className="flex justify-between gap-3"><span className="font-bold text-slate-800">{productTitle}</span><span className="font-bold text-slate-700">₹{originalPrice.toFixed(2)}</span></div>
+        <div className="flex justify-between gap-4 text-sm"><span className="font-bold text-slate-800">{primaryItemTitle}</span><span className="font-bold text-slate-700">{formatCheckoutMoney(saleAmount)}</span></div>
       )}
-      <div className="border-t border-dashed border-slate-200 pt-3 text-sm">
-        {!isCartMode && salePrice !== null && salePrice !== undefined && <div className="flex justify-between"><span className="text-slate-600">Sale discount</span><span className="font-bold text-emerald-600">- ₹{(originalPrice - salePrice).toFixed(2)}</span></div>}
-        {couponDiscount > 0 && <div className="flex justify-between"><span className="text-slate-600">Coupon savings</span><span className="font-bold text-emerald-600">- ₹{couponDiscount.toFixed(2)}</span></div>}
-        {eduCoinDiscount > 0 && <div className="flex justify-between"><span className="text-slate-600">EduCoins applied ({appliedEduCoins} @ {coinRedeemRate}:1)</span><span className="font-bold text-emerald-600">- ₹{eduCoinDiscount.toFixed(2)}</span></div>}
-        <div className="mt-3 flex items-center justify-between gap-3"><span className="text-lg font-black text-slate-900">Total</span><span className="text-2xl font-black text-primary sm:text-3xl">₹{finalPrice.toFixed(2)}</span></div>
-        {appliedEduCoins > 0 ? (
-          <div className="mt-3 rounded-2xl bg-emerald-50/90 px-4 py-3 text-sm font-black text-emerald-700">
-            Wallet discount selected: 🪙 {appliedEduCoins} applied • Live balance: 🪙 {eduCoinBalance}
-          </div>
-        ) : isCoinCheckoutEnabled ? (
-          <div className="mt-3 rounded-2xl bg-amber-50/90 px-4 py-3 text-sm font-black text-amber-700">
-            EduCoin price: 🪙 {normalizedCoinPrice} • Your balance: 🪙 {eduCoinBalance}
-          </div>
-        ) : null}
+      <div className="border-t border-dashed border-slate-200 pt-4">
+        <div className="flex items-center justify-between gap-4">
+          <span className="text-base font-black text-slate-950">Total</span>
+          <span className="text-2xl font-black text-slate-950">{formatCheckoutMoney(finalPayable)}</span>
+        </div>
+        {(couponSavings > 0 || coinSavings > 0) && <p className="mt-2 text-sm font-bold text-emerald-700">You saved {formatCheckoutMoney(totalSavings)} on this checkout.</p>}
+      </div>
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
+        <span>🛡️ Secure payment processing by Razorpay</span>
+        <span className="font-black text-blue-800">Razorpay</span>
       </div>
     </div>
   );
 
+  const paymentDetailsAside = (
+    <aside className="payment-detail-trust-panel relative overflow-hidden bg-white p-4 text-slate-900 sm:p-8 lg:p-10">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(37,99,235,0.08),transparent_28%),radial-gradient(circle_at_92%_92%,rgba(16,185,129,0.09),transparent_26%)]" />
+      <div className="relative flex h-full min-h-0 flex-col gap-5">
+        <header className="flex items-start gap-4">
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-2xl text-blue-700">📄</span>
+          <div>
+            <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl">Payment details</h2>
+            <p className="mt-1 text-sm font-semibold text-slate-600">Review what you’re buying and what you’ll get.</p>
+          </div>
+        </header>
+
+        <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+          <div className="flex gap-4">
+            <span className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-600 to-cyan-500 text-center text-xs font-black uppercase leading-4 text-white shadow-sm">{checkoutType === 'subscription' ? 'PRO' : checkoutType === 'cart' ? 'CART' : '10th'}</span>
+            <div className="min-w-0">
+              <h3 className="text-lg font-black leading-tight text-slate-950">{primaryItemTitle}</h3>
+              <span className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">{checkoutTypeLabel}</span>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{paymentDetailSubtitle}</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+          <div className="flex gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-xl">🎁</span>
+            <div className="min-w-0">
+              <h3 className="text-lg font-black text-slate-950">What you unlock</h3>
+              <ul className="mt-3 space-y-2 text-sm font-semibold text-slate-700">
+                {unlockDetails.map(item => <li key={item} className="flex gap-2"><span className="text-emerald-600">✓</span><span>{item}</span></li>)}
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+          <div className="flex gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-xl">🛡️</span>
+            <div>
+              <h3 className="text-lg font-black text-slate-950">Access information</h3>
+              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Access unlocks only after server-side payment verification. If the payment window closes, use “Check payment status” to recover a completed payment safely.</p>
+            </div>
+          </div>
+        </section>
+
+        {priceBreakdownRows}
+
+        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">🔒 Your access unlocks only after verified payment.</div>
+      </div>
+    </aside>
+  );
+
+
   const razorpayDemoPage = (
-    <div className="space-y-4 p-4 sm:space-y-6 sm:p-8">
-      <div className="relative overflow-hidden rounded-[1.5rem] border border-emerald-200/70 bg-gradient-to-br from-emerald-600 via-slate-900 to-indigo-900 p-4 text-white shadow-[0_24px_80px_rgba(16,185,129,0.24)] sm:rounded-[2rem] sm:p-6">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.24),transparent_24%),radial-gradient(circle_at_90%_80%,rgba(255,255,255,0.12),transparent_24%)]" />
-        <div className="relative">
-          <p className="text-xs font-black uppercase tracking-[0.32em] text-white/70">Verified Razorpay checkout</p>
-          <h3 className="mt-3 text-2xl font-black sm:text-3xl">Complete secure payment</h3>
-          <p className="mt-3 text-sm font-semibold leading-6 text-white/80">Your access unlocks only after Razorpay order creation and server-side signature verification succeeds.</p>
-        </div>
+    <div className="space-y-5 p-4 text-slate-900 sm:space-y-6 sm:p-8">
+      <div className="text-center">
+        <div className="mx-auto inline-flex items-center gap-2 rounded-full bg-emerald-50 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-700">🛡️ Secure checkout</div>
+        <p className="mt-2 text-sm font-semibold text-slate-500">Powered by Razorpay • 256-bit SSL encrypted</p>
       </div>
       {summaryCard}
       <div className="grid gap-3">
-        <button disabled={isCompleting} onClick={() => handlePayNow(false)} className="rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-3.5 text-sm font-black text-white shadow-[0_14px_40px_rgba(16,185,129,0.28)] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-base">Open verified Razorpay checkout</button>
-        {readPendingCheckout()?.orderId && (
-          <button disabled={isCompleting} onClick={() => { const pending = readPendingCheckout(); if (pending?.orderId) void reconcilePendingCheckout(pending.orderId, 'manual'); }} className="rounded-2xl border border-emerald-200 bg-white/90 px-5 py-3.5 text-sm font-black text-emerald-700 shadow-sm transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-base">Check payment status</button>
-        )}
+        <button disabled={isCompleting} onClick={() => handlePayNow(false)} className="rounded-2xl bg-gradient-to-r from-emerald-600 to-green-700 px-5 py-4 text-base font-black text-white shadow-[0_16px_40px_rgba(16,185,129,0.24)] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-5 sm:text-lg">
+          🔒 Open verified Razorpay checkout
+          <span className="mt-1 block text-xs font-bold text-white/80">Pay securely to get instant access</span>
+        </button>
+        <button disabled={isCompleting} onClick={() => { const pending = readPendingCheckout(); if (pending?.orderId) void reconcilePendingCheckout(pending.orderId, 'manual'); }} className="rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-black text-blue-900 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-base">
+          ↻ Check payment status
+          <span className="mt-1 block text-xs font-bold text-slate-500">Already paid? Verify your payment</span>
+        </button>
       </div>
-      <button onClick={() => setCheckoutStep('checkout')} className="w-full rounded-2xl border border-white/70 bg-white/75 px-6 py-3 text-sm font-black text-slate-600 backdrop-blur-xl">Return to checkout options</button>
+      <button onClick={() => setCheckoutStep('checkout')} className="w-full rounded-2xl border border-slate-200 bg-white px-6 py-3.5 text-sm font-black text-slate-700 shadow-sm">← Return to checkout options</button>
+      <div className="grid gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-xs font-bold text-slate-500 sm:grid-cols-3">
+        <span>🛡️ Secure & trusted</span>
+        <span>🔒 Data protected</span>
+        <span>✅ Instant access</span>
+      </div>
     </div>
   );
 
@@ -536,11 +642,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const checkoutContent = showCoinGuide ? coinGuideContent : checkoutStep === 'razorpay' ? razorpayDemoPage : checkoutStep === 'loading' ? loadingContent : (
     <>
-      <div className="bg-gradient-to-br from-slate-50 via-indigo-50/40 to-cyan-50/40 p-4 text-slate-900 sm:p-8">
-        <div className="rounded-[1.25rem] border border-white/60 bg-white/75 p-4 shadow-sm backdrop-blur-xl sm:rounded-[1.75rem] sm:p-5">
-          <p className="text-xs font-black uppercase tracking-[0.25em] text-indigo-400">Secure live checkout</p>
-          <h3 className="mt-2 text-xl font-black sm:text-2xl">Choose Razorpay or instant EduCoin unlock</h3>
-          <p className="mt-2 text-sm text-slate-600">Razorpay creates a live order and verifies the payment signature before access is unlocked. EduCoins check your latest wallet balance before product access is unlocked.</p>
+      <div className="bg-gradient-to-br from-slate-50 via-blue-50/50 to-emerald-50/35 p-4 text-slate-900 sm:p-8">
+        <div className="rounded-[1.25rem] border border-slate-200 bg-white p-4 shadow-sm sm:rounded-[1.75rem] sm:p-5">
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-blue-500">Secure live checkout</p>
+          <h3 className="mt-2 text-xl font-black sm:text-2xl">Review details, pay safely, unlock instantly</h3>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Every discount, EduCoin adjustment, and final payable amount is shown before checkout. Access unlocks only after verified payment.</p>
         </div>
       </div>
 
@@ -572,7 +678,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       <div ref={pageRef} className="fixed inset-0 z-[9999] overflow-y-auto bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 px-3 pb-10 pt-4 text-slate-900 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
         <div className="pointer-events-none absolute -left-24 top-16 h-72 w-72 rounded-full bg-indigo-400/30 blur-3xl" />
         <div className="pointer-events-none absolute -right-20 bottom-10 h-80 w-80 rounded-full bg-cyan-600/25 blur-3xl" />
-        <div className="relative mx-auto w-full max-w-6xl">
+        <div className="relative mx-auto w-full max-w-7xl">
           <div className="mb-4 flex items-center justify-between gap-3 sm:mb-5 sm:flex-wrap sm:gap-4">
             <button onClick={onClose} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-black text-white shadow-sm backdrop-blur-xl transition hover:-translate-x-0.5 hover:bg-white/15 sm:px-5 sm:py-3 sm:text-sm">
               ← Back to product
@@ -583,23 +689,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
 
           <div className="overflow-hidden rounded-[1.5rem] border border-white/20 bg-white/10 shadow-[0_28px_100px_rgba(0,0,0,0.30)] backdrop-blur-2xl sm:rounded-[2.5rem]">
-            <div className="grid lg:grid-cols-[0.95fr_1.05fr]">
-              <aside className="checkout-contrast-panel relative overflow-hidden bg-gradient-to-br from-indigo-700/95 via-purple-600/95 to-cyan-500/95 p-4 text-white sm:p-10">
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_18%,rgba(255,255,255,0.28),transparent_24%),radial-gradient(circle_at_82%_75%,rgba(255,255,255,0.18),transparent_24%)]" />
-                <div className="relative flex h-full min-h-0 flex-col justify-between gap-5 sm:min-h-[360px] sm:gap-10">
-                  <div>
-                    <p className="text-xs font-black uppercase tracking-[0.32em] text-white/70">Digital Catalyst checkout</p>
-                    <h2 className="mt-3 text-2xl font-black leading-tight sm:mt-5 sm:text-5xl">Review. Pay. Unlock.</h2>
-                    <p className="mt-4 max-w-md text-sm font-semibold leading-6 text-white/80">Use verified Razorpay checkout or spend EduCoins after a live wallet check.</p>
-                  </div>
-                  <div className="grid gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                    <div className="rounded-2xl border border-white/20 bg-white/15 p-3 backdrop-blur-xl sm:rounded-3xl sm:p-4"><span className="font-black">🔒 Secure</span><p className="mt-1 text-sm text-white/75">Access unlocks only after server-side payment signature verification.</p></div>
-                    <div className="rounded-2xl border border-white/20 bg-white/15 p-3 backdrop-blur-xl sm:rounded-3xl sm:p-4"><span className="font-black">🪙 EduCoins</span><p className="mt-1 text-sm text-white/75">Wallet balance is checked before spending.</p></div>
-                    <div className="rounded-2xl border border-white/20 bg-white/15 p-3 backdrop-blur-xl sm:rounded-3xl sm:p-4"><span className="font-black">📚 Access</span><p className="mt-1 text-sm text-white/75">Unlocked products appear in My Purchases.</p></div>
-                  </div>
-                </div>
-              </aside>
-              <section className="bg-white/90">
+            <div className="grid lg:grid-cols-[0.92fr_1.08fr]">
+              {paymentDetailsAside}
+              <section className="bg-white/95">
                 {checkoutContent}
               </section>
             </div>

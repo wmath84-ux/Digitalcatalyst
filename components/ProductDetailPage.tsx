@@ -282,6 +282,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const requiredProductCoins = Math.max(0, productCoinPrice * quantity);
   const missingProductCoins = Math.max(0, requiredProductCoins - userCoinBalance);
   const hasLockedPaidUpdates = Boolean(isPurchased && productAccess?.hasPaidLockedUpdates && onPurchaseLatestUpdate);
+  const lockedPaidUpdateCount = Math.max(0, Number(productAccess?.lockedPaidUpdateCount || 0));
   const coinCheckoutDisabled =
     isCoinButtonChecking ||
     isRedeemingWithCoins ||
@@ -561,13 +562,19 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <h2 className="mt-2 text-xl font-black text-slate-950 sm:mt-3 sm:text-2xl">Unlock instant access</h2>
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Digital products are single-quantity purchases with lifetime access from My Purchases.</p>
 
-                <div className="mt-5 rounded-2xl border border-slate-200/70 bg-slate-50/85 p-4 sm:mt-6 sm:rounded-3xl sm:p-5">
+                <div className="relative mt-5 overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/85 p-4 sm:mt-6 sm:rounded-3xl sm:p-5">
+                  {isPurchased && (
+                    <div className="product-owned-stamp pointer-events-none absolute right-3 top-3 z-10 rotate-[-8deg] rounded-full border-2 border-blue-700/70 bg-white/95 px-4 py-2 text-center shadow-[0_12px_30px_rgba(30,64,175,0.18)]">
+                      <span className="block text-[10px] font-black uppercase tracking-[0.22em] text-blue-700">Purchased</span>
+                      <span className="block text-xl font-black leading-none text-blue-950">OWNED</span>
+                    </div>
+                  )}
                   <div className="flex items-end justify-between gap-4">
                     <span className="text-sm font-black uppercase tracking-widest text-slate-500">Total</span>
                     <div className="text-right">
                       {salePriceNum !== null && !appliedCoupon && <p className="text-sm font-bold text-slate-400 line-through">₹{originalPriceNum.toFixed(2)}</p>}
                       {appliedCoupon && <p className="text-sm font-bold text-emerald-600">Saved ₹{totalCouponDiscount.toFixed(2)}</p>}
-                      <p className="text-3xl font-black text-primary sm:text-4xl">{product.isFree ? 'FREE' : `₹${finalTotalPrice.toFixed(2)}`}</p>
+                      <p className={`text-3xl font-black sm:text-4xl ${isPurchased ? 'pr-28 text-slate-900 sm:pr-32' : 'text-primary'}`}>{product.isFree ? 'FREE' : `₹${finalTotalPrice.toFixed(2)}`}</p>
                     </div>
                   </div>
                   {eduCoinDiscount > 0 && <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">🪙 {activeCoinDiscount?.coins || 0} EduCoins applied for ₹{eduCoinDiscount.toFixed(2)} off</p>}
@@ -606,10 +613,18 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     </button>
                   )}
                   {hasLockedPaidUpdates && (
-                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className="product-checkout-update w-full rounded-2xl bg-gradient-to-r from-emerald-600 to-cyan-600 px-6 py-3.5 text-base font-black text-white shadow-[0_16px_40px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 active:scale-95 sm:px-8 sm:py-4 sm:text-lg">
-                      Purchase the latest update
-                      <span className="mt-2 block text-xs font-bold text-white/85">
-                        {productAccess?.lockedPaidUpdateCount || 0} new paid content item{(productAccess?.lockedPaidUpdateCount || 0) === 1 ? '' : 's'} available
+                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className="product-checkout-update relative w-full overflow-hidden rounded-2xl bg-gradient-to-r from-emerald-700 via-emerald-600 to-cyan-600 px-6 py-4 text-left text-base font-black text-white shadow-[0_16px_40px_rgba(16,185,129,0.22)] transition hover:-translate-y-0.5 active:scale-95 sm:px-8 sm:py-4 sm:text-lg">
+                      <span className="pointer-events-none absolute -right-5 -top-8 h-24 w-24 rounded-full bg-white/15 blur-2xl" />
+                      <span className="relative flex items-center justify-between gap-4">
+                        <span>
+                          <span className="block">Purchase the latest update</span>
+                          <span className="mt-2 block text-xs font-bold text-white/85">
+                            {lockedPaidUpdateCount} new paid content item{lockedPaidUpdateCount === 1 ? '' : 's'} available
+                          </span>
+                        </span>
+                        <span className="flex h-12 min-w-12 items-center justify-center rounded-full border border-white/40 bg-white text-xl font-black text-emerald-700 shadow-[0_10px_24px_rgba(0,0,0,0.14)]">
+                          {lockedPaidUpdateCount}
+                        </span>
                       </span>
                     </button>
                   )}

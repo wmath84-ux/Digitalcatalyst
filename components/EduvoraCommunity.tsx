@@ -1822,7 +1822,7 @@ const communityPolishCss = `
     .community-desktop-social .eduvora-community-main {
       background:
         linear-gradient(180deg, rgba(244, 248, 248, 0.98), rgba(239, 246, 246, 0.98)) !important;
-      padding: 0.8rem 0.9rem 1rem !important;
+      padding: 0.55rem 0.65rem 0.75rem !important;
     }
     .community-desktop-social .community-content-stage {
       width: 100%;
@@ -1839,7 +1839,7 @@ const communityPolishCss = `
       box-shadow: 0 7px 22px rgba(35, 68, 74, 0.055) !important;
     }
     .community-desktop-social .community-social-feed-page {
-      width: min(100%, 46rem);
+      width: min(100%, 50rem);
       margin-inline: auto;
       padding-bottom: 1.25rem;
     }
@@ -2175,8 +2175,8 @@ const communityPolishCss = `
     }
     .community-desktop-social .community-social-right-rail {
       display: none;
-      width: 19rem;
-      min-width: 19rem;
+      width: 20.5rem;
+      min-width: 20.5rem;
       flex-direction: column;
       gap: 0.75rem;
       overflow-y: auto;
@@ -2498,7 +2498,7 @@ const communityPolishCss = `
       display: flex !important;
     }
     .community-desktop-social .community-center-shell {
-      max-width: calc(100% - 19rem);
+      max-width: calc(100% - 20.5rem);
     }
   }
   @media (min-width: 1024px) and (max-width: 1279px) {
@@ -8333,7 +8333,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }
 
   return (
-    <section style={communityCssVars} className={`eduvora-community-polish relative h-full min-h-0 w-full overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-2 lg:p-3 ${useSocialDesktopLayout ? 'community-desktop-social' : useLatestDesktopLayout ? 'community-desktop-latest' : 'community-desktop-classic'} ${useLatestMobileLayout ? 'community-mobile-latest' : 'community-mobile-classic'}`}>
+    <section style={communityCssVars} className={`eduvora-community-polish relative h-full min-h-0 w-full overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-0 lg:p-0 ${useSocialDesktopLayout ? 'community-desktop-social' : useLatestDesktopLayout ? 'community-desktop-latest' : 'community-desktop-classic'} ${useLatestMobileLayout ? 'community-mobile-latest' : 'community-mobile-classic'}`}>
       <style>{`
         @keyframes eduvoraBondShine {
           0% { transform: translateX(0); opacity: 0; }
@@ -8342,6 +8342,19 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           100% { transform: translateX(320px); opacity: 0; }
         }
         ${communityPolishCss}
+        @media (min-width: 1024px) {
+          .community-desktop-social.eduvora-community-polish {
+            padding: 0 !important;
+          }
+          .community-desktop-social .eduvora-community-app {
+            height: 100% !important;
+            width: 100% !important;
+            border-radius: 1.05rem !important;
+          }
+          .community-desktop-social .community-center-shell {
+            flex-basis: auto !important;
+          }
+        }
       `}</style>
       {notificationDropdownPortal}
       {renderMasterTagDetailOverlay()}
@@ -8357,7 +8370,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       />
       {page === 'statusReel' ? renderStatusReel() : null}
       <ShareComposerModal />
-      <div className="eduvora-community-app mx-auto flex h-full w-full min-w-0 max-w-none overflow-hidden border border-[var(--community-border)] bg-[var(--community-surface)] shadow-[var(--community-shadow)] sm:rounded-[1.5rem] lg:rounded-[1.85rem]">
+      <div className="eduvora-community-app mx-auto flex h-full w-full min-w-0 max-w-none overflow-hidden border border-[var(--community-border)] bg-[var(--community-surface)] shadow-[var(--community-shadow)] sm:rounded-[1.05rem] lg:rounded-[1.2rem]">
         <CommunitySidebar />
         <div className="community-center-shell flex min-w-0 flex-1 flex-col">
           <CommunityHeader />
