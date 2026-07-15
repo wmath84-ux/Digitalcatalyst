@@ -117,7 +117,7 @@ const SubscriptionPage: React.FC<{
 
   return (
     <div
-      className="subscription-page-editorial-pricing relative min-h-screen overflow-x-hidden bg-[#FFFEF8] pb-24 font-mono text-[#111111]"
+      className="subscription-page-theme-adaptive subscription-page-editorial-pricing relative min-h-screen overflow-x-hidden bg-[#FFFEF8] pb-24 font-mono text-[#111111]"
       style={{
         backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(17,17,17,0.13) 1px, transparent 0), linear-gradient(to right, rgba(17,17,17,0.055) 1px, transparent 1px), linear-gradient(to bottom, rgba(17,17,17,0.045) 1px, transparent 1px)',
         backgroundSize: '22px 22px, 250px 100%, 100% 120px',

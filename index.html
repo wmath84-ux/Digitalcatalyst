@@ -2159,6 +2159,37 @@
   }
 }
 </script>
+
+    <style id="live-payment-subscription-theme-performance-v5">
+      body:not(.theme-classic-editorial) .subscription-page-theme-adaptive {
+        background: var(--color-background, #ffffff) !important;
+        color: var(--color-text, #111827) !important;
+        font-family: var(--font-sans, Inter, system-ui, sans-serif) !important;
+      }
+      body:not(.theme-classic-editorial) .subscription-page-theme-adaptive [class*="bg-[#FFFEF8]"] {
+        background: var(--color-background, #ffffff) !important;
+      }
+      body:not(.theme-classic-editorial) .subscription-page-theme-adaptive [class*="bg-[#F4F35B]"] {
+        background: var(--color-primary, #4f46e5) !important;
+        color: var(--color-primary-foreground, #ffffff) !important;
+      }
+      body:not(.theme-classic-editorial) .subscription-page-theme-adaptive [class*="text-[#181818]"],
+      body:not(.theme-classic-editorial) .subscription-page-theme-adaptive [class*="text-[#111111]"] {
+        color: var(--color-text, #111827) !important;
+      }
+      @media (min-width: 1024px) {
+        body.theme-classic-editorial .desktop-site-content [class*="backdrop-blur"],
+        body.theme-classic-editorial .desktop-site-content [class*="blur-3xl"] {
+          -webkit-backdrop-filter: none !important;
+          backdrop-filter: none !important;
+          filter: none !important;
+        }
+        body.theme-classic-editorial .desktop-site-content [class*="transition-all"] {
+          transition-property: transform, opacity, color, background-color, border-color !important;
+        }
+      }
+    </style>
+
 </head>
   <body class="bg-background text-text antialiased">
     <div id="root"></div>

@@ -23,7 +23,7 @@ import PolicyPage from './components/PolicyPage';
 import AuthPage from './components/auth/AuthPage';
 import WishlistPage from './components/FavouritesPage';
 import CartSidebar from './components/CartSidebar';
-import PaymentModal from './components/PaymentModal';
+import PaymentModal, { PaymentVerificationDetails } from './components/PaymentModal';
 import UpcomingFeatures, { UpcomingFeatureItem } from './components/UpcomingFeatures';
 import SubscriptionSuccessModal from './components/SubscriptionSuccessModal';
 import LatestNews from './components/LatestNews';
@@ -54,6 +54,7 @@ import {
   getHigherSubscriptionTier,
   getSubscriptionBillingPrice,
   getSubscriptionPeriodMonths,
+  isSubscriptionExpired,
   getUserEduCoinMultiplier,
   getUserSubscriptionTier,
   hasPremiumMembership,
@@ -540,6 +541,10 @@ export interface OrderPaymentBreakdown {
     unlockedProductIds?: number[];
     subscriptionBillingCycle?: SubscriptionBillingCycle;
     subscriptionPeriodMonths?: number;
+    paymentProvider?: 'razorpay' | 'free';
+    razorpayOrderId?: string;
+    razorpayPaymentId?: string;
+    paymentVerified?: boolean;
 }
 
 export interface Order {
@@ -1151,6 +1156,7 @@ const App: React.FC = () => {
   const [purchasedProductIds, setPurchasedProductIds] = useState<number[]>([]);
   const [purchasedProductUpdateIds, setPurchasedProductUpdateIds] = useState<Record<string, string[]>>({});
   const [latestUpdateCheckout, setLatestUpdateCheckout] = useState<{ product: ProductWithRating; updateId?: string } | null>(null);
+  const [subscriptionCheckoutRequest, setSubscriptionCheckoutRequest] = useState<{ plan: SubscriptionPlanConfig; billingCycle: SubscriptionBillingCycle; couponCode?: string | null } | null>(null);
   const [isAuthRestoring, setIsAuthRestoring] = useState(false);
   const [authRestoreError, setAuthRestoreError] = useState<string | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>('booting');
@@ -1573,15 +1579,14 @@ const App: React.FC = () => {
       applyDockVisibility();
     };
 
+    const pointerMoveEventName: 'pointermove' | 'mousemove' = typeof window.PointerEvent === 'function' ? 'pointermove' : 'mousemove';
     window.addEventListener('scroll', onScroll, { passive: true });
-    window.addEventListener('pointermove', onPointerMove, { passive: true });
-    window.addEventListener('mousemove', onPointerMove, { passive: true });
+    window.addEventListener(pointerMoveEventName, onPointerMove, { passive: true });
     document.addEventListener('mouseleave', onPointerLeave);
     onScroll();
     return () => {
       window.removeEventListener('scroll', onScroll);
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('mousemove', onPointerMove);
+      window.removeEventListener(pointerMoveEventName, onPointerMove);
       document.removeEventListener('mouseleave', onPointerLeave);
     };
   }, []);
@@ -2209,7 +2214,7 @@ const App: React.FC = () => {
     setIsCartPaymentModalOpen(true);
   };
 
-  const handleConfirmCartPurchase = async (appliedCouponCode: string | null, appliedCoins = 0) => {
+  const handleConfirmCartPurchase = async (appliedCouponCode: string | null, appliedCoins = 0, payment?: PaymentVerificationDetails) => {
       if (cart.length === 0) return;
 
       // --- Recalculate price at the moment of confirmation for robustness ---
@@ -2285,6 +2290,7 @@ const App: React.FC = () => {
           eduCoinDiscount: coinDiscount,
           coinOnlyPurchase: false,
           paymentLabel: 'Cart checkout',
+          ...paymentVerificationBreakdown(payment),
         }
       };
       addGlobalOrder(newOrder);
@@ -3218,6 +3224,31 @@ const App: React.FC = () => {
     return entry;
   };
 
+  const paymentVerificationBreakdown = (payment?: PaymentVerificationDetails): Partial<OrderPaymentBreakdown> => ({
+    paymentProvider: payment?.provider,
+    razorpayOrderId: payment?.razorpayOrderId,
+    razorpayPaymentId: payment?.razorpayPaymentId,
+    paymentVerified: payment?.status === 'verified' || payment?.status === 'free',
+  });
+
+  const getExpiredSubscriptionPromptKey = (userId: string, expiresAt?: string) => `expired_subscription_repurchase_${userId}_${expiresAt || 'unknown'}`;
+
+  const readExpiredSubscriptionPrompt = (key: string): { remainingSessions: number; lastSeenSessionId?: string; planName?: string; billingCycle?: SubscriptionBillingCycle; expiresAt?: string } | null => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(key) || 'null');
+      if (!parsed || typeof parsed !== 'object') return null;
+      return {
+        remainingSessions: Math.max(0, Number(parsed.remainingSessions || 0)),
+        lastSeenSessionId: typeof parsed.lastSeenSessionId === 'string' ? parsed.lastSeenSessionId : undefined,
+        planName: typeof parsed.planName === 'string' ? parsed.planName : undefined,
+        billingCycle: parsed.billingCycle === 'yearly' ? 'yearly' : parsed.billingCycle === 'monthly' ? 'monthly' : undefined,
+        expiresAt: typeof parsed.expiresAt === 'string' ? parsed.expiresAt : undefined,
+      };
+    } catch {
+      return null;
+    }
+  };
+
   const syncCurrentUser = (updater: (user: User) => User, transaction?: Omit<CoinTransaction, 'id' | 'createdAt'>) => {
     if (!currentUser || !auth.currentUser || auth.currentUser.uid !== String(currentUser.id)) return null;
 
@@ -3257,6 +3288,58 @@ const App: React.FC = () => {
     persistUserToFirestore(userWithLedger);
     return userWithLedger;
   };
+
+
+  // expired subscription repurchase prompt only after expiry, user-specific and two fresh sessions.
+  useEffect(() => {
+    if (!currentUser?.id || !currentUser.subscriptionActivatedAt || !currentUser.subscriptionExpiresAt) return;
+    if (!isSubscriptionExpired(currentUser)) return;
+
+    const promptKey = getExpiredSubscriptionPromptKey(currentUser.id, currentUser.subscriptionExpiresAt);
+    if (!readExpiredSubscriptionPrompt(promptKey)) {
+      localStorage.setItem(promptKey, JSON.stringify({
+        remainingSessions: 2,
+        lastSeenSessionId: '',
+        planName: currentUser.subscriptionPlanName,
+        billingCycle: currentUser.subscriptionBillingCycle,
+        expiresAt: currentUser.subscriptionExpiresAt,
+      }));
+    }
+
+    syncCurrentUser(user => ({
+      ...user,
+      subscriptionTier: 'normal',
+      subscriptionPlanId: '',
+      subscriptionPlanName: '',
+      subscriptionBillingCycle: undefined,
+      subscriptionActivatedAt: '',
+      subscriptionExpiresAt: '',
+      eduCoinMultiplier: 1,
+      eliteStatus: false,
+    }));
+  }, [currentUser?.id, currentUser?.subscriptionExpiresAt]);
+
+  useEffect(() => {
+    if (!currentUser?.id) return;
+    const sessionId = getOrCreateDeviceSessionId();
+    const prefix = `expired_subscription_repurchase_${currentUser.id}_`;
+    const keys = Object.keys(localStorage).filter(key => key.startsWith(prefix)).sort().reverse();
+
+    for (const key of keys) {
+      const prompt = readExpiredSubscriptionPrompt(key);
+      if (!prompt || prompt.remainingSessions <= 0 || prompt.lastSeenSessionId === sessionId) continue;
+
+      const nextRemaining = Math.max(0, prompt.remainingSessions - 1);
+      localStorage.setItem(key, JSON.stringify({ ...prompt, remainingSessions: nextRemaining, lastSeenSessionId: sessionId }));
+      setInfoModal({
+        title: 'Subscription expired',
+        message: `Your ${prompt.planName || 'premium'} ${prompt.billingCycle === 'yearly' ? 'yearly' : 'monthly'} subscription has expired. Renew from the subscription page to restore Pro/Elite access. This reminder appears only for this subscribed user for two fresh sessions after expiry.`,
+        icon: '⌛',
+      });
+      break;
+    }
+  }, [currentUser?.id, authStatus]);
+
 
   const showCoinToast = (message: string) => {
     setCoinToast(message);
@@ -3584,7 +3667,7 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
-  const handlePurchaseComplete = async (appliedCouponCode: string | null, quantity: number) => {
+  const handlePurchaseComplete = async (appliedCouponCode: string | null, quantity: number, payment?: PaymentVerificationDetails) => {
     if (selectedProduct) {
         // Recalculate price robustly at the moment of confirmation
         const originalPriceNum = parseFloat(selectedProduct.price.replace('₹', ''));
@@ -3656,6 +3739,7 @@ const App: React.FC = () => {
                 eduCoinDiscount: coinDiscount,
                 coinOnlyPurchase: false,
                 paymentLabel: 'Product checkout',
+                ...paymentVerificationBreakdown(payment),
             }
         };
         addGlobalOrder(newOrder);
@@ -3928,7 +4012,7 @@ const App: React.FC = () => {
     window.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
   };
 
-  const handleConfirmLatestUpdatePurchase = async (product: ProductWithRating, updateId?: string) => {
+  const handleConfirmLatestUpdatePurchase = async (product: ProductWithRating, updateId?: string, payment?: PaymentVerificationDetails) => {
     if (!hasFirebaseUser || !auth.currentUser) {
       openAuthPage('login');
       return;
@@ -3971,6 +4055,7 @@ const App: React.FC = () => {
         paymentLabel: 'Latest course update',
         unlockedProductIds: [product.id],
         unlockedUpdateIds: summary.updateIds,
+        ...paymentVerificationBreakdown(payment),
       } as any,
     });
 
@@ -4196,6 +4281,11 @@ const App: React.FC = () => {
 
   const handleActivateSubscription = (plan: SubscriptionPlanConfig, billingCycle: SubscriptionBillingCycle = 'monthly', appliedCouponCode?: string | null) => {
     if (!hasFirebaseUser) { openAuthPage('login'); return; }
+    setSubscriptionCheckoutRequest({ plan, billingCycle, couponCode: appliedCouponCode || null });
+  };
+
+  const completeVerifiedSubscriptionActivation = (plan: SubscriptionPlanConfig, billingCycle: SubscriptionBillingCycle = 'monthly', appliedCouponCode?: string | null, payment?: PaymentVerificationDetails) => {
+    if (!hasFirebaseUser) { openAuthPage('login'); return; }
 
     const planPrice = getSubscriptionBillingPrice(plan, billingCycle);
     const couponToApply = appliedCouponCode ? coupons.find(c => c.code.trim().toUpperCase() === appliedCouponCode.trim().toUpperCase()) : null;
@@ -4247,6 +4337,7 @@ const App: React.FC = () => {
     paymentParts.push(billingCycle === 'yearly' ? 'yearly access' : 'monthly access');
     const paymentLabel = paymentParts.join(' + ');
     if (!unlockSubscriptionPlan(plan, paymentLabel, billingCycle)) return;
+    setSubscriptionCheckoutRequest(null);
     addGlobalOrder({
       id: `DC-SUB-${Date.now()}`,
       customerName: effectiveAppUser?.name || effectiveAppUser?.email?.split('@')[0] || 'Valued Customer',
@@ -4272,6 +4363,7 @@ const App: React.FC = () => {
         unlockedProductIds: plan.unlockProductIds || [],
         subscriptionBillingCycle: billingCycle,
         subscriptionPeriodMonths: getSubscriptionPeriodMonths(billingCycle),
+        ...paymentVerificationBreakdown(payment),
       },
     });
   };
@@ -4675,7 +4767,7 @@ const App: React.FC = () => {
 
   const renderContent = (appUser: User | null = currentUser) => {
     switch (currentView) {
-      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity) => handlePurchaseComplete(appliedCouponCode, quantity)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onOpenPurchases={handleNavigateToPurchases} onCoinPurchase={hasPremiumMembership(appUser) ? (product, quantity, options) => handleProductCoinPurchase(product, quantity, options) : undefined} />;
+      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity, payment) => handlePurchaseComplete(appliedCouponCode, quantity, payment)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onOpenPurchases={handleNavigateToPurchases} onCoinPurchase={hasPremiumMembership(appUser) ? (product, quantity, options) => handleProductCoinPurchase(product, quantity, options) : undefined} />;
       case 'coursePlayer':
         if (isAuthRestoring || authRestoreError) return renderAuthRestoreStatus();
         return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} currentUser={appUser} onBack={() => handleNavigateBack('myPurchases')} onUpgrade={handleNavigateToSubscription} onQuizReward={hasPremiumMembership(appUser) ? handleQuizReward : undefined} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onEducoinUnlockComplete={handleEducoinUpdateUnlockComplete} /> : renderAuthRestoreStatus();
@@ -4777,13 +4869,16 @@ const App: React.FC = () => {
         appliedEduCoins={0}
         coinRedeemRate={eduCoinRedeemRate}
         onClose={() => setLatestUpdateCheckout(null)}
-        onConfirm={() => void handleConfirmLatestUpdatePurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId)}
+        onConfirm={(payment) => void handleConfirmLatestUpdatePurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId, payment)}
         paymentLink={latestUpdateCheckout.product.paymentLink}
         currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser}
         coinPrice={hasPremiumMembership(effectiveAppUser) ? summary.coinPrice : 0}
         onConfirmWithCoins={hasPremiumMembership(effectiveAppUser) && summary.coinPrice > 0 ? () => handleConfirmLatestUpdateCoinPurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId) : undefined}
         onInsufficientCoins={(details) => handleInsufficientEduCoins({ ...details, productTitle: `${latestUpdateCheckout.product.title} · ${summary.title}` })}
         presentation="page"
+        checkoutType="latest-update"
+        checkoutUserId={effectiveAppUser?.id}
+        checkoutTargetId={latestUpdateCheckout.updateId || latestUpdateCheckout.product.id}
       />
     );
   };
@@ -4887,7 +4982,7 @@ const App: React.FC = () => {
               </div>
             )}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
-            {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={() => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins)} currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser} coinPrice={hasPremiumMembership(effectiveAppUser) && cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={hasPremiumMembership(effectiveAppUser) ? handleConfirmCartCoinPurchase : undefined} onInsufficientCoins={handleInsufficientEduCoins} />}
+            {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={(payment) => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins, payment)} currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser} coinPrice={hasPremiumMembership(effectiveAppUser) && cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={hasPremiumMembership(effectiveAppUser) ? handleConfirmCartCoinPurchase : undefined} onInsufficientCoins={handleInsufficientEduCoins} checkoutType="cart" checkoutUserId={effectiveAppUser?.id} checkoutTargetId="cart" />}
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={closeReadingDrawer} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={hasPremiumMembership(effectiveAppUser) ? handleReadingReward : undefined} />
@@ -4959,6 +5054,35 @@ const App: React.FC = () => {
         <style>{`.animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *), .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *)::before, .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *)::after { animation: none !important; scroll-behavior: auto !important; } .animations-off .animate-child, .animations-off .scroll-animate, .animations-off .hub-animate { opacity: 1 !important; transform: none !important; } .animations-off *:not(.welcome-overlay-safe):not(.welcome-overlay-safe *) { transition-duration: 0.01ms !important; }`}</style>
         {networkBanner && <div className={`fixed left-1/2 top-3 z-[9999] w-[min(92vw,42rem)] -translate-x-1/2 rounded-2xl px-4 py-3 text-center text-sm font-black shadow-[0_18px_50px_rgba(15,23,42,0.22)] ${networkBanner.includes('back online') ? 'bg-emerald-600 text-white' : 'bg-amber-500 text-slate-950'}`}>{networkBanner}</div>}
         {renderPage()}
+        {subscriptionCheckoutRequest && (() => {
+          const planPrice = getSubscriptionBillingPrice(subscriptionCheckoutRequest.plan, subscriptionCheckoutRequest.billingCycle);
+          const couponToApply = subscriptionCheckoutRequest.couponCode ? coupons.find(c => c.code.trim().toUpperCase() === subscriptionCheckoutRequest.couponCode?.trim().toUpperCase()) : null;
+          const couponDiscount = couponToApply && couponToApply.isActive ? calculateDiscount(couponToApply, planPrice) : 0;
+          const coinDiscount = activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(subscriptionCheckoutRequest.plan.id) ? Math.min(planPrice - couponDiscount, activeCoinDiscount.amount) : 0;
+          const finalPrice = Math.max(0, planPrice - couponDiscount - coinDiscount);
+          return (
+            <PaymentModal
+              settings={websiteSettings}
+              economySettings={economySettings}
+              productTitle={`${subscriptionCheckoutRequest.plan.name} ${subscriptionCheckoutRequest.billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} Subscription`}
+              originalPrice={planPrice}
+              salePrice={null}
+              couponDiscount={couponDiscount}
+              finalPrice={finalPrice}
+              eduCoinDiscount={coinDiscount}
+              appliedEduCoins={activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(subscriptionCheckoutRequest.plan.id) ? activeCoinDiscount.coins : 0}
+              coinRedeemRate={eduCoinRedeemRate}
+              onClose={() => setSubscriptionCheckoutRequest(null)}
+              onConfirm={(payment) => completeVerifiedSubscriptionActivation(subscriptionCheckoutRequest.plan, subscriptionCheckoutRequest.billingCycle, subscriptionCheckoutRequest.couponCode, payment)}
+              currentUser={effectiveAppUser}
+              checkoutType="subscription"
+              checkoutUserId={effectiveAppUser?.id}
+              checkoutTargetId={subscriptionCheckoutRequest.plan.id}
+              billingCycle={subscriptionCheckoutRequest.billingCycle}
+              presentation="page"
+            />
+          );
+        })()}
         {renderLatestUpdateCheckoutOverlay()}
         <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
       </ErrorBoundary>

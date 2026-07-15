@@ -197,6 +197,18 @@ export const getSubscriptionBillingPrice = (plan: Partial<SubscriptionPlanConfig
   return billingCycle === 'yearly' ? yearlyPrice : monthlyPrice;
 };
 
+export const getSubscriptionExpiryTime = (profile: unknown): number => {
+  const raw = (profile as Record<string, unknown> | null | undefined)?.subscriptionExpiresAt;
+  const time = raw ? new Date(String(raw)).getTime() : 0;
+  return Number.isFinite(time) ? time : 0;
+};
+
+export const isSubscriptionExpired = (profile: unknown, now = Date.now()): boolean => {
+  const tier = normalizeSubscriptionTier((profile as Record<string, unknown> | null | undefined)?.subscriptionTier);
+  const expiry = getSubscriptionExpiryTime(profile);
+  return tier !== 'normal' && expiry > 0 && expiry <= now;
+};
+
 export const getSubscriptionTierRank = (tier: SubscriptionTier): number => tier === 'elite' ? 2 : tier === 'pro' ? 1 : 0;
 
 export const getHigherSubscriptionTier = (current: SubscriptionTier, requested: SubscriptionTier): SubscriptionTier => (
@@ -204,6 +216,7 @@ export const getHigherSubscriptionTier = (current: SubscriptionTier, requested: 
 );
 
 export const getUserSubscriptionTier = (user: unknown): SubscriptionTier => {
+  if (isSubscriptionExpired(user)) return 'normal';
   const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
   const candidates = [record.subscriptionTier, record.membershipTier, record.planTier, record.subscriptionPlanId, record.subscriptionPlanName];
   for (const candidate of candidates) {

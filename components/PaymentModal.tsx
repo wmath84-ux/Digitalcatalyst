@@ -3,6 +3,15 @@ import { WebsiteSettings, ProductWithRating, CartItem, User } from '../App';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, normalizeCoinPrice } from '../utils/economy';
 import MacWindowModal from './ui/MacWindowModal';
 
+export interface PaymentVerificationDetails {
+  provider: 'razorpay' | 'free';
+  status: 'verified' | 'free';
+  razorpayOrderId?: string;
+  razorpayPaymentId?: string;
+  amount: number;
+  currency: 'INR';
+}
+
 interface PaymentModalProps {
   settings: WebsiteSettings;
   economySettings?: EconomySettings;
@@ -14,7 +23,7 @@ interface PaymentModalProps {
   appliedEduCoins?: number;
   coinRedeemRate?: number;
   onClose: () => void;
-  onConfirm: () => void | Promise<void>;
+  onConfirm: (payment?: PaymentVerificationDetails) => void | Promise<void>;
   productTitle?: string;
   cartItems?: ({ product: ProductWithRating } & CartItem)[];
   paymentLink?: string;
@@ -27,6 +36,10 @@ interface PaymentModalProps {
   initialShowCoinGuide?: boolean;
   presentation?: 'modal' | 'page';
   razorpayAlreadyOpened?: boolean;
+  checkoutType?: 'product' | 'cart' | 'subscription' | 'latest-update';
+  checkoutUserId?: string;
+  checkoutTargetId?: string | number;
+  billingCycle?: 'monthly' | 'yearly';
 }
 
 type CheckoutStep = 'checkout' | 'razorpay' | 'loading';
@@ -44,7 +57,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   onClose,
   onConfirm,
   cartItems,
-  paymentLink,
   currentUser,
   coinPrice = 0,
   onConfirmWithCoins,
@@ -54,6 +66,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   initialCheckoutStep = 'checkout',
   presentation = 'modal',
   razorpayAlreadyOpened = false,
+  checkoutType = 'product',
+  checkoutUserId = '',
+  checkoutTargetId,
+  billingCycle,
 }) => {
   const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>(initialCheckoutStep);
   const [isCompleting, setIsCompleting] = useState(false);
@@ -61,7 +77,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const [showCoinGuide, setShowCoinGuide] = useState(initialShowCoinGuide);
   const pageRef = useRef<HTMLDivElement>(null);
   const autoStartedRazorpayRef = useRef(false);
-  const razorpayUrl = paymentLink || 'https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view';
+  const razorpayCheckoutSource = 'https://checkout.razorpay.com/v1/checkout.js';
   const isCartMode = !!cartItems && cartItems.length > 0;
   const eduCoinBalance = Math.max(0, Math.floor(Number((currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0)));
   const coinEligibility = normalizeCoinPrice(coinPrice);
@@ -74,7 +90,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     { icon: '🎬', title: 'Watch purchased video lessons', text: `${economySettings.coinPerVideoMinute} EduCoin${economySettings.coinPerVideoMinute === 1 ? '' : 's'} per focused video minute`, detail: 'Open an unlocked course/video from My Purchases. Coins are credited only while the video is playing and the tab is focused.' },
     { icon: '📖', title: 'Read Study Blog / News articles', text: `${economySettings.coinPerArticleRead} EduCoins after ${Math.ceil(economySettings.articleReadTimeRequiredSec / 60)} min`, detail: 'Open the reading drawer from the dock and keep reading/scrolling until the timer completes. Each article can be rewarded once.' },
     { icon: '🎯', title: 'Complete course quizzes', text: `${economySettings.coinPerQuizCorrect} EduCoins per correct answer`, detail: 'Quiz files inside unlocked products credit coins after submission. Re-attempt rewards are protected by quiz reward history.' },
-    { icon: '🛒', title: 'Purchase reward', text: `${economySettings.coinPerPurchase} EduCoins after Razorpay/demo unlock`, detail: 'Regular checkout credits the configured purchase reward after the product unlock completes.' },
+    { icon: '🛒', title: 'Purchase reward', text: `${economySettings.coinPerPurchase} EduCoins after verified checkout unlock`, detail: 'Regular checkout credits the configured purchase reward after verified product access unlocks.' },
     { icon: '🏆', title: 'Profile milestones', text: '500 / 1000 / 2000 lifetime coin goals', detail: 'Open Profile → Glowing Milestones to claim packs, course access, and badges after crossing lifetime coin requirements.' },
     { icon: '💎', title: 'Rewards Vault claims', text: `${Math.max(1, Number(economySettings.coinToFiatRatio))} EduCoins = ₹1 discount`, detail: 'The profile vault calculates live claim cards from products/subscriptions, coin prices, and admin economy overrides.' },
   ], [economySettings]);
@@ -102,25 +118,112 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     window.setTimeout(() => onClose(), 100);
   };
 
-  const completeVerifiedCheckout = async (verificationDelay = 1600) => {
+  const completeFreeCheckout = async () => {
     setCheckoutStep('loading');
-    await new Promise(resolve => window.setTimeout(resolve, verificationDelay));
-    await onConfirm();
+    await onConfirm({ provider: 'free', status: 'free', amount: 0, currency: 'INR' });
     closeAfterStateSettles();
   };
 
-  const completeDemoRazorpayUnlock = () => {
-    void completeVerifiedCheckout();
+  const loadRazorpayCheckout = async () => {
+    const existing = document.querySelector<HTMLScriptElement>(`script[src="${razorpayCheckoutSource}"]`);
+    if ((window as any).Razorpay) return;
+    if (existing) {
+      await new Promise<void>((resolve, reject) => {
+        existing.addEventListener('load', () => resolve(), { once: true });
+        existing.addEventListener('error', () => reject(new Error('Could not load Razorpay checkout.')), { once: true });
+      });
+      return;
+    }
+    await new Promise<void>((resolve, reject) => {
+      const script = document.createElement('script');
+      script.src = razorpayCheckoutSource;
+      script.async = true;
+      script.onload = () => resolve();
+      script.onerror = () => reject(new Error('Could not load Razorpay checkout.'));
+      document.body.appendChild(script);
+    });
   };
 
-  const handlePayNow = (openRazorpayWindow = true) => {
+  const handlePayNow = async (_openRazorpayWindow = true) => {
     if (isCompleting || checkoutStep === 'loading') return;
-    setShowCoinGuide(false);
-    if (openRazorpayWindow && razorpayUrl) {
-      window.open(razorpayUrl, '_blank');
+    if (finalPrice <= 0) {
+      await completeFreeCheckout();
+      return;
     }
-    // Trigger the demo completion to prevent infinite loading
-    completeDemoRazorpayUnlock();
+
+    setShowCoinGuide(false);
+    setIsCompleting(true);
+    setCheckoutStep('loading');
+    setCoinStatus('Creating a secure Razorpay order...');
+
+    try {
+      await loadRazorpayCheckout();
+      const orderResponse = await fetch('/api/razorpay/create-order', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amount: finalPrice,
+          receipt: `${checkoutType}_${String(checkoutTargetId || 'checkout').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 16)}_${Date.now()}`.slice(0, 40),
+          checkoutType,
+          userId: checkoutUserId,
+          targetId: checkoutTargetId,
+          billingCycle,
+        }),
+      });
+      const orderData = await orderResponse.json().catch(() => ({}));
+      if (!orderResponse.ok || !orderData?.orderId || !orderData?.keyId) {
+        throw new Error(orderData?.error || 'Could not create Razorpay order.');
+      }
+
+      const RazorpayConstructor = (window as any).Razorpay;
+      const razorpay = new RazorpayConstructor({
+        key: orderData.keyId,
+        order_id: orderData.orderId,
+        amount: orderData.amount,
+        currency: orderData.currency || 'INR',
+        name: 'Digital Catalyst',
+        description: productTitle || 'Secure checkout',
+        handler: async (response: Record<string, string>) => {
+          try {
+            setCoinStatus('Verifying payment signature...');
+            const verifyResponse = await fetch('/api/razorpay/verify-payment', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify(response),
+            });
+            const verifyData = await verifyResponse.json().catch(() => ({}));
+            if (!verifyResponse.ok || !verifyData?.verified) throw new Error(verifyData?.error || 'Payment verification failed.');
+
+            await onConfirm({
+              provider: 'razorpay',
+              status: 'verified',
+              razorpayOrderId: verifyData.razorpayOrderId || response.razorpay_order_id,
+              razorpayPaymentId: verifyData.razorpayPaymentId || response.razorpay_payment_id,
+              amount: finalPrice,
+              currency: 'INR',
+            });
+            closeAfterStateSettles();
+          } catch (error) {
+            setCheckoutStep('razorpay');
+            setCoinStatus(error instanceof Error ? error.message : 'Payment verification failed.');
+            setIsCompleting(false);
+          }
+        },
+        modal: {
+          ondismiss: () => {
+            setCheckoutStep('razorpay');
+            setCoinStatus('Payment was cancelled. No access was unlocked.');
+            setIsCompleting(false);
+          },
+        },
+        theme: { color: '#111827' },
+      });
+      razorpay.open();
+    } catch (error) {
+      setCheckoutStep('razorpay');
+      setCoinStatus(error instanceof Error ? error.message : 'Payment setup failed.');
+      setIsCompleting(false);
+    }
   };
 
   useEffect(() => {
@@ -130,7 +233,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   }, [initialCheckoutStep, razorpayAlreadyOpened]);
 
   const handleFreeCheckout = async () => {
-    await completeVerifiedCheckout(900);
+    await completeFreeCheckout();
   };
 
   const handleCoinCheckout = async () => {
@@ -245,18 +348,17 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const razorpayDemoPage = (
     <div className="space-y-4 p-4 sm:space-y-6 sm:p-8">
-      <div className="relative overflow-hidden rounded-[1.5rem] border border-sky-200/60 bg-gradient-to-br from-[#0b72e7] via-[#146ef5] to-[#7c3aed] p-4 text-white shadow-[0_24px_80px_rgba(37,99,235,0.26)] sm:rounded-[2rem] sm:p-6">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.28),transparent_24%),radial-gradient(circle_at_90%_80%,rgba(255,255,255,0.16),transparent_24%)]" />
+      <div className="relative overflow-hidden rounded-[1.5rem] border border-emerald-200/70 bg-gradient-to-br from-emerald-600 via-slate-900 to-indigo-900 p-4 text-white shadow-[0_24px_80px_rgba(16,185,129,0.24)] sm:rounded-[2rem] sm:p-6">
+        <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_18%,rgba(255,255,255,0.24),transparent_24%),radial-gradient(circle_at_90%_80%,rgba(255,255,255,0.12),transparent_24%)]" />
         <div className="relative">
-          <p className="text-xs font-black uppercase tracking-[0.32em] text-white/70">Razorpay payment page</p>
-          <h3 className="mt-3 text-2xl font-black sm:text-3xl">Complete payment in the Razorpay tab</h3>
-          <p className="mt-3 text-sm font-semibold leading-6 text-white/80">The real Razorpay payment page has been opened in a new tab. After completing payment there, return here and confirm so Digital Catalyst can show verification loading and unlock the product.</p>
+          <p className="text-xs font-black uppercase tracking-[0.32em] text-white/70">Verified Razorpay checkout</p>
+          <h3 className="mt-3 text-2xl font-black sm:text-3xl">Complete secure payment</h3>
+          <p className="mt-3 text-sm font-semibold leading-6 text-white/80">Your access unlocks only after Razorpay order creation and server-side signature verification succeeds.</p>
         </div>
       </div>
       {summaryCard}
-      <div className="grid gap-3 sm:grid-cols-2">
-        <a href={razorpayUrl} target="_blank" rel="noreferrer" className="rounded-2xl border border-sky-200 bg-white/85 px-5 py-3.5 text-center text-sm font-black text-sky-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 sm:px-6 sm:py-4 sm:text-base">Open real Razorpay tab</a>
-        <button onClick={completeDemoRazorpayUnlock} className="rounded-2xl bg-gradient-to-r from-amber-400 to-orange-500 px-5 py-3.5 text-sm font-black text-white shadow-[0_14px_40px_rgba(245,158,11,0.28)] transition hover:-translate-y-0.5 sm:px-6 sm:py-4 sm:text-base">I've completed payment — unlock product</button>
+      <div className="grid gap-3">
+        <button disabled={isCompleting} onClick={() => handlePayNow(false)} className="rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-3.5 text-sm font-black text-white shadow-[0_14px_40px_rgba(16,185,129,0.28)] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-base">Open verified Razorpay checkout</button>
       </div>
       <button onClick={() => setCheckoutStep('checkout')} className="w-full rounded-2xl border border-white/70 bg-white/75 px-6 py-3 text-sm font-black text-slate-600 backdrop-blur-xl">Return to checkout options</button>
     </div>
@@ -269,9 +371,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         <div className="absolute inset-0 animate-spin rounded-full border-8 border-transparent border-t-indigo-600 border-r-cyan-500" />
         <div className="absolute inset-5 flex items-center justify-center rounded-full bg-white/80 text-3xl shadow-inner backdrop-blur-xl">🔐</div>
       </div>
-      <p className="mt-6 text-xs font-black uppercase tracking-[0.32em] text-indigo-500">Demo verification</p>
+      <p className="mt-6 text-xs font-black uppercase tracking-[0.32em] text-indigo-500">Live verification</p>
       <h3 className="mt-2 text-2xl font-black text-slate-950 sm:text-3xl">Fetching payment status...</h3>
-      <p className="mt-3 max-w-md text-sm font-semibold leading-6 text-slate-600">In live mode this is where Razorpay API verification will run. For now, demo mode safely unlocks after this loading animation.</p>
+      <p className="mt-3 max-w-md text-sm font-semibold leading-6 text-slate-600">Razorpay signature verification is running on the server. Access unlocks only after verification succeeds.</p>
     </div>
   );
 
@@ -279,9 +381,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     <>
       <div className="bg-gradient-to-br from-slate-50 via-indigo-50/40 to-cyan-50/40 p-4 text-slate-900 sm:p-8">
         <div className="rounded-[1.25rem] border border-white/60 bg-white/75 p-4 shadow-sm backdrop-blur-xl sm:rounded-[1.75rem] sm:p-5">
-          <p className="text-xs font-black uppercase tracking-[0.25em] text-indigo-400">Secure demo checkout</p>
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-indigo-400">Secure live checkout</p>
           <h3 className="mt-2 text-xl font-black sm:text-2xl">Choose Razorpay or instant EduCoin unlock</h3>
-          <p className="mt-2 text-sm text-slate-600">Razorpay opens a nested demo payment page. EduCoins check your latest wallet balance before product access is unlocked.</p>
+          <p className="mt-2 text-sm text-slate-600">Razorpay creates a live order and verifies the payment signature before access is unlocked. EduCoins check your latest wallet balance before product access is unlocked.</p>
         </div>
       </div>
 
@@ -331,10 +433,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
                   <div>
                     <p className="text-xs font-black uppercase tracking-[0.32em] text-white/70">Digital Catalyst checkout</p>
                     <h2 className="mt-3 text-2xl font-black leading-tight sm:mt-5 sm:text-5xl">Review. Pay. Unlock.</h2>
-                    <p className="mt-4 max-w-md text-sm font-semibold leading-6 text-white/80">Use the glossy Razorpay demo page or spend EduCoins after a live wallet check.</p>
+                    <p className="mt-4 max-w-md text-sm font-semibold leading-6 text-white/80">Use verified Razorpay checkout or spend EduCoins after a live wallet check.</p>
                   </div>
                   <div className="grid gap-2 sm:gap-3 sm:grid-cols-3 lg:grid-cols-1">
-                    <div className="rounded-2xl border border-white/20 bg-white/15 p-3 backdrop-blur-xl sm:rounded-3xl sm:p-4"><span className="font-black">🔒 Secure</span><p className="mt-1 text-sm text-white/75">Payment verification loader is ready for live API integration.</p></div>
+                    <div className="rounded-2xl border border-white/20 bg-white/15 p-3 backdrop-blur-xl sm:rounded-3xl sm:p-4"><span className="font-black">🔒 Secure</span><p className="mt-1 text-sm text-white/75">Access unlocks only after server-side payment signature verification.</p></div>
                     <div className="rounded-2xl border border-white/20 bg-white/15 p-3 backdrop-blur-xl sm:rounded-3xl sm:p-4"><span className="font-black">🪙 EduCoins</span><p className="mt-1 text-sm text-white/75">Wallet balance is checked before spending.</p></div>
                     <div className="rounded-2xl border border-white/20 bg-white/15 p-3 backdrop-blur-xl sm:rounded-3xl sm:p-4"><span className="font-black">📚 Access</span><p className="mt-1 text-sm text-white/75">Unlocked products appear in My Purchases.</p></div>
                   </div>
@@ -351,7 +453,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   }
 
   return (
-    <MacWindowModal title="Secure Checkout" subtitle="Razorpay demo + EduCoin wallet verification" onClose={onClose} maxWidth="max-w-lg">
+    <MacWindowModal title="Secure Checkout" subtitle="Live Razorpay verification + EduCoin wallet" onClose={onClose} maxWidth="max-w-lg">
       {checkoutContent}
     </MacWindowModal>
   );

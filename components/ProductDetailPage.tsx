@@ -4,7 +4,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { ActiveCoinDiscount, ProductWithRating, Review, Coupon, WebsiteSettings, User, ProductAccessState } from '../App';
 import { EconomySettings, normalizeCoinPrice, shouldShowCoinButton } from '../utils/economy';
 import { getProductCoinPrice, redeemProductWithEduCoins, watchUserCoinWallet } from '../utils/coinWallet';
-import PaymentModal from './PaymentModal';
+import PaymentModal, { PaymentVerificationDetails } from './PaymentModal';
 import RatingsAndReviews from './RatingsAndReviews';
 import FeaturedProducts from './FeaturedProducts';
 import ShareModal from './ShareModal';
@@ -35,7 +35,7 @@ interface ProductDetailPageProps {
   onConsumeCoinDiscount?: () => void;
   product: ProductWithRating;
   onBack: () => void;
-  onPurchase: (appliedCouponCode: string | null, quantity: number) => void;
+  onPurchase: (appliedCouponCode: string | null, quantity: number, payment?: PaymentVerificationDetails) => void;
   onAddToCart: (productId: number, quantity: number) => void;
   isWishlisted: boolean;
   onToggleWishlist: (id: number) => void;
@@ -406,15 +406,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     }
   };
 
-  const handleModalConfirm = () => {
-    // Call the main purchase function first
-    onPurchase(appliedCoupon ? appliedCoupon.code : null, quantity);
+  const handleModalConfirm = async (payment?: PaymentVerificationDetails) => {
+    await onPurchase(appliedCoupon ? appliedCoupon.code : null, quantity, payment);
 
     if (onConsumeCoinDiscount) {
       onConsumeCoinDiscount();
     }
 
-    // Delay closing the modal so App.tsx can safely transition to 'congratulations'
     setTimeout(() => {
       setModalOpen(false);
     }, 150);
@@ -445,6 +443,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         initialCheckoutStep={openRazorpayOnMount ? 'razorpay' : 'checkout'}
         presentation="page"
         razorpayAlreadyOpened={openRazorpayOnMount}
+        checkoutType="product"
+        checkoutUserId={currentUser?.id}
+        checkoutTargetId={product.id}
       />
     );
   }
