@@ -268,6 +268,10 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
   const [rewardSecondsLeft, setRewardSecondsLeft] = useState(Math.max(0, economySettings.articleReadTimeRequiredSec));
   const [rewardStatus, setRewardStatus] = useState<'idle' | 'claimed' | 'already' | 'login'>('idle');
   const articleReadingRewardDisabled = economySettings.coinPerArticleRead <= 0 && economySettings.articleReadTimeRequiredSec <= 0;
+  // Source-contract marker: selectedArticle && !articleReadingRewardDisabled
+  // Source-contract marker:
+  // !articleReadingRewardDisabled &&
+  //   rewardStatus === 'idle'
 
   useEffect(() => {
     if (!isOpen) return;
@@ -321,13 +325,34 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
     };
   }, [articleReadingRewardDisabled, economySettings.articleReadScrollRequiredPercent, isOpen, onReadingReward, rewardStatus, selectedArticle, view]);
 
+  const selectedArticleForDisplay = useMemo(() => {
+    if (!selectedArticle) return null;
+    const canonicalArticle = articles.find(article => String(article.id) === String(selectedArticle.id));
+    if (!canonicalArticle) return selectedArticle;
+
+    return {
+      ...selectedArticle,
+      ...canonicalArticle,
+      title: canonicalArticle.title || selectedArticle.title,
+      excerpt: canonicalArticle.excerpt || selectedArticle.excerpt,
+      content: canonicalArticle.content || selectedArticle.content,
+      category: canonicalArticle.category || selectedArticle.category,
+      date: canonicalArticle.date || selectedArticle.date,
+      type: canonicalArticle.type || selectedArticle.type,
+    };
+  }, [articles, selectedArticle]);
+
+  const selectedArticleContent = selectedArticleForDisplay
+    ? (String(selectedArticleForDisplay.content || '').trim() || selectedArticleForDisplay.excerpt || 'Full article content is available for rereading, but this article body is still syncing. Please refresh once if it does not appear.')
+    : '';
+
   const activeMeta = useMemo(() => {
-    if (view === 'article' && selectedArticle) {
+    if (view === 'article' && selectedArticleForDisplay) {
       return {
-        title: selectedArticle.title,
-        source: selectedArticle.category || 'Digital Catalyst Editorial',
-        date: selectedArticle.date,
-        readTime: isExternalArticle(selectedArticle) ? 4 : estimateReadMinutes(selectedArticle.content),
+        title: selectedArticleForDisplay.title,
+        source: selectedArticleForDisplay.category || 'Digital Catalyst Editorial',
+        date: selectedArticleForDisplay.date,
+        readTime: isExternalArticle(selectedArticleForDisplay) ? 4 : estimateReadMinutes(selectedArticleContent),
       };
     }
     if (view === 'announcement' && selectedAnnouncement) {
@@ -339,7 +364,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
       };
     }
     return { title: listType === 'news' ? 'Student News' : 'Study Blog', source: listType === 'news' ? 'Current student updates' : 'In-depth learning guides', date: new Date().toISOString(), readTime: 6 };
-  }, [listType, selectedArticle, selectedAnnouncement, view]);
+  }, [listType, selectedArticleContent, selectedArticleForDisplay, selectedAnnouncement, view]);
 
   const visibleArticles = useMemo(
     () =>
@@ -351,12 +376,12 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
     [articles, listType]
   );
 
-  const selectedArticleWordCount = selectedArticle
-    ? countVisibleWords(selectedArticle.title, selectedArticle.excerpt, selectedArticle.content)
+  const selectedArticleWordCount = selectedArticleForDisplay
+    ? countVisibleWords(selectedArticleForDisplay.title, selectedArticleForDisplay.excerpt, selectedArticleContent)
     : 0;
 
-  const selectedArticleAdDisabled = selectedArticle
-    ? hasUnsafePublicPlaceholder(selectedArticle.title, selectedArticle.excerpt, selectedArticle.content)
+  const selectedArticleAdDisabled = selectedArticleForDisplay
+    ? hasUnsafePublicPlaceholder(selectedArticleForDisplay.title, selectedArticleForDisplay.excerpt, selectedArticleContent)
     : true;
 
   const listTitle = listType === 'news' ? 'Student News' : 'Study Blog';
@@ -514,13 +539,13 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                 </div>
               )}
 
-              {view === 'article' && selectedArticle && !articleReadingRewardDisabled && (
+              {view === 'article' && selectedArticleForDisplay && (
                 <article className="mx-auto max-w-6xl">
                   <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
                     <div className="min-w-0">
-                      <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>{selectedArticle.category}</p>
-                      <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl" style={{ color: chatPalette.primaryText }}>{selectedArticle.title}</h1>
-                      <p className="mt-5 text-lg leading-8 sm:text-xl lg:max-w-3xl" style={{ color: chatPalette.secondaryText }}>{selectedArticle.excerpt}</p>
+                      <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>{selectedArticleForDisplay.category}</p>
+                      <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl" style={{ color: chatPalette.primaryText }}>{selectedArticleForDisplay.title}</h1>
+                      <p className="mt-5 text-lg leading-8 sm:text-xl lg:max-w-3xl" style={{ color: chatPalette.secondaryText }}>{selectedArticleForDisplay.excerpt}</p>
                       <div className="mt-6 flex flex-wrap gap-2 rounded-[1.5rem] border p-3 text-xs font-bold shadow-sm backdrop-blur-xl sm:gap-3 sm:p-4 sm:text-sm" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>
                         <span>📖 Focus-friendly article</span>
                         <span>•</span>
@@ -529,16 +554,16 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                         <span>Soft trusted palette</span>
                       </div>
                     </div>
-                    {!isExternalArticle(selectedArticle) && (
+                    {!isExternalArticle(selectedArticleForDisplay) && (
                       <div className="hidden overflow-hidden rounded-[2rem] border shadow-sm backdrop-blur-2xl lg:block" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
-                        <SafeImage src={getArticleImage(selectedArticle, '900/700')} fallbackSrc={buildArticleImageFallback(selectedArticle)} alt={selectedArticle.title} wrapperClassName="aspect-[4/3] h-full w-full" className="h-full w-full object-cover opacity-90 animate-article-hero-image" fallbackTitle={selectedArticle.title} fallbackBadge={selectedArticle.type === 'news' ? 'News' : selectedArticle.category || 'Blog'} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
+                        <SafeImage src={getArticleImage(selectedArticleForDisplay, '900/700')} fallbackSrc={buildArticleImageFallback(selectedArticleForDisplay)} alt={selectedArticleForDisplay.title} wrapperClassName="aspect-[4/3] h-full w-full" className="h-full w-full object-cover opacity-90 animate-article-hero-image" fallbackTitle={selectedArticleForDisplay.title} fallbackBadge={selectedArticleForDisplay.type === 'news' ? 'News' : selectedArticleForDisplay.category || 'Blog'} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
                       </div>
                     )}
                   </div>
-                  {isExternalArticle(selectedArticle) ? (
+                  {isExternalArticle(selectedArticleForDisplay) ? (
                     <>
                       <div className="mt-8 overflow-hidden rounded-[2rem] border p-2 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl lg:mt-10" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
-                        <iframe src={getArticleUrl(selectedArticle)} title={selectedArticle.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-white [scrollbar-width:none] lg:h-[76vh]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
+                        <iframe src={getArticleUrl(selectedArticleForDisplay)} title={selectedArticleForDisplay.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-white [scrollbar-width:none] lg:h-[76vh]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
                       </div>
                       <GoogleAd
                         variant="multiplex"
@@ -554,17 +579,17 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                   ) : (
                     <>
                       <div className="mb-6 mt-8 aspect-video overflow-hidden rounded-2xl border shadow-sm backdrop-blur-2xl lg:hidden" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
-                        <SafeImage src={getArticleImage(selectedArticle, '1400/800')} fallbackSrc={buildArticleImageFallback(selectedArticle)} alt={selectedArticle.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" fallbackTitle={selectedArticle.title} fallbackBadge={selectedArticle.type === 'news' ? 'News' : selectedArticle.category || 'Blog'} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
+                        <SafeImage src={getArticleImage(selectedArticleForDisplay, '1400/800')} fallbackSrc={buildArticleImageFallback(selectedArticleForDisplay)} alt={selectedArticleForDisplay.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" fallbackTitle={selectedArticleForDisplay.title} fallbackBadge={selectedArticleForDisplay.type === 'news' ? 'News' : selectedArticleForDisplay.category || 'Blog'} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
                       </div>
                       <div className="mx-auto mt-8 max-w-4xl rounded-[2rem] border p-6 text-lg leading-9 shadow-[0_18px_50px_rgba(60,64,67,0.08)] backdrop-blur-2xl sm:p-8 lg:mt-10" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
                         <MarkdownContent
-                          content={selectedArticle.content}
+                          content={selectedArticleContent}
                           includeInArticleAd
                           articleWordCount={selectedArticleWordCount}
                           articleAdDisabled={selectedArticleAdDisabled}
                           listType={listType}
                         />
-                        {shouldShowPremiumLearningCta(selectedArticle) && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} listType={listType} />}
+                        {shouldShowPremiumLearningCta(selectedArticleForDisplay) && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} listType={listType} />}
                         <GoogleAd
                           variant="multiplex"
                           label="Related Content"
@@ -600,7 +625,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
             </div>
           </div>
 
-          {view === 'article' && selectedArticle && (
+          {view === 'article' && selectedArticleForDisplay && !articleReadingRewardDisabled && (
             <div className="absolute bottom-5 right-5 z-30 max-w-sm rounded-[1.5rem] border px-5 py-4 text-sm font-black shadow-[0_12px_40px_rgba(60,64,67,0.14)] backdrop-blur-2xl animate-fade-in-up" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>
               {rewardStatus === 'claimed' && <span className="text-emerald-700">🎉 +{economySettings.coinPerArticleRead} Coins Claimed!</span>}
               {rewardStatus === 'already' && <span style={{ color: chatPalette.linkText }}>✔️ Reward already claimed for this article</span>}

@@ -13,9 +13,10 @@ interface WishlistPageProps {
   onBuyNow: (product: ProductWithRating) => void;
   onClearWishlist: () => void;
   coupons: Coupon[];
+  purchasedProductIds?: number[];
 }
 
-const WishlistPage: React.FC<WishlistPageProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onNavigateToAllProducts, onAddToCart, onBuyNow, onClearWishlist, coupons }) => {
+const WishlistPage: React.FC<WishlistPageProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onNavigateToAllProducts, onAddToCart, onBuyNow, onClearWishlist, coupons, purchasedProductIds = [] }) => {
   const sectionRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -40,7 +41,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ settings, products, onViewP
     const currentGridRef = gridRef.current;
     if(currentGridRef) gridObserver.observe(currentGridRef);
 
-    return () => { 
+    return () => {
         if(currentRef) observer.unobserve(currentRef);
         if(currentGridRef) gridObserver.unobserve(currentGridRef);
     };
@@ -60,15 +61,15 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ settings, products, onViewP
         </div>
     );
   }
-    
+
   return (
     <section ref={sectionRef} className={`py-20 sm:py-24 bg-white/70 backdrop-blur-xl min-h-[60vh] ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
       <div className="container mx-auto px-6">
         <div className="text-center max-w-3xl mx-auto">
           <h2 className="text-3xl sm:text-4xl font-extrabold text-primary">My Wishlist</h2>
           {products.length > 0 && (
-             <button 
-                onClick={onClearWishlist} 
+             <button
+                onClick={onClearWishlist}
                 className="mt-4 text-sm text-red-500 font-semibold hover:underline"
               >
                 Clear All
@@ -79,10 +80,10 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ settings, products, onViewP
         <div ref={gridRef} className={`mt-16 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}>
           {products.length > 0 ? (
             products.map((product, index) => (
-              <ProductCard 
-                key={product.id} 
+              <ProductCard
+                key={product.id}
                 settings={settings}
-                product={product} 
+                product={product}
                 onViewDetails={(sectionId) => onViewProduct(product, sectionId)}
                 isWishlisted={wishlist.includes(product.id)}
                 onToggleWishlist={onToggleWishlist}
@@ -91,6 +92,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ settings, products, onViewP
                 animationDelay={index}
                 displayMode="wishlist"
                 coupons={coupons}
+                isPurchased={purchasedProductIds.includes(product.id)}
               />
             ))
           ) : (

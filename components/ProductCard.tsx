@@ -21,10 +21,10 @@ interface ProductCardProps {
 const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDetails, isWishlisted, onToggleWishlist, onAddToCart, animationDelay, displayMode = 'showcase', coupons, isPurchased = false }) => {
     // Use 'animate-child' class to hook into the parent's stagger logic.
     // The 'animate-delay-X' class comes from index.html CSS
-    const animationClass = settings.animations.enabled 
-        ? `animate-child animate-delay-${(animationDelay % 12) + 1}` 
+    const animationClass = settings.animations.enabled
+        ? `animate-child animate-delay-${(animationDelay % 12) + 1}`
         : '';
-    
+
     const displayImage = getProductImage(product, 'card');
     // Coupon availability logic
     const associatedCoupon = product.couponCode ? coupons.find(c => c.code === product.couponCode) : null;
@@ -39,8 +39,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
             expiryDate = new Date(year, month - 1, day);
             expiryDate.setHours(23, 59, 59, 999);
         } catch(e) { /* ignore invalid date */ }
-        
-        isCouponAvailable = 
+
+        isCouponAvailable =
             associatedCoupon.isActive &&
             associatedCoupon.timesUsed < associatedCoupon.usageLimit &&
             expiryDate >= today;
@@ -71,35 +71,38 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
 
                 {/* Badges */}
                 <div className="absolute left-2 top-2 z-20 flex max-w-[72%] flex-col items-start gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
-                    {isPurchased && (
+                    {isPurchased ? (
                         <span className="w-fit rounded-full bg-[#059669] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(5,150,105,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs">
                             Purchased
                         </span>
-                    )}
-                    {product.isFree && (
-                        <span className="w-fit rounded-full bg-gradient-to-r from-[#0757d8] to-[#6d28d9] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(37,99,235,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs">
-                            Free
-                        </span>
-                    )}
-                    {isCouponAvailable && product.couponCode && !product.isFree && settings.features.showSaleBadges && (
-                        <button 
-                            onClick={(e) => { e.stopPropagation(); onViewDetails('price-section'); }} 
-                            className="w-fit rounded-full bg-[#6d28d9] px-3.5 py-1.5 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(109,40,217,0.45)] ring-2 ring-white/95 backdrop-blur-md transition-transform hover:scale-105 [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs"
-                            title={`Use coupon ${product.couponCode}`}
-                        >
-                            {product.couponCode}
-                        </button>
-                    )}
-                    {!product.isFree && product.salePrice && settings.features.showSaleBadges && (
-                        <span className="w-fit rounded-full bg-[#e11d48] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(225,29,72,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs">
-                            Sale
-                        </span>
+                    ) : (
+                        <>
+                            {product.isFree && (
+                                <span className="w-fit rounded-full bg-gradient-to-r from-[#0757d8] to-[#6d28d9] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(37,99,235,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs">
+                                    Free
+                                </span>
+                            )}
+                            {isCouponAvailable && product.couponCode && !product.isFree && settings.features.showSaleBadges && (
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); onViewDetails('price-section'); }}
+                                    className="w-fit rounded-full bg-[#6d28d9] px-3.5 py-1.5 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(109,40,217,0.45)] ring-2 ring-white/95 backdrop-blur-md transition-transform hover:scale-105 [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs"
+                                    title={`Use coupon ${product.couponCode}`}
+                                >
+                                    {product.couponCode}
+                                </button>
+                            )}
+                            {!product.isFree && product.salePrice && settings.features.showSaleBadges && (
+                                <span className="w-fit rounded-full bg-[#e11d48] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(225,29,72,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs">
+                                    Sale
+                                </span>
+                            )}
+                        </>
                     )}
                 </div>
 
                 {/* Wishlist Button */}
                 {settings.features.showFavourites && (
-                    <button 
+                    <button
                         onClick={(e) => { e.stopPropagation(); onToggleWishlist(product.id); }}
                         className="absolute right-2 top-2 z-30 rounded-full bg-white/90 p-2 text-slate-600 shadow-sm backdrop-blur transition-all duration-200 hover:scale-110 hover:bg-white hover:text-red-500 sm:right-3 sm:top-3"
                         aria-label={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
@@ -120,7 +123,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                             {product.rating.toFixed(1)} <span className="text-slate-600">({product.reviewCount})</span>
                         </div>
                     )}
-                    {product.category && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-800 ring-1 ring-slate-200">{product.category}</span>}
+                    {!isPurchased && product.category && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-800 ring-1 ring-slate-200">{product.category}</span>}
                 </div>
 
                 <h3 className="mb-2 line-clamp-2 text-base font-bold leading-tight text-gray-900 transition-colors group-hover:text-primary sm:text-lg" title={product.title}>
@@ -159,14 +162,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                     </div>
                 ) : (
                     <div className="mt-4 flex gap-2">
-                        <button 
+                        <button
                             disabled={isPurchased}
-                            onClick={() => onAddToCart(product.id, 1)} 
+                            onClick={() => onAddToCart(product.id, 1)}
                             className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-2 rounded-lg hover:bg-opacity-90 transition-colors text-sm shadow-sm active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
                         >
                             {isPurchased ? 'Purchased' : 'Move to Cart'}
                         </button>
-                        <button 
+                        <button
                             onClick={() => onToggleWishlist(product.id)}
                             className="px-3 py-2 border border-gray-200 text-slate-600 rounded-lg hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors"
                             title="Remove from Wishlist"

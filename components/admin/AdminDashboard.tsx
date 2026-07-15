@@ -224,9 +224,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
             <div
                 data-admin-shell="SHIPNOW_ADMIN_SHELL_V1"
-                className="admin-mobile-scope tagmaster-admin-theme h-[100dvh] min-h-[100dvh] w-full max-w-full overflow-hidden bg-[#f4e7e6] font-sans md:p-5 lg:p-7"
+                className="admin-mobile-scope tagmaster-admin-theme h-[100dvh] min-h-[100dvh] w-full max-w-full overflow-hidden bg-[#fbfbfb] p-0 font-sans"
             >
-                <div className="mx-auto flex h-full w-full max-w-[1540px] overflow-hidden bg-[#fbfbfb] shadow-[0_24px_70px_rgba(113,71,74,0.13)] md:rounded-[24px] md:border md:border-white/80">
+                <div className="flex h-full w-full max-w-none overflow-hidden border-0 bg-[#fbfbfb] shadow-none">
                     <Sidebar
                         onNavigate={setCurrentView}
                         onSwitchToHome={props.onSwitchToHome}
@@ -277,8 +277,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                             </header>
                         )}
 
-                        <main className={`shipnow-admin-content shipnow-admin-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#fbfbfb] ${isProductEditorShellOpen ? 'p-0' : 'p-3 sm:p-5 md:p-6 lg:p-8'}`}>
-                            <div className={isProductEditorShellOpen ? 'w-full max-w-none' : 'mx-auto w-full max-w-[1380px]'}>
+                        <main className={`shipnow-admin-content shipnow-admin-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#fbfbfb] ${isProductEditorShellOpen ? 'p-0' : 'p-0'}`}>
+                            <div className={isProductEditorShellOpen ? 'w-full max-w-none' : 'w-full max-w-none'}>
                                 {currentView === 'analytics' ? renderView() : (
                                     <div
                                         data-admin-view={currentView}

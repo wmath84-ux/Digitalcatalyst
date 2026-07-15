@@ -16,9 +16,10 @@ interface FeaturedProductsProps {
   coupons: Coupon[];
   variant?: 'default' | 'mobileHome';
   subtitle?: string;
+  purchasedProductIds?: number[];
 }
 
-const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, bgColor = 'bg-background', coupons, variant = 'default', subtitle }) => {
+const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, bgColor = 'bg-background', coupons, variant = 'default', subtitle, purchasedProductIds = [] }) => {
   const sectionRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
 
@@ -37,7 +38,7 @@ const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, pr
             });
         },
         // rootMargin bottom 600px: triggers when element is within 600px BELOW the viewport
-        { threshold: 0, rootMargin: "0px 0px 600px 0px" } 
+        { threshold: 0, rootMargin: "0px 0px 600px 0px" }
     );
 
     const headerEl = sectionRef.current?.querySelector('[data-featured-header]');
@@ -55,7 +56,7 @@ const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, pr
         clearTimeout(failsafe);
     };
   }, []);
-  
+
   if (!products || products.length === 0) return null;
 
   const isMobileHome = variant === 'mobileHome';
@@ -72,7 +73,7 @@ const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, pr
     : `grid grid-cols-1 gap-5 sm:gap-8 md:grid-cols-2 lg:grid-cols-3 lg:gap-10 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`;
 
   return (
-    <section 
+    <section
       ref={sectionRef}
       className={`${sectionPadding} ${bgColor}`}
     >
@@ -86,16 +87,16 @@ const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, pr
           )}
           <div className={accentClassName}></div>
         </div>
-        
-        <div 
-            ref={gridRef} 
+
+        <div
+            ref={gridRef}
             className={productListClassName}
         >
           {products.map((product, index) => (
             <div key={product.id} className={isMobileHome && products.length > 1 ? 'w-[82%] max-w-sm shrink-0 snap-start sm:w-auto sm:max-w-none' : undefined}>
-              <ProductCard 
+              <ProductCard
                 settings={settings}
-                product={product} 
+                product={product}
                 onViewDetails={(sectionId) => onViewProduct(product, sectionId)}
                 isWishlisted={wishlist.includes(product.id)}
                 onToggleWishlist={onToggleWishlist}
@@ -103,6 +104,7 @@ const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, pr
                 onBuyNow={onBuyNow}
                     animationDelay={index}
                 coupons={coupons}
+                isPurchased={purchasedProductIds.includes(product.id)}
               />
             </div>
           ))}

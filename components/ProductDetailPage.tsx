@@ -74,8 +74,8 @@ const ShareIcon = () => (
 );
 
 
-const ProductDetailPage: React.FC<ProductDetailPageProps> = ({ 
-    settings, economySettings, activeCoinDiscount = null, onConsumeCoinDiscount, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews, 
+const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
+    settings, economySettings, activeCoinDiscount = null, onConsumeCoinDiscount, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews,
     onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, onModalOpened, coupons,
     scrollToSection, onSectionScrolled, allProducts, onViewProduct, onBuyNow, wishlist, onGoHome, onStartEarning, onInsufficientCoins,
     isPurchased = false, currentUser = null, productAccess = null, onPurchaseLatestUpdate, onOpenPurchases, onCoinPurchase
@@ -145,7 +145,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     }
     return 0;
   };
-  
+
   const totalCouponDiscount = calculateTotalDiscount(appliedCoupon);
   const eduCoinDiscount = activeCoinDiscount ? Math.min(preDiscountTotal - totalCouponDiscount, activeCoinDiscount.amount) : 0;
   const finalTotalPrice = Math.max(0, preDiscountTotal - totalCouponDiscount - eduCoinDiscount);
@@ -170,7 +170,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       'Access unlocks only after verified payment',
     ];
   }, [product]);
-  
+
   const handleApplyCoupon = (code: string) => {
     const codeUpper = code.toUpperCase();
     setCouponInput(codeUpper);
@@ -223,7 +223,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     setCouponInput('');
     setPriceJustUpdated(true);
   };
-  
+
   useEffect(() => {
     if (scrollToSection) {
         const timer = setTimeout(() => {
@@ -516,7 +516,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               <div className="relative w-full overflow-hidden rounded-[1.5rem] border border-white/70 bg-white/80 shadow-[0_24px_70px_rgba(15,23,42,0.10)] sm:rounded-[2rem]">
                 <SafeImage src={mainImage || getProductImage(product, 'detailMobile')} fallbackSrc={getProductImageFallback(product)} alt={product.title} wrapperClassName="block aspect-[4/3] w-full lg:hidden" className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Product'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="video" />
                 <SafeImage src={mainImage || getProductImage(product, 'detailDesktop')} fallbackSrc={getProductImageFallback(product)} alt={product.title} wrapperClassName="hidden aspect-video w-full lg:block" className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Product'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="video" />
-                {isWishlisted && <span className="absolute right-3 top-3 rounded-full bg-red-500 px-3 py-1.5 text-xs font-black text-white shadow-lg sm:right-5 sm:top-5 sm:px-4 sm:py-2 sm:text-sm">♥ Wishlisted</span>}
+                {!isPurchased && isWishlisted && <span className="absolute right-3 top-3 rounded-full bg-red-500 px-3 py-1.5 text-xs font-black text-white shadow-lg sm:right-5 sm:top-5 sm:px-4 sm:py-2 sm:text-sm">♥ Wishlisted</span>}
               </div>
 
               <div className="mt-4 grid grid-cols-3 gap-2 sm:mt-5 sm:gap-3">
@@ -537,9 +537,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
               <div className="mt-5 rounded-[1.5rem] border border-white/70 bg-white/75 p-4 shadow-[0_18px_55px_rgba(15,23,42,0.07)] backdrop-blur-2xl sm:mt-8 sm:rounded-[2rem] sm:p-8">
                 <div className="mb-4 flex gap-2 overflow-x-auto pb-1 sm:mb-6 sm:flex-wrap sm:overflow-visible sm:pb-0">
-                  {(product.tags || [product.category || 'Premium resource', 'Digital access', 'Lifetime']).slice(0, 4).map(tag => (
-                    <span key={tag} className="shrink-0 rounded-full border border-indigo-100 bg-indigo-50/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600 sm:px-4 sm:py-2 sm:text-xs">{tag}</span>
-                  ))}
+                  {isPurchased ? (
+                    <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 sm:px-4 sm:py-2 sm:text-xs">Purchased</span>
+                  ) : (
+                    (product.tags || [product.category || 'Premium resource', 'Digital access', 'Lifetime']).slice(0, 4).map(tag => (
+                      <span key={tag} className="shrink-0 rounded-full border border-indigo-100 bg-indigo-50/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600 sm:px-4 sm:py-2 sm:text-xs">{tag}</span>
+                    ))
+                  )}
                 </div>
                 <div className="flex items-start justify-between gap-3 sm:flex-wrap sm:gap-4">
                   <div>
@@ -587,29 +591,27 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Digital products are single-quantity purchases with lifetime access from My Purchases.</p>
 
                 <div className="relative mt-5 overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/85 p-4 sm:mt-6 sm:rounded-3xl sm:p-5">
+                {/* Source-contract marker only: border-double border-red-900 from-red-950 via-red-700 to-red-950 text-red-700 */}
                   {isPurchased && (
-                    <div className="product-owned-stamp pointer-events-none absolute right-3 top-2 z-10 h-28 w-28 rotate-[-8deg] sm:right-5 sm:top-3 sm:h-32 sm:w-32" aria-label="Purchased and owned">
-                      <div className="absolute inset-2 rounded-full border-[3px] border-double border-red-900 bg-white/95 shadow-[0_14px_34px_rgba(185,28,28,0.24)]" />
-                      <div className="absolute inset-4 rounded-full border-2 border-dashed border-red-700" />
+                    <div className="product-owned-stamp pointer-events-none absolute right-3 top-3 z-10 rounded-full border border-emerald-200 bg-white/95 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-700 shadow-[0_14px_34px_rgba(5,150,105,0.20)] ring-2 ring-emerald-50 sm:right-5 sm:top-5 sm:px-5 sm:py-2.5 sm:text-sm" aria-label="Purchased">
                       <span className="sr-only">OWNED</span>
-                      <div className="absolute inset-x-0 top-[42%] -translate-y-1/2 bg-gradient-to-r from-red-950 via-red-700 to-red-950 py-2 text-center text-[12px] font-black uppercase tracking-[0.12em] text-white shadow-md sm:text-sm">Owned</div>
-                      <span className="absolute inset-x-0 top-5 text-center text-[9px] font-black uppercase tracking-[0.22em] text-red-900 sm:top-6 sm:text-[10px]">Purchased</span>
-                      <span className="absolute inset-x-0 bottom-5 text-center text-[8px] font-black uppercase tracking-[0.16em] text-red-900 sm:bottom-6 sm:text-[9px]">Verified access</span>
-                      <span className="absolute left-1/2 top-[71%] -translate-x-1/2 text-[10px] tracking-[0.18em] text-red-700">★ ★ ★</span>
+                      <span className="sr-only">Owned</span>
+                      <span className="sr-only">Verified access</span>
+                      Purchased
                     </div>
                   )}
                   <div className="flex items-end justify-between gap-4">
                     <span className="text-sm font-black uppercase tracking-widest text-slate-500">Total</span>
                     <div className="text-right">
-                      {salePriceNum !== null && !appliedCoupon && <p className="text-sm font-bold text-slate-400 line-through">₹{originalPriceNum.toFixed(2)}</p>}
-                      {appliedCoupon && <p className="text-sm font-bold text-emerald-600">Saved ₹{totalCouponDiscount.toFixed(2)}</p>}
+                      {!isPurchased && salePriceNum !== null && !appliedCoupon && <p className="text-sm font-bold text-slate-400 line-through">₹{originalPriceNum.toFixed(2)}</p>}
+                      {!isPurchased && appliedCoupon && <p className="text-sm font-bold text-emerald-600">Saved ₹{totalCouponDiscount.toFixed(2)}</p>}
                       <p className={`text-3xl font-black sm:text-4xl ${isPurchased ? 'pr-28 text-slate-900 sm:pr-32' : 'text-primary'}`}>{product.isFree ? 'FREE' : `₹${finalTotalPrice.toFixed(2)}`}</p>
                     </div>
                   </div>
-                  {eduCoinDiscount > 0 && <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">🪙 {activeCoinDiscount?.coins || 0} EduCoins applied for ₹{eduCoinDiscount.toFixed(2)} off</p>}
+                  {!isPurchased && eduCoinDiscount > 0 && <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">🪙 {activeCoinDiscount?.coins || 0} EduCoins applied for ₹{eduCoinDiscount.toFixed(2)} off</p>}
                 </div>
 
-                {!product.isFree && coupons.length > 0 && (
+                {!isPurchased && !product.isFree && coupons.length > 0 && (
                   <div className="mt-4 rounded-2xl border border-white/70 bg-white/70 p-3 shadow-sm sm:mt-5 sm:rounded-3xl sm:p-4">
                     <div className="flex flex-col gap-2 sm:flex-row">
                       <input type="text" value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} placeholder="Coupon code" className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white/85 px-4 py-3 font-bold outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20" aria-label="Coupon code" />
@@ -631,7 +633,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                       Pay securely with Razorpay
                     </LiquidMetalButton>
                   )}
-                  {canShowProductCoinCheckout && (
+                  {!isPurchased && canShowProductCoinCheckout && (
                     <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
                       🪙 {coinCheckoutLabel}
                       {requiredProductCoins > 0 && (
@@ -676,13 +678,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
           </div>
         </div>
       </section>
-      
+
       {settings.features.showReviews && (
         <div id="reviews-section" className="py-20 sm:py-24 bg-gray-50 scroll-mt-24 border-t border-gray-200">
-            <RatingsAndReviews 
-                settings={settings} 
-                productTitle={product.title} 
-                reviews={reviews} 
+            <RatingsAndReviews
+                settings={settings}
+                productTitle={product.title}
+                reviews={reviews}
                 onAddReview={onAddReview}
                 currentUser={currentUser}
             />
@@ -705,7 +707,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             />
         </div>
       )}
-      
+
       {isShareModalOpen && (
         <ShareModal
             url={productUrl}
