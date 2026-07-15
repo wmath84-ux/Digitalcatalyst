@@ -10,6 +10,8 @@ export interface PaymentVerificationDetails {
   razorpayPaymentId?: string;
   amount: number;
   currency: 'INR';
+  recovered?: boolean;
+  recoveryStatus?: 'handler' | 'dismiss' | 'focus' | 'manual' | 'mount';
 }
 
 interface PaymentModalProps {
@@ -44,6 +46,18 @@ interface PaymentModalProps {
 
 type CheckoutStep = 'checkout' | 'razorpay' | 'loading';
 
+interface PendingCheckoutSession {
+  id: string;
+  orderId?: string;
+  amount: number;
+  checkoutType: PaymentModalProps['checkoutType'];
+  checkoutUserId?: string;
+  checkoutTargetId?: string | number;
+  productTitle?: string;
+  billingCycle?: 'monthly' | 'yearly';
+  createdAt: number;
+}
+
 const PaymentModal: React.FC<PaymentModalProps> = ({
   economySettings = DEFAULT_ECONOMY_SETTINGS,
   productTitle,
@@ -77,7 +91,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const [showCoinGuide, setShowCoinGuide] = useState(initialShowCoinGuide);
   const pageRef = useRef<HTMLDivElement>(null);
   const autoStartedRazorpayRef = useRef(false);
+  const pendingStatusCheckRef = useRef(false);
   const razorpayCheckoutSource = 'https://checkout.razorpay.com/v1/checkout.js';
+  const checkoutStorageKey = useMemo(
+    () => `dc_pending_checkout:${checkoutUserId || 'guest'}:${checkoutType}:${String(checkoutTargetId || productTitle || 'checkout')}:${billingCycle || 'na'}`,
+    [billingCycle, checkoutTargetId, checkoutType, checkoutUserId, productTitle]
+  );
   const isCartMode = !!cartItems && cartItems.length > 0;
   const eduCoinBalance = Math.max(0, Math.floor(Number((currentUser as (User & { coinBalance?: number }) | null | undefined)?.coinBalance ?? currentUser?.eduCoins ?? 0)));
   const coinEligibility = normalizeCoinPrice(coinPrice);
@@ -116,6 +135,101 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const closeAfterStateSettles = () => {
     window.setTimeout(() => onClose(), 100);
+  };
+
+  const readPendingCheckout = (): PendingCheckoutSession | null => {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(checkoutStorageKey) || 'null');
+      if (!parsed || typeof parsed !== 'object') return null;
+      const createdAt = Number(parsed.createdAt || 0);
+      if (!createdAt || Date.now() - createdAt > 1000 * 60 * 45) {
+        localStorage.removeItem(checkoutStorageKey);
+        return null;
+      }
+      return {
+        id: String(parsed.id || ''),
+        orderId: parsed.orderId ? String(parsed.orderId) : undefined,
+        amount: Number(parsed.amount || 0),
+        checkoutType: parsed.checkoutType || checkoutType,
+        checkoutUserId: parsed.checkoutUserId ? String(parsed.checkoutUserId) : checkoutUserId,
+        checkoutTargetId: parsed.checkoutTargetId,
+        productTitle: parsed.productTitle ? String(parsed.productTitle) : productTitle,
+        billingCycle: parsed.billingCycle === 'yearly' ? 'yearly' : parsed.billingCycle === 'monthly' ? 'monthly' : billingCycle,
+        createdAt,
+      };
+    } catch {
+      return null;
+    }
+  };
+
+  const savePendingCheckout = (session: PendingCheckoutSession) => {
+    try {
+      localStorage.setItem(checkoutStorageKey, JSON.stringify(session));
+    } catch {
+      // Ignore storage failures; checkout can still complete through the live handler.
+    }
+  };
+
+  const clearPendingCheckout = () => {
+    try {
+      localStorage.removeItem(checkoutStorageKey);
+    } catch {
+      // Ignore storage cleanup failures.
+    }
+  };
+
+  const reconcilePendingCheckout = async (orderId: string, source: PaymentVerificationDetails['recoveryStatus'] = 'manual') => {
+    if (!orderId || pendingStatusCheckRef.current) return false;
+    pendingStatusCheckRef.current = true;
+    setIsCompleting(true);
+    setCheckoutStep('loading');
+    setCoinStatus('Checking live payment status...');
+
+    try {
+      const statusResponse = await fetch('/api/razorpay/payment-status', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ orderId, expectedAmount: finalPrice }),
+      });
+      const statusData = await statusResponse.json().catch(() => ({}));
+      if (!statusResponse.ok) throw new Error(statusData?.error || 'Could not fetch payment status.');
+
+      if (statusData?.status === 'paid' && statusData?.amountMatches !== false) {
+        clearPendingCheckout();
+        await onConfirm({
+          provider: 'razorpay',
+          status: 'verified',
+          razorpayOrderId: String(statusData.orderId || orderId),
+          razorpayPaymentId: String(statusData.paymentId || ''),
+          amount: finalPrice,
+          currency: 'INR',
+          recovered: source !== 'handler',
+          recoveryStatus: source,
+        });
+        closeAfterStateSettles();
+        return true;
+      }
+
+      if (statusData?.status === 'amount_mismatch') {
+        setCoinStatus('Payment detected, but the amount does not match this checkout. Access was not unlocked. Please contact support with the Razorpay payment id.');
+      } else if (statusData?.status === 'failed') {
+        setCoinStatus(statusData?.error || 'Payment failed or was cancelled. No access was unlocked.');
+        clearPendingCheckout();
+      } else {
+        setCoinStatus('Payment not completed yet. No access was unlocked. You can retry or check status again.');
+      }
+
+      setCheckoutStep('razorpay');
+      setIsCompleting(false);
+      return false;
+    } catch (error) {
+      setCoinStatus(error instanceof Error ? error.message : 'Payment status check failed.');
+      setCheckoutStep('razorpay');
+      setIsCompleting(false);
+      return false;
+    } finally {
+      pendingStatusCheckRef.current = false;
+    }
   };
 
   const completeFreeCheckout = async () => {
@@ -158,12 +272,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
     try {
       await loadRazorpayCheckout();
+      const checkoutReceipt = `${checkoutType}_${String(checkoutTargetId || 'checkout').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 16)}_${Date.now()}`.slice(0, 40);
       const orderResponse = await fetch('/api/razorpay/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           amount: finalPrice,
-          receipt: `${checkoutType}_${String(checkoutTargetId || 'checkout').replace(/[^a-zA-Z0-9_-]/g, '').slice(0, 16)}_${Date.now()}`.slice(0, 40),
+          receipt: checkoutReceipt,
           checkoutType,
           userId: checkoutUserId,
           targetId: checkoutTargetId,
@@ -174,6 +289,18 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       if (!orderResponse.ok || !orderData?.orderId || !orderData?.keyId) {
         throw new Error(orderData?.error || 'Could not create Razorpay order.');
       }
+
+      savePendingCheckout({
+        id: String(orderData.receipt || checkoutReceipt),
+        orderId: String(orderData.orderId),
+        amount: finalPrice,
+        checkoutType: checkoutType as NonNullable<PaymentModalProps['checkoutType']>,
+        checkoutUserId,
+        checkoutTargetId,
+        productTitle,
+        billingCycle,
+        createdAt: Date.now(),
+      });
 
       const RazorpayConstructor = (window as any).Razorpay;
       const razorpay = new RazorpayConstructor({
@@ -194,6 +321,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
             const verifyData = await verifyResponse.json().catch(() => ({}));
             if (!verifyResponse.ok || !verifyData?.verified) throw new Error(verifyData?.error || 'Payment verification failed.');
 
+            clearPendingCheckout();
             await onConfirm({
               provider: 'razorpay',
               status: 'verified',
@@ -201,6 +329,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
               razorpayPaymentId: verifyData.razorpayPaymentId || response.razorpay_payment_id,
               amount: finalPrice,
               currency: 'INR',
+              recovered: false,
+              recoveryStatus: 'handler',
             });
             closeAfterStateSettles();
           } catch (error) {
@@ -211,9 +341,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         },
         modal: {
           ondismiss: () => {
-            setCheckoutStep('razorpay');
-            setCoinStatus('Payment was cancelled. No access was unlocked.');
-            setIsCompleting(false);
+            void reconcilePendingCheckout(String(orderData.orderId), 'dismiss').then((unlocked) => {
+              if (!unlocked) {
+                setCheckoutStep('razorpay');
+                setIsCompleting(false);
+              }
+            });
           },
         },
         theme: { color: '#111827' },
@@ -227,10 +360,31 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   };
 
   useEffect(() => {
+    const pendingCheckout = readPendingCheckout();
+    if (pendingCheckout?.orderId && Math.abs(Number(pendingCheckout.amount || 0) - finalPrice) < 0.01) {
+      window.setTimeout(() => void reconcilePendingCheckout(pendingCheckout.orderId!, 'mount'), 250);
+      return;
+    }
+
     if (initialCheckoutStep !== 'razorpay' || autoStartedRazorpayRef.current) return;
     autoStartedRazorpayRef.current = true;
     window.setTimeout(() => handlePayNow(!razorpayAlreadyOpened), 0);
-  }, [initialCheckoutStep, razorpayAlreadyOpened]);
+  }, [checkoutStorageKey, finalPrice, initialCheckoutStep, razorpayAlreadyOpened]);
+
+  useEffect(() => {
+    const handleReturnToApp = () => {
+      const pendingCheckout = readPendingCheckout();
+      if (!pendingCheckout?.orderId || Math.abs(Number(pendingCheckout.amount || 0) - finalPrice) >= 0.01) return;
+      void reconcilePendingCheckout(pendingCheckout.orderId, 'focus');
+    };
+
+    window.addEventListener('focus', handleReturnToApp);
+    document.addEventListener('visibilitychange', handleReturnToApp);
+    return () => {
+      window.removeEventListener('focus', handleReturnToApp);
+      document.removeEventListener('visibilitychange', handleReturnToApp);
+    };
+  }, [checkoutStorageKey, finalPrice]);
 
   const handleFreeCheckout = async () => {
     await completeFreeCheckout();
@@ -359,6 +513,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       {summaryCard}
       <div className="grid gap-3">
         <button disabled={isCompleting} onClick={() => handlePayNow(false)} className="rounded-2xl bg-gradient-to-r from-emerald-500 to-cyan-500 px-5 py-3.5 text-sm font-black text-white shadow-[0_14px_40px_rgba(16,185,129,0.28)] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-base">Open verified Razorpay checkout</button>
+        {readPendingCheckout()?.orderId && (
+          <button disabled={isCompleting} onClick={() => { const pending = readPendingCheckout(); if (pending?.orderId) void reconcilePendingCheckout(pending.orderId, 'manual'); }} className="rounded-2xl border border-emerald-200 bg-white/90 px-5 py-3.5 text-sm font-black text-emerald-700 shadow-sm transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-base">Check payment status</button>
+        )}
       </div>
       <button onClick={() => setCheckoutStep('checkout')} className="w-full rounded-2xl border border-white/70 bg-white/75 px-6 py-3 text-sm font-black text-slate-600 backdrop-blur-xl">Return to checkout options</button>
     </div>

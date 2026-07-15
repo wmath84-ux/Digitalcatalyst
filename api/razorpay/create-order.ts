@@ -11,8 +11,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const keySecret = process.env.RAZORPAY_KEY_SECRET;
   if (!keyId || !keySecret) return res.status(500).json({ ok: false, error: 'Razorpay server keys are not configured.' });
 
-  const amountRupees = Math.round(Number(req.body?.amount || 0));
-  if (!Number.isFinite(amountRupees) || amountRupees <= 0) {
+  const amountRupees = Number(req.body?.amount || 0);
+  const amountPaise = Math.round(amountRupees * 100);
+  if (!Number.isFinite(amountRupees) || !Number.isFinite(amountPaise) || amountPaise <= 0) {
     return res.status(400).json({ ok: false, error: 'Invalid checkout amount.' });
   }
 
@@ -22,7 +23,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     method: 'POST',
     headers: { Authorization: `Basic ${auth}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      amount: amountRupees * 100,
+      amount: amountPaise,
       currency: 'INR',
       receipt,
       payment_capture: 1,
@@ -38,5 +39,5 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   const data = await response.json().catch(() => ({} as any)) as any;
   if (!response.ok) return res.status(response.status).json({ ok: false, error: data?.error?.description || 'Could not create Razorpay order.' });
 
-  return res.status(200).json({ ok: true, keyId, orderId: data.id, amount: data.amount, currency: data.currency });
+  return res.status(200).json({ ok: true, keyId, orderId: data.id, amount: data.amount, currency: data.currency, receipt });
 }

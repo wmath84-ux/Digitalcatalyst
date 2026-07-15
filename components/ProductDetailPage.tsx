@@ -271,7 +271,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     }
     setOpenCoinGuideOnMount(false);
     setOpenRazorpayOnMount(true);
-    window.open(product.paymentLink || 'https://pages.razorpay.com/pl_RIfTCxnYj73xqE/view', '_blank');
     window.scrollTo(0, 0);
     setModalOpen(true);
   };
