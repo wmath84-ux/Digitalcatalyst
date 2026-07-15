@@ -149,6 +149,27 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const totalCouponDiscount = calculateTotalDiscount(appliedCoupon);
   const eduCoinDiscount = activeCoinDiscount ? Math.min(preDiscountTotal - totalCouponDiscount, activeCoinDiscount.amount) : 0;
   const finalTotalPrice = Math.max(0, preDiscountTotal - totalCouponDiscount - eduCoinDiscount);
+  const productFeatureUnlockDetails = React.useMemo(() => {
+    const featureDetails = (product.features || [])
+      .map(feature => String(feature || '').trim())
+      .filter(Boolean)
+      .slice(0, 8);
+
+    if (featureDetails.length > 0) {
+      return [
+        ...featureDetails,
+        'Lifetime access from My Purchases',
+        'Access unlocks only after verified payment',
+      ];
+    }
+
+    return [
+      'Complete product files and included learning content',
+      'Lifetime access from My Purchases',
+      'Future free improvements included with the owned product',
+      'Access unlocks only after verified payment',
+    ];
+  }, [product]);
   
   const handleApplyCoupon = (code: string) => {
     const codeUpper = code.toUpperCase();
@@ -425,13 +446,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         economySettings={economySettings}
         productTitle={product.title}
         productImage={mainImage || getProductImage(product, 'detailMobile')}
-        itemDescription={product.description || `Complete access to ${product.title} and all included digital content.`}
-        unlockDetails={[
-          'Complete product files and included learning content',
-          'Lifetime access from My Purchases',
-          'Future free improvements included with the owned product',
-          'Access unlocks only after verified payment',
-        ]}
+        itemDescription={product.description || product.longDescription || `Complete access to ${product.title} and all included digital content.`}
+        unlockDetails={productFeatureUnlockDetails}
         originalPrice={originalPriceNum * quantity}
         salePrice={salePriceNum !== null ? salePriceNum * quantity : null}
         couponDiscount={totalCouponDiscount}

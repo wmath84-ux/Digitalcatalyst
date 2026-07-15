@@ -1158,6 +1158,7 @@ const App: React.FC = () => {
   const [purchasedProductUpdateIds, setPurchasedProductUpdateIds] = useState<Record<string, string[]>>({});
   const [latestUpdateCheckout, setLatestUpdateCheckout] = useState<{ product: ProductWithRating; updateId?: string } | null>(null);
   const [subscriptionCheckoutRequest, setSubscriptionCheckoutRequest] = useState<{ plan: SubscriptionPlanConfig; billingCycle: SubscriptionBillingCycle; couponCode?: string | null } | null>(null);
+  const [purchaseCelebration, setPurchaseCelebration] = useState<{ title: string; message: string; icon: string; at: number } | null>(null);
   const [isAuthRestoring, setIsAuthRestoring] = useState(false);
   const [authRestoreError, setAuthRestoreError] = useState<string | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>('booting');
@@ -1213,6 +1214,12 @@ const App: React.FC = () => {
   const effectiveAppUser = currentUser || (effectiveFirebaseUser ? createFallbackUserFromFirebase(effectiveFirebaseUser) : null);
   const isLoggedIn = Boolean(effectiveFirebaseUser);
   const isAuthBooting = authStatus === 'booting' || authStatus === 'checking-session' || isRedirectResultPending;
+
+  useEffect(() => {
+    if (!purchaseCelebration) return;
+    const timer = window.setTimeout(() => setPurchaseCelebration(null), 5200);
+    return () => window.clearTimeout(timer);
+  }, [purchaseCelebration]);
 
   const readEduCoinBalance = (user?: Partial<User> | null) =>
     Math.max(0, Math.floor(Number(user?.coinBalance ?? user?.eduCoins ?? 0)));
@@ -2235,6 +2242,10 @@ const App: React.FC = () => {
       const safeAppliedCoins = Math.min(liveCartCoinBalance, Math.max(0, appliedCoins), Math.floor(afterCoupon * eduCoinRedeemRate));
       const coinDiscount = Math.min(afterCoupon, safeAppliedCoins / eduCoinRedeemRate);
       const finalPrice = Math.max(0, afterCoupon - coinDiscount);
+      if (!isCheckoutUnlockVerified(finalPrice, payment)) {
+        blockUnverifiedPaymentUnlock('Cart checkout');
+        return;
+      }
       if (safeAppliedCoins > 0) {
         const coinsDebited = await deductEduCoinsAtomically(safeAppliedCoins, {
           source: 'Checkout discount',
@@ -2303,8 +2314,7 @@ const App: React.FC = () => {
       setAppliedCartCoupon(null);
       setCartCouponError(null);
       setApplyCartEduCoins(false);
-      setCurrentView('congratulations');
-      window.scrollTo(0, 0);
+      showPurchasePageCelebration('Purchase complete', 'Your cart items are unlocked and ready in My Purchases.');
   };
 
   const cartDetails = cart.map(item => {
@@ -3232,6 +3242,30 @@ const App: React.FC = () => {
     paymentVerified: payment?.status === 'verified' || payment?.status === 'free',
   });
 
+  const isCheckoutUnlockVerified = (finalPayable: number, payment?: PaymentVerificationDetails): boolean => {
+    const payable = Math.max(0, Number(finalPayable) || 0);
+    if (payable <= 0) return payment?.status === 'free' || payment?.status === 'verified';
+    return payment?.provider === 'razorpay'
+      && payment.status === 'verified'
+      && Boolean(payment.razorpayOrderId)
+      && Boolean(payment.razorpayPaymentId);
+  };
+
+  const blockUnverifiedPaymentUnlock = (context: string) => {
+    setInfoModal({
+      title: 'Payment not verified',
+      message: `${context} was not unlocked because payment was not verified as successful. If money was deducted, tap “Check payment status” on the checkout page before retrying.`,
+      icon: '🛡️',
+    });
+  };
+
+  const showPurchasePageCelebration = useCallback((title: string, message: string, icon = '🎉') => {
+    setPurchaseCelebration({ title, message, icon, at: Date.now() });
+    setCurrentView('myPurchases');
+    setSelectedProduct(null);
+    window.scrollTo(0, 0);
+  }, []);
+
   const getExpiredSubscriptionPromptKey = (userId: string, expiresAt?: string) => `expired_subscription_repurchase_${userId}_${expiresAt || 'unknown'}`;
 
   const readExpiredSubscriptionPrompt = (key: string): { remainingSessions: number; lastSeenSessionId?: string; planName?: string; billingCycle?: SubscriptionBillingCycle; expiresAt?: string } | null => {
@@ -3683,6 +3717,10 @@ const App: React.FC = () => {
         }
         const coinDiscount = activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? Math.min(preDiscountTotal - finalDiscount, activeCoinDiscount.amount) : 0;
         const robustFinalPrice = Math.max(0, preDiscountTotal - finalDiscount - coinDiscount);
+        if (!isCheckoutUnlockVerified(robustFinalPrice, payment)) {
+          blockUnverifiedPaymentUnlock(selectedProduct.title);
+          return;
+        }
         if (activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id && activeCoinDiscount.coins > 0) {
           const coinsDebited = await deductEduCoinsAtomically(activeCoinDiscount.coins, {
             source: 'Profile coin claim',
@@ -3749,8 +3787,7 @@ const App: React.FC = () => {
         updateCouponUsage(appliedCouponCode);
     }
     setCart([]); // Clear cart after single product purchase
-    setCurrentView('congratulations');
-    window.scrollTo(0, 0);
+    showPurchasePageCelebration('Purchase complete', `${selectedProduct?.title || 'Your product'} is unlocked and ready in My Purchases.`);
   };
 
   const completeProductUnlock = async (product: ProductWithRating, quantity: number, totalLabel: string, status: Order['status'] = 'Completed') => {
@@ -3786,9 +3823,7 @@ const App: React.FC = () => {
         paymentLabel: 'EduCoin wallet purchase',
       },
     });
-    setSelectedProduct(product);
-    setCurrentView('congratulations');
-    window.scrollTo(0, 0);
+    showPurchasePageCelebration('Product unlocked', `${product.title} is ready in My Purchases.`);
   };
 
   const handleProductCoinPurchase = async (
@@ -3887,8 +3922,7 @@ const App: React.FC = () => {
     setAppliedCartCoupon(null);
     setCartCouponError(null);
     setApplyCartEduCoins(false);
-    setCurrentView('congratulations');
-    window.scrollTo(0, 0);
+    showPurchasePageCelebration('Purchase complete', 'Your EduCoin cart purchase is unlocked and ready in My Purchases.');
     return true;
   };
 
@@ -4026,6 +4060,12 @@ const App: React.FC = () => {
       return;
     }
 
+    if (!isCheckoutUnlockVerified(summary.price, payment)) {
+      setLatestUpdateCheckout(null);
+      blockUnverifiedPaymentUnlock(summary.title);
+      return;
+    }
+
     const productKey = String(product.id);
     const nextUpdates = {
       ...purchasedProductUpdateIds,
@@ -4061,15 +4101,7 @@ const App: React.FC = () => {
     });
 
     setLatestUpdateCheckout(null);
-    setSelectedProduct(product);
-    setCurrentView('coursePlayer');
-    window.scrollTo(0, 0);
-
-    setInfoModal({
-      title: 'Paid content unlocked',
-      message: `${summary.title} is now available inside your course player.`,
-      icon: '✅',
-    });
+    showPurchasePageCelebration('Paid update unlocked', `${product.title} · ${summary.title} is ready in My Purchases.`);
   };
 
   const handleConfirmLatestUpdateCoinPurchase = async (product: ProductWithRating, updateId?: string): Promise<boolean> => {
@@ -4194,17 +4226,12 @@ const App: React.FC = () => {
       });
 
       setLatestUpdateCheckout(null);
-      setSelectedProduct(product);
-      setCurrentView('coursePlayer');
-      window.scrollTo(0, 0);
-
-      setInfoModal({
-        title: result.alreadyUnlocked ? 'Already unlocked' : 'Paid content unlocked',
-        message: result.alreadyUnlocked
-          ? `${summary.title} is already available inside your course player.`
-          : `${summary.title} is now unlocked with EduCoins.`,
-        icon: '✅',
-      });
+      showPurchasePageCelebration(
+        result.alreadyUnlocked ? 'Already unlocked' : 'Paid update unlocked',
+        result.alreadyUnlocked
+          ? `${product.title} · ${summary.title} is already available in My Purchases.`
+          : `${product.title} · ${summary.title} is unlocked and ready in My Purchases.`,
+      );
 
       return true;
     } catch (error) {
@@ -4247,7 +4274,7 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
-  const unlockSubscriptionPlan = (plan: SubscriptionPlanConfig, paymentLabel = 'Fiat checkout', billingCycle: SubscriptionBillingCycle = 'monthly') => {
+  const unlockSubscriptionPlan = (plan: SubscriptionPlanConfig, paymentLabel = 'Fiat checkout', billingCycle: SubscriptionBillingCycle = 'monthly', options: { silent?: boolean } = {}) => {
     if (!currentUser) return false;
     const requestedTier = inferPremiumTier(plan);
     const nextTier = getHigherSubscriptionTier(getUserSubscriptionTier(currentUser), requestedTier);
@@ -4276,7 +4303,7 @@ const App: React.FC = () => {
     }
     setPurchasedProductIds(newPurchasedIds);
     persistUserPurchasedProducts(newPurchasedIds);
-    setInfoModal({ title: 'Subscription active', message: `${plan.name} activated successfully via ${paymentLabel}.`, icon: '✅' });
+    if (!options.silent) setInfoModal({ title: 'Subscription active', message: `${plan.name} activated successfully via ${paymentLabel}.`, icon: '✅' });
     return true;
   };
 
@@ -4323,6 +4350,11 @@ const App: React.FC = () => {
     const coinDiscount = activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(plan.id) ? Math.min(planPrice - couponDiscount, activeCoinDiscount.amount) : 0;
     const finalPrice = Math.max(0, planPrice - couponDiscount - coinDiscount);
 
+    if (!isCheckoutUnlockVerified(finalPrice, payment)) {
+      blockUnverifiedPaymentUnlock(plan.name);
+      return;
+    }
+
     if (coinDiscount > 0 && activeCoinDiscount?.coins) {
       if (!deductEduCoins(activeCoinDiscount.coins, { source: 'Subscription EduCoin discount', description: `Applied ${activeCoinDiscount.coins} EduCoins for ₹${coinDiscount.toFixed(2)} subscription discount` })) return;
       setActiveCoinDiscount(null);
@@ -4337,7 +4369,7 @@ const App: React.FC = () => {
     if (coinDiscount > 0) paymentParts.push(`${activeCoinDiscount?.coins || 0} EduCoins`);
     paymentParts.push(billingCycle === 'yearly' ? 'yearly access' : 'monthly access');
     const paymentLabel = paymentParts.join(' + ');
-    if (!unlockSubscriptionPlan(plan, paymentLabel, billingCycle)) return;
+    if (!unlockSubscriptionPlan(plan, paymentLabel, billingCycle, { silent: true })) return;
     setSubscriptionCheckoutRequest(null);
     addGlobalOrder({
       id: `DC-SUB-${Date.now()}`,
@@ -4367,6 +4399,9 @@ const App: React.FC = () => {
         ...paymentVerificationBreakdown(payment),
       },
     });
+
+    setSubscriptionCheckoutRequest(null);
+    showPurchasePageCelebration('Subscription active', `${plan.name} ${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} is active. Your unlocked products are ready in My Purchases.`);
   };
 
   const handleActivateSubscriptionWithCoins = (plan: SubscriptionPlanConfig, billingCycle: SubscriptionBillingCycle = 'monthly') => {
@@ -5037,6 +5072,25 @@ const App: React.FC = () => {
               </div>
             )}
             <main key={currentView} className={`${websiteSettings.animations.enabled ? appleOpenClass : ''} ${currentView === 'home' ? 'mobile-app-home' : ''} ${currentView === 'allProducts' ? 'store-page-active' : ''}`}>{renderContent(effectiveAppUser)}</main>
+            {currentView === 'myPurchases' && purchaseCelebration && (
+              <div className="pointer-events-none fixed inset-0 z-[2600] flex items-start justify-center overflow-hidden px-4 pt-[calc(env(safe-area-inset-top)+4rem)]">
+                <div className="relative w-full max-w-md rounded-[2rem] border border-white/70 bg-white/90 p-5 text-center shadow-[0_30px_90px_rgba(15,23,42,0.22)] backdrop-blur-2xl animate-fade-in-up">
+                  <div className="absolute -left-10 -top-10 h-24 w-24 rounded-full bg-yellow-300/35 blur-2xl" />
+                  <div className="absolute -right-8 -top-8 h-24 w-24 rounded-full bg-fuchsia-400/25 blur-2xl" />
+                  <div className="relative">
+                    <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-gradient-to-br from-yellow-200 via-amber-100 to-white text-4xl shadow-inner">{purchaseCelebration.icon}</div>
+                    <div className="mt-4 flex justify-center gap-2 text-lg" aria-hidden="true">
+                      <span className="animate-bounce">✨</span>
+                      <span className="animate-pulse">🎊</span>
+                      <span className="animate-bounce [animation-delay:120ms]">✨</span>
+                    </div>
+                    <h2 className="mt-2 text-2xl font-black text-slate-950">{purchaseCelebration.title}</h2>
+                    <p className="mt-2 text-sm font-bold leading-6 text-slate-600">{purchaseCelebration.message}</p>
+                    <p className="mt-3 text-xs font-black uppercase tracking-[0.22em] text-emerald-700">Verified success</p>
+                  </div>
+                </div>
+              </div>
+            )}
             <div className="mobile-app-chrome"><InstallAppButton enabled={canShowInstallPrompt} /></div>
             {currentView === 'home' && (
               <div className={shouldHideFooterOnMobile ? 'max-md:hidden' : ''}>
@@ -5074,6 +5128,13 @@ const App: React.FC = () => {
               settings={websiteSettings}
               economySettings={economySettings}
               productTitle={`${subscriptionCheckoutRequest.plan.name} ${subscriptionCheckoutRequest.billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} Subscription`}
+              itemDescription={subscriptionCheckoutRequest.plan.description || `${subscriptionCheckoutRequest.plan.name} membership unlocks premium learning benefits.`}
+              unlockDetails={[
+                ...(subscriptionCheckoutRequest.plan.benefits || []),
+                ...(subscriptionCheckoutRequest.plan.unlockProductIds || []).map(id => productsWithRatings.find(product => product.id === id)?.title || `Product #${id}`),
+                `${subscriptionCheckoutRequest.billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} access cycle`,
+                `${subscriptionCheckoutRequest.plan.earningMultiplier}× EduCoin earning multiplier`,
+              ].filter(Boolean).slice(0, 10)}
               originalPrice={planPrice}
               salePrice={null}
               couponDiscount={couponDiscount}

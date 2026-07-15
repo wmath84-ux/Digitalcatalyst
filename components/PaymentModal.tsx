@@ -250,7 +250,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     if (existing) {
       await new Promise<void>((resolve, reject) => {
         existing.addEventListener('load', () => resolve(), { once: true });
-        existing.addEventListener('error', () => reject(new Error('Could not load Razorpay checkout.')), { once: true });
+        existing.addEventListener('error', () => reject(new Error('Payment app/window could not load. Check your internet connection, disable blocking extensions, then retry.')), { once: true });
       });
       return;
     }
@@ -259,9 +259,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       script.src = razorpayCheckoutSource;
       script.async = true;
       script.onload = () => resolve();
-      script.onerror = () => reject(new Error('Could not load Razorpay checkout.'));
+      script.onerror = () => reject(new Error('Payment app/window could not load. Check your internet connection, disable blocking extensions, then retry.'));
       document.body.appendChild(script);
     });
+
+    if (!(window as any).Razorpay) {
+      throw new Error('Payment app/window is not available on this browser right now. Please retry, switch browser, or use another payment method.');
+    }
   };
 
   const handlePayNow = async (_openRazorpayWindow = true) => {
@@ -309,13 +313,23 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       });
 
       const RazorpayConstructor = (window as any).Razorpay;
+      if (typeof RazorpayConstructor !== 'function') {
+        throw new Error('Payment app/window is not available on this browser right now. Please retry, switch browser, or use another payment method.');
+      }
+
+      const normalizedMobile = String(currentUser?.mobile || '').replace(/\D/g, '').slice(-10);
       const razorpay = new RazorpayConstructor({
         key: orderData.keyId,
         order_id: orderData.orderId,
         amount: orderData.amount,
         currency: orderData.currency || 'INR',
         name: 'Digital Catalyst',
-        description: productTitle || 'Secure checkout',
+        description: primaryItemTitle || productTitle || 'Secure checkout',
+        prefill: {
+          name: currentUser?.name || '',
+          email: currentUser?.email || '',
+          ...(normalizedMobile ? { contact: `+91${normalizedMobile}` } : {}),
+        },
         handler: async (response: Record<string, string>) => {
           try {
             setCoinStatus('Verifying payment signature...');
@@ -341,23 +355,43 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
             closeAfterStateSettles();
           } catch (error) {
             setCheckoutStep('razorpay');
-            setCoinStatus(error instanceof Error ? error.message : 'Payment verification failed.');
+            setCoinStatus(error instanceof Error ? error.message : 'Payment verification failed. Access was not unlocked.');
             setIsCompleting(false);
           }
         },
         modal: {
+          confirm_close: true,
+          escape: true,
+          handleback: true,
           ondismiss: () => {
             void reconcilePendingCheckout(String(orderData.orderId), 'dismiss').then((unlocked) => {
               if (!unlocked) {
                 setCheckoutStep('razorpay');
+                setCoinStatus('Payment window was closed/cancelled or the payment app was not available. No access was unlocked. If money was deducted, tap “Check payment status”.');
                 setIsCompleting(false);
               }
             });
           },
         },
+        retry: { enabled: true },
         theme: { color: '#111827' },
       });
-      razorpay.open();
+
+      if (typeof razorpay.on === 'function') {
+        razorpay.on('payment.failed', (response: any) => {
+          const description = response?.error?.description || response?.error?.reason || 'Payment failed or was cancelled. No access was unlocked.';
+          setCheckoutStep('razorpay');
+          setCoinStatus(description);
+          setIsCompleting(false);
+        });
+      }
+
+      try {
+        razorpay.open();
+        setCoinStatus('Razorpay checkout opened. Complete the payment in the selected app/window.');
+      } catch (openError) {
+        throw new Error(openError instanceof Error ? openError.message : 'Payment app/window could not open. Please check that a payment app/browser is available and retry.');
+      }
     } catch (error) {
       setCheckoutStep('razorpay');
       setCoinStatus(error instanceof Error ? error.message : 'Payment setup failed.');
