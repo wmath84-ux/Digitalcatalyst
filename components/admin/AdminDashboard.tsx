@@ -16,7 +16,6 @@ import WebsiteSettingsComponent from './WebsiteSettings';
 import AdminManagement from './AdminManagement';
 import NewsBlogManagement from './NewsBlogManagement';
 import CoinEconomyManagement from './CoinEconomyManagement';
-import EduCoinRewardSettings from './EduCoinRewardSettings';
 import NewsletterSubscribers from './NewsletterSubscribers';
 import AdminPostManagement from './AdminPostManagement';
 import AdminOverview from './AdminOverview';
@@ -45,11 +44,10 @@ interface AdminDashboardProps {
     onTicketsUpdate: (tickets: SupportTicket[]) => void;
     onSubscribersUpdate: (subscribers: NewsletterSubscriber[]) => void;
     onWebsiteSettingsChange: (settings: WebsiteSettings) => Promise<boolean>;
-    onLogout: () => void;
     onSwitchToHome: () => void;
 }
 
-export type AdminView = 'dashboard' | 'firebaseAdmin' | 'adminPosts' | 'economy' | 'rewardSettings' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'subscribers' | 'analytics' | 'websiteSettings';
+export type AdminView = 'dashboard' | 'firebaseAdmin' | 'adminPosts' | 'economy' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'subscribers' | 'analytics' | 'websiteSettings';
 
 const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?: string; icon: React.ReactNode; gradient: string }> = ({ title, value, subtitle, icon, gradient }) => (
     <div className={`relative overflow-hidden rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-slate-900 sm:p-6 ${gradient} transform transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]`}>
@@ -129,7 +127,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
         firebaseAdmin: { title: 'Firebase Admin', subtitle: 'Verify Firebase permissions and upload access' },
         adminPosts: { title: 'Admin Post', subtitle: 'Publish and manage official community updates' },
         economy: { title: 'EduCoin Economy', subtitle: 'Control coin pricing and product economy' },
-        rewardSettings: { title: 'Reward Logic', subtitle: 'Configure learning rewards and earning rules' },
         products: { title: 'Products', subtitle: 'Create, update, and organize store products' },
         newsBlog: { title: 'News & Blog', subtitle: 'Manage articles, news, and blog content' },
         reviews: { title: 'Reviews', subtitle: 'Moderate customer ratings and feedback' },
@@ -151,11 +148,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             case 'firebaseAdmin': return <FirebaseAdminSetup />;
             case 'adminPosts': return <AdminPostManagement />;
             case 'economy': return <CoinEconomyManagement economySettings={props.economySettings} products={props.products} websiteSettings={props.websiteSettings} />;
-            case 'rewardSettings': return <EduCoinRewardSettings economySettings={props.economySettings} />;
             case 'products': return <ProductManagement products={props.products} users={props.users} coupons={props.coupons} onAddProduct={props.onAddProduct} onUpdateProduct={props.onUpdateProduct} onDeleteProduct={props.onDeleteProduct} onEditorStateChange={setIsProductEditorOpen} />;
             case 'newsBlog': return <NewsBlogManagement settings={props.websiteSettings} onSettingsChange={props.onWebsiteSettingsChange} />;
             case 'reviews': return <AdminReviewManagement products={props.products} reviews={props.reviews} />;
-            case 'reports': return <Reports products={props.products} reviews={props.reviews} />;
+            case 'reports': return <Reports products={props.products} reviews={props.reviews} orders={props.orders} users={props.users} tickets={props.tickets} />;
             case 'users': return <UserManagement users={props.users} onDeleteUser={props.onDeleteUser} />;
             case 'admins': return <AdminManagement adminUsers={props.adminUsers} currentAdminUser={props.currentAdminUser} onUpdateAdminUsers={props.onAdminUsersUpdate} />;
             case 'orders': return <OrderManagement orders={props.orders} />;
@@ -233,7 +229,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                 <div className="mx-auto flex h-full w-full max-w-[1540px] overflow-hidden bg-[#fbfbfb] shadow-[0_24px_70px_rgba(113,71,74,0.13)] md:rounded-[24px] md:border md:border-white/80">
                     <Sidebar
                         onNavigate={setCurrentView}
-                        onLogout={props.onLogout}
                         onSwitchToHome={props.onSwitchToHome}
                         currentView={currentView}
                         isOpen={isMobileSidebarOpen}

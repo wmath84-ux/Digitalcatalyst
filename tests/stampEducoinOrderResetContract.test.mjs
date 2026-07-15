@@ -37,10 +37,11 @@ test('reading reward bottom counter hides when article coin and time are both ze
   assert.match(reading, /!articleReadingRewardDisabled &&\n\s+rewardStatus === 'idle'/);
 });
 
-test('admin order reset is a one-time latest-customer-only migration with backup marker', () => {
-  assert.match(app, /ADMIN_ORDER_LATEST_CUSTOMER_RESET_DOC/);
+test('admin order reset is a one-time latest-order-only migration with backup marker', () => {
+  assert.match(app, /ADMIN_ORDER_LATEST_ONLY_RESET_DOC/);
   assert.match(app, /buildLatestCustomerOrderResetPlan/);
-  assert.match(app, /latest-customer-only-v1/);
+  assert.match(app, /latest-order-only-v2/);
+  assert.match(app, /const keepOrders = \[latestOrder\]/);
   assert.match(app, /removedOrderSummaries/);
   assert.match(app, /batch\.delete\(doc\(db, GLOBAL_ORDERS_COLLECTION/);
   assert.match(app, /status: 'complete'/);

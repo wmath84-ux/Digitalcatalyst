@@ -1028,6 +1028,8 @@ const GLOBAL_COUPONS_COLLECTION = 'siteCoupons';
 const GLOBAL_TICKETS_COLLECTION = 'siteSupportTickets';
 const GLOBAL_ORDERS_COLLECTION = 'siteOrders';
 const ADMIN_ORDER_LATEST_CUSTOMER_RESET_DOC = ['settings', 'adminOrderLatestCustomerResetV1'] as const;
+const ADMIN_ORDER_LATEST_ONLY_RESET_DOC = ['settings', 'adminOrderLatestOnlyResetV2'] as const;
+const ADMIN_SUPPORT_TICKET_LATEST_RESET_DOC = ['settings', 'adminSupportTicketLatestResetV1'] as const;
 const GLOBAL_REVIEWS_DOC = ['siteData', 'productReviews'] as const;
 const GLOBAL_WEBSITE_SETTINGS_DOC = ['settings', 'website'] as const;
 const ENABLE_DEMO_SEED_DATA = isDemoMode();
@@ -1068,9 +1070,80 @@ const logGlobalSyncWarning = (scope: string, error: unknown) => {
   console.warn(`${scope} global sync failed; local data remains available.`, error);
 };
 
+const normalizeFirestoreDate = (value: unknown, fallback = new Date().toISOString()): string => {
+  if (typeof value === 'string' && value.trim()) return value;
+  if (typeof value === 'number' && Number.isFinite(value)) return new Date(value).toISOString();
+  if (value && typeof value === 'object') {
+    const record = value as { toDate?: () => Date; seconds?: number };
+    if (typeof record.toDate === 'function') {
+      const parsed = record.toDate();
+      if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+    }
+    if (Number.isFinite(record.seconds)) return new Date(Number(record.seconds) * 1000).toISOString();
+  }
+  return fallback;
+};
+
+const normalizeAdminUserSnapshot = (uid: string, data: Record<string, any>): User => {
+  const email = String(data.email || '').trim();
+  const fallbackName = email ? email.split('@')[0] : `User ${String(uid).slice(-6) || 'account'}`;
+  const existingBalance = Number(data.coinBalance ?? data.eduCoins ?? 0) || 0;
+  const totalCoinsEarned = Number(data.totalCoinsEarned ?? data.totalLifetimeCoins ?? existingBalance) || 0;
+  const photoURL = String(data.photoURL || data.avatarUrl || data.avatar || '').trim();
+
+  return {
+    id: uid,
+    uid,
+    name: String(data.name || data.generatedDisplayName || fallbackName).trim() || fallbackName,
+    email,
+    mobile: String(data.mobile || data.phone || '').trim(),
+    photoURL,
+    profilePhotoSet: data.profilePhotoSet === true || Boolean(photoURL),
+    communityAvatarSet: data.communityAvatarSet === true,
+    role: data.role === 'admin' ? 'admin' : 'user',
+    status: data.status === 'blocked' ? 'blocked' : 'active',
+    blocked: data.blocked === true,
+    suspended: data.suspended === true,
+    authProvider: data.authProvider === 'google' ? 'google' : 'password',
+    providerIds: Array.isArray(data.providerIds) ? data.providerIds : [],
+    emailVerified: data.emailVerified === true,
+    createdAt: normalizeFirestoreDate(data.createdAt),
+    lastLoginAt: normalizeFirestoreDate(data.lastLoginAt || data.updatedAt || data.createdAt),
+    coinBalance: existingBalance,
+    eduCoins: existingBalance,
+    totalCoinsEarned,
+    totalCoinsSpent: Number(data.totalCoinsSpent || 0) || 0,
+    studyMinutes: Number(data.studyMinutes || 0) || 0,
+    totalWatchTimeMinutes: Number(data.totalWatchTimeMinutes ?? data.studyMinutes ?? 0) || 0,
+    totalLifetimeCoins: totalCoinsEarned,
+    rewardedArticleIds: Array.isArray(data.rewardedArticleIds) ? data.rewardedArticleIds : [],
+    readArticles: Array.isArray(data.readArticles) ? data.readArticles : Array.isArray(data.rewardedArticleIds) ? data.rewardedArticleIds : [],
+    rewardedQuizIds: Array.isArray(data.rewardedQuizIds) ? data.rewardedQuizIds : [],
+    claimedRewardIds: Array.isArray(data.claimedRewardIds) ? data.claimedRewardIds : [],
+    profileStreakClaims: data.profileStreakClaims || {},
+    coinTransactions: Array.isArray(data.coinTransactions) ? data.coinTransactions : [],
+    purchasedProductIds: normalizeSharedPurchaseIds(data.purchasedProductIds),
+    purchasedProductUpdateIds: data.purchasedProductUpdateIds || {},
+    subscriptionTier: getUserSubscriptionTier(data),
+    subscriptionPlanId: data.subscriptionPlanId || '',
+    subscriptionPlanName: data.subscriptionPlanName || '',
+    subscriptionBillingCycle: data.subscriptionBillingCycle === 'yearly' ? 'yearly' : data.subscriptionBillingCycle === 'monthly' ? 'monthly' : undefined,
+    subscriptionActivatedAt: normalizeFirestoreDate(data.subscriptionActivatedAt, ''),
+    subscriptionExpiresAt: normalizeFirestoreDate(data.subscriptionExpiresAt, ''),
+    eduCoinMultiplier: getUserEduCoinMultiplier(data),
+    eliteStatus: getUserSubscriptionTier(data) === 'elite',
+  };
+};
+
 const getOrderDateValue = (order: Order) => {
   const parsed = new Date(order.date).getTime();
   const idTime = Number(String(order.id || '').replace(/\D/g, '').slice(-13));
+  return Number.isFinite(parsed) ? parsed : Number.isFinite(idTime) ? idTime : 0;
+};
+
+const getSupportTicketDateValue = (ticket: SupportTicket) => {
+  const parsed = new Date(ticket.repliedAt || ticket.date).getTime();
+  const idTime = Number(String(ticket.id || '').replace(/\D/g, '').slice(-13));
   return Number.isFinite(parsed) ? parsed : Number.isFinite(idTime) ? idTime : 0;
 };
 
@@ -1097,14 +1170,24 @@ const buildLatestCustomerOrderResetPlan = (sourceOrders: Order[]) => {
   const sorted = [...sourceOrders].sort((a, b) => getOrderDateValue(b) - getOrderDateValue(a));
   const latestOrder = sorted.find(order => getOrderCustomerKey(order));
   if (!latestOrder) return null;
-  const keepOrders = sorted.filter(order => isSameLatestCustomerOrder(order, latestOrder));
-  const removeOrders = sorted.filter(order => !isSameLatestCustomerOrder(order, latestOrder));
+  const keepOrders = [latestOrder];
+  const removeOrders = sorted.filter(order => String(order.id) !== String(latestOrder.id));
   return {
     latestOrder,
     latestCustomerKey: getOrderCustomerKey(latestOrder),
     keepOrders,
     removeOrders,
+    lifetimeRevenueAfterReset: latestOrder.paymentBreakdown?.finalPrice ?? (parseFloat(String(latestOrder.total || '').replace(/[^\d.]/g, '')) || 0),
   };
+};
+
+const buildLatestSupportTicketResetPlan = (sourceTickets: SupportTicket[]) => {
+  const sorted = [...sourceTickets].sort((a, b) => getSupportTicketDateValue(b) - getSupportTicketDateValue(a));
+  const latestTicket = sorted[0];
+  if (!latestTicket) return null;
+  const keepTickets = [latestTicket];
+  const removeTickets = sorted.filter(ticket => String(ticket.id) !== String(latestTicket.id));
+  return { latestTicket, keepTickets, removeTickets };
 };
 
 const App: React.FC = () => {
@@ -1216,6 +1299,7 @@ const App: React.FC = () => {
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>(initialAdminUsers);
   const [currentAdminUser, setCurrentAdminUser] = useState<AdminUser | null>(null);
   const [adminOrderLatestCustomerResetStatus, setAdminOrderLatestCustomerResetStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
+  const [adminSupportLatestResetStatus, setAdminSupportLatestResetStatus] = useState<'idle' | 'running' | 'done' | 'failed'>('idle');
   const [productToBuyAfterLogin, setProductToBuyAfterLogin] = useState<ProductWithRating | null>(null);
   const [resumeCartCheckoutAfterLogin, setResumeCartCheckoutAfterLogin] = useState(false);
   const [autoOpenPaymentModalFor, setAutoOpenPaymentModalFor] = useState<number | null>(null);
@@ -1784,6 +1868,20 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!currentAdminUser) return undefined;
+
+    const unsubscribeUsers = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const remoteUsers = snapshot.docs
+        .map(item => normalizeAdminUserSnapshot(item.id, item.data()))
+        .sort((a, b) => String(b.lastLoginAt || b.createdAt).localeCompare(String(a.lastLoginAt || a.createdAt)));
+      setUsers(remoteUsers);
+      safeSetItem('siteUsers', remoteUsers);
+    }, error => logGlobalSyncWarning('Admin customers', error));
+
+    return () => unsubscribeUsers();
+  }, [currentAdminUser]);
+
+  useEffect(() => {
     const unsubscribeProducts = onSnapshot(collection(db, GLOBAL_PRODUCTS_COLLECTION), (snapshot) => {
       const remoteProducts = snapshot.docs
         .map(item => normalizeProductArrays(item.data() as Product))
@@ -2147,7 +2245,7 @@ const App: React.FC = () => {
     setAdminOrderLatestCustomerResetStatus('running');
 
     const runLatestCustomerOrderReset = async () => {
-      const resetRef = doc(db, ...ADMIN_ORDER_LATEST_CUSTOMER_RESET_DOC);
+      const resetRef = doc(db, ...ADMIN_ORDER_LATEST_ONLY_RESET_DOC);
       try {
         const existingReset = await getDoc(resetRef);
         const existingStatus = existingReset.exists() ? String(existingReset.data()?.status || '') : '';
@@ -2172,7 +2270,7 @@ const App: React.FC = () => {
 
         await setDoc(resetRef, stripUndefinedDeep({
           status: 'pending_delete',
-          version: 'latest-customer-only-v1',
+          version: 'latest-order-only-v2',
           latestCustomerKey: resetPlan.latestCustomerKey,
           latestOrderId: resetPlan.latestOrder.id,
           latestOrderEmail: resetPlan.latestOrder.customerEmail,
@@ -2194,6 +2292,7 @@ const App: React.FC = () => {
           status: 'complete',
           completedAt: new Date().toISOString(),
           keptOrderCount: resetPlan.keepOrders.length,
+          lifetimeRevenueAfterReset: resetPlan.lifetimeRevenueAfterReset,
           removedOrderCount: resetPlan.removeOrders.length,
         }), { merge: true });
 
@@ -2214,6 +2313,86 @@ const App: React.FC = () => {
       cancelled = true;
     };
   }, [adminOrderLatestCustomerResetStatus, currentAdminUser, orders]);
+
+  useEffect(() => {
+    if (!currentAdminUser || adminSupportLatestResetStatus !== 'idle' || tickets.length < 2) return;
+
+    const resetPlan = buildLatestSupportTicketResetPlan(tickets);
+    if (!resetPlan || resetPlan.removeTickets.length === 0) {
+      setAdminSupportLatestResetStatus('done');
+      return;
+    }
+
+    let cancelled = false;
+    setAdminSupportLatestResetStatus('running');
+
+    const runLatestSupportTicketReset = async () => {
+      const resetRef = doc(db, ...ADMIN_SUPPORT_TICKET_LATEST_RESET_DOC);
+      try {
+        const existingReset = await getDoc(resetRef);
+        const existingStatus = existingReset.exists() ? String(existingReset.data()?.status || '') : '';
+        if (existingStatus === 'complete') {
+          if (!cancelled) {
+            setTickets(resetPlan.keepTickets);
+            safeSetItem('siteSupportTickets', resetPlan.keepTickets);
+            setAdminSupportLatestResetStatus('done');
+          }
+          return;
+        }
+
+        const removedTicketSummaries = resetPlan.removeTickets.map(ticket => ({
+          id: ticket.id,
+          customerEmail: ticket.customerEmail || '',
+          customerName: ticket.customerName || '',
+          subject: ticket.subject || '',
+          date: ticket.date,
+          status: ticket.status,
+        }));
+
+        await setDoc(resetRef, stripUndefinedDeep({
+          status: 'pending_delete',
+          version: 'latest-ticket-only-v1',
+          latestTicketId: resetPlan.latestTicket.id,
+          latestTicketEmail: resetPlan.latestTicket.customerEmail,
+          keptTicketIds: resetPlan.keepTickets.map(ticket => ticket.id),
+          removedTicketCount: resetPlan.removeTickets.length,
+          removedTicketSummaries,
+          startedAt: new Date().toISOString(),
+        }), { merge: true });
+
+        for (let index = 0; index < resetPlan.removeTickets.length; index += 450) {
+          const batch = writeBatch(db);
+          resetPlan.removeTickets.slice(index, index + 450).forEach(ticket => {
+            batch.delete(doc(db, GLOBAL_TICKETS_COLLECTION, String(ticket.id)));
+          });
+          await batch.commit();
+        }
+
+        await setDoc(resetRef, stripUndefinedDeep({
+          status: 'complete',
+          completedAt: new Date().toISOString(),
+          keptTicketCount: resetPlan.keepTickets.length,
+          removedTicketCount: resetPlan.removeTickets.length,
+        }), { merge: true });
+
+        if (!cancelled) {
+          setTickets(resetPlan.keepTickets);
+          safeSetItem('siteSupportTickets', resetPlan.keepTickets);
+          setAdminSupportLatestResetStatus('done');
+          window.dispatchEvent(new Event('siteSupportTicketsUpdated'));
+        }
+      } catch (error) {
+        logGlobalSyncWarning('One-time latest support ticket reset', error);
+        if (!cancelled) setAdminSupportLatestResetStatus('failed');
+      }
+    };
+
+    void runLatestSupportTicketReset();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [adminSupportLatestResetStatus, currentAdminUser, tickets]);
 
   const updateCouponUsage = (couponCode: string) => {
     const normalizedCouponCode = couponCode.trim().toUpperCase();
@@ -4721,15 +4900,14 @@ const App: React.FC = () => {
   };
 
   const handleAdminSwitchToHome = () => {
-      // Does NOT clear currentAdminUser, just changes view
-      setCurrentView('home');
-  };
-
-  const handleAdminLogout = () => {
-    void signOut(auth).catch(error => console.warn('Firebase admin logout failed.', error));
+    void signOut(auth).catch(error => console.warn('Firebase admin auto sign-out failed.', error));
     setCurrentAdminUser(null);
     localStorage.removeItem('currentAdminUser');
     setCurrentView('home');
+  };
+
+  const handleAdminLogout = () => {
+    handleAdminSwitchToHome();
   };
 
   const persistProductsLocalFallback = (nextProducts: Product[]) => {
@@ -5060,7 +5238,7 @@ const App: React.FC = () => {
     if (currentView === 'auth' && !hasFirebaseUser) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (isSignedOut && requiresAuthForView) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={() => handleNavigateBack('home')} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
-    if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onLogout={handleAdminLogout} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); }} /></div>;
+    if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent(effectiveAppUser)}</div>;
     if (currentView === 'community') return (

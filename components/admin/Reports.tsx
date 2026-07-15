@@ -1,100 +1,113 @@
 import React from 'react';
-import { ProductWithRating, Review } from '../../App';
+import { Order, ProductWithRating, Review, SupportTicket, User } from '../../App';
 
 interface ReportsProps {
     products: ProductWithRating[];
     reviews: { [productId: number]: Review[] };
+    orders: Order[];
+    users: User[];
+    tickets: SupportTicket[];
 }
 
-const StatCard: React.FC<{ title: string; value: string | number }> = ({ title, value }) => (
-    <div className="bg-white/80 backdrop-blur-xl p-6 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-        <h3 className="font-bold text-lg text-razorpay-blue">{title}</h3>
-        <p className="text-3xl font-bold mt-2">{value}</p>
+const parseMoney = (value: string | number | undefined | null) => Number(String(value || '0').replace(/[^\d.]/g, '')) || 0;
+const formatMoney = (value: number) => `₹${value.toLocaleString('en-IN', { maximumFractionDigits: 2 })}`;
+const formatDate = (value?: string) => {
+    if (!value) return 'Unknown';
+    const parsed = new Date(value);
+    return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric' });
+};
+
+const StatCard: React.FC<{ title: string; value: string | number; helper?: string }> = ({ title, value, helper }) => (
+    <div className="rounded-[1.5rem] border border-white/60 bg-white/85 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl">
+        <h3 className="text-sm font-black uppercase tracking-[0.18em] text-slate-500">{title}</h3>
+        <p className="mt-3 text-3xl font-black text-slate-900">{value}</p>
+        {helper && <p className="mt-2 text-xs font-bold leading-5 text-slate-500">{helper}</p>}
     </div>
+);
+
+const DataCard: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
+    <section className="rounded-[1.5rem] border border-white/60 bg-white/85 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-xl">
+        <h3 className="text-lg font-black text-slate-900">{title}</h3>
+        <div className="mt-4">{children}</div>
+    </section>
 );
 
 const StarRating: React.FC<{ rating: number }> = ({ rating }) => (
     <div className="flex items-center">
-        {/* Gradient definition needed for SVG fill */}
-        <svg width="0" height="0" className="absolute">
-            <defs>
-                <linearGradient id="report-star-gradient" x1="0%" y1="0%" x2="0%" y2="100%">
-                    <stop offset="0%" stopColor="#FBBF24" />
-                    <stop offset="100%" stopColor="#F59E0B" />
-                </linearGradient>
-            </defs>
-        </svg>
         {[...Array(5)].map((_, i) => (
-             <svg key={i} className="w-4 h-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                <path 
-                    d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z"
-                    fill={i < Math.round(rating) ? "url(#report-star-gradient)" : "#E5E7EB"}
-                    stroke={i < Math.round(rating) ? "#F59E0B" : "#D1D5DB"}
-                    strokeWidth="0.5"
-                />
+             <svg key={i} className="h-4 w-4" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+                <path d="M12 .587l3.668 7.568 8.332 1.151-6.064 5.828 1.48 8.279-7.416-3.967-7.417 3.967 1.481-8.279-6.064-5.828 8.332-1.151z" fill={i < Math.round(rating) ? '#F59E0B' : '#E5E7EB'} />
             </svg>
         ))}
     </div>
 );
 
-const ProductListCard: React.FC<{ title: string; products: ProductWithRating[] }> = ({ title, products }) => (
-     <div className="bg-white/80 backdrop-blur-xl p-6 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)]">
-        <h3 className="font-bold text-lg text-razorpay-blue mb-4">{title}</h3>
-        {products.length > 0 ? (
-            <ul className="space-y-3">
-                {products.map(p => (
-                    <li key={p.id} className="flex justify-between items-center text-sm">
-                        <span className="font-medium text-gray-700">{p.title}</span>
-                         <div className="flex items-center gap-2">
-                            <span className="font-bold text-gray-800 text-xs">{p.rating.toFixed(1)}</span>
-                            <StarRating rating={p.rating} />
-                        </div>
-                    </li>
-                ))}
-            </ul>
-        ) : (
-            <p className="text-sm text-slate-600">Not enough data to display.</p>
-        )}
-    </div>
-);
-
-const Reports: React.FC<ReportsProps> = ({ products, reviews }) => {
-    // Create a clean, validated array of all reviews first to prevent errors from malformed data.
-    const allValidReviews = Object.values(reviews)
-        .filter(Array.isArray) // Ensure we only process arrays of reviews
-        .flat()
-        .filter((r): r is Review => r && typeof r.rating === 'number');
-
-    const totalReviews = allValidReviews.length;
-
-    const overallAverageRating = () => {
-        if (totalReviews === 0) return 0;
-        const totalRatingSum = allValidReviews.reduce((acc, r) => acc + r.rating, 0);
-        return totalRatingSum / totalReviews;
-    };
-
-    const sortedProducts = [...products]
-        .filter(p => p.reviewCount > 0)
-        .sort((a, b) => b.rating - a.rating);
-    
-    const topRatedProducts = sortedProducts.slice(0, 3);
-    const lowestRatedProducts = sortedProducts.slice(-3).reverse();
-
+const Reports: React.FC<ReportsProps> = ({ products, reviews, orders, users, tickets }) => {
+    const allValidReviews = Object.values(reviews).filter(Array.isArray).flat().filter((r): r is Review => r && typeof r.rating === 'number');
+    const completedOrders = orders.filter(order => order.status === 'Completed');
+    const totalRevenue = completedOrders.reduce((sum, order) => sum + (order.paymentBreakdown?.finalPrice ?? parseMoney(order.total)), 0);
+    const openTickets = tickets.filter(ticket => ticket.status !== 'Resolved').length;
+    const uniqueCustomerEmails = new Set(orders.map(order => String(order.customerEmail || '').toLowerCase()).filter(Boolean));
+    const topRatedProducts = [...products].filter(product => product.reviewCount > 0).sort((a, b) => b.rating - a.rating).slice(0, 5);
+    const latestOrders = [...orders].sort((a, b) => String(b.date).localeCompare(String(a.date))).slice(0, 5);
 
     return (
-        <div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-6">Store Reports</h1>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-                <StatCard title="Total Products" value={products.length} />
-                <StatCard title="Total Customer Reviews" value={totalReviews} />
-                <StatCard title="Overall Average Rating" value={overallAverageRating().toFixed(2)} />
+        <div className="space-y-8 animate-fade-in-up">
+            <div>
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-blue-600">Database-backed reports</p>
+                <h1 className="mt-2 text-3xl font-black text-slate-900">Store Reports</h1>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Connected to live products, orders, users, support tickets, and review data already synced into the admin dashboard.</p>
             </div>
 
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                <ProductListCard title="Top 3 Highest Rated Products" products={topRatedProducts} />
-                <ProductListCard title="Top 3 Lowest Rated Products" products={lowestRatedProducts} />
+            <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-4">
+                <StatCard title="Lifetime revenue" value={formatMoney(totalRevenue)} helper={`${completedOrders.length} completed order${completedOrders.length === 1 ? '' : 's'}`} />
+                <StatCard title="Logged-in users" value={users.length} helper="From Firebase users collection when admin is signed in" />
+                <StatCard title="Order customers" value={uniqueCustomerEmails.size} helper={`${orders.length} total order record${orders.length === 1 ? '' : 's'}`} />
+                <StatCard title="Open support" value={openTickets} helper={`${tickets.length} total ticket${tickets.length === 1 ? '' : 's'}`} />
             </div>
+
+            <div className="grid gap-6 xl:grid-cols-2">
+                <DataCard title="Latest real orders">
+                    {latestOrders.length ? (
+                        <div className="space-y-3">
+                            {latestOrders.map(order => (
+                                <div key={order.id} className="rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                                    <div className="flex items-start justify-between gap-3">
+                                        <div>
+                                            <p className="font-black text-slate-900">#{order.id}</p>
+                                            <p className="text-xs font-bold text-slate-500">{order.customerEmail || order.customerName}</p>
+                                        </div>
+                                        <span className="rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">{order.status}</span>
+                                    </div>
+                                    <div className="mt-3 flex items-center justify-between text-sm font-bold text-slate-600"><span>{formatDate(order.date)}</span><span>{formatMoney(order.paymentBreakdown?.finalPrice ?? parseMoney(order.total))}</span></div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : <p className="text-sm font-bold text-slate-500">No real orders found.</p>}
+                </DataCard>
+
+                <DataCard title="Top rated products from real reviews">
+                    {topRatedProducts.length ? (
+                        <div className="space-y-3">
+                            {topRatedProducts.map(product => (
+                                <div key={product.id} className="flex items-center justify-between gap-3 rounded-2xl border border-slate-100 bg-slate-50/80 p-4">
+                                    <div className="min-w-0"><p className="truncate font-black text-slate-900">{product.title}</p><p className="text-xs font-bold text-slate-500">{product.reviewCount} review{product.reviewCount === 1 ? '' : 's'}</p></div>
+                                    <div className="text-right"><p className="font-black text-slate-900">{product.rating.toFixed(1)}</p><StarRating rating={product.rating} /></div>
+                                </div>
+                            ))}
+                        </div>
+                    ) : <p className="text-sm font-bold text-slate-500">Not enough review data to display.</p>}
+                </DataCard>
+            </div>
+
+            <DataCard title="Data source contract">
+                <div className="grid gap-3 text-sm font-bold text-slate-600 md:grid-cols-2">
+                    <p className="rounded-2xl bg-slate-50 p-4">Products: live siteProducts collection via dashboard state.</p>
+                    <p className="rounded-2xl bg-slate-50 p-4">Orders: live siteOrders collection via dashboard state.</p>
+                    <p className="rounded-2xl bg-slate-50 p-4">Users: live users collection for admin sessions.</p>
+                    <p className="rounded-2xl bg-slate-50 p-4">Support: live siteSupportTickets collection via dashboard state.</p>
+                </div>
+            </DataCard>
         </div>
     );
 };

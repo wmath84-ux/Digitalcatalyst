@@ -8,7 +8,10 @@ interface AdminManagementProps {
 }
 
 const AdminManagement: React.FC<AdminManagementProps> = ({ adminUsers, currentAdminUser }) => {
-    const visibleAdmins = adminUsers.filter((admin) => admin.email);
+    const visibleAdmins = [
+        ...(currentAdminUser ? [currentAdminUser] : []),
+        ...adminUsers.filter((admin) => admin.email && admin.email !== currentAdminUser?.email),
+    ];
 
     return (
         <div>

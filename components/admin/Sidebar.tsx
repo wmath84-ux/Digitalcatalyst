@@ -5,7 +5,6 @@ import { AdminView } from './AdminDashboard';
 interface SidebarProps {
     currentView: AdminView;
     onNavigate: (view: AdminView) => void;
-    onLogout: () => void;
     onSwitchToHome: () => void;
     isOpen: boolean;
     onClose: () => void;
@@ -48,12 +47,12 @@ const NavLink: React.FC<{
     );
 };
 
-const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, onSwitchToHome, isOpen, onClose, supportUnreadCount = 0, adminEmail }) => {
+const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onSwitchToHome, isOpen, onClose, supportUnreadCount = 0, adminEmail }) => {
+    const resolvedAdminEmail = adminEmail || 'admin@firebase.local';
     const navItems: { label: string; view: AdminView; isFeatured?: boolean; icon: React.ReactNode; badge?: string | number | null }[] = [
         { label: 'Dashboard', view: 'dashboard', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg> },
         { label: 'Admin Post', view: 'adminPosts', isFeatured: true, icon: <span className="text-lg">📣</span> },
         { label: 'EduCoin Economy', view: 'economy', isFeatured: true, icon: <span className="text-lg">🪙</span> },
-        { label: 'Reward Logic', view: 'rewardSettings', isFeatured: true, icon: <span className="text-lg">📖</span> },
         { label: 'Analytics', view: 'analytics', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg> },
         { label: 'Firebase Admin', view: 'firebaseAdmin', isFeatured: true, icon: <span className="text-lg">🔥</span> },
         { label: 'Products', view: 'products', icon: <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg> },
@@ -104,11 +103,11 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
 
                     <div className="mt-4 flex items-center gap-2.5 rounded-lg border border-[#eeeaea] bg-[#faf9f9] p-2.5">
                         <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[#fde7e9] text-[11px] font-black text-[#d94857]">
-                            {adminEmail.charAt(0).toUpperCase()}
+                            {resolvedAdminEmail.charAt(0).toUpperCase()}
                         </div>
                         <div className="min-w-0 flex-1">
-                            <p className="truncate text-[11px] font-bold text-[#2b2d31]">{adminEmail.split('@')[0]}</p>
-                            <p className="truncate text-[9px] font-medium text-[#989295]">{adminEmail}</p>
+                            <p className="truncate text-[11px] font-bold text-[#2b2d31]">{resolvedAdminEmail.split('@')[0]}</p>
+                            <p className="truncate text-[9px] font-medium text-[#989295]">{resolvedAdminEmail}</p>
                         </div>
                         <svg className="h-3.5 w-3.5 shrink-0 text-[#aaa4a6]" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m19 9-7 7-7-7" /></svg>
                     </div>
@@ -140,16 +139,10 @@ const Sidebar: React.FC<SidebarProps> = ({ currentView, onNavigate, onLogout, on
                             Open Store
                         </button>
                     </div>
-                    <div className="grid grid-cols-2 gap-1.5">
-                        <button type="button" onClick={onSwitchToHome} className="flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[10px] font-bold text-[#666168] transition hover:bg-[#f7f5f5] hover:text-[#d94857]">
-                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4m-4-10h6m0 0v6m0-6L10 14" /></svg>
-                            Website
-                        </button>
-                        <button type="button" onClick={onLogout} className="flex items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[10px] font-bold text-[#8c4d54] transition hover:bg-[#fdebed] hover:text-[#d94857]">
-                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="m17 16 4-4m0 0-4-4m4 4H7m6 4v1a3 3 0 0 1-3 3H6a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h4a3 3 0 0 1 3 3v1" /></svg>
-                            Sign Out
-                        </button>
-                    </div>
+                    <button type="button" onClick={onSwitchToHome} className="flex w-full items-center justify-center gap-1.5 rounded-lg px-2 py-2 text-[10px] font-bold text-[#666168] transition hover:bg-[#f7f5f5] hover:text-[#d94857]">
+                        <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4m-4-10h6m0 0v6m0-6L10 14" /></svg>
+                        Website · auto sign-out
+                    </button>
                 </div>
             </aside>
         </>
