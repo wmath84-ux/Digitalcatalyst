@@ -3683,6 +3683,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const [masterTagsAudienceFilter, setMasterTagsAudienceFilter] = useState<'all' | 'mine' | 'following' | 'verified'>('all');
   const [masterTagSearch, setMasterTagSearch] = useState('');
   const [masterTagSort, setMasterTagSort] = useState<'recent' | 'appreciated' | 'trending'>('recent');
+  const [isMasterTagMoreTopicsOpen, setIsMasterTagMoreTopicsOpen] = useState(false);
   const [masterSearch, setMasterSearch] = useState('');
   const [selectedMaster, setSelectedMaster] = useState<Creator | null>(null);
   const [masterTagType, setMasterTagType] = useState<(typeof masterTagTypes)[number]>('Teacher');
@@ -6895,6 +6896,109 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
     </section>
   );
 
+  const renderMasterTagDesktopFilters = () => {
+    const masterTagAudienceOptions: Array<{ value: typeof masterTagsAudienceFilter; label: string; helper: string }> = [
+      { value: 'all', label: 'Everyone', helper: 'All public notes' },
+      { value: 'mine', label: 'My posts', helper: 'Your appreciations' },
+      { value: 'following', label: 'Following', helper: 'People you follow' },
+      { value: 'verified', label: 'Verified', helper: 'Verified mentors' },
+    ];
+    const primaryMasterTagTopics = masterTagCategories.slice(0, 6) as Array<(typeof masterTagCategories)[number]>;
+    const moreMasterTagTopics = masterTagCategories.slice(6) as Array<(typeof masterTagCategories)[number]>;
+    const isMoreTopicActive = masterTagFilter !== 'All' && moreMasterTagTopics.includes(masterTagFilter as (typeof masterTagCategories)[number]);
+    const activeFilterCount = (masterTagSearch.trim() ? 1 : 0) + (masterTagsAudienceFilter !== 'all' ? 1 : 0) + (masterTagFilter !== 'All' ? 1 : 0);
+    const resetMasterTagFilters = () => {
+      setMasterTagSearch('');
+      setMasterTagsAudienceFilter('all');
+      setMasterTagFilter('All');
+      setIsMasterTagMoreTopicsOpen(false);
+    };
+    const chooseMasterTagTopic = (category: 'All' | (typeof masterTagCategories)[number]) => {
+      setMasterTagFilter(category);
+      if (category === 'All' || !moreMasterTagTopics.includes(category as (typeof masterTagCategories)[number])) setIsMasterTagMoreTopicsOpen(false);
+    };
+
+    return (
+      <section className="master-tag-desktop-filter-card overflow-visible rounded-[2rem] border border-[#DCE3EE] bg-[#FFFEFB] shadow-[0_22px_60px_rgba(23,32,51,0.10)]">
+        <div className="rounded-t-[2rem] border-b border-[#E8EDF3] bg-[linear-gradient(135deg,#FFFDF8_0%,#F4F7FB_58%,#EEF3FA_100%)] p-5">
+          <div className="flex items-start justify-between gap-4">
+            <div className="min-w-0">
+              <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#8A6520]">Mentor appreciation</p>
+              <h2 className="mt-2 text-[2.45rem] font-black leading-[0.98] tracking-[-0.045em] text-[#172033] xl:text-[2.75rem]">Celebrate the people who helped you learn.</h2>
+              <p className="mt-3 text-sm font-semibold leading-7 text-[#5F6B7A]">Search, sort and filter appreciation posts with fewer taps. Use More topics for extra subjects without crowding the desktop layout.</p>
+            </div>
+            {activeFilterCount ? <span className="shrink-0 rounded-full border border-[#E9D8AF] bg-[#FFF8E8] px-3 py-1.5 text-xs font-black text-[#8A6520]">{activeFilterCount} active</span> : null}
+          </div>
+        </div>
+
+        <div className="space-y-5 p-4">
+          <div className="grid gap-3">
+            <label className="min-w-0">
+              <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-[#42516A]">Search appreciation</span>
+              <span className="flex h-12 items-center gap-3 rounded-2xl border border-[#D7DFEA] bg-white px-4 shadow-[0_8px_20px_rgba(23,32,51,0.04)] focus-within:border-[#3157A4] focus-within:ring-4 focus-within:ring-[#3157A4]/10">
+                <span className="text-[#7C879A]">⌕</span>
+                <input value={masterTagSearch} onChange={(event) => setMasterTagSearch(event.target.value)} placeholder="Name, subject, author or message" className="min-w-0 flex-1 bg-transparent text-sm font-bold text-[#273247] outline-none placeholder:text-[#9AA5B4]" />
+                {masterTagSearch ? <button type="button" onClick={() => setMasterTagSearch('')} className="rounded-full bg-[#F1F4F8] px-2.5 py-1 text-[11px] font-black text-[#42516A]">Clear</button> : null}
+              </span>
+            </label>
+
+            <label>
+              <span className="mb-2 block text-xs font-black uppercase tracking-[0.12em] text-[#42516A]">Sort by</span>
+              <select value={masterTagSort} onChange={(event) => setMasterTagSort(event.target.value as typeof masterTagSort)} className="h-12 w-full rounded-2xl border border-[#D7DFEA] bg-white px-4 text-sm font-black text-[#273247] shadow-[0_8px_20px_rgba(23,32,51,0.04)] outline-none focus:border-[#3157A4] focus:ring-4 focus:ring-[#3157A4]/10">
+                <option value="recent">Newest first</option>
+                <option value="appreciated">Most appreciated</option>
+                <option value="trending">Trending now</option>
+              </select>
+            </label>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-[#42516A]">Show posts from</p>
+              <span className="text-[11px] font-bold text-[#7C879A]">Optimised buttons</span>
+            </div>
+            <div className="grid gap-2 sm:grid-cols-2">
+              {masterTagAudienceOptions.map((option) => (
+                <button key={option.value} type="button" onClick={() => setMasterTagsAudienceFilter(option.value)} className={`rounded-2xl border px-3 py-2.5 text-left transition ${masterTagsAudienceFilter === option.value ? 'border-[#273247] bg-[#273247] text-white shadow-[0_12px_28px_rgba(23,32,51,0.20)]' : 'border-[#D7DFEA] bg-white text-[#536178] hover:border-[#B9C8DE] hover:bg-[#F8FBFF]'}`}>
+                  <span className="block text-sm font-black leading-tight">{option.label}</span>
+                  <span className={`mt-1 block text-[11px] font-bold ${masterTagsAudienceFilter === option.value ? 'text-white/72' : 'text-[#7C879A]'}`}>{option.helper}</span>
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div>
+            <div className="mb-2 flex items-center justify-between gap-3">
+              <p className="text-xs font-black uppercase tracking-[0.12em] text-[#42516A]">Learning area</p>
+              {masterTagFilter !== 'All' ? <span className="rounded-full bg-[#FFF5D9] px-2.5 py-1 text-[11px] font-black text-[#725116]">{masterTagFilter}</span> : null}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {(['All', ...primaryMasterTagTopics] as Array<'All' | (typeof masterTagCategories)[number]>).map((category) => (
+                <button key={category} type="button" onClick={() => chooseMasterTagTopic(category)} className={`rounded-full border px-4 py-2 text-xs font-black transition ${masterTagFilter === category ? 'border-[#B88A2B] bg-[#FFF5D9] text-[#725116] shadow-[0_8px_22px_rgba(184,138,43,0.14)]' : 'border-[#D7DFEA] bg-white text-[#536178] hover:border-[#B9C8DE]'}`}>{category === 'All' ? 'All topics' : category}</button>
+              ))}
+              {moreMasterTagTopics.length ? (
+                <button type="button" aria-expanded={isMasterTagMoreTopicsOpen} aria-controls="master-tag-more-topics-panel" onClick={() => setIsMasterTagMoreTopicsOpen((current) => !current)} className={`rounded-full border px-4 py-2 text-xs font-black transition ${isMoreTopicActive || isMasterTagMoreTopicsOpen ? 'border-[#3157A4] bg-[#EEF4FF] text-[#3157A4]' : 'border-[#D7DFEA] bg-white text-[#536178] hover:border-[#B9C8DE]'}`}>More topics {isMasterTagMoreTopicsOpen ? '↑' : '↓'}</button>
+              ) : null}
+            </div>
+            {isMasterTagMoreTopicsOpen ? (
+              <div id="master-tag-more-topics-panel" className="mt-3 rounded-[1.2rem] border border-[#D7DFEA] bg-[#F8FBFF] p-3 shadow-[0_14px_34px_rgba(23,32,51,0.08)]">
+                <p className="mb-2 text-[11px] font-black uppercase tracking-[0.16em] text-[#7C879A]">More learning areas</p>
+                <div className="flex flex-wrap gap-2">
+                  {moreMasterTagTopics.map((category) => <button key={category} type="button" onClick={() => chooseMasterTagTopic(category)} className={`rounded-full border px-3.5 py-2 text-xs font-black transition ${masterTagFilter === category ? 'border-[#B88A2B] bg-[#FFF5D9] text-[#725116]' : 'border-[#D7DFEA] bg-white text-[#536178] hover:border-[#B9C8DE]'}`}>{category}</button>)}
+                </div>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[#E8EDF3] pt-4">
+            <p className="text-sm font-semibold text-[#5F6B7A]"><span className="font-black text-[#273247]">{filteredMasterTagRequests.length}</span> appreciation {filteredMasterTagRequests.length === 1 ? 'post' : 'posts'} found</p>
+            {activeFilterCount ? <button type="button" onClick={resetMasterTagFilters} className="rounded-full border border-[#D7DFEA] bg-white px-3 py-2 text-xs font-black text-[#3157A4] hover:bg-[#EEF4FF]">Reset filters</button> : null}
+          </div>
+        </div>
+      </section>
+    );
+  };
+
   const renderMasterTagRows = () => filteredMasterTagRequests.length ? filteredMasterTagRequests.map((request) => (
     <div key={request.id} role="button" tabIndex={0} aria-label={`Open appreciation for ${request.targetMasterName || request.title}`} onClick={() => openMasterTagDetail(request.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); openMasterTagDetail(request.id); } }}>
       {renderMasterTagCard(request)}
@@ -6932,13 +7036,31 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         <button type="button" onClick={() => setPage('tagMaster')} className="fixed bottom-[calc(env(safe-area-inset-bottom)+1rem)] right-4 z-[1200] rounded-full border border-white/40 bg-[#273247] px-5 py-3.5 text-sm font-black text-white shadow-[0_18px_48px_rgba(23,32,51,0.28)]">＋ Write appreciation</button>
       </div>
 
-      <div className="hidden grid-cols-[minmax(0,1fr)_330px] gap-6 md:grid">
-        <main className="min-w-0 space-y-5">
-          {renderMasterTagFilters()}
-          <div className="grid gap-4 xl:grid-cols-2">{renderMasterTagRows()}</div>
+      <div className="hidden gap-5 md:grid md:grid-cols-[minmax(19rem,22rem)_minmax(0,1fr)] xl:grid-cols-[minmax(19rem,22rem)_minmax(0,1fr)_20rem]">
+        <aside className="min-w-0 space-y-4 lg:sticky lg:top-4 lg:self-start">
+          {renderMasterTagDesktopFilters()}
+        </aside>
+
+        <main className="min-w-0 space-y-4">
+          <section className="rounded-[1.6rem] border border-[#DCE3EE] bg-[#FFFEFB] p-5 shadow-[0_12px_34px_rgba(23,32,51,0.06)]">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div className="min-w-0">
+                <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#8A6520]">Appreciation wall</p>
+                <h3 className="mt-1 text-2xl font-black tracking-[-0.03em] text-[#172033]">Browse appreciation posts</h3>
+                <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#6B7482]">Open a card to read the full note, react, or reset filters from the left panel.</p>
+              </div>
+              <div className="grid grid-cols-3 gap-2 text-center">
+                <span className="rounded-2xl bg-[#F5F7FA] px-3 py-2"><strong className="block text-sm font-black text-[#172033]">{filteredMasterTagRequests.length}</strong><span className="text-[10px] font-bold text-[#6B7482]">Results</span></span>
+                <span className="rounded-2xl bg-[#FFF8E8] px-3 py-2"><strong className="block text-sm font-black text-[#8A6520]">{trendingMasterTags.length}</strong><span className="text-[10px] font-bold text-[#8A6520]">Top</span></span>
+                <span className="rounded-2xl bg-[#EEF4FF] px-3 py-2"><strong className="block text-sm font-black text-[#3157A4]">{masterTagFilter === 'All' ? 'All' : '1'}</strong><span className="text-[10px] font-bold text-[#3157A4]">Topic</span></span>
+              </div>
+            </div>
+          </section>
+
+          <div className="grid gap-4 2xl:grid-cols-2">{renderMasterTagRows()}</div>
         </main>
 
-        <aside className="space-y-4 lg:sticky lg:top-4 lg:self-start">
+        <aside className="hidden space-y-4 lg:sticky lg:top-4 lg:self-start xl:block">
           <section className="rounded-[1.6rem] border border-[#DCE3EE] bg-[#FFFEFB] p-5 shadow-[0_12px_34px_rgba(23,32,51,0.06)]">
             <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#8A6520]">Community favourites</p>
             <h3 className="mt-1 text-xl font-black text-[#172033]">Most appreciated mentors</h3>
@@ -6946,9 +7068,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           </section>
 
           <section className="rounded-[1.6rem] border border-[#DCE3EE] bg-[#FFFEFB] p-5 shadow-[0_12px_34px_rgba(23,32,51,0.06)]">
-            <h3 className="text-xl font-black text-[#172033]">Browse by topic</h3>
-            <p className="mt-1 text-sm font-semibold text-[#6B7482]">Choose a learning area to narrow the wall.</p>
-            <div className="mt-4 flex flex-wrap gap-2">{masterTagCategories.slice(0, 8).map((category) => <button key={category} type="button" onClick={() => setMasterTagFilter(category)} className="rounded-full border border-[#E1E7EF] bg-[#F5F7FA] px-3 py-2 text-xs font-black text-[#3157A4] transition hover:border-[#B9C8DE]">{category}</button>)}</div>
+            <h3 className="text-xl font-black text-[#172033]">Quick topic picks</h3>
+            <p className="mt-1 text-sm font-semibold text-[#6B7482]">Use the More topics dropdown in the filter panel for extra learning areas.</p>
+            <div className="mt-4 flex flex-wrap gap-2">{masterTagCategories.slice(0, 6).map((category) => <button key={category} type="button" onClick={() => { setMasterTagFilter(category); setIsMasterTagMoreTopicsOpen(false); }} className={`rounded-full border px-3 py-2 text-xs font-black transition ${masterTagFilter === category ? 'border-[#B88A2B] bg-[#FFF5D9] text-[#725116]' : 'border-[#E1E7EF] bg-[#F5F7FA] text-[#3157A4] hover:border-[#B9C8DE]'}`}>{category}</button>)}</div>
           </section>
 
           <button type="button" onClick={() => setPage('tagMaster')} className="w-full rounded-2xl bg-[#273247] px-5 py-4 text-sm font-black text-white shadow-[0_16px_40px_rgba(23,32,51,0.18)]">Write an appreciation post</button>
