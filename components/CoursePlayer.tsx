@@ -319,8 +319,14 @@ const ModuleItem: React.FC<{
   educoinBalance?: number;
   level?: number;
   parentLocked?: boolean;
-}> = ({ module, productId, productAccess, activeFile, onSelectFile, onPurchaseLatestUpdate, onUnlockWithEducoins, educoinBalance = 0, level = 0, parentLocked = false }) => {
-  const [isExpanded, setIsExpanded] = useState(true);
+  defaultExpanded?: boolean;
+  resetKey?: number;
+}> = ({ module, productId, productAccess, activeFile, onSelectFile, onPurchaseLatestUpdate, onUnlockWithEducoins, educoinBalance = 0, level = 0, parentLocked = false, defaultExpanded = false, resetKey = 0 }) => {
+  const [isExpanded, setIsExpanded] = useState(defaultExpanded);
+
+  useEffect(() => {
+    setIsExpanded(defaultExpanded);
+  }, [defaultExpanded, module.id, resetKey]);
   const moduleHidden = isCoursePlayerItemHidden(module);
   const moduleUpdateId = resolveCoursePlayerUpdateId(productId, module);
   const moduleUnlocked = !parentLocked && hasCoursePlayerItemAccess(productId, module, productAccess);
@@ -418,7 +424,7 @@ const ModuleItem: React.FC<{
 
           {visibleModules.map((subModule) => (
             <ModuleItem
-              key={subModule.id}
+              key={`${resetKey}-${subModule.id}`}
               module={subModule}
               productId={productId}
               productAccess={productAccess}
@@ -429,6 +435,8 @@ const ModuleItem: React.FC<{
               educoinBalance={educoinBalance}
               level={level + 1}
               parentLocked={!moduleUnlocked}
+              defaultExpanded={false}
+              resetKey={resetKey}
             />
           ))}
         </div>
@@ -1299,6 +1307,7 @@ const CoursePlayer: React.FC<{
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => getViewportMetrics().width < 900);
+  const [modulePanelResetKey, setModulePanelResetKey] = useState(0);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
   const youtubePlayerRef = useRef<any>(null);
@@ -1521,15 +1530,21 @@ const CoursePlayer: React.FC<{
     }
   }, []);
 
+  const resetCourseModulePanel = useCallback(() => {
+    setModulePanelResetKey(value => value + 1);
+  }, []);
+
   const closeCourseSidebar = useCallback(() => {
+    resetCourseModulePanel();
     setIsSidebarOpen(false);
     closeCourseLayerHistory('modules');
-  }, [closeCourseLayerHistory]);
+  }, [closeCourseLayerHistory, resetCourseModulePanel]);
 
   const openCourseSidebar = useCallback(() => {
+    resetCourseModulePanel();
     setIsMentorOpen(false);
     setIsSidebarOpen(true);
-  }, []);
+  }, [resetCourseModulePanel]);
 
   const toggleCourseSidebar = useCallback(() => {
     if (isSidebarOpenRef.current) closeCourseSidebar();
@@ -2140,7 +2155,7 @@ const CoursePlayer: React.FC<{
 
           <div className="flex min-w-0 items-center justify-center gap-3">
             <YoutubeRewardChip />
-            <button onClick={() => setIsDesktopSidebarCollapsed(value => !value)} className="shrink-0 rounded-2xl border border-[#D9E7F8] bg-white px-5 py-3 text-base font-black text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.06)] transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]">
+            <button onClick={() => { resetCourseModulePanel(); setIsDesktopSidebarCollapsed(value => !value); }} className="shrink-0 rounded-2xl border border-[#D9E7F8] bg-white px-5 py-3 text-base font-black text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.06)] transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]">
               {isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize modules'}
             </button>
             <button onClick={() => toggleCourseMentor()} className="rounded-2xl border border-[#C9C2FF] bg-[#F1EEFF] px-6 py-3 text-base font-black text-[#5B4BFF] shadow-[0_14px_34px_rgba(91,75,255,0.14)] transition hover:-translate-y-0.5 hover:bg-white">
@@ -2180,9 +2195,9 @@ const CoursePlayer: React.FC<{
                 </div>
               </div>
               <nav className="flex-1 overflow-y-auto p-2 sm:p-3">
-                {courseContent.length > 0 ? courseContent.map(m => (
+                {courseContent.length > 0 ? courseContent.map((m, index) => (
                   <ModuleItem
-                    key={m.id}
+                    key={`${modulePanelResetKey}-${m.id}`}
                     module={m}
                     productId={product.id}
                     productAccess={productAccess}
@@ -2191,6 +2206,8 @@ const CoursePlayer: React.FC<{
                     onPurchaseLatestUpdate={onPurchaseLatestUpdate ? (updateId?: string) => onPurchaseLatestUpdate(product, updateId) : undefined}
                     onUnlockWithEducoins={unlockContentWithEducoins}
                     educoinBalance={educoinBalance}
+                    defaultExpanded={index === 0}
+                    resetKey={modulePanelResetKey}
                   />
                 )) : <p className="p-4 text-center font-semibold text-[#50527a]/70">No content added yet.</p>}
               </nav>
