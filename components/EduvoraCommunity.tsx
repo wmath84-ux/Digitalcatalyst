@@ -2510,6 +2510,359 @@ const communityPolishCss = `
     }
   }
 
+  /* Premium readable desktop community typography v2: larger type, calmer cards, tablet/desktop hierarchy. */
+  @media (min-width: 1024px) {
+    .community-desktop-social {
+      font-size: 16px !important;
+    }
+    .community-desktop-social .eduvora-community-app {
+      max-width: 1680px !important;
+      border-radius: 1.15rem !important;
+      box-shadow: 0 20px 64px rgba(39, 73, 78, 0.14) !important;
+    }
+    .community-desktop-social .community-desktop-sidebar {
+      width: 15.75rem !important;
+      padding: 1.05rem 0.9rem !important;
+    }
+    .community-desktop-social .community-desktop-brand > div > span:first-child {
+      height: 2.75rem !important;
+      width: 2.75rem !important;
+      border-radius: 0.8rem !important;
+    }
+    .community-desktop-social .community-desktop-brand > div > span:last-child > span:first-child {
+      font-size: 0.82rem !important;
+      letter-spacing: 0.22em !important;
+    }
+    .community-desktop-social .community-desktop-brand > div > span:last-child > span:last-child {
+      font-size: 0.67rem !important;
+      padding: 0.22rem 0.48rem !important;
+    }
+    .community-desktop-social .community-desktop-member-card {
+      margin-bottom: 1.05rem !important;
+      padding: 0.75rem 0.55rem !important;
+    }
+    .community-desktop-social .community-desktop-member-card > span:last-child > span:first-child {
+      font-size: 0.96rem !important;
+      line-height: 1.15 !important;
+    }
+    .community-desktop-social .community-desktop-member-card > span:last-child > span:nth-child(2) {
+      font-size: 0.78rem !important;
+    }
+    .community-desktop-social .community-desktop-member-card > span:last-child > span:last-child {
+      font-size: 0.64rem !important;
+      letter-spacing: 0.11em !important;
+    }
+    .community-desktop-social .community-desktop-nav {
+      display: grid !important;
+      gap: 0.35rem !important;
+    }
+    .community-desktop-social .community-desktop-nav-item {
+      min-height: 3.05rem !important;
+      gap: 0.7rem !important;
+      border-radius: 0.75rem !important;
+      padding: 0.35rem 0.65rem !important;
+      font-size: 0.95rem !important;
+      line-height: 1.15 !important;
+    }
+    .community-desktop-social .community-desktop-nav-icon {
+      height: 2.35rem !important;
+      width: 2.35rem !important;
+      border-radius: 0.65rem !important;
+      font-size: 1.2rem !important;
+    }
+    .community-desktop-social .community-desktop-header {
+      min-height: 4.55rem !important;
+      padding: 0.65rem 1rem !important;
+    }
+    .community-desktop-social .community-desktop-header h1 {
+      font-size: clamp(1.38rem, 1.9vw, 1.9rem) !important;
+      line-height: 1.06 !important;
+    }
+    .community-desktop-social .community-desktop-header p {
+      font-size: 0.68rem !important;
+      letter-spacing: 0.22em !important;
+    }
+    .community-desktop-social .community-desktop-header-actions {
+      gap: 0.55rem !important;
+    }
+    .community-desktop-social .community-desktop-header-actions > button,
+    .community-desktop-social .community-desktop-header-actions > div > button {
+      height: 3rem !important;
+      min-height: 3rem !important;
+      border-radius: 0.85rem !important;
+      padding-inline: 1rem !important;
+      font-size: 0.86rem !important;
+    }
+    .community-desktop-social .eduvora-community-main {
+      padding: 0.78rem 0.9rem 1rem !important;
+    }
+    .community-desktop-social .community-social-feed-page {
+      width: min(100%, 58rem) !important;
+      padding-bottom: 1.6rem !important;
+    }
+    .community-desktop-social .community-social-commandbar,
+    .community-desktop-social .community-social-stories,
+    .community-desktop-social .community-social-feed-panel {
+      border-radius: 1rem !important;
+      box-shadow: 0 10px 28px rgba(35, 68, 74, 0.07) !important;
+    }
+    .community-desktop-social .community-social-commandbar {
+      gap: 0.9rem !important;
+      margin-bottom: 0.95rem !important;
+      padding: 0.72rem !important;
+    }
+    .community-desktop-social .community-social-search {
+      min-height: 3rem !important;
+      gap: 0.7rem !important;
+      border-radius: 0.8rem !important;
+      padding-inline: 1rem !important;
+      font-size: 0.92rem !important;
+    }
+    .community-desktop-social .community-social-command-actions {
+      gap: 0.62rem !important;
+    }
+    .community-desktop-social .community-social-command-actions button {
+      min-height: 3rem !important;
+      border-radius: 0.78rem !important;
+      padding-inline: 1.05rem !important;
+      font-size: 0.82rem !important;
+    }
+    .community-desktop-social .community-social-stories {
+      margin-bottom: 0.95rem !important;
+      padding: 0.9rem 1rem 0.85rem !important;
+    }
+    .community-desktop-social .community-social-section-heading {
+      margin-bottom: 0.72rem !important;
+    }
+    .community-desktop-social .community-social-section-heading h2,
+    .community-desktop-social .community-social-section-heading h3 {
+      font-size: 1.08rem !important;
+      line-height: 1.15 !important;
+    }
+    .community-desktop-social .community-social-section-heading p,
+    .community-desktop-social .community-social-section-heading span {
+      font-size: 0.75rem !important;
+      line-height: 1.35 !important;
+    }
+    .community-desktop-social .community-social-story-row {
+      gap: 0.9rem !important;
+      padding-bottom: 0.35rem !important;
+    }
+    .community-desktop-social .community-social-story {
+      width: 4.9rem !important;
+      flex-basis: 4.9rem !important;
+      gap: 0.42rem !important;
+      font-size: 0.72rem !important;
+      line-height: 1.15 !important;
+    }
+    .community-desktop-social .community-social-story-avatar {
+      height: 3.55rem !important;
+      width: 3.55rem !important;
+    }
+    .community-desktop-social .community-social-story-plus {
+      height: 1.18rem !important;
+      width: 1.18rem !important;
+      font-size: 0.72rem !important;
+    }
+    .community-desktop-social .community-social-feed-heading {
+      padding: 1rem 1.1rem 0.85rem !important;
+    }
+    .community-desktop-social .community-social-feed-heading h2 {
+      font-size: 1.18rem !important;
+      line-height: 1.15 !important;
+    }
+    .community-desktop-social .community-social-feed-heading p {
+      margin-top: 0.25rem !important;
+      font-size: 0.78rem !important;
+      line-height: 1.45 !important;
+    }
+    .community-desktop-social .community-social-feed-heading > span {
+      border-radius: 0.62rem !important;
+      padding: 0.45rem 0.68rem !important;
+      font-size: 0.74rem !important;
+    }
+    .community-desktop-social .community-social-feed-tabs {
+      gap: 0.3rem !important;
+      padding: 0.55rem 0.72rem !important;
+    }
+    .community-desktop-social .community-social-feed-tab {
+      min-height: 2.45rem !important;
+      border-radius: 0.66rem !important;
+      padding-inline: 0.82rem !important;
+      font-size: 0.78rem !important;
+    }
+    .community-desktop-social .community-social-feed-stream {
+      gap: 0.95rem !important;
+      padding: 0.95rem !important;
+    }
+    .community-desktop-social .community-desktop-feed-card {
+      border-radius: 0.95rem !important;
+      box-shadow: 0 8px 22px rgba(35, 68, 74, 0.07) !important;
+    }
+    .community-desktop-social .community-desktop-feed-card-main {
+      gap: 0.85rem !important;
+      padding: 1rem 1.05rem 0.85rem !important;
+    }
+    .community-desktop-social .community-mobile-feed-card-title {
+      font-size: 1.05rem !important;
+      line-height: 1.25 !important;
+      letter-spacing: -0.012em !important;
+    }
+    .community-desktop-social .community-mobile-feed-card-time {
+      font-size: 0.72rem !important;
+    }
+    .community-desktop-social .community-mobile-feed-card-meta {
+      font-size: 0.76rem !important;
+      line-height: 1.35 !important;
+    }
+    .community-desktop-social .community-mobile-feed-card-meta > span:last-child {
+      border-radius: 0.48rem !important;
+      padding: 0.16rem 0.55rem !important;
+    }
+    .community-desktop-social .community-mobile-feed-card-body {
+      margin-top: 0.7rem !important;
+      font-size: 0.96rem !important;
+      font-weight: 620 !important;
+      line-height: 1.7 !important;
+      -webkit-line-clamp: 5 !important;
+    }
+    .community-desktop-social .community-social-card-media {
+      min-height: 15rem !important;
+      border-top-color: #e5ecee !important;
+      border-bottom-color: #e5ecee !important;
+    }
+    .community-desktop-social .community-social-card-media > button {
+      min-height: 15rem !important;
+    }
+    .community-desktop-social .community-social-card-poll {
+      gap: 0.55rem !important;
+      padding: 0.9rem 1.05rem !important;
+    }
+    .community-desktop-social .community-social-card-poll button {
+      min-height: 2.65rem !important;
+      border-radius: 0.68rem !important;
+      padding: 0.58rem 0.85rem !important;
+      font-size: 0.78rem !important;
+    }
+    .community-desktop-social .community-desktop-feed-card-actions {
+      gap: 0.22rem !important;
+      padding: 0.55rem 0.85rem 0.65rem !important;
+    }
+    .community-desktop-social .community-desktop-feed-card-actions button {
+      min-height: 2.1rem !important;
+      border-radius: 0.58rem !important;
+      padding: 0.42rem 0.62rem !important;
+      font-size: 0.74rem !important;
+    }
+    .community-desktop-social .community-social-empty {
+      border-radius: 0.88rem !important;
+      padding: 3.2rem 1.25rem !important;
+      font-size: 0.95rem !important;
+      line-height: 1.5 !important;
+    }
+    .community-desktop-social .community-desktop-thread {
+      width: min(100%, 58rem) !important;
+      border-radius: 1rem !important;
+    }
+    .community-desktop-social .community-desktop-thread-header {
+      min-height: 4.35rem !important;
+      padding: 0.75rem 1rem !important;
+    }
+    .community-desktop-social .community-desktop-thread-header h2 {
+      font-size: 1.05rem !important;
+    }
+    .community-desktop-social .community-desktop-post-card {
+      max-width: 50rem !important;
+      border-radius: 0.95rem !important;
+      padding: 1.25rem !important;
+    }
+    .community-desktop-social .community-desktop-post-card > h3 {
+      font-size: clamp(1.45rem, 2vw, 1.9rem) !important;
+    }
+    .community-desktop-social .community-desktop-post-card > p {
+      font-size: 1.03rem !important;
+      line-height: 1.78 !important;
+    }
+    .community-desktop-social .community-desktop-reaction-chip {
+      font-size: 0.8rem !important;
+      padding: 0.48rem 0.68rem !important;
+    }
+    .community-desktop-social .community-desktop-reply-composer textarea {
+      min-height: 3rem !important;
+      border-radius: 0.78rem !important;
+      font-size: 0.9rem !important;
+      line-height: 1.45 !important;
+    }
+    .community-desktop-social .community-desktop-reply-composer > div > button {
+      height: 3rem !important;
+      min-height: 3rem !important;
+      min-width: 5rem !important;
+      border-radius: 0.78rem !important;
+    }
+    .community-desktop-social .community-social-rail-card {
+      border-radius: 0.95rem !important;
+      padding: 0.95rem !important;
+      box-shadow: 0 8px 24px rgba(35, 68, 74, 0.055) !important;
+    }
+    .community-desktop-social .community-social-rail-profile h3,
+    .community-desktop-social .community-social-rail-title h3 {
+      font-size: 0.98rem !important;
+      line-height: 1.2 !important;
+    }
+    .community-desktop-social .community-social-rail-profile p,
+    .community-desktop-social .community-social-rail-title button,
+    .community-desktop-social .community-social-rail-title span {
+      font-size: 0.72rem !important;
+    }
+    .community-desktop-social .community-social-rail-stats span {
+      border-radius: 0.7rem !important;
+      padding: 0.58rem 0.35rem !important;
+      font-size: 0.66rem !important;
+    }
+    .community-desktop-social .community-social-rail-stats strong {
+      font-size: 0.86rem !important;
+    }
+    .community-desktop-social .community-social-rail-empty {
+      border-radius: 0.7rem !important;
+      padding: 0.9rem !important;
+      font-size: 0.72rem !important;
+      line-height: 1.4 !important;
+    }
+    .community-desktop-social .community-social-contact span,
+    .community-desktop-social .community-social-suggestion-name strong,
+    .community-desktop-social .community-social-notification strong {
+      font-size: 0.78rem !important;
+    }
+    .community-desktop-social .community-social-suggestion-name span,
+    .community-desktop-social .community-social-notification span {
+      font-size: 0.68rem !important;
+    }
+    .community-desktop-social .community-social-follow-button {
+      min-height: 2.15rem !important;
+      border-radius: 0.58rem !important;
+      font-size: 0.68rem !important;
+    }
+  }
+  @media (min-width: 1280px) {
+    .community-desktop-social .community-social-right-rail {
+      width: 22rem !important;
+      min-width: 22rem !important;
+      gap: 0.95rem !important;
+      padding: 1rem !important;
+    }
+    .community-desktop-social .community-center-shell {
+      max-width: calc(100% - 22rem) !important;
+    }
+  }
+  @media (min-width: 1024px) and (max-width: 1279px) {
+    .community-desktop-social .community-desktop-sidebar {
+      width: 14.5rem !important;
+    }
+    .community-desktop-social .community-social-feed-page {
+      width: min(100%, 48rem) !important;
+    }
+  }
+
   /* Instagram-inspired default mobile Community UX */
   @media (max-width: 767px) {
     .community-mobile-latest { background: #fff !important; color: #111 !important; }
