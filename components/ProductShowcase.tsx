@@ -161,29 +161,36 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
           </div>
         </div>
 
-        <div className={`store-search-sticky sticky top-1 z-20 mx-auto max-w-6xl border border-[#DDE5EF] bg-white/95 shadow-[0_16px_48px_rgba(16,33,63,0.08)] backdrop-blur-xl animate-child animate-delay-2 transition-all duration-300 sm:top-3 lg:top-4 ${isStoreFilterCompact ? 'rounded-2xl p-2 sm:p-3' : 'rounded-3xl p-3 sm:p-4'}`}>
+        <div className={`store-search-sticky sticky top-2 z-20 mx-auto max-w-6xl overflow-hidden border border-white/80 bg-white/90 shadow-[0_24px_70px_rgba(16,33,63,0.14)] ring-1 ring-[#D7E7FF]/80 backdrop-blur-2xl animate-child animate-delay-2 transition-all duration-300 sm:top-4 lg:top-5 ${isStoreFilterCompact ? 'rounded-[1.35rem] p-2 sm:p-3' : 'rounded-[1.75rem] p-3.5 sm:p-5'}`}>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             {!hideInternalSearch && (
-              <div className="relative min-h-[52px] flex-1">
+              <div className="store-search-field group relative min-h-[58px] flex-1">
                 <label className="sr-only" htmlFor="product-search">Search products</label>
-                <svg className="pointer-events-none absolute left-4 top-1/2 h-5 w-5 -translate-y-1/2 text-[#1769FF]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                <input id="product-search" type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') clearSearch(); }} placeholder="Search Math, physics numericals, class 10, PDF, course..." aria-label="Search products" className="h-[52px] w-full rounded-full border border-blue-100 bg-[#F8FBFF]/90 py-3 pl-12 pr-14 text-sm font-semibold text-[#081A45] outline-none transition focus:border-[#1769FF] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:text-base" />
-                {searchQuery && <button type="button" onClick={clearSearch} aria-label="Clear product search" className="absolute right-3 top-1/2 grid h-9 w-9 -translate-y-1/2 place-items-center rounded-full bg-white text-[#536178] shadow-sm transition hover:text-[#1769FF]">×</button>}
+                <div className="pointer-events-none absolute left-3 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-gradient-to-br from-[#EAF2FF] to-[#F4F0FF] text-[#1769FF] shadow-inner">
+                  <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                </div>
+                <input id="product-search" type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onKeyDown={(event) => { if (event.key === 'Escape') clearSearch(); }} placeholder="Search courses, notes, class, subject..." aria-label="Search products" className="h-[58px] w-full rounded-[1.15rem] border border-[#CFE0F7] bg-gradient-to-r from-white to-[#F7FAFF] py-3 pl-16 pr-14 text-[15px] font-black text-[#081A45] shadow-[inset_0_1px_0_rgba(255,255,255,0.95)] outline-none transition placeholder:text-[#8794AA] focus:border-[#1769FF] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:rounded-[1.35rem] sm:text-base" />
+                {searchQuery && <button type="button" onClick={clearSearch} aria-label="Clear product search" className="absolute right-3 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-[#E1EAF7] bg-white text-lg font-black text-[#536178] shadow-sm transition hover:border-[#1769FF] hover:text-[#1769FF]">×</button>}
               </div>
             )}
-            <div className={`${isStoreFilterCompact ? 'hidden' : 'flex'} flex-col gap-3 sm:flex-row lg:w-auto`}>
-              <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)} aria-label="Sort products" className="h-12 rounded-full border border-blue-100 bg-white px-4 text-sm font-bold text-[#081A45] outline-none focus:border-[#1769FF] focus:ring-4 focus:ring-blue-100">
+            <div className={`${isStoreFilterCompact ? 'hidden' : 'flex'} store-sort-actions flex-col gap-2 sm:flex-row lg:w-auto`}>
+              <select value={sortBy} onChange={(e) => setSortBy(e.target.value as SortOption)} aria-label="Sort products" className="h-12 rounded-2xl border border-[#CFE0F7] bg-white px-4 text-sm font-black text-[#081A45] shadow-sm outline-none focus:border-[#1769FF] focus:ring-4 focus:ring-blue-100">
                 <option value="recommended">Recommended</option><option value="newest">Newest</option><option value="rating">Top rated</option><option value="price-asc">Price low to high</option><option value="price-desc">Price high to low</option><option value="free-first">Free first</option><option value="popular">Popular</option>
               </select>
-              <button type="button" onClick={clearAll} className="h-12 rounded-full border border-blue-100 bg-white px-5 text-sm font-black text-[#1769FF] transition hover:bg-blue-50">Clear all</button>
+              <button type="button" onClick={clearAll} className="h-12 rounded-2xl border border-[#CFE0F7] bg-[#F8FBFF] px-5 text-sm font-black text-[#1769FF] shadow-sm transition hover:border-[#1769FF] hover:bg-white">Clear all</button>
             </div>
           </div>
-          <div className={`${isStoreFilterCompact ? 'hidden' : 'flex'} mt-4 items-center gap-2 overflow-x-auto border-t border-[#E4EAF2] pt-4 pb-1`} aria-label="Product category filters">
-            {filters.map(filter => <button key={filter} type="button" onClick={() => setActiveFilter(filter)} aria-pressed={activeFilter === filter} className={`shrink-0 rounded-xl px-4 py-2.5 text-xs font-bold transition sm:text-sm ${activeFilter === filter ? 'bg-[#1557B0] text-white shadow-[0_8px_20px_rgba(21,87,176,0.2)]' : 'border border-[#DDE5EF] bg-[#F7F9FC] text-[#526179] hover:border-[#B7CAE4] hover:bg-white hover:text-[#1557B0]'}`}>{filter}</button>)}
+          <div className={`${isStoreFilterCompact ? 'hidden' : 'flex'} store-filter-chip-strip mt-4 items-center gap-2 overflow-x-auto border-t border-[#E4EAF2]/80 pt-4 pb-1`} aria-label="Product category filters">
+            <span className="shrink-0 rounded-full bg-[#EEF4FF] px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#1557B0]">Tags</span>
+            {filters.map(filter => (
+              <button key={filter} type="button" onClick={() => setActiveFilter(filter)} aria-pressed={activeFilter === filter} className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-black transition sm:text-sm ${activeFilter === filter ? 'border-[#1557B0] bg-gradient-to-r from-[#1557B0] to-[#6D5CFF] text-white shadow-[0_10px_24px_rgba(21,87,176,0.24)]' : 'border-[#DDE5EF] bg-white/85 text-[#526179] shadow-sm hover:border-[#B7CAE4] hover:bg-white hover:text-[#1557B0]'}`}>
+                {activeFilter === filter && <span className="mr-1.5">✓</span>}{filter}
+              </button>
+            ))}
           </div>
-          {!activeQuery && suggestions.length > 0 && <div className={`${isStoreFilterCompact ? 'hidden' : 'flex'} mt-3 items-center gap-2 overflow-x-auto pb-1`} aria-label="Popular searches">
-            <span className="shrink-0 text-xs font-bold uppercase tracking-[0.12em] text-[#7A879A]">Popular</span>
-            {suggestions.slice(0, 6).map(suggestion => <button key={suggestion} type="button" onClick={() => setSearchQuery(suggestion)} className="shrink-0 rounded-lg bg-[#EEF3F9] px-3 py-2 text-xs font-bold text-[#1557B0] transition hover:bg-[#DFEAF7]">{suggestion}</button>)}
+          {!activeQuery && suggestions.length > 0 && <div className={`${isStoreFilterCompact ? 'hidden' : 'flex'} store-popular-chip-strip mt-3 items-center gap-2 overflow-x-auto pb-1`} aria-label="Popular searches">
+            <span className="shrink-0 text-xs font-black uppercase tracking-[0.14em] text-[#7A879A]">Try</span>
+            {suggestions.slice(0, 6).map(suggestion => <button key={suggestion} type="button" onClick={() => setSearchQuery(suggestion)} className="shrink-0 rounded-full border border-[#DDE7F5] bg-[#F8FBFF] px-3.5 py-2 text-xs font-black text-[#1557B0] shadow-sm transition hover:border-[#1769FF] hover:bg-white">{suggestion}</button>)}
           </div>}
         </div>
 

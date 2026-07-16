@@ -1933,6 +1933,24 @@
         isolation: isolate;
         transform: translateZ(0);
         will-change: transform;
+        contain: paint;
+      }
+
+      .store-filter-chip-strip,
+      .store-popular-chip-strip {
+        -webkit-overflow-scrolling: touch;
+        scrollbar-width: none;
+        scroll-snap-type: x proximity;
+      }
+
+      .store-filter-chip-strip::-webkit-scrollbar,
+      .store-popular-chip-strip::-webkit-scrollbar {
+        display: none;
+      }
+
+      .store-filter-chip-strip > button,
+      .store-popular-chip-strip > button {
+        scroll-snap-align: start;
       }
 
       .dock-count-badge {
