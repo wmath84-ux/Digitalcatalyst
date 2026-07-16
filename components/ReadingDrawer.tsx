@@ -442,22 +442,44 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
   const accentSoftBackground = themedExperience ? chatPalette.activeBlue : hexToRgba(readingStyle.accentColor, readingStyle.accentOpacity, defaultReadingStyle.accentColor);
   const accentStrongBackground = themedExperience ? chatPalette.linkText : hexToRgba(readingStyle.accentColor, 92, defaultReadingStyle.accentColor);
 
+  const handleOverlayPointerDownCapture = (event: React.PointerEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest?.('[data-reading-drawer-panel="true"]')) return;
+
+    event.preventDefault();
+    event.stopPropagation();
+
+    if (event.pointerType !== 'touch' && window.matchMedia('(min-width: 768px)').matches) {
+      onClose();
+    }
+  };
+
+  const absorbOverlayClick = (event: React.MouseEvent<HTMLDivElement>) => {
+    const target = event.target as HTMLElement | null;
+    if (target?.closest?.('[data-reading-drawer-panel="true"]')) return;
+    event.preventDefault();
+    event.stopPropagation();
+  };
+
   if (!isOpen) return null;
 
   return (
     <div
-      className="fixed inset-0 z-[1200]"
+      className="fixed inset-0 z-[1200] pointer-events-auto"
       role="dialog"
       aria-modal="true"
       aria-labelledby="reading-drawer-title"
+      onPointerDownCapture={handleOverlayPointerDownCapture}
+      onClickCapture={absorbOverlayClick}
     >
       <div
-        className="absolute inset-0 backdrop-blur-sm"
+        className="absolute inset-0 pointer-events-auto touch-none backdrop-blur-sm"
         style={{ backgroundColor: readingBackground }}
-        onPointerDown={() => window.matchMedia('(min-width: 768px)').matches && onClose()}
+        aria-hidden="true"
       />
       <div className="absolute inset-y-0 right-0 flex w-full justify-end pointer-events-none">
         <section
+          data-reading-drawer-panel="true"
           onPointerDown={(event) => event.stopPropagation()}
           className="relative h-full w-full overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw] pointer-events-auto"
           style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder }}

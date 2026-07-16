@@ -47,9 +47,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
     }
 
     return (
-        <article className={`group relative flex flex-col overflow-hidden rounded-3xl border border-[#DDE5EF] bg-white shadow-[0_10px_32px_rgba(16,33,63,0.06)] transition duration-300 ease-out hover:-translate-y-1 hover:border-[#B7CAE4] hover:shadow-[0_20px_48px_rgba(16,33,63,0.12)] ${animationClass}`}>
+        <article className={`group relative flex flex-col overflow-hidden rounded-[22px] border border-[#DDE5EF] bg-white shadow-[0_10px_32px_rgba(16,33,63,0.06)] transition duration-300 ease-out hover:-translate-y-1 hover:border-[#B7CAE4] hover:shadow-[0_20px_48px_rgba(16,33,63,0.12)] ${animationClass}`}>
             {/* Image Container */}
-            <div className="relative aspect-[4/3] w-full overflow-hidden border-b border-[#E4EAF2] bg-[#F7F9FC]">
+            <div className="relative aspect-[4/3] w-full overflow-hidden border-b border-[#E4EAF2] bg-[#F7F9FC] p-2 sm:p-3">
+                <div className="product-card-media-safe-frame relative h-full w-full overflow-hidden rounded-[16px] bg-white/70">
                 <SafeImage
                     src={displayImage}
                     fallbackSrc={getProductImageFallback(product)}
@@ -62,6 +63,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                     fallbackMessage="Image preview unavailable"
                     aspect="video"
                 />
+                </div>
                 <button
                     type="button"
                     onClick={() => onViewDetails()}
