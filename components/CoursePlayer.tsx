@@ -1401,6 +1401,7 @@ const CoursePlayer: React.FC<{
       return;
     }
 
+    resetCourseModulePanel();
     void flushYoutubeCoins('closed');
     onBack();
   };
@@ -1535,16 +1536,14 @@ const CoursePlayer: React.FC<{
   }, []);
 
   const closeCourseSidebar = useCallback(() => {
-    resetCourseModulePanel();
     setIsSidebarOpen(false);
     closeCourseLayerHistory('modules');
-  }, [closeCourseLayerHistory, resetCourseModulePanel]);
+  }, [closeCourseLayerHistory]);
 
   const openCourseSidebar = useCallback(() => {
-    resetCourseModulePanel();
     setIsMentorOpen(false);
     setIsSidebarOpen(true);
-  }, [resetCourseModulePanel]);
+  }, []);
 
   const toggleCourseSidebar = useCallback(() => {
     if (isSidebarOpenRef.current) closeCourseSidebar();
@@ -2155,7 +2154,7 @@ const CoursePlayer: React.FC<{
 
           <div className="flex min-w-0 items-center justify-center gap-3">
             <YoutubeRewardChip />
-            <button onClick={() => { resetCourseModulePanel(); setIsDesktopSidebarCollapsed(value => !value); }} className="shrink-0 rounded-2xl border border-[#D9E7F8] bg-white px-5 py-3 text-base font-black text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.06)] transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]">
+            <button onClick={() => { setIsDesktopSidebarCollapsed(value => !value); }} className="shrink-0 rounded-2xl border border-[#D9E7F8] bg-white px-5 py-3 text-base font-black text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.06)] transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]">
               {isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize modules'}
             </button>
             <button onClick={() => toggleCourseMentor()} className="rounded-2xl border border-[#C9C2FF] bg-[#F1EEFF] px-6 py-3 text-base font-black text-[#5B4BFF] shadow-[0_14px_34px_rgba(91,75,255,0.14)] transition hover:-translate-y-0.5 hover:bg-white">

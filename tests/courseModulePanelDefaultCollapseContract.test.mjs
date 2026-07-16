@@ -19,11 +19,14 @@ test('nested modules stay closed by default and inherit reset key', () => {
   assert.match(source, /resetKey=\{resetKey\}/);
 });
 
-test('course module panel resets expansion state on close, reopen and desktop collapse toggle', () => {
+test('course module panel preserves expansion during lesson navigation and resets only on course exit', () => {
   assert.match(source, /const \[modulePanelResetKey, setModulePanelResetKey\] = useState\(0\)/);
   assert.match(source, /const resetCourseModulePanel = useCallback\(\(\) => \{/);
   assert.match(source, /setModulePanelResetKey\(value => value \+ 1\)/);
-  assert.match(source, /const closeCourseSidebar = useCallback\(\(\) => \{\s*resetCourseModulePanel\(\);\s*setIsSidebarOpen\(false\);/s);
-  assert.match(source, /const openCourseSidebar = useCallback\(\(\) => \{\s*resetCourseModulePanel\(\);\s*setIsMentorOpen\(false\);\s*setIsSidebarOpen\(true\);/s);
-  assert.match(source, /onClick=\{\(\) => \{ resetCourseModulePanel\(\); setIsDesktopSidebarCollapsed\(value => !value\); \}\}/);
+  assert.match(source, /const closeCourseSidebar = useCallback\(\(\) => \{\s*setIsSidebarOpen\(false\);\s*closeCourseLayerHistory\('modules'\);\s*\}, \[closeCourseLayerHistory\]\);/s);
+  assert.match(source, /const openCourseSidebar = useCallback\(\(\) => \{\s*setIsMentorOpen\(false\);\s*setIsSidebarOpen\(true\);\s*\}, \[\]\);/s);
+  assert.match(source, /resetCourseModulePanel\(\);\s*void flushYoutubeCoins\('closed'\);\s*onBack\(\);/);
+  assert.doesNotMatch(source, /resetCourseModulePanel\(\);\s*setIsSidebarOpen\(false\);/);
+  assert.doesNotMatch(source, /resetCourseModulePanel\(\);\s*setIsMentorOpen\(false\);/);
+  assert.doesNotMatch(source, /resetCourseModulePanel\(\); setIsDesktopSidebarCollapsed/);
 });

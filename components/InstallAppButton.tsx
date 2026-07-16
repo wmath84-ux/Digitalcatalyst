@@ -14,7 +14,7 @@ interface InstallAppButtonProps {
   enabled?: boolean;
 }
 
-const INSTALL_DISMISSED_SESSION_KEY = 'digitalCatalystInstallDismissed';
+const INSTALL_DISMISSED_SESSION_KEY = 'eduvoraInstallDismissed';
 
 const InstallAppButton: React.FC<InstallAppButtonProps> = ({ enabled = true }) => {
   const [installPrompt, setInstallPrompt] = useState<BeforeInstallPromptEvent | null>(null);
@@ -87,9 +87,9 @@ const InstallAppButton: React.FC<InstallAppButtonProps> = ({ enabled = true }) =
           <img src="/icons/icon-192x192.svg" alt="" className="h-full w-full" aria-hidden="true" />
         </div>
         <div>
-          <h2 className="text-sm font-black">Install Digital Catalyst</h2>
+          <h2 className="text-sm font-black">Install Eduvora</h2>
           <p className="mt-1 text-xs leading-5 text-slate-600">
-            Add the student learning app to your home screen for faster access and offline app-shell loading.
+            Add Eduvora to your home screen for faster learning access and offline app-shell loading.
           </p>
         </div>
       </div>
@@ -100,7 +100,7 @@ const InstallAppButton: React.FC<InstallAppButtonProps> = ({ enabled = true }) =
           onClick={handleInstallClick}
           className="flex-1 rounded-full px-4 py-2.5 text-sm font-bold"
         >
-          {installPrompt ? 'Install App' : 'Add to Home Screen'}
+          {installPrompt ? 'Install Eduvora' : 'Add Eduvora'}
         </LiquidMetalButton>
         <button
           type="button"

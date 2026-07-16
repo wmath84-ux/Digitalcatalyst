@@ -813,7 +813,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   </div>
                 )}
 
-                <div className="mt-5 space-y-3 sm:mt-6">
+                <div className="product-detail-eye-catching-actions mt-5 space-y-3 rounded-[22px] border border-white/80 bg-white/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_46px_rgba(37,99,235,0.10)] ring-1 ring-blue-100/70 backdrop-blur-xl sm:mt-6 sm:p-3">
+                  <div className="product-detail-action-focus-copy rounded-[18px] border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-cyan-50 px-4 py-3">
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Choose your unlock path</p>
+                    <p className="mt-1 text-sm font-bold leading-6 text-slate-600">The primary payment action stays visually strongest so students know exactly what to tap next.</p>
+                  </div>
                   {/* Source-contract marker only: className="product-checkout-primary product-checkout-purchased w-full rounded-2xl */}
                   {/* Source-contract marker only: className="product-checkout-secondary w-full rounded-2xl */}
                   {/* Source-contract marker only: className="product-checkout-primary w-full rounded-2xl */}
@@ -821,28 +825,44 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   {/* Source-contract marker only: product-checkout-secondary w-full rounded-2xl */}
                   {/* Source-contract marker only: product-checkout-primary w-full rounded-2xl */}
                   {isPurchased ? (
-                    <button type="button" onClick={() => { onOpenPurchases?.(); }} className={`product-checkout-primary product-checkout-purchased w-full ${detailActionRoundClass} border border-slate-300 bg-gradient-to-r from-slate-100 to-white px-6 py-4 text-base font-black text-slate-600 shadow-sm transition hover:border-slate-400 hover:text-slate-800 active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg`}>
-                      <span className="block">✓ Purchased · Open My Purchases</span>
-                      <span className="mt-1 block text-xs font-bold text-slate-500">Complete product already owned</span>
+                    <button type="button" onClick={() => { onOpenPurchases?.(); }} className={`product-checkout-primary product-checkout-purchased product-detail-primary-owned-button w-full ${detailActionRoundClass} border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-cyan-50 px-6 py-4 text-base font-black text-emerald-800 shadow-[0_18px_46px_rgba(16,185,129,0.16)] ring-4 ring-emerald-500/10 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:text-emerald-900 hover:shadow-[0_22px_56px_rgba(16,185,129,0.20)] active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg`}>
+                      <span className="flex items-center justify-between gap-4">
+                        <span className="text-left">
+                          <span className="block">✓ Purchased · Open My Purchases</span>
+                          <span className="mt-1 block text-xs font-bold text-emerald-700/80">Complete product already owned</span>
+                        </span>
+                        <span className="flex h-11 min-w-11 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-[0_12px_30px_rgba(16,185,129,0.28)]">→</span>
+                      </span>
                     </button>
                   ) : (
-                    <LiquidMetalButton tone="blue" onClick={handleBuyClick} className={`product-checkout-primary w-full ${detailActionRoundClass} px-6 py-3.5 text-base font-black sm:px-8 sm:py-4 sm:text-lg`}>
-                      {product.isFree ? 'Complete free checkout' : `Pay ₹${finalTotalPrice.toFixed(2)} securely`}
+                    <LiquidMetalButton tone="blue" onClick={handleBuyClick} className={`product-checkout-primary product-detail-primary-pay-button product-detail-action-lift-ring w-full ${detailActionRoundClass} min-h-[4.85rem] px-6 py-4 text-base font-black shadow-[0_24px_62px_rgba(37,99,235,0.34)] ring-4 ring-blue-500/15 transition hover:-translate-y-0.5 hover:ring-blue-400/30 active:scale-[0.99] sm:px-8 sm:py-5 sm:text-lg`}>
+                      <span className="flex w-full items-center justify-between gap-4">
+                        <span className="text-left">
+                          <span className="block text-[11px] font-black uppercase tracking-[0.22em] text-white/80">Secure checkout</span>
+                          <span className="mt-1 block text-lg font-black leading-tight sm:text-xl">{product.isFree ? 'Complete free checkout' : `Pay ₹${finalTotalPrice.toFixed(2)} securely`}</span>
+                        </span>
+                        <span className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-white/20 text-2xl shadow-inner">→</span>
+                      </span>
                     </LiquidMetalButton>
                   )}
                   {!isPurchased && canShowProductCoinCheckout && (
-                    <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className={`w-full ${detailActionRoundClass} border border-amber-200/70 bg-gradient-to-r from-white via-amber-50/90 to-white px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.14)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg`}>
-                      🪙 {coinCheckoutLabel} with EduCoins
-                      {requiredProductCoins > 0 && (
-                        <span className="mt-2 block text-xs font-bold text-slate-600">
-                          Admin coin price: {requiredProductCoins} EduCoins · Your balance: {userCoinBalance} EduCoins
-                          {missingProductCoins > 0 ? ` · Missing: ${missingProductCoins}` : ' · Ready to unlock instantly'}
+                    <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className={`product-detail-educoin-button w-full ${detailActionRoundClass} border border-amber-200/80 bg-gradient-to-r from-amber-50 via-white to-yellow-50 px-6 py-4 text-base font-black text-amber-900 shadow-[0_18px_48px_rgba(245,158,11,0.18)] ring-2 ring-amber-400/10 backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_22px_58px_rgba(245,158,11,0.23)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg`}>
+                      <span className="flex items-center justify-between gap-4">
+                        <span className="text-left">
+                          <span className="block">🪙 {coinCheckoutLabel} with EduCoins</span>
+                          {requiredProductCoins > 0 && (
+                            <span className="mt-2 block text-xs font-bold text-slate-600">
+                              Admin coin price: {requiredProductCoins} EduCoins · Your balance: {userCoinBalance} EduCoins
+                              {missingProductCoins > 0 ? ` · Missing: ${missingProductCoins}` : ' · Ready to unlock instantly'}
+                            </span>
+                          )}
                         </span>
-                      )}
+                        <span className="flex h-11 min-w-11 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-[0_12px_30px_rgba(245,158,11,0.24)]">→</span>
+                      </span>
                     </button>
                   )}
                   {hasLockedPaidUpdates && (
-                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className={`product-checkout-update relative min-h-[5.75rem] w-full overflow-hidden ${detailActionRoundClass} border border-emerald-300/60 bg-gradient-to-r from-emerald-700 via-teal-600 to-cyan-600 px-6 py-4 text-left text-base font-black text-white shadow-[0_18px_46px_rgba(5,150,105,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_52px_rgba(5,150,105,0.34)] active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg`}>
+                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className={`product-checkout-update product-detail-latest-update-button relative min-h-[5.75rem] w-full overflow-hidden ${detailActionRoundClass} border border-emerald-300/70 bg-gradient-to-r from-emerald-700 via-teal-600 to-cyan-600 px-6 py-4 text-left text-base font-black text-white shadow-[0_22px_58px_rgba(5,150,105,0.32)] ring-4 ring-emerald-400/15 transition hover:-translate-y-0.5 hover:shadow-[0_26px_66px_rgba(5,150,105,0.38)] active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg`}>
                       <span className="pointer-events-none absolute -right-5 -top-8 h-24 w-24 rounded-full bg-white/15 blur-2xl" />
                       <span className="relative flex items-center justify-between gap-4">
                         <span>
@@ -859,8 +879,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                       </span>
                     </button>
                   )}
-                  <button onClick={() => { if (isPurchased) { onOpenPurchases?.(); return; } onAddToCart(product.id, 1); }} className={`product-checkout-secondary w-full ${detailActionRoundClass} border border-indigo-200/70 bg-white/85 px-6 py-3.5 text-base font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 sm:px-8 sm:py-4`}>
-                    {isPurchased ? 'Already in My Purchases' : 'Add to Cart'}
+                  <button onClick={() => { if (isPurchased) { onOpenPurchases?.(); return; } onAddToCart(product.id, 1); }} className={`product-checkout-secondary product-detail-secondary-cart-button w-full ${detailActionRoundClass} border border-indigo-200/80 bg-white/90 px-6 py-4 text-base font-black text-indigo-700 shadow-[0_14px_36px_rgba(79,70,229,0.10)] ring-1 ring-indigo-100/80 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-[0_18px_46px_rgba(79,70,229,0.16)] active:scale-95 sm:px-8 sm:py-4`}>
+                    <span className="flex items-center justify-center gap-2">
+                      <span>{isPurchased ? 'Already in My Purchases' : 'Add to Cart'}</span>
+                      {!isPurchased && <span aria-hidden="true">＋</span>}
+                    </span>
                   </button>
                 </div>
 

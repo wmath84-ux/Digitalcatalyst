@@ -18,9 +18,9 @@ export default defineConfig(({ mode }) => {
           registerType: 'autoUpdate',
           includeAssets: ['ads.txt'],
           manifest: {
-            name: 'Digital Catalyst',
-            short_name: 'Digital Catalyst',
-            description: 'Notes, courses, AI learning store, and student learning app.',
+            name: 'Eduvora',
+            short_name: 'Eduvora',
+            description: 'Eduvora student learning app for notes, courses, AI mentor, and digital study resources.',
             start_url: '/',
             scope: '/',
             display: 'standalone',
@@ -42,7 +42,7 @@ export default defineConfig(({ mode }) => {
                 urlPattern: ({ request }) => ['script', 'style', 'image', 'font'].includes(request.destination),
                 handler: 'CacheFirst',
                 options: {
-                  cacheName: 'digital-catalyst-static-assets',
+                  cacheName: 'eduvora-static-assets',
                   expiration: { maxEntries: 80, maxAgeSeconds: 60 * 60 * 24 * 30 }
                 }
               }
