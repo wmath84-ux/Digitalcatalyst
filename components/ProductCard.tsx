@@ -3,6 +3,16 @@ import React from 'react';
 import { ProductWithRating, WebsiteSettings, Coupon } from '../App';
 import { getProductImage, getProductImageFallback } from '../utils/productImages';
 import SafeImage from './common/SafeImage';
+import { pillClassForProductRoundness, resolveProductRoundnessSettings } from '../utils/productRoundness';
+import type { ProductRoundnessKey } from '../utils/productRoundness';
+
+type ProductCardRoundnessSurface = 'store' | 'homeFeatured' | 'wishlist';
+
+const productCardRoundnessKeyBySurface: Record<ProductCardRoundnessSurface, ProductRoundnessKey> = {
+  store: 'storeCards',
+  homeFeatured: 'homeFeaturedCards',
+  wishlist: 'wishlistCards',
+};
 
 interface ProductCardProps {
   settings: WebsiteSettings;
@@ -16,14 +26,25 @@ interface ProductCardProps {
   displayMode?: 'showcase' | 'wishlist';
   coupons: Coupon[];
   isPurchased?: boolean;
+  roundnessSurface?: ProductCardRoundnessSurface;
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDetails, isWishlisted, onToggleWishlist, onAddToCart, animationDelay, displayMode = 'showcase', coupons, isPurchased = false }) => {
+const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDetails, isWishlisted, onToggleWishlist, onAddToCart, animationDelay, displayMode = 'showcase', coupons, isPurchased = false, roundnessSurface = 'store' }) => {
     // Use 'animate-child' class to hook into the parent's stagger logic.
     // The 'animate-delay-X' class comes from index.html CSS
     const animationClass = settings.animations.enabled
         ? `animate-child animate-delay-${(animationDelay % 12) + 1}`
         : '';
+
+    const productRoundness = resolveProductRoundnessSettings(settings);
+    const surfaceRoundnessKey = productCardRoundnessKeyBySurface[roundnessSurface];
+    const isSurfaceRounded = productRoundness[surfaceRoundnessKey] !== false;
+    const isInnerFrameRounded = productRoundness.mediaInnerFrame !== false;
+    const cardRoundClass = isSurfaceRounded ? 'rounded-[22px]' : 'rounded-xl';
+    const mediaPaddingClass = isInnerFrameRounded ? 'p-2 sm:p-3' : '';
+    const mediaFrameRoundClass = isInnerFrameRounded ? 'rounded-[16px] bg-white/70' : 'rounded-none bg-transparent';
+    const badgeRoundClass = pillClassForProductRoundness(productRoundness.productBadges !== false);
+    const actionButtonRoundClass = productRoundness.productActionButtons !== false ? 'rounded-full' : 'rounded-lg';
 
     const displayImage = getProductImage(product, 'card');
     // Coupon availability logic
@@ -47,10 +68,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
     }
 
     return (
-        <article className={`group relative flex flex-col overflow-hidden rounded-[22px] border border-[#DDE5EF] bg-white shadow-[0_10px_32px_rgba(16,33,63,0.06)] transition duration-300 ease-out hover:-translate-y-1 hover:border-[#B7CAE4] hover:shadow-[0_20px_48px_rgba(16,33,63,0.12)] ${animationClass}`}>
+        <article className={`group relative flex flex-col overflow-hidden ${cardRoundClass} border border-[#DDE5EF] bg-white shadow-[0_10px_32px_rgba(16,33,63,0.06)] transition duration-300 ease-out hover:-translate-y-1 hover:border-[#B7CAE4] hover:shadow-[0_20px_48px_rgba(16,33,63,0.12)] ${animationClass}`}>
             {/* Image Container */}
-            <div className="relative aspect-[4/3] w-full overflow-hidden border-b border-[#E4EAF2] bg-[#F7F9FC] p-2 sm:p-3">
-                <div className="product-card-media-safe-frame relative h-full w-full overflow-hidden rounded-[16px] bg-white/70">
+            <div className={`relative aspect-[4/3] w-full overflow-hidden border-b border-[#E4EAF2] bg-[#F7F9FC] ${mediaPaddingClass}`}>
+                <div className={`product-card-media-safe-frame relative h-full w-full overflow-hidden ${mediaFrameRoundClass}`}>
                 <SafeImage
                     src={displayImage}
                     fallbackSrc={getProductImageFallback(product)}
@@ -74,27 +95,27 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                 {/* Badges */}
                 <div className="absolute left-2 top-2 z-20 flex max-w-[72%] flex-col items-start gap-1.5 sm:left-3 sm:top-3 sm:gap-2">
                     {isPurchased ? (
-                        <span className="w-fit rounded-full bg-[#059669] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(5,150,105,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs">
+                        <span className={`w-fit ${badgeRoundClass} bg-[#059669] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(5,150,105,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs`}>
                             Purchased
                         </span>
                     ) : (
                         <>
                             {product.isFree && (
-                                <span className="w-fit rounded-full bg-gradient-to-r from-[#0757d8] to-[#6d28d9] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(37,99,235,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs">
+                                <span className={`w-fit ${badgeRoundClass} bg-gradient-to-r from-[#0757d8] to-[#6d28d9] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(37,99,235,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs`}>
                                     Free
                                 </span>
                             )}
                             {isCouponAvailable && product.couponCode && !product.isFree && settings.features.showSaleBadges && (
                                 <button
                                     onClick={(e) => { e.stopPropagation(); onViewDetails('price-section'); }}
-                                    className="w-fit rounded-full bg-[#6d28d9] px-3.5 py-1.5 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(109,40,217,0.45)] ring-2 ring-white/95 backdrop-blur-md transition-transform hover:scale-105 [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs"
+                                    className={`w-fit ${badgeRoundClass} bg-[#6d28d9] px-3.5 py-1.5 font-mono text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(109,40,217,0.45)] ring-2 ring-white/95 backdrop-blur-md transition-transform hover:scale-105 [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs`}
                                     title={`Use coupon ${product.couponCode}`}
                                 >
                                     {product.couponCode}
                                 </button>
                             )}
                             {!product.isFree && product.salePrice && settings.features.showSaleBadges && (
-                                <span className="w-fit rounded-full bg-[#e11d48] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(225,29,72,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs">
+                                <span className={`w-fit ${badgeRoundClass} bg-[#e11d48] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(225,29,72,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs`}>
                                     Sale
                                 </span>
                             )}
@@ -106,7 +127,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                 {settings.features.showFavourites && (
                     <button
                         onClick={(e) => { e.stopPropagation(); onToggleWishlist(product.id); }}
-                        className="absolute right-2 top-2 z-30 rounded-full bg-white/90 p-2 text-slate-600 shadow-sm backdrop-blur transition-all duration-200 hover:scale-110 hover:bg-white hover:text-red-500 sm:right-3 sm:top-3"
+                        className={`absolute right-2 top-2 z-30 ${badgeRoundClass} bg-white/90 p-2 text-slate-600 shadow-sm backdrop-blur transition-all duration-200 hover:scale-110 hover:bg-white hover:text-red-500 sm:right-3 sm:top-3`}
                         aria-label={isWishlisted ? 'Remove from Wishlist' : 'Add to Wishlist'}
                     >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill={isWishlisted ? 'currentColor' : 'none'} viewBox="0 0 24 24" stroke="currentColor" strokeWidth={isWishlisted ? 0 : 2}>
@@ -120,12 +141,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
             <div className="flex flex-grow flex-col p-5 sm:p-6">
                 <div className="mb-1 flex items-center justify-between gap-2">
                     {settings.features.showReviews && product.rating > 0 && (
-                        <div className="flex items-center gap-1 text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-0.5 rounded-full">
+                        <div className={`flex items-center gap-1 text-xs font-medium text-yellow-600 bg-yellow-50 px-2 py-0.5 ${badgeRoundClass}`}>
                             <svg className="w-3 h-3 fill-current" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00.951-.69l1.07-3.292z" /></svg>
                             {product.rating.toFixed(1)} <span className="text-slate-600">({product.reviewCount})</span>
                         </div>
                     )}
-                    {!isPurchased && product.category && <span className="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-800 ring-1 ring-slate-200">{product.category}</span>}
+                    {!isPurchased && product.category && <span className={`${badgeRoundClass} bg-slate-100 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.12em] text-slate-800 ring-1 ring-slate-200`}>{product.category}</span>}
                 </div>
 
                 <h3 className="mb-2 line-clamp-2 text-base font-bold leading-tight text-gray-900 transition-colors group-hover:text-primary sm:text-lg" title={product.title}>
@@ -158,7 +179,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                                 </>
                             )}
                         </div>
-                        <button onClick={() => onViewDetails()} className="flex shrink-0 items-center rounded-full border border-indigo-200/70 bg-white/85 px-3 py-2 text-xs font-black text-primary shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 sm:px-4 sm:text-sm">
+                        <button onClick={() => onViewDetails()} className={`flex shrink-0 items-center ${actionButtonRoundClass} border border-indigo-200/70 bg-white/85 px-3 py-2 text-xs font-black text-primary shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 sm:px-4 sm:text-sm`}>
                             {isPurchased ? 'Purchased' : 'Details'} <span className="ml-1">&rarr;</span>
                         </button>
                     </div>
@@ -167,13 +188,13 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                         <button
                             disabled={isPurchased}
                             onClick={() => onAddToCart(product.id, 1)}
-                            className="flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-2 rounded-lg hover:bg-opacity-90 transition-colors text-sm shadow-sm active:scale-95 disabled:cursor-not-allowed disabled:opacity-50"
+                            className={`flex-1 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold py-2 ${actionButtonRoundClass} hover:bg-opacity-90 transition-colors text-sm shadow-sm active:scale-95 disabled:cursor-not-allowed disabled:opacity-50`}
                         >
                             {isPurchased ? 'Purchased' : 'Move to Cart'}
                         </button>
                         <button
                             onClick={() => onToggleWishlist(product.id)}
-                            className="px-3 py-2 border border-gray-200 text-slate-600 rounded-lg hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors"
+                            className={`px-3 py-2 border border-gray-200 text-slate-600 ${actionButtonRoundClass} hover:bg-red-50 hover:text-red-500 hover:border-red-200 transition-colors`}
                             title="Remove from Wishlist"
                         >
                             ✕

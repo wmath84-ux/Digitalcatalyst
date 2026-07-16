@@ -105,6 +105,7 @@ const FeaturedProducts: React.FC<FeaturedProductsProps> = ({ settings, title, pr
                     animationDelay={index}
                 coupons={coupons}
                 isPurchased={purchasedProductIds.includes(product.id)}
+                roundnessSurface="homeFeatured"
               />
             </div>
           ))}

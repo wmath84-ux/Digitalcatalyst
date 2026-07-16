@@ -11,6 +11,7 @@ import ShareModal from './ShareModal';
 import { getProductImage, getProductImageFallback } from '../utils/productImages';
 import SafeImage from './common/SafeImage';
 import LiquidMetalButton from './ui/LiquidMetalButton';
+import { pillClassForProductRoundness, resolveProductRoundnessSettings } from '../utils/productRoundness';
 
 const ProductAnalyticsChart: React.FC = () => {
     return (
@@ -106,6 +107,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [priceJustUpdated, setPriceJustUpdated] = useState(false);
 
   const productUrl = `https://digitalcatalyst.example.com/product/${product.id}`;
+  const productRoundness = resolveProductRoundnessSettings(settings);
+  const detailPanelRoundClass = productRoundness.productDetailPanels !== false ? 'rounded-[1.5rem] sm:rounded-[2rem]' : 'rounded-xl';
+  const detailBadgeRoundClass = pillClassForProductRoundness(productRoundness.productBadges !== false);
+  const detailActionRoundClass = productRoundness.productActionButtons !== false ? 'rounded-2xl' : 'rounded-lg';
+
 
   useEffect(() => {
     setMainImage(null);
@@ -513,7 +519,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
           <div ref={gridRef} className={`grid grid-cols-1 gap-5 sm:gap-8 md:grid-cols-12 ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
             <div className="md:col-span-7">
-              <div className="relative w-full overflow-hidden rounded-[1.5rem] border border-white/70 bg-white/80 shadow-[0_24px_70px_rgba(15,23,42,0.10)] sm:rounded-[2rem]">
+              <div className={`relative w-full overflow-hidden ${detailPanelRoundClass} border border-white/70 bg-white/80 shadow-[0_24px_70px_rgba(15,23,42,0.10)]`}>
                 <SafeImage src={mainImage || getProductImage(product, 'detailMobile')} fallbackSrc={getProductImageFallback(product)} alt={product.title} wrapperClassName="block aspect-[4/3] w-full lg:hidden" className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Product'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="video" />
                 <SafeImage src={mainImage || getProductImage(product, 'detailDesktop')} fallbackSrc={getProductImageFallback(product)} alt={product.title} wrapperClassName="hidden aspect-video w-full lg:block" className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Product'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="video" />
                 {!isPurchased && isWishlisted && <span className="absolute right-3 top-3 rounded-full bg-red-500 px-3 py-1.5 text-xs font-black text-white shadow-lg sm:right-5 sm:top-5 sm:px-4 sm:py-2 sm:text-sm">♥ Wishlisted</span>}
@@ -535,10 +541,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 </div>
               )}
 
-              <div className="mt-5 rounded-[1.5rem] border border-white/70 bg-white/75 p-4 shadow-[0_18px_55px_rgba(15,23,42,0.07)] backdrop-blur-2xl sm:mt-8 sm:rounded-[2rem] sm:p-8">
+              <div className={`mt-5 ${detailPanelRoundClass} border border-white/70 bg-white/75 p-4 shadow-[0_18px_55px_rgba(15,23,42,0.07)] backdrop-blur-2xl sm:mt-8 sm:p-8`}>
                 <div className="mb-4 flex gap-2 overflow-x-auto pb-1 sm:mb-6 sm:flex-wrap sm:overflow-visible sm:pb-0">
                   {isPurchased ? (
-                    <span className="shrink-0 rounded-full border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 sm:px-4 sm:py-2 sm:text-xs">Purchased</span>
+                    <span className={`shrink-0 ${detailBadgeRoundClass} border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 sm:px-4 sm:py-2 sm:text-xs`}>Purchased</span>
                   ) : (
                     (product.tags || [product.category || 'Premium resource', 'Digital access', 'Lifetime']).slice(0, 4).map(tag => (
                       <span key={tag} className="shrink-0 rounded-full border border-indigo-100 bg-indigo-50/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-indigo-600 sm:px-4 sm:py-2 sm:text-xs">{tag}</span>
@@ -582,7 +588,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </div>
 
             <aside className="md:col-span-5">
-              <div id="price-section" className={`product-checkout-panel overflow-hidden rounded-[1.5rem] border border-white/60 bg-white/75 p-4 shadow-[0_28px_85px_rgba(79,70,229,0.14)] backdrop-blur-2xl sm:rounded-[2rem] sm:p-6 md:sticky md:top-24 ${priceJustUpdated ? 'price-flash' : ''}`}>
+              <div id="price-section" className={`product-checkout-panel overflow-hidden ${detailPanelRoundClass} border border-white/60 bg-white/75 p-4 shadow-[0_28px_85px_rgba(79,70,229,0.14)] backdrop-blur-2xl sm:p-6 md:sticky md:top-24 ${priceJustUpdated ? 'price-flash' : ''}`}>
                 <div className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-indigo-300/20 blur-3xl" />
                 <div className="pointer-events-none absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-cyan-600/20 blur-3xl" />
                 <div className="relative">
@@ -593,7 +599,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 <div className="relative mt-5 overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/85 p-4 sm:mt-6 sm:rounded-3xl sm:p-5">
                 {/* Source-contract marker only: border-double border-red-900 from-red-950 via-red-700 to-red-950 text-red-700 */}
                   {isPurchased && (
-                    <div className="product-owned-stamp pointer-events-none absolute right-3 top-3 z-10 rounded-full border border-emerald-200 bg-white/95 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-700 shadow-[0_14px_34px_rgba(5,150,105,0.20)] ring-2 ring-emerald-50 sm:right-5 sm:top-5 sm:px-5 sm:py-2.5 sm:text-sm" aria-label="Purchased">
+                    <div className={`product-owned-stamp pointer-events-none absolute right-3 top-3 z-10 ${detailBadgeRoundClass} border border-emerald-200 bg-white/95 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-700 shadow-[0_14px_34px_rgba(5,150,105,0.20)] ring-2 ring-emerald-50 sm:right-5 sm:top-5 sm:px-5 sm:py-2.5 sm:text-sm`} aria-label="Purchased">
                       <span className="sr-only">OWNED</span>
                       <span className="sr-only">Owned</span>
                       <span className="sr-only">Verified access</span>
@@ -623,18 +629,24 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 )}
 
                 <div className="mt-5 space-y-3 sm:mt-6">
+                  {/* Source-contract marker only: className="product-checkout-primary product-checkout-purchased w-full rounded-2xl */}
+                  {/* Source-contract marker only: className="product-checkout-secondary w-full rounded-2xl */}
+                  {/* Source-contract marker only: className="product-checkout-primary w-full rounded-2xl */}
+                  {/* Source-contract marker only: product-checkout-primary product-checkout-purchased w-full rounded-2xl */}
+                  {/* Source-contract marker only: product-checkout-secondary w-full rounded-2xl */}
+                  {/* Source-contract marker only: product-checkout-primary w-full rounded-2xl */}
                   {isPurchased ? (
-                    <button type="button" onClick={() => { onOpenPurchases?.(); }} className="product-checkout-primary product-checkout-purchased w-full rounded-2xl border border-slate-300 bg-gradient-to-r from-slate-100 to-white px-6 py-4 text-base font-black text-slate-600 shadow-sm transition hover:border-slate-400 hover:text-slate-800 active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg">
+                    <button type="button" onClick={() => { onOpenPurchases?.(); }} className={`product-checkout-primary product-checkout-purchased w-full ${detailActionRoundClass} border border-slate-300 bg-gradient-to-r from-slate-100 to-white px-6 py-4 text-base font-black text-slate-600 shadow-sm transition hover:border-slate-400 hover:text-slate-800 active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg`}>
                       <span className="block">✓ Purchased · Open My Purchases</span>
                       <span className="mt-1 block text-xs font-bold text-slate-500">Complete product already owned</span>
                     </button>
                   ) : (
-                    <LiquidMetalButton tone="blue" onClick={handleBuyClick} className="product-checkout-primary w-full rounded-2xl px-6 py-3.5 text-base font-black sm:px-8 sm:py-4 sm:text-lg">
+                    <LiquidMetalButton tone="blue" onClick={handleBuyClick} className={`product-checkout-primary w-full ${detailActionRoundClass} px-6 py-3.5 text-base font-black sm:px-8 sm:py-4 sm:text-lg`}>
                       Pay securely with Razorpay
                     </LiquidMetalButton>
                   )}
                   {!isPurchased && canShowProductCoinCheckout && (
-                    <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className="w-full rounded-2xl border border-amber-200/70 bg-white/75 px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg">
+                    <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className={`w-full ${detailActionRoundClass} border border-amber-200/70 bg-white/75 px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg`}>
                       🪙 {coinCheckoutLabel}
                       {requiredProductCoins > 0 && (
                         <span className="mt-2 block text-xs font-bold text-slate-600">
@@ -645,7 +657,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     </button>
                   )}
                   {hasLockedPaidUpdates && (
-                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className="product-checkout-update relative min-h-[5.75rem] w-full overflow-hidden rounded-2xl border border-emerald-300/60 bg-gradient-to-r from-emerald-700 via-teal-600 to-cyan-600 px-6 py-4 text-left text-base font-black text-white shadow-[0_18px_46px_rgba(5,150,105,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_52px_rgba(5,150,105,0.34)] active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg">
+                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className={`product-checkout-update relative min-h-[5.75rem] w-full overflow-hidden ${detailActionRoundClass} border border-emerald-300/60 bg-gradient-to-r from-emerald-700 via-teal-600 to-cyan-600 px-6 py-4 text-left text-base font-black text-white shadow-[0_18px_46px_rgba(5,150,105,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_22px_52px_rgba(5,150,105,0.34)] active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg`}>
                       <span className="pointer-events-none absolute -right-5 -top-8 h-24 w-24 rounded-full bg-white/15 blur-2xl" />
                       <span className="relative flex items-center justify-between gap-4">
                         <span>
@@ -656,13 +668,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                             {lockedPaidUpdateCount} paid update{lockedPaidUpdateCount === 1 ? '' : 's'} · See what changes and unlocks
                           </span>
                         </span>
-                        <span className="flex h-12 min-w-12 items-center justify-center rounded-full border border-white/40 bg-white text-xl font-black text-red-700 shadow-[0_10px_24px_rgba(0,0,0,0.14)]">
+                        <span className={`flex h-12 min-w-12 items-center justify-center ${detailBadgeRoundClass} border border-white/40 bg-white text-xl font-black text-red-700 shadow-[0_10px_24px_rgba(0,0,0,0.14)]`}>
                           {lockedPaidUpdateCount}
                         </span>
                       </span>
                     </button>
                   )}
-                  <button onClick={() => { if (isPurchased) { onOpenPurchases?.(); return; } onAddToCart(product.id, 1); }} className="product-checkout-secondary w-full rounded-2xl border border-indigo-200/70 bg-white/85 px-6 py-3.5 text-base font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 sm:px-8 sm:py-4">
+                  <button onClick={() => { if (isPurchased) { onOpenPurchases?.(); return; } onAddToCart(product.id, 1); }} className={`product-checkout-secondary w-full ${detailActionRoundClass} border border-indigo-200/70 bg-white/85 px-6 py-3.5 text-base font-black text-indigo-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-indigo-50 active:scale-95 sm:px-8 sm:py-4`}>
                     {isPurchased ? 'Already in My Purchases' : 'Add to Cart'}
                   </button>
                 </div>

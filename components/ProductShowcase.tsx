@@ -188,7 +188,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
         </div>
 
         <div ref={gridRef} className={`${isMobileHome ? 'mt-6 gap-4 sm:mt-10 sm:gap-6' : 'mt-10 gap-5 sm:mt-16 sm:gap-8 lg:gap-10'} grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}>
-          {displayProducts.length > 0 ? displayProducts.map((product, index) => <ProductCard key={product.id} settings={settings} product={product} onViewDetails={(sectionId) => onViewProduct(product, sectionId)} isWishlisted={wishlist.includes(product.id)} onToggleWishlist={onToggleWishlist} onAddToCart={onAddToCart} onBuyNow={onBuyNow} animationDelay={index} coupons={coupons} isPurchased={purchasedProductIds.includes(product.id)} />) : (
+          {displayProducts.length > 0 ? displayProducts.map((product, index) => <ProductCard key={product.id} settings={settings} product={product} onViewDetails={(sectionId) => onViewProduct(product, sectionId)} isWishlisted={wishlist.includes(product.id)} onToggleWishlist={onToggleWishlist} onAddToCart={onAddToCart} onBuyNow={onBuyNow} animationDelay={index} coupons={coupons} isPurchased={purchasedProductIds.includes(product.id)} roundnessSurface="store" />) : (
             <div className="col-span-full rounded-[2rem] border border-dashed border-blue-200 bg-white/85 px-6 py-14 text-center shadow-[0_18px_55px_rgba(23,105,255,0.08)]" role="status" aria-live="polite">
               <div className="mx-auto grid h-16 w-16 place-items-center rounded-3xl bg-gradient-to-br from-blue-50 to-violet-50 text-3xl">🔎</div>
               <h3 className="mt-5 text-2xl font-black text-[#081A45]">No matching products found</h3>

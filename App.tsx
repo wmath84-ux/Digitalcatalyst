@@ -49,6 +49,8 @@ import { getFirebaseAuthErrorMessageFromCode, mergePurchasedProductIds, normaliz
 import { isDemoMode } from './utils/runtimeMode';
 import { isProductSearchVisible, withProductSearchIndex } from './utils/productSearch';
 import MembershipUpgradeCard from './components/MembershipUpgradeCard';
+import { DEFAULT_PRODUCT_ROUNDNESS_SETTINGS } from './utils/productRoundness';
+import type { ProductRoundnessSettings } from './utils/productRoundness';
 import {
   DEFAULT_SUBSCRIPTION_PAGE_CONTENT,
   DEFAULT_SUBSCRIPTION_PLANS,
@@ -720,6 +722,7 @@ export interface WebsiteSettings {
             accentColor: string;
             accentOpacity: number;
         };
+        productRoundness?: ProductRoundnessSettings;
         profileStyle?: ProfileStyleSettings;
         communityStyle?: CommunityStyleSettings;
         profileStreaks?: ProfileStreakConfig[];
@@ -948,6 +951,7 @@ const defaultWebsiteSettings: WebsiteSettings = {
             accentColor: '#C2E7FF',
             accentOpacity: 66,
         },
+        productRoundness: DEFAULT_PRODUCT_ROUNDNESS_SETTINGS,
         profileStreaks: [
             { id: 'daily-login', title: 'Daily Login Spark', icon: '🔥', metric: 'dailyLogin', goal: 1, unit: 'day', coinReward: 10, accent: 'from-orange-400 via-amber-400 to-yellow-300', note: 'Open your hub every day and claim today’s flame.', active: true },
             { id: 'study-15', title: '15 Minute Focus', icon: '⏱️', metric: 'studyMinutes', goal: 15, unit: 'mins', coinReward: 15, accent: 'from-cyan-400 via-blue-500 to-indigo-500', note: 'Watch lessons or read learning content for 15 minutes.', active: true },
@@ -1016,6 +1020,10 @@ const mergeWebsiteSettings = (settings?: Partial<WebsiteSettings> | null): Websi
       communityStyle: {
         ...defaultWebsiteSettings.content.communityStyle,
         ...((incoming.content as any)?.communityStyle || {}),
+      },
+      productRoundness: {
+        ...DEFAULT_PRODUCT_ROUNDNESS_SETTINGS,
+        ...((incoming.content as any)?.productRoundness || {}),
       },
       subscriptionPlans: normalizeSubscriptionPlans((incoming.content as any)?.subscriptionPlans || defaultWebsiteSettings.content.subscriptionPlans),
       subscriptionPage: normalizeSubscriptionPageContent((incoming.content as any)?.subscriptionPage),

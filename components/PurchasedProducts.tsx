@@ -3,6 +3,7 @@ import React, { useEffect, useRef } from 'react';
 import { ProductWithRating, WebsiteSettings } from '../App';
 import { getProductImage, getProductImageCandidates, getProductImageFallback } from '../utils/productImages';
 import SafeImage from './common/SafeImage';
+import { pillClassForProductRoundness, resolveProductRoundnessSettings } from '../utils/productRoundness';
 
 const PURCHASED_IMAGE_LOAD_TIMEOUT_MS = 14000;
 
@@ -16,6 +17,10 @@ const PurchasedProductCard: React.FC<{
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${delay}` : '';
     const buttonText = 'Access Files';
     const isMobileHome = variant === 'mobileHome';
+    const productRoundness = resolveProductRoundnessSettings(settings);
+    const purchasedCardRoundClass = productRoundness.myPurchasesCards !== false ? (isMobileHome ? 'rounded-lg' : 'rounded-xl') : 'rounded-none';
+    const purchasedBadgeRoundClass = pillClassForProductRoundness(productRoundness.productBadges !== false);
+    const purchasedActionButtonRoundClass = productRoundness.productActionButtons !== false ? 'rounded-lg' : 'rounded-none';
     const purchaseImageSlot = isMobileHome ? 'purchaseSquare' : 'purchaseCard';
     const purchaseImageCandidates = getProductImageCandidates(product, purchaseImageSlot).filter(Boolean);
     const purchaseImage = purchaseImageCandidates[0] || getProductImage(product, purchaseImageSlot);
@@ -23,7 +28,7 @@ const PurchasedProductCard: React.FC<{
     const purchaseImageKey = `${product.id}-${purchaseImage}-${purchaseImageFallback}`;
 
     return (
-        <div className={`relative bg-white/70 backdrop-blur-xl ${isMobileHome ? 'rounded-lg' : 'rounded-xl'} shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden border border-gray-200 flex flex-col transform hover:-translate-y-2 transition-all duration-300 ease-in-out hover:shadow-sm product-card-shine ${animationClass}`}>
+        <div className={`relative bg-white/70 backdrop-blur-xl ${purchasedCardRoundClass} shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden border border-gray-200 flex flex-col transform hover:-translate-y-2 transition-all duration-300 ease-in-out hover:shadow-sm product-card-shine ${animationClass}`}>
             <div className="purchased-product-media-frame relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
                 <SafeImage
                     key={purchaseImageKey}
@@ -45,7 +50,7 @@ const PurchasedProductCard: React.FC<{
                     loadTimeoutMs={PURCHASED_IMAGE_LOAD_TIMEOUT_MS}
                 />
                 <div className="pointer-events-none absolute inset-0 z-[11] bg-white/5"></div>
-                <div className="absolute right-3 top-3 z-20 rounded-full bg-[#059669] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(5,150,105,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs">
+                <div className={`absolute right-3 top-3 z-20 ${purchasedBadgeRoundClass} bg-[#059669] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(5,150,105,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs`}>
                     PURCHASED
                 </div>
             </div>
@@ -53,7 +58,7 @@ const PurchasedProductCard: React.FC<{
                 <h3 className={`${isMobileHome ? 'text-base' : 'text-lg'} font-bold text-primary line-clamp-1`} title={product.title}>{product.title}</h3>
                 <p className="mt-2 text-text-muted text-sm flex-grow line-clamp-2">{product.description}</p>
                 <div className={isMobileHome ? 'mt-4' : 'mt-6'}>
-                    <button onClick={onViewProduct} className="w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold px-5 py-3 rounded-lg hover:opacity-90 transition-all duration-300 transform active:scale-95 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex items-center justify-center gap-2">
+                    <button onClick={onViewProduct} className={`w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold px-5 py-3 ${purchasedActionButtonRoundClass} hover:opacity-90 transition-all duration-300 transform active:scale-95 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex items-center justify-center gap-2`}>
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
                         {buttonText}
                     </button>
@@ -103,7 +108,7 @@ const PurchasedProducts: React.FC<PurchasedProductsProps> = ({ settings, product
   const subtitle = isMobileHome ? 'Access your purchased products instantly.' : 'Welcome back! Here are the products you have access to.';
 
   return (
-    <section 
+    <section
       ref={sectionRef}
       className={`${isMobileHome ? 'py-8' : 'py-20'} bg-blue-50 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
     >
@@ -119,13 +124,13 @@ const PurchasedProducts: React.FC<PurchasedProductsProps> = ({ settings, product
                 Showing {products.length} item{products.length !== 1 && 's'}
             </div>
         </div>
-        
+
         <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ${isMobileHome ? 'gap-4' : 'gap-8'}`}>
           {products.map((product, index) => (
-            <PurchasedProductCard 
-              key={product.id} 
+            <PurchasedProductCard
+              key={product.id}
               settings={settings}
-              product={product} 
+              product={product}
               onViewProduct={() => onViewPurchasedProduct(product)}
               delay={index + 2}
               variant={variant}

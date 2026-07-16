@@ -13,6 +13,8 @@ import {
     SubscriptionPageContent,
     SubscriptionPlanConfig,
 } from '../../utils/subscriptionAccess';
+import { DEFAULT_PRODUCT_ROUNDNESS_SETTINGS, productRoundnessModeLabel } from '../../utils/productRoundness';
+import type { ProductRoundnessKey } from '../../utils/productRoundness';
 
 const sectionNames: Record<HomepageSection['id'], string> = {
     hero: 'Hero Section',
@@ -60,7 +62,7 @@ const ServiceManagement: React.FC<{ services: ServiceItem[], onUpdate: (services
         setEditing(null);
     };
     const handleDelete = (id: number) => onUpdate(services.filter(s => s.id !== id));
-    
+
     return (
         <div>
             {editing && <ServiceFormModal service={editing} onSave={handleSave} onCancel={() => setEditing(null)} />}
@@ -290,8 +292,21 @@ const metricLabels: Record<string, string> = {
 const getRewardStatus = (reward: { active?: boolean; draft?: boolean; archived?: boolean }) => reward.archived ? 'Archived' : reward.draft ? 'Draft' : reward.active === false ? 'Disabled' : 'Active';
 const statusClass = (status: string) => status === 'Active' ? 'bg-emerald-100 text-emerald-700' : status === 'Draft' ? 'bg-amber-100 text-amber-700' : status === 'Archived' ? 'bg-slate-200 text-slate-600' : 'bg-rose-100 text-rose-700';
 
+const productRoundnessControls: Array<{ key: ProductRoundnessKey; label: string; description: string }> = [
+    { key: 'storeCards', label: 'Store product cards', description: 'All Products / Store page card outer corners.' },
+    { key: 'homeFeaturedCards', label: 'Home featured/top-rated cards', description: 'Website home featured sections that use ProductCard.' },
+    { key: 'homePreviewCards', label: 'Mobile home preview cards', description: 'Mobile Top Rated and All Products preview card surfaces.' },
+    { key: 'wishlistCards', label: 'Wishlist product cards', description: 'Wishlist/Favourites product cards.' },
+    { key: 'productDetailPanels', label: 'Product detail panels', description: 'Product detail gallery, info and checkout panels.' },
+    { key: 'myPurchasesCards', label: 'My Purchases cards', description: 'Purchased product library cards and mobile continue-learning cards.' },
+    { key: 'mediaInnerFrame', label: 'Product media inner frame', description: 'The safe image frame inside Store/Home/Wishlist product cards.' },
+    { key: 'productBadges', label: 'Product badges and chips', description: 'Purchased, free, sale, category and small product chips.' },
+    { key: 'productActionButtons', label: 'Product action buttons', description: 'View, Details, Access Files, checkout and product action buttons.' },
+];
+
+
 const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, products = [], onSettingsChange }) => {
-    const [activeTab, setActiveTab] = useState<'theme' | 'layout' | 'content' | 'subscriptions' | 'reading' | 'profile' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
+    const [activeTab, setActiveTab] = useState<'theme' | 'roundness' | 'layout' | 'content' | 'subscriptions' | 'reading' | 'profile' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
     const [localSettings, setLocalSettings] = useState<WebsiteSettings>(settings);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'failed'>('idle');
 
@@ -319,7 +334,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
             }
         }));
     };
-    
+
 
     const handleHeroImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
         const file = event.target.files?.[0];
@@ -335,7 +350,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const handleLayoutChange = (newLayout: HomepageSection[]) => {
         setLocalSettings(prev => ({ ...prev, layout: newLayout }));
     };
-    
+
     const updateContentValue = (field: string, value: any) => {
         handleNestedChange('content', field, value);
     };
@@ -377,6 +392,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const latestDesktopCommunityLayout = communityStyle.desktopLayout !== 'classic';
     const socialDesktopCommunityLayout = Boolean(communityStyle.desktopSocialLayout);
     const readingStyle = { backgroundColor: '#F8FAFD', backgroundOpacity: 98, panelOpacity: 96, cardOpacity: 94, accentColor: '#C2E7FF', accentOpacity: 66, ...((localSettings.content as any).readingStyle || {}) };
+    const productRoundness = { ...DEFAULT_PRODUCT_ROUNDNESS_SETTINGS, ...(((localSettings.content as any).productRoundness || {}) as Partial<Record<ProductRoundnessKey, boolean>>) };
     const profileStyle = { backgroundColor: '#e2e8f0', backgroundTint: '#e0e7ff', cardOpacity: 82, heroOverlayOpacity: 76, accentColor: '#f97316', ...((localSettings.content as any).profileStyle || {}) };
     const profileStreaks = (((localSettings.content as any).profileStreaks || []) as ProfileStreakConfig[]);
     const profileMilestones = (((localSettings.content as any).profileMilestones || []) as ProfileMilestoneConfig[]);
@@ -447,6 +463,16 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const updateReadingStyle = (field: string, value: string | number) => {
         updateContentValue('readingStyle', { ...readingStyle, [field]: value });
     };
+
+    const updateProductRoundness = (field: ProductRoundnessKey, value: boolean) => {
+        updateContentValue('productRoundness', { ...productRoundness, [field]: value });
+    };
+
+    const setAllProductRoundness = (value: boolean) => {
+        const next = productRoundnessControls.reduce((acc, item) => ({ ...acc, [item.key]: value }), {} as Record<ProductRoundnessKey, boolean>);
+        updateContentValue('productRoundness', next);
+    };
+
 
 
     const updateProfileStyle = (field: string, value: string | number) => {
@@ -627,6 +653,53 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                     </FormRow>
                 </div>
             );
+            case 'roundness': return (
+                <div className="space-y-5">
+                    <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-5">
+                        <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">Product UI controls</p>
+                        <h2 className="mt-2 text-2xl font-black text-slate-900">Round effect by exact surface</h2>
+                        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Each row has separate buttons. Choose Round where you want the premium soft look, or Default where you want the simpler original/sharper style. Click Save Changes after editing.</p>
+                        <div className="mt-4 flex flex-wrap gap-2">
+                            <button type="button" onClick={() => setAllProductRoundness(true)} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-black text-white">Set all Round</button>
+                            <button type="button" onClick={() => setAllProductRoundness(false)} className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700">Set all Default</button>
+                        </div>
+                    </div>
+                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                        {productRoundnessControls.map(control => {
+                            const enabled = productRoundness[control.key] !== false;
+                            return (
+                                <div key={control.key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
+                                    <div className="flex min-h-20 flex-col justify-between gap-2">
+                                        <div>
+                                            <h3 className="text-base font-black text-slate-900">{control.label}</h3>
+                                            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">{control.description}</p>
+                                        </div>
+                                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Current: {productRoundnessModeLabel(enabled)}</p>
+                                    </div>
+                                    <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-1">
+                                        <button
+                                            type="button"
+                                            aria-pressed={enabled}
+                                            onClick={() => updateProductRoundness(control.key, true)}
+                                            className={`rounded-lg px-3 py-2 text-sm font-black transition ${enabled ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
+                                        >
+                                            Round
+                                        </button>
+                                        <button
+                                            type="button"
+                                            aria-pressed={!enabled}
+                                            onClick={() => updateProductRoundness(control.key, false)}
+                                            className={`rounded-lg px-3 py-2 text-sm font-black transition ${!enabled ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
+                                        >
+                                            Default
+                                        </button>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+            );
             case 'layout': return (
                 <div className="space-y-3">
                     {localSettings.layout.map((section, index) => (
@@ -662,11 +735,11 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                     <div className="bg-indigo-50 p-4 rounded-lg mb-6 border border-indigo-200">
                         <h3 className="font-bold text-indigo-800 mb-2">Hero Floating Metrics</h3>
                         <p className="text-sm text-indigo-600 mb-4">Customize the floating cards seen on the hero image.</p>
-                        
+
                         <FormRow label="Use Real Data" description="Automatically calculate Revenue and Users from site data.">
-                            <input 
-                                type="checkbox" 
-                                checked={localSettings.content.heroMetrics?.enableRealData || false} 
+                            <input
+                                type="checkbox"
+                                checked={localSettings.content.heroMetrics?.enableRealData || false}
                                 onChange={e => {
                                     setLocalSettings(prev => ({
                                         ...prev,
@@ -675,27 +748,27 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                             heroMetrics: { ...prev.content.heroMetrics, enableRealData: e.target.checked }
                                         }
                                     }));
-                                }} 
-                                className="w-5 h-5" 
+                                }}
+                                className="w-5 h-5"
                             />
                         </FormRow>
 
                         {!localSettings.content.heroMetrics?.enableRealData && (
                             <>
                                 <FormRow label="Custom Revenue Text" description="e.g., +128% or $50k">
-                                    <input 
-                                        type="text" 
-                                        value={localSettings.content.heroMetrics?.customRevenueChange || ""} 
-                                        onChange={e => setLocalSettings(prev => ({...prev, content: {...prev.content, heroMetrics: {...prev.content.heroMetrics, customRevenueChange: e.target.value}}}))} 
-                                        className="w-full p-2 border rounded" 
+                                    <input
+                                        type="text"
+                                        value={localSettings.content.heroMetrics?.customRevenueChange || ""}
+                                        onChange={e => setLocalSettings(prev => ({...prev, content: {...prev.content, heroMetrics: {...prev.content.heroMetrics, customRevenueChange: e.target.value}}}))}
+                                        className="w-full p-2 border rounded"
                                     />
                                 </FormRow>
                                 <FormRow label="Custom Active Users" description="e.g., 2.4k+">
-                                    <input 
-                                        type="text" 
-                                        value={localSettings.content.heroMetrics?.customActiveUsers || ""} 
-                                        onChange={e => setLocalSettings(prev => ({...prev, content: {...prev.content, heroMetrics: {...prev.content.heroMetrics, customActiveUsers: e.target.value}}}))} 
-                                        className="w-full p-2 border rounded" 
+                                    <input
+                                        type="text"
+                                        value={localSettings.content.heroMetrics?.customActiveUsers || ""}
+                                        onChange={e => setLocalSettings(prev => ({...prev, content: {...prev.content, heroMetrics: {...prev.content.heroMetrics, customActiveUsers: e.target.value}}}))}
+                                        className="w-full p-2 border rounded"
                                     />
                                 </FormRow>
                             </>
@@ -1171,9 +1244,10 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                     {saveStatus === 'saving' ? 'Saving...' : 'Save Changes'}
                 </button>
             </div>
-            
+
             <div className="flex flex-wrap gap-2 mb-6">
                 <TabButton label="Theme" isActive={activeTab === 'theme'} onClick={() => setActiveTab('theme')} />
+                <TabButton label="Round Effects" isActive={activeTab === 'roundness'} onClick={() => setActiveTab('roundness')} />
                 <TabButton label="Layout" isActive={activeTab === 'layout'} onClick={() => setActiveTab('layout')} />
                 <TabButton label="Content" isActive={activeTab === 'content'} onClick={() => setActiveTab('content')} />
                 <TabButton label="Subscriptions" isActive={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')} />

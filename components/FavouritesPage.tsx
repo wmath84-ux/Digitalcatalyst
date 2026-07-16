@@ -93,6 +93,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ settings, products, onViewP
                 displayMode="wishlist"
                 coupons={coupons}
                 isPurchased={purchasedProductIds.includes(product.id)}
+                roundnessSurface="wishlist"
               />
             ))
           ) : (
