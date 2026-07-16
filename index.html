@@ -2208,6 +2208,42 @@
       }
     </style>
 
+    <style id="global-card-radius-unification">
+      :root {
+        --eduvora-card-radius: 22px;
+        --eduvora-card-inner-radius: 18px;
+      }
+
+      /* Global card corner system: match the Store ProductCard edge (rounded-[22px]) without touching pills, avatars, or circular buttons. */
+      .product-card-shine,
+      .course-youtube-frame,
+      :where(article, section, aside, form, dialog, div)[class*="rounded-2xl"][class*="border"],
+      :where(article, section, aside, form, dialog, div)[class*="rounded-3xl"][class*="border"],
+      :where(article, section, aside, form, dialog, div)[class*="rounded-xl"][class*="border"][class*="shadow"],
+      :where(article, section, aside, form, dialog, div)[class*="rounded-lg"][class*="border"][class*="shadow"],
+      :where(article, section, aside, form, dialog, div)[class*="rounded-[1.25rem]"][class*="border"],
+      :where(article, section, aside, form, dialog, div)[class*="rounded-[1.35rem]"][class*="border"],
+      :where(article, section, aside, form, dialog, div)[class*="rounded-[1.5rem]"][class*="border"],
+      :where(article, section, aside, form, dialog, div)[class*="rounded-[1.6rem]"][class*="border"],
+      :where(article, section, aside, form, dialog, div)[class*="rounded-[1.75rem]"][class*="border"],
+      :where(article, section, aside, form, dialog, div)[class*="rounded-[1.8rem]"][class*="border"],
+      :where(article, section, aside, form, dialog, div)[class*="rounded-[2rem]"][class*="border"],
+      :where(article, section, aside, form, dialog, div)[class*="rounded-[24px]"][class*="border"],
+      :where(article, section, aside, form, dialog, div)[class*="sm:rounded-2xl"][class*="border"],
+      :where(article, section, aside, form, dialog, div)[class*="sm:rounded-3xl"][class*="border"],
+      :where(article, section, aside, form, dialog, div)[class*="sm:rounded-[2rem]"][class*="border"] {
+        border-radius: var(--eduvora-card-radius) !important;
+      }
+
+      .product-card-media-safe-frame,
+      .purchased-product-media-frame,
+      :where(img, video, iframe)[class*="rounded-2xl"],
+      :where(img, video, iframe)[class*="rounded-3xl"],
+      :where(div)[class*="rounded-2xl"][class*="overflow-hidden"][class*="bg-white"],
+      :where(div)[class*="rounded-[1.5rem]"][class*="overflow-hidden"] {
+        border-radius: var(--eduvora-card-inner-radius) !important;
+      }
+    </style>
 </head>
   <body class="bg-background text-text antialiased">
     <div id="root"></div>
