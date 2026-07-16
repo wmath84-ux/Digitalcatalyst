@@ -17,6 +17,7 @@ const PurchasedProductCard: React.FC<{
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${delay}` : '';
     const buttonText = 'Access Files';
     const isMobileHome = variant === 'mobileHome';
+    const isCompactMobileGrid = !isMobileHome;
     const productRoundness = resolveProductRoundnessSettings(settings);
     const purchasedCardRoundClass = productRoundness.myPurchasesCards !== false ? (isMobileHome ? 'rounded-lg' : 'rounded-xl') : 'rounded-none';
     const purchasedBadgeRoundClass = pillClassForProductRoundness(productRoundness.productBadges !== false);
@@ -28,7 +29,7 @@ const PurchasedProductCard: React.FC<{
     const purchaseImageKey = `${product.id}-${purchaseImage}-${purchaseImageFallback}`;
 
     return (
-        <div className={`relative bg-white/70 backdrop-blur-xl ${purchasedCardRoundClass} shadow-[0_8px_30px_rgb(0,0,0,0.04)] overflow-hidden border border-gray-200 flex flex-col transform hover:-translate-y-2 transition-all duration-300 ease-in-out hover:shadow-sm product-card-shine ${animationClass}`}>
+        <div className={`purchased-mobile-grid-card relative flex min-h-full flex-col overflow-hidden border border-gray-200 bg-white/95 ${purchasedCardRoundClass} shadow-[0_6px_18px_rgba(8,26,68,0.08)] transition-[border-color,box-shadow,transform] duration-200 sm:hover:-translate-y-1 sm:hover:border-blue-200 sm:hover:shadow-[0_12px_28px_rgba(8,26,68,0.12)] product-card-shine ${animationClass}`}>
             <div className="purchased-product-media-frame relative aspect-[4/3] w-full overflow-hidden bg-gray-100">
                 <SafeImage
                     key={purchaseImageKey}
@@ -43,24 +44,24 @@ const PurchasedProductCard: React.FC<{
                     fallbackIcon="🎓"
                     fallbackMessage="Image preview unavailable"
                     aspect="video"
-                    loading="eager"
-                    fetchPriority={delay <= 6 ? 'high' : 'auto'}
+                    loading={delay <= 2 ? 'eager' : 'lazy'}
+                    fetchPriority={delay <= 2 ? 'high' : 'auto'}
                     decoding="async"
                     referrerPolicy="no-referrer"
                     loadTimeoutMs={PURCHASED_IMAGE_LOAD_TIMEOUT_MS}
                 />
                 <div className="pointer-events-none absolute inset-0 z-[11] bg-white/5"></div>
-                <div className={`absolute right-3 top-3 z-20 ${purchasedBadgeRoundClass} bg-[#059669] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(5,150,105,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs`}>
+                <div className={`absolute z-20 ${purchasedBadgeRoundClass} bg-[#059669] font-black uppercase text-white shadow-sm ring-1 ring-white/95 [text-shadow:0_1px_2px_rgba(0,0,0,0.25)] ${isCompactMobileGrid ? 'right-1.5 top-1.5 px-2 py-1 text-[8px] tracking-[0.12em] sm:right-3 sm:top-3 sm:px-4 sm:py-1.5 sm:text-xs sm:tracking-[0.18em]' : 'right-3 top-3 px-3.5 py-1.5 text-[10px] tracking-[0.18em] sm:px-4 sm:text-xs'}`}>
                     PURCHASED
                 </div>
             </div>
-            <div className={`${isMobileHome ? 'p-4' : 'p-6'} flex flex-col flex-grow`}>
-                <h3 className={`${isMobileHome ? 'text-base' : 'text-lg'} font-bold text-primary line-clamp-1`} title={product.title}>{product.title}</h3>
-                <p className="mt-2 text-text-muted text-sm flex-grow line-clamp-2">{product.description}</p>
-                <div className={isMobileHome ? 'mt-4' : 'mt-6'}>
-                    <button onClick={onViewProduct} className={`w-full bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-semibold px-5 py-3 ${purchasedActionButtonRoundClass} hover:opacity-90 transition-all duration-300 transform active:scale-95 shadow-[0_8px_30px_rgb(0,0,0,0.04)] flex items-center justify-center gap-2`}>
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                        {buttonText}
+            <div className={`${isCompactMobileGrid ? 'p-2.5 sm:p-6' : 'p-4'} flex flex-grow flex-col`}>
+                <h3 className={`${isCompactMobileGrid ? 'line-clamp-2 text-[13px] leading-[1.2] sm:line-clamp-1 sm:text-lg sm:leading-normal' : 'line-clamp-1 text-base'} font-bold text-primary`} title={product.title}>{product.title}</h3>
+                <p className={`${isCompactMobileGrid ? 'hidden sm:block' : 'block'} mt-2 flex-grow line-clamp-2 text-sm text-text-muted`}>{product.description}</p>
+                <div className={isCompactMobileGrid ? 'mt-2.5 sm:mt-6' : 'mt-4'}>
+                    <button onClick={onViewProduct} className={`flex w-full items-center justify-center bg-gradient-to-r from-[#1769FF] to-[#6D5CFF] font-semibold text-white shadow-[0_6px_16px_rgba(23,105,255,0.20)] transition active:scale-95 ${purchasedActionButtonRoundClass} ${isCompactMobileGrid ? 'min-h-9 gap-1 px-2 py-2 text-[10px] sm:min-h-0 sm:gap-2 sm:px-5 sm:py-3 sm:text-base' : 'gap-2 px-5 py-3'}`}>
+                        <svg xmlns="http://www.w3.org/2000/svg" className={isCompactMobileGrid ? 'h-4 w-4 sm:h-5 sm:w-5' : 'h-5 w-5'} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                        <span className="truncate">{buttonText}</span>
                     </button>
                 </div>
             </div>
@@ -125,7 +126,7 @@ const PurchasedProducts: React.FC<PurchasedProductsProps> = ({ settings, product
             </div>
         </div>
 
-        <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 ${isMobileHome ? 'gap-4' : 'gap-8'}`}>
+        <div className={`purchased-mobile-two-column-grid grid md:grid-cols-2 lg:grid-cols-3 ${isMobileHome ? 'grid-cols-1 gap-4' : 'grid-cols-2 gap-2.5 sm:gap-8'}`}>
           {products.map((product, index) => (
             <PurchasedProductCard
               key={product.id}
@@ -140,7 +141,7 @@ const PurchasedProducts: React.FC<PurchasedProductsProps> = ({ settings, product
 
         {!isMobileHome ? (
           <footer className="purchase-page-tablet-scroll-footer mt-10 hidden md:block 2xl:hidden" aria-label="Purchase page scroll footer">
-            <div className="mx-auto max-w-4xl rounded-[2rem] border border-[#D9E7F8] bg-white/80 p-6 text-center shadow-[0_18px_45px_rgba(8,26,69,0.08)] backdrop-blur-xl">
+            <div className="mx-auto max-w-4xl rounded-[2rem] border border-[#D9E7F8] bg-white/80 p-6 text-center shadow-[0_10px_28px_rgba(8,26,69,0.08)]">
               <p className="text-xs font-black uppercase tracking-[0.28em] text-[#1769FF]">Learning library</p>
               <h3 className="mt-2 text-xl font-black text-[#081A45]">Your purchased products are ready whenever you are.</h3>
               <p className="mx-auto mt-2 max-w-2xl text-sm font-medium leading-6 text-[#536178]">

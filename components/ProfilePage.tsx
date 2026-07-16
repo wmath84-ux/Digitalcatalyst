@@ -55,7 +55,7 @@ interface MilestoneReward extends ProfileMilestoneConfig {
 }
 
 const glassCard =
-  'profile-glass-card border border-[#D2E3FC] backdrop-blur-2xl shadow-[0_18px_55px_rgba(26,115,232,0.12)] transition-all duration-300 hover:-translate-y-1 hover:border-[#C2E7FF] hover:shadow-[0_22px_65px_rgba(26,115,232,0.16)]';
+  'profile-glass-card profile-performance-card border border-[#D2E3FC] shadow-[0_8px_24px_rgba(26,115,232,0.10)] transition-[border-color,box-shadow] duration-200 lg:hover:border-[#C2E7FF] lg:hover:shadow-[0_12px_30px_rgba(26,115,232,0.13)]';
 
 
 const fallbackProfileStyle = { backgroundColor: '#F8FAFD', backgroundTint: '#E8F0FE', cardOpacity: 95, heroOverlayOpacity: 76, accentColor: '#1A73E8' };
@@ -499,7 +499,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   }
 
   return (
-    <div className="min-h-[100dvh] w-full max-w-full overflow-x-clip text-[#202124]" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}, ${profileStyle.backgroundTint}, #C2E7FF)`, '--profile-card-opacity': String(Number(profileStyle.cardOpacity) / 100) } as React.CSSProperties}>
+    <div className="profile-performance-root relative isolate min-h-[100dvh] w-full max-w-full overflow-x-clip text-[#202124]" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}, ${profileStyle.backgroundTint}, #C2E7FF)`, '--profile-card-opacity': String(Number(profileStyle.cardOpacity) / 100) } as React.CSSProperties}>
       <style>{`
         @keyframes hubFadeUp {
           from { opacity: 0; transform: translateY(28px); }
@@ -525,17 +525,47 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
         .profile-glass-card {
           background-color: rgba(255,255,255,var(--profile-card-opacity,0.95));
+          -webkit-backdrop-filter: none;
+          backdrop-filter: none;
+        }
+
+        .profile-performance-backdrop {
+          contain: paint;
+        }
+
+        .profile-deferred-section {
+          content-visibility: auto;
+          contain-intrinsic-size: 1px 760px;
+        }
+
+        @media (hover: none), (pointer: coarse), (max-width: 1024px) {
+          .profile-performance-root .hub-animate {
+            animation: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+          }
+
+          .profile-performance-root .profile-performance-card,
+          .profile-performance-root article {
+            transform: none !important;
+            box-shadow: 0 5px 16px rgba(26,115,232,0.08) !important;
+          }
+
+          .profile-performance-root button,
+          .profile-performance-root article,
+          .profile-performance-root .profile-performance-card {
+            transition-duration: 120ms !important;
+          }
         }
       `}</style>
 
-      <div className="pointer-events-none fixed inset-0 overflow-hidden opacity-80">
-        <div className="absolute inset-0" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}d9, ${profileStyle.backgroundTint}b8, rgba(194,231,255,0.42))` }} />
-        <div className="absolute left-[-10%] top-10 h-72 w-72 rounded-full blur-3xl" style={{ backgroundColor: `${profileStyle.accentColor}26` }} />
-        <div className="absolute right-[-5%] top-1/3 h-96 w-96 rounded-full bg-[#C2E7FF]/45 blur-3xl" />
-        <div className="absolute bottom-[-10%] left-1/3 h-80 w-80 rounded-full bg-[#1A73E8]/12 blur-3xl" />
-      </div>
+      <div
+        className="profile-performance-backdrop pointer-events-none absolute inset-0 z-0 opacity-70"
+        aria-hidden="true"
+        style={{ background: `radial-gradient(circle at 10% 12%, ${profileStyle.accentColor}1f 0, transparent 34%), radial-gradient(circle at 92% 38%, rgba(194,231,255,0.42) 0, transparent 32%), radial-gradient(circle at 42% 92%, rgba(26,115,232,0.10) 0, transparent 28%)` }}
+      />
 
-      <main className="relative mx-auto min-w-0 w-full max-w-[1600px] px-3 py-4 pb-32 sm:px-6 sm:py-5 sm:pb-36 lg:px-8 xl:px-10">
+      <main className="relative z-10 mx-auto min-w-0 w-full max-w-[1600px] px-3 py-4 pb-32 sm:px-6 sm:py-5 sm:pb-36 lg:px-8 xl:px-10">
 
         <div className="mb-6 rounded-3xl border border-blue-100 bg-white/90 p-5 shadow-sm">
           <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -554,7 +584,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
         <button
           onClick={onBack}
-          className="hub-animate mb-4 rounded-2xl border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-xs font-black uppercase tracking-[0.16em] text-[#202124] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-[#E8F0FE] hover:shadow-sm hover:shadow-sm hover:shadow-black/5 sm:mb-5 sm:px-5 sm:py-3 sm:text-sm sm:tracking-[0.2em]"
+          className="hub-animate mb-4 rounded-2xl border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-xs font-black uppercase tracking-[0.16em] text-[#202124] transition-[border-color,background-color,box-shadow,transform] duration-200 lg:hover:-translate-y-0.5 hover:bg-[#E8F0FE] hover:shadow-sm hover:shadow-sm hover:shadow-black/5 sm:mb-5 sm:px-5 sm:py-3 sm:text-sm sm:tracking-[0.2em]"
         >
           ← Back
         </button>
@@ -564,7 +594,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
             <div className="absolute inset-0 bg-gradient-to-t from-[#202124] via-[#202124]/35 to-[#174EA6]/18" style={{ opacity: Number(profileStyle.heroOverlayOpacity) / 100 }} />
             <div className="absolute inset-x-0 top-0 flex min-w-0 flex-wrap items-start justify-between gap-2 p-3 sm:items-center sm:p-6">
-              <div className="max-w-[min(100%,9.5rem)] shrink rounded-full border border-[#D2E3FC] bg-white/95 px-3 py-1.5 text-[9px] font-black uppercase leading-4 tracking-[0.18em] text-[#1967D2] backdrop-blur-xl sm:max-w-none sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.28em]">
+              <div className="max-w-[min(100%,9.5rem)] shrink rounded-full border border-[#D2E3FC] bg-white/95 px-3 py-1.5 text-[9px] font-black uppercase leading-4 tracking-[0.18em] text-[#1967D2] sm:max-w-none sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.28em]">
                 Verified Learning Profile
               </div>
 
@@ -581,7 +611,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                     </p>
                   </div>
                 </div>
-                <div className="w-fit rounded-2xl border border-[#D2E3FC]/70 bg-[#202124]/55 px-4 py-3 text-left text-white backdrop-blur-xl shadow-[0_18px_45px_rgba(15,23,42,0.22)] sm:rounded-3xl sm:px-5 sm:py-4 sm:text-right">
+                <div className="w-fit rounded-2xl border border-[#D2E3FC]/70 bg-[#202124]/55 px-4 py-3 text-left text-white shadow-[0_18px_45px_rgba(15,23,42,0.22)] sm:rounded-3xl sm:px-5 sm:py-4 sm:text-right">
                   <p className="text-sm font-bold text-[#E8F0FE]">Backend Streak</p>
                   <p className="mt-1 text-2xl font-black sm:text-3xl">🔥 {streakDays} Days</p>
                   <p className="text-xs uppercase tracking-[0.2em] text-[#C2E7FF]/90">server tracked</p>
@@ -605,7 +635,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           ))}
         </section>
 
-        <section className={`hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '320ms' }}>
+        <section className={`profile-deferred-section hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '320ms' }}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Verified Reward Progress</p>
@@ -616,7 +646,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
           <div className="mt-4 grid gap-3 sm:mt-6 xl:grid-cols-2">
             {streakCards.map((streak, index) => (
-              <article key={streak.id} className="group relative overflow-hidden rounded-[1.25rem] border border-[#E0E3EB] bg-white/95 p-3.5 shadow-[0_18px_45px_rgba(26,115,232,0.10)] backdrop-blur-2xl transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_22px_60px_rgba(26,115,232,0.14)] sm:rounded-[1.5rem] sm:p-4" style={{ animationDelay: `${360 + index * 45}ms` }}>
+              <article key={streak.id} className="group relative overflow-hidden rounded-[1.25rem] border border-[#E0E3EB] bg-white/95 p-3.5 shadow-[0_6px_18px_rgba(26,115,232,0.08)] transition-[border-color,background-color,box-shadow,transform] duration-200 lg:hover:-translate-y-0.5 lg:hover:shadow-[0_10px_26px_rgba(26,115,232,0.11)] sm:rounded-[1.5rem] sm:p-4" style={{ animationDelay: `${360 + index * 45}ms` }}>
                 <div className={`absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b ${streak.accent}`} />
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
                   <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${streak.accent} text-2xl shadow-[0_12px_30px_rgba(26,115,232,0.18)] transition group-hover:scale-110 sm:h-14 sm:w-14 sm:text-3xl`}>{streak.icon}</div>
@@ -648,9 +678,9 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </section>
 
-        <section className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+        <section className="profile-deferred-section mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[1.15fr_0.85fr]">
           <div className={`hub-animate overflow-hidden rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '360ms' }}>
-            <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-r from-[#E8F0FE] via-[#C2E7FF] to-[#D3E3FD] blur-2xl" />
+            <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-r from-[#E8F0FE] via-[#C2E7FF] to-[#D3E3FD] opacity-55" />
             <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
               <div>
                 <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Learning Analytics</p>
@@ -658,7 +688,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 <p className="mt-2 text-xs font-bold leading-5 text-[#5F6368] sm:text-sm">Every purchased course gets its own live progress card.</p>
               </div>
               {!purchasedProducts.length && (
-                <button onClick={onExplore} className="w-full rounded-full bg-white/95 px-4 py-2 text-xs font-black text-[#202124] shadow-sm transition-all duration-300 hover:-translate-y-1 hover:shadow-md sm:w-auto sm:text-sm">
+                <button onClick={onExplore} className="w-full rounded-full bg-white/95 px-4 py-2 text-xs font-black text-[#202124] shadow-sm transition-[border-color,background-color,box-shadow,transform] duration-200 lg:hover:-translate-y-0.5 hover:shadow-md sm:w-auto sm:text-sm">
                   Explore Courses
                 </button>
               )}
@@ -679,11 +709,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                   'from-[#E6F4EA] via-[#E8F0FE] to-[#1A73E8]',
                 ][index % 4];
                 return (
-                  <article key={course.id} className="group relative overflow-hidden rounded-[1.35rem] border border-[#E0E3EB] bg-white/95 p-4 shadow-[0_18px_45px_rgba(26,115,232,0.10)] backdrop-blur-xl transition-all duration-300 hover:-translate-y-1 hover:bg-[#F8FAFD] hover:shadow-[0_24px_60px_rgba(26,115,232,0.12)] sm:rounded-[1.75rem] sm:p-5">
+                  <article key={course.id} className="group relative overflow-hidden rounded-[1.35rem] border border-[#E0E3EB] bg-white/95 p-4 shadow-[0_6px_18px_rgba(26,115,232,0.08)] transition-[border-color,background-color,box-shadow,transform] duration-200 lg:hover:-translate-y-0.5 hover:bg-[#F8FAFD] lg:hover:shadow-[0_10px_26px_rgba(26,115,232,0.10)] sm:rounded-[1.75rem] sm:p-5">
                     <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${accent}`} />
                     <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
                       <div className="relative mx-auto h-24 w-24 shrink-0 sm:mx-0 sm:h-28 sm:w-28">
-                        <div className={`absolute inset-2 rounded-full bg-gradient-to-br ${accent} opacity-20 blur-xl transition group-hover:opacity-35`} />
+                        <div className={`absolute inset-2 rounded-full bg-gradient-to-br ${accent} opacity-20 transition-opacity group-hover:opacity-30`} />
                         <svg viewBox="0 0 100 100" className="relative h-full w-full -rotate-90 drop-shadow-sm">
                           <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-[#202124]/10" />
                           <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} className={index % 2 === 0 ? 'text-[#1A73E8]' : 'text-[#1967D2]'} />
@@ -718,7 +748,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
 
           <div className={`hub-animate overflow-hidden rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '440ms' }}>
-            <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#C2E7FF]/35 blur-3xl" />
+            <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#C2E7FF]/25 opacity-70" />
             <div className="relative">
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Verified Badges</p>
               <h2 className="mt-2 text-2xl font-black sm:text-3xl">Achievement Progress</h2>
@@ -753,7 +783,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </section>
 
-        <section className={`hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '520ms' }}>
+        <section className={`profile-deferred-section hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '520ms' }}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Actionable Milestones</p>
@@ -765,7 +795,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
             {milestoneRewards.map(reward => {
               const claimed = (currentUser?.claimedRewardIds || []).includes(reward.id);
               return (
-                <article key={reward.id} className={`relative overflow-hidden rounded-[1.35rem] border p-4 transition-all duration-300 hover:-translate-y-1 sm:rounded-[1.75rem] sm:p-5 ${claimed ? 'border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_0_22px_rgba(52,168,83,0.18)]' : reward.reached ? 'border-[#1A73E8] bg-white/95 shadow-[0_0_24px_rgba(26,115,232,0.30)]' : 'border-[#D2E3FC] bg-white/72 opacity-90'}`}>
+                <article key={reward.id} className={`relative overflow-hidden rounded-[1.35rem] border p-4 transition-[border-color,background-color,box-shadow,transform] duration-200 lg:hover:-translate-y-0.5 sm:rounded-[1.75rem] sm:p-5 ${claimed ? 'border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_0_22px_rgba(52,168,83,0.18)]' : reward.reached ? 'border-[#1A73E8] bg-white/95 shadow-[0_0_24px_rgba(26,115,232,0.30)]' : 'border-[#D2E3FC] bg-white/72 opacity-90'}`}>
                   <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#D3E3FD] via-[#1A73E8] to-[#C2E7FF]" />
                   <div className="flex items-start gap-4">
                     <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/60 bg-white/95 text-2xl shadow-sm sm:h-16 sm:w-16 sm:text-3xl">{reward.icon}</div>
@@ -800,7 +830,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 return (
                   <article
                     key={reward.id}
-                    className={`rounded-2xl border p-3.5 text-left transition-all duration-300 sm:p-4 ${isRedeemed ? 'border-[#DADCE0] bg-[#F8FAFD] opacity-75' : isActive ? 'border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_0_20px_rgba(52,168,83,0.18)]' : reward.claimable ? 'border-[#1A73E8] bg-white/95 shadow-[0_0_15px_rgba(26,115,232,0.28)] hover:-translate-y-1 hover:bg-[#F8FAFD]' : 'border-[#D2E3FC] bg-white/95 shadow-sm'}`}
+                    className={`rounded-2xl border p-3.5 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 sm:p-4 ${isRedeemed ? 'border-[#DADCE0] bg-[#F8FAFD] opacity-75' : isActive ? 'border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_0_20px_rgba(52,168,83,0.18)]' : reward.claimable ? 'border-[#1A73E8] bg-white/95 shadow-[0_0_15px_rgba(26,115,232,0.28)] lg:hover:-translate-y-0.5 hover:bg-[#F8FAFD]' : 'border-[#D2E3FC] bg-white/95 shadow-sm'}`}
                   >
                     <div className="flex items-start justify-between gap-4">
                       <div>
@@ -834,7 +864,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                   <button
                     key={theme.name}
                     onClick={() => onThemeChange(key)}
-                    className={`rounded-2xl border p-2.5 text-left transition-all duration-300 hover:-translate-y-1 sm:p-3 ${activeTheme === key ? 'border-[#C2E7FF] bg-[#E8F0FE]' : 'border-[#D2E3FC] bg-white/95'}`}
+                    className={`rounded-2xl border p-2.5 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 lg:hover:-translate-y-0.5 sm:p-3 ${activeTheme === key ? 'border-[#C2E7FF] bg-[#E8F0FE]' : 'border-[#D2E3FC] bg-white/95'}`}
                   >
                     <div className="flex -space-x-1">
                       <span className="h-4 w-4 rounded-full border border-white" style={{ background: '#1A73E8' }} />
@@ -858,7 +888,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                   const isCouponActive = coupon.isActive;
                   const buttonLabel = isCouponActive ? (redeemedCouponCode === coupon.code ? 'Code copied' : 'Redeem') : 'Not available';
                   return (
-                    <div key={coupon.id} className={`rounded-2xl border p-3 transition-all duration-300 sm:p-4 ${isCouponActive ? 'border-dashed border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_10px_30px_rgba(16,185,129,0.10)]' : 'border-[#E0E3EB] bg-[#F8FAFD] opacity-80'}`}>
+                    <div key={coupon.id} className={`rounded-2xl border p-3 transition-[border-color,background-color,box-shadow,transform] duration-200 sm:p-4 ${isCouponActive ? 'border-dashed border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_10px_30px_rgba(16,185,129,0.10)]' : 'border-[#E0E3EB] bg-[#F8FAFD] opacity-80'}`}>
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
                           <div className="flex flex-wrap items-center gap-2">
@@ -886,7 +916,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </section>
 
-        <section className={`hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '760ms' }}>
+        <section className={`profile-deferred-section hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '760ms' }}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Coin History</p>
@@ -896,7 +926,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
           <div className="mt-5 grid gap-3">
             {coinTransactions.length ? coinTransactions.slice(0, 8).map((entry) => (
-              <div key={entry.id || `${entry.createdAt}-${entry.description}`} className="flex flex-col items-start gap-3 rounded-2xl border border-[#D2E3FC] bg-white/95 p-3 shadow-sm backdrop-blur-xl sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-4">
+              <div key={entry.id || `${entry.createdAt}-${entry.description}`} className="flex flex-col items-start gap-3 rounded-2xl border border-[#D2E3FC] bg-white/95 p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-4">
                 <div>
                   <p className="font-black text-[#202124]">{entry.amount >= 0 ? '🟢' : '🔴'} {entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</p>
                   <p className="mt-1 text-xs leading-5 text-[#5F6368] sm:text-sm">{entry.amount >= 0 ? '📝' : '🛒'} <span className="font-bold">{entry.title || entry.source}</span> — {entry.description}</p>
