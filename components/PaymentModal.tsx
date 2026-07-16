@@ -557,12 +557,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   );
 
   const summaryCard = (
-    <div className="space-y-4 rounded-[1.25rem] border border-slate-200 bg-white p-4 shadow-[0_18px_55px_rgba(15,23,42,0.06)] sm:rounded-[1.75rem] sm:p-5">
+    <div className="space-y-4 rounded-[22px] border border-blue-100 bg-gradient-to-br from-white via-blue-50/45 to-emerald-50/35 p-4 shadow-[0_18px_55px_rgba(37,99,235,0.10)] sm:p-5">
       <div className="flex items-center justify-between gap-4">
-        <h3 className="text-lg font-black text-slate-950">Order summary</h3>
-        <span className="rounded-full bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">Verified</span>
+        <h3 className="text-lg font-black text-slate-950">Price summary</h3>
+        <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">Verified</span>
       </div>
-      <div className="flex justify-between text-xs font-black uppercase tracking-widest text-slate-500"><span>Item</span><span>Price</span></div>
+      <div className="flex justify-between text-xs font-black uppercase tracking-widest text-slate-500"><span>Selected item</span><span>Price</span></div>
       {isCartMode ? (
         <div className="max-h-36 space-y-3 overflow-y-auto pr-2 custom-scrollbar">
           {cartItems.map(item => (
@@ -577,33 +577,36 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       )}
       <div className="border-t border-dashed border-slate-200 pt-4">
         <div className="flex items-center justify-between gap-4">
-          <span className="text-base font-black text-slate-950">Total</span>
-          <span className="text-2xl font-black text-slate-950">{formatCheckoutMoney(finalPayable)}</span>
+          <span className="text-base font-black text-slate-950">Final payable</span>
+          <span className="text-2xl font-black text-blue-700">{formatCheckoutMoney(finalPayable)}</span>
         </div>
         {(couponSavings > 0 || coinSavings > 0) && <p className="mt-2 text-sm font-bold text-emerald-700">You saved {formatCheckoutMoney(totalSavings)} on this checkout.</p>}
       </div>
-      <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-800">
-        <span>🛡️ Secure payment processing by Razorpay</span>
-        <span className="font-black text-blue-800">Razorpay</span>
+      <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-white/85 px-4 py-3 text-sm font-bold text-emerald-800">
+        <div className="flex min-w-0 flex-col">
+          <span>🛡️ Secure payment processing by Razorpay</span>
+          <span className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">Verified Razorpay payment before unlock</span>
+        </div>
+        <span className="font-black text-blue-800">Safe</span>
       </div>
     </div>
   );
 
   const paymentDetailsAside = (
-    <aside className="payment-detail-trust-panel relative overflow-hidden bg-white p-4 text-slate-900 sm:p-8 lg:p-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(37,99,235,0.08),transparent_28%),radial-gradient(circle_at_92%_92%,rgba(16,185,129,0.09),transparent_26%)]" />
+    <aside className="payment-detail-trust-panel relative overflow-hidden bg-gradient-to-br from-white via-blue-50/70 to-emerald-50/55 p-4 text-slate-900 sm:p-8 lg:p-10">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(37,99,235,0.12),transparent_28%),radial-gradient(circle_at_92%_92%,rgba(16,185,129,0.13),transparent_26%)]" />
       <div className="relative flex h-full min-h-0 flex-col gap-5">
         <header className="flex items-start gap-4">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-blue-100 bg-blue-50 text-2xl text-blue-700">📄</span>
+          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] border border-blue-100 bg-blue-600 text-2xl text-white shadow-[0_14px_34px_rgba(37,99,235,0.22)]">📄</span>
           <div>
             <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl"><span className="sr-only">Payment details</span>{checkoutType === 'latest-update' ? 'Update purchase details' : checkoutType === 'subscription' ? 'Subscription payment details' : checkoutType === 'cart' ? 'Cart payment details' : 'Product payment details'}</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-600">Review what you’re buying and what you’ll get.</p>
+            <p className="mt-1 text-sm font-semibold text-slate-600">A simple view of the product, unlocks, final price, and payment safety.</p>
           </div>
         </header>
 
-        <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+        <section className="rounded-[22px] border border-blue-100 bg-white/90 p-4 shadow-[0_14px_42px_rgba(37,99,235,0.08)]">
           <div className="flex gap-4">
-            <span className="relative flex h-20 w-24 shrink-0 items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-slate-100 shadow-sm sm:h-24 sm:w-28">
+            <span className="relative flex h-20 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[22px] border border-blue-100 bg-blue-50 shadow-sm sm:h-24 sm:w-28">
               {productImage ? (
                 <img src={productImage} alt={primaryItemTitle} className="h-full w-full object-contain" />
               ) : (
@@ -618,9 +621,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+        <section className="rounded-[22px] border border-emerald-100 bg-white/90 p-4 shadow-[0_14px_42px_rgba(16,185,129,0.08)]">
           <div className="flex gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-xl">🎁</span>
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-xl text-white shadow-[0_10px_28px_rgba(16,185,129,0.22)]">🎁</span>
             <div className="min-w-0">
               <h3 className="text-lg font-black text-slate-950">What you unlock</h3>
               <ul className="mt-3 space-y-2 text-sm font-semibold text-slate-700">
@@ -630,9 +633,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           </div>
         </section>
 
-        <section className="rounded-2xl border border-slate-200 bg-white/90 p-4 shadow-sm">
+        <section className="rounded-[22px] border border-amber-100 bg-white/90 p-4 shadow-[0_14px_42px_rgba(245,158,11,0.08)]">
           <div className="flex gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-blue-50 text-xl">🛡️</span>
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-xl text-white shadow-[0_10px_28px_rgba(245,158,11,0.20)]">🛡️</span>
             <div>
               <h3 className="text-lg font-black text-slate-950">Access information</h3>
               <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Access unlocks only after server-side payment verification. If the payment window closes, use “Check payment status” to recover a completed payment safely.</p>
@@ -642,7 +645,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
         {priceBreakdownRows}
 
-        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">🔒 Your access unlocks only after verified payment.</div>
+        <div className="rounded-[22px] border border-blue-100 bg-white/90 px-4 py-3 text-sm font-bold text-blue-700 shadow-sm">🔒 Access unlocks only after verified payment. If payment is interrupted, status recovery is available.</div>
       </div>
     </aside>
   );
@@ -690,10 +693,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const checkoutContent = showCoinGuide ? coinGuideContent : checkoutStep === 'razorpay' ? razorpayDemoPage : checkoutStep === 'loading' ? loadingContent : (
     <>
       <div className="bg-gradient-to-br from-slate-50 via-blue-50/50 to-emerald-50/35 p-4 text-slate-900 sm:p-8">
-        <div className="rounded-[1.25rem] border border-slate-200 bg-white p-4 shadow-sm sm:rounded-[1.75rem] sm:p-5">
-          <p className="text-xs font-black uppercase tracking-[0.25em] text-blue-500">Secure live checkout</p>
-          <h3 className="mt-2 text-xl font-black sm:text-2xl">Review details, pay safely, unlock instantly</h3>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Every discount, EduCoin adjustment, and final payable amount is shown before checkout. Access unlocks only after verified payment.</p>
+        <div className="rounded-[22px] border border-blue-100 bg-white p-4 shadow-[0_14px_40px_rgba(37,99,235,0.08)] sm:p-5">
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-blue-600">Secure live checkout</p>
+          <h3 className="mt-2 text-xl font-black sm:text-2xl">Understand details, pay safely, unlock instantly</h3>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Every discount, EduCoin adjustment, final payable amount, and unlock rule is shown before checkout.</p>
         </div>
       </div>
 
@@ -702,7 +705,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         {coinStatus && <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm font-black text-amber-800">{coinStatus}</div>}
 
         <div className="space-y-3">
-          <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className="w-full rounded-2xl bg-gradient-to-r from-indigo-600 via-purple-600 to-cyan-500 px-5 py-3.5 text-base font-black text-white shadow-[0_16px_45px_rgba(79,70,229,0.24)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg">{finalPrice <= 0 ? 'Complete ₹0 Checkout' : 'Pay with Razorpay'}</button>
+          <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className="w-full rounded-[22px] bg-gradient-to-r from-blue-700 via-indigo-700 to-cyan-600 px-5 py-3.5 text-base font-black text-white shadow-[0_16px_45px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg">{finalPrice <= 0 ? 'Complete ₹0 Checkout' : `Pay ${formatCheckoutMoney(finalPayable)} with Razorpay`}</button>
           {isCoinCheckoutEnabled && appliedEduCoins <= 0 && (
             <button disabled={isCompleting} onClick={handleCoinCheckout} className={`w-full rounded-2xl border px-5 py-3.5 text-base font-black shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg ${canPayWithCoins ? 'border-amber-200/60 bg-white/80 text-amber-700' : 'border-amber-200 bg-amber-50/90 text-amber-800'}`}>
               <span className="block">

@@ -525,10 +525,22 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 {!isPurchased && isWishlisted && <span className="absolute right-3 top-3 rounded-full bg-red-500 px-3 py-1.5 text-xs font-black text-white shadow-lg sm:right-5 sm:top-5 sm:px-4 sm:py-2 sm:text-sm">♥ Wishlisted</span>}
               </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-2 sm:mt-5 sm:gap-3">
-                <div className="rounded-2xl border border-white/70 bg-white/70 p-3 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl sm:rounded-3xl sm:p-4"><p className="text-xl sm:text-2xl">⚡</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Instant</p><p className="text-sm font-black text-slate-900">Unlock</p></div>
-                <div className="rounded-2xl border border-white/70 bg-white/70 p-3 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl sm:rounded-3xl sm:p-4"><p className="text-xl sm:text-2xl">🪙</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Wallet</p><p className="text-sm font-black text-slate-900">{canShowProductCoinCheckout ? `${productCoinPrice} Coins` : 'Razorpay'}</p></div>
-                <div className="rounded-2xl border border-white/70 bg-white/70 p-3 text-center shadow-[0_18px_45px_rgba(15,23,42,0.06)] backdrop-blur-2xl sm:rounded-3xl sm:p-4"><p className="text-xl sm:text-2xl">⭐</p><p className="mt-1 text-xs font-black uppercase tracking-[0.2em] text-slate-500">Rating</p><p className="text-sm font-black text-slate-900">{product.rating.toFixed(1)} / 5</p></div>
+              <div className="mt-4 grid grid-cols-1 gap-3 sm:mt-5 sm:grid-cols-3">
+                <div className="rounded-[22px] border border-blue-100 bg-gradient-to-br from-white via-blue-50/80 to-white p-4 shadow-[0_16px_42px_rgba(37,99,235,0.09)] ring-1 ring-white/80 backdrop-blur-2xl">
+                  <p className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-xl text-white shadow-[0_10px_24px_rgba(37,99,235,0.24)]">⚡</p>
+                  <p className="mt-3 text-xs font-black uppercase tracking-[0.2em] text-blue-600">Instant access</p>
+                  <p className="mt-1 text-sm font-black text-slate-950">Unlock after verified payment</p>
+                </div>
+                <div className="rounded-[22px] border border-amber-100 bg-gradient-to-br from-white via-amber-50/90 to-white p-4 shadow-[0_16px_42px_rgba(245,158,11,0.09)] ring-1 ring-white/80 backdrop-blur-2xl">
+                  <p className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500 text-xl text-white shadow-[0_10px_24px_rgba(245,158,11,0.22)]">🪙</p>
+                  <p className="mt-3 text-xs font-black uppercase tracking-[0.2em] text-amber-700">Payment choice</p>
+                  <p className="mt-1 text-sm font-black text-slate-950">{canShowProductCoinCheckout ? `${productCoinPrice} EduCoins` : 'Razorpay secure pay'}</p>
+                </div>
+                <div className="rounded-[22px] border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/90 to-white p-4 shadow-[0_16px_42px_rgba(16,185,129,0.09)] ring-1 ring-white/80 backdrop-blur-2xl">
+                  <p className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-xl text-white shadow-[0_10px_24px_rgba(16,185,129,0.22)]">⭐</p>
+                  <p className="mt-3 text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Learner trust</p>
+                  <p className="mt-1 text-sm font-black text-slate-950">{product.rating.toFixed(1)} / 5 rating</p>
+                </div>
               </div>
 
               {detailGalleryImages.length > 1 && (
@@ -588,16 +600,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </div>
 
             <aside className="md:col-span-5">
-              <div id="price-section" className={`product-checkout-panel overflow-hidden ${detailPanelRoundClass} border border-white/60 bg-white/75 p-4 shadow-[0_28px_85px_rgba(79,70,229,0.14)] backdrop-blur-2xl sm:p-6 md:sticky md:top-24 ${priceJustUpdated ? 'price-flash' : ''}`}>
+              <div id="price-section" className={`product-checkout-panel overflow-hidden ${detailPanelRoundClass} border border-blue-100/80 bg-gradient-to-br from-white via-blue-50/80 to-cyan-50/70 p-4 shadow-[0_30px_90px_rgba(37,99,235,0.16)] ring-1 ring-white/80 backdrop-blur-2xl sm:p-6 md:sticky md:top-24 ${priceJustUpdated ? 'price-flash' : ''}`}>
                 <div className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-indigo-300/20 blur-3xl" />
                 <div className="pointer-events-none absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-cyan-600/20 blur-3xl" />
                 <div className="relative">
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-indigo-500">Secure checkout</p>
-                <h2 className="mt-2 text-xl font-black text-slate-950 sm:mt-3 sm:text-2xl">Unlock instant access</h2>
-                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Digital products are single-quantity purchases with lifetime access from My Purchases.</p>
+                <p className="text-xs font-black uppercase tracking-[0.28em] text-blue-600">Course payment details</p>
+                <h2 className="mt-2 text-xl font-black text-slate-950 sm:mt-3 sm:text-2xl">Clear price, safe unlock</h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Review the final amount, discounts, and payment choice before your course access unlocks.</p>
 
-                <div className="relative mt-5 overflow-hidden rounded-2xl border border-slate-200/70 bg-slate-50/85 p-4 sm:mt-6 sm:rounded-3xl sm:p-5">
+                <div className="relative mt-5 overflow-hidden rounded-[22px] border border-blue-100 bg-white/90 p-4 shadow-[0_18px_50px_rgba(37,99,235,0.10)] sm:mt-6 sm:p-5">
                 {/* Source-contract marker only: border-double border-red-900 from-red-950 via-red-700 to-red-950 text-red-700 */}
+                  <div className="pointer-events-none absolute -right-12 -top-16 h-36 w-36 rounded-full bg-blue-300/25 blur-3xl" />
                   {isPurchased && (
                     <div className={`product-owned-stamp pointer-events-none absolute right-3 top-3 z-10 ${detailBadgeRoundClass} border border-emerald-200 bg-white/95 px-4 py-2 text-xs font-black uppercase tracking-[0.18em] text-emerald-700 shadow-[0_14px_34px_rgba(5,150,105,0.20)] ring-2 ring-emerald-50 sm:right-5 sm:top-5 sm:px-5 sm:py-2.5 sm:text-sm`} aria-label="Purchased">
                       <span className="sr-only">OWNED</span>
@@ -606,25 +619,36 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                       Purchased
                     </div>
                   )}
-                  <div className="flex items-end justify-between gap-4">
-                    <span className="text-sm font-black uppercase tracking-widest text-slate-500">Total</span>
+                  <div className="relative flex items-start justify-between gap-4">
+                    <div>
+                      <span className="text-sm font-black uppercase tracking-widest text-blue-600">Pay today</span>
+                      <p className="mt-1 text-xs font-bold text-slate-500">Verified digital access · Lifetime library</p>
+                    </div>
                     <div className="text-right">
                       {!isPurchased && salePriceNum !== null && !appliedCoupon && <p className="text-sm font-bold text-slate-400 line-through">₹{originalPriceNum.toFixed(2)}</p>}
-                      {!isPurchased && appliedCoupon && <p className="text-sm font-bold text-emerald-600">Saved ₹{totalCouponDiscount.toFixed(2)}</p>}
-                      <p className={`text-3xl font-black sm:text-4xl ${isPurchased ? 'pr-28 text-slate-900 sm:pr-32' : 'text-primary'}`}>{product.isFree ? 'FREE' : `₹${finalTotalPrice.toFixed(2)}`}</p>
+                      {!isPurchased && appliedCoupon && <p className="text-sm font-black text-emerald-700">Saved ₹{totalCouponDiscount.toFixed(2)}</p>}
+                      <p className={`text-3xl font-black sm:text-4xl ${isPurchased ? 'pr-28 text-slate-900 sm:pr-32' : 'text-blue-700'}`}>{product.isFree ? 'FREE' : `₹${finalTotalPrice.toFixed(2)}`}</p>
                     </div>
                   </div>
-                  {!isPurchased && eduCoinDiscount > 0 && <p className="mt-3 rounded-2xl bg-amber-50 px-4 py-3 text-sm font-bold text-amber-700">🪙 {activeCoinDiscount?.coins || 0} EduCoins applied for ₹{eduCoinDiscount.toFixed(2)} off</p>}
+                  {!isPurchased && eduCoinDiscount > 0 && <p className="relative mt-3 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">🪙 {activeCoinDiscount?.coins || 0} EduCoins applied for ₹{eduCoinDiscount.toFixed(2)} off</p>}
+                  <div className="relative mt-4 grid grid-cols-2 gap-2 text-[11px] font-black uppercase tracking-[0.14em] text-slate-600">
+                    <span className="rounded-2xl border border-emerald-100 bg-emerald-50 px-3 py-2 text-emerald-700">✓ Instant unlock</span>
+                    <span className="rounded-2xl border border-blue-100 bg-blue-50 px-3 py-2 text-blue-700">✓ Secure payment</span>
+                  </div>
                 </div>
 
                 {!isPurchased && !product.isFree && coupons.length > 0 && (
-                  <div className="mt-4 rounded-2xl border border-white/70 bg-white/70 p-3 shadow-sm sm:mt-5 sm:rounded-3xl sm:p-4">
+                  <div className="mt-4 rounded-[22px] border border-indigo-100 bg-white/85 p-3 shadow-[0_12px_34px_rgba(79,70,229,0.08)] sm:mt-5 sm:p-4">
+                    <div className="mb-3">
+                      <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">Have a coupon?</p>
+                      <p className="mt-1 text-xs font-bold text-slate-500">Apply it here and the payable amount updates before payment.</p>
+                    </div>
                     <div className="flex flex-col gap-2 sm:flex-row">
-                      <input type="text" value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} placeholder="Coupon code" className="min-w-0 flex-1 rounded-2xl border border-slate-200 bg-white/85 px-4 py-3 font-bold outline-none transition focus:border-primary focus:ring-2 focus:ring-primary/20" aria-label="Coupon code" />
-                      <button onClick={() => handleApplyCoupon(couponInput)} className="rounded-2xl bg-slate-950 px-5 py-3 font-black text-white transition hover:-translate-y-0.5">Apply</button>
+                      <input type="text" value={couponInput} onChange={e => setCouponInput(e.target.value.toUpperCase())} placeholder="Enter coupon code" className="min-w-0 flex-1 rounded-2xl border border-indigo-100 bg-white px-4 py-3 font-bold outline-none transition focus:border-indigo-500 focus:ring-2 focus:ring-indigo-500/20" aria-label="Coupon code" />
+                      <button onClick={() => handleApplyCoupon(couponInput)} className="rounded-2xl bg-gradient-to-r from-slate-950 to-blue-950 px-5 py-3 font-black text-white shadow-[0_12px_30px_rgba(15,23,42,0.20)] transition hover:-translate-y-0.5">Apply</button>
                     </div>
                     {couponError && <p className="mt-2 text-sm font-bold text-red-500">{couponError}</p>}
-                    {appliedCoupon && !couponError && <div className="mt-3 flex items-center justify-between rounded-2xl bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700"><span>{appliedCoupon.code} applied</span><button onClick={handleRemoveCoupon} className="text-red-500 hover:underline">Remove</button></div>}
+                    {appliedCoupon && !couponError && <div className="mt-3 flex items-center justify-between rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm font-bold text-emerald-700"><span>{appliedCoupon.code} applied</span><button onClick={handleRemoveCoupon} className="text-red-500 hover:underline">Remove</button></div>}
                   </div>
                 )}
 
@@ -642,12 +666,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     </button>
                   ) : (
                     <LiquidMetalButton tone="blue" onClick={handleBuyClick} className={`product-checkout-primary w-full ${detailActionRoundClass} px-6 py-3.5 text-base font-black sm:px-8 sm:py-4 sm:text-lg`}>
-                      Pay securely with Razorpay
+                      {product.isFree ? 'Complete free checkout' : `Pay ₹${finalTotalPrice.toFixed(2)} securely`}
                     </LiquidMetalButton>
                   )}
                   {!isPurchased && canShowProductCoinCheckout && (
-                    <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className={`w-full ${detailActionRoundClass} border border-amber-200/70 bg-white/75 px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.12)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg`}>
-                      🪙 {coinCheckoutLabel}
+                    <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className={`w-full ${detailActionRoundClass} border border-amber-200/70 bg-gradient-to-r from-white via-amber-50/90 to-white px-6 py-3.5 text-base font-black text-amber-800 shadow-[0_14px_38px_rgba(245,158,11,0.14)] backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-amber-50 active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg`}>
+                      🪙 {coinCheckoutLabel} with EduCoins
                       {requiredProductCoins > 0 && (
                         <span className="mt-2 block text-xs font-bold text-slate-600">
                           Admin coin price: {requiredProductCoins} EduCoins · Your balance: {userCoinBalance} EduCoins
@@ -679,10 +703,10 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   </button>
                 </div>
 
-                <div className="mt-4 grid grid-cols-3 gap-2 text-xs font-bold text-slate-600 sm:mt-5 sm:gap-3 sm:text-sm md:grid-cols-1 lg:grid-cols-3">
-                  <div className="rounded-2xl border border-white/70 bg-white/75 p-3 text-center shadow-sm backdrop-blur-xl">🔒 Razorpay</div>
-                  <div className="rounded-2xl border border-white/70 bg-white/75 p-3 text-center shadow-sm backdrop-blur-xl">🪙 EduCoins</div>
-                  <div className="rounded-2xl border border-white/70 bg-white/75 p-3 text-center shadow-sm backdrop-blur-xl">📚 Lifetime</div>
+                <div className="mt-5 grid grid-cols-1 gap-2 text-xs font-bold text-slate-600 sm:grid-cols-3 md:grid-cols-1 lg:grid-cols-3">
+                  <div className="rounded-[22px] border border-blue-100 bg-white/85 p-3 text-center shadow-sm backdrop-blur-xl"><span className="block text-lg">🔒</span><span className="block font-black text-blue-700">Razorpay</span><span className="text-[11px] text-slate-500">verified pay</span></div>
+                  <div className="rounded-[22px] border border-amber-100 bg-white/85 p-3 text-center shadow-sm backdrop-blur-xl"><span className="block text-lg">🪙</span><span className="block font-black text-amber-700">EduCoins</span><span className="text-[11px] text-slate-500">student discount</span></div>
+                  <div className="rounded-[22px] border border-emerald-100 bg-white/85 p-3 text-center shadow-sm backdrop-blur-xl"><span className="block text-lg">📚</span><span className="block font-black text-emerald-700">Lifetime</span><span className="text-[11px] text-slate-500">My Purchases</span></div>
                 </div>
                 </div>
               </div>
