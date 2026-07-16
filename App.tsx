@@ -5228,6 +5228,7 @@ const App: React.FC = () => {
         onConfirmWithCoins={hasPremiumMembership(effectiveAppUser) && summary.coinPrice > 0 ? () => handleConfirmLatestUpdateCoinPurchase(latestUpdateCheckout.product, latestUpdateCheckout.updateId) : undefined}
         onInsufficientCoins={(details) => handleInsufficientEduCoins({ ...details, productTitle: `${latestUpdateCheckout.product.title} · ${summary.title}` })}
         presentation="page"
+        initialCheckoutStep="checkout"
         checkoutType="latest-update"
         checkoutUserId={effectiveAppUser?.id}
         checkoutTargetId={latestUpdateCheckout.updateId || latestUpdateCheckout.product.id}

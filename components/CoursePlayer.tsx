@@ -348,7 +348,7 @@ const ModuleItem: React.FC<{
         className={`module-item-button group flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition sm:py-4 ${
           moduleUnlocked
             ? 'border border-transparent bg-white/65 text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.04)] hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]'
-            : 'border border-amber-200 bg-[#FFF7E0] text-amber-950 shadow-[0_8px_24px_rgba(245,184,46,0.10)] hover:bg-amber-100'
+            : 'paid-module-unlock-action border border-blue-300 bg-gradient-to-r from-blue-600 via-[#1769ff] to-cyan-500 text-white shadow-[0_16px_38px_rgba(23,105,255,0.24)] hover:-translate-y-0.5 hover:shadow-[0_20px_46px_rgba(23,105,255,0.30)]'
         }`}
         aria-expanded={isExpanded}
       >
@@ -366,8 +366,8 @@ const ModuleItem: React.FC<{
           </span>
         </span>
         {!moduleUnlocked ? (
-          <span className="shrink-0 rounded-full bg-[#F5B82E] px-3 py-1 text-[10px] font-black uppercase tracking-widest text-amber-950 ring-1 ring-amber-300">
-            🔒 Buy
+          <span className="shrink-0 rounded-full border border-white/30 bg-white/15 px-3 py-1 text-[10px] font-black uppercase tracking-widest text-white shadow-inner">
+            🔒 Unlock
           </span>
         ) : (
           <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white text-sm font-black text-[#5B4BFF] shadow-sm">
@@ -394,7 +394,7 @@ const ModuleItem: React.FC<{
                       ? "border-[#C9C2FF] bg-white font-black text-[#5B4BFF] shadow-[0_14px_34px_rgba(91,75,255,0.16)]"
                       : fileUnlocked
                         ? "border-transparent bg-white/45 font-semibold text-[#344054] hover:border-[#E3E8F5] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]"
-                        : "cursor-pointer border-amber-200 bg-[#FFF7E0] font-black text-amber-950 hover:bg-amber-100"
+                        : "paid-lesson-unlock-action cursor-pointer border-blue-300 bg-blue-50 font-black text-blue-800 hover:-translate-y-0.5 hover:bg-blue-100"
                   }`}
                 >
                   <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-xl ${
@@ -2117,8 +2117,8 @@ const CoursePlayer: React.FC<{
           <YoutubeRewardChip compact />
           <button onClick={() => toggleCourseMentor()} className={`${viewport.isTinyPlayer ? 'h-10 px-2 text-xs' : 'h-11 px-3 text-xs sm:text-sm'} shrink-0 rounded-2xl border border-[#ded8ff] bg-white/85 font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff] focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50`}>🧠 AI</button>
           {productAccess?.hasPaidLockedUpdates && onPurchaseLatestUpdate && !viewport.isTinyPlayer && (
-            <button onClick={() => onPurchaseLatestUpdate(product)} className="hidden h-11 shrink-0 rounded-2xl border border-emerald-200 bg-emerald-50 px-3 text-xs font-black text-emerald-700 shadow-[0_10px_30px_rgba(16,185,129,0.10)] transition hover:-translate-y-0.5 hover:bg-emerald-100 focus:outline-none focus:ring-2 focus:ring-emerald-400/40 sm:inline-flex sm:items-center">
-              Latest Update
+            <button onClick={() => onPurchaseLatestUpdate(product)} className="course-player-paid-update-action eduvora-primary-action hidden h-11 shrink-0 items-center gap-2 rounded-[18px] border border-blue-500 px-4 text-xs font-black text-white shadow-[0_14px_34px_rgba(23,105,255,0.26)] transition hover:-translate-y-0.5 hover:shadow-[0_18px_42px_rgba(23,105,255,0.32)] focus:outline-none focus:ring-2 focus:ring-blue-500/40 sm:inline-flex">
+              <span aria-hidden="true">▣</span> Unlock Update
             </button>
           )}
         </div>

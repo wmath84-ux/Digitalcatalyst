@@ -867,19 +867,19 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                     </button>
                   )}
                   {hasLockedPaidUpdates && (
-                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className={`product-checkout-update product-detail-latest-update-button relative min-h-[5.75rem] w-full overflow-hidden ${detailActionRoundClass} border border-emerald-300/70 bg-gradient-to-r from-emerald-700 via-teal-600 to-cyan-600 px-6 py-4 text-left text-base font-black text-white shadow-[0_22px_58px_rgba(5,150,105,0.32)] ring-4 ring-emerald-400/15 transition hover:-translate-y-0.5 hover:shadow-[0_26px_66px_rgba(5,150,105,0.38)] active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg`}>
-                      <span className="pointer-events-none absolute -right-5 -top-8 h-24 w-24 rounded-full bg-white/15 blur-2xl" />
+                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className={`product-checkout-update product-detail-latest-update-button paid-update-primary-action eduvora-primary-action relative min-h-[5.75rem] w-full overflow-hidden ${detailActionRoundClass} border border-blue-500 px-6 py-4 text-left text-base font-black text-white shadow-[0_22px_54px_rgba(23,105,255,0.30)] ring-4 ring-blue-500/15 transition hover:-translate-y-0.5 hover:shadow-[0_26px_62px_rgba(23,105,255,0.36)] active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg`}>
                       <span className="relative flex items-center justify-between gap-4">
                         <span>
                           <span className="sr-only">Purchase the latest update</span>
-                              <span className="sr-only">new paid content item</span>
-                          <span className="block">Unlock new update features</span>
+                          <span className="sr-only">new paid content item</span>
+                          <span className="block text-[11px] font-black uppercase tracking-[0.2em] text-white/75">Paid course update</span>
+                          <span className="mt-1 block text-lg font-black">Unlock new update features</span>
                           <span className="mt-2 block text-xs font-bold text-white/85">
-                            {lockedPaidUpdateCount} paid update{lockedPaidUpdateCount === 1 ? '' : 's'} · See what changes and unlocks
+                            {lockedPaidUpdateCount} paid update{lockedPaidUpdateCount === 1 ? '' : 's'} · Review details and pay securely
                           </span>
                         </span>
-                        <span className={`flex h-12 min-w-12 items-center justify-center ${detailBadgeRoundClass} border border-white/40 bg-white text-xl font-black text-red-700 shadow-[0_10px_24px_rgba(0,0,0,0.14)]`}>
-                          {lockedPaidUpdateCount}
+                        <span className={`payment-card-icon flex h-12 min-w-12 items-center justify-center ${detailBadgeRoundClass} border border-white/35 bg-white/15 text-xl font-black text-white shadow-inner`}>
+                          →
                         </span>
                       </span>
                     </button>

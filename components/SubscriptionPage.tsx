@@ -117,14 +117,14 @@ const SubscriptionPage: React.FC<{
 
   return (
     <div
-      className="subscription-page-theme-adaptive subscription-page-editorial-pricing relative min-h-screen overflow-x-hidden bg-[#FFFEF8] pb-24 font-mono text-[#111111]"
+      className="subscription-page-theme-adaptive subscription-page-default-theme relative min-h-screen overflow-x-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-blue-50/60 to-cyan-50/40 pb-24 text-slate-900"
       style={{
-        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(17,17,17,0.13) 1px, transparent 0), linear-gradient(to right, rgba(17,17,17,0.055) 1px, transparent 1px), linear-gradient(to bottom, rgba(17,17,17,0.045) 1px, transparent 1px)',
-        backgroundSize: '22px 22px, 250px 100%, 100% 120px',
+        backgroundImage: 'radial-gradient(circle at 1px 1px, rgba(37,99,235,0.10) 1px, transparent 0)',
+        backgroundSize: '24px 24px',
       }}
     >
       <main className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-5 sm:px-7 sm:py-7 lg:px-10">
-        <button type="button" onClick={onBack} className="w-fit border border-[#181818] bg-white px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.08em] text-[#111111] outline-none transition hover:-translate-y-0.5 hover:bg-[#F4F35B] focus-visible:ring-2 focus-visible:ring-[#F4F35B]">
+        <button type="button" onClick={onBack} className="w-fit rounded-[18px] border border-blue-200 bg-white px-4 py-2 text-[11px] font-black uppercase tracking-[0.08em] text-blue-800 shadow-sm outline-none transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-blue-500/40">
           ← Back
         </button>
 
@@ -140,11 +140,11 @@ const SubscriptionPage: React.FC<{
             )}
           </div>
 
-          <div className="mt-6 flex items-center justify-center border border-[#181818] bg-white text-[11px] font-black leading-none text-[#111111] sm:mt-7" aria-label="Billing preview toggle">
-            <button type="button" aria-pressed={billingPreview === 'monthly'} onClick={() => setBillingPreview('monthly')} className={`h-9 min-w-24 border-r border-[#181818] px-5 outline-none transition focus-visible:ring-2 focus-visible:ring-[#F4F35B] focus-visible:ring-inset ${billingPreview === 'monthly' ? 'bg-[#F4F35B]' : 'bg-white hover:bg-[#FFFBC4]'}`}>
+          <div className="mt-6 flex items-center justify-center overflow-hidden rounded-[18px] border border-blue-200 bg-white p-1 text-[11px] font-black leading-none text-slate-800 shadow-sm sm:mt-7" aria-label="Billing preview toggle">
+            <button type="button" aria-pressed={billingPreview === 'monthly'} onClick={() => setBillingPreview('monthly')} className={`h-9 min-w-24 rounded-[14px] px-5 outline-none transition focus-visible:ring-2 focus-visible:ring-blue-500/40 ${billingPreview === 'monthly' ? 'bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)]' : 'bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-700'}`}>
               {pageContent.monthlyLabel}
             </button>
-            <button type="button" aria-pressed={billingPreview === 'yearly'} onClick={() => setBillingPreview('yearly')} className={`flex h-9 min-w-24 items-center justify-center gap-1.5 px-5 outline-none transition focus-visible:ring-2 focus-visible:ring-[#F4F35B] focus-visible:ring-inset ${billingPreview === 'yearly' ? 'bg-[#F4F35B]' : 'bg-white hover:bg-[#FFFBC4]'}`}>
+            <button type="button" aria-pressed={billingPreview === 'yearly'} onClick={() => setBillingPreview('yearly')} className={`flex h-9 min-w-24 items-center justify-center gap-1.5 rounded-[14px] px-5 outline-none transition focus-visible:ring-2 focus-visible:ring-blue-500/40 ${billingPreview === 'yearly' ? 'bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)]' : 'bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-700'}`}>
               <span>{pageContent.yearlyLabel}</span>
               <span className="border border-[#181818] bg-white px-1 py-0.5 text-[8px] leading-none">{pageContent.yearlyBadge}</span>
             </button>
@@ -178,8 +178,8 @@ const SubscriptionPage: React.FC<{
               const disabled = currentPlanOrHigher;
 
               return (
-                <article key={plan.id} className={`subscription-plan-card group relative flex min-h-[660px] flex-col overflow-visible border bg-white px-5 pb-5 pt-7 text-left shadow-[8px_8px_0_rgba(17,17,17,0.06)] transition hover:-translate-y-1 sm:px-6 ${isHighlighted ? 'border-2 border-[#181818] md:-translate-y-2 md:hover:-translate-y-3' : 'border-[#181818]'}`}>
-                  {isHighlighted && <span className="absolute -top-3 left-1/2 -translate-x-1/2 border border-[#181818] bg-[#F4F35B] px-4 py-1 text-[10px] font-black uppercase tracking-[0.12em]">{plan.badge || 'Most Popular'}</span>}
+                <article key={plan.id} className={`subscription-plan-card group relative flex min-h-[660px] flex-col overflow-visible rounded-[22px] border bg-white/95 px-5 pb-5 pt-7 text-left shadow-[0_22px_64px_rgba(37,99,235,0.10)] ring-1 ring-white/80 transition hover:-translate-y-1 hover:shadow-[0_28px_72px_rgba(37,99,235,0.14)] sm:px-6 ${isHighlighted ? 'border-blue-300 ring-4 ring-blue-500/10 md:-translate-y-2 md:hover:-translate-y-3' : 'border-blue-100'}`}>
+                  {isHighlighted && <span className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full border border-blue-300 bg-blue-600 px-4 py-1.5 text-[10px] font-black uppercase tracking-[0.12em] text-white shadow-[0_10px_24px_rgba(37,99,235,0.22)]">{plan.badge || 'Most Popular'}</span>}
                   {disabled && (
                     <div className="pointer-events-none absolute left-1/2 top-1/2 z-20 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rotate-[-8deg] sm:h-28 sm:w-28" aria-label="Subscription purchased and active">
                       <div className="absolute inset-2 rounded-full border-[3px] border-double border-red-900 bg-white/95 shadow-[0_12px_30px_rgba(185,28,28,0.22)]" />
@@ -191,9 +191,9 @@ const SubscriptionPage: React.FC<{
                   )}
 
                   <div className="flex flex-wrap items-start gap-2">
-                    <span className="border border-[#181818] bg-white px-2 py-1 text-[10px] font-black uppercase tracking-[0.08em]">{plan.accessTier}</span>
-                    <span className="border border-[#181818] bg-[#FFFBC4] px-2 py-1 text-[10px] font-black uppercase tracking-[0.04em]">{plan.earningMultiplier}× earning</span>
-                    {availableCoupon && <span className="border border-[#181818] bg-[#F4F35B] px-2 py-1 text-[10px] font-black uppercase tracking-[0.04em]">Coupon available</span>}
+                    <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em]">{plan.accessTier}</span>
+                    <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.04em]">{plan.earningMultiplier}× earning</span>
+                    {availableCoupon && <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.04em]">Coupon available</span>}
                   </div>
 
                   <div className="mt-7 text-center">
@@ -217,14 +217,14 @@ const SubscriptionPage: React.FC<{
                   </div>
 
                   {unlockedProducts.length > 0 && (
-                    <div className="mt-5 border border-[#181818] bg-[#FFFDF5] p-3">
+                    <div className="mt-5 rounded-[18px] border border-blue-100 bg-blue-50/60 p-4">
                       <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#676767]">Selected content access</p>
                       <p className="mt-2 text-[11px] font-bold leading-5">{unlockedProducts.join(' • ')}</p>
                     </div>
                   )}
 
                   {(activeDiscount || validAppliedCoupon) && (
-                    <div className="mt-5 border border-[#181818] bg-[#FFFDF5] p-3 text-[11px] font-bold">
+                    <div className="mt-5 rounded-[18px] border border-blue-100 bg-blue-50/60 p-4 text-[11px] font-bold">
                       <div className="flex justify-between gap-3"><span>Subtotal</span><span>₹{planPrice}</span></div>
                       {validAppliedCoupon && <div className="mt-1 flex justify-between gap-3"><span>Coupon ({validAppliedCoupon.code})</span><span>-₹{couponDiscount.toFixed(2)}</span></div>}
                       {activeDiscount && <div className="mt-1 flex justify-between gap-3"><span>EduCoin Discount</span><span>-₹{eduCoinDiscount}</span></div>}
@@ -233,18 +233,18 @@ const SubscriptionPage: React.FC<{
                   )}
 
                   <div className="mt-auto space-y-2.5 pt-6">
-                    <button type="button" disabled={disabled} onClick={() => onActivatePlan(plan, billingCycle, validAppliedCoupon?.code || null)} className={`block min-h-12 w-full rounded-xl border px-4 py-3 text-center text-[12px] font-black uppercase tracking-[0.08em] outline-none transition active:scale-[0.99] ${disabled ? 'cursor-not-allowed border-slate-300 bg-gradient-to-r from-slate-100 to-white text-slate-500 shadow-sm' : 'border-blue-700 bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-600 text-white shadow-[0_12px_30px_rgba(37,99,235,0.24)] hover:-translate-y-0.5 hover:shadow-[0_16px_36px_rgba(37,99,235,0.30)]'}`}>
+                    <button type="button" disabled={disabled} onClick={() => onActivatePlan(plan, billingCycle, validAppliedCoupon?.code || null)} className={`subscription-primary-action block min-h-12 w-full rounded-[18px] border px-4 py-3 text-center text-[12px] font-black uppercase tracking-[0.08em] outline-none transition active:scale-[0.99] ${disabled ? 'cursor-not-allowed border-slate-300 bg-gradient-to-r from-slate-100 to-white text-slate-500 shadow-sm' : 'eduvora-primary-action border-blue-500 text-white shadow-[0_18px_42px_rgba(23,105,255,0.28)] hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(23,105,255,0.34)]'}`}>
                       {disabled ? `${currentTier === 'elite' ? 'Elite' : 'Pro'} subscription active` : `${plan.ctaLabel} · ₹${finalPlanPrice.toFixed(0)} / ${billingLabel}`}
                     </button>
 
                     {coinPrice > 0 && (
-                      <button type="button" disabled={disabled || !canPayWithCoins} onClick={() => onActivatePlanWithCoins?.(plan, billingCycle)} className="block h-10 w-full border border-[#181818] bg-white px-4 text-center text-[11px] font-black uppercase tracking-[0.06em] outline-none transition hover:bg-[#F4F35B] disabled:cursor-not-allowed disabled:border-[#9B9B94] disabled:bg-[#F2F2EE] disabled:text-[#676767]">
+                      <button type="button" disabled={disabled || !canPayWithCoins} onClick={() => onActivatePlanWithCoins?.(plan, billingCycle)} className="subscription-educoin-action block min-h-11 w-full rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-center text-[11px] font-black uppercase tracking-[0.06em] text-amber-800 outline-none transition hover:-translate-y-0.5 hover:border-amber-300 hover:bg-amber-100 disabled:cursor-not-allowed disabled:border-slate-200 disabled:bg-slate-100 disabled:text-slate-500">
                         {disabled ? 'Membership active' : !canUseEduCoins ? 'EduCoin use unlocks with Pro' : canPayWithCoins ? `Pay ${coinPrice} EduCoins` : `Need ${missingCoins} more coins`}
                       </button>
                     )}
                   </div>
 
-                  <div className="mt-4 border border-[#181818] bg-[#FFFDF5] p-3">
+                  <div className="mt-4 rounded-[18px] border border-blue-100 bg-slate-50/90 p-4">
                     <label htmlFor={`coupon-${planId}`} className="text-[10px] font-black uppercase tracking-[0.12em] text-[#676767]">Coupon code</label>
                     <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
                       <input id={`coupon-${planId}`} type="text" value={couponInputs[planId] || ''} onChange={event => handleCouponInputChange(planId, event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !validAppliedCoupon) handleApplyCoupon(planId, couponInputs[planId] || ''); }} placeholder="Code" disabled={disabled} className="h-10 w-full min-w-0 border border-[#181818] bg-white px-3 text-[12px] font-black uppercase tracking-[0.08em] outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-[#676767] focus:bg-[#FFFBC4] disabled:bg-[#F2F2EE]" />

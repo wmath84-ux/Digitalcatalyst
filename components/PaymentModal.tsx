@@ -93,7 +93,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 }) => {
   const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>(initialCheckoutStep);
   const [isCompleting, setIsCompleting] = useState(false);
+  const [isRazorpayLaunching, setIsRazorpayLaunching] = useState(false);
   const [coinStatus, setCoinStatus] = useState<string | null>(null);
+  const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
   const [showCoinGuide, setShowCoinGuide] = useState(initialShowCoinGuide);
   const pageRef = useRef<HTMLDivElement>(null);
   const autoStartedRazorpayRef = useRef(false);
@@ -134,10 +136,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   }, [presentation]);
 
   useEffect(() => {
-    if (presentation === 'page') {
+    if (presentation === 'page' && showCoinGuide) {
       pageRef.current?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });
     }
-  }, [checkoutStep, presentation, showCoinGuide]);
+  }, [presentation, showCoinGuide]);
 
   const closeAfterStateSettles = () => {
     window.setTimeout(() => onClose(), 100);
@@ -276,9 +278,10 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     }
 
     setShowCoinGuide(false);
+    setPaymentNotice(null);
+    setIsRazorpayLaunching(true);
     setIsCompleting(true);
-    setCheckoutStep('loading');
-    setCoinStatus('Creating a secure Razorpay order...');
+    setCoinStatus('Preparing the secure Razorpay window...');
 
     try {
       await loadRazorpayCheckout();
@@ -323,7 +326,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         order_id: orderData.orderId,
         amount: orderData.amount,
         currency: orderData.currency || 'INR',
-        name: 'Digital Catalyst',
+        name: 'Eduvora',
         description: primaryItemTitle || productTitle || 'Secure checkout',
         prefill: {
           name: currentUser?.name || '',
@@ -332,6 +335,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         },
         handler: async (response: Record<string, string>) => {
           try {
+            setIsRazorpayLaunching(false);
+            setPaymentNotice(null);
+            setCheckoutStep('loading');
             setCoinStatus('Verifying payment signature...');
             const verifyResponse = await fetch('/api/razorpay/verify-payment', {
               method: 'POST',
@@ -364,23 +370,27 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           escape: true,
           handleback: true,
           ondismiss: () => {
+            setIsRazorpayLaunching(false);
             void reconcilePendingCheckout(String(orderData.orderId), 'dismiss').then((unlocked) => {
               if (!unlocked) {
-                setCheckoutStep('razorpay');
-                setCoinStatus('Payment window was closed/cancelled or the payment app was not available. No access was unlocked. If money was deducted, tap “Check payment status”.');
+                setCheckoutStep('checkout');
+                setPaymentNotice('Payment wasn’t completed. No access was unlocked—retry when you’re ready.');
+                setCoinStatus('Payment window was closed/cancelled or the payment app was not available. If money was deducted, use “Check payment status” before paying again.');
                 setIsCompleting(false);
               }
             });
           },
         },
         retry: { enabled: true },
-        theme: { color: '#111827' },
+        theme: { color: '#1769ff' },
       });
 
       if (typeof razorpay.on === 'function') {
         razorpay.on('payment.failed', (response: any) => {
-          const description = response?.error?.description || response?.error?.reason || 'Payment failed or was cancelled. No access was unlocked.';
-          setCheckoutStep('razorpay');
+          const description = response?.error?.description || response?.error?.reason || 'Payment did not go through.';
+          setIsRazorpayLaunching(false);
+          setCheckoutStep('checkout');
+          setPaymentNotice('Payment wasn’t completed. No access was unlocked—please try again.');
           setCoinStatus(description);
           setIsCompleting(false);
         });
@@ -388,12 +398,15 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
       try {
         razorpay.open();
-        setCoinStatus('Razorpay checkout opened. Complete the payment in the selected app/window.');
+        window.setTimeout(() => setIsRazorpayLaunching(false), 120);
+        setCoinStatus('Razorpay checkout is open. Complete the payment in the secure window.');
       } catch (openError) {
         throw new Error(openError instanceof Error ? openError.message : 'Payment app/window could not open. Please check that a payment app/browser is available and retry.');
       }
     } catch (error) {
-      setCheckoutStep('razorpay');
+      setIsRazorpayLaunching(false);
+      setCheckoutStep('checkout');
+      setPaymentNotice('The secure payment window could not open. Please retry.');
       setCoinStatus(error instanceof Error ? error.message : 'Payment setup failed.');
       setIsCompleting(false);
     }
@@ -537,6 +550,20 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         : ['Complete digital product access', 'Lifetime access from My Purchases', 'All included files and course content', 'Instant access after verified payment'];
   const unlockDetails = providedUnlockDetails?.length ? providedUnlockDetails : defaultUnlockDetails;
   const primaryItemTitle = productTitle || (isCartMode ? 'Selected cart items' : 'Eduvora checkout');
+  const primaryPaymentLabel = finalPrice <= 0
+    ? 'Complete ₹0 Checkout'
+    : checkoutType === 'latest-update'
+      ? `Pay ${formatCheckoutMoney(finalPayable)} & unlock update`
+      : checkoutType === 'subscription'
+        ? `Pay ${formatCheckoutMoney(finalPayable)} & activate plan`
+        : checkoutType === 'cart'
+          ? `Pay ${formatCheckoutMoney(finalPayable)} for cart`
+          : `Pay ${formatCheckoutMoney(finalPayable)} with Razorpay`;
+  const primaryPaymentHint = checkoutType === 'latest-update'
+    ? 'Open verified Razorpay checkout to unlock this paid module/update only'
+    : checkoutType === 'subscription'
+      ? 'Open verified Razorpay checkout to activate the selected membership cycle'
+      : 'Open verified Razorpay checkout to unlock access instantly';
 
   const priceBreakdownRows = (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -600,6 +627,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           <div>
             <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl"><span className="sr-only">Payment details</span>{checkoutType === 'latest-update' ? 'Update purchase details' : checkoutType === 'subscription' ? 'Subscription payment details' : checkoutType === 'cart' ? 'Cart payment details' : 'Product payment details'}</h2>
             <p className="mt-1 text-sm font-semibold text-slate-600">A simple view of the product, unlocks, final price, and payment safety.</p>
+            {checkoutType === 'latest-update' && <span className="mt-3 inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-blue-700">Paid module update checkout</span>}
           </div>
         </header>
 
@@ -650,6 +678,24 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   );
 
 
+  const paymentNoticeCard = paymentNotice ? (
+    <div className="payment-not-completed-notice rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-900 shadow-sm" role="status">
+      <span className="block">{paymentNotice}</span>
+      {coinStatus && <span className="mt-1 block text-xs font-bold leading-5 text-amber-800/80">{coinStatus}</span>}
+    </div>
+  ) : null;
+
+  const razorpayLaunchOverlay = isRazorpayLaunching ? (
+    <div className="payment-razorpay-launch-overlay fixed inset-0 z-[10020] flex items-center justify-center bg-slate-950/55 px-5" role="status" aria-live="polite">
+      <div className="w-full max-w-sm rounded-[22px] border border-blue-200 bg-white p-6 text-center shadow-[0_28px_80px_rgba(15,23,42,0.28)]">
+        <div className="mx-auto h-14 w-14 animate-spin rounded-full border-4 border-blue-100 border-t-[#1769ff]" />
+        <p className="mt-5 text-xs font-black uppercase tracking-[0.22em] text-blue-600">Opening secure payment</p>
+        <h3 className="mt-2 text-xl font-black text-slate-950">Connecting to Razorpay…</h3>
+        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Please wait. The secure payment window will open automatically.</p>
+      </div>
+    </div>
+  ) : null;
+
   const razorpayDemoPage = (
     <div className="space-y-5 p-4 text-slate-900 sm:space-y-6 sm:p-8">
       <div className="text-center">
@@ -657,10 +703,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         <p className="mt-2 text-sm font-semibold text-slate-500">Powered by Razorpay • 256-bit SSL encrypted</p>
       </div>
       {summaryCard}
+      {paymentNoticeCard}
       <div className="grid gap-3">
-        <button disabled={isCompleting} onClick={() => handlePayNow(false)} className="payment-primary-action eduvora-primary-action rounded-[18px] px-5 py-4 text-base font-black disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-5 sm:text-lg">
-          🔒 Open verified Razorpay checkout
-          <span className="mt-1 block text-xs font-bold text-white/80">Pay securely to get instant access</span>
+        <button disabled={isCompleting} onClick={() => handlePayNow(false)} className={`payment-primary-action eduvora-primary-action ${checkoutType === 'latest-update' ? 'latest-update-payment-action' : ''} rounded-[18px] px-5 py-4 text-base font-black disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-5 sm:text-lg`}>
+          <span className="block">{primaryPaymentLabel}</span>
+          <span className="mt-1 block text-xs font-bold text-white/80">{primaryPaymentHint}</span>
         </button>
         <button disabled={isCompleting} onClick={() => { const pending = readPendingCheckout(); if (pending?.orderId) void reconcilePendingCheckout(pending.orderId, 'manual'); }} className="rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-black text-blue-900 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-base">
           ↻ Check payment status
@@ -698,10 +745,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Every discount, EduCoin adjustment, final payable amount, and unlock rule is shown before checkout.</p>
         </div>
         {summaryCard}
-        {coinStatus && <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm font-black text-amber-800">{coinStatus}</div>}
+        {paymentNoticeCard}
+        {!paymentNotice && coinStatus && <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-black text-blue-800">{coinStatus}</div>}
 
         <div className="space-y-3">
-          <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className="payment-primary-action eduvora-primary-action w-full rounded-[18px] px-5 py-4 text-base font-black disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg">{finalPrice <= 0 ? 'Complete ₹0 Checkout' : `Pay ${formatCheckoutMoney(finalPayable)} with Razorpay`}</button>
+          <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className={`payment-primary-action eduvora-primary-action ${checkoutType === 'latest-update' ? 'latest-update-payment-action' : ''} w-full rounded-[18px] px-5 py-4 text-base font-black disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg`}>
+            <span className="block">{primaryPaymentLabel}</span>
+            <span className="mt-1 block text-xs font-bold text-white/80">{primaryPaymentHint}</span>
+          </button>
           {isCoinCheckoutEnabled && appliedEduCoins <= 0 && (
             <button disabled={isCompleting} onClick={handleCoinCheckout} className={`w-full rounded-2xl border px-5 py-3.5 text-base font-black shadow-sm transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg ${canPayWithCoins ? 'border-amber-200/60 bg-white/80 text-amber-700' : 'border-amber-200 bg-amber-50/90 text-amber-800'}`}>
               <span className="block">
@@ -756,14 +807,18 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
             </footer>
           </main>
         </div>
+        {razorpayLaunchOverlay}
       </div>
     );
   }
 
   return (
-    <MacWindowModal title="Secure Checkout" subtitle="Live Razorpay verification + EduCoin wallet" onClose={onClose} maxWidth="max-w-lg">
-      {checkoutContent}
-    </MacWindowModal>
+    <>
+      <MacWindowModal title="Secure Checkout" subtitle="Live Razorpay verification + EduCoin wallet" onClose={onClose} maxWidth="max-w-lg">
+        {checkoutContent}
+      </MacWindowModal>
+      {razorpayLaunchOverlay}
+    </>
   );
 };
 
