@@ -143,10 +143,14 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
         <div className="pointer-events-none absolute inset-x-8 top-0 h-px bg-gradient-to-r from-transparent via-[var(--mobile-border-active)] to-transparent" />
         <div ref={dockScrollRef} onScroll={preserveDockScroll} className="relative flex items-center gap-2 overflow-x-auto pb-1 custom-scrollbar">
           {items.map((item) => {
-            const tone = dockToneClasses[item.label] || 'from-[var(--mobile-bg)] to-[var(--mobile-bg-soft)] hover:border-[var(--mobile-border-active)]';
+            const isLoggedOutProfileVisual = !isLoggedIn && (item.label === authButtonLabel || item.label === 'Login');
+            const visualLabel = isLoggedOutProfileVisual ? 'Profile' : item.label;
+            const visualIcon = isLoggedOutProfileVisual ? '🪙' : item.icon;
+            const tone = dockToneClasses[visualLabel] || dockToneClasses[item.label] || 'from-[var(--mobile-bg)] to-[var(--mobile-bg-soft)] hover:border-[var(--mobile-border-active)]';
             return (
               <button
   key={item.label}
+  aria-label={isLoggedOutProfileVisual ? authButtonLabel : item.label}
   onPointerDown={preserveDockScroll}
   onClick={() => {
     preserveDockScroll();
@@ -161,8 +165,8 @@ const BottomGlassDock: React.FC<BottomGlassDockProps> = ({ settings, currentUser
   style={{ backgroundColor: itemBackground, padding: Math.max(8, dockPadding - 2) }}
 >
                 <span className={`absolute inset-0 rounded-2xl bg-gradient-to-br ${tone.split(' hover:')[0]} transition duration-300 group-hover/item:opacity-75`} style={{ opacity: accentOpacity }} />
-                <span className="relative flex items-center justify-center rounded-2xl border border-[var(--mobile-border)] bg-[var(--mobile-bg-soft)] shadow-inner transition duration-300 group-hover/item:scale-110 group-hover/item:bg-[var(--mobile-card)]" style={{ width: iconSize, height: iconSize, fontSize: Math.max(16, iconSize * 0.55) }}>{item.icon}</span>
-                <span className="relative mt-1.5 font-black tracking-wide text-[var(--mobile-body)] transition group-hover/item:text-[var(--mobile-primary)]" style={{ fontSize: labelSize }}>{item.label}</span>
+                <span className="relative flex items-center justify-center rounded-2xl border border-[var(--mobile-border)] bg-[var(--mobile-bg-soft)] shadow-inner transition duration-300 group-hover/item:scale-110 group-hover/item:bg-[var(--mobile-card)]" style={{ width: iconSize, height: iconSize, fontSize: Math.max(16, iconSize * 0.55) }}>{visualIcon}</span>
+                <span className="relative mt-1.5 font-black tracking-wide text-[var(--mobile-body)] transition group-hover/item:text-[var(--mobile-primary)]" style={{ fontSize: labelSize }}>{visualLabel}</span>
                 {item.badge ? <span className="dock-count-badge absolute -right-1 -top-1 rounded-full border border-[var(--mobile-border-active)] bg-gradient-to-r from-[var(--mobile-primary)] to-[var(--mobile-violet)] px-1.5 py-0.5 text-[10px] font-black text-white shadow-[0_8px_20px_rgba(79,70,229,0.38)]">{item.badge}</span> : null}
               </button>
             );
