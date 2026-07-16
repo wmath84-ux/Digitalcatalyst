@@ -26,3 +26,15 @@ test('payment detail page uses understandable product, unlock, and final payable
   assert.match(paymentModal, /Pay \$\{formatCheckoutMoney\(finalPayable\)\} with Razorpay/);
   assert.match(paymentModal, /rounded-\[22px\]/);
 });
+
+
+test('course detail focus sections make overview, features, and analytics visually primary', () => {
+  assert.match(productDetail, /course-detail-focus-description/);
+  assert.match(productDetail, /Read this first/);
+  assert.match(productDetail, /course-detail-focus-features/);
+  assert.match(productDetail, /Key features you should notice/);
+  assert.match(productDetail, /Tap each feature to see why it matters for your learning before you pay/);
+  assert.match(productDetail, /course-detail-focus-analytics/);
+  assert.match(productDetail, /Learning focus insights/);
+  assert.match(productDetail, /Scroll focus: overview → features → checkout/);
+});

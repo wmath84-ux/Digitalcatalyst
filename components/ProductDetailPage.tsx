@@ -14,18 +14,35 @@ import LiquidMetalButton from './ui/LiquidMetalButton';
 import { pillClassForProductRoundness, resolveProductRoundnessSettings } from '../utils/productRoundness';
 
 const ProductAnalyticsChart: React.FC = () => {
+    const focusPoints = [
+        { icon: '📖', label: 'Read overview', text: 'Understand exactly what the product helps you do before checkout.' },
+        { icon: '✅', label: 'Check features', text: 'Review every key feature and the practical learner value behind it.' },
+        { icon: '🔒', label: 'Verify access', text: 'Confirm payment safety, unlock rules, and lifetime access before paying.' },
+    ];
+
     return (
-        <div className="rounded-lg border border-dashed border-slate-300 bg-slate-50 p-6">
-            <h3 className="text-xl font-bold text-primary">30-Day Product Analytics</h3>
-            <div className="mt-4 rounded-xl border border-slate-200 bg-white p-5 text-center">
-                <p className="text-3xl" aria-hidden="true">📊</p>
-                <p className="mt-3 text-base font-bold text-slate-800">No real 30-day analytics data connected yet.</p>
-                <p className="mt-2 text-sm leading-6 text-slate-600">
-                    This product page does not currently have a real daily analytics event source for views, purchases, or engagement.
-                    Connect a real analytics/event collection before showing a chart.
-                </p>
+        <section id="course-detail-focus-analytics" className="scroll-mt-24 rounded-[22px] border border-blue-100 bg-gradient-to-br from-blue-950 via-indigo-900 to-slate-950 p-4 text-white shadow-[0_24px_70px_rgba(30,64,175,0.22)] sm:p-6" aria-label="Learning focus insights">
+            <div className="flex items-start justify-between gap-4">
+                <div>
+                    <p className="text-xs font-black uppercase tracking-[0.24em] text-cyan-200">Learning focus insights</p>
+                    <h3 className="mt-2 text-xl font-black tracking-tight sm:text-2xl">Focus on overview, features, then payment</h3>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-blue-100">Scroll focus: overview → features → checkout. These sections are arranged to make the product value understandable before the pay button.</p>
+                </div>
+                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-white/12 text-2xl ring-1 ring-white/15" aria-hidden="true">📊</span>
             </div>
-        </div>
+            <div className="mt-5 grid gap-3 sm:grid-cols-3">
+                {focusPoints.map(point => (
+                    <div key={point.label} className="rounded-[18px] border border-white/10 bg-white/10 p-4 shadow-[0_12px_34px_rgba(15,23,42,0.18)] backdrop-blur-xl">
+                        <span className="text-2xl" aria-hidden="true">{point.icon}</span>
+                        <p className="mt-3 text-sm font-black text-white">{point.label}</p>
+                        <p className="mt-1 text-xs font-semibold leading-5 text-blue-100">{point.text}</p>
+                    </div>
+                ))}
+            </div>
+            <div className="mt-4 rounded-[18px] border border-cyan-200/20 bg-cyan-100/10 px-4 py-3 text-xs font-bold leading-5 text-cyan-50">
+                No fake chart is shown here until real daily analytics events are connected. The current panel works as a clear decision guide for learners.
+            </div>
+        </section>
     );
 };
 
@@ -570,27 +587,51 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   </div>
                   <button onClick={handleShare} className="shrink-0 rounded-full border border-slate-200 bg-white/80 p-2.5 text-slate-600 shadow-sm transition hover:-translate-y-0.5 hover:text-primary sm:p-3" aria-label="Share this product"><ShareIcon /></button>
                 </div>
-                <p className="mt-4 text-base leading-7 text-slate-600 sm:mt-6 sm:text-lg sm:leading-8">{product.longDescription}</p>
-
-                {(product.features || []).length > 0 && (
-                  <div className="mt-6 rounded-2xl border border-slate-200/70 bg-slate-50/80 sm:mt-8 sm:rounded-3xl">
-                    <h3 className="border-b border-slate-200/70 p-4 text-lg font-black text-primary sm:text-xl">Key Features</h3>
-                    <div className="divide-y divide-slate-200/70">
-                      {(product.features || []).map((feature, i) => (
-                        <div key={i} className="feature-accordion">
-                          <button onClick={() => setOpenAccordion(openAccordion === i ? null : i)} className="feature-accordion-header flex w-full items-center justify-between gap-3 p-4 text-left">
-                            <span className="font-bold text-slate-900">{feature}</span>
-                            <span className={`transform transition-transform duration-300 ${openAccordion === i ? 'rotate-45' : ''}`}><svg className="h-5 w-5 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg></span>
-                          </button>
-                          <div className={`feature-accordion-content px-4 ${openAccordion === i ? 'is-open' : ''}`}>
-                            <p className="text-sm leading-6 text-slate-600">
-                              This feature is included to help learners understand the resource clearly, apply it during study sessions, and get practical value from the product without confusion.
-                            </p>
-                          </div>
-                        </div>
-                      ))}
+                <section id="course-detail-focus-description" className="mt-5 scroll-mt-24 rounded-[22px] border border-indigo-100 bg-gradient-to-br from-white via-indigo-50/70 to-blue-50/60 p-4 shadow-[0_18px_52px_rgba(79,70,229,0.10)] ring-1 ring-white/80 sm:mt-7 sm:p-6" aria-label="Course overview focus">
+                  <div className="flex items-start gap-4">
+                    <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-indigo-600 text-2xl text-white shadow-[0_14px_30px_rgba(79,70,229,0.22)]" aria-hidden="true">📘</span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-black uppercase tracking-[0.24em] text-indigo-600">Course overview</p>
+                      <h2 className="mt-1 text-xl font-black tracking-tight text-slate-950 sm:text-2xl">Read this first</h2>
+                      <p className="mt-3 text-base font-semibold leading-8 text-slate-700 sm:text-lg sm:leading-9">{product.longDescription}</p>
                     </div>
                   </div>
+                </section>
+
+                {(product.features || []).length > 0 && (
+                  <section id="course-detail-focus-features" className="mt-6 scroll-mt-24 overflow-hidden rounded-[22px] border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/70 to-cyan-50/60 shadow-[0_20px_60px_rgba(16,185,129,0.12)] ring-1 ring-white/80 sm:mt-8" aria-label="Key features focus">
+                    <div className="border-b border-emerald-100/80 p-4 sm:p-5">
+                      <p className="text-xs font-black uppercase tracking-[0.24em] text-emerald-700">Primary value</p>
+                      <h3 className="mt-1 text-xl font-black tracking-tight text-slate-950 sm:text-2xl">Key features you should notice</h3>
+                      <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Tap each feature to see why it matters for your learning before you pay.</p>
+                    </div>
+                    <div className="space-y-3 p-3 sm:p-4">
+                      {(product.features || []).map((feature, i) => {
+                        const isOpen = openAccordion === i;
+                        return (
+                        <div key={i} className={`feature-accordion overflow-hidden rounded-[18px] border transition-all duration-300 ${isOpen ? 'border-emerald-200 bg-white shadow-[0_16px_42px_rgba(16,185,129,0.12)]' : 'border-white/80 bg-white/75 hover:border-emerald-100 hover:bg-white'}`}>
+                          <button onClick={() => setOpenAccordion(isOpen ? null : i)} className="feature-accordion-header flex w-full items-center justify-between gap-3 p-4 text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-emerald-500/40 sm:p-5" aria-expanded={isOpen}>
+                            <span className="flex min-w-0 items-start gap-3">
+                              <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-2xl text-sm font-black ${isOpen ? 'bg-emerald-600 text-white' : 'bg-emerald-50 text-emerald-700'}`}>{i + 1}</span>
+                              <span className="min-w-0">
+                                <span className="block text-base font-black leading-6 text-slate-950">{feature}</span>
+                                <span className="mt-1 block text-xs font-bold uppercase tracking-[0.14em] text-emerald-700">Learner benefit</span>
+                              </span>
+                            </span>
+                            <span className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-2xl border border-emerald-100 bg-emerald-50 text-emerald-700 transition-transform duration-300 ${isOpen ? 'rotate-45' : ''}`}><svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg></span>
+                          </button>
+                          <div className={`feature-accordion-content px-4 ${isOpen ? 'is-open' : ''}`}>
+                            <div className="mb-4 rounded-[18px] border border-emerald-100 bg-emerald-50/70 p-4 sm:mb-5">
+                              <p className="text-sm font-semibold leading-7 text-slate-700">
+                                This feature is included to help learners understand the resource clearly, apply it during study sessions, and get practical value from the product without confusion.
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                        );
+                      })}
+                    </div>
+                  </section>
                 )}
 
                 <div className="mt-8">
