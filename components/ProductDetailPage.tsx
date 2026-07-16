@@ -13,34 +13,120 @@ import SafeImage from './common/SafeImage';
 import LiquidMetalButton from './ui/LiquidMetalButton';
 import { pillClassForProductRoundness, resolveProductRoundnessSettings } from '../utils/productRoundness';
 
-const ProductAnalyticsChart: React.FC = () => {
-    const focusPoints = [
-        { icon: '📖', label: 'Read overview', text: 'Understand exactly what the product helps you do before checkout.' },
-        { icon: '✅', label: 'Check features', text: 'Review every key feature and the practical learner value behind it.' },
-        { icon: '🔒', label: 'Verify access', text: 'Confirm payment safety, unlock rules, and lifetime access before paying.' },
-    ];
+type ProductPriceHistoryPoint = {
+    label: string;
+    price: number;
+};
+
+const parseProductPriceValue = (value: unknown): number | null => {
+    if (typeof value === 'number' && Number.isFinite(value)) return value;
+    if (typeof value === 'string') {
+        const parsed = Number(value.replace(/[^0-9.]/g, ''));
+        return Number.isFinite(parsed) ? parsed : null;
+    }
+    return null;
+};
+
+const formatPriceHistoryMoney = (value: number): string => {
+    if (!Number.isFinite(value)) return '₹0';
+    return `₹${value % 1 === 0 ? value.toFixed(0) : value.toFixed(2)}`;
+};
+
+const formatPriceHistoryLabel = (value: unknown, fallback: string): string => {
+    const raw = String(value || '').trim();
+    if (!raw) return fallback;
+    const parsedDate = new Date(raw);
+    if (!Number.isNaN(parsedDate.getTime())) {
+        return parsedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+    }
+    return raw.length > 14 ? raw.slice(0, 14) : raw;
+};
+
+interface ProductPriceHistoryChartProps {
+    points: ProductPriceHistoryPoint[];
+}
+
+const ProductPriceHistoryChart: React.FC<ProductPriceHistoryChartProps> = ({ points }) => {
+    if (points.length < 2) return null;
+
+    const prices = points.map(point => point.price);
+    const minPrice = Math.min(...prices);
+    const maxPrice = Math.max(...prices);
+    const range = Math.max(1, maxPrice - minPrice);
+    const chartWidth = 260;
+    const chartHeight = 116;
+    const padding = 16;
+    const usableWidth = chartWidth - padding * 2;
+    const usableHeight = chartHeight - padding * 2;
+
+    const coordinates = points.map((point, index) => ({
+        x: padding + (index / Math.max(1, points.length - 1)) * usableWidth,
+        y: padding + ((maxPrice - point.price) / range) * usableHeight,
+        ...point,
+    }));
+
+    const linePath = coordinates
+        .map((point, index) => `${index === 0 ? 'M' : 'L'} ${point.x.toFixed(2)} ${point.y.toFixed(2)}`)
+        .join(' ');
+    const areaPath = `${linePath} L ${coordinates[coordinates.length - 1].x.toFixed(2)} ${chartHeight - padding} L ${coordinates[0].x.toFixed(2)} ${chartHeight - padding} Z`;
+    const firstPrice = coordinates[0].price;
+    const lastPrice = coordinates[coordinates.length - 1].price;
+    const difference = lastPrice - firstPrice;
+    const isPriceDrop = difference < 0;
+    const percentageChange = firstPrice > 0 ? Math.abs((difference / firstPrice) * 100) : 0;
 
     return (
-        <section id="course-detail-focus-analytics" className="scroll-mt-24 rounded-[22px] border border-blue-100 bg-gradient-to-br from-blue-950 via-indigo-900 to-slate-950 p-4 text-white shadow-[0_24px_70px_rgba(30,64,175,0.22)] sm:p-6" aria-label="Learning focus insights">
+        <section id="price-history-section" className="scroll-mt-24 rounded-[22px] border border-blue-100 bg-gradient-to-br from-white via-blue-50/80 to-cyan-50/70 p-4 shadow-[0_20px_60px_rgba(37,99,235,0.12)] ring-1 ring-white/80 sm:p-6" aria-label="Price history chart">
             <div className="flex items-start justify-between gap-4">
                 <div>
-                    <p className="text-xs font-black uppercase tracking-[0.24em] text-cyan-200">Learning focus insights</p>
-                    <h3 className="mt-2 text-xl font-black tracking-tight sm:text-2xl">Focus on overview, features, then payment</h3>
-                    <p className="mt-2 text-sm font-semibold leading-6 text-blue-100">Scroll focus: overview → features → checkout. These sections are arranged to make the product value understandable before the pay button.</p>
+                    <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-600">Price history</p>
+                    <h3 className="mt-2 text-xl font-black tracking-tight text-slate-950 sm:text-2xl">Only shown when price changes</h3>
+                    <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">This chart uses real product price history or the verified original-to-current price change. It stays hidden when there is no actual price movement.</p>
                 </div>
-                <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-[18px] bg-white/12 text-2xl ring-1 ring-white/15" aria-hidden="true">📊</span>
+                <span className={`shrink-0 rounded-[18px] px-3 py-2 text-xs font-black ${isPriceDrop ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                    {isPriceDrop ? 'Price dropped' : 'Price changed'}
+                </span>
             </div>
-            <div className="mt-5 grid gap-3 sm:grid-cols-3">
-                {focusPoints.map(point => (
-                    <div key={point.label} className="rounded-[18px] border border-white/10 bg-white/10 p-4 shadow-[0_12px_34px_rgba(15,23,42,0.18)] backdrop-blur-xl">
-                        <span className="text-2xl" aria-hidden="true">{point.icon}</span>
-                        <p className="mt-3 text-sm font-black text-white">{point.label}</p>
-                        <p className="mt-1 text-xs font-semibold leading-5 text-blue-100">{point.text}</p>
+
+            <div className="mt-5 rounded-[20px] border border-white/80 bg-white/90 p-4 shadow-inner">
+                <svg className="h-auto w-full" viewBox={`0 0 ${chartWidth} ${chartHeight}`} role="img" aria-label="Product price history line chart">
+                    <defs>
+                        <linearGradient id="priceHistoryAreaGradient" x1="0" x2="0" y1="0" y2="1">
+                            <stop offset="0%" stopColor="#2563eb" stopOpacity="0.24" />
+                            <stop offset="100%" stopColor="#06b6d4" stopOpacity="0.04" />
+                        </linearGradient>
+                    </defs>
+                    <path d={areaPath} fill="url(#priceHistoryAreaGradient)" />
+                    <path d={linePath} fill="none" stroke="#2563eb" strokeWidth="4" strokeLinecap="round" strokeLinejoin="round" />
+                    {coordinates.map((point) => (
+                        <g key={`${point.label}-${point.price}`}>
+                            <circle cx={point.x} cy={point.y} r="5" fill="#ffffff" stroke="#2563eb" strokeWidth="3" />
+                        </g>
+                    ))}
+                </svg>
+
+                <div className="mt-4 grid grid-cols-2 gap-3 text-sm sm:grid-cols-3">
+                    <div className="rounded-[18px] border border-slate-100 bg-slate-50 p-3">
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Started</p>
+                        <p className="mt-1 text-lg font-black text-slate-950">{formatPriceHistoryMoney(firstPrice)}</p>
                     </div>
-                ))}
-            </div>
-            <div className="mt-4 rounded-[18px] border border-cyan-200/20 bg-cyan-100/10 px-4 py-3 text-xs font-bold leading-5 text-cyan-50">
-                No fake chart is shown here until real daily analytics events are connected. The current panel works as a clear decision guide for learners.
+                    <div className="rounded-[18px] border border-blue-100 bg-blue-50 p-3">
+                        <p className="text-xs font-black uppercase tracking-[0.16em] text-blue-600">Current</p>
+                        <p className="mt-1 text-lg font-black text-blue-700">{formatPriceHistoryMoney(lastPrice)}</p>
+                    </div>
+                    <div className={`col-span-2 rounded-[18px] border p-3 sm:col-span-1 ${isPriceDrop ? 'border-emerald-100 bg-emerald-50 text-emerald-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}>
+                        <p className="text-xs font-black uppercase tracking-[0.16em]">{isPriceDrop ? 'You save' : 'Change'}</p>
+                        <p className="mt-1 text-lg font-black">{formatPriceHistoryMoney(Math.abs(difference))} · {percentageChange.toFixed(0)}%</p>
+                    </div>
+                </div>
+
+                <div className="mt-4 flex gap-2 overflow-x-auto pb-1 text-xs font-black text-slate-600">
+                    {coordinates.map(point => (
+                        <div key={`${point.label}-${point.price}-pill`} className="shrink-0 rounded-full border border-blue-100 bg-white px-3 py-1.5">
+                            {point.label}: {formatPriceHistoryMoney(point.price)}
+                        </div>
+                    ))}
+                </div>
             </div>
         </section>
     );
@@ -153,6 +239,38 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const originalPriceNum = parseFloat(product.price.replace('₹', ''));
   const salePriceNum = product.salePrice && product.salePrice !== '₹' ? parseFloat(product.salePrice.replace('₹', '')) : null;
   const currentPriceNum = salePriceNum ?? originalPriceNum;
+
+  const productPriceHistoryPoints = React.useMemo<ProductPriceHistoryPoint[]>(() => {
+    const rawHistory = Array.isArray((product as ProductWithRating & { priceHistory?: unknown[] }).priceHistory)
+      ? ((product as ProductWithRating & { priceHistory?: unknown[] }).priceHistory || [])
+      : [];
+
+    const historyPoints = rawHistory
+      .map((entry, index) => {
+        const item = entry as { date?: unknown; createdAt?: unknown; updatedAt?: unknown; label?: unknown; price?: unknown; salePrice?: unknown; value?: unknown; amount?: unknown; };
+        const price = parseProductPriceValue(item.price ?? item.salePrice ?? item.value ?? item.amount);
+        if (price === null) return null;
+        return {
+          label: formatPriceHistoryLabel(item.label ?? item.date ?? item.createdAt ?? item.updatedAt, `Update ${index + 1}`),
+          price,
+        };
+      })
+      .filter((point): point is ProductPriceHistoryPoint => Boolean(point));
+
+    const points = historyPoints.slice(-6);
+
+    if (points.length === 0 && Number.isFinite(originalPriceNum) && Number.isFinite(currentPriceNum) && Math.abs(originalPriceNum - currentPriceNum) >= 0.01) {
+      points.push(
+        { label: 'Original', price: originalPriceNum },
+        { label: 'Current', price: currentPriceNum },
+      );
+    } else if (points.length === 1 && Number.isFinite(currentPriceNum) && Math.abs(points[0].price - currentPriceNum) >= 0.01) {
+      points.push({ label: 'Current', price: currentPriceNum });
+    }
+
+    const distinctPrices = new Set(points.map(point => point.price.toFixed(2)));
+    return distinctPrices.size > 1 ? points : [];
+  }, [currentPriceNum, originalPriceNum, product]);
 
   const preDiscountTotal = currentPriceNum;
 
@@ -634,9 +752,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   </section>
                 )}
 
-                <div className="mt-8">
-                  <ProductAnalyticsChart />
-                </div>
+                {productPriceHistoryPoints.length > 0 && (
+                  <div className="mt-8">
+                    <ProductPriceHistoryChart points={productPriceHistoryPoints} />
+                  </div>
+                )}
               </div>
             </div>
 

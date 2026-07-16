@@ -28,13 +28,18 @@ test('payment detail page uses understandable product, unlock, and final payable
 });
 
 
-test('course detail focus sections make overview, features, and analytics visually primary', () => {
+test('course detail focus sections restore the real price history chart only for price changes', () => {
   assert.match(productDetail, /course-detail-focus-description/);
   assert.match(productDetail, /Read this first/);
   assert.match(productDetail, /course-detail-focus-features/);
   assert.match(productDetail, /Key features you should notice/);
   assert.match(productDetail, /Tap each feature to see why it matters for your learning before you pay/);
-  assert.match(productDetail, /course-detail-focus-analytics/);
-  assert.match(productDetail, /Learning focus insights/);
-  assert.match(productDetail, /Scroll focus: overview → features → checkout/);
+  assert.match(productDetail, /ProductPriceHistoryChart/);
+  assert.match(productDetail, /price-history-section/);
+  assert.match(productDetail, /Price history/);
+  assert.match(productDetail, /Only shown when price changes/);
+  assert.match(productDetail, /productPriceHistoryPoints\.length > 0/);
+  assert.match(productDetail, /priceHistory/);
+  assert.doesNotMatch(productDetail, /Learning focus insights/);
+  assert.doesNotMatch(productDetail, /No fake chart is shown here/);
 });
