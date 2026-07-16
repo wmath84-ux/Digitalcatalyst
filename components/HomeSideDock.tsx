@@ -190,20 +190,20 @@ const HomeSideDock: React.FC<HomeSideDockProps> = ({
 
   return (
     <aside
-      className="fixed inset-y-0 left-0 z-[80] hidden overflow-visible bg-[var(--color-background)] p-2 transition-[width] duration-300 ease-out lg:flex"
+      className="home-side-dock-performance fixed inset-y-0 left-0 z-[80] hidden overflow-visible bg-[var(--color-background)] p-2 transition-[width] duration-150 ease-out lg:flex"
       style={{ width: visualWidth }}
       data-sidebar-state={sidebarState}
       data-hover-expanded={hoverExpanded ? 'true' : 'false'}
-      onPointerEnter={() => {
-        if (sidebarState === 'collapsed') setHoverExpanded(true);
+      onPointerEnter={(event) => {
+        if (event.pointerType === 'mouse' && sidebarState === 'collapsed') setHoverExpanded(true);
       }}
-      onPointerLeave={() => {
-        if (sidebarState === 'collapsed') setHoverExpanded(false);
+      onPointerLeave={(event) => {
+        if (event.pointerType === 'mouse' && sidebarState === 'collapsed') setHoverExpanded(false);
       }}
       aria-label="Main desktop navigation"
     >
       <div
-        className="flex h-full w-full min-w-0 flex-col overflow-hidden rounded-[1.75rem] border border-[#DDE5EF] bg-[var(--color-background)] shadow-[0_18px_48px_rgba(8,26,69,0.08)]"
+        className="home-side-dock-surface flex h-full w-full min-w-0 flex-col overflow-hidden rounded-[1.75rem] border border-[#DDE5EF] bg-[var(--color-background)] shadow-[0_10px_26px_rgba(8,26,69,0.07)]"
       >
         <div className={`shrink-0 border-b border-[#D9E7F8] p-3 ${isVisuallyExpanded ? '' : 'flex flex-col items-center'}`}>
           <div className={`flex min-w-0 items-center ${isVisuallyExpanded ? 'justify-between gap-3' : 'flex-col gap-2'}`}>
@@ -277,14 +277,14 @@ const HomeSideDock: React.FC<HomeSideDockProps> = ({
                 onClick={item.action}
                 title={!isVisuallyExpanded ? item.label : undefined}
                 aria-current={isActive ? 'page' : undefined}
-                className={`group relative flex min-h-[54px] w-full items-center rounded-2xl border transition-all duration-200 ${
+                className={`group relative flex min-h-[54px] w-full items-center rounded-2xl border transition-colors duration-150 ${
                   isVisuallyExpanded
                     ? 'gap-3 px-3 text-left'
                     : 'justify-center px-2'
                 } ${
                   isActive
-                    ? 'border-transparent bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-[0_12px_28px_rgba(23,105,255,0.24)]'
-                    : 'border-[#D9E7F8] text-[#536178] shadow-[0_6px_18px_rgba(8,26,69,0.05)] hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:bg-[#EEF6FF] hover:text-[#1769FF]'
+                    ? 'border-transparent bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-[0_8px_18px_rgba(23,105,255,0.18)]'
+                    : 'border-[#D9E7F8] text-[#536178] shadow-none hover:border-[#BFD7FF] hover:bg-[#EEF6FF] hover:text-[#1769FF]'
                 }`}
                 style={
                   !isActive

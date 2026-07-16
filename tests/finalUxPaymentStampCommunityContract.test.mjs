@@ -46,5 +46,9 @@ test('payment recovery and exact-price safety remain present', () => {
   assert.match(payment,/clearPendingCheckout/);
   assert.match(payment,/api\/razorpay\/payment-status/);
   assert.match(payment,/finalPrice/);
-  assert.match(payment,/bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-600/);
+  assert.match(payment,/payment-checkout-long-page/);
+  assert.match(payment,/payment-checkout-blue-hero/);
+  assert.match(payment,/payment-primary-action eduvora-primary-action/);
+  assert.match(payment,/Razorpay protected/);
+  assert.match(payment,/Payment recovery available/);
 });

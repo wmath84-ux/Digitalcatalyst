@@ -640,9 +640,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   return (
     <>
-      <section className="relative overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-cyan-50/40 py-10 text-slate-900 sm:py-20">
-        <div className="pointer-events-none absolute -left-24 top-20 h-72 w-72 rounded-full bg-indigo-200/40 blur-3xl" />
-        <div className="pointer-events-none absolute -right-24 bottom-28 h-80 w-80 rounded-full bg-cyan-200/40 blur-3xl" />
+      <section className="product-detail-performance-scope relative overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-cyan-50/40 py-10 text-slate-900 sm:py-20">
+        <div className="product-detail-decorative-blur pointer-events-none absolute -left-24 top-20 h-72 w-72 rounded-full bg-indigo-200/40 blur-3xl" />
+        <div className="product-detail-decorative-blur pointer-events-none absolute -right-24 bottom-28 h-80 w-80 rounded-full bg-cyan-200/40 blur-3xl" />
         <div className="container relative z-10 mx-auto px-4 sm:px-6">
           <nav className="mb-5 flex items-center space-x-2 overflow-hidden text-xs text-slate-600 sm:mb-8 sm:text-sm" aria-label="Breadcrumb">
             <button onClick={onGoHome} className="font-bold transition-colors hover:text-primary hover:underline">Home</button>
@@ -661,17 +661,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
               </div>
 
               <div className="mt-4 grid grid-cols-1 gap-3 sm:mt-5 sm:grid-cols-3">
-                <div className="rounded-[22px] border border-blue-100 bg-gradient-to-br from-white via-blue-50/80 to-white p-4 shadow-[0_16px_42px_rgba(37,99,235,0.09)] ring-1 ring-white/80 backdrop-blur-2xl">
+                <div className="rounded-[22px] border border-blue-100 bg-gradient-to-br from-white via-blue-50/80 to-white p-4 shadow-[0_16px_42px_rgba(37,99,235,0.09)] ring-1 ring-white/80">
                   <p className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-xl text-white shadow-[0_10px_24px_rgba(37,99,235,0.24)]">⚡</p>
                   <p className="mt-3 text-xs font-black uppercase tracking-[0.2em] text-blue-600">Instant access</p>
                   <p className="mt-1 text-sm font-black text-slate-950">Unlock after verified payment</p>
                 </div>
-                <div className="rounded-[22px] border border-amber-100 bg-gradient-to-br from-white via-amber-50/90 to-white p-4 shadow-[0_16px_42px_rgba(245,158,11,0.09)] ring-1 ring-white/80 backdrop-blur-2xl">
+                <div className="rounded-[22px] border border-amber-100 bg-gradient-to-br from-white via-amber-50/90 to-white p-4 shadow-[0_16px_42px_rgba(245,158,11,0.09)] ring-1 ring-white/80">
                   <p className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500 text-xl text-white shadow-[0_10px_24px_rgba(245,158,11,0.22)]">🪙</p>
                   <p className="mt-3 text-xs font-black uppercase tracking-[0.2em] text-amber-700">Payment choice</p>
                   <p className="mt-1 text-sm font-black text-slate-950">{canShowProductCoinCheckout ? `${productCoinPrice} EduCoins` : 'Razorpay secure pay'}</p>
                 </div>
-                <div className="rounded-[22px] border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/90 to-white p-4 shadow-[0_16px_42px_rgba(16,185,129,0.09)] ring-1 ring-white/80 backdrop-blur-2xl">
+                <div className="rounded-[22px] border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/90 to-white p-4 shadow-[0_16px_42px_rgba(16,185,129,0.09)] ring-1 ring-white/80">
                   <p className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-xl text-white shadow-[0_10px_24px_rgba(16,185,129,0.22)]">⭐</p>
                   <p className="mt-3 text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Learner trust</p>
                   <p className="mt-1 text-sm font-black text-slate-950">{product.rating.toFixed(1)} / 5 rating</p>
@@ -688,7 +688,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 </div>
               )}
 
-              <div className={`mt-5 ${detailPanelRoundClass} border border-white/70 bg-white/75 p-4 shadow-[0_18px_55px_rgba(15,23,42,0.07)] backdrop-blur-2xl sm:mt-8 sm:p-8`}>
+              <div className={`mt-5 ${detailPanelRoundClass} border border-white/70 bg-white/75 p-4 shadow-[0_18px_55px_rgba(15,23,42,0.07)] sm:mt-8 sm:p-8`}>
                 <div className="mb-4 flex gap-2 overflow-x-auto pb-1 sm:mb-6 sm:flex-wrap sm:overflow-visible sm:pb-0">
                   {isPurchased ? (
                     <span className={`shrink-0 ${detailBadgeRoundClass} border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-emerald-700 sm:px-4 sm:py-2 sm:text-xs`}>Purchased</span>
@@ -761,7 +761,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
             </div>
 
             <aside className="md:col-span-5">
-              <div id="price-section" className={`product-checkout-panel overflow-hidden ${detailPanelRoundClass} border border-blue-100/80 bg-gradient-to-br from-white via-blue-50/80 to-cyan-50/70 p-4 shadow-[0_30px_90px_rgba(37,99,235,0.16)] ring-1 ring-white/80 backdrop-blur-2xl sm:p-6 md:sticky md:top-24 ${priceJustUpdated ? 'price-flash' : ''}`}>
+              <div id="price-section" className={`product-checkout-panel overflow-hidden ${detailPanelRoundClass} border border-blue-100/80 bg-gradient-to-br from-white via-blue-50/80 to-cyan-50/70 p-4 shadow-[0_30px_90px_rgba(37,99,235,0.16)] ring-1 ring-white/80 sm:p-6 md:sticky md:top-24 ${priceJustUpdated ? 'price-flash' : ''}`}>
                 <div className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-indigo-300/20 blur-3xl" />
                 <div className="pointer-events-none absolute -bottom-16 -left-16 h-44 w-44 rounded-full bg-cyan-600/20 blur-3xl" />
                 <div className="relative">
@@ -813,10 +813,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   </div>
                 )}
 
-                <div className="product-detail-eye-catching-actions mt-5 space-y-3 rounded-[22px] border border-white/80 bg-white/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_46px_rgba(37,99,235,0.10)] ring-1 ring-blue-100/70 backdrop-blur-xl sm:mt-6 sm:p-3">
-                  <div className="product-detail-action-focus-copy rounded-[18px] border border-blue-100 bg-gradient-to-r from-blue-50 via-white to-cyan-50 px-4 py-3">
-                    <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Choose your unlock path</p>
-                    <p className="mt-1 text-sm font-bold leading-6 text-slate-600">The primary payment action stays visually strongest so students know exactly what to tap next.</p>
+                <div className="product-detail-eye-catching-actions mt-5 space-y-3 rounded-[22px] border border-white/80 bg-white/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_46px_rgba(37,99,235,0.10)] ring-1 ring-blue-100/70 sm:mt-6 sm:p-3">
+                  <div className="product-detail-action-focus-copy flex items-center justify-between gap-3 rounded-[18px] border border-blue-100 bg-blue-50 px-4 py-3">
+                    <span>
+                      <span className="block text-xs font-black uppercase tracking-[0.22em] text-blue-700">Ready to unlock</span>
+                      <span className="mt-1 block text-sm font-bold text-slate-600">Review the final amount, then use the blue payment button.</span>
+                    </span>
+                    <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-white text-blue-700 shadow-sm" aria-hidden="true">🔒</span>
                   </div>
                   {/* Source-contract marker only: className="product-checkout-primary product-checkout-purchased w-full rounded-2xl */}
                   {/* Source-contract marker only: className="product-checkout-secondary w-full rounded-2xl */}
@@ -835,18 +838,20 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                       </span>
                     </button>
                   ) : (
-                    <LiquidMetalButton tone="blue" onClick={handleBuyClick} className={`product-checkout-primary product-detail-primary-pay-button product-detail-action-lift-ring w-full ${detailActionRoundClass} min-h-[4.85rem] px-6 py-4 text-base font-black shadow-[0_24px_62px_rgba(37,99,235,0.34)] ring-4 ring-blue-500/15 transition hover:-translate-y-0.5 hover:ring-blue-400/30 active:scale-[0.99] sm:px-8 sm:py-5 sm:text-lg`}>
-                      <span className="flex w-full items-center justify-between gap-4">
-                        <span className="text-left">
-                          <span className="block text-[11px] font-black uppercase tracking-[0.22em] text-white/80">Secure checkout</span>
-                          <span className="mt-1 block text-lg font-black leading-tight sm:text-xl">{product.isFree ? 'Complete free checkout' : `Pay ₹${finalTotalPrice.toFixed(2)} securely`}</span>
+                    <LiquidMetalButton tone="blue" onClick={handleBuyClick} className={`product-checkout-primary product-detail-primary-pay-button eduvora-primary-action w-full ${detailActionRoundClass} min-h-[4.5rem] px-5 py-4 text-base font-black sm:px-7 sm:text-lg`}>
+                      <span className="flex w-full items-center justify-center gap-3 sm:gap-4">
+                        <span className="payment-card-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h3"/></svg>
                         </span>
-                        <span className="flex h-12 min-w-12 items-center justify-center rounded-2xl bg-white/20 text-2xl shadow-inner">→</span>
+                        <span className="text-center">
+                          <span className="block text-[11px] font-black uppercase tracking-[0.2em] text-white/80">Pay now</span>
+                          <span className="mt-0.5 block text-lg font-black leading-tight sm:text-xl">{product.isFree ? 'Complete free checkout' : `Pay ₹${finalTotalPrice.toFixed(2)} securely`}</span>
+                        </span>
                       </span>
                     </LiquidMetalButton>
                   )}
                   {!isPurchased && canShowProductCoinCheckout && (
-                    <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className={`product-detail-educoin-button w-full ${detailActionRoundClass} border border-amber-200/80 bg-gradient-to-r from-amber-50 via-white to-yellow-50 px-6 py-4 text-base font-black text-amber-900 shadow-[0_18px_48px_rgba(245,158,11,0.18)] ring-2 ring-amber-400/10 backdrop-blur-xl transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_22px_58px_rgba(245,158,11,0.23)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg`}>
+                    <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className={`product-detail-educoin-button w-full ${detailActionRoundClass} border border-amber-200/80 bg-gradient-to-r from-amber-50 via-white to-yellow-50 px-6 py-4 text-base font-black text-amber-900 shadow-[0_18px_48px_rgba(245,158,11,0.18)] ring-2 ring-amber-400/10 transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_22px_58px_rgba(245,158,11,0.23)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg`}>
                       <span className="flex items-center justify-between gap-4">
                         <span className="text-left">
                           <span className="block">🪙 {coinCheckoutLabel} with EduCoins</span>
@@ -888,9 +893,9 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 </div>
 
                 <div className="mt-5 grid grid-cols-1 gap-2 text-xs font-bold text-slate-600 sm:grid-cols-3 md:grid-cols-1 lg:grid-cols-3">
-                  <div className="rounded-[22px] border border-blue-100 bg-white/85 p-3 text-center shadow-sm backdrop-blur-xl"><span className="block text-lg">🔒</span><span className="block font-black text-blue-700">Razorpay</span><span className="text-[11px] text-slate-500">verified pay</span></div>
-                  <div className="rounded-[22px] border border-amber-100 bg-white/85 p-3 text-center shadow-sm backdrop-blur-xl"><span className="block text-lg">🪙</span><span className="block font-black text-amber-700">EduCoins</span><span className="text-[11px] text-slate-500">student discount</span></div>
-                  <div className="rounded-[22px] border border-emerald-100 bg-white/85 p-3 text-center shadow-sm backdrop-blur-xl"><span className="block text-lg">📚</span><span className="block font-black text-emerald-700">Lifetime</span><span className="text-[11px] text-slate-500">My Purchases</span></div>
+                  <div className="rounded-[22px] border border-blue-100 bg-white/85 p-3 text-center shadow-sm"><span className="block text-lg">🔒</span><span className="block font-black text-blue-700">Razorpay</span><span className="text-[11px] text-slate-500">verified pay</span></div>
+                  <div className="rounded-[22px] border border-amber-100 bg-white/85 p-3 text-center shadow-sm"><span className="block text-lg">🪙</span><span className="block font-black text-amber-700">EduCoins</span><span className="text-[11px] text-slate-500">student discount</span></div>
+                  <div className="rounded-[22px] border border-emerald-100 bg-white/85 p-3 text-center shadow-sm"><span className="block text-lg">📚</span><span className="block font-black text-emerald-700">Lifetime</span><span className="text-[11px] text-slate-500">My Purchases</span></div>
                 </div>
                 </div>
               </div>
@@ -912,7 +917,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
       )}
 
       {relatedProducts.length > 0 && (
-        <div className="bg-white/70 backdrop-blur-xl">
+        <div className="bg-white/70">
            <FeaturedProducts
                 settings={settings}
                 title="Related Products"

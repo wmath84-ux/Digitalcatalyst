@@ -28,10 +28,10 @@ test('course module panel keeps expanded lessons after lesson selection and only
 
 test('product detail checkout buttons are visually focused and action-first', () => {
   assert.match(productDetail, /product-detail-eye-catching-actions/);
-  assert.match(productDetail, /Choose your unlock path/);
+  assert.match(productDetail, /Ready to unlock/);
   assert.match(productDetail, /product-detail-primary-pay-button/);
-  assert.match(productDetail, /product-detail-action-lift-ring/);
-  assert.match(productDetail, /Secure checkout/);
+  assert.match(productDetail, /eduvora-primary-action/);
+  assert.match(productDetail, /Pay now/);
   assert.match(productDetail, /Pay ₹\$\{finalTotalPrice\.toFixed\(2\)\} securely/);
   assert.match(productDetail, /product-detail-educoin-button/);
   assert.match(productDetail, /product-detail-secondary-cart-button/);

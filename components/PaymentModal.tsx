@@ -473,7 +473,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const coinGuideContent = (
     <div className="space-y-4 p-4 text-slate-900 sm:space-y-6 sm:p-8">
-      <div className="relative overflow-hidden rounded-[1.5rem] border border-white/60 bg-white/75 p-4 text-center shadow-[0_24px_70px_rgba(15,23,42,0.10)] backdrop-blur-2xl sm:rounded-[2rem] sm:p-6">
+      <div className="relative overflow-hidden rounded-[1.5rem] border border-white/60 bg-white/75 p-4 text-center shadow-[0_24px_70px_rgba(15,23,42,0.10)] sm:rounded-[2rem] sm:p-6">
         <div className="absolute inset-0 bg-[radial-gradient(circle_at_18%_20%,rgba(251,191,36,0.22),transparent_28%),radial-gradient(circle_at_86%_12%,rgba(99,102,241,0.18),transparent_24%)]" />
         <div className="relative">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full border border-amber-200 bg-amber-100/80 text-2xl shadow-inner sm:h-16 sm:w-16 sm:text-3xl">🪙</div>
@@ -487,7 +487,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
       <div className="grid gap-3 sm:gap-4 md:grid-cols-2">
         {earnMethods.map(method => (
-          <div key={method.title} className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)] backdrop-blur-xl sm:rounded-[1.5rem] sm:p-5">
+          <div key={method.title} className="rounded-2xl border border-white/70 bg-white/75 p-4 shadow-[0_14px_40px_rgba(15,23,42,0.06)] sm:rounded-[1.5rem] sm:p-5">
             <div className="flex items-start gap-3 sm:gap-4">
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-100 to-cyan-100 text-xl sm:h-12 sm:w-12 sm:rounded-2xl sm:text-2xl">{method.icon}</div>
               <div>
@@ -501,7 +501,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       </div>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <button onClick={() => setShowCoinGuide(false)} className="rounded-2xl border border-white/70 bg-white/80 px-5 py-3.5 text-sm font-black text-slate-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-white sm:px-6 sm:py-4 sm:text-base">Back to checkout</button>
+        <button onClick={() => setShowCoinGuide(false)} className="rounded-2xl border border-white/70 bg-white/80 px-5 py-3.5 text-sm font-black text-slate-700 shadow-sm transition hover:-translate-y-0.5 hover:bg-white sm:px-6 sm:py-4 sm:text-base">Back to checkout</button>
         <button onClick={onStartEarning || (() => setShowCoinGuide(false))} className="rounded-2xl bg-gradient-to-r from-indigo-600 to-purple-600 px-5 py-3.5 text-sm font-black text-white shadow-[0_12px_34px_rgba(79,70,229,0.22)] transition hover:-translate-y-0.5 sm:px-6 sm:py-4 sm:text-base">Open Profile & Start Earning</button>
       </div>
     </div>
@@ -536,7 +536,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         ? ['All selected products unlock after verification', 'Each item appears in My Purchases', 'Coupon and EduCoin discounts are preserved', 'Safe recovery if payment status needs checking']
         : ['Complete digital product access', 'Lifetime access from My Purchases', 'All included files and course content', 'Instant access after verified payment'];
   const unlockDetails = providedUnlockDetails?.length ? providedUnlockDetails : defaultUnlockDetails;
-  const primaryItemTitle = productTitle || (isCartMode ? 'Selected cart items' : 'Digital Catalyst checkout');
+  const primaryItemTitle = productTitle || (isCartMode ? 'Selected cart items' : 'Eduvora checkout');
 
   const priceBreakdownRows = (
     <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
@@ -557,7 +557,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   );
 
   const summaryCard = (
-    <div className="space-y-4 rounded-[22px] border border-blue-100 bg-gradient-to-br from-white via-blue-50/45 to-emerald-50/35 p-4 shadow-[0_18px_55px_rgba(37,99,235,0.10)] sm:p-5">
+    <div className="payment-item-summary space-y-4 rounded-[22px] border border-blue-100 bg-white p-4 shadow-[0_10px_28px_rgba(37,99,235,0.08)] sm:p-5">
       <div className="flex items-center justify-between gap-4">
         <h3 className="text-lg font-black text-slate-950">Price summary</h3>
         <span className="rounded-full border border-emerald-100 bg-emerald-50 px-3 py-1 text-[11px] font-black uppercase tracking-[0.18em] text-emerald-700">Verified</span>
@@ -593,9 +593,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   );
 
   const paymentDetailsAside = (
-    <aside className="payment-detail-trust-panel relative overflow-hidden bg-gradient-to-br from-white via-blue-50/70 to-emerald-50/55 p-4 text-slate-900 sm:p-8 lg:p-10">
-      <div className="absolute inset-0 bg-[radial-gradient(circle_at_12%_8%,rgba(37,99,235,0.12),transparent_28%),radial-gradient(circle_at_92%_92%,rgba(16,185,129,0.13),transparent_26%)]" />
-      <div className="relative flex h-full min-h-0 flex-col gap-5">
+    <aside className="payment-detail-trust-panel bg-white p-4 text-slate-900 sm:p-8 lg:p-10">
+      <div className="flex h-full min-h-0 flex-col gap-5">
         <header className="flex items-start gap-4">
           <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] border border-blue-100 bg-blue-600 text-2xl text-white shadow-[0_14px_34px_rgba(37,99,235,0.22)]">📄</span>
           <div>
@@ -659,7 +658,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       </div>
       {summaryCard}
       <div className="grid gap-3">
-        <button disabled={isCompleting} onClick={() => handlePayNow(false)} className="rounded-2xl bg-gradient-to-r from-blue-700 via-indigo-700 to-blue-600 px-5 py-4 text-base font-black text-white shadow-[0_16px_40px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-5 sm:text-lg">
+        <button disabled={isCompleting} onClick={() => handlePayNow(false)} className="payment-primary-action eduvora-primary-action rounded-[18px] px-5 py-4 text-base font-black disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-5 sm:text-lg">
           🔒 Open verified Razorpay checkout
           <span className="mt-1 block text-xs font-bold text-white/80">Pay securely to get instant access</span>
         </button>
@@ -682,7 +681,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       <div className="relative h-24 w-24 sm:h-28 sm:w-28">
         <div className="absolute inset-0 rounded-full border-8 border-indigo-100" />
         <div className="absolute inset-0 animate-spin rounded-full border-8 border-transparent border-t-indigo-600 border-r-cyan-500" />
-        <div className="absolute inset-5 flex items-center justify-center rounded-full bg-white/80 text-3xl shadow-inner backdrop-blur-xl">🔐</div>
+        <div className="absolute inset-5 flex items-center justify-center rounded-full bg-white/80 text-3xl shadow-inner">🔐</div>
       </div>
       <p className="mt-6 text-xs font-black uppercase tracking-[0.32em] text-indigo-500">Live verification</p>
       <h3 className="mt-2 text-2xl font-black text-slate-950 sm:text-3xl">Fetching payment status...</h3>
@@ -692,22 +691,19 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   const checkoutContent = showCoinGuide ? coinGuideContent : checkoutStep === 'razorpay' ? razorpayDemoPage : checkoutStep === 'loading' ? loadingContent : (
     <>
-      <div className="bg-gradient-to-br from-slate-50 via-blue-50/50 to-emerald-50/35 p-4 text-slate-900 sm:p-8">
-        <div className="rounded-[22px] border border-blue-100 bg-white p-4 shadow-[0_14px_40px_rgba(37,99,235,0.08)] sm:p-5">
-          <p className="text-xs font-black uppercase tracking-[0.25em] text-blue-600">Secure live checkout</p>
+      <div className="payment-action-section space-y-4 border-t border-blue-100 bg-[#f8fbff] p-4 sm:space-y-6 sm:p-8">
+        <div className="rounded-[22px] border border-blue-100 bg-white p-4 sm:p-5">
+          <p className="text-xs font-black uppercase tracking-[0.25em] text-blue-600">Payment action</p>
           <h3 className="mt-2 text-xl font-black sm:text-2xl">Understand details, pay safely, unlock instantly</h3>
           <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Every discount, EduCoin adjustment, final payable amount, and unlock rule is shown before checkout.</p>
         </div>
-      </div>
-
-      <div className="space-y-4 p-4 sm:space-y-6 sm:p-8">
         {summaryCard}
         {coinStatus && <div className="rounded-2xl border border-amber-200 bg-amber-50/90 px-4 py-3 text-sm font-black text-amber-800">{coinStatus}</div>}
 
         <div className="space-y-3">
-          <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className="w-full rounded-[22px] bg-gradient-to-r from-blue-700 via-indigo-700 to-cyan-600 px-5 py-3.5 text-base font-black text-white shadow-[0_16px_45px_rgba(37,99,235,0.28)] transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg">{finalPrice <= 0 ? 'Complete ₹0 Checkout' : `Pay ${formatCheckoutMoney(finalPayable)} with Razorpay`}</button>
+          <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className="payment-primary-action eduvora-primary-action w-full rounded-[18px] px-5 py-4 text-base font-black disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg">{finalPrice <= 0 ? 'Complete ₹0 Checkout' : `Pay ${formatCheckoutMoney(finalPayable)} with Razorpay`}</button>
           {isCoinCheckoutEnabled && appliedEduCoins <= 0 && (
-            <button disabled={isCompleting} onClick={handleCoinCheckout} className={`w-full rounded-2xl border px-5 py-3.5 text-base font-black shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg ${canPayWithCoins ? 'border-amber-200/60 bg-white/80 text-amber-700' : 'border-amber-200 bg-amber-50/90 text-amber-800'}`}>
+            <button disabled={isCompleting} onClick={handleCoinCheckout} className={`w-full rounded-2xl border px-5 py-3.5 text-base font-black shadow-sm transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg ${canPayWithCoins ? 'border-amber-200/60 bg-white/80 text-amber-700' : 'border-amber-200 bg-amber-50/90 text-amber-800'}`}>
               <span className="block">
                 {isCompleting ? 'Checking live DB balance...' : canPayWithCoins ? 'Pay with EduCoins' : `Need ${missingCoins} more EduCoins`}
               </span>
@@ -725,27 +721,40 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
   if (presentation === 'page') {
     return (
-      <div ref={pageRef} className="fixed inset-0 z-[9999] overflow-y-auto bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900 px-3 pb-10 pt-4 text-slate-900 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
-        <div className="pointer-events-none absolute -left-24 top-16 h-72 w-72 rounded-full bg-indigo-400/30 blur-3xl" />
-        <div className="pointer-events-none absolute -right-20 bottom-10 h-80 w-80 rounded-full bg-cyan-600/25 blur-3xl" />
-        <div className="relative mx-auto w-full max-w-7xl">
-          <div className="mb-4 flex items-center justify-between gap-3 sm:mb-5 sm:flex-wrap sm:gap-4">
-            <button onClick={onClose} className="inline-flex items-center gap-2 rounded-full border border-white/20 bg-white/10 px-4 py-2.5 text-xs font-black text-white shadow-sm backdrop-blur-xl transition hover:-translate-x-0.5 hover:bg-white/15 sm:px-5 sm:py-3 sm:text-sm">
-              ← Back to product
-            </button>
-            <div className="hidden items-center gap-2 rounded-full border border-emerald-200/30 bg-emerald-400/10 px-4 py-2 text-xs font-black uppercase tracking-[0.2em] text-emerald-100 shadow-sm backdrop-blur-xl sm:flex">
-              <span className="h-2 w-2 rounded-full bg-emerald-400" /> Secure checkout
-            </div>
-          </div>
+      <div ref={pageRef} className="payment-checkout-page fixed inset-0 z-[9999] overflow-y-auto bg-[#eaf1fb] px-3 pb-10 pt-4 text-slate-900 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
+        <div className="mx-auto w-full max-w-3xl">
+          <button onClick={onClose} className="mb-4 inline-flex items-center gap-2 rounded-[16px] border border-blue-200 bg-white px-4 py-2.5 text-xs font-black text-blue-800 shadow-sm transition hover:border-blue-300 sm:px-5 sm:py-3 sm:text-sm">
+            ← Back to product
+          </button>
 
-          <div className="overflow-hidden rounded-[1.5rem] border border-white/20 bg-white/10 shadow-[0_28px_100px_rgba(0,0,0,0.30)] backdrop-blur-2xl sm:rounded-[2.5rem]">
-            <div className="grid lg:grid-cols-[0.92fr_1.08fr]">
-              {paymentDetailsAside}
-              <section className="bg-white/95">
-                {checkoutContent}
-              </section>
-            </div>
-          </div>
+          <main className="payment-checkout-long-page overflow-hidden rounded-[22px] border border-blue-100 bg-white shadow-[0_22px_64px_rgba(20,70,150,0.16)]">
+            <header className="payment-checkout-blue-hero bg-gradient-to-br from-[#0b4bd8] via-[#1769ff] to-[#4f7cff] px-5 py-7 text-white sm:px-8 sm:py-10">
+              <div className="flex items-start justify-between gap-5">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.28em] text-blue-100">Eduvora secure payment</p>
+                  <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Complete your checkout</h1>
+                  <p className="mt-3 max-w-xl text-sm font-semibold leading-6 text-blue-50 sm:text-base">Review the product, item summary, savings, and access rules on one clear page before paying.</p>
+                </div>
+                <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] border border-white/30 bg-white/15 text-2xl" aria-hidden="true">▣</span>
+              </div>
+              <div className="mt-7 flex items-end justify-between gap-4 border-t border-white/20 pt-5">
+                <span className="text-sm font-bold text-blue-100">Amount payable</span>
+                <span className="text-3xl font-black">{formatCheckoutMoney(finalPayable)}</span>
+              </div>
+            </header>
+
+            {paymentDetailsAside}
+            <section className="bg-white">{checkoutContent}</section>
+
+            <footer className="border-t border-blue-100 bg-[#f8fbff] px-5 py-6 text-center sm:px-8">
+              <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-black text-slate-600">
+                <span>🔒 Razorpay protected</span>
+                <span>✓ Server verified access</span>
+                <span>↻ Payment recovery available</span>
+              </div>
+              <p className="mt-4 text-xs font-semibold leading-5 text-slate-500">Eduvora unlocks access only after verified payment. A completed payment can be recovered safely through payment-status checking.</p>
+            </footer>
+          </main>
         </div>
       </div>
     );

@@ -67,9 +67,9 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
         <>
             {/* FIX: Wrapped event handler in an arrow function to prevent passing implicit event arguments. */}
             <div className={`cart-overlay ${isOpen ? 'is-open' : ''}`} onClick={() => onClose()}></div>
-            <aside className={`cart-sidebar bg-white/80 backdrop-blur-2xl border-l border-white/50 shadow-2xl ${isOpen ? 'is-open' : ''}`}>
+            <aside className={`cart-sidebar bg-white border-l border-slate-200 shadow-xl ${isOpen ? 'is-open' : ''}`}>
                 <div className="flex flex-col h-full">
-                    <header className="p-6 border-b border-white/50 flex justify-between items-center bg-white/60 backdrop-blur-xl">
+                    <header className="p-6 border-b border-slate-200 flex justify-between items-center bg-white">
                         <h2 className="text-2xl font-bold text-slate-900">Your Cart</h2>
                         {/* FIX: Wrapped event handler in an arrow function to prevent passing implicit event arguments. */}
                         <button onClick={() => onClose()} className="p-2 text-slate-600 hover:text-gray-600">
@@ -160,8 +160,8 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
                                 <div className="flex justify-between border-t border-white/70 pt-2 text-lg font-black"><span>Total</span><span>₹{finalPrice.toFixed(2)}</span></div>
                             </div>
                             {/* FIX: Wrapped event handler in an arrow function to prevent passing implicit event arguments. */}
-                            <button onClick={() => onCheckout()} className="w-full mt-4 bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-black py-4 rounded-2xl hover:opacity-90 transition-all transform active:scale-95 shadow-sm">
-                                Proceed to Checkout
+                            <button onClick={() => onCheckout()} className="cart-primary-action eduvora-primary-action w-full mt-4 px-6 py-4 text-base font-black">
+                                <span className="flex items-center justify-center gap-3"><span className="payment-card-icon" aria-hidden="true">▣</span><span>Proceed to Checkout</span></span>
                             </button>
                              <p className="text-xs text-text-muted text-center mt-2">Discounts are validated again at checkout.</p>
                         </footer>
