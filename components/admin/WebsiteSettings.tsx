@@ -415,7 +415,14 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     };
     const latestDesktopCommunityLayout = communityStyle.desktopLayout !== 'classic';
     const socialDesktopCommunityLayout = Boolean(communityStyle.desktopSocialLayout);
-    const readingStyle = { backgroundColor: '#F8FAFD', backgroundOpacity: 98, panelOpacity: 96, cardOpacity: 94, accentColor: '#C2E7FF', accentOpacity: 66, ...((localSettings.content as any).readingStyle || {}) };
+    const readingStyle = {
+        backgroundColor: '#F8FAFD', backgroundOpacity: 98, panelOpacity: 96, cardOpacity: 94, accentColor: '#C2E7FF', accentOpacity: 24,
+        newsHeadingFont: 'Merriweather', blogHeadingFont: 'Montserrat', bodyFont: 'Lato', newsHeadingColor: '#083B4C', blogHeadingColor: '#3B1D5A',
+        bodyTextColor: '#334155', metadataColor: '#64748B', linkColor: '#1769FF', quoteBackgroundColor: '#EEF6FF', quoteBorderColor: '#1769FF',
+        titleSizeMobile: 38, titleSizeDesktop: 64, bodySizeMobile: 17, bodySizeDesktop: 19, lineHeight: 1.85, contentWidth: 860,
+        ...((localSettings.content as any).readingStyle || {})
+    };
+    const readingFontMap: Record<string, string> = { Merriweather: 'Merriweather, Georgia, serif', Montserrat: 'Montserrat, Inter, sans-serif', Lato: 'Lato, Inter, sans-serif', Inter: 'Inter, sans-serif', Roboto: 'Roboto, Arial, sans-serif', Oswald: 'Oswald, Arial, sans-serif' };
     const productRoundness = { ...DEFAULT_PRODUCT_ROUNDNESS_SETTINGS, ...(((localSettings.content as any).productRoundness || {}) as Partial<Record<ProductRoundnessKey, boolean>>) };
     const profileStyle = { backgroundColor: '#e2e8f0', backgroundTint: '#e0e7ff', cardOpacity: 82, heroOverlayOpacity: 76, accentColor: '#f97316', ...((localSettings.content as any).profileStyle || {}) };
     const profileStreaks = (((localSettings.content as any).profileStreaks || []) as ProfileStreakConfig[]);
@@ -1102,42 +1109,84 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
 
             case 'reading': return (
                 <div className="space-y-5">
-                    <div className="rounded-xl border bg-white p-4">
-                        <h4 className="font-bold text-gray-800">News & Blog Reading Colors</h4>
-                        <p className="text-sm text-slate-600">Customize the reading hub and news/blog section for every user. Keep opacity moderate for easy reading.</p>
-                        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_18rem]">
-                            <div className="space-y-4">
-                                <FormRow label="Reading Background" description="Soft page background behind news/blog and reading drawer.">
-                                    <input type="color" value={readingStyle.backgroundColor} onChange={e => updateReadingStyle('backgroundColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" />
-                                </FormRow>
-                                <FormRow label={`Background Dim (${readingStyle.backgroundOpacity}%)`} description="Higher value makes the reading surface more dim/solid, but not dark.">
-                                    <input type="range" min="55" max="100" step="1" value={readingStyle.backgroundOpacity} onChange={e => updateReadingStyle('backgroundOpacity', Number(e.target.value))} className="w-full" />
-                                </FormRow>
-                                <FormRow label={`Drawer Panel Opacity (${readingStyle.panelOpacity}%)`} description="Controls the main drawer glass panel transparency.">
-                                    <input type="range" min="65" max="100" step="1" value={readingStyle.panelOpacity} onChange={e => updateReadingStyle('panelOpacity', Number(e.target.value))} className="w-full" />
-                                </FormRow>
-                                <FormRow label={`Card Opacity (${readingStyle.cardOpacity}%)`} description="Controls cards and header glass surfaces in reading mode.">
-                                    <input type="range" min="45" max="100" step="1" value={readingStyle.cardOpacity} onChange={e => updateReadingStyle('cardOpacity', Number(e.target.value))} className="w-full" />
-                                </FormRow>
-                                <FormRow label="Accent Color" description="Used for progress, chips, and subtle reading highlights.">
-                                    <input type="color" value={readingStyle.accentColor} onChange={e => updateReadingStyle('accentColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" />
-                                </FormRow>
-                                <FormRow label={`Accent Softness (${readingStyle.accentOpacity}%)`} description="Controls how strong the colored background glow appears.">
-                                    <input type="range" min="0" max="45" step="1" value={readingStyle.accentOpacity} onChange={e => updateReadingStyle('accentOpacity', Number(e.target.value))} className="w-full" />
-                                </FormRow>
-                            </div>
-                            <div className="rounded-2xl border border-slate-200 bg-slate-100 p-4">
-                                <p className="text-sm font-bold text-slate-700">Live Preview</p>
-                                <div className="mt-4 rounded-[2rem] border border-white/50 p-4 shadow-xl" style={{ backgroundColor: `${readingStyle.backgroundColor}${Math.round((Number(readingStyle.backgroundOpacity) / 100) * 255).toString(16).padStart(2, '0')}` }}>
-                                    <div className="rounded-[1.5rem] border border-white/50 p-4" style={{ backgroundColor: `rgba(255,255,255,${Number(readingStyle.cardOpacity) / 100})` }}>
-                                        <div className="mb-3 h-2 rounded-full" style={{ backgroundColor: readingStyle.accentColor, opacity: Number(readingStyle.accentOpacity) / 100 }} />
-                                        <p className="text-xs font-black uppercase tracking-[0.25em] text-indigo-700">Reading Mode</p>
-                                        <h5 className="mt-2 text-lg font-black text-slate-900">Comfortable article preview</h5>
-                                        <p className="mt-2 text-sm leading-6 text-slate-600">Soft dim background, readable cards, and controlled accent glow.</p>
+                    <div className="rounded-[1.5rem] border border-blue-100 bg-gradient-to-br from-white via-[#F8FBFF] to-[#EEF6FF] p-5 shadow-sm">
+                        <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Reading typography studio</p>
+                        <h4 className="mt-2 text-xl font-black text-slate-900">News and Blog article design</h4>
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">These controls drive the real mobile and desktop Reading page. Save Changes publishes the fonts, sizes, colors, spacing, quotes and readable content width for every user.</p>
+                    </div>
+
+                    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
+                        <div className="space-y-5">
+                            <section className="rounded-xl border bg-white p-4">
+                                <h5 className="font-black text-slate-900">Fonts and responsive sizing</h5>
+                                <div className="mt-4 space-y-4">
+                                    <FormRow label="News heading font" description="Used for News article and announcement titles/headings.">
+                                        <select value={readingStyle.newsHeadingFont} onChange={e => updateReadingStyle('newsHeadingFont', e.target.value)} className="w-full rounded border p-2">
+                                            {['Merriweather','Montserrat','Lato','Inter','Roboto','Oswald'].map(font => <option key={`news-font-${font}`} value={font}>{font}</option>)}
+                                        </select>
+                                    </FormRow>
+                                    <FormRow label="Blog heading font" description="Used for Blog titles and section headings.">
+                                        <select value={readingStyle.blogHeadingFont} onChange={e => updateReadingStyle('blogHeadingFont', e.target.value)} className="w-full rounded border p-2">
+                                            {['Montserrat','Merriweather','Lato','Inter','Roboto','Oswald'].map(font => <option key={`blog-font-${font}`} value={font}>{font}</option>)}
+                                        </select>
+                                    </FormRow>
+                                    <FormRow label="Article body font" description="Used for paragraphs, lists and long-form reading.">
+                                        <select value={readingStyle.bodyFont} onChange={e => updateReadingStyle('bodyFont', e.target.value)} className="w-full rounded border p-2">
+                                            {['Lato','Inter','Roboto','Merriweather','Montserrat'].map(font => <option key={`body-font-${font}`} value={font}>{font}</option>)}
+                                        </select>
+                                    </FormRow>
+                                    <FormRow label={`Mobile title size (${readingStyle.titleSizeMobile}px)`} description="Responsive title size on phones and compact tablets."><input type="range" min="30" max="56" step="1" value={readingStyle.titleSizeMobile} onChange={e => updateReadingStyle('titleSizeMobile', Number(e.target.value))} className="w-full" /></FormRow>
+                                    <FormRow label={`Desktop title size (${readingStyle.titleSizeDesktop}px)`} description="Maximum title size on larger screens."><input type="range" min="44" max="84" step="1" value={readingStyle.titleSizeDesktop} onChange={e => updateReadingStyle('titleSizeDesktop', Number(e.target.value))} className="w-full" /></FormRow>
+                                    <FormRow label={`Mobile body size (${readingStyle.bodySizeMobile}px)`} description="Long-form paragraph size on mobile."><input type="range" min="15" max="22" step="1" value={readingStyle.bodySizeMobile} onChange={e => updateReadingStyle('bodySizeMobile', Number(e.target.value))} className="w-full" /></FormRow>
+                                    <FormRow label={`Desktop body size (${readingStyle.bodySizeDesktop}px)`} description="Long-form paragraph size on desktop."><input type="range" min="16" max="25" step="1" value={readingStyle.bodySizeDesktop} onChange={e => updateReadingStyle('bodySizeDesktop', Number(e.target.value))} className="w-full" /></FormRow>
+                                    <FormRow label={`Line height (${Number(readingStyle.lineHeight).toFixed(2)})`} description="Controls breathing room between article lines."><input type="range" min="1.45" max="2.2" step="0.05" value={readingStyle.lineHeight} onChange={e => updateReadingStyle('lineHeight', Number(e.target.value))} className="w-full" /></FormRow>
+                                    <FormRow label={`Readable width (${readingStyle.contentWidth}px)`} description="Maximum paragraph width; narrower lines are easier to read."><input type="range" min="680" max="1080" step="20" value={readingStyle.contentWidth} onChange={e => updateReadingStyle('contentWidth', Number(e.target.value))} className="w-full" /></FormRow>
+                                </div>
+                            </section>
+
+                            <section className="rounded-xl border bg-white p-4">
+                                <h5 className="font-black text-slate-900">Article colors and surfaces</h5>
+                                <div className="mt-4 grid gap-4 sm:grid-cols-2">
+                                    {[
+                                        ['newsHeadingColor','News heading', readingStyle.newsHeadingColor],
+                                        ['blogHeadingColor','Blog heading', readingStyle.blogHeadingColor],
+                                        ['bodyTextColor','Body text', readingStyle.bodyTextColor],
+                                        ['metadataColor','Metadata', readingStyle.metadataColor],
+                                        ['linkColor','Links and bullets', readingStyle.linkColor],
+                                        ['quoteBackgroundColor','Quote background', readingStyle.quoteBackgroundColor],
+                                        ['quoteBorderColor','Quote border', readingStyle.quoteBorderColor],
+                                        ['backgroundColor','Reading background', readingStyle.backgroundColor],
+                                        ['accentColor','Accent and progress', readingStyle.accentColor],
+                                    ].map(([field,label,value]) => (
+                                        <label key={field} className="rounded-xl border border-slate-200 p-3 text-sm font-bold text-slate-700">
+                                            <span className="mb-2 block">{label}</span>
+                                            <input type="color" value={String(value)} onChange={e => updateReadingStyle(String(field), e.target.value)} className="h-10 w-full rounded border p-1" />
+                                        </label>
+                                    ))}
+                                </div>
+                                <div className="mt-4 space-y-4">
+                                    <FormRow label={`Background opacity (${readingStyle.backgroundOpacity}%)`} description="Page overlay solidity."><input type="range" min="55" max="100" step="1" value={readingStyle.backgroundOpacity} onChange={e => updateReadingStyle('backgroundOpacity', Number(e.target.value))} className="w-full" /></FormRow>
+                                    <FormRow label={`Panel opacity (${readingStyle.panelOpacity}%)`} description="Main Reading drawer panel solidity."><input type="range" min="65" max="100" step="1" value={readingStyle.panelOpacity} onChange={e => updateReadingStyle('panelOpacity', Number(e.target.value))} className="w-full" /></FormRow>
+                                    <FormRow label={`Card opacity (${readingStyle.cardOpacity}%)`} description="Article card and header surface solidity."><input type="range" min="55" max="100" step="1" value={readingStyle.cardOpacity} onChange={e => updateReadingStyle('cardOpacity', Number(e.target.value))} className="w-full" /></FormRow>
+                                    <FormRow label={`Accent softness (${readingStyle.accentOpacity}%)`} description="Strength of decorative reading glow."><input type="range" min="0" max="45" step="1" value={readingStyle.accentOpacity} onChange={e => updateReadingStyle('accentOpacity', Number(e.target.value))} className="w-full" /></FormRow>
+                                </div>
+                            </section>
+                        </div>
+
+                        <aside className="xl:sticky xl:top-4 xl:self-start">
+                            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-100 p-4">
+                                <p className="text-sm font-black text-slate-700">Live Reading preview</p>
+                                <div className="mt-4 rounded-[1.5rem] border p-5 shadow-xl" style={{ backgroundColor: readingStyle.backgroundColor }}>
+                                    <div className="rounded-[1.25rem] border border-white/70 p-5" style={{ backgroundColor: `rgba(255,255,255,${Number(readingStyle.cardOpacity) / 100})`, maxWidth: `${Math.min(360, Number(readingStyle.contentWidth))}px` }}>
+                                        <p className="text-[10px] font-black uppercase tracking-[0.22em]" style={{ color: readingStyle.metadataColor }}>News desk · 6 min read</p>
+                                        <h5 className="mt-3 font-black" style={{ fontFamily: readingFontMap[readingStyle.newsHeadingFont], color: readingStyle.newsHeadingColor, fontSize: `${Math.min(32, Number(readingStyle.titleSizeMobile))}px`, lineHeight: 1.12 }}>A clear headline built for serious reading</h5>
+                                        <p className="mt-4" style={{ fontFamily: readingFontMap[readingStyle.bodyFont], color: readingStyle.bodyTextColor, fontSize: `${Math.min(18, Number(readingStyle.bodySizeMobile))}px`, lineHeight: readingStyle.lineHeight }}>Article paragraphs now follow the exact font, color, size, width and spacing configured here.</p>
+                                        <blockquote className="mt-4 border-l-4 px-4 py-3 italic" style={{ fontFamily: readingFontMap[readingStyle.newsHeadingFont], color: readingStyle.bodyTextColor, backgroundColor: readingStyle.quoteBackgroundColor, borderColor: readingStyle.quoteBorderColor }}>A focused quote style helps important ideas stand out.</blockquote>
+                                        <a className="mt-4 inline-block font-black underline" style={{ color: readingStyle.linkColor }}>Sample article link</a>
                                     </div>
                                 </div>
                             </div>
-                        </div>
+                        </aside>
                     </div>
                 </div>
             );

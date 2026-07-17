@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { NewsArticle, WebsiteSettings } from '../../App';
-import { ContentDatabaseAdapter, ContentPostRecord, ContentPostType, runContentAutomation } from '../../utils/contentAutomator';
+import { ContentDatabaseAdapter, ContentPostRecord, ContentPostType, ContentRetentionUnit, DEFAULT_CONTENT_PURGE_POLICY, getExpiredContentIds, normalizeContentPurgePolicy, runContentAutomation } from '../../utils/contentAutomator';
 import PremiumImageUrlInput, { PremiumImageUrlStatus } from '../common/PremiumImageUrlInput';
 import { isCloudinaryImageUploadConfigured, uploadImageToCloudinary } from '../../utils/cloudinaryUpload';
 
@@ -99,6 +99,11 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
   const [newsGenerationCount, setNewsGenerationCount] = useState(() => readStoredGenerationCount('aiNewsGenerationCount', 3));
   const [blogGenerationCount, setBlogGenerationCount] = useState(() => readStoredGenerationCount('aiBlogGenerationCount', 3));
   const totalGenerationCount = newsGenerationCount + blogGenerationCount;
+  const storedPurgePolicy = normalizeContentPurgePolicy((settings.content as any).readingAutomation || DEFAULT_CONTENT_PURGE_POLICY);
+  const [autoPurgeEnabled, setAutoPurgeEnabled] = useState(storedPurgePolicy.autoPurgeEnabled);
+  const [retentionValue, setRetentionValue] = useState(storedPurgePolicy.retentionValue);
+  const [retentionUnit, setRetentionUnit] = useState<ContentRetentionUnit>(storedPurgePolicy.retentionUnit);
+  const [isPurging, setIsPurging] = useState(false);
   const [successToast, setSuccessToast] = useState('');
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [coverUploadError, setCoverUploadError] = useState('');
@@ -107,6 +112,13 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
   useEffect(() => {
     setArticles(settingsPosts);
   }, [settingsPosts]);
+
+  useEffect(() => {
+    const nextPolicy = normalizeContentPurgePolicy((settings.content as any).readingAutomation || DEFAULT_CONTENT_PURGE_POLICY);
+    setAutoPurgeEnabled(nextPolicy.autoPurgeEnabled);
+    setRetentionValue(nextPolicy.retentionValue);
+    setRetentionUnit(nextPolicy.retentionUnit);
+  }, [(settings.content as any).readingAutomation]);
 
   useEffect(() => {
     if (!successToast) return;
@@ -194,6 +206,41 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
     updatePosts(posts.filter((post) => post.id !== id));
   };
 
+  const currentPurgePolicy = normalizeContentPurgePolicy({ autoPurgeEnabled, retentionValue, retentionUnit });
+
+  const savePurgePolicy = (updates: Partial<typeof currentPurgePolicy>) => {
+    const nextPolicy = normalizeContentPurgePolicy({ ...currentPurgePolicy, ...updates });
+    setAutoPurgeEnabled(nextPolicy.autoPurgeEnabled);
+    setRetentionValue(nextPolicy.retentionValue);
+    setRetentionUnit(nextPolicy.retentionUnit);
+    onSettingsChange({
+      ...settings,
+      content: { ...settings.content, readingAutomation: nextPolicy },
+    });
+    setAutomationStatus(nextPolicy.autoPurgeEnabled
+      ? `Auto purge enabled for News/Blog older than ${nextPolicy.retentionValue} ${nextPolicy.retentionUnit}.`
+      : 'Auto purge disabled. AI generation will not delete old content.');
+  };
+
+  const purgeOldContentNow = async () => {
+    const eligibleIds = getExpiredContentIds(posts, currentPurgePolicy);
+    if (eligibleIds.length === 0) {
+      setAutomationStatus(`No News or Blog items are older than ${currentPurgePolicy.retentionValue} ${currentPurgePolicy.retentionUnit}.`);
+      return;
+    }
+    if (!window.confirm(`Permanently purge ${eligibleIds.length} eligible News/Blog item${eligibleIds.length === 1 ? '' : 's'} older than ${currentPurgePolicy.retentionValue} ${currentPurgePolicy.retentionUnit}? Store products, purchases and community content are not included.`)) return;
+
+    setIsPurging(true);
+    try {
+      const eligibleSet = new Set(eligibleIds);
+      updatePosts(posts.filter(post => !eligibleSet.has(post.id)));
+      setSuccessToast(`Purged ${eligibleIds.length} old News/Blog item${eligibleIds.length === 1 ? '' : 's'}.`);
+      setAutomationStatus(`Manual purge complete. Removed ${eligibleIds.length} eligible reading item${eligibleIds.length === 1 ? '' : 's'}.`);
+    } finally {
+      setIsPurging(false);
+    }
+  };
+
   const runAiFetchNow = async () => {
     if (totalGenerationCount === 0) {
       setAutomationStatus('Select at least one News or Blog item before starting AI generation.');
@@ -202,7 +249,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
 
     setIsRunning(true);
     setSuccessToast('');
-    setAutomationStatus(`Generating ${newsGenerationCount} news + ${blogGenerationCount} blogs in small verified batches, then purging expired content…`);
+    setAutomationStatus(`Generating ${newsGenerationCount} news + ${blogGenerationCount} blogs in small verified batches${currentPurgePolicy.autoPurgeEnabled ? `, then purging items older than ${currentPurgePolicy.retentionValue} ${currentPurgePolicy.retentionUnit}` : ' with auto purge disabled'}…`);
 
     let workingPosts = [...posts];
     const localAdapter: ContentDatabaseAdapter<ContentPostRecord> = {
@@ -217,6 +264,9 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
       const result = await runContentAutomation(localAdapter, {
         newsCount: newsGenerationCount,
         blogCount: blogGenerationCount,
+        autoPurgeEnabled: currentPurgePolicy.autoPurgeEnabled,
+        retentionValue: currentPurgePolicy.retentionValue,
+        retentionUnit: currentPurgePolicy.retentionUnit,
         idFactory: () => Date.now() + Math.floor(Math.random() * 100000),
       });
       const newArticles = result.generated.map((post) => ({
@@ -239,7 +289,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
       const nextPosts = [...newArticles, ...workingPosts.filter((post) => !purgedPostIds.has(post.id))];
       updatePosts(nextPosts);
       setSuccessToast(`AI fetch complete — added ${newArticles.filter(post => post.type === 'news').length} news + ${newArticles.filter(post => post.type === 'blog').length} blogs with topic-matched image URLs.`);
-      setAutomationStatus(`Completed safely: generated ${result.generated.length} validated posts and purged ${result.purgedIds.length} expired posts.`);
+      setAutomationStatus(`Completed safely: generated ${result.generated.length} validated posts${currentPurgePolicy.autoPurgeEnabled ? ` and purged ${result.purgedIds.length} eligible old posts` : '; auto purge was OFF and no old content was deleted'}.`);
     } catch (error) {
       console.error('AI content automation failed:', error);
       const message = error instanceof Error ? error.message : 'AI automation failed. Check the console for details.';
@@ -365,7 +415,7 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
           <div>
             <p className="text-xs font-black uppercase tracking-[0.35em] text-fuchsia-700/80">AI Autopilot Status</p>
             <h2 className="mt-3 text-2xl font-black text-slate-900">Daily AI Fetch</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Choose exactly how many News and Blog items to add. Generation runs in small schema-validated batches, assigns a topic-matched real image URL to every new post, and purges posts older than 72 hours only after generation succeeds.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Choose exactly how many News and Blog items to add. Generation uses small schema-validated batches and topic-matched image URLs. Old content is never deleted unless Auto purge is explicitly ON or you press Purge now.</p>
             <div className="mt-5 grid gap-3 sm:grid-cols-2">
               <label className="rounded-2xl border border-cyan-200/70 bg-cyan-50/80 p-4">
                 <span className="block text-xs font-black uppercase tracking-[0.18em] text-cyan-800">News to add</span>
@@ -381,6 +431,29 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
               </label>
             </div>
             <p className="mt-3 text-xs font-bold text-slate-500">Selected run: {newsGenerationCount} News + {blogGenerationCount} Blogs = {totalGenerationCount} new items.</p>
+            <div className="mt-5 rounded-[1.5rem] border border-amber-200 bg-amber-50/85 p-4">
+              <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-800">Old-content purge control</p>
+                  <p className="mt-1 text-sm leading-6 text-amber-950">Auto purge is OFF by default. The rule applies only to News and Blog records.</p>
+                </div>
+                <label className="inline-flex items-center gap-3 font-black text-amber-950">
+                  <input type="checkbox" checked={autoPurgeEnabled} onChange={event => savePurgePolicy({ autoPurgeEnabled: event.target.checked })} className="h-5 w-5 rounded border-amber-300" />
+                  Auto purge {autoPurgeEnabled ? 'ON' : 'OFF'}
+                </label>
+              </div>
+              <div className="mt-4 grid gap-3 sm:grid-cols-[1fr_10rem_auto]">
+                <label className="text-xs font-black uppercase tracking-[0.14em] text-amber-900">Retention value
+                  <input type="number" min="1" max={retentionUnit === 'hours' ? 8760 : 3650} value={retentionValue} onChange={event => savePurgePolicy({ retentionValue: Number(event.target.value) })} className="mt-2 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-base font-black normal-case tracking-normal text-slate-900" />
+                </label>
+                <label className="text-xs font-black uppercase tracking-[0.14em] text-amber-900">Unit
+                  <select value={retentionUnit} onChange={event => savePurgePolicy({ retentionUnit: event.target.value as ContentRetentionUnit })} className="mt-2 w-full rounded-xl border border-amber-200 bg-white px-3 py-2 text-base font-black normal-case tracking-normal text-slate-900">
+                    <option value="hours">Hours</option><option value="days">Days</option>
+                  </select>
+                </label>
+                <button type="button" onClick={purgeOldContentNow} disabled={isPurging} className="self-end rounded-xl border border-red-200 bg-white px-4 py-2.5 font-black text-red-700 transition hover:bg-red-50 disabled:opacity-50">{isPurging ? 'Purging…' : 'Purge now'}</button>
+              </div>
+            </div>
             <p className="mt-4 rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-sm text-slate-600">{automationStatus}</p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">

@@ -25,7 +25,9 @@ test('AI generation uses small structured batches and never saves malformed JSON
   assert.match(automator, /maxOutputTokens: 8192/);
   assert.match(automator, /for \(let attempt = 1; attempt <= 2; attempt \+= 1\)/);
   assert.match(automator, /The batch was retried and no posts were changed/);
-  assert.match(automator, /const generatedPosts = await generateEducationalContent\(counts\);\s*const purgedIds = await purgeExpiredContent/s);
+  assert.match(automator, /const generatedPosts = await generateEducationalContent\(counts\);/);
+  assert.match(automator, /purgePolicy\.autoPurgeEnabled[\s\S]*purgeExpiredContent/);
+  assert.match(automator, /DEFAULT_CONTENT_PURGE_POLICY[\s\S]*autoPurgeEnabled: false/);
   assert.doesNotMatch(automator, /Generate exactly 20 fresh/);
   assert.doesNotMatch(automator, /slice\(0, 10\)/);
 });

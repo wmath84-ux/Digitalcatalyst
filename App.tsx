@@ -51,6 +51,7 @@ import { isProductSearchVisible, withProductSearchIndex } from './utils/productS
 import MembershipUpgradeCard from './components/MembershipUpgradeCard';
 import { DEFAULT_PRODUCT_ROUNDNESS_SETTINGS } from './utils/productRoundness';
 import type { ProductRoundnessSettings } from './utils/productRoundness';
+import { acknowledgeDockDestination as acknowledgeDockSeenDestination, computeDockActivity, createDockInventory, DockCountDestination, DockSeenState, readOrInitializeDockSeenState } from './utils/dockNewContent';
 import {
   DEFAULT_SUBSCRIPTION_PAGE_CONTENT,
   DEFAULT_SUBSCRIPTION_PLANS,
@@ -721,6 +722,27 @@ export interface WebsiteSettings {
             cardOpacity: number;
             accentColor: string;
             accentOpacity: number;
+            newsHeadingFont: string;
+            blogHeadingFont: string;
+            bodyFont: string;
+            newsHeadingColor: string;
+            blogHeadingColor: string;
+            bodyTextColor: string;
+            metadataColor: string;
+            linkColor: string;
+            quoteBackgroundColor: string;
+            quoteBorderColor: string;
+            titleSizeMobile: number;
+            titleSizeDesktop: number;
+            bodySizeMobile: number;
+            bodySizeDesktop: number;
+            lineHeight: number;
+            contentWidth: number;
+        };
+        readingAutomation?: {
+            autoPurgeEnabled: boolean;
+            retentionValue: number;
+            retentionUnit: 'hours' | 'days';
         };
         productRoundness?: ProductRoundnessSettings;
         profileStyle?: ProfileStyleSettings;
@@ -949,7 +971,28 @@ const defaultWebsiteSettings: WebsiteSettings = {
             panelOpacity: 96,
             cardOpacity: 94,
             accentColor: '#C2E7FF',
-            accentOpacity: 66,
+            accentOpacity: 24,
+            newsHeadingFont: 'Merriweather',
+            blogHeadingFont: 'Montserrat',
+            bodyFont: 'Lato',
+            newsHeadingColor: '#083B4C',
+            blogHeadingColor: '#3B1D5A',
+            bodyTextColor: '#334155',
+            metadataColor: '#64748B',
+            linkColor: '#1769FF',
+            quoteBackgroundColor: '#EEF6FF',
+            quoteBorderColor: '#1769FF',
+            titleSizeMobile: 38,
+            titleSizeDesktop: 64,
+            bodySizeMobile: 17,
+            bodySizeDesktop: 19,
+            lineHeight: 1.85,
+            contentWidth: 860,
+        },
+        readingAutomation: {
+            autoPurgeEnabled: false,
+            retentionValue: 30,
+            retentionUnit: 'days',
         },
         productRoundness: DEFAULT_PRODUCT_ROUNDNESS_SETTINGS,
         profileStreaks: [
@@ -1020,6 +1063,14 @@ const mergeWebsiteSettings = (settings?: Partial<WebsiteSettings> | null): Websi
       communityStyle: {
         ...defaultWebsiteSettings.content.communityStyle,
         ...((incoming.content as any)?.communityStyle || {}),
+      },
+      readingStyle: {
+        ...defaultWebsiteSettings.content.readingStyle,
+        ...((incoming.content as any)?.readingStyle || {}),
+      },
+      readingAutomation: {
+        ...defaultWebsiteSettings.content.readingAutomation,
+        ...((incoming.content as any)?.readingAutomation || {}),
       },
       productRoundness: {
         ...DEFAULT_PRODUCT_ROUNDNESS_SETTINGS,
@@ -2432,6 +2483,36 @@ const App: React.FC = () => {
   const wishlistProducts = visibleProducts.filter(p => wishlist.includes(p.id));
   const freeProducts = visibleProducts.filter(p => p.isFree);
 
+  const dockViewerKey = String(effectiveAppUser?.id || effectiveFirebaseUser?.uid || 'guest');
+  const dockInventory = React.useMemo(() => createDockInventory({
+    storeIds: visibleProducts.map(product => product.id),
+    purchasedIds: purchasedProducts.map(product => product.id),
+    wishlistIds: wishlist,
+    cartCount: cart.reduce((total, item) => total + item.quantity, 0),
+    newsIds: [
+      ...websiteSettings.content.newsArticles.filter(article => article.type === 'news').map(article => `news:${article.id}`),
+      ...websiteSettings.content.announcements.map(announcement => `announcement:${announcement.id}`),
+    ],
+    blogIds: websiteSettings.content.newsArticles.filter(article => article.type !== 'news').map(article => `blog:${article.id}`),
+    freeIds: freeProducts.map(product => product.id),
+  }), [cart, freeProducts, purchasedProducts, visibleProducts, websiteSettings.content.announcements, websiteSettings.content.newsArticles, wishlist]);
+  const dockSeenReady = isAuthStateReady && (!isLoggedIn || purchaseStatus === 'ready' || purchaseStatus === 'fallback' || purchaseStatus === 'error');
+  const [dockSeenState, setDockSeenState] = useState<DockSeenState | null>(null);
+
+  useEffect(() => {
+    if (!dockSeenReady) return;
+    setDockSeenState(readOrInitializeDockSeenState(dockViewerKey, dockInventory));
+  }, [dockSeenReady, dockViewerKey]);
+
+  const dockActivity = React.useMemo(
+    () => computeDockActivity(dockInventory, dockSeenState?.viewerKey === dockViewerKey ? dockSeenState : null),
+    [dockInventory, dockSeenState],
+  );
+
+  const acknowledgeDockDestination = useCallback((destination: DockCountDestination) => {
+    setDockSeenState(current => acknowledgeDockSeenDestination(dockViewerKey, current, dockInventory, destination));
+  }, [dockInventory, dockViewerKey]);
+
   const collectPaidUpdateIdsFromModules = (productId: number, modules: CourseModule[] = []): string[] => {
     const updateIds: string[] = [];
 
@@ -2697,6 +2778,7 @@ const App: React.FC = () => {
 
   // --- Cart Handlers ---
   const openCartSidebar = () => {
+      acknowledgeDockDestination('Cart');
       if (typeof window !== 'undefined' && !isCartOpenRef.current) {
           window.history.pushState({ ...(window.history.state || {}), dcView: currentViewRef.current, dcOverlay: 'cart' }, '', window.location.href);
       }
@@ -4900,6 +4982,7 @@ const App: React.FC = () => {
   };
 
   const handleNavigateToAllProducts = () => {
+    acknowledgeDockDestination('Store');
     writePurchasesReturnContext(null);
     selectedProductRef.current = null;
     setCurrentView('allProducts');
@@ -4908,6 +4991,7 @@ const App: React.FC = () => {
   };
 
   const handleNavigateToPurchases = () => {
+    acknowledgeDockDestination('Purchased');
     const originProduct = currentViewRef.current === 'product' ? selectedProductRef.current : null;
     if (originProduct) {
       const returnContext: PurchasesReturnContext = { view: 'product', productId: originProduct.id };
@@ -5105,11 +5189,13 @@ const App: React.FC = () => {
   const handleNavigateToSubscription = () => { setCurrentView('subscription'); window.scrollTo(0,0); };
 
   const handleNavigateToWishlist = () => {
+    acknowledgeDockDestination('Wishlist');
     setCurrentView('wishlist');
     window.scrollTo(0, 0);
   };
 
   const handleNavigateToFreeProducts = () => {
+    acknowledgeDockDestination('Free');
     setIsFreeModalOpen(false);
     setCurrentView('freeProducts');
     window.scrollTo(0, 0);
@@ -5169,6 +5255,7 @@ const App: React.FC = () => {
   };
 
   const openReadingHub = (type: ReadingListType = 'blog') => {
+    acknowledgeDockDestination(type === 'news' ? 'News' : 'Blog');
     if (!isReadingDrawerOpenRef.current) pushReadingHistory(type, type, undefined, 1);
     else if (window.history.state?.dcOverlay === 'reading') {
       window.history.replaceState({ ...(window.history.state || {}), dcReadingView: type, dcReadingListType: type, dcReadingItemId: null, dcReadingDepth: Math.max(1, Number(window.history.state?.dcReadingDepth) || 1) }, '', window.location.href);
@@ -5672,6 +5759,7 @@ const App: React.FC = () => {
                 purchasedProducts={purchasedProducts}
                 cartCount={cartItemCount}
                 wishlistCount={wishlist.length}
+                dockBadgeCounts={dockActivity.badgeCounts}
                 activeItem={desktopSidebarActiveItem}
                 onHomeClick={handleBackToHome}
                 onOpenBlogModal={() => openReadingHub('blog')}
@@ -5701,7 +5789,7 @@ const App: React.FC = () => {
             <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={`${shouldHideMainDockOnMobile ? 'max-md:hidden' : ''} ${useDesktopSidebar ? 'lg:hidden' : ''}`}>
-                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
+                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>
             )}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />

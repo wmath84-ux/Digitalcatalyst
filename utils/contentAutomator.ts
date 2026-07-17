@@ -45,14 +45,29 @@ export interface ContentAutomationResult<TPost extends ContentPostRecord = Conte
   generatedAt: string;
 }
 
+export type ContentRetentionUnit = 'hours' | 'days';
+
+export interface ContentPurgePolicy {
+  autoPurgeEnabled: boolean;
+  retentionValue: number;
+  retentionUnit: ContentRetentionUnit;
+}
+
 export interface ContentAutomationOptions<TPost extends ContentPostRecord = ContentPostRecord> {
   now?: Date;
   idFactory?: () => TPost['id'];
   newsCount?: number;
   blogCount?: number;
+  autoPurgeEnabled?: boolean;
+  retentionValue?: number;
+  retentionUnit?: ContentRetentionUnit;
 }
 
-const THREE_DAYS_IN_MS = 72 * 60 * 60 * 1000;
+export const DEFAULT_CONTENT_PURGE_POLICY: ContentPurgePolicy = {
+  autoPurgeEnabled: false,
+  retentionValue: 30,
+  retentionUnit: 'days',
+};
 const MAX_ITEMS_PER_TYPE = 10;
 const GENERATION_BATCH_SIZE = 2;
 const DEFAULT_GENERATION_COUNTS: ContentGenerationCounts = { newsCount: 3, blogCount: 3 };
@@ -348,16 +363,49 @@ export const generateEducationalContent = async (
   return generated;
 };
 
+const normalizeRetentionValue = (value: unknown, unit: ContentRetentionUnit) => {
+  const fallback = DEFAULT_CONTENT_PURGE_POLICY.retentionValue;
+  const numeric = Number(value);
+  const rounded = Number.isFinite(numeric) ? Math.round(numeric) : fallback;
+  return unit === 'hours'
+    ? Math.min(24 * 365, Math.max(1, rounded))
+    : Math.min(3650, Math.max(1, rounded));
+};
+
+export const normalizeContentPurgePolicy = (policy: Partial<ContentPurgePolicy> = {}): ContentPurgePolicy => {
+  const retentionUnit: ContentRetentionUnit = policy.retentionUnit === 'hours' ? 'hours' : 'days';
+  return {
+    autoPurgeEnabled: policy.autoPurgeEnabled === true,
+    retentionUnit,
+    retentionValue: normalizeRetentionValue(policy.retentionValue, retentionUnit),
+  };
+};
+
+export const getExpiredContentIds = <TPost extends ContentPostRecord>(
+  posts: TPost[],
+  policy: Partial<ContentPurgePolicy> = {},
+  now = new Date(),
+): Array<TPost['id']> => {
+  const normalized = normalizeContentPurgePolicy(policy);
+  const unitMs = normalized.retentionUnit === 'hours' ? 60 * 60 * 1000 : 24 * 60 * 60 * 1000;
+  const cutoff = now.getTime() - (normalized.retentionValue * unitMs);
+
+  return (posts || [])
+    .filter(post => post.type === 'news' || post.type === 'blog')
+    .filter((post) => {
+      const timestamp = new Date(post.createdAt || post.date).getTime();
+      return Number.isFinite(timestamp) && timestamp < cutoff;
+    })
+    .map(post => post.id);
+};
+
 export const purgeExpiredContent = async <TPost extends ContentPostRecord>(
   database: ContentDatabaseAdapter<TPost>,
+  policy: Partial<ContentPurgePolicy> = {},
   now = new Date(),
 ): Promise<Array<TPost['id']>> => {
-  const cutoff = now.getTime() - THREE_DAYS_IN_MS;
   const posts = await database.listPosts();
-  const expiredIds = (posts || [])
-    .filter((post) => new Date(post.createdAt || post.date).getTime() < cutoff)
-    .map((post) => post.id);
-
+  const expiredIds = getExpiredContentIds(posts || [], policy, now);
   if (expiredIds.length > 0) await database.deletePosts(expiredIds);
   return expiredIds;
 };
@@ -369,7 +417,14 @@ export const runContentAutomation = async <TPost extends ContentPostRecord = Con
   const now = options.now || new Date();
   const counts = normalizeContentGenerationCounts({ newsCount: options.newsCount, blogCount: options.blogCount });
   const generatedPosts = await generateEducationalContent(counts);
-  const purgedIds = await purgeExpiredContent(database, now);
+  const purgePolicy = normalizeContentPurgePolicy({
+    autoPurgeEnabled: options.autoPurgeEnabled,
+    retentionValue: options.retentionValue,
+    retentionUnit: options.retentionUnit,
+  });
+  const purgedIds = purgePolicy.autoPurgeEnabled
+    ? await purgeExpiredContent(database, purgePolicy, now)
+    : [];
 
   const hydratedPosts = generatedPosts.map((post, index) => {
     const contextualCoverImage = buildContextualCoverImage(post, index);
@@ -399,5 +454,5 @@ export const runContentAutomation = async <TPost extends ContentPostRecord = Con
 
 // Cron/Firebase Function integration sketch:
 // export const dailyContentAutopilot = onSchedule('every day 06:00', async () => {
-//   await runContentAutomation(firestoreContentAdapter, { newsCount: 3, blogCount: 3 });
+//   await runContentAutomation(firestoreContentAdapter, { newsCount: 3, blogCount: 3, autoPurgeEnabled: false });
 // });

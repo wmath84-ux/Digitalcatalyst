@@ -40,7 +40,38 @@ const defaultReadingStyle = {
   panelOpacity: 96,
   cardOpacity: 94,
   accentColor: '#C2E7FF',
-  accentOpacity: 66,
+  accentOpacity: 24,
+  newsHeadingFont: 'Merriweather',
+  blogHeadingFont: 'Montserrat',
+  bodyFont: 'Lato',
+  newsHeadingColor: '#083B4C',
+  blogHeadingColor: '#3B1D5A',
+  bodyTextColor: '#334155',
+  metadataColor: '#64748B',
+  linkColor: '#1769FF',
+  quoteBackgroundColor: '#EEF6FF',
+  quoteBorderColor: '#1769FF',
+  titleSizeMobile: 38,
+  titleSizeDesktop: 64,
+  bodySizeMobile: 17,
+  bodySizeDesktop: 19,
+  lineHeight: 1.85,
+  contentWidth: 860,
+};
+
+const readingFontFamilies: Record<string, string> = {
+  Merriweather: 'Merriweather, Georgia, serif',
+  Montserrat: 'Montserrat, Inter, sans-serif',
+  Lato: 'Lato, Inter, sans-serif',
+  Inter: 'Inter, system-ui, sans-serif',
+  Roboto: 'Roboto, Arial, sans-serif',
+  Oswald: 'Oswald, Arial, sans-serif',
+};
+
+const clampReadingNumber = (value: unknown, min: number, max: number, fallback: number) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric)) return fallback;
+  return Math.min(max, Math.max(min, numeric));
 };
 
 const getPalette = (listType: ReadingListType) => {
@@ -115,12 +146,11 @@ const shouldShowPremiumLearningCta = (article: NewsArticle | null) => Boolean((a
 const stripMarkdown = (value = '') => value.replace(/[#*_`>-]/g, ' ').replace(/\s+/g, ' ').trim();
 
 const InlineMarkdown: React.FC<{ text: string; listType: ReadingListType }> = ({ text, listType }) => {
-  const palette = getPalette(listType);
   const parts = text.split(/(\*\*[^*]+\*\*)/g).filter(Boolean);
   return (
     <>
       {parts.map((part, index) => part.startsWith('**') && part.endsWith('**')
-        ? <strong key={index} className="font-black" style={{ color: palette.primaryText }}>{part.slice(2, -2)}</strong>
+        ? <strong key={index} className="font-black text-[var(--reading-heading-color)]">{part.slice(2, -2)}</strong>
         : <React.Fragment key={index}>{part}</React.Fragment>)}
     </>
   );
@@ -142,8 +172,8 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
     const current = bullets;
     bullets = [];
     nodes.push(
-      <ul key={`ul-${nodes.length}`} className="my-8 space-y-4 rounded-[1.5rem] border p-6 shadow-sm backdrop-blur-xl" style={{ backgroundColor: palette.cardSurface, borderColor: palette.cardBorder }}>
-        {current.map((item, index) => <li key={index} className="flex gap-4"><span className="mt-2 h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: palette.activeBlue }} /><span className="text-base leading-7 sm:text-lg sm:leading-8" style={{ color: palette.secondaryText }}><InlineMarkdown text={item} listType={listType} /></span></li>)}
+      <ul key={`ul-${nodes.length}`} className="reading-article-list my-8 space-y-4 rounded-[1.5rem] border p-5 shadow-sm sm:p-6" style={{ backgroundColor: palette.cardSurface, borderColor: palette.cardBorder }}>
+        {current.map((item, index) => <li key={index} className="flex gap-4"><span className="mt-[0.72em] h-2 w-2 shrink-0 rounded-full bg-[var(--reading-link-color)]" /><span><InlineMarkdown text={item} listType={listType} /></span></li>)}
       </ul>
     );
   };
@@ -153,7 +183,7 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
     const text = paragraph.join(' ').trim();
     paragraph = [];
     if (text) {
-      nodes.push(<p key={`p-${nodes.length}`} className="my-6 text-lg leading-9" style={{ color: palette.secondaryText }}><InlineMarkdown text={text} listType={listType} /></p>);
+      nodes.push(<p key={`p-${nodes.length}`} className="reading-article-paragraph my-6"><InlineMarkdown text={text} listType={listType} /></p>);
       const paragraphCount = nodes.filter(node => React.isValidElement(node) && node.type === 'p').length;
       if (includeInArticleAd && paragraphCount === 2) {
         nodes.push(
@@ -183,13 +213,23 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
     if (line.startsWith('## ')) {
       flushParagraph();
       flushBullets();
-      nodes.push(<h2 key={`h2-${nodes.length}`} className="mb-6 mt-16 text-3xl font-black tracking-tight" style={{ color: palette.primaryText }}><InlineMarkdown text={line.slice(3).trim()} listType={listType} /></h2>);
+      nodes.push(<h2 key={`h2-${nodes.length}`} className="reading-article-h2 mb-5 mt-14 font-black tracking-tight"><InlineMarkdown text={line.slice(3).trim()} listType={listType} /></h2>);
       return;
     }
     if (line.startsWith('### ')) {
       flushParagraph();
       flushBullets();
-      nodes.push(<h3 key={`h3-${nodes.length}`} className="mb-4 mt-10 text-2xl font-black" style={{ color: palette.primaryText }}><InlineMarkdown text={line.slice(4).trim()} listType={listType} /></h3>);
+      nodes.push(<h3 key={`h3-${nodes.length}`} className="reading-article-h3 mb-4 mt-9 font-black"><InlineMarkdown text={line.slice(4).trim()} listType={listType} /></h3>);
+      return;
+    }
+    if (line.startsWith('> ')) {
+      flushParagraph();
+      flushBullets();
+      nodes.push(
+        <blockquote key={`quote-${nodes.length}`} className="reading-article-quote my-8 border-l-4 px-5 py-4 sm:px-6">
+          <InlineMarkdown text={line.slice(2).trim()} listType={listType} />
+        </blockquote>
+      );
       return;
     }
     if (line.startsWith('- ')) {
@@ -249,11 +289,11 @@ const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: s
       <div className="flex flex-1 flex-col p-3 sm:p-6">
         <div className="flex min-w-0 flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
           <span className="max-w-full truncate rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] sm:px-3 sm:text-[10px] sm:tracking-[0.2em]" style={{ backgroundColor: palette.activeBlue, color: palette.primaryText }}>{badge}</span>
-          <span className="max-w-full truncate text-[9px] font-semibold sm:text-xs" style={{ color: palette.secondaryText }}>{meta}</span>
+          <span className="reading-meta max-w-full truncate text-[9px] font-semibold sm:text-xs">{meta}</span>
         </div>
-        <h3 className="mt-2 line-clamp-2 flex-1 text-[14px] font-black leading-[1.22] transition sm:mt-4 sm:text-xl sm:leading-tight" style={{ color: palette.primaryText }}>{title}</h3>
-        <p className="mt-3 hidden text-sm leading-7 sm:line-clamp-3 sm:block" style={{ color: palette.secondaryText }}>{excerpt}</p>
-        <div className="mt-3 inline-flex items-center gap-1 text-[10px] font-black sm:mt-5 sm:gap-2 sm:text-sm" style={{ color: palette.linkText }}>Read article <span className="text-lg">→</span></div>
+        <h3 className="reading-hub-heading mt-2 line-clamp-2 flex-1 text-[14px] font-black leading-[1.22] transition sm:mt-4 sm:text-xl sm:leading-tight">{title}</h3>
+        <p className="reading-hub-excerpt mt-3 hidden text-sm leading-7 sm:line-clamp-3 sm:block">{excerpt}</p>
+        <div className="mt-3 inline-flex items-center gap-1 text-[10px] font-black text-[var(--reading-link-color)] sm:mt-5 sm:gap-2 sm:text-sm">Read article <span className="text-lg">→</span></div>
       </div>
     </button>
   );
@@ -428,19 +468,42 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
   const storedReadingStyle = ((settings.content as any).readingStyle || {}) as Partial<typeof defaultReadingStyle>;
   const readingStyle = {
     ...defaultReadingStyle,
-    cardOpacity: storedReadingStyle.cardOpacity ?? defaultReadingStyle.cardOpacity,
-    backgroundColor: defaultReadingStyle.backgroundColor,
-    backgroundOpacity: defaultReadingStyle.backgroundOpacity,
-    panelOpacity: defaultReadingStyle.panelOpacity,
-    accentColor: defaultReadingStyle.accentColor,
-    accentOpacity: defaultReadingStyle.accentOpacity,
+    ...storedReadingStyle,
+    backgroundOpacity: clampPercent(storedReadingStyle.backgroundOpacity, defaultReadingStyle.backgroundOpacity),
+    panelOpacity: clampPercent(storedReadingStyle.panelOpacity, defaultReadingStyle.panelOpacity),
+    cardOpacity: clampPercent(storedReadingStyle.cardOpacity, defaultReadingStyle.cardOpacity),
+    accentOpacity: clampPercent(storedReadingStyle.accentOpacity, defaultReadingStyle.accentOpacity),
+    titleSizeMobile: clampReadingNumber(storedReadingStyle.titleSizeMobile, 30, 56, defaultReadingStyle.titleSizeMobile),
+    titleSizeDesktop: clampReadingNumber(storedReadingStyle.titleSizeDesktop, 44, 84, defaultReadingStyle.titleSizeDesktop),
+    bodySizeMobile: clampReadingNumber(storedReadingStyle.bodySizeMobile, 15, 22, defaultReadingStyle.bodySizeMobile),
+    bodySizeDesktop: clampReadingNumber(storedReadingStyle.bodySizeDesktop, 16, 25, defaultReadingStyle.bodySizeDesktop),
+    lineHeight: clampReadingNumber(storedReadingStyle.lineHeight, 1.45, 2.2, defaultReadingStyle.lineHeight),
+    contentWidth: clampReadingNumber(storedReadingStyle.contentWidth, 680, 1080, defaultReadingStyle.contentWidth),
   };
-  const themedExperience = settings.theme.colorExperience !== 'original';
-  const readingBackground = themedExperience ? chatPalette.appCanvas : hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity);
-  const panelBackground = themedExperience ? chatPalette.searchBlue : hexToRgba(readingStyle.backgroundColor, readingStyle.panelOpacity);
-  const cardBackground = themedExperience ? chatPalette.cardSurface : `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;
-  const accentSoftBackground = themedExperience ? chatPalette.activeBlue : hexToRgba(readingStyle.accentColor, readingStyle.accentOpacity, defaultReadingStyle.accentColor);
-  const accentStrongBackground = themedExperience ? chatPalette.linkText : hexToRgba(readingStyle.accentColor, 92, defaultReadingStyle.accentColor);
+  const readingBackground = hexToRgba(readingStyle.backgroundColor, readingStyle.backgroundOpacity);
+  const panelBackground = hexToRgba(readingStyle.backgroundColor, readingStyle.panelOpacity);
+  const cardBackground = `rgba(255, 255, 255, ${readingStyle.cardOpacity / 100})`;
+  const accentSoftBackground = hexToRgba(readingStyle.accentColor, readingStyle.accentOpacity, defaultReadingStyle.accentColor);
+  const accentStrongBackground = hexToRgba(readingStyle.accentColor, 92, defaultReadingStyle.accentColor);
+  const readingHeadingFont = readingFontFamilies[listType === 'news' ? readingStyle.newsHeadingFont : readingStyle.blogHeadingFont] || readingFontFamilies.Merriweather;
+  const readingBodyFont = readingFontFamilies[readingStyle.bodyFont] || readingFontFamilies.Lato;
+  const readingHeadingColor = listType === 'news' ? readingStyle.newsHeadingColor : readingStyle.blogHeadingColor;
+  const readingCssVariables = {
+    '--reading-heading-font': readingHeadingFont,
+    '--reading-body-font': readingBodyFont,
+    '--reading-heading-color': readingHeadingColor,
+    '--reading-body-color': readingStyle.bodyTextColor,
+    '--reading-meta-color': readingStyle.metadataColor,
+    '--reading-link-color': readingStyle.linkColor,
+    '--reading-quote-background': readingStyle.quoteBackgroundColor,
+    '--reading-quote-border': readingStyle.quoteBorderColor,
+    '--reading-title-mobile': `${readingStyle.titleSizeMobile}px`,
+    '--reading-title-desktop': `${readingStyle.titleSizeDesktop}px`,
+    '--reading-body-mobile': `${readingStyle.bodySizeMobile}px`,
+    '--reading-body-desktop': `${readingStyle.bodySizeDesktop}px`,
+    '--reading-line-height': String(readingStyle.lineHeight),
+    '--reading-content-width': `${readingStyle.contentWidth}px`,
+  } as React.CSSProperties;
 
   const handleOverlayPointerDownCapture = (event: React.PointerEvent<HTMLDivElement>) => {
     const target = event.target as HTMLElement | null;
@@ -482,8 +545,25 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
           data-reading-drawer-panel="true"
           onPointerDown={(event) => event.stopPropagation()}
           className="relative h-full w-full overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw] pointer-events-auto"
-          style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder }}
+          style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder, ...readingCssVariables }}
         >
+          <style>{`
+            .reading-article-title, .reading-article-h2, .reading-article-h3 { font-family: var(--reading-heading-font); color: var(--reading-heading-color); }
+            .reading-article-title { font-size: clamp(var(--reading-title-mobile), 8vw, var(--reading-title-desktop)); line-height: 1.08; text-wrap: balance; }
+            .reading-article-deck { font-family: var(--reading-body-font); color: var(--reading-body-color); font-size: clamp(calc(var(--reading-body-mobile) + 1px), 2.4vw, calc(var(--reading-body-desktop) + 2px)); line-height: 1.65; }
+            .reading-article-content, .reading-article-body, .reading-rich-html { font-family: var(--reading-body-font); color: var(--reading-body-color); font-size: clamp(var(--reading-body-mobile), 2vw, var(--reading-body-desktop)); line-height: var(--reading-line-height); }
+            .reading-article-content { max-width: var(--reading-content-width); }
+            .reading-article-h2, .reading-rich-html h2 { font-size: clamp(1.65rem, 4vw, 2.25rem); line-height: 1.2; }
+            .reading-article-h3, .reading-rich-html h3 { font-size: clamp(1.3rem, 3vw, 1.75rem); line-height: 1.3; }
+            .reading-article-paragraph, .reading-rich-html p { margin-block: 1.35em; }
+            .reading-article-list { font-family: var(--reading-body-font); color: var(--reading-body-color); font-size: inherit; line-height: var(--reading-line-height); }
+            .reading-article-quote, .reading-rich-html blockquote { background: var(--reading-quote-background); border-color: var(--reading-quote-border); color: var(--reading-body-color); font-family: var(--reading-heading-font); font-style: italic; line-height: 1.75; }
+            .reading-rich-html h1, .reading-rich-html h2, .reading-rich-html h3, .reading-rich-html h4, .reading-rich-html strong { font-family: var(--reading-heading-font); color: var(--reading-heading-color); }
+            .reading-rich-html a, .reading-article-body a { color: var(--reading-link-color); font-weight: 800; text-decoration: underline; text-underline-offset: 0.22em; }
+            .reading-meta { color: var(--reading-meta-color) !important; }
+            .reading-hub-heading { font-family: var(--reading-heading-font); color: var(--reading-heading-color); }
+            .reading-hub-excerpt { font-family: var(--reading-body-font); color: var(--reading-body-color); }
+          `}</style>
           <div className="sticky top-0 z-30 h-1" style={{ backgroundColor: chatPalette.cardSurface }}>
             <div className="h-full rounded-r-full shadow-sm transition-all duration-150" style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${chatPalette.gradientStart}, ${chatPalette.gradientEnd})` }} />
           </div>
@@ -526,9 +606,9 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
               {(view === 'news' || view === 'blog') && (
                 <div className="mx-auto max-w-7xl">
                   <div className="mb-10 max-w-3xl">
-                    <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>{listType === 'news' ? 'News Desk' : 'Learning Blog'}</p>
-                    <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl" style={{ color: chatPalette.primaryText }}>{listTitle}</h1>
-                    <p className="mt-5 text-lg leading-8" style={{ color: chatPalette.secondaryText }}>{listDescription}</p>
+                    <p className="reading-meta text-xs font-black uppercase tracking-[0.35em]">{listType === 'news' ? 'News Desk' : 'Learning Blog'}</p>
+                    <h1 className="reading-article-title mt-3 font-black tracking-tight">{listTitle}</h1>
+                    <p className="reading-article-deck mt-5">{listDescription}</p>
                     <div className="mt-6 flex flex-wrap gap-3">
                       {['Comfort reading', 'Fresh insights', 'Calm layout'].map((label) => (
                         <span key={label} className="rounded-full border px-4 py-2 text-xs font-black uppercase tracking-[0.22em] shadow-sm" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>{label}</span>
@@ -568,9 +648,9 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                 <article className="mx-auto max-w-6xl">
                   <div className="grid gap-8 lg:grid-cols-[minmax(0,1fr)_420px] lg:items-start">
                     <div className="min-w-0">
-                      <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>{selectedArticleForDisplay.category}</p>
-                      <h1 className="mt-3 text-4xl font-black tracking-tight sm:text-6xl lg:text-7xl" style={{ color: chatPalette.primaryText }}>{selectedArticleForDisplay.title}</h1>
-                      <p className="mt-5 text-lg leading-8 sm:text-xl lg:max-w-3xl" style={{ color: chatPalette.secondaryText }}>{selectedArticleForDisplay.excerpt}</p>
+                      <p className="reading-meta text-xs font-black uppercase tracking-[0.35em]">{selectedArticleForDisplay.category}</p>
+                      <h1 className="reading-article-title mt-3 font-black tracking-tight">{selectedArticleForDisplay.title}</h1>
+                      <p className="reading-article-deck mt-5 lg:max-w-3xl">{selectedArticleForDisplay.excerpt}</p>
                       <div className="mt-6 flex flex-wrap gap-2 rounded-[1.5rem] border p-3 text-xs font-bold shadow-sm backdrop-blur-xl sm:gap-3 sm:p-4 sm:text-sm" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>
                         <span>📖 Focus-friendly article</span>
                         <span>•</span>
@@ -606,7 +686,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                       <div className="mb-6 mt-8 aspect-video overflow-hidden rounded-2xl border shadow-sm backdrop-blur-2xl lg:hidden" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
                         <SafeImage src={getArticleImage(selectedArticleForDisplay, '1400/800')} fallbackSrc={buildArticleImageFallback(selectedArticleForDisplay)} alt={selectedArticleForDisplay.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" fallbackTitle={selectedArticleForDisplay.title} fallbackBadge={selectedArticleForDisplay.type === 'news' ? 'News' : selectedArticleForDisplay.category || 'Blog'} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
                       </div>
-                      <div className="mx-auto mt-8 max-w-4xl rounded-[2rem] border p-6 text-lg leading-9 shadow-[0_18px_50px_rgba(60,64,67,0.08)] backdrop-blur-2xl sm:p-8 lg:mt-10" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
+                      <div className="reading-article-content reading-article-body mx-auto mt-8 rounded-[2rem] border p-6 shadow-[0_18px_50px_rgba(60,64,67,0.08)] sm:p-8 lg:mt-10" style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }}>
                         <MarkdownContent
                           content={selectedArticleContent}
                           includeInArticleAd
@@ -632,10 +712,10 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
               )}
 
               {view === 'announcement' && selectedAnnouncement && (
-                <article className="mx-auto max-w-3xl">
-                  <p className="text-xs font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>Official Announcement</p>
-                  <h1 className="mt-4 text-4xl font-black tracking-tight sm:text-6xl" style={{ color: chatPalette.primaryText }}>{selectedAnnouncement.title}</h1>
-                  <div className="mt-12 space-y-7 rounded-[2rem] border p-6 text-lg leading-9 shadow-sm backdrop-blur-2xl sm:p-8" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
+                <article className="mx-auto max-w-6xl">
+                  <p className="reading-meta text-xs font-black uppercase tracking-[0.35em]">Official Announcement</p>
+                  <h1 className="reading-article-title mt-4 font-black tracking-tight">{selectedAnnouncement.title}</h1>
+                  <div className="reading-article-content reading-article-body mx-auto mt-12 space-y-7 rounded-[2rem] border p-6 shadow-sm sm:p-8" style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }}>
                     {selectedAnnouncement.content.split('\n').filter(Boolean).map((paragraph, index) => (
                       <React.Fragment key={index}>
                         {index === 1 && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} listType={listType} />}

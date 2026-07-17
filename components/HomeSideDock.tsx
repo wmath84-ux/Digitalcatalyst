@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import type { ProductWithRating, WebsiteSettings } from '../App';
+import type { DockCountDestination } from '../utils/dockNewContent';
 import { defaultDockStyle, dockCustomizationItems } from './BottomGlassDock';
 
 interface HomeSideDockProps {
@@ -7,6 +8,7 @@ interface HomeSideDockProps {
   purchasedProducts: ProductWithRating[];
   cartCount: number;
   wishlistCount: number;
+  dockBadgeCounts?: Partial<Record<DockCountDestination, number>>;
   onHomeClick: () => void;
   onOpenBlogModal: () => void;
   onOpenFreeModal: () => void;
@@ -57,12 +59,13 @@ const clampPercent = (value: unknown, fallback: number) => {
   return Math.min(100, Math.max(0, number));
 };
 
-const HomeSideDock: React.FC<HomeSideDockProps> = ({
+const HomeSideDock = ({
   settings,
   isLoggedIn,
   purchasedProducts,
   cartCount,
   wishlistCount,
+  dockBadgeCounts = {},
   onHomeClick,
   onOpenBlogModal,
   onOpenFreeModal,
@@ -76,7 +79,7 @@ const HomeSideDock: React.FC<HomeSideDockProps> = ({
   onOpenCommunity,
   authButtonLabel,
   activeItem = '',
-}) => {
+}: HomeSideDockProps) => {
   const [sidebarState, setSidebarState] = useState<SidebarState>(readInitialState);
   const [hoverExpanded, setHoverExpanded] = useState(false);
 
@@ -122,16 +125,16 @@ const HomeSideDock: React.FC<HomeSideDockProps> = ({
 
   const defaultItems: NavigationItem[] = [
     { id: 'Home', label: 'Home', action: onHomeClick, icon: '🏠', badge: null },
-    { id: 'Store', label: 'Store', action: onNavigateToAllProducts, icon: '🛍️', badge: null },
-    { id: 'Purchased', label: 'Purchased', action: onNavigateToPurchases, icon: '📚', badge: purchasedProducts.length || null },
-    { id: 'Wishlist', label: 'Wishlist', action: onNavigateToWishlist, icon: '❤️', badge: wishlistCount || null },
-    { id: 'Cart', label: 'Cart', action: onCartClick, icon: '🛒', badge: cartCount || null },
-    { id: 'News', label: 'News', action: onOpenAnnouncementsModal, icon: '📢', badge: null },
+    { id: 'Store', label: 'Store', action: onNavigateToAllProducts, icon: '🛍️', badge: dockBadgeCounts.Store || null },
+    { id: 'Purchased', label: 'Purchased', action: onNavigateToPurchases, icon: '📚', badge: (dockBadgeCounts.Purchased ?? purchasedProducts.length) || null },
+    { id: 'Wishlist', label: 'Wishlist', action: onNavigateToWishlist, icon: '❤️', badge: (dockBadgeCounts.Wishlist ?? wishlistCount) || null },
+    { id: 'Cart', label: 'Cart', action: onCartClick, icon: '🛒', badge: (dockBadgeCounts.Cart ?? cartCount) || null },
+    { id: 'News', label: 'News', action: onOpenAnnouncementsModal, icon: '📢', badge: dockBadgeCounts.News || null },
     ...(onOpenCommunity
       ? [{ id: 'Community', label: 'Community', action: onOpenCommunity, icon: '💬', badge: null }]
       : []),
-    { id: 'Blog', label: 'Blog', action: onOpenBlogModal, icon: '📝', badge: null },
-    { id: 'Free', label: 'Free', action: onOpenFreeModal, icon: '🎁', badge: null },
+    { id: 'Blog', label: 'Blog', action: onOpenBlogModal, icon: '📝', badge: dockBadgeCounts.Blog || null },
+    { id: 'Free', label: 'Free', action: onOpenFreeModal, icon: '🎁', badge: dockBadgeCounts.Free || null },
     profileItem,
     { id: 'Subscriptions', label: 'Subscriptions', action: onSubscriptionClick, icon: '💎', badge: null },
   ];
@@ -321,7 +324,7 @@ const HomeSideDock: React.FC<HomeSideDockProps> = ({
                         : 'absolute -right-0.5 -top-0.5'
                     } inline-flex min-w-5 items-center justify-center rounded-full border border-white bg-[#1769FF] px-1.5 py-0.5 text-[10px] font-black leading-none text-white shadow-sm`}
                   >
-                    {item.badge}
+                    {item.badge > 99 ? '99+' : item.badge}
                   </span>
                 ) : null}
               </button>
