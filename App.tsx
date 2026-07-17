@@ -708,12 +708,28 @@ export interface WebsiteSettings {
         dockStyle?: {
             backgroundColor: string;
             backgroundOpacity: number;
+            itemColor?: string;
             itemOpacity: number;
+            accentColor?: string;
             accentOpacity: number;
+            textColor?: string;
+            borderColor?: string;
             height?: number;
             iconSize?: number;
             labelSize?: number;
             padding?: number;
+            gap?: number;
+            radius?: number;
+            itemRadius?: number;
+            bottomOffset?: number;
+            blur?: number;
+            shadowStrength?: 'none' | 'soft' | 'strong';
+            showLabels?: boolean;
+            showBadges?: boolean;
+            autoHideOnScroll?: boolean;
+            mobileEnabled?: boolean;
+            desktopExpandedWidth?: number;
+            desktopCollapsedWidth?: number;
         };
         readingStyle?: {
             backgroundColor: string;
@@ -932,12 +948,28 @@ const defaultWebsiteSettings: WebsiteSettings = {
         dockStyle: {
             backgroundColor: '#FBFDFF',
             backgroundOpacity: 92,
+            itemColor: '#FFFFFF',
             itemOpacity: 96,
+            accentColor: '#1769FF',
             accentOpacity: 22,
+            textColor: '#334155',
+            borderColor: '#BFD7FF',
             height: 76,
             iconSize: 36,
             labelSize: 11,
             padding: 12,
+            gap: 8,
+            radius: 24,
+            itemRadius: 16,
+            bottomOffset: 8,
+            blur: 24,
+            shadowStrength: 'soft',
+            showLabels: true,
+            showBadges: true,
+            autoHideOnScroll: false,
+            mobileEnabled: true,
+            desktopExpandedWidth: 320,
+            desktopCollapsedWidth: 88,
         },
         communityStyle: {
             desktopLayout: 'latest',
@@ -5619,6 +5651,7 @@ const App: React.FC = () => {
 
   const shouldHideFooterOnMobile = Boolean(websiteSettings.mobile?.hideFooter);
   const shouldHideMainDockOnMobile =
+    (websiteSettings.content.dockStyle?.mobileEnabled === false) ||
     currentView !== 'home' ||
     isCartOpen ||
     isReadingDrawerOpen ||
@@ -5789,7 +5822,7 @@ const App: React.FC = () => {
             <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={`${shouldHideMainDockOnMobile ? 'max-md:hidden' : ''} ${useDesktopSidebar ? 'lg:hidden' : ''}`}>
-                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
+                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>
             )}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />

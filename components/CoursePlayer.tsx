@@ -1016,8 +1016,31 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
 const HostedDocumentViewer: React.FC<{ file: ProductFile }> = ({ file }) => {
   const previewUrl = getHostedDocsPreviewUrl(file);
   const isDrive = file.provider === 'google_drive_pdf' || file.provider === 'google_drive_doc' || isGoogleDriveUrl(file.url);
-  const fallbackLabel = isDrive ? 'Open in Google Drive' : file.type === 'pdf' || file.provider === 'direct_pdf' ? 'Open PDF' : 'Open in new tab';
+  const fallbackLabel = isDrive ? 'Open Drive' : file.type === 'pdf' || file.provider === 'direct_pdf' ? 'Open PDF' : 'Open in new tab';
   const badge = isDrive ? 'Google Drive Preview' : file.type === 'pdf' || file.provider === 'direct_pdf' ? 'PDF Viewer' : 'Hosted Docs';
+  const [isDriveInterfaceOpen, setIsDriveInterfaceOpen] = useState(false);
+
+  useEffect(() => {
+    if (!isDriveInterfaceOpen || typeof document === 'undefined') return;
+
+    const previousOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    const closeOnEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsDriveInterfaceOpen(false);
+    };
+    window.addEventListener('keydown', closeOnEscape);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', closeOnEscape);
+    };
+  }, [isDriveInterfaceOpen]);
+
+  const openExternalDocument = () => {
+    const target = file.url || previewUrl;
+    if (!target || typeof window === 'undefined') return;
+    window.open(target, '_blank', 'noopener,noreferrer');
+  };
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col bg-white/70 text-slate-900">
@@ -1025,24 +1048,56 @@ const HostedDocumentViewer: React.FC<{ file: ProductFile }> = ({ file }) => {
         <div className="min-w-0">
           <p className="text-xs font-black uppercase tracking-[0.25em] text-cyan-700">{badge}</p>
           <h2 className="truncate text-lg font-black text-slate-900 sm:text-2xl">{file.name}</h2>
-          {isDrive && <p className="mt-1 text-xs font-bold text-amber-700">If preview is blocked, make sure Google Drive sharing is set to Anyone with the link.</p>}
+          {isDrive && <p className="mt-1 text-xs font-bold text-amber-700">Normal preview keeps pinch zoom locked. Use Open Drive for the interactive zoom-enabled Drive interface.</p>}
         </div>
-        <a href={file.url || previewUrl} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-2xl bg-cyan-100 px-5 py-3 text-sm font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50">
-          {fallbackLabel}
-        </a>
+        {isDrive ? (
+          <button type="button" onClick={() => setIsDriveInterfaceOpen(true)} className="shrink-0 rounded-xl border border-cyan-200 bg-cyan-100 px-5 py-3 text-sm font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50 focus:outline-none focus:ring-4 focus:ring-cyan-200/60">
+            {fallbackLabel}
+          </button>
+        ) : (
+          <button type="button" onClick={openExternalDocument} className="shrink-0 rounded-xl border border-cyan-200 bg-cyan-100 px-5 py-3 text-sm font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50 focus:outline-none focus:ring-4 focus:ring-cyan-200/60">
+            {fallbackLabel}
+          </button>
+        )}
       </div>
-      <div className="min-h-0 flex-1 bg-slate-100/70 p-2 sm:p-4">
+      <div className="course-hosted-document-stage min-h-0 flex-1 bg-slate-100/70 p-2 [touch-action:pan-x_pan-y] sm:p-4" data-pinch-zoom="disabled">
         {previewUrl ? (
           <iframe
             title={file.name || 'Document preview'}
             src={previewUrl}
-            className="h-full w-full rounded-[1.5rem] border border-white/70 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)]"
+            className="course-hosted-document-frame h-full w-full rounded-[1.5rem] border border-white/70 bg-white shadow-[0_8px_30px_rgb(0,0,0,0.04)] [touch-action:pan-x_pan-y]"
+            style={{ touchAction: 'pan-x pan-y', overscrollBehavior: 'contain' }}
             allow="fullscreen"
+            data-pinch-zoom="disabled"
           />
         ) : (
           <GlassDownloadCard file={file} headline="Document preview unavailable" />
         )}
       </div>
+
+      {isDrive && isDriveInterfaceOpen && previewUrl && (
+        <div className="fixed inset-0 z-[2600] flex min-h-0 flex-col bg-slate-950/95 text-white" role="dialog" aria-modal="true" aria-label={`Interactive Drive interface for ${file.name}`}>
+          <header className="flex shrink-0 items-center gap-3 border-b border-white/15 bg-slate-950 px-3 py-3 sm:px-5">
+            <div className="min-w-0 flex-1">
+              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-cyan-300">Interactive Drive mode · pinch zoom enabled</p>
+              <h3 className="truncate text-sm font-black sm:text-lg">{file.name}</h3>
+            </div>
+            <button type="button" onClick={openExternalDocument} className="hidden rounded-lg border border-white/20 bg-white/10 px-4 py-2 text-xs font-black hover:bg-white/15 sm:inline-flex">Open new tab</button>
+            <button type="button" onClick={() => setIsDriveInterfaceOpen(false)} className="rounded-lg border border-white/20 bg-white px-4 py-2 text-xs font-black text-slate-950 hover:bg-cyan-100" aria-label="Close interactive Drive interface">Close</button>
+          </header>
+          <div className="min-h-0 flex-1 bg-white" data-pinch-zoom="enabled">
+            <iframe
+              title={`Interactive Drive: ${file.name || 'Document'}`}
+              src={previewUrl}
+              className="h-full w-full border-0 bg-white [touch-action:auto]"
+              style={{ touchAction: 'auto', overscrollBehavior: 'auto' }}
+              allow="fullscreen"
+              allowFullScreen
+              data-pinch-zoom="enabled"
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 };

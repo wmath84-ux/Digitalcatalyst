@@ -13,8 +13,6 @@ import {
     SubscriptionPageContent,
     SubscriptionPlanConfig,
 } from '../../utils/subscriptionAccess';
-import { DEFAULT_PRODUCT_ROUNDNESS_SETTINGS, productRoundnessModeLabel } from '../../utils/productRoundness';
-import type { ProductRoundnessKey } from '../../utils/productRoundness';
 
 const sectionNames: Record<HomepageSection['id'], string> = {
     hero: 'Hero Section',
@@ -32,8 +30,8 @@ const sectionNames: Record<HomepageSection['id'], string> = {
 const TabButton: React.FC<{ label: string, isActive: boolean, onClick: () => void }> = ({ label, isActive, onClick }) => (
     <button
         onClick={onClick}
-        className={`py-2 px-4 font-semibold text-sm rounded-lg transition-colors whitespace-nowrap ${
-            isActive ? 'bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'bg-gray-200 text-gray-600 hover:bg-gray-300'
+        className={`border-b-2 px-4 py-2.5 text-sm font-black whitespace-nowrap transition-colors ${
+            isActive ? 'border-blue-600 bg-white text-blue-700' : 'border-transparent bg-transparent text-slate-600 hover:border-slate-300 hover:text-slate-950'
         }`}
     >
         {label}
@@ -292,23 +290,12 @@ const metricLabels: Record<string, string> = {
 const getRewardStatus = (reward: { active?: boolean; draft?: boolean; archived?: boolean }) => reward.archived ? 'Archived' : reward.draft ? 'Draft' : reward.active === false ? 'Disabled' : 'Active';
 const statusClass = (status: string) => status === 'Active' ? 'bg-emerald-100 text-emerald-700' : status === 'Draft' ? 'bg-amber-100 text-amber-700' : status === 'Archived' ? 'bg-slate-200 text-slate-600' : 'bg-rose-100 text-rose-700';
 
-const productRoundnessControls: Array<{ key: ProductRoundnessKey; label: string; description: string }> = [
-    { key: 'storeCards', label: 'Store product cards', description: 'All Products / Store page card outer corners.' },
-    { key: 'homeFeaturedCards', label: 'Home featured/top-rated cards', description: 'Website home featured sections that use ProductCard.' },
-    { key: 'homePreviewCards', label: 'Mobile home preview cards', description: 'Mobile Top Rated and All Products preview card surfaces.' },
-    { key: 'wishlistCards', label: 'Wishlist product cards', description: 'Wishlist/Favourites product cards.' },
-    { key: 'productDetailPanels', label: 'Product detail panels', description: 'Product detail gallery, info and checkout panels.' },
-    { key: 'myPurchasesCards', label: 'My Purchases cards', description: 'Purchased product library cards and mobile continue-learning cards.' },
-    { key: 'mediaInnerFrame', label: 'Product media inner frame', description: 'The safe image frame inside Store/Home/Wishlist product cards.' },
-    { key: 'productBadges', label: 'Product badges and chips', description: 'Purchased, free, sale, category and small product chips.' },
-    { key: 'productActionButtons', label: 'Product action buttons', description: 'View, Details, Access Files, checkout and product action buttons.' },
-];
 
 
 
-type WebsiteSettingsTab = 'theme' | 'roundness' | 'layout' | 'content' | 'subscriptions' | 'reading' | 'profile' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations';
+type WebsiteSettingsTab = 'theme' | 'layout' | 'content' | 'subscriptions' | 'reading' | 'profile' | 'community' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations';
 const WEBSITE_SETTINGS_TAB_KEY = 'eduvora.storeConfigTab.v1';
-const WEBSITE_SETTINGS_TABS: WebsiteSettingsTab[] = ['theme', 'roundness', 'layout', 'content', 'subscriptions', 'reading', 'profile', 'dock', 'announcements', 'services', 'faq', 'upcoming', 'features', 'animations'];
+const WEBSITE_SETTINGS_TABS: WebsiteSettingsTab[] = ['theme', 'layout', 'content', 'subscriptions', 'reading', 'profile', 'community', 'dock', 'announcements', 'services', 'faq', 'upcoming', 'features', 'animations'];
 
 const readInitialWebsiteSettingsTab = (): WebsiteSettingsTab => {
     if (typeof window === 'undefined') return 'theme';
@@ -384,7 +371,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const redeemRewards = (((localSettings.content as any).redeemRewards || []) as EditableReward[]);
     const eduCoinRules = ((localSettings.content as any).eduCoinRules || { purchase: 25, redeemRate: 10 }) as { purchase: number; redeemRate: number };
     const dockItems = (((localSettings.content as any).dockItems || []) as string[]);
-    const dockStyle = { backgroundColor: '#FBFDFF', backgroundOpacity: 92, itemOpacity: 96, accentOpacity: 22, height: 76, iconSize: 36, labelSize: 11, padding: 12, ...((localSettings.content as any).dockStyle || {}) };
+    const dockStyle = { ...defaultDockStyle, ...((localSettings.content as any).dockStyle || {}) };
     const desktopNavigationMode = localSettings.desktop?.navigationMode === 'dock' ? 'dock' : 'sidebar';
     const communityStyle = {
         desktopLayout: 'latest',
@@ -423,7 +410,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         ...((localSettings.content as any).readingStyle || {})
     };
     const readingFontMap: Record<string, string> = { Merriweather: 'Merriweather, Georgia, serif', Montserrat: 'Montserrat, Inter, sans-serif', Lato: 'Lato, Inter, sans-serif', Inter: 'Inter, sans-serif', Roboto: 'Roboto, Arial, sans-serif', Oswald: 'Oswald, Arial, sans-serif' };
-    const productRoundness = { ...DEFAULT_PRODUCT_ROUNDNESS_SETTINGS, ...(((localSettings.content as any).productRoundness || {}) as Partial<Record<ProductRoundnessKey, boolean>>) };
     const profileStyle = { backgroundColor: '#e2e8f0', backgroundTint: '#e0e7ff', cardOpacity: 82, heroOverlayOpacity: 76, accentColor: '#f97316', ...((localSettings.content as any).profileStyle || {}) };
     const profileStreaks = (((localSettings.content as any).profileStreaks || []) as ProfileStreakConfig[]);
     const profileMilestones = (((localSettings.content as any).profileMilestones || []) as ProfileMilestoneConfig[]);
@@ -509,13 +495,22 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     };
 
     const toggleDockItem = (label: string) => {
+        if (label === 'Home') return;
         const nextItems = selectedDockItems.includes(label)
             ? selectedDockItems.filter(item => item !== label)
             : [...selectedDockItems, label];
+        updateContentValue('dockItems', nextItems.includes('Home') ? nextItems : ['Home', ...nextItems]);
+    };
+
+    const moveDockItem = (index: number, direction: -1 | 1) => {
+        const nextIndex = index + direction;
+        if (index <= 0 || nextIndex <= 0 || nextIndex >= selectedDockItems.length) return;
+        const nextItems = [...selectedDockItems];
+        [nextItems[index], nextItems[nextIndex]] = [nextItems[nextIndex], nextItems[index]];
         updateContentValue('dockItems', nextItems);
     };
 
-    const updateDockStyle = (field: string, value: string | number) => {
+    const updateDockStyle = (field: string, value: string | number | boolean) => {
         updateContentValue('dockStyle', { ...dockStyle, [field]: value });
     };
 
@@ -527,14 +522,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         updateContentValue('readingStyle', { ...readingStyle, [field]: value });
     };
 
-    const updateProductRoundness = (field: ProductRoundnessKey, value: boolean) => {
-        updateContentValue('productRoundness', { ...productRoundness, [field]: value });
-    };
-
-    const setAllProductRoundness = (value: boolean) => {
-        const next = productRoundnessControls.reduce((acc, item) => ({ ...acc, [item.key]: value }), {} as Record<ProductRoundnessKey, boolean>);
-        updateContentValue('productRoundness', next);
-    };
 
 
 
@@ -746,53 +733,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             </button>
                         </div>
                     </section>
-                </div>
-            );
-            case 'roundness': return (
-                <div className="space-y-5">
-                    <div className="rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-indigo-50 p-5">
-                        <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">Product UI controls</p>
-                        <h2 className="mt-2 text-2xl font-black text-slate-900">Round effect by exact surface</h2>
-                        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Each row has separate buttons. Choose Round where you want the premium soft look, or Default where you want the simpler original/sharper style. Click Save Changes after editing.</p>
-                        <div className="mt-4 flex flex-wrap gap-2">
-                            <button type="button" onClick={() => setAllProductRoundness(true)} className="rounded-full bg-blue-600 px-4 py-2 text-sm font-black text-white">Set all Round</button>
-                            <button type="button" onClick={() => setAllProductRoundness(false)} className="rounded-full border border-slate-300 bg-white px-4 py-2 text-sm font-black text-slate-700">Set all Default</button>
-                        </div>
-                    </div>
-                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                        {productRoundnessControls.map(control => {
-                            const enabled = productRoundness[control.key] !== false;
-                            return (
-                                <div key={control.key} className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-                                    <div className="flex min-h-20 flex-col justify-between gap-2">
-                                        <div>
-                                            <h3 className="text-base font-black text-slate-900">{control.label}</h3>
-                                            <p className="mt-1 text-xs font-semibold leading-5 text-slate-500">{control.description}</p>
-                                        </div>
-                                        <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-400">Current: {productRoundnessModeLabel(enabled)}</p>
-                                    </div>
-                                    <div className="mt-4 grid grid-cols-2 overflow-hidden rounded-xl border border-slate-200 bg-slate-50 p-1">
-                                        <button
-                                            type="button"
-                                            aria-pressed={enabled}
-                                            onClick={() => updateProductRoundness(control.key, true)}
-                                            className={`rounded-lg px-3 py-2 text-sm font-black transition ${enabled ? 'bg-blue-600 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
-                                        >
-                                            Round
-                                        </button>
-                                        <button
-                                            type="button"
-                                            aria-pressed={!enabled}
-                                            onClick={() => updateProductRoundness(control.key, false)}
-                                            className={`rounded-lg px-3 py-2 text-sm font-black transition ${!enabled ? 'bg-slate-900 text-white shadow-sm' : 'text-slate-600 hover:bg-white'}`}
-                                        >
-                                            Default
-                                        </button>
-                                    </div>
-                                </div>
-                            );
-                        })}
-                    </div>
                 </div>
             );
             case 'layout': return (
@@ -1190,163 +1130,144 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                     </div>
                 </div>
             );
-            case 'dock': return (
+            case 'community': return (
                 <div className="space-y-5">
-                    <div className="rounded-[1.5rem] border border-slate-200 bg-gradient-to-br from-[#F4F9FA] via-white to-[#EEF4FF] p-5 shadow-sm">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">Community desktop experience</p>
-                                <h4 className="mt-1 text-lg font-black text-slate-900">Use latest clean Community UX</h4>
-                                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">Latest is the default. Turn this switch off and save to restore the preserved classic desktop layout. Mobile Community layout and behaviour remain unchanged.</p>
-                            </div>
-                            <label className="relative inline-flex cursor-pointer items-center gap-3">
-                                <input type="checkbox" className="peer sr-only" checked={latestDesktopCommunityLayout} onChange={e => updateCommunityStyle('desktopLayout', e.target.checked ? 'latest' : 'classic')} />
-                                <span className="relative h-8 w-14 rounded-full bg-slate-300 transition peer-checked:bg-blue-600 after:absolute after:left-1 after:top-1 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow-md after:transition-transform peer-checked:after:translate-x-6" />
-                                <span className="min-w-[4.5rem] text-sm font-black text-slate-700">{latestDesktopCommunityLayout ? 'Latest' : 'Classic'}</span>
+                    <section className="border border-slate-300 bg-white p-5">
+                        <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Community workspace</p>
+                        <h2 className="mt-1 text-2xl font-black text-slate-950">Desktop layouts and Community colors</h2>
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Community controls now live here instead of being mixed into Dock Settings.</p>
+                        <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                            <label className="flex items-center justify-between gap-4 border border-slate-200 bg-slate-50 p-4">
+                                <span><span className="block font-black text-slate-900">Latest clean desktop UX</span><span className="mt-1 block text-xs leading-5 text-slate-600">Turn off to use the preserved classic layout.</span></span>
+                                <input type="checkbox" checked={latestDesktopCommunityLayout} onChange={e => updateCommunityStyle('desktopLayout', e.target.checked ? 'latest' : 'classic')} className="h-5 w-5" />
+                            </label>
+                            <label className="flex items-center justify-between gap-4 border border-slate-200 bg-slate-50 p-4">
+                                <span><span className="block font-black text-slate-900">Social workspace layout</span><span className="mt-1 block text-xs leading-5 text-slate-600">Enable the three-column social desktop experience.</span></span>
+                                <input type="checkbox" checked={socialDesktopCommunityLayout} onChange={e => updateCommunityStyle('desktopSocialLayout', e.target.checked)} className="h-5 w-5" />
                             </label>
                         </div>
-                    </div>
+                    </section>
 
-                    <div className="rounded-[1.5rem] border border-emerald-100 bg-gradient-to-br from-[#EAF7F4] via-white to-[#EAF2FF] p-5 shadow-sm">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <p className="text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Alternative desktop community</p>
-                                <h4 className="mt-1 text-lg font-black text-slate-900">Enable classic social workspace UX</h4>
-                                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">Adds the reference-style three-column desktop workspace with compact identity/navigation, stories, a readable single-column media feed, full-page post threads, requests, suggestions and contacts. Turning it off instantly returns to the preserved Classic/Latest desktop selector above. Mobile Community stays unchanged.</p>
-                            </div>
-                            <label className="relative inline-flex cursor-pointer items-center gap-3">
-                                <input type="checkbox" className="peer sr-only" checked={socialDesktopCommunityLayout} onChange={e => updateCommunityStyle('desktopSocialLayout', e.target.checked)} />
-                                <span className="relative h-8 w-14 rounded-full bg-slate-300 transition peer-checked:bg-emerald-600 after:absolute after:left-1 after:top-1 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow-md after:transition-transform peer-checked:after:translate-x-6" />
-                                <span className="min-w-[4.5rem] text-sm font-black text-slate-700">{socialDesktopCommunityLayout ? 'Social' : 'Existing'}</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div className="rounded-[1.5rem] border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-violet-50 p-5 shadow-sm">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                            <div>
-                                <p className="text-xs font-black uppercase tracking-[0.2em] text-blue-700">Desktop navigation</p>
-                                <h4 className="mt-1 text-lg font-black text-slate-900">Use expanded side panel</h4>
-                                <p className="mt-1 max-w-2xl text-sm leading-6 text-slate-600">Enabled by default. Turn it off and save to restore the existing bottom dock on desktop. Mobile dock behavior stays unchanged.</p>
-                            </div>
-                            <label className="relative inline-flex cursor-pointer items-center gap-3">
-                                <input type="checkbox" className="peer sr-only" checked={desktopNavigationMode === 'sidebar'} onChange={e => handleNestedChange('desktop', 'navigationMode', e.target.checked ? 'sidebar' : 'dock')} />
-                                <span className="relative h-8 w-14 rounded-full bg-slate-300 transition peer-checked:bg-gradient-to-r peer-checked:from-blue-600 peer-checked:to-violet-600 after:absolute after:left-1 after:top-1 after:h-6 after:w-6 after:rounded-full after:bg-white after:shadow-md after:transition-transform peer-checked:after:translate-x-6" />
-                                <span className="min-w-[4.5rem] text-sm font-black text-slate-700">{desktopNavigationMode === 'sidebar' ? 'Side panel' : 'Bottom dock'}</span>
-                            </label>
-                        </div>
-                    </div>
-
-                    <div className="rounded-xl border bg-white p-4">
-                        <h4 className="font-bold text-gray-800">Navigation Items</h4>
-                        <p className="text-sm text-slate-600">Choose which labels appear in both the desktop side panel and preserved bottom dock.</p>
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {defaultDockItems.map(label => (
-                                <button type="button" key={label} onClick={() => toggleDockItem(label)} className={`rounded-full border px-4 py-2 text-sm font-bold ${selectedDockItems.includes(label) ? 'border-blue-600 bg-gradient-to-r from-indigo-600 to-purple-600 text-white' : 'border-slate-200/80 bg-slate-100/80 text-gray-700'}`}>{label}</button>
+                    <section className="border border-slate-300 bg-white p-5">
+                        <h3 className="text-lg font-black text-slate-950">Community surfaces</h3>
+                        <p className="mt-1 text-sm text-slate-600">These colors apply to Community cards, tabs, chat surfaces and its own mobile dock.</p>
+                        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            {[
+                                ['pageBackground','Page background',communityStyle.pageBackground], ['surfaceColor','Surface',communityStyle.surfaceColor], ['cardColor','Cards',communityStyle.cardColor], ['softBackground','Soft background',communityStyle.softBackground],
+                                ['primaryColor','Primary',communityStyle.primaryColor], ['secondaryColor','Secondary',communityStyle.secondaryColor], ['accentColor','Accent',communityStyle.accentColor], ['headingColor','Heading',communityStyle.headingColor],
+                                ['bodyColor','Body text',communityStyle.bodyColor], ['mutedColor','Muted text',communityStyle.mutedColor], ['borderColor','Borders',communityStyle.borderColor], ['activeTabBackground','Active tab background',communityStyle.activeTabBackground],
+                                ['activeTabText','Active tab text',communityStyle.activeTabText], ['outgoingBubble','Outgoing bubble',communityStyle.outgoingBubble], ['incomingBubble','Incoming bubble',communityStyle.incomingBubble],
+                                ['dockBackground','Community dock',communityStyle.dockBackground], ['dockItemBackground','Dock item',communityStyle.dockItemBackground], ['dockActiveBackground','Dock active',communityStyle.dockActiveBackground],
+                                ['dockTextColor','Dock text',communityStyle.dockTextColor], ['dockActiveTextColor','Dock active text',communityStyle.dockActiveTextColor],
+                            ].map(([field, label, value]) => (
+                                <label key={String(field)} className="border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700">
+                                    <span className="mb-2 block">{label}</span>
+                                    <input type="color" value={String(value)} onChange={e => updateCommunityStyle(String(field), e.target.value)} className="h-10 w-full border p-1" />
+                                </label>
                             ))}
                         </div>
-                    </div>
+                        <FormRow label={`Shadow opacity (${communityStyle.shadowOpacity}%)`} description="Community card shadow strength."><input type="range" min="0" max="40" step="1" value={communityStyle.shadowOpacity} onChange={e => updateCommunityStyle('shadowOpacity', Number(e.target.value))} className="w-full" /></FormRow>
+                    </section>
+                </div>
+            );
+            case 'dock': return (
+                <div className="store-config-dock-studio grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
+                    <div className="space-y-6">
+                        <section className="border border-slate-300 bg-white p-5 shadow-sm">
+                            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">Real navigation deployment</p>
+                            <h2 className="mt-1 text-2xl font-black text-slate-950">Dock Settings</h2>
+                            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Every control below is connected to the actual mobile dock and desktop navigation. Community-only controls have moved to the Community tab.</p>
+                            <div className="mt-5 grid gap-3 md:grid-cols-2">
+                                <label className="border border-slate-200 bg-slate-50 p-4">
+                                    <span className="block text-xs font-black uppercase tracking-[0.14em] text-slate-500">Desktop navigation</span>
+                                    <select value={desktopNavigationMode} onChange={e => handleNestedChange('desktop', 'navigationMode', e.target.value as 'sidebar' | 'dock')} className="mt-2 w-full border border-slate-300 bg-white px-3 py-2.5 font-bold text-slate-900">
+                                        <option value="sidebar">Expanded side panel</option>
+                                        <option value="dock">Bottom dock</option>
+                                    </select>
+                                    <span className="mt-2 block text-xs leading-5 text-slate-500">Bottom dock mode now genuinely renders on desktop with numeric badges and no glow.</span>
+                                </label>
+                                <div className="grid gap-2 border border-slate-200 bg-slate-50 p-4">
+                                    <label className="flex items-center justify-between gap-3 text-sm font-bold text-slate-800"><span>Show mobile dock</span><input type="checkbox" checked={dockStyle.mobileEnabled !== false} onChange={e => updateDockStyle('mobileEnabled', e.target.checked)} className="h-5 w-5" /></label>
+                                    <label className="flex items-center justify-between gap-3 text-sm font-bold text-slate-800"><span>Show labels</span><input type="checkbox" checked={dockStyle.showLabels !== false} onChange={e => updateDockStyle('showLabels', e.target.checked)} className="h-5 w-5" /></label>
+                                    <label className="flex items-center justify-between gap-3 text-sm font-bold text-slate-800"><span>Show numeric badges</span><input type="checkbox" checked={dockStyle.showBadges !== false} onChange={e => updateDockStyle('showBadges', e.target.checked)} className="h-5 w-5" /></label>
+                                    <label className="flex items-center justify-between gap-3 text-sm font-bold text-slate-800"><span>Auto-hide bottom dock on scroll</span><input type="checkbox" checked={dockStyle.autoHideOnScroll === true} onChange={e => updateDockStyle('autoHideOnScroll', e.target.checked)} className="h-5 w-5" /></label>
+                                </div>
+                            </div>
+                        </section>
 
-                    <div className="rounded-xl border bg-white p-4">
-                        <h4 className="font-bold text-gray-800">Community Color Customization</h4>
-                        <p className="text-sm text-slate-600">These colors globally apply to every user's Community screen, mobile community dock, sidebar, cards, tabs, and chat surfaces.</p>
-
-                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <FormRow label="Community Page Background"><input type="color" value={communityStyle.pageBackground} onChange={e => updateCommunityStyle('pageBackground', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Surface Color"><input type="color" value={communityStyle.surfaceColor} onChange={e => updateCommunityStyle('surfaceColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Card Color"><input type="color" value={communityStyle.cardColor} onChange={e => updateCommunityStyle('cardColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Soft Background"><input type="color" value={communityStyle.softBackground} onChange={e => updateCommunityStyle('softBackground', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Primary Color"><input type="color" value={communityStyle.primaryColor} onChange={e => updateCommunityStyle('primaryColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Secondary Color"><input type="color" value={communityStyle.secondaryColor} onChange={e => updateCommunityStyle('secondaryColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Accent Color"><input type="color" value={communityStyle.accentColor} onChange={e => updateCommunityStyle('accentColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Heading Text"><input type="color" value={communityStyle.headingColor} onChange={e => updateCommunityStyle('headingColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Body Text"><input type="color" value={communityStyle.bodyColor} onChange={e => updateCommunityStyle('bodyColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Muted Text"><input type="color" value={communityStyle.mutedColor} onChange={e => updateCommunityStyle('mutedColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Border Color"><input type="color" value={communityStyle.borderColor} onChange={e => updateCommunityStyle('borderColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Active Tab Background"><input type="color" value={communityStyle.activeTabBackground} onChange={e => updateCommunityStyle('activeTabBackground', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Active Tab Text"><input type="color" value={communityStyle.activeTabText} onChange={e => updateCommunityStyle('activeTabText', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Outgoing Bubble"><input type="color" value={communityStyle.outgoingBubble} onChange={e => updateCommunityStyle('outgoingBubble', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Incoming Bubble"><input type="color" value={communityStyle.incomingBubble} onChange={e => updateCommunityStyle('incomingBubble', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label={`Shadow Opacity (${communityStyle.shadowOpacity}%)`}><input type="range" min="0" max="40" step="1" value={communityStyle.shadowOpacity} onChange={e => updateCommunityStyle('shadowOpacity', Number(e.target.value))} className="w-full" /></FormRow>
-                        </div>
-                    </div>
-
-                    <div className="rounded-xl border bg-white p-4">
-                        <h4 className="font-bold text-gray-800">Community Dock Color Customization</h4>
-                        <p className="text-sm text-slate-600">These colors globally apply to the mobile community dock buttons.</p>
-
-                        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <FormRow label="Community Dock Background"><input type="color" value={communityStyle.dockBackground} onChange={e => updateCommunityStyle('dockBackground', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Dock Item Background"><input type="color" value={communityStyle.dockItemBackground} onChange={e => updateCommunityStyle('dockItemBackground', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Active Dock Background"><input type="color" value={communityStyle.dockActiveBackground} onChange={e => updateCommunityStyle('dockActiveBackground', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Dock Text Color"><input type="color" value={communityStyle.dockTextColor} onChange={e => updateCommunityStyle('dockTextColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                            <FormRow label="Active Dock Text"><input type="color" value={communityStyle.dockActiveTextColor} onChange={e => updateCommunityStyle('dockActiveTextColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" /></FormRow>
-                        </div>
-
-                        <div className="mt-5 rounded-[2rem] border border-slate-200 bg-slate-100 p-4">
-                            <p className="text-sm font-bold text-slate-700">Community Dock Preview</p>
-                            <div className="mt-4 flex gap-2 overflow-hidden rounded-[1.65rem] border p-2 shadow-xl" style={{ backgroundColor: communityStyle.dockBackground, borderColor: communityStyle.borderColor }}>
-                                {['Feed', 'Status', 'Chat'].map((label, index) => (
-                                    <div key={label} className="min-w-[76px] rounded-[1.2rem] px-2 py-2 text-center" style={{ backgroundColor: index === 0 ? communityStyle.dockActiveBackground : communityStyle.dockItemBackground, color: index === 0 ? communityStyle.dockActiveTextColor : communityStyle.dockTextColor }}>
-                                        <span className="block text-xl">{index === 0 ? '📢' : index === 1 ? '⭕' : '💬'}</span>
-                                        <span className="text-[10px] font-black">{label}</span>
+                        <section className="border border-slate-300 bg-white p-5 shadow-sm">
+                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+                                <div><h3 className="text-lg font-black text-slate-950">Items and order</h3><p className="mt-1 text-sm text-slate-600">Home is required. Reorder the rest; the same saved order is used by mobile dock, desktop bottom dock and side panel.</p></div>
+                                <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{selectedDockItems.length} active</span>
+                            </div>
+                            <div className="mt-4 divide-y divide-slate-200 border border-slate-200">
+                                {selectedDockItems.map((label, index) => (
+                                    <div key={label} className="flex items-center gap-3 bg-white px-3 py-3">
+                                        <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-slate-200 bg-slate-50 text-xs font-black text-slate-500">{index + 1}</span>
+                                        <span className="min-w-0 flex-1 font-black text-slate-900">{label}</span>
+                                        <button type="button" onClick={() => moveDockItem(index, -1)} disabled={index <= 1} className="border border-slate-300 px-2.5 py-1.5 text-xs font-black disabled:opacity-30" aria-label={`Move ${label} up`}>↑</button>
+                                        <button type="button" onClick={() => moveDockItem(index, 1)} disabled={index === 0 || index >= selectedDockItems.length - 1} className="border border-slate-300 px-2.5 py-1.5 text-xs font-black disabled:opacity-30" aria-label={`Move ${label} down`}>↓</button>
+                                        <button type="button" onClick={() => toggleDockItem(label)} disabled={label === 'Home'} className="border border-rose-200 px-2.5 py-1.5 text-xs font-black text-rose-700 disabled:cursor-not-allowed disabled:opacity-30">Remove</button>
                                     </div>
                                 ))}
                             </div>
-                        </div>
+                            <div className="mt-4 flex flex-wrap gap-2">
+                                {defaultDockItems.filter(label => !selectedDockItems.includes(label)).map(label => <button type="button" key={label} onClick={() => toggleDockItem(label)} className="border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-black text-blue-800">+ {label}</button>)}
+                            </div>
+                        </section>
+
+                        <section className="border border-slate-300 bg-white p-5 shadow-sm">
+                            <h3 className="text-lg font-black text-slate-950">Surface and color</h3>
+                            <p className="mt-1 text-sm text-slate-600">The side panel and bottom dock share these saved surfaces.</p>
+                            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                {[
+                                    ['backgroundColor','Dock background',dockStyle.backgroundColor], ['itemColor','Item background',dockStyle.itemColor], ['accentColor','Active/accent',dockStyle.accentColor], ['textColor','Text',dockStyle.textColor], ['borderColor','Border',dockStyle.borderColor],
+                                ].map(([field,label,value]) => <label key={String(field)} className="border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700"><span className="mb-2 block">{label}</span><input type="color" value={String(value)} onChange={e => updateDockStyle(String(field), e.target.value)} className="h-10 w-full border p-1" /></label>)}
+                            </div>
+                            <div className="mt-4 space-y-1 border-t border-slate-200 pt-2">
+                                <FormRow label={`Background opacity (${dockStyle.backgroundOpacity}%)`}><input type="range" min="20" max="100" value={dockStyle.backgroundOpacity} onChange={e => updateDockStyle('backgroundOpacity', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label={`Item opacity (${dockStyle.itemOpacity}%)`}><input type="range" min="20" max="100" value={dockStyle.itemOpacity} onChange={e => updateDockStyle('itemOpacity', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label={`Accent strength (${dockStyle.accentOpacity}%)`}><input type="range" min="0" max="70" value={dockStyle.accentOpacity} onChange={e => updateDockStyle('accentOpacity', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label={`Backdrop blur (${dockStyle.blur}px)`}><input type="range" min="0" max="36" value={dockStyle.blur} onChange={e => updateDockStyle('blur', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label="Shadow depth"><select value={dockStyle.shadowStrength} onChange={e => updateDockStyle('shadowStrength', e.target.value)} className="w-full border border-slate-300 bg-white px-3 py-2"><option value="none">None</option><option value="soft">Soft</option><option value="strong">Strong</option></select></FormRow>
+                            </div>
+                        </section>
+
+                        <section className="border border-slate-300 bg-white p-5 shadow-sm">
+                            <h3 className="text-lg font-black text-slate-950">Sizing and spacing</h3>
+                            <div className="mt-3 space-y-1">
+                                <FormRow label={`Bottom dock height (${dockStyle.height}px)`}><input type="range" min="58" max="112" value={dockStyle.height} onChange={e => updateDockStyle('height', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label={`Icon size (${dockStyle.iconSize}px)`}><input type="range" min="28" max="52" value={dockStyle.iconSize} onChange={e => updateDockStyle('iconSize', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label={`Label size (${dockStyle.labelSize}px)`}><input type="range" min="9" max="16" value={dockStyle.labelSize} onChange={e => updateDockStyle('labelSize', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label={`Inner padding (${dockStyle.padding}px)`}><input type="range" min="8" max="22" value={dockStyle.padding} onChange={e => updateDockStyle('padding', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label={`Item gap (${dockStyle.gap}px)`}><input type="range" min="4" max="20" value={dockStyle.gap} onChange={e => updateDockStyle('gap', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label={`Dock radius (${dockStyle.radius}px)`}><input type="range" min="0" max="40" value={dockStyle.radius} onChange={e => updateDockStyle('radius', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label={`Item radius (${dockStyle.itemRadius}px)`}><input type="range" min="0" max="28" value={dockStyle.itemRadius} onChange={e => updateDockStyle('itemRadius', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label={`Bottom safe gap (${dockStyle.bottomOffset}px)`}><input type="range" min="0" max="32" value={dockStyle.bottomOffset} onChange={e => updateDockStyle('bottomOffset', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label={`Desktop expanded width (${dockStyle.desktopExpandedWidth}px)`}><input type="range" min="260" max="380" value={dockStyle.desktopExpandedWidth} onChange={e => updateDockStyle('desktopExpandedWidth', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label={`Desktop collapsed width (${dockStyle.desktopCollapsedWidth}px)`}><input type="range" min="72" max="108" value={dockStyle.desktopCollapsedWidth} onChange={e => updateDockStyle('desktopCollapsedWidth', Number(e.target.value))} className="w-full" /></FormRow>
+                            </div>
+                        </section>
                     </div>
 
-                    <div className="rounded-xl border bg-white p-4">
-                        <h4 className="font-bold text-gray-800">Dock Color & Transparency</h4>
-                        <p className="text-sm text-slate-600">These saved values control the preserved bottom dock and the matching desktop side-panel surfaces.</p>
-                        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[1fr_18rem]">
-                            <div className="space-y-4">
-                                <FormRow label="Dock Background Color" description="Main dark/glass color behind the dock.">
-                                    <input type="color" value={dockStyle.backgroundColor} onChange={e => updateDockStyle('backgroundColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" />
-                                </FormRow>
-                                <FormRow label={`Dock Transparency (${dockStyle.backgroundOpacity}%)`} description="Higher value means a darker, less transparent dock.">
-                                    <input type="range" min="20" max="100" step="1" value={dockStyle.backgroundOpacity} onChange={e => updateDockStyle('backgroundOpacity', Number(e.target.value))} className="w-full" />
-                                </FormRow>
-                                <FormRow label={`Item Transparency (${dockStyle.itemOpacity}%)`} description="Controls the small glass tile behind every dock icon.">
-                                    <input type="range" min="0" max="40" step="1" value={dockStyle.itemOpacity} onChange={e => updateDockStyle('itemOpacity', Number(e.target.value))} className="w-full" />
-                                </FormRow>
-                                <FormRow label={`Accent Saturation (${dockStyle.accentOpacity}%)`} description="Controls the colored gradient glow inside each dock item.">
-                                    <input type="range" min="0" max="85" step="1" value={dockStyle.accentOpacity} onChange={e => updateDockStyle('accentOpacity', Number(e.target.value))} className="w-full" />
-                                </FormRow>
-                                <div className="rounded-2xl border border-blue-100 bg-blue-50/60 p-4">
-                                    <h5 className="font-black text-slate-900">Dock Size Customization</h5>
-                                    <p className="text-xs text-slate-600">Preview and save responsive dock sizing without changing dock navigation behavior.</p>
-                                    <div className="mt-3 space-y-4">
-                                        <FormRow label={`Dock Height (${dockStyle.height}px)`} description="Controls the minimum glass dock height.">
-                                            <input type="range" min="58" max="112" step="1" value={dockStyle.height} onChange={e => updateDockStyle('height', Number(e.target.value))} className="w-full" />
-                                        </FormRow>
-                                        <FormRow label={`Icon Size (${dockStyle.iconSize}px)`} description="Controls each dock icon bubble size.">
-                                            <input type="range" min="28" max="52" step="1" value={dockStyle.iconSize} onChange={e => updateDockStyle('iconSize', Number(e.target.value))} className="w-full" />
-                                        </FormRow>
-                                        <FormRow label={`Label Size (${dockStyle.labelSize}px)`} description="Controls dock label typography size.">
-                                            <input type="range" min="9" max="14" step="1" value={dockStyle.labelSize} onChange={e => updateDockStyle('labelSize', Number(e.target.value))} className="w-full" />
-                                        </FormRow>
-                                        <FormRow label={`Dock Padding (${dockStyle.padding}px)`} description="Controls the dock inner padding rhythm.">
-                                            <input type="range" min="8" max="22" step="1" value={dockStyle.padding} onChange={e => updateDockStyle('padding', Number(e.target.value))} className="w-full" />
-                                        </FormRow>
-                                    </div>
+                    <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
+                        <section className="border border-slate-300 bg-slate-950 p-4 text-white shadow-lg">
+                            <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300">Live mobile / bottom dock</p>
+                            <div className="mt-4 overflow-hidden border" style={{ backgroundColor: `${dockStyle.backgroundColor}${Math.round((Number(dockStyle.backgroundOpacity) / 100) * 255).toString(16).padStart(2, '0')}`, borderColor: dockStyle.borderColor, borderRadius: Number(dockStyle.radius), padding: Number(dockStyle.padding), minHeight: Number(dockStyle.height), boxShadow: dockStyle.shadowStrength === 'none' ? 'none' : dockStyle.shadowStrength === 'strong' ? '0 22px 52px rgba(15,23,42,0.35)' : '0 12px 30px rgba(15,23,42,0.22)' }}>
+                                <div className="flex overflow-hidden" style={{ gap: Number(dockStyle.gap) }}>
+                                    {selectedDockItems.slice(0, 4).map((label, index) => <div key={label} className="relative min-w-[4rem] border px-2 py-2 text-center" style={{ backgroundColor: `${dockStyle.itemColor}${Math.round((Number(dockStyle.itemOpacity) / 100) * 255).toString(16).padStart(2, '0')}`, borderColor: index === 0 ? dockStyle.accentColor : dockStyle.borderColor, borderRadius: Number(dockStyle.itemRadius), color: dockStyle.textColor }}><div className="mx-auto flex items-center justify-center bg-white/90" style={{ width: Number(dockStyle.iconSize), height: Number(dockStyle.iconSize), borderRadius: Math.max(4, Number(dockStyle.itemRadius) - 4) }}>{['🏠','🛍️','📚','❤️'][index] || '•'}</div>{dockStyle.showLabels !== false && <p className="mt-1 font-black" style={{ fontSize: Number(dockStyle.labelSize) }}>{label}</p>}{dockStyle.showBadges !== false && index === 1 && <span className="absolute -right-1 -top-1 rounded-full px-1.5 py-0.5 text-[9px] font-black text-white" style={{ backgroundColor: dockStyle.accentColor }}>3</span>}</div>)}
                                 </div>
                             </div>
-                            <div className="rounded-2xl border border-slate-200 bg-slate-100 p-4">
-                                <p className="text-sm font-bold text-slate-700">Live Preview</p>
-                                <div className="mt-4 rounded-[2rem] border border-blue-100 shadow-xl" style={{ backgroundColor: `${dockStyle.backgroundColor}${Math.round((Number(dockStyle.backgroundOpacity) / 100) * 255).toString(16).padStart(2, '0')}`, minHeight: Number(dockStyle.height), padding: Number(dockStyle.padding) }}>
-                                    <div className="flex gap-2 overflow-hidden">
-                                        {defaultDockItems.slice(0, 4).map(label => (
-                                            <div key={label} className="min-w-[4.25rem] rounded-2xl border border-white/10 px-3 py-2 text-center text-white" style={{ backgroundColor: `rgba(255,255,255,${Number(dockStyle.itemOpacity) / 100})` }}>
-                                                <div className="mx-auto rounded-xl bg-gradient-to-br from-blue-600 to-violet-500" style={{ opacity: Number(dockStyle.accentOpacity) / 100, width: Number(dockStyle.iconSize), height: Number(dockStyle.iconSize) }} />
-                                                <p className="mt-1 font-black" style={{ fontSize: Number(dockStyle.labelSize) }}>{label}</p>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
+                            <p className="mt-3 text-xs leading-5 text-slate-300">Mobile unseen items keep the required glow. Desktop bottom dock uses this design with numeric badges only.</p>
+                        </section>
+
+                        <section className="border border-slate-300 bg-white p-4 shadow-sm">
+                            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">Desktop side panel preview</p>
+                            <div className="mt-4 border p-3" style={{ backgroundColor: `${dockStyle.backgroundColor}${Math.round((Number(dockStyle.backgroundOpacity) / 100) * 255).toString(16).padStart(2, '0')}`, borderColor: dockStyle.borderColor, borderRadius: Number(dockStyle.radius) }}>
+                                {selectedDockItems.slice(0, 4).map((label, index) => <div key={label} className="mb-2 flex items-center border px-3 py-2 last:mb-0" style={{ gap: Number(dockStyle.gap), backgroundColor: index === 0 ? dockStyle.accentColor : `${dockStyle.itemColor}${Math.round((Number(dockStyle.itemOpacity) / 100) * 255).toString(16).padStart(2, '0')}`, borderColor: index === 0 ? dockStyle.accentColor : dockStyle.borderColor, borderRadius: Number(dockStyle.itemRadius), color: index === 0 ? '#FFFFFF' : dockStyle.textColor }}><span className="flex items-center justify-center bg-white/90" style={{ width: Number(dockStyle.iconSize), height: Number(dockStyle.iconSize), borderRadius: Math.max(4, Number(dockStyle.itemRadius) - 4) }}>{['🏠','🛍️','📚','❤️'][index] || '•'}</span>{dockStyle.showLabels !== false && <span className="font-black" style={{ fontSize: Number(dockStyle.labelSize) }}>{label}</span>}{dockStyle.showBadges !== false && index === 2 && <span className="ml-auto rounded-full px-2 py-1 text-[9px] font-black text-white" style={{ backgroundColor: dockStyle.accentColor }}>7</span>}</div>)}
                             </div>
-                        </div>
-                    </div>
+                        </section>
+                    </aside>
                 </div>
             );
             case 'announcements': return <AnnouncementManagement announcements={localSettings.content.announcements} onUpdate={announcements => handleNestedChange('content', 'announcements', announcements)} />;
@@ -1371,8 +1292,8 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     };
 
     return (
-        <div className="bg-white/80 backdrop-blur-xl p-6 rounded-lg shadow-[0_8px_30px_rgb(0,0,0,0.04)] border">
-            <div className="flex flex-col md:flex-row justify-between md:items-center mb-6 border-b pb-4">
+        <div className="store-config-workspace overflow-hidden border border-slate-300 bg-white shadow-sm">
+            <div className="flex flex-col justify-between gap-4 border-b border-slate-200 bg-slate-50 p-5 md:flex-row md:items-center">
                 <div>
                     <h1 className="text-3xl font-bold text-gray-800">Site Customizer</h1>
                     <p className="text-slate-600 mt-1">Section buttons and toggles update this local draft first. Click Save Changes to publish them to the website.</p>{isDirty && <p className="mt-2 rounded-xl bg-amber-100 px-3 py-2 text-sm font-black text-amber-800">Unsaved changes — click Save Changes to publish.</p>}{saveStatus === 'success' && <p className="mt-2 rounded-xl bg-emerald-100 px-3 py-2 text-sm font-black text-emerald-800">Settings saved and synced.</p>}{saveStatus === 'failed' && <p className="mt-2 rounded-xl bg-rose-100 px-3 py-2 text-sm font-black text-rose-800">Saved locally but cloud sync failed. Please retry when online.</p>}
@@ -1382,14 +1303,14 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                 </button>
             </div>
 
-            <div className="flex flex-wrap gap-2 mb-6">
+            <div className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-3 pt-2 custom-scrollbar">
                 <TabButton label="Theme" isActive={activeTab === 'theme'} onClick={() => setActiveTab('theme')} />
-                <TabButton label="Round Effects" isActive={activeTab === 'roundness'} onClick={() => setActiveTab('roundness')} />
                 <TabButton label="Layout" isActive={activeTab === 'layout'} onClick={() => setActiveTab('layout')} />
                 <TabButton label="Content" isActive={activeTab === 'content'} onClick={() => setActiveTab('content')} />
                 <TabButton label="Subscriptions" isActive={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')} />
                 <TabButton label="Reading" isActive={activeTab === 'reading'} onClick={() => setActiveTab('reading')} />
                 <TabButton label="Profile" isActive={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
+                <TabButton label="Community" isActive={activeTab === 'community'} onClick={() => setActiveTab('community')} />
                 <TabButton label="Dock" isActive={activeTab === 'dock'} onClick={() => setActiveTab('dock')} />
                 <TabButton label="Announcements" isActive={activeTab === 'announcements'} onClick={() => setActiveTab('announcements')} />
                 <TabButton label="Services" isActive={activeTab === 'services'} onClick={() => setActiveTab('services')} />
@@ -1399,7 +1320,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                 <TabButton label="Animations" isActive={activeTab === 'animations'} onClick={() => setActiveTab('animations')} />
             </div>
 
-            <div className="mt-4">{renderContent()}</div>
+            <div className="p-5">{renderContent()}</div>
         </div>
     );
 };

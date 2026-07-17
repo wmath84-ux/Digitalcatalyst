@@ -17,29 +17,19 @@ test('website settings persist separate product roundness controls', () => {
   assert.match(utility, /DEFAULT_PRODUCT_ROUNDNESS_SETTINGS/);
   for (const key of ['storeCards', 'homeFeaturedCards', 'homePreviewCards', 'wishlistCards', 'productDetailPanels', 'myPurchasesCards', 'mediaInnerFrame', 'productBadges', 'productActionButtons']) {
     assert.match(utility, new RegExp(`${key}: true`));
-    assert.match(websiteSettings, new RegExp(`key: '${key}'`));
   }
   assert.match(app, /productRoundness\?: ProductRoundnessSettings/);
   assert.match(app, /productRoundness: DEFAULT_PRODUCT_ROUNDNESS_SETTINGS/);
   assert.match(app, /\.\.\.DEFAULT_PRODUCT_ROUNDNESS_SETTINGS/);
 });
 
-test('admin panel exposes separate buttons for every round effect surface', () => {
-  assert.match(websiteSettings, /Round Effects/);
-  assert.match(websiteSettings, /case 'roundness': return/);
-  assert.match(websiteSettings, /Set all Round/);
-  assert.match(websiteSettings, /Set all Default/);
-  assert.match(websiteSettings, /Store product cards/);
-  assert.match(websiteSettings, /Home featured\/top-rated cards/);
-  assert.match(websiteSettings, /Mobile home preview cards/);
-  assert.match(websiteSettings, /Wishlist product cards/);
-  assert.match(websiteSettings, /Product detail panels/);
-  assert.match(websiteSettings, /My Purchases cards/);
-  assert.match(websiteSettings, /Product media inner frame/);
-  assert.match(websiteSettings, /Product badges and chips/);
-  assert.match(websiteSettings, /Product action buttons/);
-  assert.match(websiteSettings, /updateProductRoundness\(control\.key, true\)/);
-  assert.match(websiteSettings, /updateProductRoundness\(control\.key, false\)/);
+test('admin Store Config removes the obsolete Round Effects workspace', () => {
+  assert.doesNotMatch(websiteSettings, /Round Effects/);
+  assert.doesNotMatch(websiteSettings, /case 'roundness': return/);
+  assert.doesNotMatch(websiteSettings, /Set all Round/);
+  assert.doesNotMatch(websiteSettings, /updateProductRoundness/);
+  assert.match(websiteSettings, /store-config-workspace/);
+  assert.match(websiteSettings, /Community.*activeTab === 'community'/s);
 });
 
 test('public product surfaces read their own roundness keys', () => {
