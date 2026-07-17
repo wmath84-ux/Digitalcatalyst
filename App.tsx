@@ -1198,6 +1198,99 @@ const buildLatestSupportTicketResetPlan = (sourceTickets: SupportTicket[]) => {
   return { latestTicket, keepTickets, removeTickets };
 };
 
+
+const APP_VIEW_SESSION_KEY = 'eduvora.appView.v1';
+const APP_PRODUCT_SESSION_KEY = 'eduvora.selectedProductId.v1';
+const READING_ROUTE_SESSION_KEY = 'eduvora.readingRoute.v1';
+
+const PERSISTABLE_APP_VIEWS = new Set([
+  'home',
+  'allProducts',
+  'product',
+  'myPurchases',
+  'coursePlayer',
+  'eduCoinGuide',
+  'congratulations',
+  'profile',
+  'subscription',
+  'freeProducts',
+  'wishlist',
+  'auth',
+  'policies',
+  'admin',
+  'adminLogin',
+  'community',
+]);
+
+const PRODUCT_BOUND_APP_VIEWS = new Set(['product', 'coursePlayer', 'eduCoinGuide', 'congratulations']);
+
+type PersistedReadingRoute = {
+  view: ReadingView;
+  listType: ReadingListType;
+  itemId?: string | null;
+};
+
+const readSessionText = (key: string) => {
+  if (typeof window === 'undefined') return '';
+  try {
+    return window.sessionStorage.getItem(key) || '';
+  } catch {
+    return '';
+  }
+};
+
+const readInitialAppView = () => {
+  if (typeof window === 'undefined') return 'home';
+  const historyView = typeof window.history.state?.dcView === 'string'
+    ? window.history.state.dcView
+    : '';
+  const candidate = historyView || readSessionText(APP_VIEW_SESSION_KEY);
+  return PERSISTABLE_APP_VIEWS.has(candidate) ? candidate : 'home';
+};
+
+const readInitialProductId = () => {
+  const value = readSessionText(APP_PRODUCT_SESSION_KEY);
+  if (!value) return null;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const readPersistedReadingRoute = (): PersistedReadingRoute | null => {
+  if (typeof window === 'undefined') return null;
+
+  const state = window.history.state || {};
+  if (state.dcOverlay === 'reading') {
+    const listType: ReadingListType = state.dcReadingListType === 'news' ? 'news' : 'blog';
+    const view: ReadingView = state.dcReadingView === 'article' || state.dcReadingView === 'announcement'
+      ? state.dcReadingView
+      : listType;
+    return {
+      view,
+      listType,
+      itemId: state.dcReadingItemId === null || state.dcReadingItemId === undefined
+        ? null
+        : String(state.dcReadingItemId),
+    };
+  }
+
+  const stored = readSessionText(READING_ROUTE_SESSION_KEY);
+  if (!stored) return null;
+  try {
+    const parsed = JSON.parse(stored) as Partial<PersistedReadingRoute>;
+    const listType: ReadingListType = parsed.listType === 'news' ? 'news' : 'blog';
+    const view: ReadingView = parsed.view === 'article' || parsed.view === 'announcement'
+      ? parsed.view
+      : listType;
+    return {
+      view,
+      listType,
+      itemId: parsed.itemId === null || parsed.itemId === undefined ? null : String(parsed.itemId),
+    };
+  } catch {
+    return null;
+  }
+};
+
 const App: React.FC = () => {
   // Initialize products with default data immediately to prevent "white screen" or empty state
   const [products, setProducts] = useState<Product[]>([]);
@@ -1207,7 +1300,7 @@ const App: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>(() => ENABLE_DEMO_SEED_DATA ? initialOrders : []);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
-  const [currentView, setCurrentView] = useState('home');
+  const [currentView, setCurrentView] = useState(() => readInitialAppView());
 
   useEffect(() => {
     if (typeof document === 'undefined' || currentView !== 'allProducts') return undefined;
@@ -1281,7 +1374,22 @@ const App: React.FC = () => {
 
     appViewStackRef.current = [...stack, nextView].slice(-24);
   }, []);
+  const pendingRestoredProductIdRef = React.useRef<number | null>(readInitialProductId());
   const [selectedProduct, setSelectedProduct] = useState<ProductWithRating | null>(null);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    try {
+      window.sessionStorage.setItem(APP_VIEW_SESSION_KEY, currentView);
+      if (selectedProduct?.id !== undefined && selectedProduct?.id !== null) {
+        window.sessionStorage.setItem(APP_PRODUCT_SESSION_KEY, String(selectedProduct.id));
+      } else if (!PRODUCT_BOUND_APP_VIEWS.has(currentView)) {
+        window.sessionStorage.removeItem(APP_PRODUCT_SESSION_KEY);
+      }
+    } catch {
+      // Session storage may be unavailable in private/restricted browser contexts.
+    }
+  }, [currentView, selectedProduct?.id]);
   const [selectedAnnouncement, setSelectedAnnouncement] = useState<Announcement | null>(null);
   const [selectedArticle, setSelectedArticle] = useState<NewsArticle | null>(null);
   const [wishlist, setWishlist] = useState<number[]>([]);
@@ -1752,8 +1860,69 @@ const App: React.FC = () => {
   const [isReadingDrawerOpen, setIsReadingDrawerOpen] = useState(false);
   const [readingDrawerView, setReadingDrawerView] = useState<ReadingView>('blog');
   const [readingListType, setReadingListType] = useState<ReadingListType>('blog');
+  const pendingReadingRouteRef = React.useRef<PersistedReadingRoute | null>(readPersistedReadingRoute());
+  const readingRouteRestoreCompleteRef = React.useRef(false);
   isReadingDrawerOpenRef.current = isReadingDrawerOpen;
   readingDrawerViewRef.current = readingDrawerView;
+
+  useEffect(() => {
+    if (readingRouteRestoreCompleteRef.current) return;
+    const route = pendingReadingRouteRef.current;
+    if (!route) {
+      readingRouteRestoreCompleteRef.current = true;
+      return;
+    }
+
+    if (route.view === 'article') {
+      if (websiteSettings.content.newsArticles.length === 0) return;
+      const article = websiteSettings.content.newsArticles.find(item => String(item.id) === String(route.itemId)) || null;
+      setSelectedArticle(article);
+      setSelectedAnnouncement(null);
+      setReadingListType(route.listType);
+      setReadingDrawerView(article ? 'article' : route.listType);
+    } else if (route.view === 'announcement') {
+      if (websiteSettings.content.announcements.length === 0) return;
+      const announcement = websiteSettings.content.announcements.find(item => String(item.id) === String(route.itemId)) || null;
+      setSelectedAnnouncement(announcement);
+      setSelectedArticle(null);
+      setReadingListType('news');
+      setReadingDrawerView(announcement ? 'announcement' : 'news');
+    } else {
+      setSelectedArticle(null);
+      setSelectedAnnouncement(null);
+      setReadingListType(route.listType);
+      setReadingDrawerView(route.listType);
+    }
+
+    setIsReadingDrawerOpen(true);
+    pendingReadingRouteRef.current = null;
+    readingRouteRestoreCompleteRef.current = true;
+  }, [websiteSettings.content.announcements, websiteSettings.content.newsArticles]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !readingRouteRestoreCompleteRef.current) return;
+    try {
+      if (!isReadingDrawerOpen) {
+        window.sessionStorage.removeItem(READING_ROUTE_SESSION_KEY);
+        return;
+      }
+
+      const itemId = readingDrawerView === 'article'
+        ? selectedArticle?.id
+        : readingDrawerView === 'announcement'
+          ? selectedAnnouncement?.id
+          : null;
+
+      window.sessionStorage.setItem(READING_ROUTE_SESSION_KEY, JSON.stringify({
+        view: readingDrawerView,
+        listType: readingListType,
+        itemId: itemId === null || itemId === undefined ? null : String(itemId),
+      }));
+    } catch {
+      // Reading restoration is an enhancement; navigation remains usable without storage.
+    }
+  }, [isReadingDrawerOpen, readingDrawerView, readingListType, selectedAnnouncement?.id, selectedArticle?.id]);
+
   const [isFreeModalOpen, setIsFreeModalOpen] = useState(false);
 
   // User Theme State
@@ -2081,31 +2250,27 @@ const App: React.FC = () => {
     root.style.setProperty('--font-serif', colorExperience === 'classic' ? classicFontSerif : selectedFonts.serif);
     root.style.setProperty('--style-corner-radius', colorExperience === 'classic' ? '0.25rem' : adminTheme.cornerRadius);
 
-    const shadows = {
-      light: '0 1px 3px 0 rgb(15 23 42 / 0.06), 0 1px 2px -1px rgb(15 23 42 / 0.05)',
-      medium: '0 10px 28px rgb(15 23 42 / 0.08)',
-      heavy: '0 18px 48px rgb(15 23 42 / 0.12)',
+    const shadowScales = {
+      light: {
+        base: '0 1px 3px rgb(15 23 42 / 0.05)',
+        lg: '0 7px 20px rgb(15 23 42 / 0.07)',
+        xl: '0 12px 30px rgb(15 23 42 / 0.09)',
+      },
+      medium: {
+        base: '0 4px 12px rgb(15 23 42 / 0.07)',
+        lg: '0 14px 36px rgb(15 23 42 / 0.10)',
+        xl: '0 20px 52px rgb(15 23 42 / 0.12)',
+      },
+      heavy: {
+        base: '0 8px 22px rgb(15 23 42 / 0.10)',
+        lg: '0 20px 48px rgb(15 23 42 / 0.14)',
+        xl: '0 28px 70px rgb(15 23 42 / 0.17)',
+      },
     };
-    root.style.setProperty('--style-shadow-base', shadows[adminTheme.shadowIntensity as keyof typeof shadows] || shadows.medium);
-
-    const experienceShadowLg = colorExperience === 'classic'
-      ? '0 2px 0 rgb(17 17 17 / 0.10)'
-      : colorExperience === 'warm'
-        ? '0 16px 42px rgb(73 52 43 / 0.10)'
-        : colorExperience === 'modern-white'
-          ? '0 16px 42px rgb(17 24 39 / 0.08)'
-          : '0 16px 42px rgb(15 23 42 / 0.10)';
-
-    const experienceShadowXl = colorExperience === 'classic'
-      ? '0 3px 0 rgb(17 17 17 / 0.12)'
-      : colorExperience === 'warm'
-        ? '0 22px 60px rgb(73 52 43 / 0.13)'
-        : colorExperience === 'modern-white'
-          ? '0 22px 60px rgb(17 24 39 / 0.10)'
-          : '0 22px 60px rgb(15 23 42 / 0.12)';
-
-    root.style.setProperty('--style-shadow-lg', colorExperience === 'original' ? shadows.heavy : experienceShadowLg);
-    root.style.setProperty('--style-shadow-xl', colorExperience === 'original' ? shadows.heavy : experienceShadowXl);
+    const selectedShadowScale = shadowScales[adminTheme.shadowIntensity as keyof typeof shadowScales] || shadowScales.medium;
+    root.style.setProperty('--style-shadow-base', selectedShadowScale.base);
+    root.style.setProperty('--style-shadow-lg', selectedShadowScale.lg);
+    root.style.setProperty('--style-shadow-xl', selectedShadowScale.xl);
   }, [websiteSettings.theme, activeTheme]);
 
   const handleWebsiteSettingsUpdate = async (newSettings: WebsiteSettings): Promise<boolean> => {
@@ -2144,6 +2309,34 @@ const App: React.FC = () => {
     const displayRating = (p.manualRating !== null && p.manualRating !== undefined) ? p.manualRating : calculatedRating;
     return { ...p, rating: displayRating, reviewCount, calculatedRating };
   });
+
+  useEffect(() => {
+    if (!PRODUCT_BOUND_APP_VIEWS.has(currentView)) {
+      pendingRestoredProductIdRef.current = null;
+      return;
+    }
+
+    const restoredId = pendingRestoredProductIdRef.current;
+    if (restoredId === null || selectedProduct?.id === restoredId) return;
+
+    const restoredProduct = productsWithRatings.find(product => Number(product.id) === restoredId);
+    if (restoredProduct) {
+      setSelectedProduct(restoredProduct);
+      pendingRestoredProductIdRef.current = null;
+      return;
+    }
+
+    if (productsWithRatings.length > 0) {
+      pendingRestoredProductIdRef.current = null;
+      try {
+        window.sessionStorage.removeItem(APP_PRODUCT_SESSION_KEY);
+      } catch {
+        // Ignore restricted storage.
+      }
+      historyNavigationRef.current = true;
+      setCurrentView('allProducts');
+    }
+  }, [currentView, productsWithRatings.length, selectedProduct?.id]);
 
   const visibleProducts = productsWithRatings.filter(isProductSearchVisible);
   const topRatedProducts = [...visibleProducts].sort((a, b) => b.rating - a.rating).slice(0, 3);
@@ -3441,6 +3634,12 @@ const App: React.FC = () => {
       localStorage.removeItem('productWishlist');
       localStorage.removeItem('shoppingCart');
       sessionStorage.removeItem('welcomeOverlaySeen');
+      sessionStorage.removeItem(APP_VIEW_SESSION_KEY);
+      sessionStorage.removeItem(APP_PRODUCT_SESSION_KEY);
+      sessionStorage.removeItem(READING_ROUTE_SESSION_KEY);
+      sessionStorage.removeItem('eduvora.communityRoute.v1');
+      sessionStorage.removeItem('eduvora.adminView.v1');
+      sessionStorage.removeItem('eduvora.storeConfigTab.v1');
       setCurrentView('home');
       window.scrollTo(0, 0);
   };

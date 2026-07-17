@@ -63,35 +63,35 @@ const getArticleCoverImage = (article: NewsArticle, size = '800/600') => resolve
 const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, settings: WebsiteSettings, cardBackground?: string, onReadMoreClick: (article: NewsArticle) => void }> = ({ article, animationDelay, settings, cardBackground, onReadMoreClick }) => {
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${(animationDelay % 8) + 1}` : '';
     return (
-        <div style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }} className={`backdrop-blur-2xl rounded-2xl shadow-[0_8px_30px_rgba(60,64,67,0.08)] hover:shadow-[0_12px_34px_rgba(60,64,67,0.12)] border overflow-hidden transform hover:-translate-y-2 transition-all duration-300 group flex flex-col h-full ${animationClass}`}>
-            <div className="relative h-48 overflow-hidden rounded-t-2xl" style={{ backgroundColor: chatPalette.searchBlue }}>
+        <div style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }} className={`latest-news-mobile-card group flex h-full min-h-[17rem] flex-col overflow-hidden rounded-[1.25rem] border bg-white/95 shadow-[0_6px_18px_rgba(60,64,67,0.08)] transition-[border-color,box-shadow,transform] duration-200 sm:min-h-0 sm:rounded-2xl sm:hover:-translate-y-1 sm:hover:shadow-[0_12px_30px_rgba(60,64,67,0.12)] ${animationClass}`}>
+            <div className="relative h-28 overflow-hidden rounded-t-[1.25rem] sm:h-48 sm:rounded-t-2xl" style={{ backgroundColor: chatPalette.searchBlue }}>
                 <SafeImage
                     src={getArticleCoverImage(article)}
                     fallbackSrc={buildArticleImageFallback(article)}
                     alt={article.title}
                     wrapperClassName="h-full w-full rounded-t-2xl"
-                    className="h-full w-full rounded-t-2xl object-cover transition-transform duration-700 group-hover:scale-110"
+                    className="h-full w-full rounded-t-[1.25rem] object-cover transition-transform duration-300 sm:rounded-t-2xl sm:group-hover:scale-105"
                     fallbackTitle={article.title}
                     fallbackBadge={article.type === 'news' ? 'News' : article.category || 'Blog'}
                     fallbackIcon="📰"
                     fallbackMessage="Image preview unavailable"
                     aspect="video"
                 />
-                <div className="absolute top-4 left-4 backdrop-blur-xl px-3 py-1 text-xs font-bold uppercase tracking-wider border rounded-md shadow-sm" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder, color: chatPalette.linkText }}>
+                <div className="absolute left-2 top-2 max-w-[80%] truncate rounded-md border bg-white/95 px-2 py-1 text-[9px] font-bold uppercase tracking-wide shadow-sm sm:left-4 sm:top-4 sm:px-3 sm:text-xs" style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder, color: chatPalette.linkText }}>
                     {article.type === 'news' ? 'News' : article.category}
                 </div>
             </div>
-            <div className="p-6 flex flex-col flex-grow">
-                <div className="mb-3 text-xs font-medium" style={{ color: chatPalette.secondaryText }}>
+            <div className="flex flex-grow flex-col p-3 sm:p-6">
+                <div className="mb-2 truncate text-[9px] font-medium sm:mb-3 sm:text-xs" style={{ color: chatPalette.secondaryText }}>
                     {new Date(article.date).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' })}
                 </div>
-                <h3 className="text-xl font-bold transition-colors mb-3 leading-tight" style={{ color: chatPalette.primaryText }}>
+                <h3 className="mb-2 line-clamp-2 text-[14px] font-bold leading-[1.22] transition-colors sm:mb-3 sm:text-xl sm:leading-tight" style={{ color: chatPalette.primaryText }}>
                     {article.title}
                 </h3>
-                <p className="text-sm line-clamp-3 mb-6 flex-grow" style={{ color: chatPalette.secondaryText }}>
+                <p className="mb-6 hidden flex-grow text-sm sm:line-clamp-3 sm:block" style={{ color: chatPalette.secondaryText }}>
                     {article.excerpt}
                 </p>
-                <button onClick={() => onReadMoreClick(article)} className="font-bold text-sm uppercase tracking-wide flex items-center gap-2 group-hover:gap-3 transition-all" style={{ color: chatPalette.linkText }}>
+                <button onClick={() => onReadMoreClick(article)} className="mt-auto flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide transition-[gap] sm:gap-2 sm:text-sm sm:group-hover:gap-3" style={{ color: chatPalette.linkText }}>
                     Read Article <span className="text-lg leading-none">&rarr;</span>
                 </button>
             </div>
@@ -176,7 +176,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
 
         <div 
             ref={gridRef} 
-            className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+            className={`latest-news-mobile-two-column grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-2 lg:grid-cols-3 lg:gap-8 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
         >
           {newsArticles.map((article, index) => (
             <React.Fragment key={article.id}>
@@ -194,7 +194,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
                   pageType="news-list"
                   realContentCardCount={newsArticles.length}
                   isContentLoaded={true}
-                  className="md:col-span-2 lg:col-span-3 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
+                  className="col-span-2 rounded-[1.25rem] border p-4 shadow-sm md:col-span-2 lg:col-span-3 lg:rounded-[2rem] lg:p-5"
                   style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }}
                 />
               )}

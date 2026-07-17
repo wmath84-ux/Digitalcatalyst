@@ -240,20 +240,20 @@ const SponsoredPartnerCard: React.FC<{
 const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: string; imageSeed?: string; fallbackImage?: string; onClick: () => void; listType: ReadingListType; }> = ({ title, meta, excerpt, badge, imageSeed, fallbackImage, onClick, listType }) => {
   const palette = getPalette(listType);
   return (
-    <button onClick={onClick} className="group relative flex flex-col overflow-hidden rounded-[2rem] border text-left shadow-[0_12px_36px_rgba(60,64,67,0.10)] backdrop-blur-xl transition duration-300 hover:-translate-y-2 hover:shadow-[0_24px_50px_rgba(60,64,67,0.18)]" style={{ backgroundColor: palette.cardSurface, borderColor: palette.cardBorder }}>
+    <button onClick={onClick} className="reading-hub-mobile-card group relative flex min-h-[13rem] flex-col overflow-hidden rounded-[1.25rem] border text-left shadow-[0_6px_18px_rgba(60,64,67,0.09)] transition-[border-color,box-shadow,transform] duration-200 sm:min-h-0 sm:rounded-[2rem] sm:hover:-translate-y-1 sm:hover:shadow-[0_16px_38px_rgba(60,64,67,0.14)]" style={{ backgroundColor: palette.cardSurface, borderColor: palette.cardBorder }}>
       {imageSeed && (
-        <div className="aspect-[16/9] w-full overflow-hidden" style={{ backgroundColor: palette.searchBlue }}>
-          <SafeImage src={imageSeed || ''} fallbackSrc={fallbackImage || ''} alt={title} wrapperClassName="h-full w-full" className="h-full w-full object-cover opacity-95 transition duration-700 group-hover:scale-105" fallbackTitle={title} fallbackBadge={badge} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
+        <div className="aspect-[4/3] w-full overflow-hidden sm:aspect-[16/9]" style={{ backgroundColor: palette.searchBlue }}>
+          <SafeImage src={imageSeed || ''} fallbackSrc={fallbackImage || ''} alt={title} wrapperClassName="h-full w-full" className="h-full w-full object-cover opacity-95 transition-transform duration-300 sm:group-hover:scale-105" fallbackTitle={title} fallbackBadge={badge} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
         </div>
       )}
-      <div className="flex flex-1 flex-col p-6">
-        <div className="flex items-center justify-between gap-4">
-          <span className="rounded-full px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em]" style={{ backgroundColor: palette.activeBlue, color: palette.primaryText }}>{badge}</span>
-          <span className="text-xs font-semibold" style={{ color: palette.secondaryText }}>{meta}</span>
+      <div className="flex flex-1 flex-col p-3 sm:p-6">
+        <div className="flex min-w-0 flex-col items-start gap-1.5 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
+          <span className="max-w-full truncate rounded-full px-2 py-1 text-[8px] font-black uppercase tracking-[0.12em] sm:px-3 sm:text-[10px] sm:tracking-[0.2em]" style={{ backgroundColor: palette.activeBlue, color: palette.primaryText }}>{badge}</span>
+          <span className="max-w-full truncate text-[9px] font-semibold sm:text-xs" style={{ color: palette.secondaryText }}>{meta}</span>
         </div>
-        <h3 className="mt-4 flex-1 text-xl font-black leading-tight transition" style={{ color: palette.primaryText }}>{title}</h3>
-        <p className="mt-3 line-clamp-3 text-sm leading-7" style={{ color: palette.secondaryText }}>{excerpt}</p>
-        <div className="mt-5 inline-flex items-center gap-2 text-sm font-black" style={{ color: palette.linkText }}>Read article <span className="text-lg">→</span></div>
+        <h3 className="mt-2 line-clamp-2 flex-1 text-[14px] font-black leading-[1.22] transition sm:mt-4 sm:text-xl sm:leading-tight" style={{ color: palette.primaryText }}>{title}</h3>
+        <p className="mt-3 hidden text-sm leading-7 sm:line-clamp-3 sm:block" style={{ color: palette.secondaryText }}>{excerpt}</p>
+        <div className="mt-3 inline-flex items-center gap-1 text-[10px] font-black sm:mt-5 sm:gap-2 sm:text-sm" style={{ color: palette.linkText }}>Read article <span className="text-lg">→</span></div>
       </div>
     </button>
   );
@@ -532,9 +532,9 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                       ))}
                     </div>
                   </div>
-                  <div className="grid gap-6 lg:grid-cols-3">
+                  <div className="reading-hub-mobile-grid grid grid-cols-2 gap-3 sm:gap-5 lg:grid-cols-3 lg:gap-6">
                     {visibleArticles.length === 0 && (
-                      <div className="rounded-[2rem] border p-8 shadow-sm backdrop-blur-xl lg:col-span-3" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
+                      <div className="col-span-2 rounded-[1.25rem] border p-5 shadow-sm lg:col-span-3 lg:rounded-[2rem] lg:p-8" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder, color: chatPalette.secondaryText }}>
                         <p className="text-3xl">📚</p>
                         <h3 className="mt-3 text-2xl font-black" style={{ color: chatPalette.primaryText }}>No {listType} posts yet</h3>
                         <p className="mt-2">Fresh learning posts will appear here after they are reviewed and published.</p>
@@ -550,7 +550,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                             pageType={listType === 'news' ? 'news-list' : 'blog-list'}
                             realContentCardCount={visibleArticles.length}
                             isContentLoaded={true}
-                            className="lg:col-span-3 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
+                            className="col-span-2 rounded-[1.25rem] border p-4 shadow-sm lg:col-span-3 lg:rounded-[2rem] lg:p-5"
                             style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}
                           />
                         )}

@@ -4500,6 +4500,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
       ...extraState,
     };
 
+    try {
+      window.sessionStorage.setItem('eduvora.communityRoute.v1', JSON.stringify(nextState));
+    } catch {
+      // History state remains the primary source if session storage is unavailable.
+    }
+
     if (mode === 'push') window.history.pushState(nextState, '', window.location.href);
     else window.history.replaceState(nextState, '', window.location.href);
   };
@@ -4564,8 +4570,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   useEffect(() => {
     if (typeof window === 'undefined') return;
 
-    const onCommunityPopState = (event: PopStateEvent) => {
-      const state = event.state || {};
+    const applyCommunityHistoryState = (state: Record<string, any>) => {
       if (state.dcView !== 'community') return;
 
       clearTransientCommunityUi();
@@ -4589,6 +4594,21 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
         setActiveView('feed');
         restoreSocialFeedScroll();
       }
+    };
+
+    let initialState = window.history.state || {};
+    if (initialState.dcView !== 'community') {
+      try {
+        const storedState = JSON.parse(window.sessionStorage.getItem('eduvora.communityRoute.v1') || 'null');
+        if (storedState?.dcView === 'community') initialState = storedState;
+      } catch {
+        // Fall back to the Community feed.
+      }
+    }
+    applyCommunityHistoryState(initialState);
+
+    const onCommunityPopState = (event: PopStateEvent) => {
+      applyCommunityHistoryState(event.state || {});
     };
 
     window.addEventListener('popstate', onCommunityPopState);

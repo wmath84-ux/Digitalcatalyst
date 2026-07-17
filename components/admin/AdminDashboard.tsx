@@ -49,6 +49,39 @@ interface AdminDashboardProps {
 
 export type AdminView = 'dashboard' | 'firebaseAdmin' | 'adminPosts' | 'economy' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'subscribers' | 'analytics' | 'websiteSettings';
 
+const ADMIN_VIEW_SESSION_KEY = 'eduvora.adminView.v1';
+const ADMIN_VIEWS: AdminView[] = [
+    'dashboard',
+    'firebaseAdmin',
+    'adminPosts',
+    'economy',
+    'products',
+    'newsBlog',
+    'reviews',
+    'reports',
+    'users',
+    'admins',
+    'orders',
+    'coupons',
+    'support',
+    'subscribers',
+    'analytics',
+    'websiteSettings',
+];
+
+const readInitialAdminView = (): AdminView => {
+    if (typeof window === 'undefined') return 'dashboard';
+    const historyView = window.history.state?.dcAdminView;
+    if (ADMIN_VIEWS.includes(historyView)) return historyView;
+    try {
+        const stored = window.sessionStorage.getItem(ADMIN_VIEW_SESSION_KEY);
+        return ADMIN_VIEWS.includes(stored as AdminView) ? stored as AdminView : 'dashboard';
+    } catch {
+        return 'dashboard';
+    }
+};
+
+
 const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?: string; icon: React.ReactNode; gradient: string }> = ({ title, value, subtitle, icon, gradient }) => (
     <div className={`relative overflow-hidden rounded-2xl p-4 shadow-[0_8px_30px_rgb(0,0,0,0.04)] text-slate-900 sm:p-6 ${gradient} transform transition-all duration-300 hover:-translate-y-1 hover:shadow-[0_8px_30px_rgb(0,0,0,0.04)]`}>
         <div className="relative z-10">
@@ -112,7 +145,7 @@ const FirebaseAdminSetup: React.FC = () => {
 };
 
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
-    const [currentView, setCurrentView] = useState<AdminView>('dashboard');
+    const [currentView, setCurrentView] = useState<AdminView>(() => readInitialAdminView());
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
     const [isProductEditorOpen, setIsProductEditorOpen] = useState(false);
     const supportUnreadCount = props.tickets.filter((ticket) => isSupportTicketNeedsAttention(ticket)).length;
@@ -120,6 +153,21 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
     useEffect(() => {
         if (currentView !== 'products') setIsProductEditorOpen(false);
+    }, [currentView]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            window.sessionStorage.setItem(ADMIN_VIEW_SESSION_KEY, currentView);
+        } catch {
+            // Admin navigation still works if storage is restricted.
+        }
+        window.history.replaceState({
+            ...(window.history.state || {}),
+            dcView: 'admin',
+            dcAdminView: currentView,
+            dcAppEntry: true,
+        }, '', window.location.href);
     }, [currentView]);
 
     const viewMeta: Record<AdminView, { title: string; subtitle: string }> = {

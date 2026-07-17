@@ -305,8 +305,23 @@ const productRoundnessControls: Array<{ key: ProductRoundnessKey; label: string;
 ];
 
 
+
+type WebsiteSettingsTab = 'theme' | 'roundness' | 'layout' | 'content' | 'subscriptions' | 'reading' | 'profile' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations';
+const WEBSITE_SETTINGS_TAB_KEY = 'eduvora.storeConfigTab.v1';
+const WEBSITE_SETTINGS_TABS: WebsiteSettingsTab[] = ['theme', 'roundness', 'layout', 'content', 'subscriptions', 'reading', 'profile', 'dock', 'announcements', 'services', 'faq', 'upcoming', 'features', 'animations'];
+
+const readInitialWebsiteSettingsTab = (): WebsiteSettingsTab => {
+    if (typeof window === 'undefined') return 'theme';
+    try {
+        const stored = window.sessionStorage.getItem(WEBSITE_SETTINGS_TAB_KEY) as WebsiteSettingsTab | null;
+        return stored && WEBSITE_SETTINGS_TABS.includes(stored) ? stored : 'theme';
+    } catch {
+        return 'theme';
+    }
+};
+
 const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, products = [], onSettingsChange }) => {
-    const [activeTab, setActiveTab] = useState<'theme' | 'roundness' | 'layout' | 'content' | 'subscriptions' | 'reading' | 'profile' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations'>('theme');
+    const [activeTab, setActiveTab] = useState<WebsiteSettingsTab>(() => readInitialWebsiteSettingsTab());
     const [localSettings, setLocalSettings] = useState<WebsiteSettings>(settings);
     const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'success' | 'failed'>('idle');
 
@@ -314,6 +329,15 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         setLocalSettings(settings);
         setSaveStatus('idle');
     }, [settings]);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        try {
+            window.sessionStorage.setItem(WEBSITE_SETTINGS_TAB_KEY, activeTab);
+        } catch {
+            // The Store Config remains usable without persisted tab state.
+        }
+    }, [activeTab]);
 
     const isDirty = JSON.stringify(localSettings) !== JSON.stringify(settings);
 
@@ -409,6 +433,38 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         ].filter(Boolean)),
     ];
     const classicWorkspaceTheme = localSettings.theme.classicWorkspaceTheme !== false;
+    const selectedColorExperience = localSettings.theme.colorExperience || 'immersive';
+    const originalPaletteActive = selectedColorExperience === 'original';
+    const classicModeActive = selectedColorExperience === 'classic';
+    const themePreviewPalettes = {
+        immersive: { background: '#F4F8FF', surface: '#FFFFFF', primary: '#1769FF', accent: '#6D5CFF', text: '#081A45' },
+        warm: { background: '#FFF9F1', surface: '#FFFEFB', primary: '#7A4A3A', accent: '#A56A4F', text: '#2F2925' },
+        'modern-white': { background: '#F8FAFC', surface: '#FFFFFF', primary: '#0F172A', accent: '#2563EB', text: '#111827' },
+        classic: { background: '#FFFEEB', surface: '#FFFEF8', primary: '#111111', accent: '#F4F35B', text: '#111111' },
+    };
+    const selectedThemePreviewPalette = originalPaletteActive
+        ? {
+            background: localSettings.theme.backgroundColor,
+            surface: '#FFFFFF',
+            primary: localSettings.theme.primaryColor,
+            accent: localSettings.theme.accentColor,
+            text: localSettings.theme.textColor,
+        }
+        : themePreviewPalettes[selectedColorExperience as keyof typeof themePreviewPalettes] || themePreviewPalettes.immersive;
+    const themePreviewFont = classicModeActive
+        ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
+        : localSettings.theme.fontPairing === 'roboto-merriweather'
+            ? 'Roboto, sans-serif'
+            : localSettings.theme.fontPairing === 'montserrat-oswald'
+                ? 'Montserrat, sans-serif'
+                : 'Inter, sans-serif';
+    const themePreviewRadius = classicModeActive ? '0.25rem' : localSettings.theme.cornerRadius;
+    const themePreviewShadows = {
+        light: '0 7px 20px rgba(15,23,42,0.07)',
+        medium: '0 14px 36px rgba(15,23,42,0.10)',
+        heavy: '0 20px 48px rgba(15,23,42,0.14)',
+    };
+    const themePreviewShadow = themePreviewShadows[localSettings.theme.shadowIntensity as keyof typeof themePreviewShadows] || themePreviewShadows.medium;
     const defaultDockItems = dockCustomizationItems;
     const selectedDockItems = dockItems.length ? dockItems : defaultDockItems;
 
@@ -609,8 +665,9 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                     type="button"
                                     role="switch"
                                     aria-checked={classicWorkspaceTheme}
+                                    disabled={!classicModeActive}
                                     onClick={() => handleNestedChange('theme', 'classicWorkspaceTheme', !classicWorkspaceTheme)}
-                                    className={`inline-flex min-h-11 shrink-0 items-center gap-3 rounded border border-[#181818] px-3 py-2 text-sm font-black transition ${classicWorkspaceTheme ? 'bg-[#F4F35B] text-[#111111]' : 'bg-white text-[#676767]'}`}
+                                    className={`theme-control-availability inline-flex min-h-11 shrink-0 items-center gap-3 rounded border border-[#181818] px-3 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-45 ${classicWorkspaceTheme ? 'bg-[#F4F35B] text-[#111111]' : 'bg-white text-[#676767]'}`}
                                 >
                                     <span className={`relative h-5 w-10 rounded border border-[#181818] bg-white after:absolute after:top-0.5 after:h-4 after:w-4 after:rounded-sm after:bg-[#111111] after:transition-transform ${classicWorkspaceTheme ? 'after:left-[1.25rem]' : 'after:left-0.5'}`} />
                                     {classicWorkspaceTheme ? 'Applied' : 'Off'}
@@ -622,35 +679,66 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                         <h3 className="text-lg font-black text-slate-900">Original palette controls</h3>
                         <p className="mt-1 text-sm text-slate-600">These detailed colours remain available for Current / Original Colours mode.</p>
                     </div>
-                    <FormRow label="Primary Color" description="Main brand color for headers, buttons, and links.">
-                        <input type="color" value={localSettings.theme.primaryColor} onChange={e => handleNestedChange('theme', 'primaryColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" />
-                    </FormRow>
-                    <FormRow label="Accent Color" description="Used for highlights and secondary elements.">
-                        <input type="color" value={localSettings.theme.accentColor} onChange={e => handleNestedChange('theme', 'accentColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" />
-                    </FormRow>
-                    <FormRow label="Background Color" description="The main background color for most pages.">
-                        <input type="color" value={localSettings.theme.backgroundColor} onChange={e => handleNestedChange('theme', 'backgroundColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" />
-                    </FormRow>
-                    <FormRow label="Text Color" description="Main text color.">
-                        <input type="color" value={localSettings.theme.textColor} onChange={e => handleNestedChange('theme', 'textColor', e.target.value)} className="w-full h-10 p-1 border rounded-md" />
-                    </FormRow>
-                    <FormRow label="Typography" description="Choose a font pairing for your site.">
-                        <select value={localSettings.theme.fontPairing} onChange={e => handleNestedChange('theme', 'fontPairing', e.target.value)} className="w-full p-2 border rounded">
+                    <fieldset disabled={!originalPaletteActive} className={`theme-control-availability space-y-4 rounded-2xl border p-4 ${originalPaletteActive ? 'border-blue-100 bg-blue-50/40' : 'border-slate-200 bg-slate-50 opacity-55'}`}>
+                        <legend className="px-2 text-xs font-black uppercase tracking-[0.16em] text-slate-600">
+                            {originalPaletteActive ? 'Editing the active Original palette' : 'Select Current / Original Colours to edit these values'}
+                        </legend>
+                        <FormRow label="Primary Color" description="Main brand color for headers, buttons, and links.">
+                            <input type="color" value={localSettings.theme.primaryColor} onChange={e => handleNestedChange('theme', 'primaryColor', e.target.value)} className="h-10 w-full rounded-md border p-1 disabled:cursor-not-allowed" />
+                        </FormRow>
+                        <FormRow label="Accent Color" description="Used for highlights and secondary elements.">
+                            <input type="color" value={localSettings.theme.accentColor} onChange={e => handleNestedChange('theme', 'accentColor', e.target.value)} className="h-10 w-full rounded-md border p-1 disabled:cursor-not-allowed" />
+                        </FormRow>
+                        <FormRow label="Background Color" description="The main background color for most pages.">
+                            <input type="color" value={localSettings.theme.backgroundColor} onChange={e => handleNestedChange('theme', 'backgroundColor', e.target.value)} className="h-10 w-full rounded-md border p-1 disabled:cursor-not-allowed" />
+                        </FormRow>
+                        <FormRow label="Text Color" description="Main text color.">
+                            <input type="color" value={localSettings.theme.textColor} onChange={e => handleNestedChange('theme', 'textColor', e.target.value)} className="h-10 w-full rounded-md border p-1 disabled:cursor-not-allowed" />
+                        </FormRow>
+                    </fieldset>
+                    <FormRow label="Typography" description={classicModeActive ? 'Classic Trust uses its fixed editorial monospace typography.' : 'Choose a real loaded font pairing for the complete website.'}>
+                        <select disabled={classicModeActive} value={localSettings.theme.fontPairing} onChange={e => handleNestedChange('theme', 'fontPairing', e.target.value)} className="theme-control-availability w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-55">
                             <option value="inter-lato">Inter & Lato</option>
                             <option value="roboto-merriweather">Roboto & Merriweather</option>
                             <option value="montserrat-oswald">Montserrat & Oswald</option>
                         </select>
                     </FormRow>
-                     <FormRow label="Corner Radius" description="Controls the roundness of buttons and cards.">
-                        <input type="range" min="0" max="2" step="0.1" value={parseFloat(localSettings.theme.cornerRadius)} onChange={e => handleNestedChange('theme', 'cornerRadius', `${e.target.value}rem`)} className="w-full" />
+                     <FormRow label="Corner Radius" description={classicModeActive ? 'Classic Trust intentionally uses a fixed sharp 0.25rem radius.' : `Controls global cards and buttons. Current: ${localSettings.theme.cornerRadius}`}>
+                        <input disabled={classicModeActive} type="range" min="0" max="2" step="0.1" value={parseFloat(localSettings.theme.cornerRadius)} onChange={e => handleNestedChange('theme', 'cornerRadius', `${e.target.value}rem`)} className="theme-control-availability w-full disabled:cursor-not-allowed disabled:opacity-45" />
                     </FormRow>
-                     <FormRow label="Shadow Intensity" description="Controls the depth of shadows on cards.">
-                        <select value={localSettings.theme.shadowIntensity} onChange={e => handleNestedChange('theme', 'shadowIntensity', e.target.value)} className="w-full p-2 border rounded">
+                     <FormRow label="Shadow Intensity" description="Controls base, large, and extra-large shadow depth across the real website.">
+                        <select value={localSettings.theme.shadowIntensity} onChange={e => handleNestedChange('theme', 'shadowIntensity', e.target.value)} className="w-full rounded border p-2">
                             <option value="light">Light</option>
                             <option value="medium">Medium</option>
                             <option value="heavy">Heavy</option>
                         </select>
                     </FormRow>
+                    <section
+                        className="theme-settings-live-preview overflow-hidden border p-5"
+                        style={{
+                            backgroundColor: selectedThemePreviewPalette.background,
+                            borderColor: selectedThemePreviewPalette.accent,
+                            borderRadius: themePreviewRadius,
+                            boxShadow: themePreviewShadow,
+                            fontFamily: themePreviewFont,
+                        }}
+                    >
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div>
+                                <p className="text-[10px] font-black uppercase tracking-[0.2em]" style={{ color: selectedThemePreviewPalette.primary }}>Live website preview</p>
+                                <h3 className="mt-1 text-xl font-black" style={{ color: selectedThemePreviewPalette.text }}>Product discovery card</h3>
+                            </div>
+                            <span className="rounded-full px-3 py-1 text-[10px] font-black" style={{ backgroundColor: selectedThemePreviewPalette.accent, color: selectedThemePreviewPalette.text }}>
+                                {selectedColorExperience}
+                            </span>
+                        </div>
+                        <div className="mt-4 border p-4" style={{ backgroundColor: selectedThemePreviewPalette.surface, borderColor: selectedThemePreviewPalette.accent, borderRadius: themePreviewRadius, boxShadow: themePreviewShadow }}>
+                            <p className="text-sm font-semibold" style={{ color: selectedThemePreviewPalette.text }}>Typography, palette, radius and all three shadow depths update after Save Changes.</p>
+                            <button type="button" className="mt-4 px-4 py-2 text-sm font-black text-white" style={{ backgroundColor: selectedThemePreviewPalette.primary, borderRadius: themePreviewRadius }}>
+                                Sample primary action
+                            </button>
+                        </div>
+                    </section>
                 </div>
             );
             case 'roundness': return (
