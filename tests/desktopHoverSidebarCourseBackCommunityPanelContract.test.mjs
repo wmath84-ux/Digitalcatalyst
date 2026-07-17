@@ -13,7 +13,8 @@ test('Community uses the real website side panel as a pinned in-page layout with
   assert.match(community, /isDesktopSidebarCollapsed/);
   assert.doesNotMatch(community, /community-website-sidebar-trigger/);
   assert.doesNotMatch(community, /onWebsiteSidebarPreviewStart/);
-  assert.match(app, /openExpandedOnMount/);
+  assert.doesNotMatch(app, /activeItem="Community"[\s\S]{0,180}openExpandedOnMount/);
+  assert.match(app, /siteSidebarState=\{useDesktopSidebar \? desktopSidebarState : 'hidden'\}/);
   assert.match(app, /elevatedLayer/);
   assert.match(app, /detachedTriggerPlacement="top-left"/);
   assert.match(app, /--desktop-site-sidebar-offset/);

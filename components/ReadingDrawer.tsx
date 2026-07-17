@@ -156,10 +156,68 @@ const InlineMarkdown: React.FC<{ text: string; listType: ReadingListType }> = ({
   );
 };
 
+const RICH_HTML_AD_BREAKPOINTS = new Set(['P', 'DIV', 'UL', 'OL', 'BLOCKQUOTE', 'H2', 'H3', 'H4', 'TABLE', 'FIGURE']);
+
+const splitRichHtmlForInArticleAds = (content: string): string[] => {
+  if (typeof document === 'undefined') return [content];
+
+  const template = document.createElement('template');
+  template.innerHTML = content;
+  const sections: string[] = [];
+  let pendingNodes: Node[] = [];
+  let eligibleBlockCount = 0;
+
+  const flushSection = () => {
+    if (!pendingNodes.length) return;
+    const holder = document.createElement('div');
+    pendingNodes.forEach((node) => holder.appendChild(node));
+    const html = holder.innerHTML.trim();
+    pendingNodes = [];
+    if (html) sections.push(html);
+  };
+
+  Array.from(template.content.childNodes).forEach((sourceNode) => {
+    const node = sourceNode.cloneNode(true);
+    pendingNodes.push(node);
+    if (sourceNode.nodeType !== Node.ELEMENT_NODE) return;
+
+    const tagName = (sourceNode as Element).tagName;
+    if (!RICH_HTML_AD_BREAKPOINTS.has(tagName)) return;
+    eligibleBlockCount += 1;
+
+    const shouldBreak = eligibleBlockCount === 3 || (eligibleBlockCount === 8 && content.length >= 5000);
+    if (shouldBreak) flushSection();
+  });
+
+  flushSection();
+  return sections.length ? sections : [content];
+};
+
 const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean; articleWordCount?: number; articleAdDisabled?: boolean; listType: ReadingListType }> = ({ content, includeInArticleAd = false, articleWordCount = 0, articleAdDisabled = false, listType }) => {
   const palette = getPalette(listType);
   if (/<\/?[a-z][\s\S]*>/i.test(content)) {
-    return <div className="reading-rich-html" dangerouslySetInnerHTML={{ __html: content }} />;
+    const richSections = includeInArticleAd ? splitRichHtmlForInArticleAds(content) : [content];
+    return (
+      <>
+        {richSections.map((section, index) => (
+          <React.Fragment key={`rich-section-${index}`}>
+            <div className="reading-rich-html" dangerouslySetInnerHTML={{ __html: section }} />
+            {includeInArticleAd && index < richSections.length - 1 ? (
+              <GoogleAd
+                variant="inArticle"
+                label="Advertisement"
+                pageType="article"
+                visibleWordCount={articleWordCount}
+                isContentLoaded={true}
+                disabled={articleAdDisabled}
+                className="my-10 rounded-[2rem] border p-6 shadow-sm backdrop-blur-xl"
+                style={{ backgroundColor: palette.cardSurface, borderColor: palette.cardBorder }}
+              />
+            ) : null}
+          </React.Fragment>
+        ))}
+      </>
+    );
   }
 
   const lines = content.split('\n');

@@ -7,6 +7,7 @@ import SafeImage from './common/SafeImage';
 import { ensureUserCoinWallet, watchUserCoinWallet } from '../utils/coinWallet';
 import LiquidMetalButton from './ui/LiquidMetalButton';
 import { pillClassForProductRoundness, resolveProductRoundnessSettings } from '../utils/productRoundness';
+import MobileProductSearchPage from './MobileProductSearchPage';
 
 interface MobileAppHomeProps {
   settings: WebsiteSettings;
@@ -81,14 +82,11 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   onProfileClick,
   onAuthClick,
 }) => {
-  const [query, setQuery] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const siteName = settings.content.siteName || 'Digital Catalyst';
   const ownedPreview = purchasedProducts[0];
-  const allPreview = useMemo(() => visibleProducts.filter(product => {
-    const q = query.trim().toLowerCase();
-    if (!q) return true;
-    return [product.title, product.description, product.category, ...(product.tags || [])].filter(Boolean).join(' ').toLowerCase().includes(q);
-  }).slice(0, 6), [visibleProducts, query]);
+  const allPreview = useMemo(() => visibleProducts.slice(0, 6), [visibleProducts]);
   const topPreview = topRatedProducts.slice(0, 4);
   const [mobileCoinBalance, setMobileCoinBalance] = useState<number | null>(null);
   const walletUserId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
@@ -187,7 +185,7 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
 
       <section className="mt-5 rounded-[24px] border border-[#D8E6FF] bg-white p-3 shadow-[0_16px_42px_rgba(11,99,255,0.10)]">
         <label className="flex items-center gap-3 rounded-[20px] bg-[#F5F9FF] px-4 py-3">
-          <span>🔎</span><input value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') onNavigateToAllProducts(); }} placeholder="Search notes, courses, resources..." className="min-w-0 flex-1 bg-transparent text-sm font-bold text-[#081A44] outline-none placeholder:text-[#64708F]/75" /><button type="button" onClick={onNavigateToAllProducts}>🎚️</button>
+          <span>🔎</span><input value={searchQuery} readOnly onFocus={() => setIsMobileSearchOpen(true)} onClick={() => setIsMobileSearchOpen(true)} placeholder="Search notes, courses, resources..." aria-label="Open product search" className="min-w-0 flex-1 cursor-pointer bg-transparent text-sm font-bold text-[#081A44] outline-none placeholder:text-[#64708F]/75" /><button type="button" onClick={() => setIsMobileSearchOpen(true)} aria-label="Open full product search">↗</button>
         </label>
       </section>
 
@@ -204,6 +202,7 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
       <section id="mobile-coupons" className="mt-7 scroll-mt-24"><SectionHead title="Coupons" subtitle="Apply active offers during checkout." onViewAll={onNavigateToAllProducts} /><div className="space-y-3">{activeCoupons.length > 0 ? activeCoupons.map(coupon => <article key={coupon.id} className="flex items-center justify-between gap-3 rounded-[24px] border border-[#D8E6FF] bg-white p-4 shadow-[0_14px_36px_rgba(11,99,255,0.08)]"><div><p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#0B63FF]">Active Coupon</p><h3 className="mt-1 text-lg font-black text-[#081A44]">{coupon.code}</h3><p className="mt-1 text-xs font-bold text-[#64708F]">{coupon.type === 'percentage' ? `${coupon.value}% off` : `₹${coupon.value} off`} • valid till {coupon.expiryDate || 'checkout'}</p></div><button type="button" onClick={onNavigateToAllProducts} className="shrink-0 rounded-2xl bg-[#EEF6FF] px-4 py-2 text-xs font-black text-[#0B63FF]">Use</button></article>) : <div className="rounded-[24px] border border-dashed border-[#BFD7FF] bg-white/78 p-5 text-center font-bold text-[#64708F]">No active coupons right now.</div>}</div></section>
 
       <section className="mt-7"><SectionHead title="All Products" subtitle="Browse all premium learning products." onViewAll={onNavigateToAllProducts} /><div className="space-y-3">{allPreview.length > 0 ? allPreview.map(product => <article key={product.id} className={`relative ${mobileHomePreviewCardRoundClass} border border-[#D8E6FF] bg-white p-3 shadow-[0_16px_42px_rgba(11,99,255,0.08)]`}><button onClick={() => onToggleWishlist(product.id)} className={`absolute right-4 top-4 z-30 grid h-9 w-9 place-items-center ${productBadgeRoundClass} bg-white/90 shadow`}>{wishlist.includes(product.id) ? '❤️' : '♡'}</button><div className="flex gap-3"><div className={`relative w-24 shrink-0 overflow-hidden ${mobileHomePreviewMediaRoundClass} aspect-[6/7]`}><ProductCover product={product} slot="homeList" /><button type="button" onClick={() => onViewProduct(product)} aria-label={`Open ${product.title}`} className="absolute inset-0 z-10 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-[-4px] focus-visible:outline-[#0B63FF]" /></div><div className="min-w-0 flex-1 pr-10"><div className="flex max-w-full flex-wrap items-center gap-2 overflow-visible pb-0.5">{purchasedProductIds.includes(product.id) ? (<span className={`inline-flex max-w-full shrink-0 items-center ${productBadgeRoundClass} border border-emerald-300/70 bg-emerald-500/15 px-2.5 py-1 text-[9px] font-black uppercase leading-none tracking-[0.08em] text-emerald-700 shadow-[0_6px_16px_rgba(5,150,105,0.16)] ring-1 ring-emerald-100/80`}>Purchased</span>) : (<span className={`inline-flex max-w-full items-center ${productBadgeRoundClass} border border-emerald-300/70 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-black leading-none text-emerald-700 shadow-[0_6px_16px_rgba(5,150,105,0.16)] ring-1 ring-emerald-100/80`}>{product.category || 'Learning'}</span>)}</div><h3 className="mt-2 line-clamp-1 text-base font-black text-[#081A44]"><button type="button" onClick={() => onViewProduct(product)} className="block w-full truncate text-left focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0B63FF]">{product.title}</button></h3><p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[#64708F]">{product.description}</p><div className="mt-2 flex items-center justify-between"><p className="text-[11px] font-bold text-[#64708F]">⭐ <span className="text-[#FFB020]">{product.rating.toFixed(1)}</span> ({product.reviewCount})</p><span className="font-black text-[#081A44]">{currency(product)}</span></div><button onClick={() => onViewProduct(product)} className={`mt-2 ${productActionButtonRoundClass} bg-[#0B63FF] px-3 py-2 text-xs font-black text-white`}>View Details</button></div></div></article>) : <div className="rounded-[24px] border border-[#D8E6FF] bg-white p-5 text-center font-bold text-[#64708F]">No products found. Try another search.</div>}</div></section>
+      {isMobileSearchOpen ? <MobileProductSearchPage source="home" products={visibleProducts} query={searchQuery} onQueryChange={setSearchQuery} onClose={() => setIsMobileSearchOpen(false)} onViewProduct={(product) => onViewProduct(product)} wishlist={wishlist} onToggleWishlist={onToggleWishlist} purchasedProductIds={purchasedProductIds} /> : null}
     </div>
   );
 };

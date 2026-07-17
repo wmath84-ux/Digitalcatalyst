@@ -718,7 +718,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   const defaultPages = useMemo(() => normalizeDocPages(file), [file]);
   const [pages, setPages] = useState<ProductDocPage[]>(defaultPages);
   const [activePageId, setActivePageId] = useState(defaultPages[0]?.id || 'page-1');
-  const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(() => getViewportMetrics().width >= 768);
   const [savedAt, setSavedAt] = useState('Loaded admin version');
   const [isReadingMode, setIsReadingMode] = useState(false);
   const [fontSize, setFontSize] = useState(18);
@@ -744,6 +744,10 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
 
   const activePage = pages.find(page => page.id === activePageId) || pages[0];
   const activeContent = activePage?.content || OPEN_DOCS_DEFAULT_HTML;
+
+  useEffect(() => {
+    setIsSidebarOpen(!isCompactDocs);
+  }, [file.id, isCompactDocs]);
 
   useEffect(() => {
     return onAuthStateChanged(auth, user => {
@@ -2249,60 +2253,41 @@ const CoursePlayer: React.FC<{
       <div onClick={closeCourseSidebar} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition ${useDesktopSidebar ? 'lg:hidden' : ''} ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
       <main className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${compactPlayerChrome ? 'gap-1 p-1.5' : 'gap-2 p-2 sm:gap-3 sm:p-3 lg:p-3'}`} style={{ paddingLeft: 'max(0.375rem, env(safe-area-inset-left))', paddingRight: 'max(0.375rem, env(safe-area-inset-right))', paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}>
-        <div className={`${forceOverlaySidebar ? 'hidden' : 'hidden lg:grid'} shrink-0 grid-cols-[minmax(18rem,1fr)_auto_minmax(18rem,1fr)] items-center gap-4 rounded-[1.75rem] border border-[#E3E8F5] bg-white/90 px-5 py-4 text-[#071735] shadow-[0_18px_45px_rgba(8,26,69,0.08)] backdrop-blur-2xl`}>
-          <div className="flex min-w-0 items-center gap-4">
-            <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-3xl bg-gradient-to-br from-[#5B4BFF] to-[#7B61FF] text-white shadow-[0_14px_34px_rgba(91,75,255,0.22)]">
-              <ModuleIcon className="h-7 w-7" />
+        <div className={`${forceOverlaySidebar ? 'hidden' : 'hidden lg:flex'} shrink-0 items-center gap-2 rounded-xl border border-[#E3E8F5] bg-white/92 px-3 py-2.5 text-[#071735] shadow-[0_12px_32px_rgba(8,26,69,0.07)] backdrop-blur-2xl`}>
+          <div className="flex min-w-0 flex-1 items-center gap-3">
+            <div className="course-panel-icon-contrast flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-[0_10px_24px_rgba(91,75,255,0.20)]" style={{ background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)' }}>
+              <ModuleIcon className="h-5 w-5" />
             </div>
             <div className="min-w-0">
-              <p className="text-[11px] font-black uppercase tracking-[0.28em] text-[#5B4BFF]">Course Player</p>
-              <h1 className="mt-1 truncate text-2xl font-black leading-tight text-[#071735]">{product.title}</h1>
-              <p className="mt-1 truncate text-sm font-bold text-[#667085]">
-                {activeFile?.name ? `Now learning: ${activeFile.name}` : 'Continue your learning journey'}
-              </p>
+              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-[#5B4BFF]">Course Player</p>
+              <h1 className="truncate text-lg font-black leading-tight text-[#071735]">{product.title}</h1>
+              <p className="truncate text-xs font-bold text-[#667085]">{activeFile?.name || 'Continue learning'}</p>
             </div>
           </div>
 
-          <div className="flex min-w-0 items-center justify-center gap-3">
-            <YoutubeRewardChip />
-            <button onClick={() => { setIsDesktopSidebarCollapsed(value => !value); }} className="shrink-0 rounded-2xl border border-[#D9E7F8] bg-white px-5 py-3 text-base font-black text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.06)] transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]">
-              {isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize modules'}
+          <div className="flex shrink-0 items-center gap-2">
+            <YoutubeRewardChip compact />
+            <button onClick={() => { setIsDesktopSidebarCollapsed(value => !value); }} className="shrink-0 rounded-xl border border-[#D9E7F8] bg-white px-3 py-2 text-xs font-black text-[#071735] shadow-sm transition hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]">
+              {isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize'}
             </button>
-            <button onClick={() => toggleCourseMentor()} className="rounded-2xl border border-[#C9C2FF] bg-[#F1EEFF] px-6 py-3 text-base font-black text-[#5B4BFF] shadow-[0_14px_34px_rgba(91,75,255,0.14)] transition hover:-translate-y-0.5 hover:bg-white">
-              🧠 {isMentorOpen ? 'Lesson View' : 'AI Mentor'}
+            <button onClick={() => toggleCourseMentor()} className="shrink-0 rounded-xl border border-[#C9C2FF] bg-[#F1EEFF] px-3 py-2 text-xs font-black text-[#5B4BFF] shadow-sm transition hover:bg-white">
+              🧠 {isMentorOpen ? 'Lesson' : 'AI Mentor'}
             </button>
-          </div>
-
-          <div className="flex min-w-0 items-center justify-end gap-3">
-            <div className="min-w-0 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-3 text-right shadow-[0_8px_24px_rgba(8,26,69,0.04)]">
-              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-[#7C879A]">Learning Mode</p>
-              <p className="mt-1 truncate text-sm font-black text-[#22A06B]">In Progress</p>
-            </div>
-            <button onClick={handlePlayerBack} className="shrink-0 rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-black text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.06)] transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF]" aria-label="Back to course details">
-              ← Course details
+            <button onClick={handlePlayerBack} className="shrink-0 rounded-xl border border-[#D9E7F8] bg-white px-3 py-2 text-xs font-black text-[#071735] shadow-sm transition hover:border-[#C9C2FF] hover:bg-[#F1EEFF]" aria-label="Back to course details">
+              ← Back
             </button>
           </div>
         </div>
 
-        <section className={`${useDesktopSidebar ? 'lg:grid-cols-[var(--course-sidebar-width)_minmax(0,1fr)]' : 'grid-cols-1'} grid min-h-0 min-w-0 flex-1 overflow-hidden gap-2 sm:gap-3`} style={{ ['--course-sidebar-width' as any]: 'clamp(18rem, 28vw, 28rem)' }}>
-          <aside id={modulePanelId} className={`${useDesktopSidebar ? 'lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-2xl' : ''} fixed inset-y-0 left-0 z-40 w-[min(88svw,20rem)] max-w-full transform transition sm:w-80 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-            <div className="flex h-full flex-col border-r border-[#ded8ff] bg-white/85 shadow-sm backdrop-blur-xl lg:rounded-2xl lg:border lg:border-[#ded8ff] lg:bg-white/85 lg:shadow-sm">
-              <div className="shrink-0 border-b border-[#E3E8F5] bg-white/90 px-4 py-4 shadow-sm lg:border-[#E3E8F5] lg:py-5">
-                <div className="rounded-[1.5rem] border border-[#D9E7F8] bg-gradient-to-br from-white via-[#F8FBFF] to-[#F1EEFF] p-4 shadow-[0_8px_24px_rgba(8,26,69,0.06)]">
-                  <div className="mb-3 flex items-center gap-3">
-                    <span className="course-panel-icon-contrast flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl text-white shadow-[0_14px_34px_rgba(91,75,255,0.22)] ring-1 ring-[#dcd7ff]" style={{ background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)', color: '#FFFFFF' }}>
-                      <ModuleIcon className="h-6 w-6 text-white drop-shadow-sm" />
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-[11px] font-black uppercase tracking-[0.24em] text-[#5B4BFF]">Course Panel</p>
-                      <p className="truncate text-sm font-bold text-[#667085]">Modules, lessons, docs & quizzes</p>
-                    </div>
-                  </div>
-                  <div className="flex items-start gap-3">
-                    <h2 className="line-clamp-2 min-w-0 flex-1 text-xl font-black leading-tight text-[#071735] sm:text-[25px]">{product.title}</h2>
-                    <button type="button" onClick={closeCourseSidebar} className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#071735] shadow-sm transition hover:bg-[#F1EEFF] focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50 lg:hidden" aria-label="Close modules">×</button>
-                  </div>
+        <section className={`${useDesktopSidebar ? 'lg:grid-cols-[var(--course-sidebar-width)_minmax(0,1fr)]' : 'grid-cols-1'} grid min-h-0 min-w-0 flex-1 overflow-hidden gap-2 sm:gap-3`} style={{ ['--course-sidebar-width' as any]: 'clamp(17rem, 22vw, 21rem)' }}>
+          <aside id={modulePanelId} className={`${useDesktopSidebar ? 'lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-lg' : ''} fixed inset-y-0 left-0 z-40 w-[min(88svw,20rem)] max-w-full transform transition sm:w-80 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
+            <div className="flex h-full flex-col border-r border-[#ded8ff] bg-white/85 shadow-sm backdrop-blur-xl lg:rounded-lg lg:border lg:border-[#ded8ff] lg:bg-white/85 lg:shadow-sm">
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#E3E8F5] bg-white/90 px-4 py-3">
+                <div className="min-w-0">
+                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#5B4BFF]">Course modules</p>
+                  <p className="truncate text-xs font-bold text-[#667085]">{activeFile?.name || 'Choose a lesson'}</p>
                 </div>
+                <button type="button" onClick={closeCourseSidebar} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#D9E7F8] bg-white text-lg font-black text-[#071735] shadow-sm transition hover:bg-[#F1EEFF] focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50 lg:hidden" aria-label="Close modules">×</button>
               </div>
               <nav className="flex-1 overflow-y-auto p-2 sm:p-3">
                 {courseContent.length > 0 ? courseContent.map((m, index) => (

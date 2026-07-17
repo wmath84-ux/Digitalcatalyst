@@ -68,6 +68,32 @@ export const withProductSearchIndex = <T extends Partial<Product>>(product: T): 
 
 export const isProductSearchVisible = (product: Product): boolean => product.isVisible !== false && (product as any).status !== 'draft' && (product as any).status !== 'archived' && (product as any).isDeleted !== true;
 
+const boundedTokenDistance = (left: string, right: string, maxDistance: number): number => {
+  if (left === right) return 0;
+  if (Math.abs(left.length - right.length) > maxDistance) return maxDistance + 1;
+  let previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    const current = [leftIndex];
+    let rowMinimum = current[0];
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const cost = left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1;
+      const distance = Math.min(previous[rightIndex] + 1, current[rightIndex - 1] + 1, previous[rightIndex - 1] + cost);
+      current.push(distance);
+      rowMinimum = Math.min(rowMinimum, distance);
+    }
+    if (rowMinimum > maxDistance) return maxDistance + 1;
+    previous = current;
+  }
+  return previous[right.length];
+};
+
+const looseTokenMatch = (queryToken: string, fieldToken: string): boolean => {
+  if (fieldToken.includes(queryToken) || fieldToken.startsWith(queryToken)) return true;
+  if (queryToken.length >= 4 && fieldToken.startsWith(queryToken.slice(0, -1))) return true;
+  const maxDistance = queryToken.length >= 7 ? 2 : queryToken.length >= 4 ? 1 : 0;
+  return maxDistance > 0 && boundedTokenDistance(queryToken, fieldToken, maxDistance) <= maxDistance;
+};
+
 export const rankProductForQuery = (product: ProductWithRating, query: string): number => {
   const normalizedQuery = normalizeSearchValue(query);
   const tokens = splitSearchTokens(normalizedQuery);
@@ -77,7 +103,7 @@ export const rankProductForQuery = (product: ProductWithRating, query: string): 
   const categories = [index.normalizedCategory, ...(product.tags || []).map(normalizeSearchValue)];
   const keywords = index.normalizedKeywords;
   const description = normalizeSearchValue([product.description, product.longDescription].join(' '));
-  const allTokensMatch = tokens.every(token => index.searchableText.includes(token) || index.searchTokens.some(fieldToken => fieldToken.startsWith(token)));
+  const allTokensMatch = tokens.every(token => index.searchableText.includes(token) || index.searchTokens.some(fieldToken => looseTokenMatch(token, fieldToken)));
   if (!allTokensMatch) return 0;
 
   let score = 10;
@@ -89,6 +115,7 @@ export const rankProductForQuery = (product: ProductWithRating, query: string): 
     if (categories.some(item => item.includes(token))) return sum + 90;
     if (keywords.some(item => item.includes(token))) return sum + 75;
     if (description.includes(token)) return sum + 35;
+    if (index.searchTokens.some(fieldToken => looseTokenMatch(token, fieldToken))) return sum + 25;
     return sum + 15;
   }, 0);
   return score;

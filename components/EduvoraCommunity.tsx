@@ -20,6 +20,7 @@ interface EduvoraCommunityProps {
   isAuthenticated?: boolean;
   settings?: WebsiteSettings;
   currentUser?: User | null;
+  siteSidebarState?: 'expanded' | 'collapsed' | 'hidden';
 }
 
 type CommunityView = 'feed' | 'status';
@@ -401,6 +402,7 @@ const toCommunityCssVars = (
 };
 
 const normalizeUsername = (value: string) => value.toLowerCase().trim().replace(/\s+/g, '_').replace(/[^a-z0-9._]/g, '').replace(/[.]{2,}/g, '.').replace(/_{2,}/g, '_').replace(/^[._]+|[._]+$/g, '');
+const normalizeEditableUsername = (value: string) => value.toLowerCase().replace(/[^a-z]/g, '').slice(0, 30);
 
 const readJsonArray = <T,>(key: string, fallback: T[]): T[] => {
   if (typeof window === 'undefined') return fallback;
@@ -2579,11 +2581,17 @@ const communityPolishCss = `
     }
   }
   @media (min-width: 1280px) {
-    .community-desktop-social .community-social-right-rail {
+    .community-desktop-social.community-site-sidebar-compact .community-social-right-rail {
       display: flex !important;
     }
-    .community-desktop-social .community-center-shell {
+    .community-desktop-social.community-site-sidebar-compact .community-center-shell {
       max-width: calc(100% - 20.5rem);
+    }
+    .community-desktop-social.community-site-sidebar-expanded .community-social-right-rail {
+      display: none !important;
+    }
+    .community-desktop-social.community-site-sidebar-expanded .community-center-shell {
+      max-width: 100% !important;
     }
   }
   @media (min-width: 1024px) and (max-width: 1279px) {
@@ -2929,13 +2937,13 @@ const communityPolishCss = `
     }
   }
   @media (min-width: 1280px) {
-    .community-desktop-social .community-social-right-rail {
+    .community-desktop-social.community-site-sidebar-compact .community-social-right-rail {
       width: 22rem !important;
       min-width: 22rem !important;
       gap: 0.95rem !important;
       padding: 1rem !important;
     }
-    .community-desktop-social .community-center-shell {
+    .community-desktop-social.community-site-sidebar-compact .community-center-shell {
       max-width: calc(100% - 22rem) !important;
     }
   }
@@ -3610,6 +3618,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
   isAuthenticated = false,
   settings,
   currentUser = null,
+  siteSidebarState = 'hidden',
 }) => {
   const navigate = useNavigate();
   const guardedAuth = getAuth();
@@ -6104,11 +6113,11 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
 
   const saveProfileChanges = () => {
     const name = profileDraft.name.trim() || buildStableCommunityName(currentUserKey);
-    const username = normalizeUsername(profileDraft.username || name) || buildStableCommunityUsername(currentUserKey);
+    const username = normalizeEditableUsername(profileDraft.username || name);
     const bio = profileDraft.bio.trim().slice(0, PROFILE_BIO_MAX_LENGTH);
 
-    if (!/^[a-z0-9][a-z0-9._]{1,28}[a-z0-9]$/.test(username)) {
-      setProfileFeedback({ type: 'error', message: 'Username must be 3-30 characters and can use lowercase letters, numbers, underscores, or dots.' });
+    if (!/^[a-z]{3,30}$/.test(username)) {
+      setProfileFeedback({ type: 'error', message: 'Username must be 3-30 lowercase letters only, with no spaces, numbers, dots, or symbols.' });
       return;
     }
 
@@ -8521,9 +8530,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
               Username
               <span className="mt-2 flex h-12 items-center rounded-2xl border border-[#D7DFEA] bg-[#FFFEFB] px-4 focus-within:border-[#3157A4] focus-within:ring-4 focus-within:ring-[#3157A4]/10">
                 <span className="mr-1 font-black text-[#7C879A]">@</span>
-                <input value={profileDraft.username} onChange={(event) => setProfileDraft((current) => ({ ...current, username: normalizeUsername(event.target.value) }))} autoCapitalize="none" autoComplete="username" spellCheck={false} placeholder="username" className="min-w-0 flex-1 bg-transparent font-semibold text-[#273247] outline-none" />
+                <input value={profileDraft.username} onChange={(event) => setProfileDraft((current) => ({ ...current, username: normalizeEditableUsername(event.target.value) }))} autoCapitalize="none" autoComplete="username" spellCheck={false} inputMode="text" pattern="[a-z]{3,30}" placeholder="username" className="min-w-0 flex-1 bg-transparent font-semibold text-[#273247] outline-none" />
               </span>
-              <span className="mt-1.5 block text-xs font-semibold leading-5 text-[#7C879A]">3–30 characters: lowercase letters, numbers, dots or underscores.</span>
+              <span className="mt-1.5 block text-xs font-semibold leading-5 text-[#7C879A]">3–30 lowercase letters only. Spaces, numbers and symbols are removed.</span>
             </label>
 
             <label className="min-w-0 text-sm font-black text-[#273247] sm:col-span-2">
@@ -8809,14 +8818,18 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
   };
 
   const renderCommunitySearchPage = () => {
-    const query = normalizeSearchText(communitySearchQuery);
+    const query = normalizeSearchText(communitySearchQuery.replace(/^@/, ''));
+    const directUsername = communitySearchQuery.trim().startsWith('@') ? normalizeUsername(communitySearchQuery.trim().slice(1)) : '';
     const results = allCreators
       .filter((creator) => !isOwnCommunityId(creator.id) && creator.isPublic !== false && !creator.isSuspended)
-      .map((creator) => ({ creator, score: scoreCreatorSearch(creator, query) }))
+      .map((creator) => ({
+        creator,
+        score: scoreCreatorSearch(creator, communitySearchQuery) + (directUsername && normalizeUsername(creator.username) === directUsername ? 10000 : 0),
+      }))
       .filter(({ score }) => !query || score > 0)
       .sort((left, right) => right.score - left.score || left.creator.name.localeCompare(right.creator.name))
       .slice(0, 100);
-    return <div className="community-user-search mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col overflow-hidden bg-white md:h-[calc(100dvh-8rem)] md:rounded-[1.5rem] md:border md:border-[#e5e7eb]"><header className="flex items-center gap-2 border-b border-[#efefef] px-3 py-2"><button type="button" onClick={goBack} className="flex h-11 w-11 items-center justify-center rounded-full text-xl hover:bg-[#f5f5f5]">←</button><label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl bg-[#efefef] px-3"><span>⌕</span><input ref={communitySearchInputRef} autoFocus value={communitySearchQuery} onChange={(event) => setCommunitySearchQuery(event.target.value)} placeholder="Search people" className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[#111] outline-none" />{communitySearchQuery ? <button type="button" onClick={() => setCommunitySearchQuery('')} className="text-sm font-black text-[#737373]">✕</button> : null}</label></header><div className="min-h-0 flex-1 overflow-y-auto p-2 custom-scrollbar">{results.length ? results.map(({ creator }) => <button key={creator.id} type="button" onClick={() => { setSelectedProfileId(creator.id); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); }} className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left hover:bg-[#f7f7f7]"><Avatar value={creator.avatar} size="h-12 w-12" /><span className="min-w-0 flex-1"><strong className="flex items-center gap-1 truncate text-sm text-[#111]">{creator.name}{creator.verified ? <BlueVerifiedTick /> : null}</strong><span className="block truncate text-xs font-semibold text-[#737373]">@{creator.username} · {creator.role}</span></span><span className="text-lg text-[#a3a3a3]">›</span></button>) : <div className="px-6 py-16 text-center"><div className="text-5xl">⌕</div><h3 className="mt-4 text-xl font-black text-[#111]">No users found</h3><p className="mt-2 text-sm font-semibold text-[#737373]">Try a shorter name, username, or nearby spelling.</p></div>}</div></div>;
+    return <div className="community-user-search mx-auto flex h-full min-h-0 w-full max-w-3xl flex-col overflow-hidden bg-white md:h-[calc(100dvh-8rem)] md:rounded-[1.5rem] md:border md:border-[#e5e7eb]"><header className="flex items-center gap-2 border-b border-[#efefef] px-3 py-2"><button type="button" onClick={goBack} className="flex h-11 w-11 items-center justify-center rounded-full text-xl hover:bg-[#f5f5f5]">←</button><label className="flex min-h-11 min-w-0 flex-1 items-center gap-2 rounded-xl bg-[#efefef] px-3"><span>⌕</span><input ref={communitySearchInputRef} autoFocus value={communitySearchQuery} onChange={(event) => setCommunitySearchQuery(event.target.value)} placeholder="Search name or @username" className="min-w-0 flex-1 bg-transparent text-sm font-semibold text-[#111] outline-none" />{communitySearchQuery ? <button type="button" onClick={() => setCommunitySearchQuery('')} className="text-sm font-black text-[#737373]">✕</button> : null}</label></header><div className="min-h-0 flex-1 overflow-y-auto p-2 custom-scrollbar">{results.length ? results.map(({ creator }) => <button key={creator.id} type="button" onClick={() => { setSelectedProfileId(creator.id); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); }} className="flex w-full items-center gap-3 rounded-xl px-2 py-3 text-left hover:bg-[#f7f7f7]"><Avatar value={creator.avatar} size="h-12 w-12" /><span className="min-w-0 flex-1"><strong className="flex items-center gap-1 truncate text-sm text-[#111]">{creator.name}{creator.verified ? <BlueVerifiedTick /> : null}</strong><span className="block truncate text-xs font-semibold text-[#737373]">@{creator.username} · {creator.role}</span></span><span className="text-lg text-[#a3a3a3]">›</span></button>) : <div className="px-6 py-16 text-center"><div className="text-5xl">⌕</div><h3 className="mt-4 text-xl font-black text-[#111]">No users found</h3><p className="mt-2 text-sm font-semibold text-[#737373]">Try a shorter name, username, or nearby spelling.</p></div>}</div></div>;
   };
 
   const renderFollowingPage = () => {
@@ -8891,7 +8904,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
   }
 
   return (
-    <section style={communityCssVars} className={`eduvora-community-polish relative h-full min-h-0 w-full overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-0 lg:p-0 ${useSocialDesktopLayout ? 'community-desktop-social' : useLatestDesktopLayout ? 'community-desktop-latest' : 'community-desktop-classic'} ${useLatestMobileLayout ? 'community-mobile-latest' : 'community-mobile-classic'}`}>
+    <section style={communityCssVars} className={`eduvora-community-polish relative h-full min-h-0 w-full overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-0 lg:p-0 ${useSocialDesktopLayout ? 'community-desktop-social' : useLatestDesktopLayout ? 'community-desktop-latest' : 'community-desktop-classic'} ${siteSidebarState === 'expanded' ? 'community-site-sidebar-expanded' : 'community-site-sidebar-compact'} ${useLatestMobileLayout ? 'community-mobile-latest' : 'community-mobile-classic'}`}>
       <style>{`
         @keyframes eduvoraBondShine {
           0% { transform: translateX(0); opacity: 0; }

@@ -32,7 +32,7 @@ import ComingSoonModal from './components/ComingSoonModal';
 import { FreeProductsModal, FreeProductsPage } from './components/ContentModals';
 import ReadingDrawer, { ReadingListType, ReadingView } from './components/ReadingDrawer';
 import BottomGlassDock from './components/BottomGlassDock';
-import HomeSideDock from './components/HomeSideDock';
+import HomeSideDock, { DesktopSidebarState, readDesktopSidebarState } from './components/HomeSideDock';
 import ProfilePage from './components/ProfilePage';
 import PlatformExperience from './components/PlatformExperience';
 import SubscriptionPage from './components/SubscriptionPage';
@@ -1536,6 +1536,7 @@ const App: React.FC = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [currentView, setCurrentView] = useState(() => readInitialAppView());
+  const [desktopSidebarState, setDesktopSidebarState] = useState<DesktopSidebarState>(() => readDesktopSidebarState());
 
   useEffect(() => {
     if (typeof document === 'undefined' || currentView !== 'allProducts') return undefined;
@@ -6253,8 +6254,8 @@ const App: React.FC = () => {
             wishlistCount={wishlist.length}
             dockBadgeCounts={dockActivity.badgeCounts}
             activeItem="Community"
-            openExpandedOnMount
             elevatedLayer
+            onStateChange={setDesktopSidebarState}
             detachedTriggerPlacement="top-left"
             onHomeClick={handleBackToHome}
             onOpenBlogModal={() => openReadingHub('blog')}
@@ -6280,6 +6281,7 @@ const App: React.FC = () => {
               onClose={() => handleNavigateBack('home')}
               isAuthenticated={isLoggedIn}
               currentUser={effectiveAppUser}
+              siteSidebarState={useDesktopSidebar ? desktopSidebarState : 'hidden'}
             />
           ) : (
             <div className="flex min-h-full items-center justify-center">
@@ -6332,6 +6334,7 @@ const App: React.FC = () => {
                 wishlistCount={wishlist.length}
                 dockBadgeCounts={dockActivity.badgeCounts}
                 activeItem={desktopSidebarActiveItem}
+                onStateChange={setDesktopSidebarState}
                 onHomeClick={handleBackToHome}
                 onOpenBlogModal={() => openReadingHub('blog')}
                 onOpenFreeModal={handleNavigateToFreeProducts}

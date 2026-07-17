@@ -37,9 +37,10 @@ interface HomeSideDockProps {
   openExpandedOnMount?: boolean;
   elevatedLayer?: boolean;
   detachedTriggerPlacement?: 'default' | 'top-left';
+  onStateChange?: (state: DesktopSidebarState) => void;
 }
 
-type SidebarState = 'expanded' | 'collapsed' | 'hidden';
+export type DesktopSidebarState = 'expanded' | 'collapsed' | 'hidden';
 
 type NavigationItem = {
   id: string;
@@ -51,7 +52,7 @@ type NavigationItem = {
 
 const SIDEBAR_STATE_KEY = 'digitalCatalystDesktopSidebarState';
 
-const readInitialState = (): SidebarState => {
+export const readDesktopSidebarState = (): DesktopSidebarState => {
   if (typeof window === 'undefined') return 'expanded';
   try {
     const stored = window.localStorage.getItem(SIDEBAR_STATE_KEY);
@@ -69,8 +70,8 @@ const clamp = (value: unknown, minimum: number, maximum: number, fallback: numbe
   return Math.min(maximum, Math.max(minimum, number));
 };
 
-const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity, authButtonLabel, activeItem = '', showDetachedTrigger = true, overlayMode = false, openExpandedOnMount = false, elevatedLayer = false, detachedTriggerPlacement = 'default' }: HomeSideDockProps) => {
-  const [sidebarState, setSidebarState] = useState<SidebarState>(() => openExpandedOnMount ? 'expanded' : readInitialState());
+const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity, authButtonLabel, activeItem = '', showDetachedTrigger = true, overlayMode = false, openExpandedOnMount = false, elevatedLayer = false, detachedTriggerPlacement = 'default', onStateChange }: HomeSideDockProps) => {
+  const [sidebarState, setSidebarState] = useState<DesktopSidebarState>(() => openExpandedOnMount ? 'expanded' : readDesktopSidebarState());
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const hoverCloseTimerRef = useRef<number | null>(null);
   const dockStyle = { ...defaultDockStyle, ...((settings.content as any).dockStyle || {}) };
@@ -95,7 +96,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
   const isTemporaryPreview = hoverExpanded && (sidebarState === 'collapsed' || sidebarState === 'hidden');
   const isVisuallyExpanded = showLabels && (sidebarState === 'expanded' || isTemporaryPreview);
   const isPanelVisible = sidebarState !== 'hidden' || hoverExpanded;
-  const layoutWidth = sidebarState === 'hidden' ? 0 : isVisuallyExpanded ? expandedWidth : collapsedWidth;
+  const layoutWidth = sidebarState === 'expanded' ? expandedWidth : sidebarState === 'collapsed' ? collapsedWidth : 0;
   const visualWidth = isVisuallyExpanded ? expandedWidth : collapsedWidth;
 
   useEffect(() => {
@@ -104,7 +105,8 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
     } catch {
       // Persistence is optional.
     }
-  }, [sidebarState]);
+    onStateChange?.(sidebarState);
+  }, [onStateChange, sidebarState]);
 
   useEffect(() => {
     if (overlayMode) return undefined;
@@ -137,7 +139,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
 
   useEffect(() => () => cancelHoverClose(), []);
 
-  const setPersistentState = (nextState: SidebarState) => {
+  const setPersistentState = (nextState: DesktopSidebarState) => {
     cancelHoverClose();
     setHoverExpanded(false);
     setSidebarState(nextState);
