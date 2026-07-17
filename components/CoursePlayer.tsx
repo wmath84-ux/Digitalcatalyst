@@ -1400,6 +1400,15 @@ const CoursePlayer: React.FC<{
       closeCourseSidebar();
       return;
     }
+    if (
+      typeof window !== 'undefined'
+      && forceOverlaySidebarRef.current
+      && window.history.state?.dcView === 'coursePlayer'
+      && window.history.state?.dcCourseLessonSelection === true
+    ) {
+      window.history.back();
+      return;
+    }
 
     resetCourseModulePanel();
     void flushYoutubeCoins('closed');
@@ -1485,6 +1494,7 @@ const CoursePlayer: React.FC<{
       dcCourseLayer: layer,
       dcCourseProductId: product.id,
       dcCourseFileId: activeFile?.id || null,
+      dcCourseLessonSelection: false,
     };
 
     if (mode === 'push') window.history.pushState(nextState, '', window.location.href);
@@ -1503,6 +1513,7 @@ const CoursePlayer: React.FC<{
         dcCourseLayer: null,
         dcCourseProductId: product.id,
         dcCourseFileId: activeFile?.id || null,
+        dcCourseLessonSelection: false,
       };
 
       if (window.history.state?.dcView === 'coursePlayer') {
@@ -1539,6 +1550,36 @@ const CoursePlayer: React.FC<{
     setIsSidebarOpen(false);
     closeCourseLayerHistory('modules');
   }, [closeCourseLayerHistory]);
+
+  const closeCourseSidebarAfterLessonSelection = useCallback((fileId: string) => {
+    setIsSidebarOpen(false);
+
+    if (typeof window === 'undefined' || !forceOverlaySidebarRef.current) {
+      closeCourseLayerHistory('modules');
+      return;
+    }
+
+    const currentState = window.history.state || {};
+    if (currentState.dcView !== 'coursePlayer' || currentState.dcCourseLayer !== 'modules') {
+      closeCourseLayerHistory('modules');
+      return;
+    }
+
+    const modulesState = {
+      ...currentState,
+      dcView: 'coursePlayer',
+      dcCourseLayer: 'modules',
+      dcCourseProductId: product.id,
+      dcCourseFileId: fileId,
+      dcCourseLessonSelection: false,
+    };
+    window.history.replaceState(modulesState, '', window.location.href);
+    window.history.pushState({
+      ...modulesState,
+      dcCourseLayer: null,
+      dcCourseLessonSelection: true,
+    }, '', window.location.href);
+  }, [closeCourseLayerHistory, product.id]);
 
   const openCourseSidebar = useCallback(() => {
     setIsMentorOpen(false);
@@ -1932,7 +1973,7 @@ const CoursePlayer: React.FC<{
     setActiveFile(file);
     setYoutubeRewardNotice('');
     setYoutubeWatchSeconds(0);
-    closeCourseSidebar();
+    closeCourseSidebarAfterLessonSelection(file.id);
     closeCourseMentor();
   };
 

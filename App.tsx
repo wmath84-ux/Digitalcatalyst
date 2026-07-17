@@ -1201,6 +1201,7 @@ const buildLatestSupportTicketResetPlan = (sourceTickets: SupportTicket[]) => {
 
 const APP_VIEW_SESSION_KEY = 'eduvora.appView.v1';
 const APP_PRODUCT_SESSION_KEY = 'eduvora.selectedProductId.v1';
+const PURCHASES_RETURN_SESSION_KEY = 'eduvora.purchasesReturn.v1';
 const READING_ROUTE_SESSION_KEY = 'eduvora.readingRoute.v1';
 
 const PERSISTABLE_APP_VIEWS = new Set([
@@ -1223,6 +1224,11 @@ const PERSISTABLE_APP_VIEWS = new Set([
 ]);
 
 const PRODUCT_BOUND_APP_VIEWS = new Set(['product', 'coursePlayer', 'eduCoinGuide', 'congratulations']);
+
+type PurchasesReturnContext = {
+  view: 'product';
+  productId: number;
+};
 
 type PersistedReadingRoute = {
   view: ReadingView;
@@ -1253,6 +1259,28 @@ const readInitialProductId = () => {
   if (!value) return null;
   const parsed = Number(value);
   return Number.isFinite(parsed) ? parsed : null;
+};
+
+const readInitialPurchasesReturnContext = (): PurchasesReturnContext | null => {
+  if (typeof window === 'undefined') return null;
+
+  const state = window.history.state || {};
+  const historyProductId = Number(state.dcPurchasesReturnProductId);
+  if (state.dcPurchasesReturnView === 'product' && Number.isFinite(historyProductId)) {
+    return { view: 'product', productId: historyProductId };
+  }
+
+  const stored = readSessionText(PURCHASES_RETURN_SESSION_KEY);
+  if (!stored) return null;
+  try {
+    const parsed = JSON.parse(stored) as Partial<PurchasesReturnContext>;
+    const productId = Number(parsed.productId);
+    return parsed.view === 'product' && Number.isFinite(productId)
+      ? { view: 'product', productId }
+      : null;
+  } catch {
+    return null;
+  }
 };
 
 const readPersistedReadingRoute = (): PersistedReadingRoute | null => {
@@ -1376,6 +1404,46 @@ const App: React.FC = () => {
   }, []);
   const pendingRestoredProductIdRef = React.useRef<number | null>(readInitialProductId());
   const [selectedProduct, setSelectedProduct] = useState<ProductWithRating | null>(null);
+  const selectedProductRef = React.useRef<ProductWithRating | null>(selectedProduct);
+  const productsWithRatingsRef = React.useRef<ProductWithRating[]>([]);
+  const purchasesReturnContextRef = React.useRef<PurchasesReturnContext | null>(readInitialPurchasesReturnContext());
+  selectedProductRef.current = selectedProduct;
+
+  const writePurchasesReturnContext = useCallback((context: PurchasesReturnContext | null) => {
+    purchasesReturnContextRef.current = context;
+    if (typeof window === 'undefined') return;
+    try {
+      if (context) {
+        window.sessionStorage.setItem(PURCHASES_RETURN_SESSION_KEY, JSON.stringify(context));
+      } else {
+        window.sessionStorage.removeItem(PURCHASES_RETURN_SESSION_KEY);
+        const currentState: Record<string, unknown> = { ...(window.history.state || {}) };
+        if ('dcPurchasesReturnView' in currentState || 'dcPurchasesReturnProductId' in currentState || 'dcPurchasesOriginEntryReady' in currentState) {
+          delete currentState.dcPurchasesReturnView;
+          delete currentState.dcPurchasesReturnProductId;
+          delete currentState.dcPurchasesOriginEntryReady;
+          window.history.replaceState(currentState, '', window.location.href);
+        }
+      }
+    } catch {
+      // Return navigation still works in-memory when session storage is restricted.
+    }
+  }, []);
+
+  const restoreProductForNavigation = useCallback((productId: unknown) => {
+    const normalizedProductId = Number(productId);
+    if (!Number.isFinite(normalizedProductId)) return false;
+    const product = productsWithRatingsRef.current.find(item => Number(item.id) === normalizedProductId);
+    if (!product) return false;
+    selectedProductRef.current = product;
+    setSelectedProduct(product);
+    try {
+      window.sessionStorage.setItem(APP_PRODUCT_SESSION_KEY, String(product.id));
+    } catch {
+      // Product state remains available in memory.
+    }
+    return true;
+  }, []);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -1726,15 +1794,34 @@ const App: React.FC = () => {
 
       if (!rawNextView && currentViewRef.current === 'home') return;
 
-      const nextView = rawNextView || getPreviousAppView('home');
+      let nextView = rawNextView || getPreviousAppView('home');
       if (!nextView) return;
+
+      if (nextView === 'product') {
+        const returnContext = purchasesReturnContextRef.current;
+        const targetProductId = event.state?.dcProductId
+          ?? event.state?.dcPurchasesReturnProductId
+          ?? returnContext?.productId
+          ?? selectedProductRef.current?.id;
+        if (!restoreProductForNavigation(targetProductId)) {
+          nextView = 'allProducts';
+        }
+        writePurchasesReturnContext(null);
+      } else if (nextView === 'coursePlayer' && !selectedProductRef.current) {
+        const targetProductId = event.state?.dcCourseProductId ?? event.state?.dcProductId;
+        if (!restoreProductForNavigation(targetProductId)) {
+          nextView = 'myPurchases';
+        }
+      }
 
       syncStackForHistoryView(nextView);
       historyNavigationRef.current = true;
       setCurrentView(nextView);
 
-      if (!rawNextView) {
-        window.history.replaceState({ ...(window.history.state || {}), dcView: nextView, dcAppEntry: true }, '', window.location.href);
+      if (!rawNextView || nextView !== rawNextView) {
+        const nextState: Record<string, unknown> = { ...(window.history.state || {}), dcView: nextView, dcAppEntry: true };
+        if (nextView === 'product' && selectedProductRef.current) nextState.dcProductId = selectedProductRef.current.id;
+        window.history.replaceState(nextState, '', window.location.href);
       }
 
       window.scrollTo(0, 0);
@@ -1742,7 +1829,7 @@ const App: React.FC = () => {
 
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, [getPreviousAppView, syncStackForHistoryView, websiteSettings.content.announcements, websiteSettings.content.newsArticles]);
+  }, [getPreviousAppView, restoreProductForNavigation, syncStackForHistoryView, websiteSettings.content.announcements, websiteSettings.content.newsArticles, writePurchasesReturnContext]);
 
   useEffect(() => {
     isCartOpenRef.current = isCartOpen;
@@ -2309,6 +2396,7 @@ const App: React.FC = () => {
     const displayRating = (p.manualRating !== null && p.manualRating !== undefined) ? p.manualRating : calculatedRating;
     return { ...p, rating: displayRating, reviewCount, calculatedRating };
   });
+  productsWithRatingsRef.current = productsWithRatings;
 
   useEffect(() => {
     if (!PRODUCT_BOUND_APP_VIEWS.has(currentView)) {
@@ -3636,6 +3724,7 @@ const App: React.FC = () => {
       sessionStorage.removeItem('welcomeOverlaySeen');
       sessionStorage.removeItem(APP_VIEW_SESSION_KEY);
       sessionStorage.removeItem(APP_PRODUCT_SESSION_KEY);
+      sessionStorage.removeItem(PURCHASES_RETURN_SESSION_KEY);
       sessionStorage.removeItem(READING_ROUTE_SESSION_KEY);
       sessionStorage.removeItem('eduvora.communityRoute.v1');
       sessionStorage.removeItem('eduvora.adminView.v1');
@@ -3658,12 +3747,31 @@ const App: React.FC = () => {
       return;
     }
 
-    const previousView = getPreviousAppView(fallbackView);
+    let previousView = getPreviousAppView(fallbackView);
+    if (
+      previousView === 'product'
+      && purchasesReturnContextRef.current?.view === 'product'
+      && typeof window !== 'undefined'
+      && window.history.state?.dcView === 'myPurchases'
+      && window.history.state?.dcPurchasesOriginEntryReady === true
+    ) {
+      window.history.back();
+      return;
+    }
+    if (previousView === 'product') {
+      const returnContext = purchasesReturnContextRef.current;
+      const targetProductId = returnContext?.productId ?? selectedProductRef.current?.id;
+      if (!restoreProductForNavigation(targetProductId)) previousView = 'allProducts';
+      writePurchasesReturnContext(null);
+    }
+
     syncStackForHistoryView(previousView);
     historyNavigationRef.current = true;
     setCurrentView(previousView);
     if (typeof window !== 'undefined') {
-      window.history.replaceState({ ...(window.history.state || {}), dcView: previousView, dcAppEntry: true }, '', window.location.href);
+      const nextState: Record<string, unknown> = { ...(window.history.state || {}), dcView: previousView, dcAppEntry: true };
+      if (previousView === 'product' && selectedProductRef.current) nextState.dcProductId = selectedProductRef.current.id;
+      window.history.replaceState(nextState, '', window.location.href);
     }
     window.scrollTo(0, 0);
   };
@@ -4132,6 +4240,7 @@ const App: React.FC = () => {
   };
 
   const handleViewProduct = (product: ProductWithRating, sectionId?: string) => {
+    writePurchasesReturnContext(null);
     // Increment view count
     const updatedProduct = { ...product, viewCount: (product.viewCount || 0) + 1 };
 
@@ -4205,6 +4314,26 @@ const App: React.FC = () => {
       window.scrollTo(0, 0);
       return;
     }
+    const returnContext = purchasesReturnContextRef.current;
+    if (returnContext?.view === 'product') {
+      const originProduct = productsWithRatingsRef.current.find(item => Number(item.id) === Number(returnContext.productId));
+      if (originProduct && typeof window !== 'undefined') {
+        syncStackForHistoryView('product');
+        historyNavigationRef.current = true;
+        window.history.replaceState({
+          ...(window.history.state || {}),
+          dcView: 'coursePlayer',
+          dcAppEntry: true,
+          dcProductId: originProduct.id,
+          dcCourseProductId: product.id,
+          dcPurchasesReturnView: 'product',
+          dcPurchasesReturnProductId: originProduct.id,
+          dcPurchasesOriginEntryReady: true,
+        }, '', window.location.href);
+      }
+    }
+
+    selectedProductRef.current = product;
     setSelectedProduct(product);
     setCurrentView('coursePlayer');
     window.scrollTo(0, 0);
@@ -4771,15 +4900,45 @@ const App: React.FC = () => {
   };
 
   const handleNavigateToAllProducts = () => {
+    writePurchasesReturnContext(null);
+    selectedProductRef.current = null;
     setCurrentView('allProducts');
     setSelectedProduct(null);
     window.scrollTo(0, 0);
   };
 
   const handleNavigateToPurchases = () => {
+    const originProduct = currentViewRef.current === 'product' ? selectedProductRef.current : null;
+    if (originProduct) {
+      const returnContext: PurchasesReturnContext = { view: 'product', productId: originProduct.id };
+      writePurchasesReturnContext(returnContext);
+      if (typeof window !== 'undefined') {
+        window.history.replaceState({
+          ...(window.history.state || {}),
+          dcView: 'product',
+          dcAppEntry: true,
+          dcProductId: originProduct.id,
+          dcPurchasesReturnView: 'product',
+          dcPurchasesReturnProductId: originProduct.id,
+          dcPurchasesOriginEntryReady: true,
+        }, '', window.location.href);
+      }
+    } else {
+      writePurchasesReturnContext(null);
+      selectedProductRef.current = null;
+      setSelectedProduct(null);
+    }
     setCurrentView('myPurchases');
-    setSelectedProduct(null);
     window.scrollTo(0, 0);
+  };
+
+  const handleBackFromCoursePlayer = () => {
+    const returnContext = purchasesReturnContextRef.current;
+    if (returnContext?.view === 'product' && typeof window !== 'undefined' && window.history.state?.dcView === 'coursePlayer') {
+      window.history.back();
+      return;
+    }
+    handleNavigateBack('myPurchases');
   };
 
   const unlockSubscriptionPlan = (plan: SubscriptionPlanConfig, paymentLabel = 'Fiat checkout', billingCycle: SubscriptionBillingCycle = 'monthly', options: { silent?: boolean } = {}) => {
@@ -5320,10 +5479,12 @@ const App: React.FC = () => {
 
   const renderContent = (appUser: User | null = currentUser) => {
     switch (currentView) {
-      case 'product': return selectedProduct && <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity, payment) => handlePurchaseComplete(appliedCouponCode, quantity, payment)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onOpenPurchases={handleNavigateToPurchases} onCoinPurchase={hasPremiumMembership(appUser) ? (product, quantity, options) => handleProductCoinPurchase(product, quantity, options) : undefined} />;
+      case 'product':
+        if (!selectedProduct) return renderMobileSessionStatus('Restoring product…', 'Please wait while we restore the product you were viewing.');
+        return <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity, payment) => handlePurchaseComplete(appliedCouponCode, quantity, payment)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} productAccess={productAccessById[selectedProduct.id] || null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onOpenPurchases={handleNavigateToPurchases} onCoinPurchase={hasPremiumMembership(appUser) ? (product, quantity, options) => handleProductCoinPurchase(product, quantity, options) : undefined} />;
       case 'coursePlayer':
         if (isAuthRestoring || authRestoreError) return renderAuthRestoreStatus();
-        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} currentUser={appUser} onBack={() => handleNavigateBack('myPurchases')} onUpgrade={handleNavigateToSubscription} onQuizReward={hasPremiumMembership(appUser) ? handleQuizReward : undefined} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onEducoinUnlockComplete={handleEducoinUpdateUnlockComplete} /> : renderAuthRestoreStatus();
+        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} currentUser={appUser} onBack={handleBackFromCoursePlayer} onUpgrade={handleNavigateToSubscription} onQuizReward={hasPremiumMembership(appUser) ? handleQuizReward : undefined} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onEducoinUnlockComplete={handleEducoinUpdateUnlockComplete} /> : renderAuthRestoreStatus();
       case 'eduCoinGuide': return appUser && hasPremiumMembership(appUser) ? <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={appUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} /> : <MembershipUpgradeCard message={normalizeSubscriptionPageContent((websiteSettings.content as any).subscriptionPage).profileUpgrade} onUpgrade={handleNavigateToSubscription} onBack={handleBackFromEduCoinGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
