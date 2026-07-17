@@ -7,6 +7,11 @@ import { isCloudinaryImageUploadConfigured, uploadImageToCloudinary } from '../.
 const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 backdrop-blur-xl';
 const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
+const AI_GENERATION_COUNT_OPTIONS = Array.from({ length: 11 }, (_, index) => index);
+const readStoredGenerationCount = (key: string, fallback: number) => {
+  const stored = Number(localStorage.getItem(key));
+  return Number.isFinite(stored) ? Math.min(10, Math.max(0, Math.round(stored))) : fallback;
+};
 
 const editorCommands: Array<[string, string, string?]> = [
   ['bold', 'B'],
@@ -91,6 +96,9 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
   const [autopilotEnabled, setAutopilotEnabled] = useState(() => localStorage.getItem('dailyAiContentAutopilot') === 'enabled');
   const [automationStatus, setAutomationStatus] = useState('Idle — ready for the next editorial run.');
   const [isRunning, setIsRunning] = useState(false);
+  const [newsGenerationCount, setNewsGenerationCount] = useState(() => readStoredGenerationCount('aiNewsGenerationCount', 3));
+  const [blogGenerationCount, setBlogGenerationCount] = useState(() => readStoredGenerationCount('aiBlogGenerationCount', 3));
+  const totalGenerationCount = newsGenerationCount + blogGenerationCount;
   const [successToast, setSuccessToast] = useState('');
   const [isUploadingCover, setIsUploadingCover] = useState(false);
   const [coverUploadError, setCoverUploadError] = useState('');
@@ -105,6 +113,11 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
     const timer = window.setTimeout(() => setSuccessToast(''), 3500);
     return () => window.clearTimeout(timer);
   }, [successToast]);
+
+  useEffect(() => {
+    localStorage.setItem('aiNewsGenerationCount', String(newsGenerationCount));
+    localStorage.setItem('aiBlogGenerationCount', String(blogGenerationCount));
+  }, [blogGenerationCount, newsGenerationCount]);
 
   const updatePosts = (nextPosts: EditablePost[]) => {
     setArticles(nextPosts);
@@ -182,9 +195,14 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
   };
 
   const runAiFetchNow = async () => {
+    if (totalGenerationCount === 0) {
+      setAutomationStatus('Select at least one News or Blog item before starting AI generation.');
+      return;
+    }
+
     setIsRunning(true);
     setSuccessToast('');
-    setAutomationStatus('Running AI fetch, generating 10 news posts + 10 blog posts, and purging expired content…');
+    setAutomationStatus(`Generating ${newsGenerationCount} news + ${blogGenerationCount} blogs in small verified batches, then purging expired content…`);
 
     let workingPosts = [...posts];
     const localAdapter: ContentDatabaseAdapter<ContentPostRecord> = {
@@ -196,7 +214,11 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
     };
 
     try {
-      const result = await runContentAutomation(localAdapter, { idFactory: () => Date.now() + Math.floor(Math.random() * 100000) });
+      const result = await runContentAutomation(localAdapter, {
+        newsCount: newsGenerationCount,
+        blogCount: blogGenerationCount,
+        idFactory: () => Date.now() + Math.floor(Math.random() * 100000),
+      });
       const newArticles = result.generated.map((post) => ({
         id: Number(post.id) || Date.now() + Math.floor(Math.random() * 10000),
         title: post.title,
@@ -207,6 +229,8 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
         imageSeed: post.imageSeed || `ai-${post.type}-${post.id}`,
         thumbnailImage: post.thumbnailImage || post.coverImage || '',
         coverImage: post.coverImage || post.thumbnailImage || '',
+        imageLayout: 'cover' as const,
+        sourceType: 'url' as const,
         excerpt: post.excerpt,
         content: post.content,
         showPremiumLearningCta: false,
@@ -214,11 +238,12 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
       const purgedPostIds = new Set(result.purgedIds);
       const nextPosts = [...newArticles, ...workingPosts.filter((post) => !purgedPostIds.has(post.id))];
       updatePosts(nextPosts);
-      setSuccessToast(`AI fetch complete — added ${newArticles.filter(post => post.type === 'news').length} news + ${newArticles.filter(post => post.type === 'blog').length} blogs.`);
-      setAutomationStatus(`Completed: generated ${result.generated.length} posts and purged ${result.purgedIds.length} expired posts. The list below has been updated instantly.`);
+      setSuccessToast(`AI fetch complete — added ${newArticles.filter(post => post.type === 'news').length} news + ${newArticles.filter(post => post.type === 'blog').length} blogs with topic-matched image URLs.`);
+      setAutomationStatus(`Completed safely: generated ${result.generated.length} validated posts and purged ${result.purgedIds.length} expired posts.`);
     } catch (error) {
       console.error('AI content automation failed:', error);
-      setAutomationStatus(error instanceof Error ? error.message : 'AI automation failed. Check the console for details.');
+      const message = error instanceof Error ? error.message : 'AI automation failed. Check the console for details.';
+      setAutomationStatus(`${message} Existing News and Blog posts were not changed.`);
     } finally {
       setIsRunning(false);
     }
@@ -340,15 +365,30 @@ const NewsBlogManagement: React.FC<NewsBlogManagementProps> = ({ settings, onSet
           <div>
             <p className="text-xs font-black uppercase tracking-[0.35em] text-fuchsia-700/80">AI Autopilot Status</p>
             <h2 className="mt-3 text-2xl font-black text-slate-900">Daily AI Fetch</h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Generates 10 educational news updates and 10 student-focused blogs, then permanently purges posts older than 72 hours.</p>
+            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Choose exactly how many News and Blog items to add. Generation runs in small schema-validated batches, assigns a topic-matched real image URL to every new post, and purges posts older than 72 hours only after generation succeeds.</p>
+            <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <label className="rounded-2xl border border-cyan-200/70 bg-cyan-50/80 p-4">
+                <span className="block text-xs font-black uppercase tracking-[0.18em] text-cyan-800">News to add</span>
+                <select value={newsGenerationCount} onChange={(event) => setNewsGenerationCount(Number(event.target.value))} className="mt-2 w-full rounded-xl border border-cyan-200 bg-white px-3 py-2 font-black text-slate-900 outline-none focus:ring-4 focus:ring-cyan-200/60">
+                  {AI_GENERATION_COUNT_OPTIONS.map((count) => <option key={`news-count-${count}`} value={count}>{count} news item{count === 1 ? '' : 's'}</option>)}
+                </select>
+              </label>
+              <label className="rounded-2xl border border-fuchsia-200/70 bg-fuchsia-50/80 p-4">
+                <span className="block text-xs font-black uppercase tracking-[0.18em] text-fuchsia-800">Blogs to add</span>
+                <select value={blogGenerationCount} onChange={(event) => setBlogGenerationCount(Number(event.target.value))} className="mt-2 w-full rounded-xl border border-fuchsia-200 bg-white px-3 py-2 font-black text-slate-900 outline-none focus:ring-4 focus:ring-fuchsia-200/60">
+                  {AI_GENERATION_COUNT_OPTIONS.map((count) => <option key={`blog-count-${count}`} value={count}>{count} blog item{count === 1 ? '' : 's'}</option>)}
+                </select>
+              </label>
+            </div>
+            <p className="mt-3 text-xs font-bold text-slate-500">Selected run: {newsGenerationCount} News + {blogGenerationCount} Blogs = {totalGenerationCount} new items.</p>
             <p className="mt-4 rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-sm text-slate-600">{automationStatus}</p>
           </div>
           <div className="flex flex-col gap-3 sm:flex-row">
             <button onClick={toggleAutopilot} className={`rounded-2xl border px-5 py-3 font-black transition ${autopilotEnabled ? 'border-emerald-300/40 bg-emerald-400/15 text-emerald-700' : 'border-white/50 bg-white/80 text-slate-600 hover:bg-white/80 hover:shadow-sm'}`}>
               {autopilotEnabled ? 'Daily AI Fetch Enabled' : 'Enable Daily AI Fetch'}
             </button>
-            <button onClick={runAiFetchNow} disabled={isRunning} className="rounded-2xl border border-purple-300/30 bg-purple-400/15 px-5 py-3 font-black text-purple-700 transition hover:bg-purple-400/25 disabled:cursor-not-allowed disabled:opacity-60">
-              {isRunning ? <span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-purple-700/30 border-t-purple-700" /> Fetching…</span> : 'Run AI Fetch Now'}
+            <button onClick={runAiFetchNow} disabled={isRunning || totalGenerationCount === 0} className="rounded-2xl border border-purple-300/30 bg-purple-400/15 px-5 py-3 font-black text-purple-700 transition hover:bg-purple-400/25 disabled:cursor-not-allowed disabled:opacity-60">
+              {isRunning ? <span className="inline-flex items-center gap-2"><span className="h-4 w-4 animate-spin rounded-full border-2 border-purple-700/30 border-t-purple-700" /> Fetching…</span> : `Generate ${totalGenerationCount} item${totalGenerationCount === 1 ? '' : 's'}`}
             </button>
           </div>
         </div>

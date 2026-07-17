@@ -492,11 +492,14 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
 
           <header className="relative z-20 flex items-center justify-between gap-4 border-b px-4 py-4 backdrop-blur-2xl sm:px-8" style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }}>
             <div className="flex min-w-0 items-center gap-4">
-              {(view === 'article' || view === 'announcement') && (
-                <button onClick={onBackToList} className="shrink-0 rounded-full border px-4 py-2 text-sm font-black shadow-sm transition hover:-translate-x-0.5 hover:shadow-md" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
-                  ← Back to List
-                </button>
-              )}
+              <button
+                onClick={view === 'article' || view === 'announcement' ? onBackToList : onClose}
+                className="shrink-0 rounded-full border px-3 py-2 text-xs font-black shadow-sm transition hover:-translate-x-0.5 hover:shadow-md sm:px-4 sm:text-sm"
+                style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}
+                aria-label={view === 'article' || view === 'announcement' ? `Back to ${listType === 'news' ? 'News' : 'Blog'} list` : 'Close reading page'}
+              >
+                ← {view === 'article' || view === 'announcement' ? `Back to ${listType === 'news' ? 'News' : 'Blog'}` : 'Back'}
+              </button>
               <div className="min-w-0">
               <p className="text-[10px] font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>Premium Reading Mode</p>
               <h2 id="reading-drawer-title" className="mt-1 truncate text-lg font-black sm:text-2xl" style={{ color: chatPalette.primaryText }}>{activeMeta.title}</h2>

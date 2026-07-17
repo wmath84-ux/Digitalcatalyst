@@ -5023,8 +5023,10 @@ const App: React.FC = () => {
 
   const handleViewAnnouncement = (announcement: Announcement) => {
     if (!isReadingDrawerOpenRef.current) pushReadingHistory('news', 'news', undefined, 1);
-    if (readingDrawerViewRef.current === 'blog' || readingDrawerViewRef.current === 'news' || !isReadingDrawerOpenRef.current) pushReadingHistory('announcement', 'news', announcement.id, 2);
-    else window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'announcement', dcReadingListType: 'news', dcReadingItemId: String(announcement.id), dcReadingDepth: 2 }, '', window.location.href);
+    if (window.history.state?.dcReadingTopBack === true) {
+      window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'announcement', dcReadingListType: 'news', dcReadingItemId: String(announcement.id), dcReadingDepth: 2, dcReadingTopBack: false }, '', window.location.href);
+    } else if (readingDrawerViewRef.current === 'blog' || readingDrawerViewRef.current === 'news' || !isReadingDrawerOpenRef.current) pushReadingHistory('announcement', 'news', announcement.id, 2);
+    else window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'announcement', dcReadingListType: 'news', dcReadingItemId: String(announcement.id), dcReadingDepth: 2, dcReadingTopBack: false }, '', window.location.href);
     setSelectedAnnouncement(announcement);
     setSelectedArticle(null);
     setReadingListType('news');
@@ -5035,8 +5037,10 @@ const App: React.FC = () => {
   const handleViewBlogArticle = (article: NewsArticle) => {
     const type: ReadingListType = article.type === 'news' ? 'news' : 'blog';
     if (!isReadingDrawerOpenRef.current) pushReadingHistory(type, type, undefined, 1);
-    if (readingDrawerViewRef.current === 'blog' || readingDrawerViewRef.current === 'news' || !isReadingDrawerOpenRef.current) pushReadingHistory('article', type, article.id, 2);
-    else window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'article', dcReadingListType: type, dcReadingItemId: String(article.id), dcReadingDepth: 2 }, '', window.location.href);
+    if (window.history.state?.dcReadingTopBack === true) {
+      window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'article', dcReadingListType: type, dcReadingItemId: String(article.id), dcReadingDepth: 2, dcReadingTopBack: false }, '', window.location.href);
+    } else if (readingDrawerViewRef.current === 'blog' || readingDrawerViewRef.current === 'news' || !isReadingDrawerOpenRef.current) pushReadingHistory('article', type, article.id, 2);
+    else window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'article', dcReadingListType: type, dcReadingItemId: String(article.id), dcReadingDepth: 2, dcReadingTopBack: false }, '', window.location.href);
     setSelectedArticle(article);
     setSelectedAnnouncement(null);
     setReadingListType(type);
@@ -5045,13 +5049,19 @@ const App: React.FC = () => {
   };
 
   const handleBackToReadingList = () => {
-    if (window.history.state?.dcOverlay === 'reading' && window.history.state?.dcReadingDepth === 2) {
-      window.history.back();
-      return;
-    }
     setSelectedArticle(null);
     setSelectedAnnouncement(null);
     setReadingDrawerView(readingListType);
+    if (window.history.state?.dcOverlay === 'reading') {
+      window.history.replaceState({
+        ...(window.history.state || {}),
+        dcReadingView: readingListType,
+        dcReadingListType: readingListType,
+        dcReadingItemId: null,
+        dcReadingDepth: Math.max(2, Number(window.history.state?.dcReadingDepth) || 2),
+        dcReadingTopBack: true,
+      }, '', window.location.href);
+    }
   };
 
   const handleExploreReadingFeature = () => {
