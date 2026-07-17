@@ -8,32 +8,28 @@ const course = fs.readFileSync('components/CoursePlayer.tsx', 'utf8');
 const community = fs.readFileSync('components/EduvoraCommunity.tsx', 'utf8');
 const settings = fs.readFileSync('components/admin/WebsiteSettings.tsx', 'utf8');
 
-test('Community restores its original internal sidebar while header controls the main website navigation', () => {
+test('Community uses the real website side panel as a pinned in-page layout with top-left recovery', () => {
   assert.match(community, /COMMUNITY_DESKTOP_SIDEBAR_COLLAPSED_KEY/);
   assert.match(community, /isDesktopSidebarCollapsed/);
-  assert.doesNotMatch(community, /CommunityDesktopSidebarState/);
-  assert.doesNotMatch(community, /COMMUNITY_DESKTOP_SIDEBAR_STATE_KEY/);
-  assert.match(community, /community-website-sidebar-trigger/);
-  assert.match(community, /onWebsiteSidebarPreviewStart/);
-  assert.match(community, /onWebsiteSidebarPreviewEnd/);
-  assert.match(community, /onWebsiteSidebarPin/);
-  assert.match(app, /showWebsiteSidebarTrigger={useDesktopSidebar}/);
-  assert.match(app, /showDetachedTrigger={false}/);
-  assert.match(app, /overlayMode/);
-  assert.match(app, /dispatchDesktopSidebarCommand\('preview-start'\)/);
+  assert.doesNotMatch(community, /community-website-sidebar-trigger/);
+  assert.doesNotMatch(community, /onWebsiteSidebarPreviewStart/);
+  assert.match(app, /openExpandedOnMount/);
+  assert.match(app, /elevatedLayer/);
+  assert.match(app, /detachedTriggerPlacement="top-left"/);
+  assert.match(app, /--desktop-site-sidebar-offset/);
+  assert.doesNotMatch(app, /dispatchDesktopSidebarCommand/);
   assert.match(app, /activeItem="Community"/);
 });
 
-test('main website side panel accepts shared preview and pin commands without shifting Community', () => {
-  assert.match(homeDock, /DESKTOP_SIDEBAR_COMMAND_EVENT/);
-  assert.match(homeDock, /DesktopSidebarCommand/);
-  assert.match(homeDock, /command === 'preview-start'/);
-  assert.match(homeDock, /command === 'preview-end'/);
-  assert.match(homeDock, /command === 'pin'/);
-  assert.match(homeDock, /showDetachedTrigger/);
-  assert.match(homeDock, /overlayMode/);
-  assert.match(homeDock, /if \(overlayMode\) return undefined/);
-  assert.match(homeDock, /overlayMode \? 'z-\[1600\]'/);
+test('main website side panel separates persistent layout width from temporary hover width', () => {
+  assert.match(homeDock, /openExpandedOnMount/);
+  assert.match(homeDock, /elevatedLayer/);
+  assert.match(homeDock, /detachedTriggerPlacement/);
+  assert.match(homeDock, /layoutWidth/);
+  assert.match(homeDock, /visualWidth/);
+  assert.match(homeDock, /isTemporaryPreview/);
+  assert.match(homeDock, /runNavigationAction/);
+  assert.match(homeDock, /overlayMode \|\| elevatedLayer/);
 });
 
 test('CoursePlayer builds the exact open-close-open-exit browser Back stack', () => {

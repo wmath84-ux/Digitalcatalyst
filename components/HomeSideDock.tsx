@@ -34,6 +34,9 @@ interface HomeSideDockProps {
   activeItem?: string;
   showDetachedTrigger?: boolean;
   overlayMode?: boolean;
+  openExpandedOnMount?: boolean;
+  elevatedLayer?: boolean;
+  detachedTriggerPlacement?: 'default' | 'top-left';
 }
 
 type SidebarState = 'expanded' | 'collapsed' | 'hidden';
@@ -66,8 +69,8 @@ const clamp = (value: unknown, minimum: number, maximum: number, fallback: numbe
   return Math.min(maximum, Math.max(minimum, number));
 };
 
-const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity, authButtonLabel, activeItem = '', showDetachedTrigger = true, overlayMode = false }: HomeSideDockProps) => {
-  const [sidebarState, setSidebarState] = useState<SidebarState>(readInitialState);
+const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity, authButtonLabel, activeItem = '', showDetachedTrigger = true, overlayMode = false, openExpandedOnMount = false, elevatedLayer = false, detachedTriggerPlacement = 'default' }: HomeSideDockProps) => {
+  const [sidebarState, setSidebarState] = useState<SidebarState>(() => openExpandedOnMount ? 'expanded' : readInitialState());
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const hoverCloseTimerRef = useRef<number | null>(null);
   const dockStyle = { ...defaultDockStyle, ...((settings.content as any).dockStyle || {}) };
@@ -140,6 +143,11 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
     setSidebarState(nextState);
   };
 
+  const runNavigationAction = (action: () => void) => {
+    cancelHoverClose();
+    setHoverExpanded(false);
+    action();
+  };
 
   useEffect(() => {
     const handleExternalCommand = (event: Event) => {
@@ -194,7 +202,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
           onClick={() => setPersistentState('expanded')}
           onPointerEnter={(event) => { if (event.pointerType === 'mouse') beginHoverPreview(event.pointerType); }}
           onPointerLeave={(event) => { if (event.pointerType === 'mouse') scheduleHoverClose(event.pointerType); }}
-          className={`fixed left-3 top-24 z-[81] hidden items-center justify-center border bg-white/95 font-black transition hover:-translate-y-0.5 lg:flex ${hoverExpanded ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
+          className={`fixed left-3 ${detachedTriggerPlacement === 'top-left' ? 'top-3 z-[1700]' : 'top-24 z-[81]'} hidden items-center justify-center border bg-white/95 font-black transition hover:-translate-y-0.5 lg:flex ${hoverExpanded ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
           style={{ width: collapsedWidth - 16, height: collapsedWidth - 16, borderColor, borderRadius: itemRadius, color: accentColor, boxShadow: dockShadowMap[shadowStrength] }}
           aria-label="Preview or pin desktop navigation"
           title="Hover to preview · click to keep open"
@@ -204,7 +212,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
       )}
 
       <aside
-        className={`home-side-dock-performance fixed inset-y-0 left-0 ${overlayMode ? 'z-[1600]' : 'z-[80]'} hidden overflow-visible bg-transparent transition-[width,transform,opacity] duration-150 ease-out lg:flex ${isPanelVisible ? 'translate-x-0 opacity-100' : 'pointer-events-none -translate-x-[calc(100%+1rem)] opacity-0'}`}
+        className={`home-side-dock-performance fixed inset-y-0 left-0 ${overlayMode || elevatedLayer ? 'z-[1600]' : 'z-[80]'} hidden overflow-visible bg-transparent transition-[width,transform,opacity] duration-150 ease-out lg:flex ${isPanelVisible ? 'translate-x-0 opacity-100' : 'pointer-events-none -translate-x-[calc(100%+1rem)] opacity-0'}`}
         style={{ width: visualWidth, padding: Math.max(6, padding - 4) }}
         data-sidebar-state={sidebarState}
         data-hover-expanded={hoverExpanded ? 'true' : 'false'}
@@ -219,7 +227,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
       >
         <div className="shrink-0 border-b" style={{ borderColor, padding }}>
           <div className={`flex min-w-0 items-center ${isVisuallyExpanded ? 'justify-between' : 'flex-col'} `} style={{ gap }}>
-            <button type="button" onClick={onHomeClick} className="flex min-w-0 items-center" style={{ gap }} aria-label="Go to homepage">
+            <button type="button" onClick={() => runNavigationAction(onHomeClick)} className="flex min-w-0 items-center" style={{ gap }} aria-label="Go to homepage">
               <img src={logoUrl} alt="Digital Catalyst logo" className="shrink-0 border bg-white object-cover shadow-sm" style={{ width: iconSize + 8, height: iconSize + 8, borderColor, borderRadius: itemRadius }} />
               {isVisuallyExpanded && (
                 <span className="min-w-0 text-left">
@@ -245,7 +253,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
               <button
                 key={item.id}
                 type="button"
-                onClick={item.action}
+                onClick={() => runNavigationAction(item.action)}
                 title={!isVisuallyExpanded ? item.label : undefined}
                 aria-current={isActive ? 'page' : undefined}
                 className={`group relative flex w-full items-center border transition-colors duration-150 ${isVisuallyExpanded ? 'text-left' : 'justify-center'}`}

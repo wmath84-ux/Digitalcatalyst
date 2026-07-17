@@ -11,6 +11,15 @@ service cloud.firestore {
     function protectedUserFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'purchasedProductIds']);
     }
+    function communityVerificationAllowedOnCreate() {
+      return isAdmin()
+        || ((!('verified' in request.resource.data) || request.resource.data.verified == false)
+          && (!('isVerified' in request.resource.data) || request.resource.data.isVerified == false));
+    }
+    function communityVerificationUnchangedOnUpdate() {
+      return isAdmin()
+        || !request.resource.data.diff(resource.data).affectedKeys().hasAny(['verified', 'isVerified']);
+    }
 
     match /settings/{settingId} {
       allow read: if true;
@@ -151,9 +160,20 @@ service cloud.firestore {
 
     match /community_profiles/{uid} {
       allow read: if signedIn();
-      allow create, update: if isOwner(uid)
+      allow create: if isOwner(uid)
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.ownerId == request.auth.uid
+        && communityVerificationAllowedOnCreate()
+        && request.resource.data.keys().hasOnly([
+          'uid', 'id', 'userId', 'ownerId', 'username', 'displayName', 'name', 'photoURL', 'avatar', 'role', 'bio',
+          'subjects', 'masterTags', 'creatorCategory', 'searchableText', 'searchTokens',
+          'followers', 'followerCount', 'followingCount', 'postCount', 'mutual',
+          'verified', 'isVerified', 'isCreator', 'isPublic', 'isSuspended', 'source', 'isOnline', 'lastActiveAt', 'lastFollowedAt', 'lastFollowerAt', 'createdAt', 'updatedAt'
+        ]);
+      allow update: if isOwner(uid)
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.ownerId == request.auth.uid
+        && communityVerificationUnchangedOnUpdate()
         && request.resource.data.keys().hasOnly([
           'uid', 'id', 'userId', 'ownerId', 'username', 'displayName', 'name', 'photoURL', 'avatar', 'role', 'bio',
           'subjects', 'masterTags', 'creatorCategory', 'searchableText', 'searchTokens',
@@ -171,10 +191,22 @@ service cloud.firestore {
 
     match /publicProfiles/{uid} {
       allow read: if signedIn() && resource.data.isPublic != false && resource.data.isSuspended != true && resource.data.hidden != true && resource.data.blocked != true;
-      allow create, update: if isOwner(uid)
+      allow create: if isOwner(uid)
         && request.resource.data.uid == request.auth.uid
         && request.resource.data.userId == request.auth.uid
         && request.resource.data.ownerId == request.auth.uid
+        && communityVerificationAllowedOnCreate()
+        && request.resource.data.keys().hasOnly([
+          'uid', 'id', 'userId', 'ownerId', 'username', 'displayName', 'name', 'photoURL', 'avatar', 'role', 'bio',
+          'subjects', 'masterTags', 'creatorCategory', 'searchableText', 'searchTokens',
+          'followerCount', 'followingCount', 'postCount', 'isCreator', 'isVerified', 'verified', 'isPublic', 'isSuspended',
+          'isOnline', 'lastActiveAt', 'lastFollowedAt', 'lastFollowerAt', 'createdAt', 'updatedAt'
+        ]);
+      allow update: if isOwner(uid)
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.userId == request.auth.uid
+        && request.resource.data.ownerId == request.auth.uid
+        && communityVerificationUnchangedOnUpdate()
         && request.resource.data.keys().hasOnly([
           'uid', 'id', 'userId', 'ownerId', 'username', 'displayName', 'name', 'photoURL', 'avatar', 'role', 'bio',
           'subjects', 'masterTags', 'creatorCategory', 'searchableText', 'searchTokens',

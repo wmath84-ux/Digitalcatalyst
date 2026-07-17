@@ -32,7 +32,7 @@ import ComingSoonModal from './components/ComingSoonModal';
 import { FreeProductsModal, FreeProductsPage } from './components/ContentModals';
 import ReadingDrawer, { ReadingListType, ReadingView } from './components/ReadingDrawer';
 import BottomGlassDock from './components/BottomGlassDock';
-import HomeSideDock, { dispatchDesktopSidebarCommand } from './components/HomeSideDock';
+import HomeSideDock from './components/HomeSideDock';
 import ProfilePage from './components/ProfilePage';
 import PlatformExperience from './components/PlatformExperience';
 import SubscriptionPage from './components/SubscriptionPage';
@@ -6253,8 +6253,9 @@ const App: React.FC = () => {
             wishlistCount={wishlist.length}
             dockBadgeCounts={dockActivity.badgeCounts}
             activeItem="Community"
-            showDetachedTrigger={false}
-            overlayMode
+            openExpandedOnMount
+            elevatedLayer
+            detachedTriggerPlacement="top-left"
             onHomeClick={handleBackToHome}
             onOpenBlogModal={() => openReadingHub('blog')}
             onOpenFreeModal={handleNavigateToFreeProducts}
@@ -6269,22 +6270,23 @@ const App: React.FC = () => {
             onOpenCommunity={() => undefined}
           />
         ) : null}
-        {hasPremiumMembership(effectiveAppUser) ? (
-          <EduvoraCommunity
-            settings={websiteSettings}
-            onClose={() => handleNavigateBack('home')}
-            isAuthenticated={isLoggedIn}
-            currentUser={effectiveAppUser}
-            showWebsiteSidebarTrigger={useDesktopSidebar}
-            onWebsiteSidebarPreviewStart={() => dispatchDesktopSidebarCommand('preview-start')}
-            onWebsiteSidebarPreviewEnd={() => dispatchDesktopSidebarCommand('preview-end')}
-            onWebsiteSidebarPin={() => dispatchDesktopSidebarCommand('pin')}
-          />
-        ) : (
-          <div className="flex min-h-full items-center justify-center">
-            <MembershipUpgradeCard message={normalizeSubscriptionPageContent(websiteSettings.content.subscriptionPage).communityLocked} onUpgrade={handleNavigateToSubscription} onBack={() => handleNavigateBack('home')} />
-          </div>
-        )}
+        <div
+          className="h-full min-w-0 transition-[padding-left] duration-300 ease-out"
+          style={{ paddingLeft: useDesktopSidebar ? 'var(--desktop-site-sidebar-offset, 320px)' : undefined }}
+        >
+          {hasPremiumMembership(effectiveAppUser) ? (
+            <EduvoraCommunity
+              settings={websiteSettings}
+              onClose={() => handleNavigateBack('home')}
+              isAuthenticated={isLoggedIn}
+              currentUser={effectiveAppUser}
+            />
+          ) : (
+            <div className="flex min-h-full items-center justify-center">
+              <MembershipUpgradeCard message={normalizeSubscriptionPageContent(websiteSettings.content.subscriptionPage).communityLocked} onUpgrade={handleNavigateToSubscription} onBack={() => handleNavigateBack('home')} />
+            </div>
+          )}
+        </div>
       </div>
     );
 
