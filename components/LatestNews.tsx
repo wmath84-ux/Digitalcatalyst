@@ -12,7 +12,7 @@ interface LatestNewsProps {
   title: string;
   articles: NewsArticle[];
   onReadMoreClick: (article: NewsArticle) => void;
-  onOpenHub: () => void;
+  onOpenHub: (type: 'news' | 'blog') => void;
 }
 
 
@@ -63,14 +63,14 @@ const getArticleCoverImage = (article: NewsArticle, size = '800/600') => resolve
 const NewsCard: React.FC<{ article: NewsArticle, animationDelay: number, settings: WebsiteSettings, cardBackground?: string, onReadMoreClick: (article: NewsArticle) => void }> = ({ article, animationDelay, settings, cardBackground, onReadMoreClick }) => {
     const animationClass = settings.animations.enabled ? `animate-child animate-delay-${(animationDelay % 8) + 1}` : '';
     return (
-        <div style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }} className={`latest-news-mobile-card group flex h-full min-h-[17rem] flex-col overflow-hidden rounded-[1.25rem] border bg-white/95 shadow-[0_6px_18px_rgba(60,64,67,0.08)] transition-[border-color,box-shadow,transform] duration-200 sm:min-h-0 sm:rounded-2xl sm:hover:-translate-y-1 sm:hover:shadow-[0_12px_30px_rgba(60,64,67,0.12)] ${animationClass}`}>
-            <div className="relative h-28 overflow-hidden rounded-t-[1.25rem] sm:h-48 sm:rounded-t-2xl" style={{ backgroundColor: chatPalette.searchBlue }}>
+        <div style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder, borderRadius: 'var(--eduvora-card-radius, 22px)' }} className={`latest-news-mobile-card group flex h-full min-h-[17rem] flex-col overflow-hidden border bg-white/95 shadow-[0_6px_18px_rgba(60,64,67,0.08)] transition-[border-color,box-shadow,transform] duration-200 sm:min-h-0 sm:hover:-translate-y-1 sm:hover:shadow-[0_12px_30px_rgba(60,64,67,0.12)] ${animationClass}`}>
+            <div className="relative h-28 overflow-hidden sm:h-48" style={{ backgroundColor: chatPalette.searchBlue }}>
                 <SafeImage
                     src={getArticleCoverImage(article)}
                     fallbackSrc={buildArticleImageFallback(article)}
                     alt={article.title}
-                    wrapperClassName="h-full w-full rounded-t-2xl"
-                    className="h-full w-full rounded-t-[1.25rem] object-cover transition-transform duration-300 sm:rounded-t-2xl sm:group-hover:scale-105"
+                    wrapperClassName="h-full w-full"
+                    className="h-full w-full object-cover transition-transform duration-300 sm:group-hover:scale-105"
                     fallbackTitle={article.title}
                     fallbackBadge={article.type === 'news' ? 'News' : article.category || 'Blog'}
                     fallbackIcon="📰"
@@ -125,11 +125,17 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
     };
   }, []);
 
-  const newsArticles = articles.filter(
-    article =>
-      article.type === 'news' &&
+  const featuredReadingArticles = [...articles]
+    .filter(article =>
+      (article.type === 'news' || article.type === 'blog') &&
       !hasUnsafePublicPlaceholder(article.title, article.excerpt, article.content)
-  );
+    )
+    .sort((left, right) => {
+      const rightDate = Date.parse(right.createdAt || right.date || '') || Number(right.id) || 0;
+      const leftDate = Date.parse(left.createdAt || left.date || '') || Number(left.id) || 0;
+      return rightDate - leftDate;
+    })
+    .slice(0, 6);
   const storedReadingStyle = ((settings.content as any).readingStyle || {}) as Partial<typeof defaultReadingStyle>;
   const readingStyle = {
     ...defaultReadingStyle,
@@ -142,7 +148,7 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
   const sectionBackground = `radial-gradient(circle at 0% 12%, ${NewsPalette.primaryCyan}33, transparent 30%), radial-gradient(circle at 100% 15%, ${NewsPalette.brightAccent}22, transparent 28%), linear-gradient(135deg, ${NewsPalette.softCyanSurface}, ${NewsPalette.mainCard})`;
   const cardBackground = `rgba(255, 255, 255, ${clampPercent(readingStyle.cardOpacity, defaultReadingStyle.cardOpacity) / 100})`;
 
-  if (newsArticles.length === 0) return null;
+  if (featuredReadingArticles.length === 0) return null;
 
   return (
     <section 
@@ -156,29 +162,34 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
           variant="display"
           label="Advertisement"
           pageType="news-list"
-          realContentCardCount={newsArticles.length}
+          realContentCardCount={featuredReadingArticles.length}
           isContentLoaded={true}
-          className="mb-12 rounded-[2rem] border p-4 shadow-sm backdrop-blur-xl"
-          style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }}
+          className="mb-12 border p-4 shadow-sm backdrop-blur-xl"
+          style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder, borderRadius: 'var(--eduvora-card-radius, 22px)' }}
         />
 
         <div className="flex flex-col md:flex-row justify-between items-end mb-12">
             <div className="max-w-2xl">
                 <h2 className="text-4xl font-extrabold tracking-tight" style={{ color: chatPalette.primaryText }}>{title}</h2>
                 <p className="mt-4 text-lg" style={{ color: chatPalette.secondaryText }}>
-                    Current student alerts, education updates, and opportunity signals from Digital Catalyst.
+                    Six fresh News and Blog picks—enough to stay informed without cluttering your Home page.
                 </p>
             </div>
-            <button onClick={onOpenHub} className="hidden md:block rounded-full border px-5 py-2 text-sm font-bold backdrop-blur-xl transition hover:shadow-md" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
+            <div className="hidden items-center gap-2 md:flex">
+              <button onClick={() => onOpenHub('news')} className="rounded-full border px-5 py-2 text-sm font-bold backdrop-blur-xl transition hover:shadow-md" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
                 Open News
-            </button>
+              </button>
+              <button onClick={() => onOpenHub('blog')} className="rounded-full border px-5 py-2 text-sm font-bold backdrop-blur-xl transition hover:shadow-md" style={{ backgroundColor: 'rgba(255,255,255,0.78)', borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>
+                Open Blog
+              </button>
+            </div>
         </div>
 
         <div 
             ref={gridRef} 
             className={`latest-news-mobile-two-column grid grid-cols-2 gap-3 sm:gap-6 md:grid-cols-2 lg:grid-cols-3 lg:gap-8 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
         >
-          {newsArticles.map((article, index) => (
+          {featuredReadingArticles.map((article, index) => (
             <React.Fragment key={article.id}>
               <NewsCard 
                 settings={settings}
@@ -187,33 +198,38 @@ const LatestNews: React.FC<LatestNewsProps> = ({ settings, title, articles, onRe
                 onReadMoreClick={onReadMoreClick}
                 cardBackground={cardBackground}
               />
-              {(index + 1) % 3 === 0 && index < newsArticles.length - 1 && (
+              {(index + 1) % 3 === 0 && index < featuredReadingArticles.length - 1 && (
                 <GoogleAd
                   variant="inFeed"
                   label="Sponsored"
                   pageType="news-list"
-                  realContentCardCount={newsArticles.length}
+                  realContentCardCount={featuredReadingArticles.length}
                   isContentLoaded={true}
                   className="col-span-2 rounded-[1.25rem] border p-4 shadow-sm md:col-span-2 lg:col-span-3 lg:rounded-[2rem] lg:p-5"
-                  style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }}
+                  style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder, borderRadius: 'var(--eduvora-card-radius, 22px)' }}
                 />
               )}
             </React.Fragment>
           ))}
         </div>
         
-        <button onClick={onOpenHub} className="md:hidden w-full mt-8 border py-3 rounded-lg font-semibold" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
-            Open News
-        </button>
+        <div className="mt-8 grid grid-cols-2 gap-3 md:hidden">
+          <button onClick={() => onOpenHub('news')} className="w-full rounded-xl border py-3 font-semibold" style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}>
+              Open News
+          </button>
+          <button onClick={() => onOpenHub('blog')} className="w-full rounded-xl border py-3 font-semibold" style={{ backgroundColor: 'rgba(255,255,255,0.78)', borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }}>
+              Open Blog
+          </button>
+        </div>
 
         <GoogleAd
           variant="display"
           label="Advertisement"
           pageType="news-list"
-          realContentCardCount={newsArticles.length}
+          realContentCardCount={featuredReadingArticles.length}
           isContentLoaded={true}
-          className="mt-12 rounded-[2rem] border p-4 shadow-sm backdrop-blur-xl"
-          style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder }}
+          className="mt-12 border p-4 shadow-sm backdrop-blur-xl"
+          style={{ backgroundColor: 'rgba(255,255,255,0.86)', borderColor: chatPalette.cardBorder, borderRadius: 'var(--eduvora-card-radius, 22px)' }}
         />
       </div>
     </section>

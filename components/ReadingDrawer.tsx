@@ -301,6 +301,9 @@ const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: s
 
 const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings, isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
+  const listScrollPositionsRef = useRef<Record<ReadingListType, number>>({ news: 0, blog: 0 });
+  const previousViewRef = useRef<ReadingView>(view);
+  const wasOpenRef = useRef(false);
   const [progress, setProgress] = useState(0);
   const progressRef = useRef(0);
   const rewardIssuedRef = useRef<number | string | null>(null);
@@ -314,12 +317,41 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
   //   rewardStatus === 'idle'
 
   useEffect(() => {
-    if (!isOpen) return;
+    if (!isOpen) {
+      wasOpenRef.current = false;
+      previousViewRef.current = view;
+      listScrollPositionsRef.current = { news: 0, blog: 0 };
+      return undefined;
+    }
+
     document.body.style.overflow = 'hidden';
-    scrollRef.current?.scrollTo({ top: 0 });
-    setProgress(0);
-    progressRef.current = 0;
     return () => { document.body.style.overflow = ''; };
+  }, [isOpen]);
+
+  useEffect(() => {
+    if (!isOpen) return;
+
+    const openedFresh = !wasOpenRef.current;
+    const previousView = previousViewRef.current;
+    const isListView = view === 'news' || view === 'blog';
+    const returningFromDetail = isListView && (previousView === 'article' || previousView === 'announcement');
+    const targetTop = returningFromDetail
+      ? listScrollPositionsRef.current[view]
+      : isListView && !openedFresh
+        ? listScrollPositionsRef.current[view]
+        : 0;
+
+    const frame = window.requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ top: targetTop, behavior: 'auto' });
+      if (!isListView) {
+        setProgress(0);
+        progressRef.current = 0;
+      }
+    });
+
+    wasOpenRef.current = true;
+    previousViewRef.current = view;
+    return () => window.cancelAnimationFrame(frame);
   }, [isOpen, view, selectedArticle?.id, selectedAnnouncement?.id]);
 
   useEffect(() => {
@@ -433,6 +465,9 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
     lastReadingActivityRef.current = Date.now();
     const el = scrollRef.current;
     if (!el) return;
+    if (view === 'news' || view === 'blog') {
+      listScrollPositionsRef.current[view] = el.scrollTop;
+    }
     const max = el.scrollHeight - el.clientHeight;
     const nextProgress = max > 0 ? Math.min(100, (el.scrollTop / max) * 100) : 100;
     progressRef.current = nextProgress;
@@ -459,6 +494,20 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
     const shareData = { title: activeMeta.title, text: `Read this on Digital Catalyst: ${activeMeta.title}`, url: window.location.href };
     if (navigator.share) await navigator.share(shareData);
     else await navigator.clipboard?.writeText(`${shareData.text} ${shareData.url}`);
+  };
+
+  const handleSelectArticleFromList = (article: NewsArticle) => {
+    if (view === 'news' || view === 'blog') {
+      listScrollPositionsRef.current[view] = scrollRef.current?.scrollTop || 0;
+    }
+    onSelectArticle(article);
+  };
+
+  const handleSelectAnnouncementFromList = (announcement: Announcement) => {
+    if (view === 'news' || view === 'blog') {
+      listScrollPositionsRef.current[view] = scrollRef.current?.scrollTop || 0;
+    }
+    onSelectAnnouncement(announcement);
   };
 
   const chatPalette = useMemo(() => getPalette(listType), [listType]);
@@ -544,7 +593,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
         <section
           data-reading-drawer-panel="true"
           onPointerDown={(event) => event.stopPropagation()}
-          className="relative h-full w-full overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw] pointer-events-auto"
+          className="relative flex h-full w-full flex-col overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw] pointer-events-auto"
           style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder, ...readingCssVariables }}
         >
           <style>{`
@@ -563,6 +612,10 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
             .reading-meta { color: var(--reading-meta-color) !important; }
             .reading-hub-heading { font-family: var(--reading-heading-font); color: var(--reading-heading-color); }
             .reading-hub-excerpt { font-family: var(--reading-body-font); color: var(--reading-body-color); }
+            @media (max-width: 639px) {
+              .reading-drawer-header { height: 4.5rem; min-height: 4.5rem; max-height: 4.5rem; }
+              .reading-drawer-header-title { max-width: min(47vw, 12rem); }
+            }
           `}</style>
           <div className="sticky top-0 z-30 h-1" style={{ backgroundColor: chatPalette.cardSurface }}>
             <div className="h-full rounded-r-full shadow-sm transition-all duration-150" style={{ width: `${progress}%`, background: `linear-gradient(90deg, ${chatPalette.gradientStart}, ${chatPalette.gradientEnd})` }} />
@@ -570,28 +623,29 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
 
           <div className="absolute inset-0 pointer-events-none" style={{ background: `radial-gradient(circle at top left, ${accentSoftBackground}, transparent 30%), radial-gradient(circle at 82% 12%, rgba(178, 158, 255, 0.20), transparent 28%), radial-gradient(circle at bottom right, rgba(194, 231, 255, 0.38), transparent 30%)` }} />
 
-          <header className="relative z-20 flex items-center justify-between gap-4 border-b px-4 py-4 backdrop-blur-2xl sm:px-8" style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }}>
-            <div className="flex min-w-0 items-center gap-4">
+          <header className="reading-drawer-header relative z-20 flex shrink-0 items-center justify-between gap-2 border-b px-2.5 py-2 backdrop-blur-2xl sm:h-auto sm:min-h-0 sm:max-h-none sm:gap-4 sm:px-8 sm:py-4" style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }}>
+            <div className="flex min-w-0 items-center gap-2 sm:gap-4">
               <button
                 onClick={view === 'article' || view === 'announcement' ? onBackToList : onClose}
-                className="shrink-0 rounded-full border px-3 py-2 text-xs font-black shadow-sm transition hover:-translate-x-0.5 hover:shadow-md sm:px-4 sm:text-sm"
+                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border text-base font-black shadow-sm transition hover:-translate-x-0.5 hover:shadow-md sm:h-auto sm:w-auto sm:rounded-full sm:px-4 sm:py-2 sm:text-sm"
                 style={{ backgroundColor: chatPalette.activeBlue, borderColor: chatPalette.activeBlue, color: chatPalette.primaryText }}
                 aria-label={view === 'article' || view === 'announcement' ? `Back to ${listType === 'news' ? 'News' : 'Blog'} list` : 'Close reading page'}
               >
-                ← {view === 'article' || view === 'announcement' ? `Back to ${listType === 'news' ? 'News' : 'Blog'}` : 'Back'}
+                <span aria-hidden="true" className="sm:hidden">←</span>
+                <span className="hidden sm:inline">← {view === 'article' || view === 'announcement' ? `Back to ${listType === 'news' ? 'News' : 'Blog'}` : 'Back'}</span>
               </button>
-              <div className="min-w-0">
-              <p className="text-[10px] font-black uppercase tracking-[0.35em]" style={{ color: chatPalette.linkText }}>Premium Reading Mode</p>
-              <h2 id="reading-drawer-title" className="mt-1 truncate text-lg font-black sm:text-2xl" style={{ color: chatPalette.primaryText }}>{activeMeta.title}</h2>
+              <div className="reading-drawer-header-title min-w-0">
+                <p className="hidden text-[9px] font-black uppercase tracking-[0.22em] min-[390px]:block sm:text-[10px] sm:tracking-[0.35em]" style={{ color: chatPalette.linkText }}>Premium Reading</p>
+                <h2 id="reading-drawer-title" className="truncate text-sm font-black min-[390px]:mt-0.5 sm:mt-1 sm:text-2xl" style={{ color: chatPalette.primaryText }}>{activeMeta.title}</h2>
               </div>
             </div>
-            <div className="flex shrink-0 items-center gap-3">
-              <button onClick={handleShare} className="rounded-full border p-3 transition hover:shadow-sm" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }} aria-label="Share reading item">↗</button>
-              <button onClick={onClose} className="rounded-full border p-3 transition hover:shadow-sm" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }} aria-label="Close reading drawer">✕</button>
+            <div className="flex shrink-0 items-center gap-1.5 sm:gap-3">
+              <button onClick={handleShare} className="flex h-10 w-10 items-center justify-center rounded-xl border text-base transition hover:shadow-sm sm:rounded-full" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }} aria-label="Share reading item">↗</button>
+              <button onClick={onClose} className="flex h-10 w-10 items-center justify-center rounded-xl border text-base transition hover:shadow-sm sm:rounded-full" style={{ backgroundColor: chatPalette.searchBlue, borderColor: chatPalette.cardBorder, color: chatPalette.primaryText }} aria-label="Close reading drawer">✕</button>
             </div>
           </header>
 
-          <div ref={scrollRef} onScroll={handleScroll} className="relative z-10 h-[calc(100%-73px)] overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+          <div ref={scrollRef} onScroll={handleScroll} className="relative z-10 min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
             <div className="px-5 py-8 sm:px-10 lg:px-16">
               <div className="mx-auto max-w-3xl">
                 <div className="mb-8 rounded-[2rem] border p-6 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl" style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }}>
@@ -625,7 +679,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                     )}
                     {visibleArticles.map((article, index) => (
                       <React.Fragment key={`article-${article.id}`}>
-                        <HubCard title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(stripMarkdown(article.content))} min`} excerpt={article.excerpt} badge={article.type === 'news' ? 'News' : article.category || 'Blog'} imageSeed={getArticleImage(article)} fallbackImage={buildPremiumArticleImage(article)} onClick={() => onSelectArticle(article)} listType={listType} />
+                        <HubCard title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(stripMarkdown(article.content))} min`} excerpt={article.excerpt} badge={article.type === 'news' ? 'News' : article.category || 'Blog'} imageSeed={getArticleImage(article)} fallbackImage={buildPremiumArticleImage(article)} onClick={() => handleSelectArticleFromList(article)} listType={listType} />
                         {(index + 1) % 3 === 0 && index < visibleArticles.length - 1 && (
                           <GoogleAd
                             variant="inFeed"
@@ -639,7 +693,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                         )}
                       </React.Fragment>
                     ))}
-                    {listType === 'news' && announcements.map((announcement) => <HubCard key={`announcement-${announcement.id}`} title={announcement.title} meta={formatDate(announcement.date)} excerpt={announcement.content} badge="Announcement" onClick={() => onSelectAnnouncement(announcement)} listType={listType} />)}
+                    {listType === 'news' && announcements.map((announcement) => <HubCard key={`announcement-${announcement.id}`} title={announcement.title} meta={formatDate(announcement.date)} excerpt={announcement.content} badge="Announcement" onClick={() => handleSelectAnnouncementFromList(announcement)} listType={listType} />)}
                   </div>
                 </div>
               )}
@@ -665,6 +719,16 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                       </div>
                     )}
                   </div>
+                  <GoogleAd
+                    variant="display"
+                    label="Advertisement"
+                    pageType="article"
+                    visibleWordCount={selectedArticleWordCount}
+                    isContentLoaded={true}
+                    disabled={selectedArticleAdDisabled}
+                    className="mx-auto mt-8 max-w-[var(--reading-content-width)] border p-4 shadow-sm backdrop-blur-xl"
+                    style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder, borderRadius: 'var(--eduvora-card-radius, 22px)' }}
+                  />
                   {isExternalArticle(selectedArticleForDisplay) ? (
                     <>
                       <div className="mt-8 overflow-hidden rounded-[2rem] border p-2 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl lg:mt-10" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>

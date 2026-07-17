@@ -11,3 +11,23 @@ self.addEventListener('fetch', event => {
     event.respondWith(fetch(event.request).catch(() => caches.match('/index.html')));
   }
 });
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const notificationId = event.notification?.data?.notificationId || '';
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clients => {
+      const existingClient = clients.find(client => 'focus' in client);
+      if (existingClient) {
+        await existingClient.focus();
+        existingClient.postMessage({ type: 'site-notification-open', notificationId });
+        return;
+      }
+
+      const targetUrl = notificationId ? `/?siteNotification=${encodeURIComponent(notificationId)}` : '/';
+      const openedClient = await self.clients.openWindow(targetUrl);
+      if (openedClient) {
+        openedClient.postMessage({ type: 'site-notification-open', notificationId });
+      }
+    })
+  );
+});

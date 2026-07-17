@@ -4,6 +4,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 
 import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, limit, onSnapshot, orderBy, query, runTransaction, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore';
 import Header from './components/Header';
+import SiteNotificationCenter from './components/SiteNotificationCenter';
 import MobileAppHome from './components/MobileAppHome';
 import Hero from './components/Hero';
 import ProductShowcase from './components/ProductShowcase';
@@ -52,6 +53,24 @@ import MembershipUpgradeCard from './components/MembershipUpgradeCard';
 import { DEFAULT_PRODUCT_ROUNDNESS_SETTINGS } from './utils/productRoundness';
 import type { ProductRoundnessSettings } from './utils/productRoundness';
 import { acknowledgeDockDestination as acknowledgeDockSeenDestination, computeDockActivity, createDockInventory, DockCountDestination, DockSeenState, readOrInitializeDockSeenState } from './utils/dockNewContent';
+import {
+  buildContentNotificationInventory,
+  createCommunityActivityNotifications,
+  createContentNotifications,
+  DEFAULT_SITE_NOTIFICATION_PREFERENCES,
+  isNotificationCategoryEnabled,
+  loadCommunityActivityBaseline,
+  loadContentNotificationBaseline,
+  loadSiteNotificationPreferences,
+  loadSiteNotifications,
+  mergeSiteNotifications,
+  saveCommunityActivityBaseline,
+  saveContentNotificationBaseline,
+  saveSiteNotificationPreferences,
+  saveSiteNotifications,
+  SiteNotification,
+  SiteNotificationPreferences,
+} from './utils/siteNotifications';
 import {
   DEFAULT_SUBSCRIPTION_PAGE_CONTENT,
   DEFAULT_SUBSCRIPTION_PLANS,
@@ -1509,6 +1528,7 @@ const readPersistedReadingRoute = (): PersistedReadingRoute | null => {
 const App: React.FC = () => {
   // Initialize products with default data immediately to prevent "white screen" or empty state
   const [products, setProducts] = useState<Product[]>([]);
+  const [notificationContentReady, setNotificationContentReady] = useState({ products: false, settings: false });
   const [canShowInstallPrompt, setCanShowInstallPrompt] = useState(false);
   const [reviews, setReviews] = useState<{ [productId: number]: Review[] }>({});
   const [coupons, setCoupons] = useState<Coupon[]>(() => ENABLE_DEMO_SEED_DATA ? initialCoupons : []);
@@ -1710,6 +1730,260 @@ const App: React.FC = () => {
   const effectiveAppUser = currentUser || (effectiveFirebaseUser ? createFallbackUserFromFirebase(effectiveFirebaseUser) : null);
   const isLoggedIn = Boolean(effectiveFirebaseUser);
   const isAuthBooting = authStatus === 'booting' || authStatus === 'checking-session' || isRedirectResultPending;
+  const siteNotificationViewerKey = String(effectiveAppUser?.id || effectiveFirebaseUser?.uid || 'guest');
+  const [siteNotifications, setSiteNotifications] = useState<SiteNotification[]>([]);
+  const [siteNotificationPreferences, setSiteNotificationPreferences] = useState<SiteNotificationPreferences>(DEFAULT_SITE_NOTIFICATION_PREFERENCES);
+  const [isSiteNotificationCenterOpen, setIsSiteNotificationCenterOpen] = useState(false);
+  const [browserNotificationPermission, setBrowserNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() =>
+    typeof window !== 'undefined' && 'Notification' in window ? window.Notification.permission : 'unsupported'
+  );
+  const siteNotificationsRef = useRef<SiteNotification[]>([]);
+  const siteNotificationPreferencesRef = useRef<SiteNotificationPreferences>(DEFAULT_SITE_NOTIFICATION_PREFERENCES);
+  const followedCommunityUserIdsRef = useRef<string[]>([]);
+
+  const showBrowserSiteNotification = useCallback((notification: SiteNotification) => {
+    if (typeof window === 'undefined' || !('Notification' in window)) return;
+    if (!siteNotificationPreferencesRef.current.browserAlerts || window.Notification.permission !== 'granted') return;
+    if (document.visibilityState === 'visible' && document.hasFocus()) return;
+
+    const options: NotificationOptions = {
+      body: notification.body,
+      icon: '/icons/icon-192x192.svg',
+      badge: '/icons/icon-192x192.svg',
+      tag: notification.id,
+      data: { notificationId: notification.id, target: notification.target },
+    };
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.ready
+        .then(registration => registration.showNotification(notification.title, options))
+        .catch(() => undefined);
+      return;
+    }
+
+    try {
+      new window.Notification(notification.title, options);
+    } catch {
+      // In-app notification history remains the fallback.
+    }
+  }, []);
+
+  const pushSiteNotifications = useCallback((incoming: SiteNotification[]) => {
+    const enabledIncoming = incoming.filter(notification =>
+      isNotificationCategoryEnabled(notification, siteNotificationPreferencesRef.current)
+    );
+    if (enabledIncoming.length === 0) return;
+
+    setSiteNotifications(current => {
+      const next = mergeSiteNotifications(current, enabledIncoming);
+      siteNotificationsRef.current = next;
+      saveSiteNotifications(siteNotificationViewerKey, next);
+      return next;
+    });
+    enabledIncoming.forEach(showBrowserSiteNotification);
+  }, [showBrowserSiteNotification, siteNotificationViewerKey]);
+
+  useEffect(() => {
+    const storedNotifications = loadSiteNotifications(siteNotificationViewerKey);
+    const storedPreferences = loadSiteNotificationPreferences(siteNotificationViewerKey);
+    siteNotificationsRef.current = storedNotifications;
+    siteNotificationPreferencesRef.current = storedPreferences;
+    setSiteNotifications(storedNotifications);
+    setSiteNotificationPreferences(storedPreferences);
+    setIsSiteNotificationCenterOpen(false);
+  }, [siteNotificationViewerKey]);
+
+  useEffect(() => {
+    const purchaseStateReady = !isLoggedIn || purchaseStatus === 'ready' || purchaseStatus === 'fallback';
+    if (!notificationContentReady.products || !notificationContentReady.settings || !purchaseStateReady) return;
+
+    const currentInventory = buildContentNotificationInventory({
+      products,
+      articles: websiteSettings.content.newsArticles,
+      announcements: websiteSettings.content.announcements,
+      purchasedProductIds,
+    });
+    const previousInventory = loadContentNotificationBaseline(siteNotificationViewerKey);
+    saveContentNotificationBaseline(siteNotificationViewerKey, currentInventory);
+    if (!previousInventory) return;
+
+    pushSiteNotifications(createContentNotifications(previousInventory, currentInventory));
+  }, [isLoggedIn, notificationContentReady.products, notificationContentReady.settings, products, purchaseStatus, purchasedProductIds, pushSiteNotifications, siteNotificationViewerKey, websiteSettings.content.announcements, websiteSettings.content.newsArticles]);
+
+  useEffect(() => {
+    const uid = effectiveFirebaseUser?.uid;
+    if (!uid) return undefined;
+
+    const seenKey = `eduvora.siteCommunityNotificationSeen.v1:${uid}`;
+    const readSeenIds = () => {
+      try {
+        const parsed = JSON.parse(window.localStorage.getItem(seenKey) || 'null');
+        return Array.isArray(parsed) ? parsed.map(String) : null;
+      } catch {
+        return null;
+      }
+    };
+    const writeSeenIds = (ids: string[]) => {
+      try {
+        window.localStorage.setItem(seenKey, JSON.stringify(Array.from(new Set(ids)).slice(-200)));
+      } catch {
+        // Listener continues in-memory when storage is restricted.
+      }
+    };
+
+    const notificationQuery = query(
+      collection(db, 'community_notifications'),
+      where('recipientId', '==', uid),
+      orderBy('createdAt', 'desc'),
+      limit(60),
+    );
+
+    return onSnapshot(notificationQuery, snapshot => {
+      const snapshotIds = snapshot.docs.map(item => item.id);
+      const storedSeenIds = readSeenIds();
+      if (!storedSeenIds) {
+        writeSeenIds(snapshotIds);
+        return;
+      }
+
+      const seen = new Set(storedSeenIds);
+      const incoming = snapshot.docs
+        .filter(item => !seen.has(item.id))
+        .map(item => {
+          const data = item.data() as Record<string, any>;
+          const rawCreatedAt = data.createdAt;
+          const createdAt = typeof rawCreatedAt === 'number'
+            ? rawCreatedAt
+            : typeof rawCreatedAt?.toMillis === 'function'
+              ? rawCreatedAt.toMillis()
+              : Date.parse(String(rawCreatedAt || '')) || Date.now();
+          return {
+            id: `community:remote:${item.id}`,
+            title: String(data.title || 'New Community activity'),
+            body: String(data.body || 'Open Community to view this update.'),
+            category: 'community' as const,
+            createdAt,
+            read: data.read === true,
+            source: 'community' as const,
+            actorAvatar: typeof data.actorAvatar === 'string' ? data.actorAvatar : undefined,
+            remoteNotificationId: item.id,
+            target: {
+              type: 'community' as const,
+              targetPage: typeof data.targetPage === 'string' ? data.targetPage : 'notifications',
+              targetId: data.targetId === undefined || data.targetId === null ? undefined : String(data.targetId),
+            },
+          };
+        });
+
+      writeSeenIds([...storedSeenIds, ...snapshotIds]);
+      pushSiteNotifications(incoming);
+    }, error => console.warn('Global Community notification listener failed.', error));
+  }, [effectiveFirebaseUser?.uid, pushSiteNotifications]);
+
+  useEffect(() => {
+    const uid = effectiveFirebaseUser?.uid;
+    if (!uid || !hasPremiumMembership(effectiveAppUser)) {
+      followedCommunityUserIdsRef.current = [];
+      return undefined;
+    }
+
+    const toMillis = (value: any) => {
+      if (typeof value === 'number') return value;
+      if (typeof value?.toMillis === 'function') return value.toMillis();
+      if (typeof value?.seconds === 'number') return value.seconds * 1000;
+      return Date.parse(String(value || '')) || Date.now();
+    };
+    const getReactionActorIds = (data: Record<string, any>) => {
+      const likedActors = data.likedByUsers && typeof data.likedByUsers === 'object'
+        ? Object.entries(data.likedByUsers).filter(([, active]) => Boolean(active)).map(([actorId]) => String(actorId))
+        : [];
+      const emojiActors = data.reactionUsers && typeof data.reactionUsers === 'object'
+        ? Object.keys(data.reactionUsers).map(String)
+        : [];
+      return Array.from(new Set([...likedActors, ...emojiActors])).filter(Boolean).sort();
+    };
+    const countReactions = (data: Record<string, any>) => {
+      const reactionCounts: number = data.reactionCounts && typeof data.reactionCounts === 'object'
+        ? Object.values(data.reactionCounts as Record<string, unknown>)
+            .reduce<number>((sum, value) => sum + Math.max(0, Number(value) || 0), 0)
+        : 0;
+      return Math.max(0, Number(data.likeCount || data.likedBy || 0), reactionCounts, getReactionActorIds(data).length);
+    };
+    const consumeActivitySnapshot = (kind: 'feed' | 'status', docs: Array<{ id: string; data: () => Record<string, any> }>) => {
+      const activityItems = docs.map(item => {
+        const data = item.data();
+        const isStory = kind === 'status';
+        return {
+          id: item.id,
+          kind: isStory ? 'story' as const : 'post' as const,
+          ownerId: String(data.ownerId || data.creatorId || ''),
+          title: String(data.title || (isStory ? 'New Community story' : data.admin || data.authorName || 'New Community post')),
+          body: String(data.body || data.text || '').slice(0, 180),
+          createdAt: toMillis(data.createdAt),
+          likeCount: countReactions(data),
+          reactionActorIds: getReactionActorIds(data),
+          source: typeof data.source === 'string' ? data.source : undefined,
+        };
+      }).filter(item => item.ownerId);
+
+      const previous = loadCommunityActivityBaseline(uid, kind);
+      const result = createCommunityActivityNotifications({
+        previous,
+        items: activityItems,
+        currentUserId: uid,
+        followedUserIds: followedCommunityUserIdsRef.current,
+      });
+      saveCommunityActivityBaseline(uid, kind, result.baseline);
+      if (previous) pushSiteNotifications(result.notifications);
+    };
+
+    const unsubscribeFollows = onSnapshot(collection(db, 'community_follows'), snapshot => {
+      followedCommunityUserIdsRef.current = snapshot.docs
+        .map(item => item.data() as Record<string, any>)
+        .filter(data => String(data.followerId || '') === uid && data.status !== 'removed')
+        .map(data => String(data.followingId || ''))
+        .filter(Boolean);
+    }, error => console.warn('Community follow activity listener failed.', error));
+
+    const unsubscribeFeed = onSnapshot(
+      query(collection(db, 'community_feed'), orderBy('createdAt', 'desc'), limit(80)),
+      snapshot => consumeActivitySnapshot('feed', snapshot.docs),
+      error => console.warn('Community post activity listener failed.', error),
+    );
+    const unsubscribeStatus = onSnapshot(
+      query(collection(db, 'community_status'), orderBy('createdAt', 'desc'), limit(80)),
+      snapshot => consumeActivitySnapshot('status', snapshot.docs),
+      error => console.warn('Community story activity listener failed.', error),
+    );
+
+    return () => {
+      unsubscribeFollows();
+      unsubscribeFeed();
+      unsubscribeStatus();
+    };
+  }, [effectiveAppUser?.subscriptionExpiresAt, effectiveAppUser?.subscriptionTier, effectiveFirebaseUser?.uid, pushSiteNotifications]);
+
+  const handleUpdateSiteNotificationPreferences = useCallback((preferences: SiteNotificationPreferences) => {
+    siteNotificationPreferencesRef.current = preferences;
+    setSiteNotificationPreferences(preferences);
+    saveSiteNotificationPreferences(siteNotificationViewerKey, preferences);
+  }, [siteNotificationViewerKey]);
+
+  const requestBrowserSiteNotifications = useCallback(async () => {
+    if (typeof window === 'undefined' || !('Notification' in window)) {
+      setBrowserNotificationPermission('unsupported');
+      return;
+    }
+
+    const permission = await window.Notification.requestPermission();
+    setBrowserNotificationPermission(permission);
+    if (permission === 'granted') {
+      handleUpdateSiteNotificationPreferences({
+        ...siteNotificationPreferencesRef.current,
+        browserAlerts: true,
+      });
+    }
+  }, [handleUpdateSiteNotificationPreferences]);
 
   useEffect(() => {
     if (!purchaseCelebration) return;
@@ -2340,6 +2614,7 @@ const App: React.FC = () => {
         .sort((a, b) => Number(a.id) - Number(b.id));
 
       setProducts(remoteProducts);
+      setNotificationContentReady(current => ({ ...current, products: true }));
       safeSetItem('siteProducts', remoteProducts);
 
       try {
@@ -2348,6 +2623,7 @@ const App: React.FC = () => {
         console.warn('Could not mark product cache as synced.', error);
       }
     }, error => {
+      setNotificationContentReady(current => ({ ...current, products: true }));
       logGlobalSyncWarning('Products', error);
     });
 
@@ -2387,12 +2663,16 @@ const App: React.FC = () => {
     }, error => logGlobalSyncWarning('Reviews', error));
 
     const unsubscribeWebsiteSettings = onSnapshot(doc(db, ...GLOBAL_WEBSITE_SETTINGS_DOC), (snapshot) => {
+      setNotificationContentReady(current => ({ ...current, settings: true }));
       if (!snapshot.exists()) return;
       const remoteSettings = snapshot.data() as WebsiteSettings;
       const mergedSettings = mergeWebsiteSettings(remoteSettings);
       setWebsiteSettings(mergedSettings);
       safeSetItem('websiteSettings', mergedSettings);
-    }, error => logGlobalSyncWarning('Website settings', error));
+    }, error => {
+      setNotificationContentReady(current => ({ ...current, settings: true }));
+      logGlobalSyncWarning('Website settings', error);
+    });
 
     return () => {
       unsubscribeProducts();
@@ -5456,6 +5736,124 @@ const App: React.FC = () => {
     handleNavigateToAllProducts();
   };
 
+  const markSiteNotificationRead = useCallback((notificationId: string) => {
+    setSiteNotifications(current => {
+      const next = current.map(notification => notification.id === notificationId ? { ...notification, read: true } : notification);
+      siteNotificationsRef.current = next;
+      saveSiteNotifications(siteNotificationViewerKey, next);
+      return next;
+    });
+
+    const remoteId = siteNotificationsRef.current.find(notification => notification.id === notificationId)?.remoteNotificationId;
+    if (remoteId && effectiveFirebaseUser?.uid) {
+      updateDoc(doc(db, 'community_notifications', remoteId), {
+        read: true,
+        readAt: Date.now(),
+        updatedAt: Date.now(),
+      }).catch(error => console.warn('Could not sync notification read state.', error));
+    }
+  }, [effectiveFirebaseUser?.uid, siteNotificationViewerKey]);
+
+  const markAllSiteNotificationsRead = useCallback(() => {
+    const unreadRemoteIds = siteNotificationsRef.current
+      .filter(notification => !notification.read && notification.remoteNotificationId)
+      .map(notification => notification.remoteNotificationId as string);
+
+    setSiteNotifications(current => {
+      const next = current.map(notification => ({ ...notification, read: true }));
+      siteNotificationsRef.current = next;
+      saveSiteNotifications(siteNotificationViewerKey, next);
+      return next;
+    });
+
+    if (unreadRemoteIds.length > 0 && effectiveFirebaseUser?.uid) {
+      const batch = writeBatch(db);
+      unreadRemoteIds.slice(0, 60).forEach(remoteId => {
+        batch.update(doc(db, 'community_notifications', remoteId), {
+          read: true,
+          readAt: Date.now(),
+          updatedAt: Date.now(),
+        });
+      });
+      batch.commit().catch(error => console.warn('Could not mark remote notifications read.', error));
+    }
+  }, [effectiveFirebaseUser?.uid, siteNotificationViewerKey]);
+
+  const openSiteNotification = useCallback((notification: SiteNotification) => {
+    markSiteNotificationRead(notification.id);
+    setIsSiteNotificationCenterOpen(false);
+
+    const target = notification.target;
+
+    switch (target.type) {
+      case 'product': {
+        const product = productsWithRatingsRef.current.find(item => Number(item.id) === Number(target.productId));
+        if (product) handleViewProduct(product);
+        else handleNavigateToAllProducts();
+        return;
+      }
+      case 'reading': {
+        const article = websiteSettings.content.newsArticles.find(item => String(item.id) === target.articleId);
+        if (article) handleViewBlogArticle(article);
+        else openReadingHub(target.listType);
+        return;
+      }
+      case 'announcement': {
+        const announcement = websiteSettings.content.announcements.find(item => String(item.id) === target.announcementId);
+        if (announcement) handleViewAnnouncement(announcement);
+        else openReadingHub('news');
+        return;
+      }
+      case 'course': {
+        const product = productsWithRatingsRef.current.find(item => Number(item.id) === Number(target.productId));
+        if (!product) {
+          handleNavigateToPurchases();
+          return;
+        }
+        selectedProductRef.current = product;
+        setSelectedProduct(product);
+        if (purchasedProductIds.includes(product.id)) setCurrentView('coursePlayer');
+        else setCurrentView('product');
+        window.scrollTo(0, 0);
+        return;
+      }
+      case 'purchases':
+        handleNavigateToPurchases();
+        return;
+      case 'community':
+        setCurrentView('community');
+        window.scrollTo(0, 0);
+        return;
+      default: {
+        const exhaustiveTarget: never = target;
+        console.warn('Unsupported notification target.', exhaustiveTarget);
+      }
+    }
+  }, [markSiteNotificationRead, purchasedProductIds, websiteSettings.content.announcements, websiteSettings.content.newsArticles]);
+
+  useEffect(() => {
+    if (!('serviceWorker' in navigator)) return undefined;
+    const handleServiceWorkerMessage = (event: MessageEvent) => {
+      if (event.data?.type !== 'site-notification-open') return;
+      const notification = siteNotificationsRef.current.find(item => item.id === event.data.notificationId);
+      if (notification) openSiteNotification(notification);
+    };
+    navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+  }, [openSiteNotification]);
+
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || siteNotifications.length === 0) return;
+    const url = new URL(window.location.href);
+    const notificationId = url.searchParams.get('siteNotification');
+    if (!notificationId) return;
+    const notification = siteNotificationsRef.current.find(item => item.id === notificationId);
+    url.searchParams.delete('siteNotification');
+    window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`);
+    if (notification) openSiteNotification(notification);
+  }, [openSiteNotification, siteNotifications.length]);
+
   // FIX: Changed to check for existing admin session before showing login screen
   const handleNavigateToAdminLogin = () => {
     if (currentAdminUser) {
@@ -5688,7 +6086,7 @@ const App: React.FC = () => {
                   case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} subtitle="A quick look at the courses learners rate highest right now." products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} coupons={coupons} variant="mobileHome" purchasedProductIds={purchasedProductIds} />;
                   case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
                   case 'services': return <div className="mobile-home-secondary"><Services settings={websiteSettings} key={section.id} services={websiteSettings.content.services} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} /></div>;
-                  case 'news': return <div className="mobile-home-secondary"><LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Daily Reading Hub'} articles={websiteSettings.content.newsArticles.filter(article => article.type === 'news')} onReadMoreClick={handleViewBlogArticle} onOpenHub={() => openReadingHub('news')} /></div>;
+                  case 'news': return <div className="mobile-home-secondary"><LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Latest News & Blog'} articles={websiteSettings.content.newsArticles} onReadMoreClick={handleViewBlogArticle} onOpenHub={openReadingHub} /></div>;
                   case 'about': return <div className="mobile-home-secondary"><AboutUs settings={websiteSettings} key={section.id} title={websiteSettings.content.aboutUsTitle} text={websiteSettings.content.aboutUsText} imageSeed={websiteSettings.content.aboutUsImageSeed} /></div>;
                   case 'trust': return <div className="mobile-home-secondary"><TrustBadges settings={websiteSettings} key={section.id} /></div>;
                   case 'upcoming': return <div className="mobile-home-secondary"><UpcomingFeatures settings={websiteSettings} key={section.id} title={section.title || "What's Next?"} features={websiteSettings.content.upcomingFeatures} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} /></div>;
@@ -5957,7 +6355,7 @@ const App: React.FC = () => {
                 ←
               </button>
             )}
-            <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
+            <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} notificationCount={siteNotifications.filter(notification => !notification.read).length} onOpenNotifications={() => setIsSiteNotificationCenterOpen(true)} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={`${shouldHideMainDockOnMobile ? 'max-md:hidden' : ''} ${useDesktopSidebar ? 'lg:hidden' : ''}`}>
                 <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
@@ -5968,6 +6366,17 @@ const App: React.FC = () => {
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={closeReadingDrawer} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={hasPremiumMembership(effectiveAppUser) ? handleReadingReward : undefined} />
+            <SiteNotificationCenter
+              isOpen={isSiteNotificationCenterOpen}
+              notifications={siteNotifications}
+              preferences={siteNotificationPreferences}
+              browserPermission={browserNotificationPermission}
+              onClose={() => setIsSiteNotificationCenterOpen(false)}
+              onOpenNotification={openSiteNotification}
+              onMarkAllRead={markAllSiteNotificationsRead}
+              onUpdatePreferences={handleUpdateSiteNotificationPreferences}
+              onRequestBrowserAlerts={requestBrowserSiteNotifications}
+            />
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
             {isMobileCompletionModalOpen && effectiveAppUser && shouldAskForMobileCompletion() && (
               <div className="fixed inset-0 z-[3000] flex items-center justify-center bg-slate-950/55 p-4 backdrop-blur-sm">
