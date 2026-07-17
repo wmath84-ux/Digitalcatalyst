@@ -1459,7 +1459,10 @@ const CoursePlayer: React.FC<{
       typeof window !== 'undefined'
       && forceOverlaySidebarRef.current
       && window.history.state?.dcView === 'coursePlayer'
-      && window.history.state?.dcCourseLessonSelection === true
+      && (
+        window.history.state?.dcCourseLessonSelection === true
+        || window.history.state?.dcCoursePanelCycleReady === true
+      )
     ) {
       window.history.back();
       return;
@@ -1532,6 +1535,7 @@ const CoursePlayer: React.FC<{
   const forceOverlaySidebarRef = useRef(forceOverlaySidebar);
   const courseHistoryRestoringRef = useRef(false);
   const courseHistoryReadyRef = useRef(false);
+  const courseExitAfterModulesRef = useRef(false);
 
   useEffect(() => {
     isSidebarOpenRef.current = isSidebarOpen;
@@ -1550,6 +1554,8 @@ const CoursePlayer: React.FC<{
       dcCourseProductId: product.id,
       dcCourseFileId: activeFile?.id || null,
       dcCourseLessonSelection: false,
+      dcCoursePanelCycleReady: false,
+      dcCourseExitAfterModules: false,
     };
 
     if (mode === 'push') window.history.pushState(nextState, '', window.location.href);
@@ -1569,6 +1575,8 @@ const CoursePlayer: React.FC<{
         dcCourseProductId: product.id,
         dcCourseFileId: activeFile?.id || null,
         dcCourseLessonSelection: false,
+        dcCoursePanelCycleReady: false,
+        dcCourseExitAfterModules: false,
       };
 
       if (window.history.state?.dcView === 'coursePlayer') {
@@ -1627,12 +1635,15 @@ const CoursePlayer: React.FC<{
       dcCourseProductId: product.id,
       dcCourseFileId: fileId,
       dcCourseLessonSelection: false,
+      dcCoursePanelCycleReady: true,
+      dcCourseExitAfterModules: true,
     };
     window.history.replaceState(modulesState, '', window.location.href);
     window.history.pushState({
       ...modulesState,
       dcCourseLayer: null,
       dcCourseLessonSelection: true,
+      dcCourseExitAfterModules: false,
     }, '', window.location.href);
   }, [closeCourseLayerHistory, product.id]);
 
@@ -1669,6 +1680,46 @@ const CoursePlayer: React.FC<{
 
       courseHistoryRestoringRef.current = true;
       const layer = state.dcCourseLayer === 'mentor' || state.dcCourseLayer === 'modules' ? state.dcCourseLayer : null;
+
+      if (
+        forceOverlaySidebarRef.current
+        && layer === null
+        && courseExitAfterModulesRef.current
+      ) {
+        courseExitAfterModulesRef.current = false;
+        window.setTimeout(() => window.history.back(), 0);
+        return;
+      }
+
+      if (
+        forceOverlaySidebarRef.current
+        && layer === null
+        && state.dcCoursePanelCycleReady !== true
+        && state.dcCourseLessonSelection !== true
+      ) {
+        const modulesState = {
+          ...state,
+          dcView: 'coursePlayer',
+          dcCourseLayer: 'modules',
+          dcCourseProductId: product.id,
+          dcCourseFileId: activeFile?.id || state.dcCourseFileId || null,
+          dcCourseLessonSelection: false,
+          dcCoursePanelCycleReady: true,
+          dcCourseExitAfterModules: true,
+        };
+        window.history.replaceState(modulesState, '', window.location.href);
+        window.history.pushState({
+          ...modulesState,
+          dcCourseLayer: null,
+          dcCourseExitAfterModules: false,
+        }, '', window.location.href);
+        setIsMentorOpen(false);
+        setIsSidebarOpen(false);
+        window.setTimeout(() => { courseHistoryRestoringRef.current = false; }, 0);
+        return;
+      }
+
+      courseExitAfterModulesRef.current = layer === 'modules' && state.dcCourseExitAfterModules === true;
       setIsMentorOpen(layer === 'mentor');
       if (forceOverlaySidebarRef.current) setIsSidebarOpen(layer === 'modules');
       window.setTimeout(() => { courseHistoryRestoringRef.current = false; }, 0);
@@ -1676,7 +1727,7 @@ const CoursePlayer: React.FC<{
 
     window.addEventListener('popstate', handleCoursePopState);
     return () => window.removeEventListener('popstate', handleCoursePopState);
-  }, []);
+  }, [activeFile?.id, product.id]);
 
   useEffect(() => {
     if (!courseHistoryReadyRef.current || courseHistoryRestoringRef.current) return;

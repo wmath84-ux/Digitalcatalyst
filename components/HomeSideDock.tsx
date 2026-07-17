@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import type { ProductWithRating, WebsiteSettings } from '../App';
 import type { DockCountDestination } from '../utils/dockNewContent';
 import { defaultDockStyle, dockCustomizationItems, dockShadowMap, hexToRgba } from './BottomGlassDock';
@@ -58,6 +58,7 @@ const clamp = (value: unknown, minimum: number, maximum: number, fallback: numbe
 const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity, authButtonLabel, activeItem = '' }: HomeSideDockProps) => {
   const [sidebarState, setSidebarState] = useState<SidebarState>(readInitialState);
   const [hoverExpanded, setHoverExpanded] = useState(false);
+  const hoverCloseTimerRef = useRef<number | null>(null);
   const dockStyle = { ...defaultDockStyle, ...((settings.content as any).dockStyle || {}) };
   const showLabels = dockStyle.showLabels !== false;
   const showBadges = dockStyle.showBadges !== false;
@@ -77,7 +78,9 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
   const borderColor = /^#[0-9a-f]{6}$/i.test(dockStyle.borderColor || '') ? dockStyle.borderColor : defaultDockStyle.borderColor;
   const shadowStrength = dockStyle.shadowStrength === 'none' || dockStyle.shadowStrength === 'strong' ? dockStyle.shadowStrength : 'soft';
 
-  const isVisuallyExpanded = showLabels && (sidebarState === 'expanded' || (sidebarState === 'collapsed' && hoverExpanded));
+  const isTemporaryPreview = hoverExpanded && (sidebarState === 'collapsed' || sidebarState === 'hidden');
+  const isVisuallyExpanded = showLabels && (sidebarState === 'expanded' || isTemporaryPreview);
+  const isPanelVisible = sidebarState !== 'hidden' || hoverExpanded;
   const layoutWidth = sidebarState === 'hidden' ? 0 : isVisuallyExpanded ? expandedWidth : collapsedWidth;
   const visualWidth = isVisuallyExpanded ? expandedWidth : collapsedWidth;
 
@@ -95,7 +98,32 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
     return () => root.style.removeProperty('--desktop-site-sidebar-offset');
   }, [layoutWidth]);
 
+  const cancelHoverClose = () => {
+    if (hoverCloseTimerRef.current !== null) {
+      window.clearTimeout(hoverCloseTimerRef.current);
+      hoverCloseTimerRef.current = null;
+    }
+  };
+
+  const beginHoverPreview = (pointerType: string) => {
+    if (pointerType !== 'mouse' || sidebarState === 'expanded' || !showLabels) return;
+    cancelHoverClose();
+    setHoverExpanded(true);
+  };
+
+  const scheduleHoverClose = (pointerType: string) => {
+    if (pointerType !== 'mouse' || sidebarState === 'expanded') return;
+    cancelHoverClose();
+    hoverCloseTimerRef.current = window.setTimeout(() => {
+      setHoverExpanded(false);
+      hoverCloseTimerRef.current = null;
+    }, 140);
+  };
+
+  useEffect(() => () => cancelHoverClose(), []);
+
   const setPersistentState = (nextState: SidebarState) => {
+    cancelHoverClose();
     setHoverExpanded(false);
     setSidebarState(nextState);
   };
@@ -132,35 +160,33 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
   const siteName = String((settings.content as any).siteName || 'Digital Catalyst');
   const logoUrl = String((settings.content as any).logoUrl || '/icons/icon-192x192.svg');
 
-  if (sidebarState === 'hidden') {
-    return (
-      <button
-        type="button"
-        onClick={() => setPersistentState('expanded')}
-        className="fixed left-3 top-24 z-[80] hidden items-center justify-center border bg-white/95 font-black transition hover:-translate-y-0.5 lg:flex"
-        style={{ width: collapsedWidth - 16, height: collapsedWidth - 16, borderColor, borderRadius: itemRadius, color: accentColor, boxShadow: dockShadowMap[shadowStrength] }}
-        aria-label="Open desktop navigation"
-        title="Open navigation"
-      >
-        ☰
-      </button>
-    );
-  }
-
   return (
-    <aside
-      className="home-side-dock-performance fixed inset-y-0 left-0 z-[80] hidden overflow-visible bg-transparent transition-[width] duration-150 ease-out lg:flex"
-      style={{ width: visualWidth, padding: Math.max(6, padding - 4) }}
-      data-sidebar-state={sidebarState}
-      data-hover-expanded={hoverExpanded ? 'true' : 'false'}
-      onPointerEnter={(event) => {
-        if (event.pointerType === 'mouse' && sidebarState === 'collapsed' && showLabels) setHoverExpanded(true);
-      }}
-      onPointerLeave={(event) => {
-        if (event.pointerType === 'mouse' && sidebarState === 'collapsed') setHoverExpanded(false);
-      }}
-      aria-label="Main desktop navigation"
-    >
+    <>
+      {sidebarState === 'hidden' && (
+        <button
+          type="button"
+          onClick={() => setPersistentState('expanded')}
+          onPointerEnter={(event) => { if (event.pointerType === 'mouse') beginHoverPreview(event.pointerType); }}
+          onPointerLeave={(event) => { if (event.pointerType === 'mouse') scheduleHoverClose(event.pointerType); }}
+          className={`fixed left-3 top-24 z-[81] hidden items-center justify-center border bg-white/95 font-black transition hover:-translate-y-0.5 lg:flex ${hoverExpanded ? 'pointer-events-none opacity-0' : 'opacity-100'}`}
+          style={{ width: collapsedWidth - 16, height: collapsedWidth - 16, borderColor, borderRadius: itemRadius, color: accentColor, boxShadow: dockShadowMap[shadowStrength] }}
+          aria-label="Preview or pin desktop navigation"
+          title="Hover to preview · click to keep open"
+        >
+          ☰
+        </button>
+      )}
+
+      <aside
+        className={`home-side-dock-performance fixed inset-y-0 left-0 z-[80] hidden overflow-visible bg-transparent transition-[width,transform,opacity] duration-150 ease-out lg:flex ${isPanelVisible ? 'translate-x-0 opacity-100' : 'pointer-events-none -translate-x-[calc(100%+1rem)] opacity-0'}`}
+        style={{ width: visualWidth, padding: Math.max(6, padding - 4) }}
+        data-sidebar-state={sidebarState}
+        data-hover-expanded={hoverExpanded ? 'true' : 'false'}
+        data-temporary-preview={isTemporaryPreview ? 'true' : 'false'}
+        onPointerEnter={(event) => { if (event.pointerType === 'mouse') beginHoverPreview(event.pointerType); }}
+        onPointerLeave={(event) => { if (event.pointerType === 'mouse') scheduleHoverClose(event.pointerType); }}
+        aria-label="Main desktop navigation"
+      >
       <div
         className="home-side-dock-surface flex h-full w-full min-w-0 flex-col overflow-hidden border"
         style={{ backgroundColor, borderColor, borderRadius: radius, boxShadow: dockShadowMap[shadowStrength], backdropFilter: `blur(${blur}px)`, WebkitBackdropFilter: `blur(${blur}px)` }}
@@ -179,7 +205,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
 
             <div className={`flex shrink-0 items-center ${isVisuallyExpanded ? '' : 'w-full justify-center'}`} style={{ gap: Math.max(4, gap / 2) }}>
               {showLabels && (
-                <button type="button" onClick={() => setPersistentState(sidebarState === 'collapsed' ? 'expanded' : 'collapsed')} className="flex items-center justify-center border bg-white/90 font-black transition hover:opacity-80" style={{ width: 32, height: 32, borderColor, borderRadius: Math.max(4, itemRadius - 4), color: accentColor }} aria-label={sidebarState === 'collapsed' ? 'Keep side panel expanded' : 'Minimize side panel'} title={sidebarState === 'collapsed' ? 'Keep expanded' : 'Minimize'}>{sidebarState === 'collapsed' ? '›' : '‹'}</button>
+                <button type="button" onClick={() => setPersistentState(sidebarState === 'expanded' ? 'collapsed' : 'expanded')} className="flex items-center justify-center border bg-white/90 font-black transition hover:opacity-80" style={{ width: 32, height: 32, borderColor, borderRadius: Math.max(4, itemRadius - 4), color: accentColor }} aria-label={sidebarState === 'expanded' ? 'Minimize side panel' : 'Pin side panel open'} title={sidebarState === 'expanded' ? 'Minimize' : 'Pin open'}>{sidebarState === 'expanded' ? '‹' : '📌'}</button>
               )}
               <button type="button" onClick={() => setPersistentState('hidden')} className="flex items-center justify-center border bg-white/90 font-black transition hover:border-red-200 hover:bg-red-50 hover:text-red-600" style={{ width: 32, height: 32, borderColor, borderRadius: Math.max(4, itemRadius - 4), color: textColor }} aria-label="Hide side panel and disable hover expansion" title="Hide panel">×</button>
             </div>
@@ -220,12 +246,13 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
           <div className="shrink-0 border-t" style={{ borderColor, padding }}>
             <div className="border px-3 py-2.5" style={{ backgroundColor: hexToRgba(accentColor, 8), borderColor, borderRadius: itemRadius }}>
               <p className="text-xs font-black" style={{ color: textColor }}>Desktop navigation</p>
-              <p className="mt-0.5 text-[10px] leading-4" style={{ color: textColor, opacity: 0.68 }}>Minimize for icons, hover to preview, or hide the panel completely.</p>
+              <p className="mt-0.5 text-[10px] leading-4" style={{ color: textColor, opacity: 0.68 }}>Minimize for icons, hover to preview, pin it open, or close to the menu trigger.</p>
             </div>
           </div>
         )}
       </div>
-    </aside>
+      </aside>
+    </>
   );
 };
 
