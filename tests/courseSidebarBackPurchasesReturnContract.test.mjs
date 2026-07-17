@@ -7,18 +7,22 @@ const course = fs.readFileSync('components/CoursePlayer.tsx', 'utf8');
 
 test('lesson selection closes the mobile module panel with a back-to-modules history sentinel', () => {
   assert.match(course, /const closeCourseSidebarAfterLessonSelection = useCallback\(\(fileId: string\) =>/);
-  assert.match(course, /dcCourseLessonSelection: false/);
-  assert.match(course, /window\.history\.pushState\(\{\s*\.\.\.modulesState,\s*dcCourseLayer: null,\s*dcCourseLessonSelection: true,/s);
+  assert.match(course, /window\.history\.replaceState\(\{[\s\S]*dcCourseFileId: fileId,[\s\S]*dcCourseLessonSelection: false,/);
+  assert.match(course, /window\.history\.pushState\(\{[\s\S]*dcCourseLayer: null,[\s\S]*dcCourseLessonSelection: true,[\s\S]*dcCourseBackStep: 'lesson-closed'/);
   assert.match(course, /closeCourseSidebarAfterLessonSelection\(file\.id\)/);
   assert.doesNotMatch(course, /setYoutubeWatchSeconds\(0\);\s*closeCourseSidebar\(\);/);
 });
 
-test('CoursePlayer back reopens modules before leaving after lesson selection', () => {
-  assert.match(course, /window\.history\.state\?\.dcCourseLessonSelection === true/);
-  assert.match(course, /window\.history\.back\(\);\s*return;/);
+test('CoursePlayer Back follows open, closed, open, then app-exit history entries', () => {
+  assert.match(course, /dcCourseBackStep: 'exit-ready'/);
+  assert.match(course, /dcCourseBackStep: 'closed-cycle'/);
+  assert.match(course, /dcCourseBackStep: 'initial-open'/);
+  assert.match(course, /window\.history\.replaceState\(exitReadyModulesState/);
+  assert.match(course, /window\.history\.pushState\(closedCycleState/);
+  assert.match(course, /window\.history\.pushState\(initialModulesState/);
   assert.match(course, /const handleCoursePopState = \(event: PopStateEvent\) =>/);
   assert.match(course, /setIsSidebarOpen\(layer === 'modules'\)/);
-  assert.match(course, /if \(isSidebarOpenRef\.current && forceOverlaySidebarRef\.current\) \{\s*closeCourseSidebar\(\);/s);
+  assert.match(course, /window\.history\.back\(\);\s*return;/);
 });
 
 test('module expansion still resets only on real CoursePlayer exit', () => {

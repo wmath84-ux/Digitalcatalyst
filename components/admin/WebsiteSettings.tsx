@@ -373,14 +373,15 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const dockItems = (((localSettings.content as any).dockItems || []) as string[]);
     const dockStyle = { ...defaultDockStyle, ...((localSettings.content as any).dockStyle || {}) };
     const desktopNavigationMode = localSettings.desktop?.navigationMode === 'dock' ? 'dock' : 'sidebar';
-    const communityStyle = {
-        desktopLayout: 'latest',
-        mobileLayout: 'latest',
-        desktopSocialLayout: false,
+    const baseCommunityPalette = {
         pageBackground: '#F8FBFF',
         surfaceColor: '#FFFFFF',
         cardColor: '#FFFFFF',
         softBackground: '#EEF6FF',
+        headerBackground: '#FFFFFF',
+        sidebarBackground: '#FFFFFF',
+        composerBackground: '#FFFFFF',
+        rightRailBackground: '#F8FBFF',
         primaryColor: '#1769FF',
         secondaryColor: '#7B61FF',
         accentColor: '#C2E7FF',
@@ -397,11 +398,63 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         dockActiveTextColor: '#1769FF',
         outgoingBubble: '#1769FF',
         incomingBubble: '#FFFFFF',
-        shadowOpacity: 16,
-        ...((localSettings.content as any).communityStyle || {}),
     };
-    const latestDesktopCommunityLayout = communityStyle.desktopLayout !== 'classic';
-    const socialDesktopCommunityLayout = Boolean(communityStyle.desktopSocialLayout);
+    const socialCommunityPalette = {
+        ...baseCommunityPalette,
+        pageBackground: '#F5F7FB',
+        softBackground: '#F1F5F9',
+        rightRailBackground: '#F8FAFC',
+        primaryColor: '#2563EB',
+        secondaryColor: '#7C3AED',
+        accentColor: '#DBEAFE',
+        headingColor: '#0F172A',
+        bodyColor: '#475569',
+        mutedColor: '#64748B',
+        borderColor: '#E2E8F0',
+        activeTabBackground: '#EFF6FF',
+        activeTabText: '#2563EB',
+        dockItemBackground: '#F8FAFC',
+        dockActiveBackground: '#EFF6FF',
+        dockTextColor: '#475569',
+        dockActiveTextColor: '#2563EB',
+        outgoingBubble: '#2563EB',
+    };
+    const storedCommunityStyle = ((localSettings.content as any).communityStyle || {});
+    const legacyCommunityPalette = {
+        ...baseCommunityPalette,
+        ...Object.fromEntries(Object.keys(baseCommunityPalette).map(key => [key, storedCommunityStyle[key] ?? (baseCommunityPalette as any)[key]])),
+    };
+    const communityStyle = {
+        desktopLayout: 'latest',
+        mobileLayout: 'latest',
+        desktopSocialLayout: false,
+        ...legacyCommunityPalette,
+        shadowOpacity: 16,
+        ...storedCommunityStyle,
+        latestPalette: {
+            ...legacyCommunityPalette,
+            ...(storedCommunityStyle.latestPalette || {}),
+        },
+        socialPalette: {
+            ...socialCommunityPalette,
+            ...(storedCommunityStyle.socialPalette || {}),
+        },
+        classicPalette: {
+            ...legacyCommunityPalette,
+            ...(storedCommunityStyle.classicPalette || {}),
+        },
+    };
+    const selectedCommunityMode: 'classic' | 'latest' | 'social' = communityStyle.desktopSocialLayout
+        ? 'social'
+        : communityStyle.desktopLayout === 'classic'
+            ? 'classic'
+            : 'latest';
+    const selectedCommunityPaletteKey = selectedCommunityMode === 'social'
+        ? 'socialPalette'
+        : selectedCommunityMode === 'classic'
+            ? 'classicPalette'
+            : 'latestPalette';
+    const selectedCommunityPalette = communityStyle[selectedCommunityPaletteKey];
     const readingStyle = {
         backgroundColor: '#F8FAFD', backgroundOpacity: 98, panelOpacity: 96, cardOpacity: 94, accentColor: '#C2E7FF', accentOpacity: 24,
         newsHeadingFont: 'Merriweather', blogHeadingFont: 'Montserrat', bodyFont: 'Lato', newsHeadingColor: '#083B4C', blogHeadingColor: '#3B1D5A',
@@ -516,6 +569,24 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
 
     const updateCommunityStyle = (field: string, value: string | number | boolean) => {
         updateContentValue('communityStyle', { ...communityStyle, [field]: value });
+    };
+
+    const selectCommunityMode = (mode: 'classic' | 'latest' | 'social') => {
+        updateContentValue('communityStyle', {
+            ...communityStyle,
+            desktopLayout: mode === 'classic' ? 'classic' : 'latest',
+            desktopSocialLayout: mode === 'social',
+        });
+    };
+
+    const updateSelectedCommunityPalette = (field: string, value: string) => {
+        updateContentValue('communityStyle', {
+            ...communityStyle,
+            [selectedCommunityPaletteKey]: {
+                ...selectedCommunityPalette,
+                [field]: value,
+            },
+        });
     };
 
     const updateReadingStyle = (field: string, value: string | number) => {
@@ -1131,42 +1202,100 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                 </div>
             );
             case 'community': return (
-                <div className="space-y-5">
-                    <section className="border border-slate-300 bg-white p-5">
+                <div className="space-y-6">
+                    <section className="border border-slate-300 bg-white p-5 shadow-sm">
                         <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Community workspace</p>
-                        <h2 className="mt-1 text-2xl font-black text-slate-950">Desktop layouts and Community colors</h2>
-                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Community controls now live here instead of being mixed into Dock Settings.</p>
-                        <div className="mt-5 grid gap-4 lg:grid-cols-2">
-                            <label className="flex items-center justify-between gap-4 border border-slate-200 bg-slate-50 p-4">
-                                <span><span className="block font-black text-slate-900">Latest clean desktop UX</span><span className="mt-1 block text-xs leading-5 text-slate-600">Turn off to use the preserved classic layout.</span></span>
-                                <input type="checkbox" checked={latestDesktopCommunityLayout} onChange={e => updateCommunityStyle('desktopLayout', e.target.checked ? 'latest' : 'classic')} className="h-5 w-5" />
-                            </label>
-                            <label className="flex items-center justify-between gap-4 border border-slate-200 bg-slate-50 p-4">
-                                <span><span className="block font-black text-slate-900">Social workspace layout</span><span className="mt-1 block text-xs leading-5 text-slate-600">Enable the three-column social desktop experience.</span></span>
-                                <input type="checkbox" checked={socialDesktopCommunityLayout} onChange={e => updateCommunityStyle('desktopSocialLayout', e.target.checked)} className="h-5 w-5" />
-                            </label>
+                        <h2 className="mt-1 text-2xl font-black text-slate-950">Layout-aware Community customization</h2>
+                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Choose the real desktop Community mode first. The color studio below automatically switches to that mode's saved palette, so Social Workspace and Latest UX no longer overwrite one another.</p>
+                        <div className="mt-5 grid gap-3 md:grid-cols-3">
+                            {([
+                                ['classic', 'Classic layout', 'Preserved Community layout with its own palette.'],
+                                ['latest', 'Latest desktop UX', 'Clean modern layout without the social three-column rail.'],
+                                ['social', 'Social Workspace', 'Three-column feed, internal Community sidebar and right rail.'],
+                            ] as const).map(([mode, title, description]) => (
+                                <button
+                                    key={mode}
+                                    type="button"
+                                    onClick={() => selectCommunityMode(mode)}
+                                    aria-pressed={selectedCommunityMode === mode}
+                                    className={`border p-4 text-left transition ${selectedCommunityMode === mode ? 'border-blue-600 bg-blue-50 shadow-sm' : 'border-slate-200 bg-slate-50 hover:border-slate-400'}`}
+                                >
+                                    <span className="block font-black text-slate-950">{title}</span>
+                                    <span className="mt-1 block text-xs font-semibold leading-5 text-slate-600">{description}</span>
+                                    <span className={`mt-3 inline-flex px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${selectedCommunityMode === mode ? 'bg-blue-600 text-white' : 'bg-white text-slate-500'}`}>{selectedCommunityMode === mode ? 'Selected' : 'Choose'}</span>
+                                </button>
+                            ))}
                         </div>
                     </section>
 
-                    <section className="border border-slate-300 bg-white p-5">
-                        <h3 className="text-lg font-black text-slate-950">Community surfaces</h3>
-                        <p className="mt-1 text-sm text-slate-600">These colors apply to Community cards, tabs, chat surfaces and its own mobile dock.</p>
-                        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                            {[
-                                ['pageBackground','Page background',communityStyle.pageBackground], ['surfaceColor','Surface',communityStyle.surfaceColor], ['cardColor','Cards',communityStyle.cardColor], ['softBackground','Soft background',communityStyle.softBackground],
-                                ['primaryColor','Primary',communityStyle.primaryColor], ['secondaryColor','Secondary',communityStyle.secondaryColor], ['accentColor','Accent',communityStyle.accentColor], ['headingColor','Heading',communityStyle.headingColor],
-                                ['bodyColor','Body text',communityStyle.bodyColor], ['mutedColor','Muted text',communityStyle.mutedColor], ['borderColor','Borders',communityStyle.borderColor], ['activeTabBackground','Active tab background',communityStyle.activeTabBackground],
-                                ['activeTabText','Active tab text',communityStyle.activeTabText], ['outgoingBubble','Outgoing bubble',communityStyle.outgoingBubble], ['incomingBubble','Incoming bubble',communityStyle.incomingBubble],
-                                ['dockBackground','Community dock',communityStyle.dockBackground], ['dockItemBackground','Dock item',communityStyle.dockItemBackground], ['dockActiveBackground','Dock active',communityStyle.dockActiveBackground],
-                                ['dockTextColor','Dock text',communityStyle.dockTextColor], ['dockActiveTextColor','Dock active text',communityStyle.dockActiveTextColor],
-                            ].map(([field, label, value]) => (
-                                <label key={String(field)} className="border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700">
-                                    <span className="mb-2 block">{label}</span>
-                                    <input type="color" value={String(value)} onChange={e => updateCommunityStyle(String(field), e.target.value)} className="h-10 w-full border p-1" />
-                                </label>
-                            ))}
+                    <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
+                        <div className="border border-slate-300 bg-white p-5 shadow-sm">
+                            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">{selectedCommunityMode} palette</p>
+                            <h3 className="mt-1 text-xl font-black text-slate-950">
+                                {selectedCommunityMode === 'social' ? 'Social Workspace colors' : selectedCommunityMode === 'latest' ? 'Latest desktop colors' : 'Classic Community colors'}
+                            </h3>
+                            <p className="mt-1 text-sm leading-6 text-slate-600">Every control below is connected to the active Community mode. Save Changes publishes this palette without changing the other modes.</p>
+                            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                                {([
+                                    ['pageBackground','Page background'],
+                                    ['surfaceColor','Main surface'],
+                                    ['cardColor','Feed and cards'],
+                                    ['softBackground','Soft background'],
+                                    ['headerBackground','Header background'],
+                                    ['sidebarBackground','Internal sidebar'],
+                                    ['composerBackground','Composer'],
+                                    ['rightRailBackground','Right rail'],
+                                    ['primaryColor','Primary action'],
+                                    ['secondaryColor','Secondary action'],
+                                    ['accentColor','Accent'],
+                                    ['headingColor','Heading text'],
+                                    ['bodyColor','Body text'],
+                                    ['mutedColor','Muted text'],
+                                    ['borderColor','Borders'],
+                                    ['activeTabBackground','Active navigation'],
+                                    ['activeTabText','Active navigation text'],
+                                    ['outgoingBubble','Outgoing bubble'],
+                                    ['incomingBubble','Incoming bubble'],
+                                    ['dockBackground','Mobile Community dock'],
+                                    ['dockItemBackground','Dock item'],
+                                    ['dockActiveBackground','Dock active item'],
+                                    ['dockTextColor','Dock text'],
+                                    ['dockActiveTextColor','Dock active text'],
+                                ] as const).map(([field, label]) => (
+                                    <label key={field} className="border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700">
+                                        <span className="mb-2 block">{label}</span>
+                                        <input type="color" value={String(selectedCommunityPalette[field])} onChange={event => updateSelectedCommunityPalette(field, event.target.value)} className="h-10 w-full border p-1" />
+                                    </label>
+                                ))}
+                            </div>
+                            <FormRow label={`Shadow opacity (${communityStyle.shadowOpacity}%)`} description="Shared Community card shadow strength.">
+                                <input type="range" min="0" max="40" step="1" value={communityStyle.shadowOpacity} onChange={event => updateCommunityStyle('shadowOpacity', Number(event.target.value))} className="w-full" />
+                            </FormRow>
                         </div>
-                        <FormRow label={`Shadow opacity (${communityStyle.shadowOpacity}%)`} description="Community card shadow strength."><input type="range" min="0" max="40" step="1" value={communityStyle.shadowOpacity} onChange={e => updateCommunityStyle('shadowOpacity', Number(e.target.value))} className="w-full" /></FormRow>
+
+                        <aside className="border border-slate-300 bg-slate-100 p-4 shadow-sm">
+                            <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-600">Live {selectedCommunityMode} preview</p>
+                            <div className="mt-4 overflow-hidden border shadow-sm" style={{ backgroundColor: selectedCommunityPalette.pageBackground, borderColor: selectedCommunityPalette.borderColor }}>
+                                <header className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ backgroundColor: selectedCommunityPalette.headerBackground, borderColor: selectedCommunityPalette.borderColor }}>
+                                    <div><p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: selectedCommunityPalette.primaryColor }}>Eduvora Community</p><h4 className="font-black" style={{ color: selectedCommunityPalette.headingColor }}>{selectedCommunityMode === 'social' ? 'Social Workspace' : selectedCommunityMode === 'latest' ? 'Latest Community' : 'Classic Community'}</h4></div>
+                                    <span className="px-3 py-1.5 text-[10px] font-black text-white" style={{ backgroundColor: selectedCommunityPalette.primaryColor }}>Action</span>
+                                </header>
+                                <div className={`grid min-h-[19rem] ${selectedCommunityMode === 'social' ? 'grid-cols-[4.5rem_minmax(0,1fr)_5.5rem]' : 'grid-cols-[4.5rem_minmax(0,1fr)]'}`}>
+                                    <aside className="border-r p-2" style={{ backgroundColor: selectedCommunityPalette.sidebarBackground, borderColor: selectedCommunityPalette.borderColor }}>
+                                        {[0,1,2,3].map(index => <span key={index} className="mb-2 flex h-9 items-center justify-center border text-xs font-black" style={{ backgroundColor: index === 0 ? selectedCommunityPalette.activeTabBackground : selectedCommunityPalette.softBackground, borderColor: selectedCommunityPalette.borderColor, color: index === 0 ? selectedCommunityPalette.activeTabText : selectedCommunityPalette.mutedColor }}>●</span>)}
+                                    </aside>
+                                    <main className="min-w-0 p-3" style={{ backgroundColor: selectedCommunityPalette.surfaceColor }}>
+                                        <article className="border p-3" style={{ backgroundColor: selectedCommunityPalette.cardColor, borderColor: selectedCommunityPalette.borderColor }}>
+                                            <h5 className="font-black" style={{ color: selectedCommunityPalette.headingColor }}>Community feed card</h5>
+                                            <p className="mt-2 text-xs font-semibold leading-5" style={{ color: selectedCommunityPalette.bodyColor }}>The selected layout uses this exact card, text, border and accent palette.</p>
+                                            <span className="mt-3 inline-flex px-2 py-1 text-[10px] font-black" style={{ backgroundColor: selectedCommunityPalette.accentColor, color: selectedCommunityPalette.primaryColor }}>Selected mode</span>
+                                        </article>
+                                        <div className="mt-3 border px-3 py-2 text-xs font-semibold" style={{ backgroundColor: selectedCommunityPalette.composerBackground, borderColor: selectedCommunityPalette.borderColor, color: selectedCommunityPalette.mutedColor }}>Write a reply…</div>
+                                    </main>
+                                    {selectedCommunityMode === 'social' ? <aside className="border-l p-2" style={{ backgroundColor: selectedCommunityPalette.rightRailBackground, borderColor: selectedCommunityPalette.borderColor }}><div className="border p-2 text-[10px] font-black" style={{ backgroundColor: selectedCommunityPalette.cardColor, borderColor: selectedCommunityPalette.borderColor, color: selectedCommunityPalette.headingColor }}>Requests</div><div className="mt-2 border p-2 text-[10px] font-black" style={{ backgroundColor: selectedCommunityPalette.cardColor, borderColor: selectedCommunityPalette.borderColor, color: selectedCommunityPalette.headingColor }}>Suggestions</div></aside> : null}
+                                </div>
+                            </div>
+                        </aside>
                     </section>
                 </div>
             );

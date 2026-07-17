@@ -31,7 +31,7 @@ import ComingSoonModal from './components/ComingSoonModal';
 import { FreeProductsModal, FreeProductsPage } from './components/ContentModals';
 import ReadingDrawer, { ReadingListType, ReadingView } from './components/ReadingDrawer';
 import BottomGlassDock from './components/BottomGlassDock';
-import HomeSideDock from './components/HomeSideDock';
+import HomeSideDock, { dispatchDesktopSidebarCommand } from './components/HomeSideDock';
 import ProfilePage from './components/ProfilePage';
 import PlatformExperience from './components/PlatformExperience';
 import SubscriptionPage from './components/SubscriptionPage';
@@ -450,14 +450,15 @@ export interface ProfileStyleSettings {
     accentColor: string;
 }
 
-export interface CommunityStyleSettings {
-    desktopLayout: 'classic' | 'latest';
-    mobileLayout: 'classic' | 'latest';
-    desktopSocialLayout: boolean;
+export interface CommunityPaletteSettings {
     pageBackground: string;
     surfaceColor: string;
     cardColor: string;
     softBackground: string;
+    headerBackground: string;
+    sidebarBackground: string;
+    composerBackground: string;
+    rightRailBackground: string;
     primaryColor: string;
     secondaryColor: string;
     accentColor: string;
@@ -474,6 +475,15 @@ export interface CommunityStyleSettings {
     dockActiveTextColor: string;
     outgoingBubble: string;
     incomingBubble: string;
+}
+
+export interface CommunityStyleSettings extends CommunityPaletteSettings {
+    desktopLayout: 'classic' | 'latest';
+    mobileLayout: 'classic' | 'latest';
+    desktopSocialLayout: boolean;
+    latestPalette?: Partial<CommunityPaletteSettings>;
+    socialPalette?: Partial<CommunityPaletteSettings>;
+    classicPalette?: Partial<CommunityPaletteSettings>;
     shadowOpacity: number;
 }
 
@@ -979,6 +989,10 @@ const defaultWebsiteSettings: WebsiteSettings = {
             surfaceColor: '#FFFFFF',
             cardColor: '#FFFFFF',
             softBackground: '#EEF6FF',
+            headerBackground: '#FFFFFF',
+            sidebarBackground: '#FFFFFF',
+            composerBackground: '#FFFFFF',
+            rightRailBackground: '#F8FBFF',
             primaryColor: '#1769FF',
             secondaryColor: '#7B61FF',
             accentColor: '#C2E7FF',
@@ -995,6 +1009,84 @@ const defaultWebsiteSettings: WebsiteSettings = {
             dockActiveTextColor: '#1769FF',
             outgoingBubble: '#1769FF',
             incomingBubble: '#FFFFFF',
+            latestPalette: {
+                pageBackground: '#F8FBFF',
+                surfaceColor: '#FFFFFF',
+                cardColor: '#FFFFFF',
+                softBackground: '#EEF6FF',
+                headerBackground: '#FFFFFF',
+                sidebarBackground: '#FFFFFF',
+                composerBackground: '#FFFFFF',
+                rightRailBackground: '#F8FBFF',
+                primaryColor: '#1769FF',
+                secondaryColor: '#7B61FF',
+                accentColor: '#C2E7FF',
+                headingColor: '#081A45',
+                bodyColor: '#536178',
+                mutedColor: '#7C879A',
+                borderColor: '#D9E7F8',
+                activeTabBackground: '#E8F2FF',
+                activeTabText: '#1769FF',
+                dockBackground: '#FFFFFF',
+                dockItemBackground: '#F8FBFF',
+                dockActiveBackground: '#E8F2FF',
+                dockTextColor: '#536178',
+                dockActiveTextColor: '#1769FF',
+                outgoingBubble: '#1769FF',
+                incomingBubble: '#FFFFFF',
+            },
+            socialPalette: {
+                pageBackground: '#F5F7FB',
+                surfaceColor: '#FFFFFF',
+                cardColor: '#FFFFFF',
+                softBackground: '#F1F5F9',
+                headerBackground: '#FFFFFF',
+                sidebarBackground: '#FFFFFF',
+                composerBackground: '#FFFFFF',
+                rightRailBackground: '#F8FAFC',
+                primaryColor: '#2563EB',
+                secondaryColor: '#7C3AED',
+                accentColor: '#DBEAFE',
+                headingColor: '#0F172A',
+                bodyColor: '#475569',
+                mutedColor: '#64748B',
+                borderColor: '#E2E8F0',
+                activeTabBackground: '#EFF6FF',
+                activeTabText: '#2563EB',
+                dockBackground: '#FFFFFF',
+                dockItemBackground: '#F8FAFC',
+                dockActiveBackground: '#EFF6FF',
+                dockTextColor: '#475569',
+                dockActiveTextColor: '#2563EB',
+                outgoingBubble: '#2563EB',
+                incomingBubble: '#FFFFFF',
+            },
+            classicPalette: {
+                pageBackground: '#F8FBFF',
+                surfaceColor: '#FFFFFF',
+                cardColor: '#FFFFFF',
+                softBackground: '#EEF6FF',
+                headerBackground: '#FFFFFF',
+                sidebarBackground: '#FFFFFF',
+                composerBackground: '#FFFFFF',
+                rightRailBackground: '#F8FBFF',
+                primaryColor: '#1769FF',
+                secondaryColor: '#7B61FF',
+                accentColor: '#C2E7FF',
+                headingColor: '#081A45',
+                bodyColor: '#536178',
+                mutedColor: '#7C879A',
+                borderColor: '#D9E7F8',
+                activeTabBackground: '#E8F2FF',
+                activeTabText: '#1769FF',
+                dockBackground: '#FFFFFF',
+                dockItemBackground: '#F8FBFF',
+                dockActiveBackground: '#E8F2FF',
+                dockTextColor: '#536178',
+                dockActiveTextColor: '#1769FF',
+                outgoingBubble: '#1769FF',
+                incomingBubble: '#FFFFFF',
+            },
             shadowOpacity: 16,
         },
         readingStyle: {
@@ -1095,6 +1187,18 @@ const mergeWebsiteSettings = (settings?: Partial<WebsiteSettings> | null): Websi
       communityStyle: {
         ...defaultWebsiteSettings.content.communityStyle,
         ...((incoming.content as any)?.communityStyle || {}),
+        latestPalette: {
+          ...(defaultWebsiteSettings.content.communityStyle?.latestPalette || {}),
+          ...((incoming.content as any)?.communityStyle?.latestPalette || {}),
+        },
+        socialPalette: {
+          ...(defaultWebsiteSettings.content.communityStyle?.socialPalette || {}),
+          ...((incoming.content as any)?.communityStyle?.socialPalette || {}),
+        },
+        classicPalette: {
+          ...(defaultWebsiteSettings.content.communityStyle?.classicPalette || {}),
+          ...((incoming.content as any)?.communityStyle?.classicPalette || {}),
+        },
       },
       readingStyle: {
         ...defaultWebsiteSettings.content.readingStyle,
@@ -5742,8 +5846,42 @@ const App: React.FC = () => {
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent(effectiveAppUser)}</div>;
     if (currentView === 'community') return (
       <div key="community" className="fixed inset-0 z-[1200] min-h-0 min-w-0 overflow-hidden bg-[var(--color-background)] p-0">
+        {useDesktopSidebar ? (
+          <HomeSideDock
+            settings={websiteSettings}
+            isLoggedIn={isLoggedIn}
+            purchasedProducts={purchasedProducts}
+            cartCount={cartItemCount}
+            wishlistCount={wishlist.length}
+            dockBadgeCounts={dockActivity.badgeCounts}
+            activeItem="Community"
+            showDetachedTrigger={false}
+            overlayMode
+            onHomeClick={handleBackToHome}
+            onOpenBlogModal={() => openReadingHub('blog')}
+            onOpenFreeModal={handleNavigateToFreeProducts}
+            onOpenAnnouncementsModal={() => openReadingHub('news')}
+            onNavigateToAllProducts={handleNavigateToAllProducts}
+            onNavigateToWishlist={handleNavigateToWishlist}
+            onNavigateToPurchases={handleNavigateToPurchases}
+            onCartClick={openCartSidebar}
+            onProfileClick={handleNavigateToProfile}
+            authButtonLabel={authButtonLabel}
+            onSubscriptionClick={handleNavigateToSubscription}
+            onOpenCommunity={() => undefined}
+          />
+        ) : null}
         {hasPremiumMembership(effectiveAppUser) ? (
-          <EduvoraCommunity settings={websiteSettings} onClose={() => handleNavigateBack('home')} isAuthenticated={isLoggedIn} currentUser={effectiveAppUser} />
+          <EduvoraCommunity
+            settings={websiteSettings}
+            onClose={() => handleNavigateBack('home')}
+            isAuthenticated={isLoggedIn}
+            currentUser={effectiveAppUser}
+            showWebsiteSidebarTrigger={useDesktopSidebar}
+            onWebsiteSidebarPreviewStart={() => dispatchDesktopSidebarCommand('preview-start')}
+            onWebsiteSidebarPreviewEnd={() => dispatchDesktopSidebarCommand('preview-end')}
+            onWebsiteSidebarPin={() => dispatchDesktopSidebarCommand('pin')}
+          />
         ) : (
           <div className="flex min-h-full items-center justify-center">
             <MembershipUpgradeCard message={normalizeSubscriptionPageContent(websiteSettings.content.subscriptionPage).communityLocked} onUpgrade={handleNavigateToSubscription} onBack={() => handleNavigateBack('home')} />

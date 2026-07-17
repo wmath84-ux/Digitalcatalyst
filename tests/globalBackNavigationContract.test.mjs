@@ -25,19 +25,21 @@ test('story/profile jumps preserve the previous community page', () => {
   assert.match(communitySource, /if \(ownerId\) \{ setSelectedProfileId\(ownerId\); setProfileViewMode\('overview'\); setProfileContentTab\('posts'\); pushPage\('profile'\); \}/);
 });
 
-test('mobile course player seeds a base entry before its initially open module layer', () => {
+test('mobile CoursePlayer seeds open-close-open entries before the app exit boundary', () => {
   assert.ok(courseSource.includes("const courseHistoryReadyRef = useRef(false);"));
-  assert.ok(courseSource.includes("dcCourseLayer: null"));
-  assert.ok(courseSource.includes("if (window.history.state?.dcView === 'coursePlayer') {"));
-  assert.ok(courseSource.includes("window.history.replaceState(baseState, '', window.location.href);"));
-  assert.ok(courseSource.includes("window.history.pushState({ ...baseState, dcCourseLayer: 'modules' }, '', window.location.href);"));
+  assert.ok(courseSource.includes("dcCourseBackStep: 'exit-ready'"));
+  assert.ok(courseSource.includes("dcCourseBackStep: 'closed-cycle'"));
+  assert.ok(courseSource.includes("dcCourseBackStep: 'initial-open'"));
+  assert.ok(courseSource.includes("window.history.replaceState(exitReadyModulesState, '', window.location.href);"));
+  assert.ok(courseSource.includes("window.history.pushState(closedCycleState, '', window.location.href);"));
+  assert.ok(courseSource.includes("window.history.pushState(initialModulesState, '', window.location.href);"));
   assert.ok(courseSource.includes("if (!courseHistoryReadyRef.current || courseHistoryRestoringRef.current) return;"));
 });
 
-test('course player module panel and AI mentor are back-navigation layers', () => {
+test('course player module panel and AI mentor remain browser-back layers', () => {
   assert.match(courseSource, /dcCourseLayer/);
   assert.match(courseSource, /writeCourseHistoryLayer\('mentor', 'push'\)/);
   assert.match(courseSource, /writeCourseHistoryLayer\('modules', 'push'\)/);
   assert.match(courseSource, /if \(isMentorOpenRef\.current\) \{\n\s+closeCourseMentor\(\);\n\s+return;\n\s+\}/);
-  assert.match(courseSource, /if \(isSidebarOpenRef\.current && forceOverlaySidebarRef\.current\) \{/);
+  assert.match(courseSource, /window\.history\.state\?\.dcView === 'coursePlayer'[\s\S]*window\.history\.back\(\)/);
 });

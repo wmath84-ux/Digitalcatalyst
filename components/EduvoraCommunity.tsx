@@ -20,6 +20,10 @@ interface EduvoraCommunityProps {
   isAuthenticated?: boolean;
   settings?: WebsiteSettings;
   currentUser?: User | null;
+  showWebsiteSidebarTrigger?: boolean;
+  onWebsiteSidebarPreviewStart?: () => void;
+  onWebsiteSidebarPreviewEnd?: () => void;
+  onWebsiteSidebarPin?: () => void;
 }
 
 type CommunityView = 'feed' | 'status';
@@ -175,19 +179,6 @@ const COMMUNITY_STATUS_CACHE_KEY = 'eduvoraCommunityStatusCacheV4';
 const COMMUNITY_CREATOR_QUOTA_KEY = 'eduvoraCommunityCreatorQuota';
 const COMMUNITY_STATUS_QUOTA_KEY = 'eduvoraCommunityStatusQuota';
 const COMMUNITY_DESKTOP_SIDEBAR_COLLAPSED_KEY = 'eduvoraCommunityDesktopSidebarCollapsed';
-const COMMUNITY_DESKTOP_SIDEBAR_STATE_KEY = 'eduvoraCommunityDesktopSidebarStateV2';
-type CommunityDesktopSidebarState = 'compact' | 'pinned' | 'hidden';
-
-const readInitialCommunityDesktopSidebarState = (): CommunityDesktopSidebarState => {
-  if (typeof window === 'undefined') return 'compact';
-  try {
-    const stored = window.localStorage.getItem(COMMUNITY_DESKTOP_SIDEBAR_STATE_KEY);
-    if (stored === 'compact' || stored === 'pinned' || stored === 'hidden') return stored;
-  } catch {
-    // Community remains usable when browser storage is restricted.
-  }
-  return 'compact';
-};
 const STORY_TTL_MS = 24 * 60 * 60 * 1000;
 const DAILY_UPLOAD_LOCK_MS = 24 * 60 * 60 * 1000;
 const PROFILE_BIO_MAX_LENGTH = 180;
@@ -285,6 +276,10 @@ const defaultCommunityStyle = {
   surfaceColor: '#FFFFFF',
   cardColor: '#FFFFFF',
   softBackground: '#EEF6FF',
+  headerBackground: '#FFFFFF',
+  sidebarBackground: '#FFFFFF',
+  composerBackground: '#FFFFFF',
+  rightRailBackground: '#F8FBFF',
   primaryColor: '#1769FF',
   secondaryColor: '#7B61FF',
   accentColor: '#C2E7FF',
@@ -301,32 +296,110 @@ const defaultCommunityStyle = {
   dockActiveTextColor: '#1769FF',
   outgoingBubble: '#1769FF',
   incomingBubble: '#FFFFFF',
+  latestPalette: {},
+  socialPalette: {
+    pageBackground: '#F5F7FB',
+    surfaceColor: '#FFFFFF',
+    cardColor: '#FFFFFF',
+    softBackground: '#F1F5F9',
+    headerBackground: '#FFFFFF',
+    sidebarBackground: '#FFFFFF',
+    composerBackground: '#FFFFFF',
+    rightRailBackground: '#F8FAFC',
+    primaryColor: '#2563EB',
+    secondaryColor: '#7C3AED',
+    accentColor: '#DBEAFE',
+    headingColor: '#0F172A',
+    bodyColor: '#475569',
+    mutedColor: '#64748B',
+    borderColor: '#E2E8F0',
+    activeTabBackground: '#EFF6FF',
+    activeTabText: '#2563EB',
+    dockBackground: '#FFFFFF',
+    dockItemBackground: '#F8FAFC',
+    dockActiveBackground: '#EFF6FF',
+    dockTextColor: '#475569',
+    dockActiveTextColor: '#2563EB',
+    outgoingBubble: '#2563EB',
+    incomingBubble: '#FFFFFF',
+  },
+  classicPalette: {},
   shadowOpacity: 16,
 };
 
-const toCommunityCssVars = (style: Partial<typeof defaultCommunityStyle> = {}): CSSProperties => {
+type CommunityPaletteMode = 'latest' | 'social' | 'classic';
+
+const toCommunityCssVars = (
+  style: Partial<typeof defaultCommunityStyle> = {},
+  mode: CommunityPaletteMode = 'latest',
+): CSSProperties => {
   const merged = { ...defaultCommunityStyle, ...style };
+  const legacyPalette = {
+    pageBackground: merged.pageBackground,
+    surfaceColor: merged.surfaceColor,
+    cardColor: merged.cardColor,
+    softBackground: merged.softBackground,
+    headerBackground: merged.headerBackground,
+    sidebarBackground: merged.sidebarBackground,
+    composerBackground: merged.composerBackground,
+    rightRailBackground: merged.rightRailBackground,
+    primaryColor: merged.primaryColor,
+    secondaryColor: merged.secondaryColor,
+    accentColor: merged.accentColor,
+    headingColor: merged.headingColor,
+    bodyColor: merged.bodyColor,
+    mutedColor: merged.mutedColor,
+    borderColor: merged.borderColor,
+    activeTabBackground: merged.activeTabBackground,
+    activeTabText: merged.activeTabText,
+    dockBackground: merged.dockBackground,
+    dockItemBackground: merged.dockItemBackground,
+    dockActiveBackground: merged.dockActiveBackground,
+    dockTextColor: merged.dockTextColor,
+    dockActiveTextColor: merged.dockActiveTextColor,
+    outgoingBubble: merged.outgoingBubble,
+    incomingBubble: merged.incomingBubble,
+  };
+  const modePalette = mode === 'social'
+    ? merged.socialPalette
+    : mode === 'classic'
+      ? merged.classicPalette
+      : merged.latestPalette;
+  const palette = { ...legacyPalette, ...(modePalette || {}) };
+
   return {
-    '--community-page-bg': merged.pageBackground,
-    '--community-surface': merged.surfaceColor,
-    '--community-card': merged.cardColor,
-    '--community-soft': merged.softBackground,
-    '--community-primary': merged.primaryColor,
-    '--community-secondary': merged.secondaryColor,
-    '--community-accent': merged.accentColor,
-    '--community-heading': merged.headingColor,
-    '--community-body': merged.bodyColor,
-    '--community-muted': merged.mutedColor,
-    '--community-border': merged.borderColor,
-    '--community-active-bg': merged.activeTabBackground,
-    '--community-active-text': merged.activeTabText,
-    '--community-dock-bg': merged.dockBackground,
-    '--community-dock-item-bg': merged.dockItemBackground,
-    '--community-dock-active-bg': merged.dockActiveBackground,
-    '--community-dock-text': merged.dockTextColor,
-    '--community-dock-active-text': merged.dockActiveTextColor,
-    '--community-outgoing-bubble': merged.outgoingBubble,
-    '--community-incoming-bubble': merged.incomingBubble,
+    '--community-page-bg': palette.pageBackground,
+    '--community-surface': palette.surfaceColor,
+    '--community-card': palette.cardColor,
+    '--community-soft': palette.softBackground,
+    '--community-header-bg': palette.headerBackground,
+    '--community-sidebar-bg': palette.sidebarBackground,
+    '--community-composer-bg': palette.composerBackground,
+    '--community-right-rail-bg': palette.rightRailBackground,
+    '--community-primary': palette.primaryColor,
+    '--community-secondary': palette.secondaryColor,
+    '--community-accent': palette.accentColor,
+    '--community-heading': palette.headingColor,
+    '--community-body': palette.bodyColor,
+    '--community-muted': palette.mutedColor,
+    '--community-border': palette.borderColor,
+    '--community-active-bg': palette.activeTabBackground,
+    '--community-active-text': palette.activeTabText,
+    '--community-dock-bg': palette.dockBackground,
+    '--community-dock-item-bg': palette.dockItemBackground,
+    '--community-dock-active-bg': palette.dockActiveBackground,
+    '--community-dock-text': palette.dockTextColor,
+    '--community-dock-active-text': palette.dockActiveTextColor,
+    '--community-outgoing-bubble': palette.outgoingBubble,
+    '--community-incoming-bubble': palette.incomingBubble,
+    '--community-social-ink': palette.headingColor,
+    '--community-social-body': palette.bodyColor,
+    '--community-social-muted': palette.mutedColor,
+    '--community-social-border': palette.borderColor,
+    '--community-social-page': palette.pageBackground,
+    '--community-social-soft': palette.softBackground,
+    '--community-social-orange': palette.accentColor,
+    '--community-social-blue': palette.primaryColor,
     '--community-shadow': `0 18px 54px rgba(23, 105, 255, ${Math.min(40, Math.max(0, Number(merged.shadowOpacity))) / 100})`,
   } as CSSProperties;
 };
@@ -3533,7 +3606,16 @@ const communityPolishCss = `
 
 `;
 
-const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenticated = false, settings, currentUser = null }) => {
+const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
+  onClose,
+  isAuthenticated = false,
+  settings,
+  currentUser = null,
+  showWebsiteSidebarTrigger = false,
+  onWebsiteSidebarPreviewStart,
+  onWebsiteSidebarPreviewEnd,
+  onWebsiteSidebarPin,
+}) => {
   const navigate = useNavigate();
   const guardedAuth = getAuth();
   const socialDesktopSettingEnabled = Boolean((settings?.content as any)?.communityStyle?.desktopSocialLayout);
@@ -3627,9 +3709,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   const isPrivateChatSending = pendingPrivateChatSends > 0;
   const [privateChatError, setPrivateChatError] = useState('');
   const [chatMenuOpen, setChatMenuOpen] = useState(false);
-  const [desktopSidebarState, setDesktopSidebarState] = useState<CommunityDesktopSidebarState>(readInitialCommunityDesktopSidebarState);
-  const [isDesktopSidebarHovered, setIsDesktopSidebarHovered] = useState(false);
-  const desktopSidebarHoverTimerRef = useRef<number | null>(null);
+  const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(() => {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(COMMUNITY_DESKTOP_SIDEBAR_COLLAPSED_KEY) === 'true';
+  });
   const [replyDrafts, setReplyDrafts] = useState<Record<number, string>>({});
   const [expandedReplyId, setExpandedReplyId] = useState<number | null>(null);
   const [replySendingIds, setReplySendingIds] = useState<Record<number, boolean>>({});
@@ -3677,43 +3760,8 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    try {
-      window.localStorage.setItem(COMMUNITY_DESKTOP_SIDEBAR_STATE_KEY, desktopSidebarState);
-      window.localStorage.setItem(COMMUNITY_DESKTOP_SIDEBAR_COLLAPSED_KEY, String(desktopSidebarState !== 'pinned'));
-    } catch {
-      // Persistence is optional.
-    }
-  }, [desktopSidebarState]);
-
-  const cancelDesktopSidebarHoverClose = () => {
-    if (desktopSidebarHoverTimerRef.current !== null) {
-      window.clearTimeout(desktopSidebarHoverTimerRef.current);
-      desktopSidebarHoverTimerRef.current = null;
-    }
-  };
-
-  const beginDesktopSidebarPreview = (pointerType: string) => {
-    if (pointerType !== 'mouse' || desktopSidebarState === 'pinned') return;
-    cancelDesktopSidebarHoverClose();
-    setIsDesktopSidebarHovered(true);
-  };
-
-  const scheduleDesktopSidebarPreviewClose = (pointerType: string) => {
-    if (pointerType !== 'mouse' || desktopSidebarState === 'pinned') return;
-    cancelDesktopSidebarHoverClose();
-    desktopSidebarHoverTimerRef.current = window.setTimeout(() => {
-      setIsDesktopSidebarHovered(false);
-      desktopSidebarHoverTimerRef.current = null;
-    }, 180);
-  };
-
-  const setPersistentDesktopSidebarState = (nextState: CommunityDesktopSidebarState) => {
-    cancelDesktopSidebarHoverClose();
-    setIsDesktopSidebarHovered(false);
-    setDesktopSidebarState(nextState);
-  };
-
-  useEffect(() => () => cancelDesktopSidebarHoverClose(), []);
+    localStorage.setItem(COMMUNITY_DESKTOP_SIDEBAR_COLLAPSED_KEY, String(isDesktopSidebarCollapsed));
+  }, [isDesktopSidebarCollapsed]);
 
   const [supportTickets, setSupportTickets] = useState<CommunitySupportTicket[]>(() => {
     const localTickets = ENABLE_DEMO_SEED_DATA ? readJsonArray<CommunitySupportTicket>(SUPPORT_TICKETS_STORAGE_KEY, []) : [];
@@ -8112,10 +8160,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   };
   const useLatestDesktopLayout = communityStyle.desktopLayout !== 'classic';
   const useLatestMobileLayout = true;
+  const activeCommunityPaletteMode: CommunityPaletteMode = useSocialDesktopLayout
+    ? 'social'
+    : useLatestDesktopLayout
+      ? 'latest'
+      : 'classic';
 
   const communityCssVars = useMemo(
-    () => toCommunityCssVars(communityStyle),
-    [settings?.content]
+    () => toCommunityCssVars(communityStyle, activeCommunityPaletteMode),
+    [activeCommunityPaletteMode, settings?.content]
   );
 
   const communityDockScrollRef = useRef<HTMLDivElement>(null);
@@ -8187,21 +8240,22 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }, [activeConversationId, activeNavItem.label, activeView, allCreators, page, profile.name, selectedMasterTag, selectedMessage?.body, selectedMessage?.title, selectedStatus.body]);
 
   const CommunityHeader = () => (
-    <header className="community-desktop-header sticky top-0 z-[1200] shrink-0 border-b border-[#D9E7F8] bg-white/96 px-3 py-2 shadow-[0_10px_28px_rgba(23,105,255,0.07)] backdrop-blur-xl sm:px-5 lg:px-4 lg:py-2.5">
-      <div className="community-desktop-header-inner mx-auto grid max-w-[1500px] grid-cols-[minmax(0,1fr)_auto] items-center gap-2 lg:grid-cols-[minmax(12rem,1fr)_minmax(13rem,auto)] lg:gap-3">
+    <header className="community-desktop-header sticky top-0 z-[1200] shrink-0 border-b border-[#D9E7F8] bg-white/94 px-3 py-2 shadow-[0_14px_36px_rgba(23,105,255,0.08)] backdrop-blur-2xl sm:px-5 lg:px-4 lg:py-2.5">
+      <div className="community-desktop-header-inner mx-auto grid max-w-[1500px] grid-cols-[minmax(0,1fr)_auto] items-start gap-2 lg:grid-cols-[minmax(10rem,0.75fr)_minmax(0,1.25fr)] lg:items-center lg:gap-3">
         <div className="community-mobile-header-left flex min-w-0 items-center gap-2 lg:gap-3">
-          <button
-            type="button"
-            onClick={() => setPersistentDesktopSidebarState(desktopSidebarState === 'hidden' ? 'compact' : desktopSidebarState === 'pinned' ? 'compact' : 'pinned')}
-            onPointerEnter={(event) => beginDesktopSidebarPreview(event.pointerType)}
-            onPointerLeave={(event) => scheduleDesktopSidebarPreviewClose(event.pointerType)}
-            aria-label={desktopSidebarState === 'pinned' ? 'Unpin Community side panel' : 'Preview or pin Community side panel'}
-            aria-expanded={desktopSidebarState === 'pinned' || isDesktopSidebarHovered}
-            className="community-desktop-sidebar-trigger hidden h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#D9E7F8] bg-white text-xl font-black leading-none text-[#1769FF] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 lg:flex"
-            title={desktopSidebarState === 'pinned' ? 'Unpin side panel' : 'Hover to preview · click to pin'}
-          >
-            <span aria-hidden="true">⋮</span>
-          </button>
+          {showWebsiteSidebarTrigger ? (
+            <button
+              type="button"
+              onClick={onWebsiteSidebarPin}
+              onPointerEnter={(event) => { if (event.pointerType === 'mouse') onWebsiteSidebarPreviewStart?.(); }}
+              onPointerLeave={(event) => { if (event.pointerType === 'mouse') onWebsiteSidebarPreviewEnd?.(); }}
+              aria-label="Preview or pin website navigation"
+              className="community-website-sidebar-trigger hidden h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-xl font-black text-[#1769FF] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16 lg:flex"
+              title="Website menu · hover to preview · click to pin"
+            >
+              <span aria-hidden="true">☰</span>
+            </button>
+          ) : null}
           <button type="button" onClick={goBack} aria-label="Back from Community" className="community-mobile-back-button flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg font-black text-[#081A45] shadow-[0_12px_30px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16">←</button>
           <div className="min-w-0">
             <p className="hidden text-[0.68rem] font-black uppercase tracking-[0.24em] text-[#1769FF] sm:block">Eduvora Community</p>
@@ -8209,17 +8263,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           </div>
         </div>
 
-        <div className="community-desktop-header-actions -mt-0.5 flex min-w-0 shrink-0 items-center justify-end gap-2 lg:mt-0">
-          <button type="button" onClick={() => onClose?.()} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] lg:inline-flex">← Leave</button>
+        <div className="community-desktop-header-actions -mt-0.5 flex min-w-0 flex-wrap items-center justify-end gap-1.5 lg:mt-0 lg:gap-2">
+          <button type="button" onClick={() => onClose?.()} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-4 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] 2xl:inline-flex">← Leave</button>
           <button type="button" ref={communityAiButtonRef} onClick={openCommunityAiMentor} aria-label="Open Community AI Mentor" className="community-mobile-ai-button flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-xs font-black text-white shadow-[0_14px_32px_rgba(123,97,255,0.24)] transition hover:-translate-y-0.5 focus:outline-none focus:ring-4 focus:ring-[#7B61FF]/20 active:scale-95"><span aria-hidden="true">✦</span><span className="sr-only">AI</span></button>
-          {page === 'chat' && activeView === 'feed' ? <div className="community-desktop-feed-filters hidden min-w-0 items-center gap-1 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 md:flex">{feedFilterOptions.map((option) => <button key={option.key} type="button" onClick={() => setFeedFilter(option.key)} className={`min-h-9 shrink-0 rounded-xl px-3 text-[11px] font-black transition ${feedFilter === option.key ? 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-sm' : 'text-[#536178] hover:bg-white hover:text-[#1769FF]'}`}>{option.label}<span className="ml-1 opacity-80">{compactCount(option.count)}</span></button>)}</div> : null}
+          {page === 'chat' && activeView === 'feed' ? <div className="community-desktop-feed-filters hidden min-w-0 max-w-[min(34rem,42vw)] items-center gap-1 overflow-x-auto rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 custom-scrollbar 2xl:flex">{feedFilterOptions.map((option) => <button key={option.key} type="button" onClick={() => setFeedFilter(option.key)} className={`min-h-9 shrink-0 rounded-xl px-3 text-[11px] font-black transition ${feedFilter === option.key ? 'bg-gradient-to-r from-[#1769FF] to-[#7B61FF] text-white shadow-sm' : 'text-[#536178] hover:bg-white hover:text-[#1769FF]'}`}>{option.label}<span className="ml-1 opacity-80">{compactCount(option.count)}</span></button>)}</div> : null}
           {page === 'chat' && activeView === 'status' ? <div className="hidden items-center gap-1 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF]/90 p-1 md:flex"><button type="button" onClick={openStatusUploadFromTop} className="min-h-9 rounded-xl bg-gradient-to-r from-[#1769FF] to-[#7B61FF] px-3 text-[11px] font-black text-white">Create</button><button type="button" onClick={openMyStatusesFromTop} className="min-h-9 rounded-xl bg-white px-3 text-[11px] font-black text-[#081A45]">Your status</button><button type="button" onClick={() => setShowStatusRulesModal(true)} className="min-h-9 rounded-xl bg-white px-3 text-[11px] font-black text-[#1769FF]">Rules</button></div> : null}
           {showCreateCta ? <button type="button" onClick={handleHeaderCreate} className="hidden rounded-2xl bg-gradient-to-r from-[#7B61FF] to-[#1769FF] px-4 py-3 text-xs font-black text-white shadow-[0_16px_38px_rgba(23,105,255,0.22)] transition hover:-translate-y-0.5 hidden">Create</button> : null}
-          <button type="button" onClick={() => pushPage('network')} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-3 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] xl:flex">⌕ Search</button>
+          <button type="button" onClick={() => pushPage('network')} className="hidden h-11 items-center gap-2 rounded-2xl border border-[#D9E7F8] bg-white px-3 text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] 2xl:flex">⌕ Search</button>
           <button type="button" onClick={() => { setCommunitySearchQuery(''); pushPage('search'); }} aria-label="Search Community users" className="community-header-search-button flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#cbd5e1] bg-white text-[#0f172a] shadow-sm transition hover:-translate-y-0.5 hover:border-[#93c5fd] hover:bg-[#eff6ff] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-[1.35rem] w-[1.35rem]" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><circle cx="11" cy="11" r="7" /><path d="m20 20-3.5-3.5" /></svg></button>
           <button type="button" onClick={() => pushPage('directChat')} aria-label="Open shared inbox" className="community-header-inbox-button relative flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-[#cbd5e1] bg-white text-[#0f172a] shadow-sm transition hover:-translate-y-0.5 hover:border-[#93c5fd] hover:bg-[#eff6ff] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#2563eb]/15"><svg aria-hidden="true" viewBox="0 0 24 24" className="h-[1.35rem] w-[1.35rem]" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round"><path d="M3.5 6.5h17v11h-17z" /><path d="m4 7 8 6 8-6" /></svg>{privateShareUnreadCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#ff3040] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{privateShareUnreadCount > 9 ? '9+' : privateShareUnreadCount}</span> : null}</button>
           <button type="button" onClick={() => { setSelectedProfileId(null); setProfileViewMode('overview'); pushPage('profile'); }} className="community-mobile-profile-button flex h-11 w-11 shrink-0 items-center justify-center rounded-full border border-[#D9E7F8] bg-white text-xs font-black text-[#081A45] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF]" aria-label="Open profile"><Avatar value={getOwnDisplayAvatar()} size="h-8 w-8" /></button>
-          <span className="hidden rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400] lg:inline-flex">🪙 {eduCoins}</span>
+          <span className="hidden rounded-full border border-[#FFE8A8] bg-[#FFF7D7] px-3 py-2 text-xs font-black text-[#9A6400] 2xl:inline-flex">🪙 {eduCoins}</span>
           <div ref={notificationPanelRef} className="relative"><button type="button" onClick={openNotificationCenter} aria-expanded={isNotificationPanelOpen || page === 'notifications'} aria-label="Community notifications" className="community-mobile-notification-button relative flex h-11 w-11 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-lg shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/16"><span aria-hidden="true">🔔</span>{unreadNotificationCount ? <span className="absolute -right-1 -top-1 min-w-5 rounded-full bg-[#FF3B5C] px-1.5 py-0.5 text-[10px] font-black leading-none text-white ring-2 ring-white">{unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}</span> : null}</button></div>
         </div>
       </div>
@@ -8227,20 +8281,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   );
 
   const CommunitySidebar = () => {
-    const sidebarPinned = desktopSidebarState === 'pinned';
-    const sidebarExpanded = sidebarPinned || isDesktopSidebarHovered;
-    const sidebarVisible = desktopSidebarState !== 'hidden' || isDesktopSidebarHovered;
+    const sidebarExpanded = useSocialDesktopLayout || !isDesktopSidebarCollapsed;
     const memberName = profile.name?.trim() || 'Eduvora Member';
     const memberUsername = normalizeUsername(profile.username || memberName) || 'eduvora_member';
 
     return (
       <aside
         aria-label="Community sidebar"
-        data-community-sidebar-state={desktopSidebarState}
-        data-community-sidebar-expanded={sidebarExpanded ? 'true' : 'false'}
-        onPointerEnter={(event) => beginDesktopSidebarPreview(event.pointerType)}
-        onPointerLeave={(event) => scheduleDesktopSidebarPreviewClose(event.pointerType)}
-        className={`community-desktop-sidebar hidden min-h-0 shrink-0 flex-col overflow-hidden border-r border-[#D9E7F8] bg-white shadow-[18px_0_60px_rgba(23,105,255,0.08)] transition-[width,padding,transform,opacity] duration-200 ease-out lg:flex ${!sidebarVisible ? 'pointer-events-none w-0 -translate-x-full border-r-0 p-0 opacity-0' : sidebarExpanded ? 'w-[clamp(16.5rem,20vw,18.5rem)] p-4 opacity-100 xl:p-5' : 'w-[5.5rem] p-3 opacity-100'}`}
+        className={`community-desktop-sidebar hidden min-h-0 shrink-0 flex-col overflow-hidden border-r border-[#D9E7F8] bg-white shadow-[18px_0_60px_rgba(23,105,255,0.08)] transition-[width,padding] duration-300 ease-out lg:flex ${sidebarExpanded ? 'w-[clamp(16.5rem,20vw,18.5rem)] p-4 xl:p-5' : 'w-[5.5rem] p-3'}`}
       >
         <div className={`mb-4 flex items-center gap-2 ${sidebarExpanded ? 'justify-between' : 'justify-center'}`}>
           {sidebarExpanded ? (
@@ -8255,40 +8303,19 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
                 </span>
               </div>
             </div>
-          ) : null}
-          {sidebarExpanded ? (
-            <div className="flex shrink-0 items-center gap-1.5">
-              <button
-                type="button"
-                onClick={() => setPersistentDesktopSidebarState(sidebarPinned ? 'compact' : 'pinned')}
-                aria-label={sidebarPinned ? 'Unpin Community side panel' : 'Pin Community side panel open'}
-                aria-pressed={sidebarPinned}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#D9E7F8] bg-white/94 text-sm font-black text-[#1769FF] shadow-sm transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:text-[#7B61FF] focus:outline-none focus:ring-4 focus:ring-[#1769FF]/18 active:scale-95"
-                title={sidebarPinned ? 'Unpin to compact mode' : 'Pin side panel open'}
-              >
-                <span aria-hidden="true">{sidebarPinned ? '●' : '📌'}</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setPersistentDesktopSidebarState('hidden')}
-                aria-label="Close Community side panel to the three-dot trigger"
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-[#D9E7F8] bg-white/94 text-base font-black text-[#536178] shadow-sm transition hover:-translate-y-0.5 hover:border-[#F7CACA] hover:bg-[#FFF7F7] hover:text-[#C5221F] focus:outline-none focus:ring-4 focus:ring-[#C5221F]/12 active:scale-95"
-                title="Close to three-dot trigger"
-              >
-                <span aria-hidden="true">×</span>
-              </button>
-            </div>
           ) : (
-            <button
-              type="button"
-              onClick={() => setPersistentDesktopSidebarState('pinned')}
-              aria-label="Pin compact Community side panel open"
-              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-[#D9E7F8] bg-white text-xl font-black leading-none text-[#1769FF] shadow-sm focus:outline-none focus:ring-4 focus:ring-[#1769FF]/18"
-              title="Hover to preview · click to pin"
-            >
-              <span aria-hidden="true">⋮</span>
-            </button>
+            <div className="flex h-12 w-12 items-center justify-center rounded-[1.25rem] border border-[#D9E7F8] bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-lg text-white shadow-[0_14px_32px_rgba(23,105,255,0.22)]" title="EDUVORA BOND" aria-label="EDUVORA BOND">✦</div>
           )}
+          <button
+            type="button"
+            onClick={() => setIsDesktopSidebarCollapsed((collapsed) => !collapsed)}
+            aria-label={sidebarExpanded ? 'Collapse community sidebar' : 'Expand community sidebar'}
+            aria-expanded={sidebarExpanded}
+            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[1.1rem] border border-[#D9E7F8] bg-white/92 text-base font-black text-[#1769FF] shadow-[0_10px_28px_rgba(23,105,255,0.10)] transition hover:-translate-y-0.5 hover:border-[#BFD7FF] hover:text-[#7B61FF] hover:shadow-[0_16px_34px_rgba(23,105,255,0.16)] focus:outline-none focus:ring-4 focus:ring-[#1769FF]/18 active:scale-95"
+            title={sidebarExpanded ? 'Collapse community sidebar' : 'Expand community sidebar'}
+          >
+            <span aria-hidden="true">{sidebarExpanded ? '‹' : '›'}</span>
+          </button>
         </div>
 
         <nav aria-label="Community sections" className="community-desktop-nav min-h-0 flex-1 space-y-2 overflow-y-auto pr-1 custom-scrollbar">
@@ -8862,7 +8889,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
   }
 
   return (
-    <section style={communityCssVars} data-community-sidebar-state={desktopSidebarState} className={`eduvora-community-polish relative h-full min-h-0 w-full overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-0 lg:p-0 ${useSocialDesktopLayout ? 'community-desktop-social' : useLatestDesktopLayout ? 'community-desktop-latest' : 'community-desktop-classic'} ${useLatestMobileLayout ? 'community-mobile-latest' : 'community-mobile-classic'}`}>
+    <section style={communityCssVars} className={`eduvora-community-polish relative h-full min-h-0 w-full overflow-hidden bg-[var(--community-page-bg)] p-0 text-[var(--community-body)] sm:p-0 lg:p-0 ${useSocialDesktopLayout ? 'community-desktop-social' : useLatestDesktopLayout ? 'community-desktop-latest' : 'community-desktop-classic'} ${useLatestMobileLayout ? 'community-mobile-latest' : 'community-mobile-classic'}`}>
       <style>{`
         @keyframes eduvoraBondShine {
           0% { transform: translateX(0); opacity: 0; }
@@ -8899,6 +8926,60 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
           .eduvora-community-polish textarea { line-height: 1.45; }
         }
         @media (min-width: 1024px) {
+          .eduvora-community-polish .community-desktop-header {
+            background: var(--community-header-bg) !important;
+            border-color: var(--community-border) !important;
+          }
+          .eduvora-community-polish .community-desktop-sidebar {
+            background: var(--community-sidebar-bg) !important;
+            border-color: var(--community-border) !important;
+          }
+          .eduvora-community-polish .community-desktop-reply-composer,
+          .eduvora-community-polish .community-share-composer,
+          .eduvora-community-polish .community-profile-post-detail-composer {
+            background: var(--community-composer-bg) !important;
+            border-color: var(--community-border) !important;
+          }
+          .eduvora-community-polish .community-social-right-rail {
+            background: var(--community-right-rail-bg) !important;
+          }
+          .eduvora-community-polish .community-social-feed-panel,
+          .eduvora-community-polish .community-social-rail-card,
+          .eduvora-community-polish .community-desktop-feed-card {
+            background: var(--community-card) !important;
+            border-color: var(--community-border) !important;
+          }
+          .eduvora-community-polish .community-social-feed-stream {
+            background: var(--community-soft) !important;
+          }
+          .eduvora-community-polish .community-desktop-header h1,
+          .eduvora-community-polish .community-social-feed-heading h2,
+          .eduvora-community-polish .community-social-rail-card h3,
+          .eduvora-community-polish .community-mobile-feed-card-title {
+            color: var(--community-heading) !important;
+          }
+          .eduvora-community-polish .community-desktop-header p,
+          .eduvora-community-polish .community-social-feed-heading p,
+          .eduvora-community-polish .community-social-rail-card p,
+          .eduvora-community-polish .community-mobile-feed-card-body {
+            color: var(--community-body) !important;
+          }
+          .eduvora-community-polish .community-social-feed-tab.is-active {
+            background: var(--community-active-bg) !important;
+            color: var(--community-active-text) !important;
+          }
+          .eduvora-community-polish .community-desktop-nav-item[aria-current='page'] {
+            background: var(--community-active-bg) !important;
+            color: var(--community-active-text) !important;
+          }
+          .community-desktop-social .community-desktop-header-inner {
+            grid-template-columns: minmax(10rem, 0.72fr) minmax(0, 1.28fr) !important;
+          }
+          .community-desktop-social .community-desktop-header-actions {
+            min-width: 0 !important;
+            flex-wrap: wrap !important;
+            overflow: hidden !important;
+          }
           .community-desktop-social.eduvora-community-polish {
             padding: 0 !important;
           }
@@ -8940,7 +9021,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({ onClose, isAuthenti
             {renderMainContent()}
           </main>
         </div>
-        {useSocialDesktopLayout && desktopSidebarState !== 'pinned' ? <SocialDesktopRightRail /> : null}
+        {useSocialDesktopLayout ? <SocialDesktopRightRail /> : null}
       </div>
       <CommunityBottomNav />
     </section>

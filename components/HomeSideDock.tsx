@@ -3,6 +3,15 @@ import type { ProductWithRating, WebsiteSettings } from '../App';
 import type { DockCountDestination } from '../utils/dockNewContent';
 import { defaultDockStyle, dockCustomizationItems, dockShadowMap, hexToRgba } from './BottomGlassDock';
 
+export type DesktopSidebarCommand = 'preview-start' | 'preview-end' | 'pin' | 'hide';
+
+export const DESKTOP_SIDEBAR_COMMAND_EVENT = 'digital-catalyst:desktop-sidebar-command';
+
+export const dispatchDesktopSidebarCommand = (command: DesktopSidebarCommand) => {
+  if (typeof window === 'undefined') return;
+  window.dispatchEvent(new CustomEvent(DESKTOP_SIDEBAR_COMMAND_EVENT, { detail: { command } }));
+};
+
 interface HomeSideDockProps {
   isLoggedIn: boolean;
   purchasedProducts: ProductWithRating[];
@@ -23,6 +32,8 @@ interface HomeSideDockProps {
   authButtonLabel: string;
   settings: WebsiteSettings;
   activeItem?: string;
+  showDetachedTrigger?: boolean;
+  overlayMode?: boolean;
 }
 
 type SidebarState = 'expanded' | 'collapsed' | 'hidden';
@@ -55,7 +66,7 @@ const clamp = (value: unknown, minimum: number, maximum: number, fallback: numbe
   return Math.min(maximum, Math.max(minimum, number));
 };
 
-const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity, authButtonLabel, activeItem = '' }: HomeSideDockProps) => {
+const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity, authButtonLabel, activeItem = '', showDetachedTrigger = true, overlayMode = false }: HomeSideDockProps) => {
   const [sidebarState, setSidebarState] = useState<SidebarState>(readInitialState);
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const hoverCloseTimerRef = useRef<number | null>(null);
@@ -93,10 +104,11 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
   }, [sidebarState]);
 
   useEffect(() => {
+    if (overlayMode) return undefined;
     const root = document.documentElement;
     root.style.setProperty('--desktop-site-sidebar-offset', `${layoutWidth}px`);
     return () => root.style.removeProperty('--desktop-site-sidebar-offset');
-  }, [layoutWidth]);
+  }, [layoutWidth, overlayMode]);
 
   const cancelHoverClose = () => {
     if (hoverCloseTimerRef.current !== null) {
@@ -127,6 +139,20 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
     setHoverExpanded(false);
     setSidebarState(nextState);
   };
+
+
+  useEffect(() => {
+    const handleExternalCommand = (event: Event) => {
+      const command = (event as CustomEvent<{ command?: DesktopSidebarCommand }>).detail?.command;
+      if (command === 'preview-start') beginHoverPreview('mouse');
+      if (command === 'preview-end') scheduleHoverClose('mouse');
+      if (command === 'pin') setPersistentState('expanded');
+      if (command === 'hide') setPersistentState('hidden');
+    };
+
+    window.addEventListener(DESKTOP_SIDEBAR_COMMAND_EVENT, handleExternalCommand);
+    return () => window.removeEventListener(DESKTOP_SIDEBAR_COMMAND_EVENT, handleExternalCommand);
+  }, [sidebarState, showLabels]);
 
   const profileItem: NavigationItem = {
     id: 'Profile',
@@ -162,7 +188,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
 
   return (
     <>
-      {sidebarState === 'hidden' && (
+      {showDetachedTrigger && sidebarState === 'hidden' && (
         <button
           type="button"
           onClick={() => setPersistentState('expanded')}
@@ -178,7 +204,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
       )}
 
       <aside
-        className={`home-side-dock-performance fixed inset-y-0 left-0 z-[80] hidden overflow-visible bg-transparent transition-[width,transform,opacity] duration-150 ease-out lg:flex ${isPanelVisible ? 'translate-x-0 opacity-100' : 'pointer-events-none -translate-x-[calc(100%+1rem)] opacity-0'}`}
+        className={`home-side-dock-performance fixed inset-y-0 left-0 ${overlayMode ? 'z-[1600]' : 'z-[80]'} hidden overflow-visible bg-transparent transition-[width,transform,opacity] duration-150 ease-out lg:flex ${isPanelVisible ? 'translate-x-0 opacity-100' : 'pointer-events-none -translate-x-[calc(100%+1rem)] opacity-0'}`}
         style={{ width: visualWidth, padding: Math.max(6, padding - 4) }}
         data-sidebar-state={sidebarState}
         data-hover-expanded={hoverExpanded ? 'true' : 'false'}

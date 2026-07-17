@@ -1451,18 +1451,11 @@ const CoursePlayer: React.FC<{
       closeCourseMentor();
       return;
     }
-    if (isSidebarOpenRef.current && forceOverlaySidebarRef.current) {
-      closeCourseSidebar();
-      return;
-    }
+
     if (
       typeof window !== 'undefined'
       && forceOverlaySidebarRef.current
       && window.history.state?.dcView === 'coursePlayer'
-      && (
-        window.history.state?.dcCourseLessonSelection === true
-        || window.history.state?.dcCoursePanelCycleReady === true
-      )
     ) {
       window.history.back();
       return;
@@ -1535,7 +1528,6 @@ const CoursePlayer: React.FC<{
   const forceOverlaySidebarRef = useRef(forceOverlaySidebar);
   const courseHistoryRestoringRef = useRef(false);
   const courseHistoryReadyRef = useRef(false);
-  const courseExitAfterModulesRef = useRef(false);
 
   useEffect(() => {
     isSidebarOpenRef.current = isSidebarOpen;
@@ -1554,8 +1546,7 @@ const CoursePlayer: React.FC<{
       dcCourseProductId: product.id,
       dcCourseFileId: activeFile?.id || null,
       dcCourseLessonSelection: false,
-      dcCoursePanelCycleReady: false,
-      dcCourseExitAfterModules: false,
+      dcCourseBackStep: layer === 'mentor' ? 'mentor' : layer === 'modules' ? 'transient-open' : 'closed-cycle',
     };
 
     if (mode === 'push') window.history.pushState(nextState, '', window.location.href);
@@ -1567,30 +1558,41 @@ const CoursePlayer: React.FC<{
 
     courseHistoryReadyRef.current = false;
     const timer = window.setTimeout(() => {
-      const baseState = {
+      const sharedState = {
         ...(window.history.state || {}),
         dcView: 'coursePlayer',
         dcAppEntry: true,
-        dcCourseLayer: null,
         dcCourseProductId: product.id,
         dcCourseFileId: activeFile?.id || null,
         dcCourseLessonSelection: false,
-        dcCoursePanelCycleReady: false,
-        dcCourseExitAfterModules: false,
+      };
+      const exitReadyModulesState = {
+        ...sharedState,
+        dcCourseLayer: 'modules',
+        dcCourseBackStep: 'exit-ready',
+      };
+      const closedCycleState = {
+        ...sharedState,
+        dcCourseLayer: null,
+        dcCourseBackStep: 'closed-cycle',
+      };
+      const initialModulesState = {
+        ...sharedState,
+        dcCourseLayer: 'modules',
+        dcCourseBackStep: 'initial-open',
       };
 
       if (window.history.state?.dcView === 'coursePlayer') {
-        window.history.replaceState(baseState, '', window.location.href);
+        window.history.replaceState(exitReadyModulesState, '', window.location.href);
       } else {
-        window.history.pushState(baseState, '', window.location.href);
+        window.history.pushState(exitReadyModulesState, '', window.location.href);
       }
+      window.history.pushState(closedCycleState, '', window.location.href);
+      window.history.pushState(initialModulesState, '', window.location.href);
 
       courseHistoryReadyRef.current = true;
-      if (isMentorOpenRef.current) {
-        window.history.pushState({ ...baseState, dcCourseLayer: 'mentor' }, '', window.location.href);
-      } else if (isSidebarOpenRef.current && forceOverlaySidebarRef.current) {
-        window.history.pushState({ ...baseState, dcCourseLayer: 'modules' }, '', window.location.href);
-      }
+      setIsMentorOpen(false);
+      if (forceOverlaySidebarRef.current) setIsSidebarOpen(true);
     }, 0);
 
     return () => {
@@ -1628,22 +1630,19 @@ const CoursePlayer: React.FC<{
       return;
     }
 
-    const modulesState = {
+    window.history.replaceState({
       ...currentState,
-      dcView: 'coursePlayer',
-      dcCourseLayer: 'modules',
-      dcCourseProductId: product.id,
       dcCourseFileId: fileId,
       dcCourseLessonSelection: false,
-      dcCoursePanelCycleReady: true,
-      dcCourseExitAfterModules: true,
-    };
-    window.history.replaceState(modulesState, '', window.location.href);
+    }, '', window.location.href);
     window.history.pushState({
-      ...modulesState,
+      ...currentState,
+      dcView: 'coursePlayer',
       dcCourseLayer: null,
+      dcCourseProductId: product.id,
+      dcCourseFileId: fileId,
       dcCourseLessonSelection: true,
-      dcCourseExitAfterModules: false,
+      dcCourseBackStep: 'lesson-closed',
     }, '', window.location.href);
   }, [closeCourseLayerHistory, product.id]);
 
@@ -1679,55 +1678,20 @@ const CoursePlayer: React.FC<{
       if (state.dcView !== 'coursePlayer') return;
 
       courseHistoryRestoringRef.current = true;
-      const layer = state.dcCourseLayer === 'mentor' || state.dcCourseLayer === 'modules' ? state.dcCourseLayer : null;
+      const layer = state.dcCourseLayer === 'mentor' || state.dcCourseLayer === 'modules'
+        ? state.dcCourseLayer
+        : null;
 
-      if (
-        forceOverlaySidebarRef.current
-        && layer === null
-        && courseExitAfterModulesRef.current
-      ) {
-        courseExitAfterModulesRef.current = false;
-        window.setTimeout(() => window.history.back(), 0);
-        return;
-      }
-
-      if (
-        forceOverlaySidebarRef.current
-        && layer === null
-        && state.dcCoursePanelCycleReady !== true
-        && state.dcCourseLessonSelection !== true
-      ) {
-        const modulesState = {
-          ...state,
-          dcView: 'coursePlayer',
-          dcCourseLayer: 'modules',
-          dcCourseProductId: product.id,
-          dcCourseFileId: activeFile?.id || state.dcCourseFileId || null,
-          dcCourseLessonSelection: false,
-          dcCoursePanelCycleReady: true,
-          dcCourseExitAfterModules: true,
-        };
-        window.history.replaceState(modulesState, '', window.location.href);
-        window.history.pushState({
-          ...modulesState,
-          dcCourseLayer: null,
-          dcCourseExitAfterModules: false,
-        }, '', window.location.href);
-        setIsMentorOpen(false);
-        setIsSidebarOpen(false);
-        window.setTimeout(() => { courseHistoryRestoringRef.current = false; }, 0);
-        return;
-      }
-
-      courseExitAfterModulesRef.current = layer === 'modules' && state.dcCourseExitAfterModules === true;
       setIsMentorOpen(layer === 'mentor');
       if (forceOverlaySidebarRef.current) setIsSidebarOpen(layer === 'modules');
-      window.setTimeout(() => { courseHistoryRestoringRef.current = false; }, 0);
+      window.setTimeout(() => {
+        courseHistoryRestoringRef.current = false;
+      }, 0);
     };
 
     window.addEventListener('popstate', handleCoursePopState);
     return () => window.removeEventListener('popstate', handleCoursePopState);
-  }, [activeFile?.id, product.id]);
+  }, []);
 
   useEffect(() => {
     if (!courseHistoryReadyRef.current || courseHistoryRestoringRef.current) return;
