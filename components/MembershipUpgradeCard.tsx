@@ -19,9 +19,9 @@ const MembershipUpgradeCard: React.FC<MembershipUpgradeCardProps> = ({
   const paragraphs = String(message.description || '').split(/\n\s*\n/).map(item => item.trim()).filter(Boolean);
 
   return (
-    <section className={`${compact ? 'rounded-[1.5rem] p-5 sm:p-6' : 'mx-auto w-full max-w-3xl rounded-[2rem] p-6 sm:p-10'} border border-[#D9E7F8] bg-white/95 text-[#081A45] shadow-[0_28px_80px_rgba(23,105,255,0.16)] backdrop-blur-2xl ${className}`}>
+    <section data-clean-neutral-component="membership-upgrade" className={`${compact ? 'rounded-[1.5rem] p-5 sm:p-6' : 'mx-auto w-full max-w-3xl rounded-[2rem] p-6 sm:p-10'} border border-[#D9E7F8] bg-white/95 text-[#081A45] shadow-[0_28px_80px_rgba(23,105,255,0.16)] backdrop-blur-2xl ${className}`}>
       <div className="flex items-start gap-4">
-        <span className={`${compact ? 'h-12 w-12 text-xl' : 'h-16 w-16 text-3xl'} flex shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-white shadow-[0_16px_35px_rgba(23,105,255,0.26)]`} aria-hidden="true">✦</span>
+        <span data-clean-neutral-icon="membership-upgrade" className={`${compact ? 'h-12 w-12 text-xl' : 'h-16 w-16 text-3xl'} flex shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-[#1769FF] to-[#7B61FF] text-white shadow-[0_16px_35px_rgba(23,105,255,0.26)]`} aria-hidden="true">✦</span>
         <div className="min-w-0">
           <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#1769FF]">{message.eyebrow}</p>
           <h1 className={`${compact ? 'mt-2 text-xl sm:text-2xl' : 'mt-3 text-2xl sm:text-4xl'} font-black leading-tight tracking-[-0.03em]`}>{message.title}</h1>

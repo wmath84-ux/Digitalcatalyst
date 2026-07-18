@@ -140,7 +140,7 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   ];
 
   return (
-    <div className="min-h-[100dvh] bg-[radial-gradient(circle_at_12%_3%,rgba(191,215,255,0.78),transparent_30%),radial-gradient(circle_at_92%_12%,rgba(220,203,255,0.52),transparent_28%),linear-gradient(180deg,#F5F9FF_0%,#EEF6FF_44%,#FFFFFF_100%)] px-4 pb-44 pt-[max(14px,env(safe-area-inset-top))] text-[#64708F]">
+    <div data-clean-neutral-workspace="mobile-home" className="min-h-[100dvh] bg-[radial-gradient(circle_at_12%_3%,rgba(191,215,255,0.78),transparent_30%),radial-gradient(circle_at_92%_12%,rgba(220,203,255,0.52),transparent_28%),linear-gradient(180deg,#F5F9FF_0%,#EEF6FF_44%,#FFFFFF_100%)] px-4 pb-44 pt-[max(14px,env(safe-area-inset-top))] text-[#64708F]">
       <header className="sticky top-2 z-30 mb-5 flex items-center gap-3 rounded-[28px] border border-[#D8E6FF]/90 bg-white/86 p-3 shadow-[0_18px_50px_rgba(11,99,255,0.12)] backdrop-blur-2xl">
         <button type="button" onClick={onNavigateToAllProducts} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#0B63FF] to-[#7C4DFF] text-xl shadow-[0_10px_24px_rgba(11,99,255,0.28)]">⚡</button>
         <div className="min-w-0 flex-1">

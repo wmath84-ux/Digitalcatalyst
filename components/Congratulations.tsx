@@ -29,7 +29,7 @@ const Congratulations: React.FC<CongratulationsProps> = ({ settings, onBack, onC
   }, []);
 
   return (
-    <div className="min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-indigo-50/50 to-cyan-50 text-slate-900">
+    <div data-clean-neutral-workspace="congratulations" className="min-h-screen overflow-hidden bg-gradient-to-br from-slate-50 via-indigo-50/50 to-cyan-50 text-slate-900">
       <header className="border-b border-white/60 bg-white/75 py-4 shadow-sm backdrop-blur-2xl">
         <div className="container mx-auto flex items-center justify-between gap-3 px-4 sm:gap-4 sm:px-6">
           <div>
@@ -51,7 +51,7 @@ const Congratulations: React.FC<CongratulationsProps> = ({ settings, onBack, onC
         <div className="container relative z-10 mx-auto px-4 sm:px-6">
           <div className="mx-auto max-w-5xl overflow-hidden rounded-[1.5rem] border border-white/70 bg-white/75 shadow-[0_30px_90px_rgba(15,23,42,0.10)] backdrop-blur-2xl sm:rounded-[2.5rem]">
             <div className="grid lg:grid-cols-[0.9fr_1.1fr]">
-              <div className="relative min-h-[260px] bg-gradient-to-br from-emerald-500 via-cyan-500 to-indigo-600 p-5 text-white sm:min-h-[320px] sm:p-10">
+              <div data-clean-neutral-panel="congratulations-summary" className="relative min-h-[260px] bg-gradient-to-br from-emerald-500 via-cyan-500 to-indigo-600 p-5 text-white sm:min-h-[320px] sm:p-10">
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.32),transparent_25%),radial-gradient(circle_at_75%_70%,rgba(255,255,255,0.18),transparent_24%)]" />
                 <div className="relative flex h-full flex-col justify-between">
                   <div className="inline-flex h-16 w-16 items-center justify-center rounded-full border-4 border-white/60 bg-white/20 text-3xl shadow-2xl backdrop-blur-xl sm:h-24 sm:w-24 sm:text-5xl">
