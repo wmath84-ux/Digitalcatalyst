@@ -1566,7 +1566,8 @@ const App: React.FC = () => {
   const [isLocalLogoutPending, setIsLocalLogoutPending] = useState(false);
   const readDesktopSidebarViewport = () => {
     try {
-      return typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 1024px)').matches;
+      if (typeof window === 'undefined') return false;
+      return window.matchMedia('(min-width: 1024px)').matches;
     } catch {
       return false;
     }
@@ -2151,7 +2152,7 @@ const App: React.FC = () => {
     };
     updateMobileViewport();
     const media = window.matchMedia('(max-width: 768px)');
-    const desktopSidebarMedia = window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 1024px)');
+    const desktopSidebarMedia = window.matchMedia('(min-width: 1024px)');
     media.addEventListener?.('change', updateMobileViewport);
     desktopSidebarMedia.addEventListener?.('change', updateMobileViewport);
     window.addEventListener('resize', updateMobileViewport, { passive: true });
