@@ -19,10 +19,12 @@ test('news/blog reading pages reserve visible article ad fields between content 
   assert.doesNotMatch(readingDrawer, /className="mt-10 rounded-\[2rem\] border p-5 shadow-sm backdrop-blur-xl"/);
 });
 
-test('desktop sidebar does not leak into touch landscape and is not duplicated on Community', () => {
-  assert.match(app, /\(min-width: 1024px\) and \(hover: hover\) and \(pointer: fine\)/);
+test('desktop sidebar stays visible on wide desktop pages while Community only uses the pointer-safe sidebar', () => {
+  assert.match(app, /return window\.matchMedia\('\(min-width: 1024px\)'\)\.matches/);
+  assert.match(app, /readDesktopSidebarPointerViewport/);
+  assert.match(app, /useCommunityDesktopSidebar = useDesktopSidebar && isPointerDesktopSidebarViewport/);
   assert.match(app, /useDesktopSidebar && currentView !== 'community' &&/);
-  assert.match(app, /style=\{\{ paddingLeft: useDesktopSidebar \? 'var\(--desktop-site-sidebar-offset, 320px\)' : undefined \}\}/);
+  assert.match(app, /style=\{\{ paddingLeft: useCommunityDesktopSidebar \? 'var\(--desktop-site-sidebar-offset, 320px\)' : undefined \}\}/);
 });
 
 test('Status hub keeps Create Story top-right and removes the Rules button from the hero', () => {

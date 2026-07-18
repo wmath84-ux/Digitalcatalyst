@@ -1567,6 +1567,14 @@ const App: React.FC = () => {
   const readDesktopSidebarViewport = () => {
     try {
       if (typeof window === 'undefined') return false;
+      return window.matchMedia('(min-width: 1024px)').matches;
+    } catch {
+      return false;
+    }
+  };
+  const readDesktopSidebarPointerViewport = () => {
+    try {
+      if (typeof window === 'undefined') return false;
       return window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)').matches;
     } catch {
       return false;
@@ -1574,6 +1582,7 @@ const App: React.FC = () => {
   };
   const [isMobileViewport, setIsMobileViewport] = useState(() => getIsMobileViewport());
   const [isDesktopSidebarViewport, setIsDesktopSidebarViewport] = useState(() => readDesktopSidebarViewport());
+  const [isPointerDesktopSidebarViewport, setIsPointerDesktopSidebarViewport] = useState(() => readDesktopSidebarPointerViewport());
   const [mobileAuthFlowState, setMobileAuthFlowState] = useState<MobileAuthFlowState>('checking');
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<FirebaseUser | null>(null);
 
@@ -2148,13 +2157,16 @@ const App: React.FC = () => {
       rafId = window.requestAnimationFrame(() => {
         setIsMobileViewport(getIsMobileViewport());
         setIsDesktopSidebarViewport(readDesktopSidebarViewport());
+        setIsPointerDesktopSidebarViewport(readDesktopSidebarPointerViewport());
       });
     };
     updateMobileViewport();
     const media = window.matchMedia('(max-width: 768px)');
-    const desktopSidebarMedia = window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)');
+    const desktopSidebarMedia = window.matchMedia('(min-width: 1024px)');
+    const desktopSidebarPointerMedia = window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)');
     media.addEventListener?.('change', updateMobileViewport);
     desktopSidebarMedia.addEventListener?.('change', updateMobileViewport);
+    desktopSidebarPointerMedia.addEventListener?.('change', updateMobileViewport);
     window.addEventListener('resize', updateMobileViewport, { passive: true });
     window.addEventListener('orientationchange', updateMobileViewport, { passive: true });
     window.visualViewport?.addEventListener('resize', updateMobileViewport);
@@ -2162,6 +2174,7 @@ const App: React.FC = () => {
       window.cancelAnimationFrame(rafId);
       media.removeEventListener?.('change', updateMobileViewport);
       desktopSidebarMedia.removeEventListener?.('change', updateMobileViewport);
+      desktopSidebarPointerMedia.removeEventListener?.('change', updateMobileViewport);
       window.removeEventListener('resize', updateMobileViewport);
       window.removeEventListener('orientationchange', updateMobileViewport);
       window.visualViewport?.removeEventListener('resize', updateMobileViewport);
@@ -6180,6 +6193,7 @@ const App: React.FC = () => {
     isSubscriptionModalOpen;
 
   const useDesktopSidebar = websiteSettings.desktop.navigationMode === 'sidebar' && isDesktopSidebarViewport;
+  const useCommunityDesktopSidebar = useDesktopSidebar && isPointerDesktopSidebarViewport;
   const desktopSidebarActiveItem = isCartOpen
     ? 'Cart'
     : isFreeModalOpen
@@ -6262,7 +6276,7 @@ const App: React.FC = () => {
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent(effectiveAppUser)}</div>;
     if (currentView === 'community') return (
       <div key="community" className="fixed inset-0 z-[1200] min-h-0 min-w-0 overflow-hidden bg-[var(--color-background)] p-0">
-        {useDesktopSidebar ? (
+        {useCommunityDesktopSidebar ? (
           <HomeSideDock
             settings={websiteSettings}
             isLoggedIn={isLoggedIn}
@@ -6290,7 +6304,7 @@ const App: React.FC = () => {
         ) : null}
         <div
           className="h-full min-w-0 transition-[padding-left] duration-300 ease-out"
-          style={{ paddingLeft: useDesktopSidebar ? 'var(--desktop-site-sidebar-offset, 320px)' : undefined }}
+          style={{ paddingLeft: useCommunityDesktopSidebar ? 'var(--desktop-site-sidebar-offset, 320px)' : undefined }}
         >
           {hasPremiumMembership(effectiveAppUser) ? (
             <EduvoraCommunity
@@ -6298,7 +6312,7 @@ const App: React.FC = () => {
               onClose={() => handleNavigateBack('home')}
               isAuthenticated={isLoggedIn}
               currentUser={effectiveAppUser}
-              siteSidebarState={useDesktopSidebar ? desktopSidebarState : 'hidden'}
+              siteSidebarState={useCommunityDesktopSidebar ? desktopSidebarState : 'hidden'}
             />
           ) : (
             <div className="flex min-h-full items-center justify-center">
