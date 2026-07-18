@@ -6193,7 +6193,7 @@ const App: React.FC = () => {
     isSubscriptionModalOpen;
 
   const useDesktopSidebar = websiteSettings.desktop.navigationMode === 'sidebar' && isDesktopSidebarViewport;
-  const useCommunityDesktopSidebar = useDesktopSidebar && isPointerDesktopSidebarViewport;
+  const useCommunityDesktopSidebar = useDesktopSidebar;
   const desktopSidebarActiveItem = isCartOpen
     ? 'Cart'
     : isFreeModalOpen
@@ -6290,15 +6290,15 @@ const App: React.FC = () => {
             detachedTriggerPlacement="top-left"
             onHomeClick={() => { setCurrentView('home'); window.scrollTo(0, 0); }}
             onOpenBlogModal={() => { setCurrentView('home'); window.setTimeout(() => openReadingHub('blog'), 0); }}
-            onOpenFreeModal={handleNavigateToFreeProducts}
+            onOpenFreeModal={() => { setCurrentView('home'); window.setTimeout(handleNavigateToFreeProducts, 0); }}
             onOpenAnnouncementsModal={() => { setCurrentView('home'); window.setTimeout(() => openReadingHub('news'), 0); }}
-            onNavigateToAllProducts={handleNavigateToAllProducts}
-            onNavigateToWishlist={handleNavigateToWishlist}
-            onNavigateToPurchases={handleNavigateToPurchases}
+            onNavigateToAllProducts={() => { setCurrentView('home'); window.setTimeout(handleNavigateToAllProducts, 0); }}
+            onNavigateToWishlist={() => { setCurrentView('home'); window.setTimeout(handleNavigateToWishlist, 0); }}
+            onNavigateToPurchases={() => { setCurrentView('home'); window.setTimeout(handleNavigateToPurchases, 0); }}
             onCartClick={() => { setCurrentView('home'); window.setTimeout(openCartSidebar, 0); }}
-            onProfileClick={handleNavigateToProfile}
+            onProfileClick={() => { setCurrentView('home'); window.setTimeout(handleNavigateToProfile, 0); }}
             authButtonLabel={authButtonLabel}
-            onSubscriptionClick={handleNavigateToSubscription}
+            onSubscriptionClick={() => { setCurrentView('home'); window.setTimeout(handleNavigateToSubscription, 0); }}
             onOpenCommunity={() => undefined}
           />
         ) : null}

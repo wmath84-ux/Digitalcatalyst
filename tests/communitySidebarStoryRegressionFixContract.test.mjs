@@ -17,13 +17,15 @@ test('desktop website side panel is restored for desktop-width viewports while h
   assert.match(app, /const desktopSidebarPointerMedia = window\.matchMedia\('\(min-width: 1024px\) and \(hover: hover\) and \(pointer: fine\)'\)/);
   assert.match(homeDock, /if \(event\.pointerType === 'mouse'\) beginHoverPreview\(event\.pointerType\);/);
   assert.match(app, /websiteSettings\.desktop\.navigationMode === 'sidebar' && isDesktopSidebarViewport/);
-  assert.match(app, /useCommunityDesktopSidebar = useDesktopSidebar && isPointerDesktopSidebarViewport/);
+  assert.match(app, /useCommunityDesktopSidebar = useDesktopSidebar/);
 });
 
 test('Community sidebar navigation leaves Community before opening non-community overlays', () => {
   assert.match(app, /onOpenBlogModal=\{\(\) => \{ setCurrentView\('home'\); window\.setTimeout\(\(\) => openReadingHub\('blog'\), 0\); \}\}/);
   assert.match(app, /onOpenAnnouncementsModal=\{\(\) => \{ setCurrentView\('home'\); window\.setTimeout\(\(\) => openReadingHub\('news'\), 0\); \}\}/);
   assert.match(app, /onCartClick=\{\(\) => \{ setCurrentView\('home'\); window\.setTimeout\(openCartSidebar, 0\); \}\}/);
+  assert.match(app, /onNavigateToAllProducts=\{\(\) => \{ setCurrentView\('home'\); window\.setTimeout\(handleNavigateToAllProducts, 0\); \}\}/);
+  assert.match(app, /onNavigateToWishlist=\{\(\) => \{ setCurrentView\('home'\); window\.setTimeout\(handleNavigateToWishlist, 0\); \}\}/);
 });
 
 test('Community Status tab remains a valid root tab and browser Back does not close the app', () => {
@@ -46,6 +48,7 @@ test('Story viewer captions are below media and expand inside a scrollable text 
   assert.match(community, /is-expanded max-h-\[42dvh\] overflow-y-auto whitespace-pre-wrap/);
   assert.match(community, /position: relative !important;/);
   assert.match(community, /max-height: min\(42dvh, 22rem\)/);
+  assert.match(community, /min-height: min\(62dvh, 32rem\)/);
 });
 
 test('Admin can customize website side panel font and HomeSideDock consumes it', () => {

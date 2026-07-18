@@ -17,7 +17,7 @@ test('Community uses the real website side panel as a pinned in-page layout with
   assert.match(app, /siteSidebarState=\{useCommunityDesktopSidebar \? desktopSidebarState : 'hidden'\}/);
   assert.match(app, /elevatedLayer/);
   assert.match(app, /detachedTriggerPlacement="top-left"/);
-  assert.match(app, /useCommunityDesktopSidebar = useDesktopSidebar && isPointerDesktopSidebarViewport/);
+  assert.match(app, /useCommunityDesktopSidebar = useDesktopSidebar/);
   assert.match(app, /--desktop-site-sidebar-offset/);
   assert.doesNotMatch(app, /dispatchDesktopSidebarCommand/);
   assert.match(app, /activeItem="Community"/);
