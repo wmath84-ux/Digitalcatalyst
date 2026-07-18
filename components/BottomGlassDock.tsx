@@ -68,6 +68,7 @@ export const defaultDockStyle = {
   mobileEnabled: true,
   desktopExpandedWidth: 320,
   desktopCollapsedWidth: 88,
+  sidebarFontFamily: 'Inter',
 };
 
 const clampNumber = (value: unknown, minimum: number, maximum: number, fallback: number) => {

@@ -92,6 +92,15 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
   const textColor = /^#[0-9a-f]{6}$/i.test(dockStyle.textColor || '') ? dockStyle.textColor : defaultDockStyle.textColor;
   const borderColor = /^#[0-9a-f]{6}$/i.test(dockStyle.borderColor || '') ? dockStyle.borderColor : defaultDockStyle.borderColor;
   const shadowStrength = dockStyle.shadowStrength === 'none' || dockStyle.shadowStrength === 'strong' ? dockStyle.shadowStrength : 'soft';
+  const sidebarFontOptions: Record<string, string> = {
+    Inter: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
+    Lato: 'Lato, Inter, ui-sans-serif, system-ui, sans-serif',
+    Montserrat: 'Montserrat, Inter, ui-sans-serif, system-ui, sans-serif',
+    Roboto: 'Roboto, Inter, ui-sans-serif, system-ui, sans-serif',
+    Merriweather: 'Merriweather, Georgia, serif',
+    Oswald: 'Oswald, Inter, ui-sans-serif, system-ui, sans-serif',
+  };
+  const sidebarFontFamily = sidebarFontOptions[String((dockStyle as any).sidebarFontFamily || 'Inter')] || sidebarFontOptions.Inter;
 
   const isTemporaryPreview = hoverExpanded && (sidebarState === 'collapsed' || sidebarState === 'hidden');
   const isVisuallyExpanded = showLabels && (sidebarState === 'expanded' || isTemporaryPreview);
@@ -225,7 +234,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
       >
       <div
         className="home-side-dock-surface flex h-full w-full min-w-0 flex-col overflow-hidden border"
-        style={{ backgroundColor, borderColor, borderRadius: radius, boxShadow: dockShadowMap[shadowStrength], backdropFilter: `blur(${blur}px)`, WebkitBackdropFilter: `blur(${blur}px)` }}
+        style={{ backgroundColor, borderColor, borderRadius: radius, boxShadow: dockShadowMap[shadowStrength], backdropFilter: `blur(${blur}px)`, WebkitBackdropFilter: `blur(${blur}px)`, fontFamily: sidebarFontFamily }}
       >
         <div className="shrink-0 border-b" style={{ borderColor, padding }}>
           <div className={`flex min-w-0 items-center ${isVisuallyExpanded ? 'justify-between' : 'flex-col'} `} style={{ gap }}>

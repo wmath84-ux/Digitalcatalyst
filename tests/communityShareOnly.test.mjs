@@ -90,7 +90,8 @@ test('legacy status grids are unreachable and profile text detail renders once i
   assert.doesNotMatch(component, /statusMine/);
   assert.doesNotMatch(component, /statusCards\.map\(renderStatusTile\)/);
   assert.doesNotMatch(component, /myStatuses\.map\(renderStatusTile\)/);
-  assert.match(component, /if \(page === 'chat' && activeView === 'status'\) setActiveView\('feed'\)/);
+  assert.doesNotMatch(component, /if \(page === 'chat' && activeView === 'status'\) setActiveView\('feed'\)/);
+  assert.match(component, /page === 'chat' && activeView === 'status' && renderStatusHub/);
   assert.match(component, /community-profile-text-detail/);
   assert.match(component, /const hasVisualPost = Boolean/);
   assert.match(component, /type === 'text' \? \(/);

@@ -759,6 +759,7 @@ export interface WebsiteSettings {
             mobileEnabled?: boolean;
             desktopExpandedWidth?: number;
             desktopCollapsedWidth?: number;
+            sidebarFontFamily?: string;
         };
         readingStyle?: {
             backgroundColor: string;
@@ -999,6 +1000,7 @@ const defaultWebsiteSettings: WebsiteSettings = {
             mobileEnabled: true,
             desktopExpandedWidth: 320,
             desktopCollapsedWidth: 88,
+            sidebarFontFamily: 'Inter',
         },
         communityStyle: {
             desktopLayout: 'latest',
@@ -1562,7 +1564,15 @@ const App: React.FC = () => {
   const committedFirebaseUidRef = useRef<string | null>(null);
   const logoutInProgressRef = useRef(false);
   const [isLocalLogoutPending, setIsLocalLogoutPending] = useState(false);
+  const readDesktopSidebarViewport = () => {
+    try {
+      return typeof window !== 'undefined' && window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 1024px)').matches;
+    } catch {
+      return false;
+    }
+  };
   const [isMobileViewport, setIsMobileViewport] = useState(() => getIsMobileViewport());
+  const [isDesktopSidebarViewport, setIsDesktopSidebarViewport] = useState(() => readDesktopSidebarViewport());
   const [mobileAuthFlowState, setMobileAuthFlowState] = useState<MobileAuthFlowState>('checking');
   const [firebaseAuthUser, setFirebaseAuthUser] = useState<FirebaseUser | null>(null);
 
@@ -2134,17 +2144,23 @@ const App: React.FC = () => {
     let rafId = 0;
     const updateMobileViewport = () => {
       window.cancelAnimationFrame(rafId);
-      rafId = window.requestAnimationFrame(() => setIsMobileViewport(getIsMobileViewport()));
+      rafId = window.requestAnimationFrame(() => {
+        setIsMobileViewport(getIsMobileViewport());
+        setIsDesktopSidebarViewport(readDesktopSidebarViewport());
+      });
     };
     updateMobileViewport();
     const media = window.matchMedia('(max-width: 768px)');
+    const desktopSidebarMedia = window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 1024px)');
     media.addEventListener?.('change', updateMobileViewport);
+    desktopSidebarMedia.addEventListener?.('change', updateMobileViewport);
     window.addEventListener('resize', updateMobileViewport, { passive: true });
     window.addEventListener('orientationchange', updateMobileViewport, { passive: true });
     window.visualViewport?.addEventListener('resize', updateMobileViewport);
     return () => {
       window.cancelAnimationFrame(rafId);
       media.removeEventListener?.('change', updateMobileViewport);
+      desktopSidebarMedia.removeEventListener?.('change', updateMobileViewport);
       window.removeEventListener('resize', updateMobileViewport);
       window.removeEventListener('orientationchange', updateMobileViewport);
       window.visualViewport?.removeEventListener('resize', updateMobileViewport);
@@ -6162,7 +6178,7 @@ const App: React.FC = () => {
     isCartPaymentModalOpen ||
     isSubscriptionModalOpen;
 
-  const useDesktopSidebar = websiteSettings.desktop.navigationMode === 'sidebar';
+  const useDesktopSidebar = websiteSettings.desktop.navigationMode === 'sidebar' && isDesktopSidebarViewport;
   const desktopSidebarActiveItem = isCartOpen
     ? 'Cart'
     : isFreeModalOpen
@@ -6257,14 +6273,14 @@ const App: React.FC = () => {
             elevatedLayer
             onStateChange={setDesktopSidebarState}
             detachedTriggerPlacement="top-left"
-            onHomeClick={handleBackToHome}
-            onOpenBlogModal={() => openReadingHub('blog')}
+            onHomeClick={() => { setCurrentView('home'); window.scrollTo(0, 0); }}
+            onOpenBlogModal={() => { setCurrentView('home'); window.setTimeout(() => openReadingHub('blog'), 0); }}
             onOpenFreeModal={handleNavigateToFreeProducts}
-            onOpenAnnouncementsModal={() => openReadingHub('news')}
+            onOpenAnnouncementsModal={() => { setCurrentView('home'); window.setTimeout(() => openReadingHub('news'), 0); }}
             onNavigateToAllProducts={handleNavigateToAllProducts}
             onNavigateToWishlist={handleNavigateToWishlist}
             onNavigateToPurchases={handleNavigateToPurchases}
-            onCartClick={openCartSidebar}
+            onCartClick={() => { setCurrentView('home'); window.setTimeout(openCartSidebar, 0); }}
             onProfileClick={handleNavigateToProfile}
             authButtonLabel={authButtonLabel}
             onSubscriptionClick={handleNavigateToSubscription}

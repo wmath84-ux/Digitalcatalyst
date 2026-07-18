@@ -372,6 +372,8 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const eduCoinRules = ((localSettings.content as any).eduCoinRules || { purchase: 25, redeemRate: 10 }) as { purchase: number; redeemRate: number };
     const dockItems = (((localSettings.content as any).dockItems || []) as string[]);
     const dockStyle = { ...defaultDockStyle, ...((localSettings.content as any).dockStyle || {}) };
+    const sidebarFontFamily = String((dockStyle as any).sidebarFontFamily || 'Inter');
+    const sidebarFontOptions = ['Inter', 'Lato', 'Montserrat', 'Roboto', 'Merriweather', 'Oswald'];
     const desktopNavigationMode = localSettings.desktop?.navigationMode === 'dock' ? 'dock' : 'sidebar';
     const baseCommunityPalette = {
         pageBackground: '#F8FBFF',
@@ -1375,6 +1377,11 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                 <FormRow label={`Bottom safe gap (${dockStyle.bottomOffset}px)`}><input type="range" min="0" max="32" value={dockStyle.bottomOffset} onChange={e => updateDockStyle('bottomOffset', Number(e.target.value))} className="w-full" /></FormRow>
                                 <FormRow label={`Desktop expanded width (${dockStyle.desktopExpandedWidth}px)`}><input type="range" min="260" max="380" value={dockStyle.desktopExpandedWidth} onChange={e => updateDockStyle('desktopExpandedWidth', Number(e.target.value))} className="w-full" /></FormRow>
                                 <FormRow label={`Desktop collapsed width (${dockStyle.desktopCollapsedWidth}px)`}><input type="range" min="72" max="108" value={dockStyle.desktopCollapsedWidth} onChange={e => updateDockStyle('desktopCollapsedWidth', Number(e.target.value))} className="w-full" /></FormRow>
+                                <FormRow label="Website side panel font" description="Custom font for the desktop website side panel labels, heading and helper text.">
+                                    <select value={sidebarFontFamily} onChange={e => updateDockStyle('sidebarFontFamily', e.target.value)} className="w-full border border-slate-300 bg-white px-3 py-2 font-bold text-slate-900">
+                                        {sidebarFontOptions.map(font => <option key={`sidebar-font-${font}`} value={font}>{font}</option>)}
+                                    </select>
+                                </FormRow>
                             </div>
                         </section>
                     </div>
@@ -1392,7 +1399,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
 
                         <section className="border border-slate-300 bg-white p-4 shadow-sm">
                             <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">Desktop side panel preview</p>
-                            <div className="mt-4 border p-3" style={{ backgroundColor: `${dockStyle.backgroundColor}${Math.round((Number(dockStyle.backgroundOpacity) / 100) * 255).toString(16).padStart(2, '0')}`, borderColor: dockStyle.borderColor, borderRadius: Number(dockStyle.radius) }}>
+                            <div className="mt-4 border p-3" style={{ backgroundColor: `${dockStyle.backgroundColor}${Math.round((Number(dockStyle.backgroundOpacity) / 100) * 255).toString(16).padStart(2, '0')}`, borderColor: dockStyle.borderColor, borderRadius: Number(dockStyle.radius), fontFamily: sidebarFontFamily }}>
                                 {selectedDockItems.slice(0, 4).map((label, index) => <div key={label} className="mb-2 flex items-center border px-3 py-2 last:mb-0" style={{ gap: Number(dockStyle.gap), backgroundColor: index === 0 ? dockStyle.accentColor : `${dockStyle.itemColor}${Math.round((Number(dockStyle.itemOpacity) / 100) * 255).toString(16).padStart(2, '0')}`, borderColor: index === 0 ? dockStyle.accentColor : dockStyle.borderColor, borderRadius: Number(dockStyle.itemRadius), color: index === 0 ? '#FFFFFF' : dockStyle.textColor }}><span className="flex items-center justify-center bg-white/90" style={{ width: Number(dockStyle.iconSize), height: Number(dockStyle.iconSize), borderRadius: Math.max(4, Number(dockStyle.itemRadius) - 4) }}>{['🏠','🛍️','📚','❤️'][index] || '•'}</span>{dockStyle.showLabels !== false && <span className="font-black" style={{ fontSize: Number(dockStyle.labelSize) }}>{label}</span>}{dockStyle.showBadges !== false && index === 2 && <span className="ml-auto rounded-full px-2 py-1 text-[9px] font-black text-white" style={{ backgroundColor: dockStyle.accentColor }}>7</span>}</div>)}
                             </div>
                         </section>

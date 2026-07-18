@@ -3393,6 +3393,33 @@ const communityPolishCss = `
   }
 
 
+  .community-status-reel-shell .community-story-media {
+    min-height: 0 !important;
+    flex: 1 1 auto !important;
+  }
+  .community-status-reel-shell .community-story-bottom {
+    position: relative !important;
+    inset: auto !important;
+    flex: 0 0 auto !important;
+    border-top: 1px solid rgba(255,255,255,.14) !important;
+    background: #050505 !important;
+    padding-top: 0.75rem !important;
+    color: #fff !important;
+  }
+  .community-status-reel-shell .community-story-caption-button {
+    max-height: 4.9rem;
+    overflow: hidden;
+  }
+  .community-status-reel-shell .community-story-caption-button.is-expanded {
+    max-height: min(42dvh, 22rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .community-profile-story-text-preview {
+    font-size: clamp(0.62rem, 1.4vw, 0.78rem);
+    line-height: 1.25;
+  }
+
   /* Stable black story viewer and classic Instagram-style profile surfaces. */
   html[data-color-experience] .eduvora-community-polish .community-status-reel-shell,
   html[data-color-experience] .eduvora-community-polish .community-status-reel-shell .community-status-reel-backdrop,
@@ -4528,10 +4555,6 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
     pageStackRef.current = pageStack;
   }, [page, activeView, pageStack]);
 
-  useEffect(() => {
-    if (page === 'chat' && activeView === 'status') setActiveView('feed');
-  }, [page, activeView]);
-
   const restoreSocialFeedScroll = () => {
     if (!socialDesktopLayoutRef.current) return;
     const savedTop = feedScrollPositionsRef.current.chatFeed || 0;
@@ -4823,12 +4846,17 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
 
     const handleCommunityBackRequest = () => {
       const handledInsideCommunity = goBack({ fromBrowser: true });
-      (window as any).__eduvoraCommunityHandledBack = handledInsideCommunity;
+      if (!handledInsideCommunity) {
+        onClose?.();
+        (window as any).__eduvoraCommunityHandledBack = true;
+        return;
+      }
+      (window as any).__eduvoraCommunityHandledBack = true;
     };
 
     window.addEventListener('eduvora-community-back-request', handleCommunityBackRequest);
     return () => window.removeEventListener('eduvora-community-back-request', handleCommunityBackRequest);
-  }, []);
+  }, [goBack, onClose]);
 
   const redirectToAuth = () => {
     const nextState = { ...(window.history.state || {}), dcView: 'auth' };
@@ -7822,9 +7850,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
                     {storyMenuStatusId === card.id ? <div className="absolute right-0 top-12 w-48 overflow-hidden rounded-xl border border-white/15 bg-[#111]/95 p-1.5 text-white shadow-2xl backdrop-blur-xl"><button type="button" onClick={() => { setStoryMenuStatusId(null); openShareComposer({ sourceType: 'status', status: card }); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">↗ Share story</button>{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); setStatusViewerPanelId(card.id); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">👁 Story activity</button> : null}{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); void deleteOwnStatusStory(card); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#fb7185] hover:bg-white/10">Delete story</button> : null}</div> : null}
                   </div>
                   <div className="community-story-media flex min-h-0 flex-1 items-center justify-center">{renderStatusReelContent(card)}</div>
-                  <div className="community-story-bottom absolute inset-x-0 bottom-0 z-30 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-24 text-white">
-                    {card.imagePreview || card.videoUrl || card.mediaUrl ? <><h2 className="line-clamp-2 text-lg font-black leading-tight text-white">{card.title}</h2>{card.body && card.body !== card.title ? <button type="button" onClick={() => setExpandedStatusTextId(expandedStatusTextId === card.id ? null : card.id)} aria-expanded={expandedStatusTextId === card.id} className={`mt-1 block w-full text-left text-sm font-semibold leading-5 text-white/85 ${expandedStatusTextId === card.id ? 'max-h-[42dvh] overflow-y-auto whitespace-pre-wrap pr-1 custom-scrollbar' : 'line-clamp-3'}`}>{card.body}</button> : null}</> : null}
-                    <div className="mt-4 flex items-end justify-between gap-3">
+                  <div className="community-story-bottom relative z-30 shrink-0 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 text-white">
+                    {card.imagePreview || card.videoUrl || card.mediaUrl ? <div className="mb-3"><h2 className="line-clamp-1 text-base font-black leading-tight text-white">{card.title}</h2>{card.body && card.body !== card.title ? <button type="button" onClick={() => setExpandedStatusTextId(expandedStatusTextId === card.id ? null : card.id)} aria-expanded={expandedStatusTextId === card.id} className={`community-story-caption-button mt-1 block w-full text-left text-sm font-semibold leading-5 text-white/85 custom-scrollbar ${expandedStatusTextId === card.id ? 'is-expanded max-h-[42dvh] overflow-y-auto whitespace-pre-wrap pr-1' : 'line-clamp-3'}`}>{card.body}</button> : null}</div> : null}
+                    <div className="mt-2 flex items-end justify-between gap-3">
                       <button type="button" onClick={() => { setStatusReplyComposerId(card.id); setExpandedStatusTextId(null); window.setTimeout(() => statusReplyInputRef.current?.focus(), 100); }} className="min-h-11 flex-1 rounded-full border border-white/25 bg-black/35 px-4 text-left text-sm font-semibold text-white/80 backdrop-blur-md">Reply or discuss…{card.discussionReplyCount ? ` · ${card.discussionReplyCount}` : ''}</button>
                       <div className="flex items-center gap-2">
                         <button type="button" onClick={() => toggleStatusLike(card.id)} aria-label="Like story" className={`community-story-action flex h-11 w-11 items-center justify-center rounded-full border border-white/20 bg-black/35 text-xl backdrop-blur-md ${liked ? 'is-liked' : ''}`}>{liked ? '♥' : '♡'}</button>
@@ -8566,9 +8594,10 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
             const options = Array.isArray(story.pollOptions) ? story.pollOptions.filter(Boolean).slice(0, 3) : [];
             return (
               <article key={story.id} role="button" tabIndex={0} onClick={() => openStatusReel(story.id)} onKeyDown={(event) => { if (event.key === 'Enter' || event.key === ' ') openStatusReel(story.id); }} className="group flex aspect-[4/5] cursor-pointer flex-col overflow-hidden rounded-xl border border-[#e5e7eb] bg-white text-left shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-4 focus:ring-[#1769FF]/25">
-                <div className={`min-h-0 flex-1 overflow-hidden ${story.imagePreview ? 'bg-[#f8fafc]' : story.type === 'poll' ? 'bg-gradient-to-br from-[#fff7ed] via-white to-[#fef3c7]' : 'bg-gradient-to-br from-[#eef6ff] via-white to-[#ede9fe]'}`}>
-                  {story.imagePreview ? <SafeImage src={storyImageSource || storyFallback} fallbackSrc={storyFallback} alt={story.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" fallbackTitle={story.title} fallbackBadge="Community story" fallbackIcon="⭕" fallbackMessage="Story preview unavailable" aspect="portrait" /> : story.type === 'poll' ? <div className="flex h-full flex-col p-4 text-[#111827]"><h3 className="line-clamp-3 text-lg font-black leading-tight">{story.title}</h3><div className="mt-auto space-y-2">{options.map((option, index) => <div key={`${story.id}-story-option-${index}`} className="rounded-xl border border-[#fed7aa] bg-white/90 px-3 py-2 text-xs font-bold"><span className="line-clamp-1">{option}</span></div>)}</div></div> : <div className="flex h-full items-center justify-center p-5 text-center text-[#081A45]"><div><h3 className="line-clamp-4 text-xl font-black leading-tight">{story.title}</h3>{story.body && story.body !== story.title ? <p className="mt-3 line-clamp-4 text-sm font-semibold leading-5 text-[#536178]">{story.body}</p> : null}</div></div>}
+                <div className={`min-h-0 ${story.imagePreview ? 'h-[62%] shrink-0 bg-[#f8fafc]' : 'flex-1'} overflow-hidden ${story.imagePreview ? '' : story.type === 'poll' ? 'bg-gradient-to-br from-[#fff7ed] via-white to-[#fef3c7]' : 'bg-gradient-to-br from-[#eef6ff] via-white to-[#ede9fe]'}`}>
+                  {story.imagePreview ? <SafeImage src={storyImageSource || storyFallback} fallbackSrc={storyFallback} alt={story.title} className="h-full w-full object-cover transition duration-300 group-hover:scale-[1.02]" fallbackTitle={story.title} fallbackBadge="Community story" fallbackIcon="⭕" fallbackMessage="Story preview unavailable" aspect="portrait" /> : story.type === 'poll' ? <div className="flex h-full flex-col overflow-hidden p-3 text-[#111827]"><h3 className="community-profile-story-text-preview break-words font-black">{story.title}</h3><div className="mt-auto space-y-1.5">{options.map((option, index) => <div key={`${story.id}-story-option-${index}`} className="rounded-lg border border-[#fed7aa] bg-white/90 px-2.5 py-1.5 text-[10px] font-bold leading-4"><span className="line-clamp-1">{option}</span></div>)}</div></div> : <div className="flex h-full items-center justify-center overflow-hidden p-3 text-center text-[#081A45]"><div><h3 className="community-profile-story-text-preview break-words font-black">{story.title}</h3>{story.body && story.body !== story.title ? <p className="community-profile-story-text-preview mt-2 break-words font-semibold text-[#536178]">{story.body}</p> : null}</div></div>}
                 </div>
+                {story.imagePreview && (story.body || story.title) ? <div className="shrink-0 border-t border-[#e5e7eb] bg-white px-3 py-2"><p className="line-clamp-3 break-words text-[11px] font-semibold leading-4 text-[#374151]">{story.body || story.title}</p></div> : null}
                 <div className="flex min-w-0 items-center justify-between gap-2 border-t border-[#e5e7eb] bg-white px-3 py-2.5"><span className="flex min-w-0 items-center gap-1.5"><span className="truncate text-xs font-black text-[#111827]">{owner.name}</span>{owner.verified ? <BlueVerifiedTick /> : null}</span><span className="shrink-0 text-[10px] font-semibold text-[#64748b]">{story.views} views</span></div>
               </article>
             );
