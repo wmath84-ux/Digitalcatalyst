@@ -73,10 +73,11 @@ test('profile post detail owns one scroll area with locked header and composer',
   assert.match(component, /profileReplyInputRef/);
 });
 
-test('text stories support formatted collapse and status-scoped replies', () => {
-  assert.match(component, /expandedStatusTextId/);
+test('text stories support formatted scroll and status-scoped replies', () => {
+  assert.match(component, /activeReelIsTextOnly/);
   assert.match(component, /buildStatusTextBlocks/);
-  assert.match(component, /'Read more'/);
+  assert.match(component, /Read more/);
+  assert.match(component, /scrollBy\(\{ top: Math\.max\(160, scroller\.clientHeight \* 0\.72\), behavior: 'smooth' \}\)/);
   assert.match(component, /statusReplyComposerId/);
   assert.match(component, /submitStatusDiscussion/);
   assert.match(component, /discussionReplies/);

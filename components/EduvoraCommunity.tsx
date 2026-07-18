@@ -3504,6 +3504,18 @@ const communityPolishCss = `
   .community-story-text-frame {
     min-height: min(62dvh, 32rem);
   }
+  .community-story-text-frame.is-text-only {
+    height: 100%;
+    min-height: 0;
+  }
+  .community-story-text-frame.is-text-only .community-story-text-copy {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    mask-image: none;
+    -webkit-mask-image: none;
+  }
   .community-story-text-frame.is-collapsed .community-story-text-copy {
     max-height: min(42dvh, 21rem);
     mask-image: linear-gradient(to bottom, #000 0%, #000 84%, transparent 100%);
@@ -7706,30 +7718,22 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
     const storyText = getStatusStoryText(card);
     const blocks = buildStatusTextBlocks(storyText);
     const longText = storyText.length > 260 || blocks.lines.length > 5;
-    const expanded = expandedStatusTextId === card.id;
 
     return (
-      <div className="community-story-text-card flex h-full w-full items-center justify-center overflow-hidden bg-black px-4 pb-[8.5rem] pt-[8rem] text-white sm:px-6">
-        <div
-          role={longText ? 'button' : undefined}
-          tabIndex={longText ? 0 : undefined}
-          aria-expanded={longText ? expanded : undefined}
-          onClick={() => { if (longText) setExpandedStatusTextId(expanded ? null : card.id); }}
-          onKeyDown={(event) => { if (longText && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); setExpandedStatusTextId(expanded ? null : card.id); } }}
-          className={`community-story-text-frame relative flex w-full max-w-[26rem] flex-col overflow-hidden p-6 text-left sm:p-8 ${expanded ? 'is-expanded' : 'is-collapsed'} ${longText ? 'cursor-pointer' : ''}`}
-        >
+      <div className="community-story-text-card flex h-full w-full items-stretch justify-center overflow-hidden bg-black px-4 pb-3 pt-[calc(env(safe-area-inset-top)+5.8rem)] text-white sm:px-6 md:pt-24">
+        <div className="community-story-text-frame is-text-only relative flex h-full w-full max-w-[27rem] flex-col overflow-hidden p-6 text-left sm:p-8">
           <div className="shrink-0">
             <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/55">Eduvora story</p>
             <h2 className="mt-3 break-words text-2xl font-black leading-tight tracking-[-0.035em] text-white sm:text-3xl">{blocks.heading}</h2>
           </div>
-          <div className={`community-story-text-copy mt-4 min-h-0 space-y-3 pr-1 ${expanded ? 'flex-1 overflow-y-auto overscroll-contain custom-scrollbar' : 'overflow-hidden'}`}>
+          <div className="community-story-text-copy mt-5 space-y-3 pr-1 custom-scrollbar">
             {(blocks.lines.length ? blocks.lines : [storyText]).map((line, index) => {
               const bulletMatch = line.match(/^(?:[-*•✓✔→]|\d+[.)])\s*(.*)$/);
               if (bulletMatch) return <p key={`${card.id}-line-${index}`} className="flex items-start gap-2 text-sm font-semibold leading-6 text-white/86 sm:text-base sm:leading-7"><span className="mt-0.5 shrink-0 text-[#93c5fd]">•</span><span className="break-words">{bulletMatch[1]}</span></p>;
               return <p key={`${card.id}-line-${index}`} className="break-words text-sm font-semibold leading-6 text-white/82 sm:text-base sm:leading-7">{line}</p>;
             })}
           </div>
-          {longText ? <button type="button" onClick={(event) => { event.stopPropagation(); setExpandedStatusTextId(expanded ? null : card.id); }} className="mt-4 shrink-0 self-start rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black text-white backdrop-blur-md">{expanded ? 'Show less' : 'Read more'}</button> : null}
+          {longText ? <button type="button" onClick={(event) => { event.stopPropagation(); const scroller = event.currentTarget.parentElement?.querySelector('.community-story-text-copy') as HTMLElement | null; scroller?.scrollBy({ top: Math.max(160, scroller.clientHeight * 0.72), behavior: 'smooth' }); }} className="mt-4 shrink-0 self-start rounded-full border border-white/20 bg-white/10 px-4 py-2 text-xs font-black text-white backdrop-blur-md">Read more</button> : null}
         </div>
       </div>
     );
@@ -7801,9 +7805,9 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
   };
 
   const renderStatusReel = () => {
-    if (!orderedStoryStatuses.length) return <div className="community-status-reel-shell fixed inset-0 z-[1500] flex items-center justify-center overflow-hidden bg-black px-4 text-white"><button type="button" onClick={goBack} aria-label="Close story viewer" className="community-status-reel-control fixed left-3 top-[calc(env(safe-area-inset-top)+1.05rem)] z-50 flex h-10 w-10 items-center justify-center rounded-full border text-lg font-black shadow-xl">←</button><div className="w-full max-w-md rounded-[2rem] border border-white/15 bg-white/10 p-7 text-center shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white/10 text-3xl">⭕</div><h2 className="mt-5 text-3xl font-black tracking-[-0.04em] text-white">No active stories yet</h2><p className="mt-3 text-sm font-semibold leading-6 text-white/70">Create the first status story or return to the Community feed.</p><div className="mt-6 grid gap-3 sm:grid-cols-2"><button type="button" onClick={openStatusUploadFromTop} className="rounded-2xl bg-[#1769ff] px-5 py-3 text-sm font-black text-white shadow-lg">Create story</button><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="rounded-2xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-black text-white">Back to feed</button></div></div></div>;
+    if (!orderedStoryStatuses.length) return <div className="community-status-reel-shell fixed inset-0 z-[1500] flex items-center justify-center overflow-hidden bg-black px-4 text-white"><button type="button" onClick={goBack} aria-label="Close story viewer" className="community-status-reel-control fixed left-3 top-[calc(env(safe-area-inset-top)+1.05rem)] z-50 hidden h-10 w-10 items-center justify-center rounded-full border text-lg font-black shadow-xl lg:flex">←</button><div className="w-full max-w-md rounded-[2rem] border border-white/15 bg-white/10 p-7 text-center shadow-[0_30px_100px_rgba(0,0,0,0.55)] backdrop-blur-xl"><div className="mx-auto flex h-16 w-16 items-center justify-center rounded-[1.5rem] bg-white/10 text-3xl">⭕</div><h2 className="mt-5 text-3xl font-black tracking-[-0.04em] text-white">No active stories yet</h2><p className="mt-3 text-sm font-semibold leading-6 text-white/70">Create the first status story or return to the Community feed.</p><div className="mt-6 grid gap-3 sm:grid-cols-2"><button type="button" onClick={openStatusUploadFromTop} className="rounded-2xl bg-[#1769ff] px-5 py-3 text-sm font-black text-white shadow-lg">Create story</button><button type="button" onClick={() => { setActiveView('feed'); setPage('chat'); setPageStack([]); }} className="rounded-2xl border border-white/20 bg-white/10 px-5 py-3 text-sm font-black text-white">Back to feed</button></div></div></div>;
 
-    const statusById = new Map(orderedStoryStatuses.map((card) => [card.id, card]));
+    const statusById = new Map<string, StatusCard>(orderedStoryStatuses.map((card) => [card.id, card] as [string, StatusCard]));
     const stableIds = statusReelOrderIdsRef.current.filter((id) => statusById.has(id));
     const knownIds = new Set(stableIds);
     const appendedIds = orderedStoryStatuses.map((card) => card.id).filter((id) => !knownIds.has(id));
@@ -7815,7 +7819,12 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
     statusReelOrderIdsRef.current = reelIds;
     const reelStatuses = reelIds.map((id) => statusById.get(id)).filter((card): card is StatusCard => Boolean(card));
     const selectedReelIndex = Math.max(0, reelStatuses.findIndex((card) => card.id === selectedStatusId));
-    const storyInteractionLocked = expandedStatusTextId === selectedStatusId || statusReplyComposerId === selectedStatusId;
+    const activeReelStatus: StatusCard | null = selectedStatusId ? (statusById.get(selectedStatusId) ?? null) : null;
+    const activeReelVideoUrl = activeReelStatus?.videoUrl || (activeReelStatus?.mediaType === 'video' ? activeReelStatus.mediaUrl : '');
+    const activeReelAudioUrl = activeReelStatus?.audioUrl || (activeReelStatus?.mediaType === 'audio' ? activeReelStatus.mediaUrl : '');
+    const activeReelDriveUrl = activeReelStatus?.driveUrl || (activeReelStatus?.mediaType === 'drive' ? activeReelStatus.mediaUrl : '');
+    const activeReelIsTextOnly = Boolean(activeReelStatus && !activeReelStatus.imagePreview && !activeReelVideoUrl && !activeReelAudioUrl && !activeReelDriveUrl && !activeReelStatus.pollOptions);
+    const storyInteractionLocked = activeReelIsTextOnly || expandedStatusTextId === selectedStatusId || statusReplyComposerId === selectedStatusId;
 
     const handleReelScroll = (event: React.UIEvent<HTMLDivElement>) => {
       const viewport = event.currentTarget;
@@ -7841,7 +7850,7 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
         <div className="community-story-progress fixed inset-x-0 top-0 z-40 flex gap-1 px-3 pt-[calc(env(safe-area-inset-top)+0.55rem)] md:left-1/2 md:max-w-[31rem] md:-translate-x-1/2">
           {reelStatuses.map((card, index) => <span key={`progress-${card.id}`} className={`h-[3px] flex-1 overflow-hidden rounded-full bg-white/25 ${card.id === selectedStatusId ? 'is-active' : index < selectedReelIndex ? 'is-complete' : ''}`}><span className="block h-full rounded-full bg-white" /></span>)}
         </div>
-        <button type="button" onClick={goBack} aria-label="Close story viewer" className="community-status-reel-control fixed left-3 top-[calc(env(safe-area-inset-top)+1.05rem)] z-50 flex h-10 w-10 items-center justify-center rounded-full border text-lg font-black shadow-xl">←</button>
+        <button type="button" onClick={goBack} aria-label="Close story viewer" className="community-status-reel-control fixed left-3 top-[calc(env(safe-area-inset-top)+1.05rem)] z-50 hidden h-10 w-10 items-center justify-center rounded-full border text-lg font-black shadow-xl lg:flex">←</button>
         <div className="community-status-desktop-scroll fixed right-6 top-1/2 z-50 hidden -translate-y-1/2 flex-col gap-3 lg:flex">
           <button type="button" onClick={() => scrollStatusReel(-1)} aria-label="Previous story" className="community-status-scroll-button flex h-12 w-12 items-center justify-center rounded-full text-xl font-black">↑</button>
           <button type="button" onClick={() => scrollStatusReel(1)} aria-label="Next story" className="community-status-scroll-button flex h-12 w-12 items-center justify-center rounded-full text-xl font-black">↓</button>
@@ -7855,15 +7864,15 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
               <section key={card.id} className="community-story-slide relative flex h-[100dvh] min-h-[100dvh] snap-start snap-always items-center justify-center overflow-hidden bg-black">
                 <div className="community-status-reel-backdrop absolute inset-0" />
                 <article className="community-status-reel-card relative flex h-[100dvh] w-full max-w-[31rem] flex-col overflow-hidden border-0 bg-black shadow-[0_30px_100px_rgba(0,0,0,0.65)] md:h-[min(92dvh,880px)] md:rounded-[1.75rem]">
-                  <div className="community-story-topbar absolute inset-x-0 top-0 z-30 flex items-center gap-3 px-4 pt-[calc(env(safe-area-inset-top)+3.25rem)] md:pt-14">
-                    <button type="button" onClick={() => { const ownerId = card.ownerId || card.creatorId; if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); } }} className="flex min-w-0 items-center gap-2 text-left text-white">
+                  <div className="community-story-topbar absolute inset-x-0 top-0 z-30 flex items-start justify-between gap-3 px-4 pt-[calc(env(safe-area-inset-top)+3.25rem)] md:pt-14">
+                    <div className="relative shrink-0">
+                      <button type="button" onClick={() => setStoryMenuStatusId((current) => current === card.id ? null : card.id)} aria-label="Story options" className="community-status-reel-control flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-xs font-black">•••</button>
+                      {storyMenuStatusId === card.id ? <div className="absolute left-0 top-12 w-48 overflow-hidden rounded-xl border border-white/15 bg-[#111]/95 p-1.5 text-white shadow-2xl backdrop-blur-xl"><button type="button" onClick={() => { setStoryMenuStatusId(null); openShareComposer({ sourceType: 'status', status: card }); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">↗ Share story</button>{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); setStatusViewerPanelId(card.id); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">👁 Story activity</button> : null}{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); void deleteOwnStatusStory(card); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#fb7185] hover:bg-white/10">Delete story</button> : null}</div> : null}
+                    </div>
+                    <button type="button" onClick={() => { const ownerId = card.ownerId || card.creatorId; if (ownerId) { setSelectedProfileId(ownerId); setProfileViewMode('overview'); setProfileContentTab('posts'); pushPage('profile'); } }} className="flex min-w-0 max-w-[15rem] items-center justify-end gap-2 text-right text-white">
+                      <span className="min-w-0"><span className="flex max-w-[12rem] items-center justify-end gap-1.5"><span className="truncate text-sm font-black">{owner.name}</span>{owner.verified ? <BlueVerifiedTick /> : null}</span><span className="block truncate text-[11px] font-semibold text-white/70">{card.slots.split('·').pop()?.trim()}</span></span>
                       <Avatar value={owner.avatar} size="h-9 w-9" className="ring-2 ring-white/80" />
-                      <span className="min-w-0"><span className="flex max-w-[12rem] items-center gap-1.5"><span className="truncate text-sm font-black">{owner.name}</span>{owner.verified ? <BlueVerifiedTick /> : null}</span><span className="block text-[11px] font-semibold text-white/70">{card.slots.split('·').pop()?.trim()}</span></span>
                     </button>
-                  </div>
-                  <div className="absolute right-3 top-[calc(env(safe-area-inset-top)+1.05rem)] z-50">
-                    <button type="button" onClick={() => setStoryMenuStatusId((current) => current === card.id ? null : card.id)} aria-label="Story options" className="community-status-reel-control flex h-10 min-w-10 items-center justify-center rounded-full border px-3 text-xs font-black">•••</button>
-                    {storyMenuStatusId === card.id ? <div className="absolute right-0 top-12 w-48 overflow-hidden rounded-xl border border-white/15 bg-[#111]/95 p-1.5 text-white shadow-2xl backdrop-blur-xl"><button type="button" onClick={() => { setStoryMenuStatusId(null); openShareComposer({ sourceType: 'status', status: card }); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">↗ Share story</button>{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); setStatusViewerPanelId(card.id); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold hover:bg-white/10">👁 Story activity</button> : null}{ownStory ? <button type="button" onClick={() => { setStoryMenuStatusId(null); void deleteOwnStatusStory(card); }} className="w-full rounded-lg px-3 py-2.5 text-left text-sm font-bold text-[#fb7185] hover:bg-white/10">Delete story</button> : null}</div> : null}
                   </div>
                   <div className="community-story-media flex min-h-0 flex-1 items-center justify-center">{renderStatusReelContent(card)}</div>
                   <div className="community-story-bottom relative z-30 shrink-0 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-3 text-white">

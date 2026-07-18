@@ -51,6 +51,27 @@ test('Story viewer captions are below media and expand inside a scrollable text 
   assert.match(community, /min-height: min\(62dvh, 32rem\)/);
 });
 
+
+test('Story viewer has a shared header and desktop-only back button', () => {
+  assert.match(community, /community-story-topbar absolute inset-x-0 top-0 z-30 flex items-start justify-between/);
+  assert.match(community, /aria-label="Story options"/);
+  assert.match(community, /absolute left-0 top-12/);
+  assert.match(community, /items-center justify-end gap-2 text-right text-white/);
+  assert.match(community, /owner\.verified \? <BlueVerifiedTick \/> : null/);
+  assert.match(community, /hidden h-10 w-10 items-center justify-center rounded-full border text-lg font-black shadow-xl lg:flex/);
+});
+
+test('Text-only story viewer fills the space above actions and scrolls without expand-collapse', () => {
+  assert.match(community, /community-story-text-frame is-text-only/);
+  assert.match(community, /community-story-text-card flex h-full w-full items-stretch justify-center/);
+  assert.match(community, /pt-\[calc\(env\(safe-area-inset-top\)\+5\.8rem\)\]/);
+  assert.match(community, /activeReelIsTextOnly/);
+  assert.match(community, /const storyInteractionLocked = activeReelIsTextOnly \|\| expandedStatusTextId === selectedStatusId/);
+  assert.match(community, /scroller\?\.scrollBy\(\{ top: Math\.max\(160, scroller\.clientHeight \* 0\.72\), behavior: 'smooth' \}\)/);
+  assert.doesNotMatch(community, /aria-expanded=\{longText \? expanded : undefined\}/);
+  assert.doesNotMatch(community, /setExpandedStatusTextId\(expanded \? null : card\.id\)/);
+});
+
 test('Admin can customize website side panel font and HomeSideDock consumes it', () => {
   assert.match(bottomDock, /sidebarFontFamily: 'Inter'/);
   assert.match(app, /sidebarFontFamily\?: string/);
