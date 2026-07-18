@@ -3,7 +3,7 @@ import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import type { User } from '../App';
 import { auth, db } from '../firebase';
 
-type MayDayTab = 'home' | 'goals' | 'reminders' | 'focus' | 'progress';
+type MayDayTab = 'dashboard' | 'home' | 'notes' | 'goals' | 'reminders' | 'focus' | 'progress';
 type NoteCategory = 'pinned' | 'study' | 'shopping';
 type ReminderRepeat = 'once' | 'daily' | 'weekdays' | 'weekends';
 type SyncStatus = 'loading' | 'local' | 'saving' | 'saved' | 'offline';
@@ -72,6 +72,7 @@ interface MayDayMobileProps {
   isPremium: boolean;
   onBack: () => void;
   onUpgrade: () => void;
+  desktop?: boolean;
 }
 
 const MAY_DAY_MARKER = 'MAY_DAY_MOBILE_V1';
@@ -244,10 +245,11 @@ const goalTones = [
   { icon: 'bg-[#F0478A]', bar: 'bg-[#FF69A4]' },
 ];
 
-const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, isPremium, onBack, onUpgrade }) => {
-  const initialTab = typeof window !== 'undefined' && ['home', 'goals', 'reminders', 'focus', 'progress'].includes(String(window.history.state?.dcMayDayTab))
+const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, isPremium, onBack, onUpgrade, desktop = false }) => {
+  const allowedTabs: MayDayTab[] = ['dashboard', 'home', 'notes', 'goals', 'reminders', 'focus', 'progress'];
+  const initialTab = typeof window !== 'undefined' && allowedTabs.includes(String(window.history.state?.dcMayDayTab) as MayDayTab)
     ? window.history.state.dcMayDayTab as MayDayTab
-    : 'home';
+    : desktop ? 'dashboard' : 'home';
   const [activeTab, setActiveTab] = useState<MayDayTab>(initialTab);
   const [workspace, setWorkspace] = useState<MayDayWorkspace>({ ...EMPTY_WORKSPACE });
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
@@ -280,6 +282,9 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   const [focusSeconds, setFocusSeconds] = useState(30 * 60);
   const [focusRunning, setFocusRunning] = useState(false);
   const [focusMessage, setFocusMessage] = useState('');
+  const [desktopSearch, setDesktopSearch] = useState('');
+  const [desktopNoteFilter, setDesktopNoteFilter] = useState<'all' | NoteCategory>('all');
+  const [desktopTaskFilter, setDesktopTaskFilter] = useState<'all' | MayDayTask['category']>('all');
   const focusCompletionGuardRef = useRef(false);
 
   const uid = auth.currentUser?.uid || currentUser?.uid || currentUser?.id || '';
@@ -292,19 +297,30 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
     if (typeof window === 'undefined') return undefined;
     const currentState = window.history.state || {};
     if (currentState.dcView === 'mayDay' && !currentState.dcMayDayTab) {
-      window.history.replaceState({ ...currentState, dcMayDayTab: 'home' }, '', window.location.href);
+      window.history.replaceState({ ...currentState, dcMayDayTab: desktop ? 'dashboard' : 'home' }, '', window.location.href);
     }
     const onPopState = (event: PopStateEvent) => {
       if (event.state?.dcView !== 'mayDay') return;
       const nextTab = String(event.state?.dcMayDayTab || 'home');
-      if (['home', 'goals', 'reminders', 'focus', 'progress'].includes(nextTab)) {
+      if (allowedTabs.includes(nextTab as MayDayTab)) {
         setActiveTab(nextTab as MayDayTab);
         window.scrollTo(0, 0);
       }
     };
     window.addEventListener('popstate', onPopState);
     return () => window.removeEventListener('popstate', onPopState);
-  }, []);
+  }, [desktop]);
+
+  useEffect(() => {
+    const nextTab: MayDayTab = desktop
+      ? (activeTab === 'home' ? 'dashboard' : activeTab)
+      : (activeTab === 'dashboard' || activeTab === 'notes' ? 'home' : activeTab);
+    if (nextTab === activeTab) return;
+    setActiveTab(nextTab);
+    if (typeof window !== 'undefined' && window.history.state?.dcView === 'mayDay') {
+      window.history.replaceState({ ...(window.history.state || {}), dcMayDayTab: nextTab }, '', window.location.href);
+    }
+  }, [activeTab, desktop]);
 
   useEffect(() => {
     setSyncStatus('loading');
@@ -648,7 +664,9 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   }, [lastSevenDays, workspace.focusSessions, workspace.tasks]);
 
   const pageTitle: Record<MayDayTab, string> = {
+    dashboard: 'May Day Dashboard',
     home: 'Quick Notes',
+    notes: 'Notes & Planning',
     goals: 'Goal Countdown',
     reminders: 'Reminders',
     focus: 'Focus Session',
@@ -901,6 +919,377 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
     </div>
   );
 
+
+  const desktopTabs: Array<{ tab: MayDayTab; label: string; icon: keyof typeof iconPaths }> = [
+    { tab: 'dashboard', label: 'Dashboard', icon: 'sparkle' },
+    { tab: 'notes', label: 'Notes & Planning', icon: 'note' },
+    { tab: 'goals', label: 'Goals & Reminders', icon: 'goal' },
+    { tab: 'progress', label: 'Streaks & Insights', icon: 'progress' },
+  ];
+
+  const filteredDesktopNotes = useMemo(() => {
+    const query = desktopSearch.trim().toLowerCase();
+    return workspace.notes
+      .filter(note => desktopNoteFilter === 'all' || note.category === desktopNoteFilter)
+      .filter(note => !query || `${note.title} ${note.body}`.toLowerCase().includes(query))
+      .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updatedAt - a.updatedAt);
+  }, [desktopNoteFilter, desktopSearch, workspace.notes]);
+
+  const filteredDesktopTasks = useMemo(() => {
+    const query = desktopSearch.trim().toLowerCase();
+    return todayTasks.filter(task => {
+      if (desktopTaskFilter !== 'all' && task.category !== desktopTaskFilter) return false;
+      return !query || task.title.toLowerCase().includes(query);
+    });
+  }, [desktopSearch, desktopTaskFilter, todayTasks]);
+
+  const nextReminder = useMemo(() => workspace.reminders
+    .filter(reminder => reminder.enabled)
+    .sort((a, b) => `${a.date}T${a.time}`.localeCompare(`${b.date}T${b.time}`))[0] || null, [workspace.reminders]);
+
+  const upcomingGoals = useMemo(() => [...workspace.goals]
+    .sort((a, b) => a.targetDate.localeCompare(b.targetDate))
+    .slice(0, 4), [workspace.goals]);
+
+  const totalCompletedTasks = useMemo(() => workspace.tasks.filter(task => task.completed).length, [workspace.tasks]);
+  const totalFocusMinutes = useMemo(() => workspace.focusSessions.reduce((sum, session) => sum + session.minutes, 0), [workspace.focusSessions]);
+  const taskCompletionRate = workspace.tasks.length ? Math.round((totalCompletedTasks / workspace.tasks.length) * 100) : 0;
+
+  const categoryStats = useMemo(() => {
+    const total = Math.max(1, workspace.tasks.length);
+    const values = ['Study', 'Personal', 'Break'].map(category => ({
+      category,
+      count: workspace.tasks.filter(task => task.category === category).length,
+    }));
+    const used = values.reduce((sum, item) => sum + item.count, 0);
+    return [...values, { category: 'Other', count: Math.max(0, total - used) }].map(item => ({
+      ...item,
+      percent: Math.round((item.count / total) * 100),
+    }));
+  }, [workspace.tasks]);
+
+  const focusChartMax = Math.max(15, ...lastSevenDays.map(day => day.minutes));
+  const focusChartPoints = lastSevenDays.map((day, index) => {
+    const x = lastSevenDays.length <= 1 ? 0 : (index / (lastSevenDays.length - 1)) * 100;
+    const y = 92 - (day.minutes / focusChartMax) * 76;
+    return `${x},${y}`;
+  }).join(' ');
+
+  const desktopSyncBadge = syncStatus === 'saving'
+    ? 'Saving…'
+    : syncStatus === 'saved'
+      ? 'Cloud synced'
+      : syncStatus === 'offline'
+        ? 'Offline copy'
+        : syncStatus === 'loading'
+          ? 'Loading…'
+          : 'Saved locally';
+
+  const desktopHeader = (title: string, subtitle: string) => (
+    <div className="sticky top-0 z-30 border-b border-[#E7ECF4] bg-white/95 px-5 py-3 backdrop-blur-xl">
+      <div className="flex min-w-0 items-center gap-4">
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-[#7A8499]">
+            <span>May Day</span><span className="text-[#C3CAD7]">/</span><span className="truncate text-[#315CEB]">{title}</span>
+          </div>
+          <p className="mt-1 truncate text-sm font-semibold text-[#667085]">{subtitle}</p>
+        </div>
+        <label className="relative hidden w-[min(28vw,340px)] xl:block">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-[#8A94A8]">⌕</span>
+          <input
+            value={desktopSearch}
+            onChange={event => setDesktopSearch(event.target.value)}
+            placeholder="Search notes, tasks and goals…"
+            className="h-10 w-full rounded-xl border border-[#E2E7F0] bg-[#F8FAFD] pl-9 pr-3 text-xs font-bold text-[#344054] outline-none transition focus:border-[#7C8DFF] focus:bg-white"
+          />
+        </label>
+        <span className="hidden rounded-full border border-[#DCE4F3] bg-[#F8FAFD] px-3 py-2 text-[10px] font-black text-[#5B6780] lg:inline-flex">{desktopSyncBadge}</span>
+        <button type="button" onClick={forceSync} className="rounded-xl border border-[#DCE4F3] bg-white px-3 py-2 text-[11px] font-black text-[#344054] transition hover:border-[#8FA1FF] hover:text-[#315CEB]">Sync</button>
+        <button type="button" onClick={exportWorkspace} className="rounded-xl bg-[#315CEB] px-3.5 py-2 text-[11px] font-black text-white shadow-[0_8px_20px_rgba(49,92,235,0.22)] transition hover:bg-[#244BD0]">Export</button>
+        <button type="button" onClick={onBack} className="rounded-xl border border-[#DCE4F3] bg-white px-3 py-2 text-[11px] font-black text-[#344054] transition hover:bg-[#F8FAFD]">Home</button>
+      </div>
+      <div className="mt-3 flex min-w-0 gap-2 overflow-x-auto pb-0.5">
+        {desktopTabs.map(item => {
+          const active = activeTab === item.tab || (item.tab === 'goals' && activeTab === 'reminders');
+          return (
+            <button
+              key={item.tab}
+              type="button"
+              onClick={() => navigateTab(item.tab)}
+              aria-current={active ? 'page' : undefined}
+              className={`flex shrink-0 items-center gap-2 rounded-xl border px-3 py-2 text-[11px] font-black transition ${active ? 'border-[#315CEB] bg-[#315CEB] text-white shadow-[0_8px_20px_rgba(49,92,235,0.18)]' : 'border-[#E1E7F0] bg-white text-[#566176] hover:border-[#9DABF8] hover:text-[#315CEB]'}`}
+            >
+              <Icon name={item.icon} className="h-4 w-4" />
+              {item.label}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+
+  const renderDesktopTaskRows = (limit?: number) => {
+    const rows = typeof limit === 'number' ? filteredDesktopTasks.slice(0, limit) : filteredDesktopTasks;
+    if (!rows.length) return <div className="grid min-h-28 place-items-center rounded-2xl border border-dashed border-[#D7DEEA] bg-[#FAFBFD] px-4 text-center text-xs font-bold text-[#8A94A8]">No matching task is planned for today.</div>;
+    return (
+      <div className="divide-y divide-[#EDF1F6]">
+        {rows.map(task => (
+          <div key={task.id} className="group flex items-center gap-3 py-3">
+            <button
+              type="button"
+              onClick={() => toggleTask(task.id)}
+              aria-label={task.completed ? `Mark ${task.title} incomplete` : `Complete ${task.title}`}
+              className={`grid h-5 w-5 shrink-0 place-items-center rounded-md border transition ${task.completed ? 'border-[#315CEB] bg-[#315CEB] text-white' : 'border-[#C8D0DE] bg-white text-transparent hover:border-[#7C8DFF]'}`}
+            >
+              <Icon name="check" className="h-3 w-3" />
+            </button>
+            <div className="min-w-0 flex-1">
+              <p className={`truncate text-xs font-black ${task.completed ? 'text-[#98A2B3] line-through' : 'text-[#263248]'}`}>{task.title}</p>
+              <div className="mt-1 flex items-center gap-2">
+                <span className={`rounded-md px-2 py-0.5 text-[9px] font-black ${task.category === 'Study' ? 'bg-[#EEF2FF] text-[#315CEB]' : task.category === 'Personal' ? 'bg-[#EAFBF4] text-[#088B7F]' : 'bg-[#FFF6E8] text-[#C96B00]'}`}>{task.category}</span>
+                <span className="text-[9px] font-bold text-[#8A94A8]">{formatClock(task.time)}</span>
+              </div>
+            </div>
+            <button type="button" onClick={() => deleteTask(task.id)} aria-label={`Delete ${task.title}`} className="grid h-8 w-8 place-items-center rounded-lg text-[#A0A8B8] opacity-0 transition hover:bg-red-50 hover:text-red-600 group-hover:opacity-100 focus:opacity-100"><Icon name="trash" className="h-4 w-4" /></button>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderDesktopDashboard = () => (
+    <div className="min-h-full bg-[#F5F7FB]">
+      {desktopHeader('Dashboard', 'Plan today, focus deeply and see meaningful progress at a glance.')}
+      <div className="grid gap-4 p-5 2xl:grid-cols-[minmax(0,1fr)_300px]">
+        <div className="min-w-0 space-y-4">
+          <section className="relative overflow-hidden rounded-[22px] border border-[#DDE7F7] bg-gradient-to-r from-[#EAF4FF] via-[#EEF5FF] to-[#FFF7E9] p-5 shadow-[0_18px_48px_rgba(38,76,150,0.08)]">
+            <div className="absolute -right-16 -top-20 h-52 w-52 rounded-full bg-[#FFD980]/35 blur-3xl" />
+            <div className="absolute bottom-0 right-16 h-24 w-64 rounded-t-[100%] bg-[#B9DFFF]/45" />
+            <div className="relative">
+              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#315CEB]">Your focused workspace</p>
+              <h1 className="mt-2 text-2xl font-black tracking-[-0.04em] text-[#182230]">Good {new Date().getHours() < 12 ? 'morning' : new Date().getHours() < 18 ? 'afternoon' : 'evening'}, {displayName}! 👋</h1>
+              <p className="mt-2 max-w-xl text-sm font-semibold leading-6 text-[#5E6A7E]">Small steps today create the progress you will be proud of tomorrow.</p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <button type="button" onClick={() => navigateTab('notes')} className="rounded-xl bg-[#315CEB] px-4 py-2.5 text-xs font-black text-white shadow-[0_10px_24px_rgba(49,92,235,0.22)]">Plan today</button>
+                <button type="button" onClick={() => navigateTab('focus')} className="rounded-xl border border-[#C9D5EA] bg-white/85 px-4 py-2.5 text-xs font-black text-[#344054]">Start focus</button>
+              </div>
+            </div>
+          </section>
+
+          <section className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            {[
+              { value: todayTasks.filter(task => !task.completed).length, label: 'Tasks Due', icon: 'calendar' as const, tone: 'text-[#0AA99A] bg-[#E9FAF6]' },
+              { value: todayFocusMinutes, label: 'Min Focused', icon: 'timer' as const, tone: 'text-[#315CEB] bg-[#EEF2FF]' },
+              { value: `${dailyGoal}%`, label: 'Daily Goal', icon: 'goal' as const, tone: 'text-[#704CF2] bg-[#F2EEFF]' },
+              { value: isPremium ? currentStreak : '—', label: isPremium ? 'Day Streak' : 'Premium Streak', icon: 'sparkle' as const, tone: 'text-[#F08A00] bg-[#FFF4E4]' },
+            ].map(item => (
+              <div key={item.label} className="flex items-center gap-3 rounded-[18px] border border-[#E2E8F1] bg-white p-4 shadow-[0_10px_30px_rgba(31,61,132,0.05)]">
+                <span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl ${item.tone}`}><Icon name={item.icon} className="h-5 w-5" /></span>
+                <div><p className="text-xl font-black text-[#1D2939]">{item.value}</p><p className="mt-0.5 text-[10px] font-bold text-[#7A8499]">{item.label}</p></div>
+              </div>
+            ))}
+          </section>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]">
+              <div className="mb-2 flex items-center justify-between"><div><h2 className="text-sm font-black text-[#202B3C]">Today&apos;s Tasks</h2><p className="mt-1 text-[10px] font-semibold text-[#8A94A8]">{completedTasks} of {todayTasks.length} completed</p></div><button type="button" onClick={() => navigateTab('notes')} className="text-[10px] font-black text-[#315CEB]">View all</button></div>
+              {renderDesktopTaskRows(5)}
+              <button type="button" onClick={() => navigateTab('notes')} className="mt-3 flex items-center gap-1 text-[10px] font-black text-[#315CEB]"><Icon name="plus" className="h-3.5 w-3.5" /> Add task</button>
+            </section>
+
+            <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]">
+              <div className="mb-3 flex items-center justify-between"><div><h2 className="text-sm font-black text-[#202B3C]">Quick Notes</h2><p className="mt-1 text-[10px] font-semibold text-[#8A94A8]">{workspace.notes.length} saved notes</p></div><button type="button" onClick={() => navigateTab('notes')} className="text-[10px] font-black text-[#315CEB]">See all</button></div>
+              <div className="grid grid-cols-2 gap-3">
+                {workspace.notes.slice(0, 4).map(note => (
+                  <button key={note.id} type="button" onClick={() => { editNote(note); navigateTab('notes'); }} className={`min-h-24 rounded-2xl border bg-gradient-to-br p-3 text-left transition hover:-translate-y-0.5 hover:shadow-md ${noteTone[note.category]}`}>
+                    <p className="line-clamp-2 text-[11px] font-black leading-4 text-[#263248]">{note.title}</p>
+                    <p className="mt-2 line-clamp-2 text-[9px] font-semibold leading-4 text-[#6E778A]">{note.body}</p>
+                  </button>
+                ))}
+                {!workspace.notes.length ? <div className="col-span-2 grid min-h-36 place-items-center rounded-2xl border border-dashed border-[#D7DEEA] bg-[#FAFBFD] text-xs font-bold text-[#8A94A8]">Your saved notes will appear here.</div> : null}
+              </div>
+            </section>
+          </div>
+
+          <div className="grid gap-4 xl:grid-cols-2">
+            <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]">
+              <div className="flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#8A94A8]">Next Reminder</p><h3 className="mt-2 text-sm font-black text-[#263248]">{nextReminder?.title || 'No reminder scheduled'}</h3><p className="mt-1 text-[10px] font-semibold text-[#7A8499]">{nextReminder ? `${nextReminder.date} • ${formatClock(nextReminder.time)}` : 'Create a reminder to stay on schedule.'}</p></div><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#F1ECFF] text-[#704CF2]"><Icon name="bell" className="h-5 w-5" /></span></div>
+              <button type="button" onClick={() => navigateTab('goals')} className="mt-4 rounded-xl border border-[#E1E7F0] px-3 py-2 text-[10px] font-black text-[#315CEB]">Manage reminders</button>
+            </section>
+            <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]">
+              <div className="flex items-center justify-between"><div><p className="text-[10px] font-black uppercase tracking-[0.14em] text-[#8A94A8]">Focus Session</p><h3 className="mt-2 text-sm font-black text-[#263248]">Deep Work • {focusMinutes} min</h3><p className="mt-1 text-[10px] font-semibold text-[#7A8499]">Eliminate distractions and stay in the zone.</p></div><span className="grid h-11 w-11 place-items-center rounded-xl bg-[#E8F7FF] text-[#137CC1]"><Icon name="timer" className="h-5 w-5" /></span></div>
+              <button type="button" onClick={() => navigateTab('focus')} className="mt-4 rounded-xl bg-[#315CEB] px-4 py-2 text-[10px] font-black text-white">Start Focus</button>
+            </section>
+          </div>
+        </div>
+
+        <aside className="min-w-0 space-y-4">
+          <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]">
+            <div className="flex items-center justify-between"><h2 className="text-sm font-black text-[#202B3C]">Weekly Streak</h2><span className="text-xs font-black text-[#263248]">{isPremium ? `${currentStreak} days` : 'Pro / Elite'}</span></div>
+            <div className="mt-4 grid grid-cols-7 gap-1.5">{lastSevenDays.map(day => <div key={day.key} className="text-center"><span className={`mx-auto grid h-7 w-7 place-items-center rounded-full text-[10px] font-black ${day.active ? 'bg-[#12AFA3] text-white' : 'border border-[#D7DEEA] text-[#A3ACBB]'}`}>{day.active ? '✓' : '○'}</span><p className="mt-1 text-[8px] font-black text-[#7A8499]">{day.label}</p></div>)}</div>
+          </section>
+          <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]">
+            <h2 className="text-sm font-black text-[#202B3C]">Today&apos;s Progress</h2>
+            <div className="mt-4 flex items-center gap-4">
+              <div className="relative grid h-24 w-24 shrink-0 place-items-center rounded-full" style={{ background: `conic-gradient(#13B3A6 ${dailyGoal * 3.6}deg, #E9EDF4 0deg)` }}><div className="grid h-[68px] w-[68px] place-items-center rounded-full bg-white"><div className="text-center"><p className="text-lg font-black text-[#263248]">{dailyGoal}%</p><p className="text-[8px] font-black text-[#8A94A8]">Daily Goal</p></div></div></div>
+              <div className="space-y-3 text-[10px] font-bold text-[#667085]"><p><span className="mr-2 inline-flex w-7 justify-center rounded-md bg-[#EEF2FF] py-1 font-black text-[#315CEB]">{completedTasks}</span>Tasks done</p><p><span className="mr-2 inline-flex w-7 justify-center rounded-md bg-[#FFF4E4] py-1 font-black text-[#D97800]">{todayFocusMinutes}</span>Min focused</p></div>
+            </div>
+          </section>
+          <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]">
+            <div className="flex items-center justify-between"><h2 className="text-sm font-black text-[#202B3C]">Upcoming</h2><button type="button" onClick={() => navigateTab('goals')} className="text-[10px] font-black text-[#315CEB]">Manage</button></div>
+            <div className="mt-3 space-y-2">{upcomingGoals.length ? upcomingGoals.map((goal, index) => <button key={goal.id} type="button" onClick={() => navigateTab('goals')} className="flex w-full items-center gap-3 rounded-xl border border-[#EDF1F6] p-2.5 text-left transition hover:border-[#AAB7F9]"><span className={`grid h-8 w-8 shrink-0 place-items-center rounded-lg text-white ${goalTones[index % goalTones.length].icon}`}><Icon name="goal" className="h-4 w-4" /></span><span className="min-w-0 flex-1"><span className="block truncate text-[10px] font-black text-[#344054]">{goal.title}</span><span className="mt-1 block text-[9px] font-bold text-[#8A94A8]">{daysUntil(goal.targetDate)} days left</span></span></button>) : <p className="rounded-xl bg-[#FAFBFD] p-4 text-center text-[10px] font-bold text-[#8A94A8]">No goal created yet.</p>}</div>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
+
+  const renderDesktopNotes = () => (
+    <div className="min-h-full bg-[#F5F7FB]">
+      {desktopHeader('Notes & Planning', 'Capture ideas, organize today and move directly into a focus block.')}
+      <div className="grid gap-4 p-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
+        <div className="min-w-0 space-y-4">
+          <section className="rounded-[20px] border border-[#E1E7F0] bg-white shadow-[0_12px_34px_rgba(31,61,132,0.05)]">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-b border-[#EDF1F6] px-4 py-3">
+              <div><h2 className="text-sm font-black text-[#202B3C]">Quick Notes</h2><p className="mt-1 text-[10px] font-semibold text-[#8A94A8]">Autosaved to the same May Day workspace used on mobile.</p></div>
+              <div className="flex gap-2">{(['pinned', 'study', 'shopping'] as NoteCategory[]).map(category => <button key={category} type="button" onClick={() => setNoteCategory(category)} className={`rounded-lg px-3 py-1.5 text-[9px] font-black capitalize ${noteCategory === category ? 'bg-[#315CEB] text-white' : 'bg-[#F3F5F9] text-[#667085]'}`}>{category}</button>)}</div>
+            </div>
+            <div className="p-4">
+              <textarea value={noteBody} onChange={event => setNoteBody(event.target.value)} placeholder="Write your quick note…" className="min-h-36 w-full resize-y rounded-2xl border border-[#E1E7F0] bg-[#FBFCFE] p-4 text-sm font-semibold leading-6 text-[#344054] outline-none transition focus:border-[#7C8DFF] focus:bg-white" />
+              <div className="mt-3 flex items-center justify-between"><p className="text-[9px] font-bold text-[#98A2B3]">{noteBody.length}/2000</p><div className="flex gap-2">{editingNoteId ? <button type="button" onClick={() => { setEditingNoteId(null); setNoteBody(''); }} className="rounded-xl border border-[#E1E7F0] px-4 py-2 text-[10px] font-black text-[#667085]">Cancel edit</button> : null}<button type="button" onClick={saveNote} disabled={!noteBody.trim()} className="rounded-xl bg-[#315CEB] px-5 py-2 text-[10px] font-black text-white disabled:cursor-not-allowed disabled:opacity-45">{editingNoteId ? 'Update note' : 'Save note'}</button></div></div>
+            </div>
+          </section>
+
+          <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div><h2 className="text-sm font-black text-[#202B3C]">Saved Notes</h2><p className="mt-1 text-[10px] font-semibold text-[#8A94A8]">{filteredDesktopNotes.length} matching notes</p></div>
+              <div className="flex gap-2">{(['all', 'pinned', 'study', 'shopping'] as Array<'all' | NoteCategory>).map(category => <button key={category} type="button" onClick={() => setDesktopNoteFilter(category)} className={`rounded-lg border px-3 py-1.5 text-[9px] font-black capitalize ${desktopNoteFilter === category ? 'border-[#315CEB] bg-[#EEF2FF] text-[#315CEB]' : 'border-[#E1E7F0] text-[#667085]'}`}>{category}</button>)}</div>
+            </div>
+            <div className="mt-4 grid gap-3 lg:grid-cols-2 xl:grid-cols-3">
+              {filteredDesktopNotes.map(note => (
+                <article key={note.id} className={`group min-h-36 rounded-2xl border bg-gradient-to-br p-4 ${noteTone[note.category]}`}>
+                  <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><h3 className="line-clamp-2 text-xs font-black leading-5 text-[#263248]">{note.title}</h3><p className="mt-2 line-clamp-4 whitespace-pre-wrap text-[10px] font-semibold leading-5 text-[#667085]">{note.body}</p></div><span className="text-[#315CEB]">{note.pinned ? '📌' : ''}</span></div>
+                  <div className="mt-4 flex items-center justify-between border-t border-black/5 pt-3"><span className="text-[8px] font-black text-[#8A94A8]">{formatNoteDate(note.updatedAt)}</span><div className="flex gap-1"><button type="button" onClick={() => editNote(note)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/70 text-[#315CEB]" aria-label={`Edit ${note.title}`}><Icon name="edit" className="h-4 w-4" /></button><button type="button" onClick={() => deleteNote(note.id)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/70 text-red-500" aria-label={`Delete ${note.title}`}><Icon name="trash" className="h-4 w-4" /></button></div></div>
+                </article>
+              ))}
+              {!filteredDesktopNotes.length ? <div className="col-span-full grid min-h-40 place-items-center rounded-2xl border border-dashed border-[#D7DEEA] bg-[#FAFBFD] text-xs font-bold text-[#8A94A8]">No note matches this filter.</div> : null}
+            </div>
+          </section>
+        </div>
+
+        <aside className="min-w-0 space-y-4">
+          <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]">
+            <div className="flex items-center justify-between"><div><h2 className="text-sm font-black text-[#202B3C]">Today&apos;s Plan</h2><p className="mt-1 text-[10px] font-semibold text-[#8A94A8]">{new Intl.DateTimeFormat(undefined, { weekday: 'long', month: 'short', day: 'numeric' }).format(new Date())}</p></div><span className="rounded-lg bg-[#EEF2FF] px-2 py-1 text-[9px] font-black text-[#315CEB]">{completedTasks}/{todayTasks.length}</span></div>
+            <div className="mt-4 space-y-2">
+              <input value={taskTitle} onChange={event => setTaskTitle(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') addTask(); }} placeholder="Add a task…" className="h-10 w-full rounded-xl border border-[#E1E7F0] bg-[#FBFCFE] px-3 text-xs font-bold outline-none focus:border-[#7C8DFF]" />
+              <div className="grid grid-cols-[1fr_112px] gap-2"><select value={taskCategory} onChange={event => setTaskCategory(event.target.value as MayDayTask['category'])} className="h-10 rounded-xl border border-[#E1E7F0] bg-white px-3 text-[10px] font-black text-[#566176]"><option>Study</option><option>Personal</option><option>Break</option></select><input type="time" value={taskTime} onChange={event => setTaskTime(event.target.value)} className="h-10 rounded-xl border border-[#E1E7F0] bg-white px-2 text-[10px] font-black text-[#566176]" /></div>
+              <button type="button" onClick={addTask} disabled={!taskTitle.trim()} className="h-10 w-full rounded-xl bg-[#315CEB] text-[10px] font-black text-white disabled:opacity-45">Add Task</button>
+            </div>
+            <div className="mt-4 flex gap-2">{(['all', 'Study', 'Personal', 'Break'] as Array<'all' | MayDayTask['category']>).map(category => <button key={category} type="button" onClick={() => setDesktopTaskFilter(category)} className={`rounded-lg px-2 py-1 text-[8px] font-black ${desktopTaskFilter === category ? 'bg-[#EEF2FF] text-[#315CEB]' : 'bg-[#F4F6F9] text-[#7A8499]'}`}>{category}</button>)}</div>
+            <div className="mt-2">{renderDesktopTaskRows()}</div>
+          </section>
+
+          <section className="overflow-hidden rounded-[20px] bg-gradient-to-r from-[#315CEB] to-[#704CF2] p-4 text-white shadow-[0_16px_38px_rgba(49,92,235,0.22)]">
+            <div className="flex items-center justify-between gap-3"><div><p className="text-[9px] font-black uppercase tracking-[0.16em] text-white/75">Focus Block</p><h3 className="mt-1 text-sm font-black">Deep Work • {focusMinutes} min</h3><p className="mt-1 text-[9px] font-semibold text-white/75">Your completed session is saved automatically.</p></div><button type="button" onClick={() => navigateTab('focus')} className="rounded-xl bg-white px-4 py-2 text-[10px] font-black text-[#315CEB]">Start</button></div>
+          </section>
+        </aside>
+      </div>
+    </div>
+  );
+
+  const renderDesktopGoalsReminders = () => (
+    <div className="min-h-full bg-[#F5F7FB]">
+      {desktopHeader('Goals & Reminders', 'Track meaningful deadlines and create reminders that work across desktop and mobile.')}
+      <div className="grid gap-4 p-5 xl:grid-cols-2">
+        <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]">
+          <div className="flex items-center justify-between"><div><h2 className="text-sm font-black text-[#202B3C]">Goal Countdown</h2><p className="mt-1 text-[10px] font-semibold text-[#8A94A8]">Move the progress slider as you advance.</p></div><button type="button" onClick={() => setGoalEditorOpen(open => !open)} className="rounded-xl bg-[#315CEB] px-3 py-2 text-[10px] font-black text-white">{goalEditorOpen ? 'Close' : '+ New goal'}</button></div>
+          {goalEditorOpen ? <div className="mt-4 grid gap-2 rounded-2xl border border-[#DCE4F3] bg-[#F8FAFD] p-3"><input value={goalTitle} onChange={event => setGoalTitle(event.target.value)} placeholder="Goal title" className="h-10 rounded-xl border border-[#E1E7F0] bg-white px-3 text-xs font-bold outline-none focus:border-[#7C8DFF]" /><textarea value={goalDescription} onChange={event => setGoalDescription(event.target.value)} placeholder="Motivational description" className="min-h-20 rounded-xl border border-[#E1E7F0] bg-white p-3 text-xs font-semibold outline-none focus:border-[#7C8DFF]" /><div className="flex gap-2"><input type="date" value={goalDate} onChange={event => setGoalDate(event.target.value)} className="h-10 min-w-0 flex-1 rounded-xl border border-[#E1E7F0] bg-white px-3 text-xs font-bold" /><button type="button" onClick={addGoal} disabled={!goalTitle.trim()} className="rounded-xl bg-[#315CEB] px-4 text-[10px] font-black text-white disabled:opacity-45">Save goal</button></div></div> : null}
+          <div className="mt-4 space-y-3">
+            {workspace.goals.map((goal, index) => <article key={goal.id} className="rounded-2xl border border-[#E5EAF2] p-3.5"><div className="flex items-start gap-3"><span className={`grid h-10 w-10 shrink-0 place-items-center rounded-xl text-white ${goalTones[index % goalTones.length].icon}`}><Icon name="goal" className="h-5 w-5" /></span><div className="min-w-0 flex-1"><div className="flex items-start justify-between gap-3"><div><h3 className="text-xs font-black text-[#263248]">{goal.title}</h3><p className="mt-1 line-clamp-2 text-[9px] font-semibold leading-4 text-[#7A8499]">{goal.description}</p></div><div className="text-right"><p className="text-xl font-black text-[#263248]">{daysUntil(goal.targetDate)}</p><p className="text-[8px] font-black text-[#8A94A8]">days left</p></div></div><div className="mt-3 flex items-center gap-3"><input aria-label={`${goal.title} progress`} type="range" min="0" max="100" value={goal.progress} onChange={event => updateGoalProgress(goal.id, Number(event.target.value))} className="min-w-0 flex-1 accent-[#315CEB]" /><span className="w-9 text-right text-[9px] font-black text-[#315CEB]">{goal.progress}%</span></div><div className="mt-2 flex items-center justify-between"><span className="text-[8px] font-bold text-[#8A94A8]">Target: {goal.targetDate}</span><button type="button" onClick={() => deleteGoal(goal.id)} className="text-[9px] font-black text-red-500">Delete</button></div></div></div></article>)}
+            {!workspace.goals.length ? <div className="grid min-h-36 place-items-center rounded-2xl border border-dashed border-[#D7DEEA] bg-[#FAFBFD] text-xs font-bold text-[#8A94A8]">Create your first countdown goal.</div> : null}
+          </div>
+        </section>
+
+        <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]">
+          <div><h2 className="text-sm font-black text-[#202B3C]">Set a Reminder</h2><p className="mt-1 text-[10px] font-semibold text-[#8A94A8]">Browser alerts run through the installed service worker when available.</p></div>
+          <div className="mt-4 grid gap-3 rounded-2xl border border-[#E1E7F0] bg-[#FBFCFE] p-4">
+            <input value={reminderTitle} onChange={event => setReminderTitle(event.target.value)} placeholder="Reminder title" className="h-10 rounded-xl border border-[#E1E7F0] bg-white px-3 text-xs font-bold outline-none focus:border-[#7C8DFF]" />
+            <div className="grid grid-cols-2 gap-2"><input type="date" value={reminderDate} onChange={event => setReminderDate(event.target.value)} className="h-10 rounded-xl border border-[#E1E7F0] bg-white px-3 text-xs font-bold" /><input type="time" value={reminderTime} onChange={event => setReminderTime(event.target.value)} className="h-10 rounded-xl border border-[#E1E7F0] bg-white px-3 text-xs font-bold" /></div>
+            <div><p className="mb-2 text-[9px] font-black uppercase tracking-[0.13em] text-[#8A94A8]">Repeat</p><div className="grid grid-cols-4 gap-2">{(['once', 'daily', 'weekdays', 'weekends'] as ReminderRepeat[]).map(repeat => <button key={repeat} type="button" onClick={() => setReminderRepeat(repeat)} className={`rounded-xl border px-2 py-2 text-[9px] font-black capitalize ${reminderRepeat === repeat ? 'border-[#315CEB] bg-[#EEF2FF] text-[#315CEB]' : 'border-[#E1E7F0] bg-white text-[#667085]'}`}>{repeat}</button>)}</div></div>
+            <div><p className="mb-2 text-[9px] font-black uppercase tracking-[0.13em] text-[#8A94A8]">Categories</p><div className="grid grid-cols-4 gap-2">{['Study', 'Tasks', 'Habits', 'Goals'].map(category => <button key={category} type="button" onClick={() => toggleReminderCategory(category)} className={`rounded-xl border px-2 py-2 text-[9px] font-black ${reminderCategories.includes(category) ? 'border-[#704CF2] bg-[#F2EEFF] text-[#704CF2]' : 'border-[#E1E7F0] bg-white text-[#667085]'}`}>{category}</button>)}</div></div>
+            <button type="button" onClick={addReminder} disabled={!reminderTitle.trim()} className="h-10 rounded-xl bg-[#315CEB] text-[10px] font-black text-white disabled:opacity-45">Save Reminder</button>
+          </div>
+
+          <div className="mt-4 flex items-center justify-between rounded-2xl border border-[#DCE4F3] bg-[#F8FAFD] p-3"><div className="flex items-center gap-3"><span className="grid h-10 w-10 place-items-center rounded-xl bg-[#E8F7FF] text-[#137CC1]"><Icon name="bell" className="h-5 w-5" /></span><div><p className="text-[10px] font-black text-[#344054]">Browser Notifications</p><p className="mt-1 text-[9px] font-semibold text-[#8A94A8]">Permission: {browserPermission}</p></div></div><button type="button" onClick={requestBrowserPermission} disabled={browserPermission === 'granted' || browserPermission === 'unsupported'} className="rounded-xl bg-[#315CEB] px-3 py-2 text-[9px] font-black text-white disabled:bg-[#B8C1D0]">{browserPermission === 'granted' ? 'Enabled' : 'Allow notifications'}</button></div>
+
+          <div className="mt-4 space-y-2">
+            {workspace.reminders.map(reminder => <article key={reminder.id} className="flex items-center gap-3 rounded-2xl border border-[#E5EAF2] p-3"><button type="button" onClick={() => toggleReminder(reminder.id)} className={`relative h-6 w-11 shrink-0 rounded-full transition ${reminder.enabled ? 'bg-[#315CEB]' : 'bg-[#C7CEDA]'}`} aria-label={reminder.enabled ? `Disable ${reminder.title}` : `Enable ${reminder.title}`}><span className={`absolute top-1 h-4 w-4 rounded-full bg-white transition ${reminder.enabled ? 'left-6' : 'left-1'}`} /></button><div className="min-w-0 flex-1"><p className="truncate text-[10px] font-black text-[#344054]">{reminder.title}</p><p className="mt-1 text-[9px] font-semibold text-[#8A94A8]">{reminder.date} • {formatClock(reminder.time)} • {reminder.repeat}</p></div><button type="button" onClick={() => deleteReminder(reminder.id)} className="grid h-8 w-8 place-items-center rounded-lg text-red-500 hover:bg-red-50"><Icon name="trash" className="h-4 w-4" /></button></article>)}
+            {!workspace.reminders.length ? <div className="grid min-h-28 place-items-center rounded-2xl border border-dashed border-[#D7DEEA] bg-[#FAFBFD] text-xs font-bold text-[#8A94A8]">No reminder scheduled.</div> : null}
+          </div>
+        </section>
+      </div>
+    </div>
+  );
+
+  const renderDesktopFocus = () => (
+    <div className="min-h-full bg-[#F5F7FB]">
+      {desktopHeader('Focus Session', 'Run a distraction-free timer; completed minutes feed your real May Day analytics.')}
+      <div className="mx-auto grid max-w-6xl gap-4 p-5 xl:grid-cols-[minmax(0,1fr)_320px]">
+        <section className="overflow-hidden rounded-[24px] border border-[#DDE5F1] bg-white shadow-[0_20px_60px_rgba(31,61,132,0.08)]">
+          <div className="bg-gradient-to-br from-[#10B8AA] via-[#0FA99E] to-[#087F78] p-8 text-center text-white">
+            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-white/70">Deep Focus</p>
+            <div className="mt-8 text-7xl font-black tracking-[-0.06em]">{pad(Math.floor(focusSeconds / 60))}:{pad(focusSeconds % 60)}</div>
+            <p className="mt-4 text-sm font-semibold text-white/80">{focusRunning ? 'Stay focused. Great things take time.' : 'Choose a duration and begin when you are ready.'}</p>
+            <div className="mt-8 flex justify-center gap-3">{focusRunning ? <button type="button" onClick={() => setFocusRunning(false)} className="rounded-xl bg-white px-6 py-3 text-xs font-black text-[#087F78]"><Icon name="pause" className="mr-2 inline h-4 w-4" />Pause</button> : <button type="button" onClick={() => { focusCompletionGuardRef.current = false; setFocusRunning(true); }} className="rounded-xl bg-white px-6 py-3 text-xs font-black text-[#087F78]"><Icon name="play" className="mr-2 inline h-4 w-4" />Start session</button>}<button type="button" onClick={() => { setFocusRunning(false); setFocusSeconds(focusMinutes * 60); setFocusMessage(''); focusCompletionGuardRef.current = false; }} className="rounded-xl border border-white/45 bg-white/10 px-5 py-3 text-xs font-black text-white"><Icon name="reset" className="mr-2 inline h-4 w-4" />Reset</button></div>
+          </div>
+          <div className="p-5"><p className="text-[10px] font-black uppercase tracking-[0.15em] text-[#8A94A8]">Session length</p><div className="mt-3 grid grid-cols-3 gap-3">{[15, 30, 45].map(minutes => <button key={minutes} type="button" onClick={() => selectFocusMinutes(minutes)} disabled={focusRunning} className={`rounded-2xl border px-4 py-4 text-center transition disabled:cursor-not-allowed ${focusMinutes === minutes ? 'border-[#315CEB] bg-[#EEF2FF] text-[#315CEB]' : 'border-[#E1E7F0] text-[#344054]'}`}><span className="block text-xl font-black">{minutes}</span><span className="mt-1 block text-[9px] font-black">minutes</span></button>)}</div>{focusMessage ? <p className="mt-4 rounded-xl bg-[#EAFBF4] px-4 py-3 text-center text-[10px] font-black text-[#088B7F]">{focusMessage}</p> : null}</div>
+        </section>
+
+        <aside className="space-y-4">
+          <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]"><h2 className="text-sm font-black text-[#202B3C]">Today</h2><div className="mt-4 grid grid-cols-2 gap-3"><div className="rounded-2xl bg-[#EEF2FF] p-3 text-center"><p className="text-2xl font-black text-[#315CEB]">{todayFocusMinutes}</p><p className="mt-1 text-[9px] font-black text-[#69759A]">minutes saved</p></div><div className="rounded-2xl bg-[#EAFBF4] p-3 text-center"><p className="text-2xl font-black text-[#088B7F]">{workspace.focusSessions.filter(session => session.date === today).length}</p><p className="mt-1 text-[9px] font-black text-[#5D837D]">sessions</p></div></div></section>
+          <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]"><h2 className="text-sm font-black text-[#202B3C]">Recent Sessions</h2><div className="mt-3 space-y-2">{workspace.focusSessions.slice(-6).reverse().map(session => <div key={session.id} className="flex items-center gap-3 rounded-xl border border-[#EDF1F6] p-2.5"><span className="grid h-8 w-8 place-items-center rounded-lg bg-[#E8F7FF] text-[#137CC1]"><Icon name="timer" className="h-4 w-4" /></span><div className="min-w-0 flex-1"><p className="text-[10px] font-black text-[#344054]">{session.minutes} minute focus</p><p className="mt-1 text-[8px] font-bold text-[#8A94A8]">{session.date}</p></div></div>)}{!workspace.focusSessions.length ? <p className="rounded-xl bg-[#FAFBFD] p-4 text-center text-[10px] font-bold text-[#8A94A8]">Completed sessions will appear here.</p> : null}</div></section>
+          {!isPremium ? <section className="rounded-[20px] border border-[#E5DDFE] bg-[#FBF9FF] p-4"><h3 className="text-xs font-black text-[#5132B4]">Go Pro / Elite</h3><p className="mt-2 text-[10px] font-semibold leading-5 text-[#756A94]">Unlock premium streak milestones and deeper progress insights while keeping the core planner available to everyone.</p><button type="button" onClick={onUpgrade} className="mt-4 rounded-xl bg-[#704CF2] px-4 py-2 text-[10px] font-black text-white">View plans</button></section> : null}
+        </aside>
+      </div>
+    </div>
+  );
+
+  const renderDesktopInsights = () => (
+    <div className="min-h-full bg-[#F5F7FB]">
+      {desktopHeader('Streaks & Insights', 'Every chart below is calculated from your saved May Day tasks and focus sessions.')}
+      <div className="space-y-4 p-5">
+        <div className="grid gap-4 xl:grid-cols-[0.9fr_1.2fr_0.9fr]">
+          <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]"><div className="flex items-center justify-between"><h2 className="text-sm font-black text-[#202B3C]">Weekly Streak</h2><span className="text-xs font-black text-[#263248]">{isPremium ? `${currentStreak} days` : 'Premium'}</span></div><div className="mt-5 grid grid-cols-7 gap-2">{lastSevenDays.map(day => <div key={day.key} className="text-center"><span className={`mx-auto grid h-8 w-8 place-items-center rounded-full text-[10px] font-black ${day.active ? 'bg-[#12AFA3] text-white' : 'border border-[#D7DEEA] text-[#A3ACBB]'}`}>{day.active ? '✓' : '○'}</span><p className="mt-1 text-[8px] font-black text-[#7A8499]">{day.label}</p></div>)}</div></section>
+          <section className="relative overflow-hidden rounded-[20px] bg-gradient-to-r from-[#10B8AA] to-[#07938A] p-5 text-center text-white shadow-[0_16px_40px_rgba(16,184,170,0.22)]"><div className="absolute left-5 top-4 text-2xl">🎉</div><div className="absolute bottom-3 right-5 text-2xl">✨</div><h2 className="relative mt-2 text-lg font-black">{dailyGoal >= 100 ? `Amazing work, ${displayName}!` : `Keep going, ${displayName}!`}</h2><p className="relative mx-auto mt-2 max-w-md text-xs font-semibold leading-5 text-white/85">{dailyGoal >= 100 ? 'You completed today’s target using real tasks and focus time.' : `Complete ${Math.max(0, 3 - completedTasks)} more tasks or reach 15 focused minutes to finish today’s goal.`}</p><button type="button" onClick={() => navigateTab(dailyGoal >= 100 ? 'notes' : 'focus')} className="relative mt-4 rounded-full bg-white px-5 py-2 text-[10px] font-black text-[#087A73]">{dailyGoal >= 100 ? 'Plan tomorrow' : 'Continue progress'}</button></section>
+          <section className="rounded-[20px] border border-[#E5DDFE] bg-[#FBF9FF] p-4 shadow-[0_12px_34px_rgba(79,52,160,0.06)]"><h2 className="text-sm font-black text-[#5132B4]">{isPremium ? 'Your Next Reward' : 'Go Pro / Elite'}</h2><p className="mt-2 text-[10px] font-semibold leading-5 text-[#756A94]">{isPremium ? 'Maintain a 15-day streak to unlock the next premium milestone.' : 'Core planning stays open. Upgrade for premium streak milestones and deeper insights.'}</p><div className="mt-4 h-2 overflow-hidden rounded-full bg-[#DED7F3]"><div className="h-full rounded-full bg-[#704CF2]" style={{ width: `${isPremium ? Math.min(100, (currentStreak / 15) * 100) : 0}%` }} /></div><div className="mt-2 flex items-center justify-between"><span className="text-[9px] font-black text-[#756A94]">{isPremium ? `${Math.min(currentStreak, 15)}/15 days` : 'Premium feature'}</span>{!isPremium ? <button type="button" onClick={onUpgrade} className="rounded-xl bg-[#704CF2] px-3 py-2 text-[9px] font-black text-white">Upgrade</button> : null}</div></section>
+        </div>
+
+        <div className="grid gap-4 md:grid-cols-3">
+          {[{ label: 'Tasks Completed', value: totalCompletedTasks, sub: `${taskCompletionRate}% all-time completion`, tone: 'text-[#315CEB] bg-[#EEF2FF]' }, { label: 'Focus Minutes', value: totalFocusMinutes, sub: `${todayFocusMinutes} minutes today`, tone: 'text-[#088B7F] bg-[#EAFBF4]' }, { label: 'Current Streak', value: isPremium ? currentStreak : '—', sub: isPremium ? '3 tasks or 15 min keeps it active' : 'Available on Pro / Elite', tone: 'text-[#D97800] bg-[#FFF4E4]' }].map(item => <section key={item.label} className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]"><div className={`inline-flex rounded-xl px-3 py-2 text-[10px] font-black ${item.tone}`}>{item.label}</div><p className="mt-4 text-3xl font-black text-[#202B3C]">{item.value}</p><p className="mt-2 text-[10px] font-semibold text-[#8A94A8]">{item.sub}</p></section>)}
+        </div>
+
+        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_330px]">
+          <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]"><div className="flex items-center justify-between"><div><h2 className="text-sm font-black text-[#202B3C]">Focus Progress</h2><p className="mt-1 text-[10px] font-semibold text-[#8A94A8]">Last seven days • real saved minutes</p></div><span className="rounded-lg bg-[#EAFBF4] px-2 py-1 text-[9px] font-black text-[#088B7F]">{lastSevenDays.reduce((sum, day) => sum + day.minutes, 0)} min</span></div><div className="mt-5 h-48 rounded-2xl bg-[#FAFBFD] p-4"><svg viewBox="0 0 100 100" preserveAspectRatio="none" className="h-full w-full overflow-visible" aria-label="Seven day focus minutes chart"><line x1="0" y1="92" x2="100" y2="92" stroke="#DCE3ED" strokeWidth="0.7" /><line x1="0" y1="54" x2="100" y2="54" stroke="#EDF1F6" strokeWidth="0.6" /><polyline points={focusChartPoints} fill="none" stroke="#315CEB" strokeWidth="2.4" vectorEffect="non-scaling-stroke" strokeLinecap="round" strokeLinejoin="round" />{lastSevenDays.map((day, index) => { const x = lastSevenDays.length <= 1 ? 0 : (index / (lastSevenDays.length - 1)) * 100; const y = 92 - (day.minutes / focusChartMax) * 76; return <circle key={day.key} cx={x} cy={y} r="1.7" fill="#315CEB" vectorEffect="non-scaling-stroke" />; })}</svg></div><div className="mt-2 grid grid-cols-7 text-center">{lastSevenDays.map(day => <span key={day.key} className="text-[8px] font-black text-[#8A94A8]">{day.label}</span>)}</div></section>
+
+          <section className="rounded-[20px] border border-[#E1E7F0] bg-white p-4 shadow-[0_12px_34px_rgba(31,61,132,0.05)]"><h2 className="text-sm font-black text-[#202B3C]">Tasks by Category</h2><div className="mt-5 flex items-center gap-5"><div className="relative h-32 w-32 shrink-0 rounded-full" style={{ background: `conic-gradient(#315CEB 0 ${categoryStats[0].percent}%, #12AFA3 ${categoryStats[0].percent}% ${categoryStats[0].percent + categoryStats[1].percent}%, #FF9E45 ${categoryStats[0].percent + categoryStats[1].percent}% ${categoryStats[0].percent + categoryStats[1].percent + categoryStats[2].percent}%, #D8DEEA 0)` }}><div className="absolute inset-5 grid place-items-center rounded-full bg-white text-center"><div><p className="text-xl font-black text-[#263248]">{workspace.tasks.length}</p><p className="text-[8px] font-black text-[#8A94A8]">tasks</p></div></div></div><div className="min-w-0 flex-1 space-y-3">{categoryStats.slice(0, 3).map((item, index) => <div key={item.category} className="flex items-center gap-2"><span className={`h-2.5 w-2.5 rounded-full ${index === 0 ? 'bg-[#315CEB]' : index === 1 ? 'bg-[#12AFA3]' : 'bg-[#FF9E45]'}`} /><span className="min-w-0 flex-1 text-[10px] font-black text-[#566176]">{item.category}</span><span className="text-[9px] font-black text-[#8A94A8]">{item.percent}%</span></div>)}</div></div></section>
+        </div>
+      </div>
+    </div>
+  );
+
+  if (desktop) {
+    return (
+      <div data-feature="MAY_DAY_DESKTOP_V1" className="min-h-[calc(100vh-5rem)] bg-[#F5F7FB] text-[#101828]">
+        {activeTab === 'dashboard' ? renderDesktopDashboard() : null}
+        {activeTab === 'notes' || activeTab === 'home' ? renderDesktopNotes() : null}
+        {activeTab === 'goals' || activeTab === 'reminders' ? renderDesktopGoalsReminders() : null}
+        {activeTab === 'focus' ? renderDesktopFocus() : null}
+        {activeTab === 'progress' ? renderDesktopInsights() : null}
+      </div>
+    );
+  }
+
+
   const navItems: Array<{ tab: MayDayTab; label: string; icon: keyof typeof iconPaths }> = [
     { tab: 'home', label: 'May Day', icon: 'note' },
     { tab: 'goals', label: 'Goals', icon: 'goal' },
@@ -910,7 +1299,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   ];
 
   return (
-    <div data-feature={MAY_DAY_MARKER} className="min-h-[100dvh] bg-[#F7F9FC] pb-[calc(env(safe-area-inset-bottom)+6.6rem)] text-[#101828] md:hidden">
+    <div data-feature={MAY_DAY_MARKER} className="min-h-[100dvh] bg-[#F7F9FC] pb-[calc(env(safe-area-inset-bottom)+6.6rem)] text-[#101828]">
       {renderHeader()}
       {activeTab === 'home' ? renderHome() : null}
       {activeTab === 'goals' ? renderGoals() : null}
@@ -918,7 +1307,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
       {activeTab === 'focus' ? renderFocus() : null}
       {activeTab === 'progress' ? renderProgress() : null}
 
-      <nav aria-label="May Day sections" className="fixed inset-x-0 bottom-0 z-50 border-t border-[#E2E7F0] bg-white/96 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-14px_38px_rgba(20,38,84,0.10)] backdrop-blur-xl md:hidden">
+      <nav aria-label="May Day sections" className="fixed inset-x-0 bottom-0 z-50 border-t border-[#E2E7F0] bg-white/96 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 shadow-[0_-14px_38px_rgba(20,38,84,0.10)] backdrop-blur-xl">
         <div className="mx-auto grid max-w-xl grid-cols-5 gap-1">{navItems.map(item => {
           const active = activeTab === item.tab;
           return <button key={item.tab} type="button" onClick={() => navigateTab(item.tab)} aria-current={active ? 'page' : undefined} className={`flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 transition active:scale-95 ${active ? 'bg-[#EEF2FF] text-[#315CEB]' : 'text-[#596579]'}`}><span className={`grid h-7 w-7 place-items-center rounded-xl ${active ? 'bg-white shadow-sm' : ''}`}><Icon name={item.icon} className="h-[18px] w-[18px]" /></span><span className="w-full truncate text-center text-[9px] font-black">{item.label}</span></button>;

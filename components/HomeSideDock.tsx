@@ -28,6 +28,7 @@ interface HomeSideDockProps {
   onCartClick: () => void;
   onProfileClick: () => void;
   onSubscriptionClick: () => void;
+  onOpenMayDay?: () => void;
   onOpenCommunity?: () => void;
   authButtonLabel: string;
   settings: WebsiteSettings;
@@ -70,7 +71,7 @@ const clamp = (value: unknown, minimum: number, maximum: number, fallback: numbe
   return Math.min(maximum, Math.max(minimum, number));
 };
 
-const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity, authButtonLabel, activeItem = '', showDetachedTrigger = true, overlayMode = false, openExpandedOnMount = false, elevatedLayer = false, detachedTriggerPlacement = 'default', onStateChange }: HomeSideDockProps) => {
+const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenMayDay, onOpenCommunity, authButtonLabel, activeItem = '', showDetachedTrigger = true, overlayMode = false, openExpandedOnMount = false, elevatedLayer = false, detachedTriggerPlacement = 'default', onStateChange }: HomeSideDockProps) => {
   const [sidebarState, setSidebarState] = useState<DesktopSidebarState>(() => openExpandedOnMount ? 'expanded' : readDesktopSidebarState());
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const hoverCloseTimerRef = useRef<number | null>(null);
@@ -192,6 +193,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
   };
 
   const defaultItems: NavigationItem[] = [
+    ...(onOpenMayDay ? [{ id: 'May Day', label: 'May Day', action: onOpenMayDay, icon: '🗓️', badge: null }] : []),
     { id: 'Home', label: 'Home', action: onHomeClick, icon: '🏠', badge: null },
     { id: 'Store', label: 'Store', action: onNavigateToAllProducts, icon: '🛍️', badge: dockBadgeCounts.Store || null },
     { id: 'Purchased', label: 'Purchased', action: onNavigateToPurchases, icon: '📚', badge: (dockBadgeCounts.Purchased ?? purchasedProducts.length) || null },
@@ -207,7 +209,8 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
 
   const configuredBase = ((settings.content as any).dockItems || dockCustomizationItems) as string[];
   const configuredWithHome = configuredBase.includes('Home') ? configuredBase : ['Home', ...configuredBase];
-  const configuredItems = configuredWithHome.filter((label, index, labels) => labels.indexOf(label) === index);
+  const configuredWithMayDay = onOpenMayDay ? ['May Day', ...configuredWithHome.filter(label => label !== 'May Day')] : configuredWithHome;
+  const configuredItems = configuredWithMayDay.filter((label, index, labels) => labels.indexOf(label) === index);
   const itemMap = Object.fromEntries(defaultItems.map(item => [item.id, item])) as Record<string, NavigationItem>;
   itemMap.EduCoins = profileItem;
   itemMap.Purchases = itemMap.Purchased;

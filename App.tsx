@@ -6167,18 +6167,14 @@ const App: React.FC = () => {
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={() => handleNavigateBack('home')} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onClearWishlist={handleClearWishlist} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
       case 'mayDay': return (
-        <>
-          <div className="md:hidden">
-            <MayDayMobile
-              currentUser={appUser}
-              isLoggedIn={isLoggedIn}
-              isPremium={hasPremiumMembership(appUser)}
-              onBack={() => handleNavigateBack('home')}
-              onUpgrade={handleNavigateToSubscription}
-            />
-          </div>
-          <div className="hidden md:block">{renderHomePageContent()}</div>
-        </>
+        <MayDayMobile
+          currentUser={appUser}
+          isLoggedIn={isLoggedIn}
+          isPremium={hasPremiumMembership(appUser)}
+          onBack={() => handleNavigateBack('home')}
+          onUpgrade={handleNavigateToSubscription}
+          desktop={!isMobileViewport}
+        />
       );
       case 'home': default: return (
         <>
@@ -6233,7 +6229,7 @@ const App: React.FC = () => {
         ? (readingListType === 'blog' ? 'Blog' : 'News')
         : ({
             home: 'Home',
-            mayDay: 'Home',
+            mayDay: 'May Day',
             allProducts: 'Store',
             product: 'Store',
             myPurchases: 'Purchases',
@@ -6332,6 +6328,7 @@ const App: React.FC = () => {
             onProfileClick={() => { setCurrentView('home'); window.setTimeout(handleNavigateToProfile, 0); }}
             authButtonLabel={authButtonLabel}
             onSubscriptionClick={() => { setCurrentView('home'); window.setTimeout(handleNavigateToSubscription, 0); }}
+            onOpenMayDay={() => { setCurrentView('mayDay'); window.scrollTo(0, 0); }}
             onOpenCommunity={() => undefined}
           />
         ) : null}
@@ -6410,6 +6407,7 @@ const App: React.FC = () => {
                 onProfileClick={handleNavigateToProfile}
                 authButtonLabel={authButtonLabel}
                 onSubscriptionClick={handleNavigateToSubscription}
+                onOpenMayDay={handleNavigateToMayDay}
                 onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }}
               />
             )}
