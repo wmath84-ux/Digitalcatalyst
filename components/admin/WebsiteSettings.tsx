@@ -373,6 +373,11 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const dockItems = (((localSettings.content as any).dockItems || []) as string[]);
     const dockStyle = { ...defaultDockStyle, ...((localSettings.content as any).dockStyle || {}) };
     const sidebarFontFamily = String((dockStyle as any).sidebarFontFamily || 'Inter');
+    const sidebarBackgroundColor = String((dockStyle as any).sidebarBackgroundColor || dockStyle.backgroundColor || defaultDockStyle.sidebarBackgroundColor);
+    const sidebarBackgroundOpacity = Number((dockStyle as any).sidebarBackgroundOpacity ?? dockStyle.backgroundOpacity ?? defaultDockStyle.sidebarBackgroundOpacity);
+    const sidebarTextColor = String((dockStyle as any).sidebarTextColor || dockStyle.textColor || defaultDockStyle.sidebarTextColor);
+    const sidebarTextOpacity = Number((dockStyle as any).sidebarTextOpacity ?? defaultDockStyle.sidebarTextOpacity);
+    const sidebarBorderColor = String((dockStyle as any).sidebarBorderColor || dockStyle.borderColor || defaultDockStyle.sidebarBorderColor);
     const sidebarFontOptions = ['Inter', 'Lato', 'Montserrat', 'Roboto', 'Merriweather', 'Oswald'];
     const desktopNavigationMode = localSettings.desktop?.navigationMode === 'dock' ? 'dock' : 'sidebar';
     const baseCommunityPalette = {
@@ -1377,11 +1382,23 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                 <FormRow label={`Bottom safe gap (${dockStyle.bottomOffset}px)`}><input type="range" min="0" max="32" value={dockStyle.bottomOffset} onChange={e => updateDockStyle('bottomOffset', Number(e.target.value))} className="w-full" /></FormRow>
                                 <FormRow label={`Desktop expanded width (${dockStyle.desktopExpandedWidth}px)`}><input type="range" min="260" max="380" value={dockStyle.desktopExpandedWidth} onChange={e => updateDockStyle('desktopExpandedWidth', Number(e.target.value))} className="w-full" /></FormRow>
                                 <FormRow label={`Desktop collapsed width (${dockStyle.desktopCollapsedWidth}px)`}><input type="range" min="72" max="108" value={dockStyle.desktopCollapsedWidth} onChange={e => updateDockStyle('desktopCollapsedWidth', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label="Website side panel font" description="Custom font for the desktop website side panel labels, heading and helper text.">
-                                    <select value={sidebarFontFamily} onChange={e => updateDockStyle('sidebarFontFamily', e.target.value)} className="w-full border border-slate-300 bg-white px-3 py-2 font-bold text-slate-900">
-                                        {sidebarFontOptions.map(font => <option key={`sidebar-font-${font}`} value={font}>{font}</option>)}
-                                    </select>
-                                </FormRow>
+                                <div className="mt-4 border-t border-slate-200 pt-4">
+                                    <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Website side panel only</p>
+                                    <div className="mt-3 grid gap-3 md:grid-cols-2">
+                                        <label className="border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700"><span className="mb-2 block">Side panel colour</span><input type="color" value={sidebarBackgroundColor} onChange={e => updateDockStyle('sidebarBackgroundColor', e.target.value)} className="h-10 w-full border p-1" /></label>
+                                        <label className="border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700"><span className="mb-2 block">Side panel text colour</span><input type="color" value={sidebarTextColor} onChange={e => updateDockStyle('sidebarTextColor', e.target.value)} className="h-10 w-full border p-1" /></label>
+                                        <label className="border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700"><span className="mb-2 block">Side panel border colour</span><input type="color" value={sidebarBorderColor} onChange={e => updateDockStyle('sidebarBorderColor', e.target.value)} className="h-10 w-full border p-1" /></label>
+                                        <FormRow label="Website side panel font" description="Custom font for the desktop website side panel labels, heading and helper text.">
+                                            <select value={sidebarFontFamily} onChange={e => updateDockStyle('sidebarFontFamily', e.target.value)} className="w-full border border-slate-300 bg-white px-3 py-2 font-bold text-slate-900">
+                                                {sidebarFontOptions.map(font => <option key={`sidebar-font-${font}`} value={font}>{font}</option>)}
+                                            </select>
+                                        </FormRow>
+                                    </div>
+                                    <div className="mt-3 space-y-1">
+                                        <FormRow label={`Side panel transparency (${sidebarBackgroundOpacity}%)`}><input type="range" min="20" max="100" value={sidebarBackgroundOpacity} onChange={e => updateDockStyle('sidebarBackgroundOpacity', Number(e.target.value))} className="w-full" /></FormRow>
+                                        <FormRow label={`Font transparency (${sidebarTextOpacity}%)`}><input type="range" min="35" max="100" value={sidebarTextOpacity} onChange={e => updateDockStyle('sidebarTextOpacity', Number(e.target.value))} className="w-full" /></FormRow>
+                                    </div>
+                                </div>
                             </div>
                         </section>
                     </div>

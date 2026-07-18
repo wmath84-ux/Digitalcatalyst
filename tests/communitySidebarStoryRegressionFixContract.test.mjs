@@ -67,17 +67,30 @@ test('Text-only story viewer fills the space above actions and scrolls without e
   assert.match(community, /pt-\[calc\(env\(safe-area-inset-top\)\+5\.8rem\)\]/);
   assert.match(community, /activeReelIsTextOnly/);
   assert.match(community, /const storyInteractionLocked = activeReelIsTextOnly \|\| expandedStatusTextId === selectedStatusId/);
+  assert.match(community, /touch-action: pan-y/);
+  assert.match(community, /-webkit-overflow-scrolling: touch/);
+  assert.match(community, /onTouchMove=\{\(event\) => event\.stopPropagation\(\)\}/);
+  assert.match(community, /onPointerMove=\{\(event\) => event\.stopPropagation\(\)\}/);
   assert.match(community, /scroller\?\.scrollBy\(\{ top: Math\.max\(160, scroller\.clientHeight \* 0\.72\), behavior: 'smooth' \}\)/);
   assert.doesNotMatch(community, /aria-expanded=\{longText \? expanded : undefined\}/);
   assert.doesNotMatch(community, /setExpandedStatusTextId\(expanded \? null : card\.id\)/);
 });
 
-test('Admin can customize website side panel font and HomeSideDock consumes it', () => {
+test('Admin can customize website side panel font, colour and transparency', () => {
   assert.match(bottomDock, /sidebarFontFamily: 'Inter'/);
+  assert.match(bottomDock, /sidebarBackgroundColor: '#FBFDFF'/);
+  assert.match(bottomDock, /sidebarTextOpacity: 100/);
   assert.match(app, /sidebarFontFamily\?: string/);
+  assert.match(app, /sidebarBackgroundColor\?: string/);
+  assert.match(app, /sidebarTextOpacity\?: number/);
   assert.match(homeDock, /sidebarFontOptions/);
+  assert.match(homeDock, /sidebarSurfaceColor/);
+  assert.match(homeDock, /sidebarTextColor = hexToRgba\(sidebarTextBaseColor, sidebarTextOpacity\)/);
   assert.match(homeDock, /fontFamily: sidebarFontFamily/);
-  assert.match(settings, /Website side panel font/);
-  assert.match(settings, /sidebarFontOptions\.map/);
+  assert.match(settings, /Website side panel only/);
+  assert.match(settings, /Side panel colour/);
+  assert.match(settings, /Font transparency/);
   assert.match(settings, /updateDockStyle\('sidebarFontFamily'/);
+  assert.match(settings, /updateDockStyle\('sidebarBackgroundColor'/);
+  assert.match(settings, /updateDockStyle\('sidebarTextOpacity'/);
 });

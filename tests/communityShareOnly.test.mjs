@@ -78,6 +78,8 @@ test('text stories support formatted scroll and status-scoped replies', () => {
   assert.match(component, /buildStatusTextBlocks/);
   assert.match(component, /Read more/);
   assert.match(component, /scrollBy\(\{ top: Math\.max\(160, scroller\.clientHeight \* 0\.72\), behavior: 'smooth' \}\)/);
+  assert.match(component, /onTouchMove=\{\(event\) => event\.stopPropagation\(\)\}/);
+  assert.match(component, /touch-action: pan-y/);
   assert.match(component, /statusReplyComposerId/);
   assert.match(component, /submitStatusDiscussion/);
   assert.match(component, /discussionReplies/);

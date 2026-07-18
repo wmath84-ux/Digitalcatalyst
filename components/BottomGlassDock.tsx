@@ -69,6 +69,11 @@ export const defaultDockStyle = {
   desktopExpandedWidth: 320,
   desktopCollapsedWidth: 88,
   sidebarFontFamily: 'Inter',
+  sidebarBackgroundColor: '#FBFDFF',
+  sidebarBackgroundOpacity: 92,
+  sidebarTextColor: '#334155',
+  sidebarTextOpacity: 100,
+  sidebarBorderColor: '#BFD7FF',
 };
 
 const clampNumber = (value: unknown, minimum: number, maximum: number, fallback: number) => {

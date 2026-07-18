@@ -3513,6 +3513,10 @@ const communityPolishCss = `
     min-height: 0;
     overflow-y: auto;
     overscroll-behavior: contain;
+    overscroll-behavior-y: contain;
+    -webkit-overflow-scrolling: touch;
+    touch-action: pan-y;
+    pointer-events: auto;
     mask-image: none;
     -webkit-mask-image: none;
   }
@@ -7726,7 +7730,14 @@ const EduvoraCommunity: React.FC<EduvoraCommunityProps> = ({
             <p className="text-[10px] font-black uppercase tracking-[0.28em] text-white/55">Eduvora story</p>
             <h2 className="mt-3 break-words text-2xl font-black leading-tight tracking-[-0.035em] text-white sm:text-3xl">{blocks.heading}</h2>
           </div>
-          <div className="community-story-text-copy mt-5 space-y-3 pr-1 custom-scrollbar">
+          <div
+            className="community-story-text-copy mt-5 space-y-3 pr-1 custom-scrollbar"
+            onWheel={(event) => event.stopPropagation()}
+            onTouchStart={(event) => event.stopPropagation()}
+            onTouchMove={(event) => event.stopPropagation()}
+            onPointerDown={(event) => event.stopPropagation()}
+            onPointerMove={(event) => event.stopPropagation()}
+          >
             {(blocks.lines.length ? blocks.lines : [storyText]).map((line, index) => {
               const bulletMatch = line.match(/^(?:[-*•✓✔→]|\d+[.)])\s*(.*)$/);
               if (bulletMatch) return <p key={`${card.id}-line-${index}`} className="flex items-start gap-2 text-sm font-semibold leading-6 text-white/86 sm:text-base sm:leading-7"><span className="mt-0.5 shrink-0 text-[#93c5fd]">•</span><span className="break-words">{bulletMatch[1]}</span></p>;

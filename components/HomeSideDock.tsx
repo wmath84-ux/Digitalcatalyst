@@ -91,6 +91,16 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
   const accentColor = /^#[0-9a-f]{6}$/i.test(dockStyle.accentColor || '') ? dockStyle.accentColor : defaultDockStyle.accentColor;
   const textColor = /^#[0-9a-f]{6}$/i.test(dockStyle.textColor || '') ? dockStyle.textColor : defaultDockStyle.textColor;
   const borderColor = /^#[0-9a-f]{6}$/i.test(dockStyle.borderColor || '') ? dockStyle.borderColor : defaultDockStyle.borderColor;
+  const sidebarBackgroundSource = String((dockStyle as any).sidebarBackgroundColor || dockStyle.backgroundColor || defaultDockStyle.sidebarBackgroundColor);
+  const sidebarBackgroundColor = /^#[0-9a-f]{6}$/i.test(sidebarBackgroundSource) ? sidebarBackgroundSource : defaultDockStyle.sidebarBackgroundColor;
+  const sidebarBackgroundOpacity = clamp((dockStyle as any).sidebarBackgroundOpacity, 20, 100, defaultDockStyle.sidebarBackgroundOpacity);
+  const sidebarTextSource = String((dockStyle as any).sidebarTextColor || dockStyle.textColor || defaultDockStyle.sidebarTextColor);
+  const sidebarTextBaseColor = /^#[0-9a-f]{6}$/i.test(sidebarTextSource) ? sidebarTextSource : defaultDockStyle.sidebarTextColor;
+  const sidebarTextOpacity = clamp((dockStyle as any).sidebarTextOpacity, 35, 100, defaultDockStyle.sidebarTextOpacity);
+  const sidebarTextColor = hexToRgba(sidebarTextBaseColor, sidebarTextOpacity);
+  const sidebarBorderSource = String((dockStyle as any).sidebarBorderColor || dockStyle.borderColor || defaultDockStyle.sidebarBorderColor);
+  const sidebarBorderColor = /^#[0-9a-f]{6}$/i.test(sidebarBorderSource) ? sidebarBorderSource : defaultDockStyle.sidebarBorderColor;
+  const sidebarSurfaceColor = hexToRgba(sidebarBackgroundColor, sidebarBackgroundOpacity);
   const shadowStrength = dockStyle.shadowStrength === 'none' || dockStyle.shadowStrength === 'strong' ? dockStyle.shadowStrength : 'soft';
   const sidebarFontOptions: Record<string, string> = {
     Inter: 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif',
@@ -234,16 +244,16 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
       >
       <div
         className="home-side-dock-surface flex h-full w-full min-w-0 flex-col overflow-hidden border"
-        style={{ backgroundColor, borderColor, borderRadius: radius, boxShadow: dockShadowMap[shadowStrength], backdropFilter: `blur(${blur}px)`, WebkitBackdropFilter: `blur(${blur}px)`, fontFamily: sidebarFontFamily }}
+        style={{ backgroundColor: sidebarSurfaceColor, borderColor: sidebarBorderColor, borderRadius: radius, boxShadow: dockShadowMap[shadowStrength], backdropFilter: `blur(${blur}px)`, WebkitBackdropFilter: `blur(${blur}px)`, fontFamily: sidebarFontFamily }}
       >
-        <div className="shrink-0 border-b" style={{ borderColor, padding }}>
+        <div className="shrink-0 border-b" style={{ borderColor: sidebarBorderColor, padding }}>
           <div className={`flex min-w-0 items-center ${isVisuallyExpanded ? 'justify-between' : 'flex-col'} `} style={{ gap }}>
             <button type="button" onClick={() => runNavigationAction(onHomeClick)} className="flex min-w-0 items-center" style={{ gap }} aria-label="Go to homepage">
               <img src={logoUrl} alt="Digital Catalyst logo" className="shrink-0 border bg-white object-cover shadow-sm" style={{ width: iconSize + 8, height: iconSize + 8, borderColor, borderRadius: itemRadius }} />
               {isVisuallyExpanded && (
                 <span className="min-w-0 text-left">
-                  <span className="block truncate font-black tracking-tight" style={{ color: textColor, fontSize: labelSize + 5 }}>{siteName}</span>
-                  <span className="block truncate text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: textColor, opacity: 0.62 }}>Learning workspace</span>
+                  <span className="block truncate font-black tracking-tight" style={{ color: sidebarTextColor, fontSize: labelSize + 5 }}>{siteName}</span>
+                  <span className="block truncate text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: sidebarTextColor, opacity: 0.62 }}>Learning workspace</span>
                 </span>
               )}
             </button>
@@ -252,7 +262,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
               {showLabels && (
                 <button type="button" onClick={() => setPersistentState(sidebarState === 'expanded' ? 'collapsed' : 'expanded')} className="flex items-center justify-center border bg-white/90 font-black transition hover:opacity-80" style={{ width: 32, height: 32, borderColor, borderRadius: Math.max(4, itemRadius - 4), color: accentColor }} aria-label={sidebarState === 'expanded' ? 'Minimize side panel' : 'Pin side panel open'} title={sidebarState === 'expanded' ? 'Minimize' : 'Pin open'}>{sidebarState === 'expanded' ? '‹' : '📌'}</button>
               )}
-              <button type="button" onClick={() => setPersistentState('hidden')} className="flex items-center justify-center border bg-white/90 font-black transition hover:border-red-200 hover:bg-red-50 hover:text-red-600" style={{ width: 32, height: 32, borderColor, borderRadius: Math.max(4, itemRadius - 4), color: textColor }} aria-label="Hide side panel and disable hover expansion" title="Hide panel">×</button>
+              <button type="button" onClick={() => setPersistentState('hidden')} className="flex items-center justify-center border bg-white/90 font-black transition hover:border-red-200 hover:bg-red-50 hover:text-red-600" style={{ width: 32, height: 32, borderColor: sidebarBorderColor, borderRadius: Math.max(4, itemRadius - 4), color: sidebarTextColor }} aria-label="Hide side panel and disable hover expansion" title="Hide panel">×</button>
             </div>
           </div>
         </div>
@@ -274,7 +284,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
                   minHeight: Math.max(50, iconSize + 14),
                   borderColor: isActive ? accentColor : borderColor,
                   borderRadius: itemRadius,
-                  color: isActive ? '#FFFFFF' : textColor,
+                  color: isActive ? '#FFFFFF' : sidebarTextColor,
                   background: isActive ? accentColor : itemColor,
                   boxShadow: isActive ? `0 8px 18px ${hexToRgba(accentColor, 22)}` : 'none',
                 }}
@@ -290,8 +300,8 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
         {isVisuallyExpanded && (
           <div className="shrink-0 border-t" style={{ borderColor, padding }}>
             <div className="border px-3 py-2.5" style={{ backgroundColor: hexToRgba(accentColor, 8), borderColor, borderRadius: itemRadius }}>
-              <p className="text-xs font-black" style={{ color: textColor }}>Desktop navigation</p>
-              <p className="mt-0.5 text-[10px] leading-4" style={{ color: textColor, opacity: 0.68 }}>Minimize for icons, hover to preview, pin it open, or close to the menu trigger.</p>
+              <p className="text-xs font-black" style={{ color: sidebarTextColor }}>Desktop navigation</p>
+              <p className="mt-0.5 text-[10px] leading-4" style={{ color: sidebarTextColor, opacity: 0.68 }}>Minimize for icons, hover to preview, pin it open, or close to the menu trigger.</p>
             </div>
           </div>
         )}

@@ -760,6 +760,11 @@ export interface WebsiteSettings {
             desktopExpandedWidth?: number;
             desktopCollapsedWidth?: number;
             sidebarFontFamily?: string;
+            sidebarBackgroundColor?: string;
+            sidebarBackgroundOpacity?: number;
+            sidebarTextColor?: string;
+            sidebarTextOpacity?: number;
+            sidebarBorderColor?: string;
         };
         readingStyle?: {
             backgroundColor: string;
@@ -1001,6 +1006,11 @@ const defaultWebsiteSettings: WebsiteSettings = {
             desktopExpandedWidth: 320,
             desktopCollapsedWidth: 88,
             sidebarFontFamily: 'Inter',
+            sidebarBackgroundColor: '#FBFDFF',
+            sidebarBackgroundOpacity: 92,
+            sidebarTextColor: '#334155',
+            sidebarTextOpacity: 100,
+            sidebarBorderColor: '#BFD7FF',
         },
         communityStyle: {
             desktopLayout: 'latest',
