@@ -10,8 +10,8 @@ const settings = fs.readFileSync('components/admin/WebsiteSettings.tsx', 'utf8')
 
 test('desktop website side panel is restored for desktop-width viewports while hover preview stays pointer-safe', () => {
   assert.match(app, /const readDesktopSidebarViewport = \(\) => \{/);
-  assert.match(app, /window\.matchMedia\('\(min-width: 1024px\)'\)\.matches/);
-  assert.doesNotMatch(app, /const desktopSidebarMedia = window\.matchMedia\('\(hover: hover\) and \(pointer: fine\) and \(min-width: 1024px\)'\)/);
+  assert.match(app, /window\.matchMedia\('\(min-width: 1024px\) and \(hover: hover\) and \(pointer: fine\)'\)\.matches/);
+  assert.match(app, /const desktopSidebarMedia = window\.matchMedia\('\(min-width: 1024px\) and \(hover: hover\) and \(pointer: fine\)'\)/);
   assert.match(homeDock, /if \(event\.pointerType === 'mouse'\) beginHoverPreview\(event\.pointerType\);/);
   assert.match(app, /websiteSettings\.desktop\.navigationMode === 'sidebar' && isDesktopSidebarViewport/);
 });

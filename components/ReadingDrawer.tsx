@@ -193,6 +193,48 @@ const splitRichHtmlForInArticleAds = (content: string): string[] => {
   return sections.length ? sections : [content];
 };
 
+const ReadingAdSlot: React.FC<{
+  variant: 'display' | 'inArticle' | 'multiplex';
+  label: string;
+  pageType: 'article' | 'list';
+  visibleWordCount: number;
+  isContentLoaded: boolean;
+  disabled?: boolean;
+  listType: ReadingListType;
+  className?: string;
+}> = ({ variant, label, pageType, visibleWordCount, isContentLoaded, disabled = false, listType, className = '' }) => {
+  const palette = getPalette(listType);
+  if (disabled) return null;
+
+  return (
+    <aside
+      className={`reading-ad-field my-10 rounded-[2rem] border p-4 shadow-sm backdrop-blur-xl sm:p-5 ${className}`}
+      style={{ backgroundColor: palette.cardSurface, borderColor: palette.cardBorder }}
+      aria-label={`${label} space`}
+    >
+      <div className="mb-3 flex items-center justify-between gap-3 text-[10px] font-black uppercase tracking-[0.28em]" style={{ color: palette.linkText }}>
+        <span>{label}</span>
+        <span className="rounded-full border px-3 py-1 text-[9px] tracking-[0.22em]" style={{ borderColor: palette.cardBorder }}>Ad Space</span>
+      </div>
+      <div className="min-h-[6rem] rounded-[1.35rem] border border-dashed p-3" style={{ borderColor: palette.cardBorder, backgroundColor: 'rgba(255,255,255,0.48)' }}>
+        <GoogleAd
+          variant={variant}
+          label={label}
+          pageType={pageType}
+          visibleWordCount={visibleWordCount}
+          isContentLoaded={isContentLoaded}
+          disabled={disabled}
+          className="w-full"
+        />
+        <p className="reading-ad-reserved-copy mt-2 text-center text-[11px] font-bold leading-5" style={{ color: palette.secondaryText }}>
+          Sponsored space reserved between reading sections.
+        </p>
+      </div>
+    </aside>
+  );
+};
+
+
 const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean; articleWordCount?: number; articleAdDisabled?: boolean; listType: ReadingListType }> = ({ content, includeInArticleAd = false, articleWordCount = 0, articleAdDisabled = false, listType }) => {
   const palette = getPalette(listType);
   if (/<\/?[a-z][\s\S]*>/i.test(content)) {
@@ -203,15 +245,14 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
           <React.Fragment key={`rich-section-${index}`}>
             <div className="reading-rich-html" dangerouslySetInnerHTML={{ __html: section }} />
             {includeInArticleAd && index < richSections.length - 1 ? (
-              <GoogleAd
+              <ReadingAdSlot
                 variant="inArticle"
                 label="Advertisement"
                 pageType="article"
                 visibleWordCount={articleWordCount}
                 isContentLoaded={true}
                 disabled={articleAdDisabled}
-                className="my-10 rounded-[2rem] border p-6 shadow-sm backdrop-blur-xl"
-                style={{ backgroundColor: palette.cardSurface, borderColor: palette.cardBorder }}
+                listType={listType}
               />
             ) : null}
           </React.Fragment>
@@ -245,7 +286,7 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
       const paragraphCount = nodes.filter(node => React.isValidElement(node) && node.type === 'p').length;
       if (includeInArticleAd && paragraphCount === 2) {
         nodes.push(
-          <GoogleAd
+          <ReadingAdSlot
             key={`in-article-ad-${nodes.length}`}
             variant="inArticle"
             label="Advertisement"
@@ -253,8 +294,7 @@ const MarkdownContent: React.FC<{ content: string; includeInArticleAd?: boolean;
             visibleWordCount={articleWordCount}
             isContentLoaded={true}
             disabled={articleAdDisabled}
-            className="my-10 rounded-[2rem] border p-6 shadow-sm backdrop-blur-xl"
-            style={{ backgroundColor: palette.cardSurface, borderColor: palette.cardBorder }}
+            listType={listType}
           />
         );
       }
@@ -777,30 +817,30 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                       </div>
                     )}
                   </div>
-                  <GoogleAd
+                  <ReadingAdSlot
                     variant="display"
                     label="Advertisement"
                     pageType="article"
                     visibleWordCount={selectedArticleWordCount}
                     isContentLoaded={true}
                     disabled={selectedArticleAdDisabled}
-                    className="mx-auto mt-8 max-w-[var(--reading-content-width)] border p-4 shadow-sm backdrop-blur-xl"
-                    style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder, borderRadius: 'var(--eduvora-card-radius, 22px)' }}
+                    listType={listType}
+                    className="mx-auto mt-8 max-w-[var(--reading-content-width)]"
                   />
                   {isExternalArticle(selectedArticleForDisplay) ? (
                     <>
                       <div className="mt-8 overflow-hidden rounded-[2rem] border p-2 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl lg:mt-10" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
                         <iframe src={getArticleUrl(selectedArticleForDisplay)} title={selectedArticleForDisplay.title} className="h-[72vh] w-full rounded-[1.5rem] border-0 bg-white [scrollbar-width:none] lg:h-[76vh]" sandbox="allow-same-origin allow-scripts allow-popups allow-forms" />
                       </div>
-                      <GoogleAd
+                      <ReadingAdSlot
                         variant="multiplex"
                         label="Related Content"
                         pageType="article"
                         visibleWordCount={selectedArticleWordCount}
                         isContentLoaded={true}
                         disabled={selectedArticleAdDisabled}
-                        className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
-                        style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}
+                        listType={listType}
+                        className="mt-10"
                       />
                     </>
                   ) : (
@@ -817,15 +857,15 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                           listType={listType}
                         />
                         {shouldShowPremiumLearningCta(selectedArticleForDisplay) && <SponsoredPartnerCard promoTitle={promoTitle} promoDescription={promoDescription} promoCtaLabel={promoCtaLabel} onExploreFeature={onExploreFeature} listType={listType} />}
-                        <GoogleAd
+                        <ReadingAdSlot
                           variant="multiplex"
                           label="Related Content"
                           pageType="article"
                           visibleWordCount={selectedArticleWordCount}
                           isContentLoaded={true}
                           disabled={selectedArticleAdDisabled}
-                          className="mt-10 rounded-[2rem] border p-5 shadow-sm backdrop-blur-xl"
-                          style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}
+                          listType={listType}
+                          className="mt-10"
                         />
                       </div>
                     </>

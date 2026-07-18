@@ -181,7 +181,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                             )}
                         </div>
                         <button onClick={() => onViewDetails()} className={`flex shrink-0 items-center justify-center ${actionButtonRoundClass} bg-gradient-to-r from-[#1769FF] to-[#6D5CFF] font-black text-white shadow-[0_8px_18px_rgba(23,105,255,0.22)] transition active:scale-95 ${compactMobile ? 'min-h-8 px-2 py-2 text-[9px] sm:min-h-0 sm:px-4 sm:py-2.5 sm:text-sm' : 'px-3.5 py-2.5 text-xs sm:px-4 sm:text-sm'}`}>
-                            {isPurchased ? 'Purchased' : 'Details'} <span className={`${compactMobile ? 'hidden sm:inline' : 'inline'} ml-1`}>&rarr;</span>
+                            {isPurchased ? 'Purchased' : 'Details'}
+                            {!isPurchased && <span className={`${compactMobile ? 'hidden sm:inline' : 'inline'} ml-1`}>&rarr;</span>}
                         </button>
                     </div>
                 ) : (

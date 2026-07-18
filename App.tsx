@@ -1567,7 +1567,7 @@ const App: React.FC = () => {
   const readDesktopSidebarViewport = () => {
     try {
       if (typeof window === 'undefined') return false;
-      return window.matchMedia('(min-width: 1024px)').matches;
+      return window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)').matches;
     } catch {
       return false;
     }
@@ -2152,7 +2152,7 @@ const App: React.FC = () => {
     };
     updateMobileViewport();
     const media = window.matchMedia('(max-width: 768px)');
-    const desktopSidebarMedia = window.matchMedia('(min-width: 1024px)');
+    const desktopSidebarMedia = window.matchMedia('(min-width: 1024px) and (hover: hover) and (pointer: fine)');
     media.addEventListener?.('change', updateMobileViewport);
     desktopSidebarMedia.addEventListener?.('change', updateMobileViewport);
     window.addEventListener('resize', updateMobileViewport, { passive: true });
@@ -6342,7 +6342,7 @@ const App: React.FC = () => {
               }
             `}</style>
             {/* Startup welcome overlay disabled. */}
-            {useDesktopSidebar && (
+            {useDesktopSidebar && currentView !== 'community' && (
               <HomeSideDock
                 settings={websiteSettings}
                 isLoggedIn={isLoggedIn}

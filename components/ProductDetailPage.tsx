@@ -814,13 +814,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 )}
 
                 <div className="product-detail-eye-catching-actions mt-5 space-y-3 rounded-[22px] border border-white/80 bg-white/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_46px_rgba(37,99,235,0.10)] ring-1 ring-blue-100/70 sm:mt-6 sm:p-3">
-                  <div className="product-detail-action-focus-copy flex items-center justify-between gap-3 rounded-[18px] border border-blue-100 bg-blue-50 px-4 py-3">
-                    <span>
-                      <span className="block text-xs font-black uppercase tracking-[0.22em] text-blue-700">Ready to unlock</span>
-                      <span className="mt-1 block text-sm font-bold text-slate-600">Review the final amount, then use the blue payment button.</span>
-                    </span>
-                    <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-white text-blue-700 shadow-sm" aria-hidden="true">🔒</span>
-                  </div>
+                  {!isPurchased && (
+                    <div className="product-detail-action-focus-copy flex items-center justify-between gap-3 rounded-[18px] border border-blue-100 bg-blue-50 px-4 py-3">
+                      <span>
+                        <span className="block text-xs font-black uppercase tracking-[0.22em] text-blue-700">Ready to unlock</span>
+                        <span className="mt-1 block text-sm font-bold text-slate-600">Review the final amount, then use the blue payment button.</span>
+                      </span>
+                      <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-white text-blue-700 shadow-sm" aria-hidden="true">🔒</span>
+                    </div>
+                  )}
                   {/* Source-contract marker only: className="product-checkout-primary product-checkout-purchased w-full rounded-2xl */}
                   {/* Source-contract marker only: className="product-checkout-secondary w-full rounded-2xl */}
                   {/* Source-contract marker only: className="product-checkout-primary w-full rounded-2xl */}
