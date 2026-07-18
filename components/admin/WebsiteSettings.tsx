@@ -489,10 +489,13 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const selectedColorExperience = localSettings.theme.colorExperience || 'immersive';
     const originalPaletteActive = selectedColorExperience === 'original';
     const classicModeActive = selectedColorExperience === 'classic';
+    const cleanNeutralModeActive = selectedColorExperience === 'clean-neutral';
+    const fixedProfessionalModeActive = classicModeActive || cleanNeutralModeActive;
     const themePreviewPalettes = {
         immersive: { background: '#F4F8FF', surface: '#FFFFFF', primary: '#1769FF', accent: '#6D5CFF', text: '#081A45' },
         warm: { background: '#FFF9F1', surface: '#FFFEFB', primary: '#7A4A3A', accent: '#A56A4F', text: '#2F2925' },
         'modern-white': { background: '#F8FAFC', surface: '#FFFFFF', primary: '#0F172A', accent: '#2563EB', text: '#111827' },
+        'clean-neutral': { background: '#F7F7F8', surface: '#FFFFFF', primary: '#171717', accent: '#EDEDED', text: '#262626' },
         classic: { background: '#FFFEEB', surface: '#FFFEF8', primary: '#111111', accent: '#F4F35B', text: '#111111' },
     };
     const selectedThemePreviewPalette = originalPaletteActive
@@ -506,18 +509,22 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         : themePreviewPalettes[selectedColorExperience as keyof typeof themePreviewPalettes] || themePreviewPalettes.immersive;
     const themePreviewFont = classicModeActive
         ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
-        : localSettings.theme.fontPairing === 'roboto-merriweather'
+        : cleanNeutralModeActive
+            ? 'Inter, ui-sans-serif, system-ui, sans-serif'
+            : localSettings.theme.fontPairing === 'roboto-merriweather'
             ? 'Roboto, sans-serif'
             : localSettings.theme.fontPairing === 'montserrat-oswald'
                 ? 'Montserrat, sans-serif'
                 : 'Inter, sans-serif';
-    const themePreviewRadius = classicModeActive ? '0.25rem' : localSettings.theme.cornerRadius;
+    const themePreviewRadius = classicModeActive ? '0.25rem' : cleanNeutralModeActive ? '0.625rem' : localSettings.theme.cornerRadius;
     const themePreviewShadows = {
         light: '0 7px 20px rgba(15,23,42,0.07)',
         medium: '0 14px 36px rgba(15,23,42,0.10)',
         heavy: '0 20px 48px rgba(15,23,42,0.14)',
     };
-    const themePreviewShadow = themePreviewShadows[localSettings.theme.shadowIntensity as keyof typeof themePreviewShadows] || themePreviewShadows.medium;
+    const themePreviewShadow = cleanNeutralModeActive
+        ? '0 1px 3px rgba(0,0,0,0.04)'
+        : themePreviewShadows[localSettings.theme.shadowIntensity as keyof typeof themePreviewShadows] || themePreviewShadows.medium;
     const defaultDockItems = dockCustomizationItems;
     const selectedDockItems = dockItems.length ? dockItems : defaultDockItems;
 
@@ -659,7 +666,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             <h2 className="text-xl font-black text-slate-950">Choose the complete website colour mode</h2>
                             <p className="text-sm font-semibold leading-6 text-slate-600">This selection controls every public page, Community screen, modal, card, button, form and Admin page. Choose a mode, then click Save Changes.</p>
                         </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
                             <button
                                 type="button"
                                 aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'original'}
@@ -714,6 +721,19 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             </button>
                             <button
                                 type="button"
+                                aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'clean-neutral'}
+                                onClick={() => handleNestedChange('theme', 'colorExperience', 'clean-neutral')}
+                                className={`rounded-2xl border p-4 text-left transition ${
+                                    (localSettings.theme.colorExperience || 'immersive') === 'clean-neutral'
+                                        ? 'border-[#171717] bg-[#171717] text-white shadow-none'
+                                        : 'border-[#E5E5E5] bg-white text-[#171717] hover:border-[#A3A3A3]'
+                                }`}
+                            >
+                                <span className="block text-base font-black">Clean Neutral</span>
+                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'clean-neutral' ? 'text-white/80' : 'text-[#737373]'}`}>Applies the complete 20-rule professional system: soft off-white pages, pure-white cards, black typography and icons, neutral active states, restrained borders, fixed radii and subtle shadows across every workspace.</span>
+                            </button>
+                            <button
+                                type="button"
                                 aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'classic'}
                                 onClick={() => handleNestedChange('theme', 'colorExperience', 'classic')}
                                 className={`rounded border p-4 text-left font-mono transition ${
@@ -726,6 +746,13 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                 <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'classic' ? 'text-[#111111]' : 'text-[#676767]'}`}>Subscription-page look: sharp cards, black borders, pale-yellow active states, warm paper background and editorial monospace typography.</span>
                             </button>
                         </div>
+                        {cleanNeutralModeActive && (
+                            <div className="mt-4 rounded-xl border border-[#E5E5E5] bg-white p-4">
+                                <p className="text-xs font-black uppercase tracking-[0.16em] text-[#737373]">Professional design contract locked</p>
+                                <h3 className="mt-1 text-base font-black text-[#171717]">All 20 Clean Neutral rules apply globally</h3>
+                                <p className="mt-1 text-xs font-semibold leading-5 text-[#525252]">Typography, card hierarchy, icon colours, active and inactive states, primary and secondary buttons, inputs, borders, shadows, status colours, spacing, radius and motion use fixed audited values on public pages, Community, Admin, course player, checkout and every overlay.</p>
+                            </div>
+                        )}
                         <div className="mt-4 rounded border border-[#181818] bg-[#FFFEF8] p-4 font-mono">
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                                 <div>
@@ -768,18 +795,18 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             <input type="color" value={localSettings.theme.textColor} onChange={e => handleNestedChange('theme', 'textColor', e.target.value)} className="h-10 w-full rounded-md border p-1 disabled:cursor-not-allowed" />
                         </FormRow>
                     </fieldset>
-                    <FormRow label="Typography" description={classicModeActive ? 'Classic Trust uses its fixed editorial monospace typography.' : 'Choose a real loaded font pairing for the complete website.'}>
-                        <select disabled={classicModeActive} value={localSettings.theme.fontPairing} onChange={e => handleNestedChange('theme', 'fontPairing', e.target.value)} className="theme-control-availability w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-55">
+                    <FormRow label="Typography" description={classicModeActive ? 'Classic Trust uses its fixed editorial monospace typography.' : cleanNeutralModeActive ? 'Clean Neutral uses fixed Inter typography for consistent professional hierarchy.' : 'Choose a real loaded font pairing for the complete website.'}>
+                        <select disabled={fixedProfessionalModeActive} value={localSettings.theme.fontPairing} onChange={e => handleNestedChange('theme', 'fontPairing', e.target.value)} className="theme-control-availability w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-55">
                             <option value="inter-lato">Inter & Lato</option>
                             <option value="roboto-merriweather">Roboto & Merriweather</option>
                             <option value="montserrat-oswald">Montserrat & Oswald</option>
                         </select>
                     </FormRow>
-                     <FormRow label="Corner Radius" description={classicModeActive ? 'Classic Trust intentionally uses a fixed sharp 0.25rem radius.' : `Controls global cards and buttons. Current: ${localSettings.theme.cornerRadius}`}>
-                        <input disabled={classicModeActive} type="range" min="0" max="2" step="0.1" value={parseFloat(localSettings.theme.cornerRadius)} onChange={e => handleNestedChange('theme', 'cornerRadius', `${e.target.value}rem`)} className="theme-control-availability w-full disabled:cursor-not-allowed disabled:opacity-45" />
+                     <FormRow label="Corner Radius" description={classicModeActive ? 'Classic Trust intentionally uses a fixed sharp 0.25rem radius.' : cleanNeutralModeActive ? 'Clean Neutral locks controls to 10px and cards to 14px for consistent hierarchy.' : `Controls global cards and buttons. Current: ${localSettings.theme.cornerRadius}`}>
+                        <input disabled={fixedProfessionalModeActive} type="range" min="0" max="2" step="0.1" value={parseFloat(localSettings.theme.cornerRadius)} onChange={e => handleNestedChange('theme', 'cornerRadius', `${e.target.value}rem`)} className="theme-control-availability w-full disabled:cursor-not-allowed disabled:opacity-45" />
                     </FormRow>
-                     <FormRow label="Shadow Intensity" description="Controls base, large, and extra-large shadow depth across the real website.">
-                        <select value={localSettings.theme.shadowIntensity} onChange={e => handleNestedChange('theme', 'shadowIntensity', e.target.value)} className="w-full rounded border p-2">
+                     <FormRow label="Shadow Intensity" description={cleanNeutralModeActive ? 'Clean Neutral locks cards to an ultra-subtle shadow and reserves stronger elevation for floating overlays.' : 'Controls base, large, and extra-large shadow depth across the real website.'}>
+                        <select disabled={cleanNeutralModeActive} value={localSettings.theme.shadowIntensity} onChange={e => handleNestedChange('theme', 'shadowIntensity', e.target.value)} className="w-full rounded border p-2">
                             <option value="light">Light</option>
                             <option value="medium">Medium</option>
                             <option value="heavy">Heavy</option>

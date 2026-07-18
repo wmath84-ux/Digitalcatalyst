@@ -687,7 +687,7 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
 // Comprehensive settings for the entire website, manageable from the admin panel
 export interface WebsiteSettings {
     theme: {
-        colorExperience: 'original' | 'immersive' | 'warm' | 'modern-white' | 'classic';
+        colorExperience: 'original' | 'immersive' | 'warm' | 'modern-white' | 'clean-neutral' | 'classic';
         classicWorkspaceTheme?: boolean;
         primaryColor: string;
         accentColor: string;
@@ -2784,11 +2784,12 @@ const App: React.FC = () => {
       requestedColorExperience === 'immersive' ||
       requestedColorExperience === 'warm' ||
       requestedColorExperience === 'modern-white' ||
+      requestedColorExperience === 'clean-neutral' ||
       requestedColorExperience === 'classic'
         ? requestedColorExperience
         : 'immersive';
 
-    const experiencePalettes: Record<'immersive' | 'warm' | 'modern-white' | 'classic', ThemePalette> = {
+    const experiencePalettes: Record<'immersive' | 'warm' | 'modern-white' | 'clean-neutral' | 'classic', ThemePalette> = {
       immersive: {
         primaryColor: '#315BCA',
         accentColor: '#315BCA',
@@ -2809,6 +2810,13 @@ const App: React.FC = () => {
         backgroundColor: '#F7F8FA',
         textColor: '#111827',
         textMutedColor: '#64748B',
+      },
+      'clean-neutral': {
+        primaryColor: '#171717',
+        accentColor: '#171717',
+        backgroundColor: '#F7F7F8',
+        textColor: '#171717',
+        textMutedColor: '#737373',
       },
       classic: {
         primaryColor: '#111111',
@@ -2843,9 +2851,10 @@ const App: React.FC = () => {
     const selectedFonts = fonts[adminTheme.fontPairing] || fonts['inter-lato'];
     const classicFontSans = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace';
     const classicFontSerif = 'ui-serif, Georgia, Cambria, \"Times New Roman\", Times, serif';
-    root.style.setProperty('--font-sans', colorExperience === 'classic' ? classicFontSans : selectedFonts.sans);
-    root.style.setProperty('--font-serif', colorExperience === 'classic' ? classicFontSerif : selectedFonts.serif);
-    root.style.setProperty('--style-corner-radius', colorExperience === 'classic' ? '0.25rem' : adminTheme.cornerRadius);
+    const cleanNeutralFont = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif';
+    root.style.setProperty('--font-sans', colorExperience === 'classic' ? classicFontSans : colorExperience === 'clean-neutral' ? cleanNeutralFont : selectedFonts.sans);
+    root.style.setProperty('--font-serif', colorExperience === 'classic' ? classicFontSerif : colorExperience === 'clean-neutral' ? cleanNeutralFont : selectedFonts.serif);
+    root.style.setProperty('--style-corner-radius', colorExperience === 'classic' ? '0.25rem' : colorExperience === 'clean-neutral' ? '0.625rem' : adminTheme.cornerRadius);
 
     const shadowScales = {
       light: {
@@ -2864,7 +2873,14 @@ const App: React.FC = () => {
         xl: '0 28px 70px rgb(15 23 42 / 0.17)',
       },
     };
-    const selectedShadowScale = shadowScales[adminTheme.shadowIntensity as keyof typeof shadowScales] || shadowScales.medium;
+    const cleanNeutralShadowScale = {
+      base: '0 1px 3px rgb(0 0 0 / 0.04)',
+      lg: '0 4px 14px rgb(0 0 0 / 0.06)',
+      xl: '0 12px 32px rgb(0 0 0 / 0.10)',
+    };
+    const selectedShadowScale = colorExperience === 'clean-neutral'
+      ? cleanNeutralShadowScale
+      : shadowScales[adminTheme.shadowIntensity as keyof typeof shadowScales] || shadowScales.medium;
     root.style.setProperty('--style-shadow-base', selectedShadowScale.base);
     root.style.setProperty('--style-shadow-lg', selectedShadowScale.lg);
     root.style.setProperty('--style-shadow-xl', selectedShadowScale.xl);

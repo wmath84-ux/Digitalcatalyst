@@ -51,7 +51,7 @@ test('Admin Theme controls are honest, real and previewable', () => {
   assert.match(app, /selectedShadowScale\.xl/);
   assert.match(settings, /theme-control-availability/);
   assert.match(settings, /disabled=\{!originalPaletteActive\}/);
-  assert.match(settings, /disabled=\{classicModeActive\}/);
+  assert.match(settings, /disabled=\{fixedProfessionalModeActive\}/);
   assert.match(settings, /theme-settings-live-preview/);
   assert.match(settings, /WEBSITE_SETTINGS_TAB_KEY = 'eduvora\.storeConfigTab\.v1'/);
   assert.match(settings, /Controls base, large, and extra-large shadow depth/);
