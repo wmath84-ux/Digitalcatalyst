@@ -21,12 +21,14 @@ interface BottomGlassDockProps {
   onCartClick: () => void;
   onProfileClick: () => void;
   onSubscriptionClick: () => void;
+  onOpenMayDay?: () => void;
   onOpenCommunity?: () => void;
   authButtonLabel: string;
   settings: WebsiteSettings;
 }
 
 const dockToneClasses: Record<string, string> = {
+  'May Day': 'from-[#EEF2FF] to-[#DDE8FF] hover:border-[#7C8DFF]',
   Store: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
   Purchased: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
   Purchases: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
@@ -103,7 +105,7 @@ export const dockShadowMap = {
   strong: '0 24px 60px rgba(15,23,42,0.24)',
 };
 
-const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, dockGlowItems = [], activeItem = '', onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenCommunity, authButtonLabel }: BottomGlassDockProps) => {
+const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, dockGlowItems = [], activeItem = '', onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenMayDay, onOpenCommunity, authButtonLabel }: BottomGlassDockProps) => {
   const defaultItems = useMemo(() => ([
     { label: 'Home', action: onHomeClick, icon: '🏠', badge: null },
     { label: 'Store', action: onNavigateToAllProducts, icon: '🛍️', badge: dockBadgeCounts.Store || null },
@@ -134,7 +136,9 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
   map.EduCoins = map.Profile || { label: isLoggedIn ? 'Profile' : authButtonLabel, action: onProfileClick, icon: isLoggedIn ? '🪙' : '🔐', badge: null };
   map['Profile'] = map['Profile'] || { label: isLoggedIn ? 'Profile' : authButtonLabel, action: onProfileClick, icon: isLoggedIn ? '🪙' : '🔐', badge: null };
   map.Subscriptions = { label: 'Subscriptions', action: onSubscriptionClick, icon: '💎', badge: null };
-  const items = configured.map(label => map[label]).filter(Boolean);
+  map['May Day'] = onOpenMayDay ? { label: 'May Day', action: onOpenMayDay, icon: '🗓️', badge: null, mobileOnly: true } : null;
+  const configuredItems = configured.map(label => map[label]).filter(Boolean);
+  const items = map['May Day'] ? [map['May Day'], ...configuredItems.filter((item: any) => item.label !== 'May Day')] : configuredItems;
 
   const dockStyle = { ...defaultDockStyle, ...((settings.content as any).dockStyle || {}) };
   const dockBackground = hexToRgba(dockStyle.backgroundColor, dockStyle.backgroundOpacity);
@@ -251,7 +255,7 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
                       if (dockScrollRef.current) dockScrollRef.current.scrollLeft = dockScrollLeftRef.current;
                     });
                   }}
-                  className={`group/item relative flex shrink-0 flex-col items-center border transition duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-4 ${hasNewGlow ? 'dock-new-content-glow' : ''} ${tone}`}
+                  className={`group/item relative ${item.mobileOnly ? 'md:hidden' : ''} flex shrink-0 flex-col items-center border transition duration-200 hover:-translate-y-0.5 focus:outline-none focus:ring-4 ${hasNewGlow ? 'dock-new-content-glow' : ''} ${tone}`}
                   style={{
                     backgroundColor: isActive ? hexToRgba(accentColor, 18) : itemBackground,
                     borderColor: isActive ? accentColor : borderColor,

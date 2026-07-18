@@ -6,6 +6,7 @@ import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, limit,
 import Header from './components/Header';
 import SiteNotificationCenter from './components/SiteNotificationCenter';
 import MobileAppHome from './components/MobileAppHome';
+import MayDayMobile from './components/MayDayMobile';
 import Hero from './components/Hero';
 import ProductShowcase from './components/ProductShowcase';
 import Services, { ServiceItem } from './components/Services';
@@ -1424,6 +1425,7 @@ const READING_ROUTE_SESSION_KEY = 'eduvora.readingRoute.v1';
 
 const PERSISTABLE_APP_VIEWS = new Set([
   'home',
+  'mayDay',
   'allProducts',
   'product',
   'myPurchases',
@@ -4280,6 +4282,11 @@ const App: React.FC = () => {
     }
   };
 
+  const handleNavigateToMayDay = () => {
+    setCurrentView('mayDay');
+    window.scrollTo(0, 0);
+  };
+
   const handleNavigateBack = (fallbackView: string = 'home') => {
     if (latestUpdateCheckout) {
       setLatestUpdateCheckout(null);
@@ -6159,6 +6166,20 @@ const App: React.FC = () => {
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={() => handleNavigateBack('home')} onActivatePlan={handleActivateSubscription} currentUser={appUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={() => handleNavigateBack('home')} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onClearWishlist={handleClearWishlist} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
+      case 'mayDay': return (
+        <>
+          <div className="md:hidden">
+            <MayDayMobile
+              currentUser={appUser}
+              isLoggedIn={isLoggedIn}
+              isPremium={hasPremiumMembership(appUser)}
+              onBack={() => handleNavigateBack('home')}
+              onUpgrade={handleNavigateToSubscription}
+            />
+          </div>
+          <div className="hidden md:block">{renderHomePageContent()}</div>
+        </>
+      );
       case 'home': default: return (
         <>
           <div className="md:hidden">
@@ -6212,6 +6233,7 @@ const App: React.FC = () => {
         ? (readingListType === 'blog' ? 'Blog' : 'News')
         : ({
             home: 'Home',
+            mayDay: 'Home',
             allProducts: 'Store',
             product: 'Store',
             myPurchases: 'Purchases',
@@ -6224,6 +6246,7 @@ const App: React.FC = () => {
 
   const shouldShowMainPageBackButtonOnMobile =
     currentView !== 'home' &&
+    currentView !== 'mayDay' &&
     currentView !== 'admin' &&
     currentView !== 'adminLogin';
 
@@ -6401,10 +6424,10 @@ const App: React.FC = () => {
                 ←
               </button>
             )}
-            <div className="mobile-site-header"><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} notificationCount={siteNotifications.filter(notification => !notification.read).length} onOpenNotifications={() => setIsSiteNotificationCenterOpen(true)} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
+            <div className={`mobile-site-header ${currentView === 'mayDay' ? 'max-md:hidden' : ''}`}><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} notificationCount={siteNotifications.filter(notification => !notification.read).length} onOpenNotifications={() => setIsSiteNotificationCenterOpen(true)} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={`${shouldHideMainDockOnMobile ? 'max-md:hidden' : ''} ${useDesktopSidebar ? 'lg:hidden' : ''}`}>
-                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
+                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenMayDay={handleNavigateToMayDay} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>
             )}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
@@ -6484,7 +6507,7 @@ const App: React.FC = () => {
                 </div>
               </div>
             )}
-            <div className="mobile-app-chrome"><InstallAppButton enabled={canShowInstallPrompt} /></div>
+            <div className={`mobile-app-chrome ${currentView === 'mayDay' ? 'max-md:hidden' : ''}`}><InstallAppButton enabled={canShowInstallPrompt} /></div>
             {currentView === 'home' && (
               <div className={shouldHideFooterOnMobile ? 'max-md:hidden' : ''}>
                 <Footer
