@@ -6,6 +6,7 @@ import { FaqItem } from '../Faq';
 import { UpcomingFeatureItem } from '../UpcomingFeatures';
 import { defaultDockStyle, dockCustomizationItems } from '../BottomGlassDock';
 import PremiumImageUrlInput from '../common/PremiumImageUrlInput';
+import CleanNeutralDesignStudio from './CleanNeutralDesignStudio';
 import {
     MembershipMessage,
     normalizeSubscriptionPageContent,
@@ -752,6 +753,12 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                 <h3 className="mt-1 text-base font-black text-[#171717]">All 20 Clean Neutral rules apply globally</h3>
                                 <p className="mt-1 text-xs font-semibold leading-5 text-[#525252]">Typography, card hierarchy, icon colours, active and inactive states, primary and secondary buttons, inputs, borders, shadows, status colours, spacing, radius and motion use fixed audited values on public pages, Community, Admin, course player, checkout and every overlay.</p>
                             </div>
+                        )}
+                        {cleanNeutralModeActive && (
+                            <CleanNeutralDesignStudio
+                                value={localSettings.theme.cleanNeutralCustomizer}
+                                onChange={customizer => handleNestedChange('theme', 'cleanNeutralCustomizer', customizer)}
+                            />
                         )}
                         <div className="mt-4 rounded border border-[#181818] bg-[#FFFEF8] p-4 font-mono">
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

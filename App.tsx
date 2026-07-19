@@ -47,6 +47,12 @@ import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, normalizeCoinPrice, resolveC
 import { ensureUserCoinWallet, spendUserCoinWallet } from './utils/coinWallet';
 import { clearRememberedAuthAccount, getRememberedAuthAccount, RememberedAuthAccount, saveRememberedAuthAccount } from './utils/rememberedAuth';
 import { isMobileViewport as getIsMobileViewport } from './utils/device';
+import {
+  DEFAULT_CLEAN_NEUTRAL_CUSTOMIZER,
+  applyCleanNeutralRuntime,
+  normalizeCleanNeutralCustomizer,
+  type CleanNeutralCustomizerSettings,
+} from './utils/cleanNeutralCustomizer';
 import { getFirebaseAuthErrorMessageFromCode, mergePurchasedProductIds, normalizePurchaseIds as normalizeSharedPurchaseIds, shouldRestoreEntitlementStatus } from './utils/authParity';
 import { isDemoMode } from './utils/runtimeMode';
 import { isProductSearchVisible, withProductSearchIndex } from './utils/productSearch';
@@ -689,6 +695,7 @@ export interface WebsiteSettings {
     theme: {
         colorExperience: 'original' | 'immersive' | 'warm' | 'modern-white' | 'clean-neutral' | 'classic';
         classicWorkspaceTheme?: boolean;
+        cleanNeutralCustomizer?: CleanNeutralCustomizerSettings;
         primaryColor: string;
         accentColor: string;
         backgroundColor: string;
@@ -917,6 +924,7 @@ const defaultWebsiteSettings: WebsiteSettings = {
         textMutedColor: '#536178',
         fontPairing: 'inter-lato',
         classicWorkspaceTheme: true,
+        cleanNeutralCustomizer: DEFAULT_CLEAN_NEUTRAL_CUSTOMIZER,
         cornerRadius: '0.75rem', // lg
         shadowIntensity: 'medium',
     },
@@ -1200,6 +1208,7 @@ const mergeWebsiteSettings = (settings?: Partial<WebsiteSettings> | null): Websi
     theme: {
       ...defaultWebsiteSettings.theme,
       ...(incoming.theme || {}),
+      cleanNeutralCustomizer: normalizeCleanNeutralCustomizer((incoming.theme as any)?.cleanNeutralCustomizer),
     },
     mobile: {
       ...defaultWebsiteSettings.mobile,
@@ -2833,6 +2842,13 @@ const App: React.FC = () => {
 
     root.dataset.colorExperience = colorExperience;
     root.dataset.classicWorkspaceTheme = colorExperience === 'classic' && adminTheme.classicWorkspaceTheme !== false ? 'on' : 'off';
+    applyCleanNeutralRuntime(
+      root,
+      adminTheme.cleanNeutralCustomizer,
+      currentView,
+      typeof window !== 'undefined' ? window.innerWidth : 1440,
+      colorExperience === 'clean-neutral',
+    );
     root.style.setProperty('--color-primary', mergedPalette.primaryColor);
     root.style.setProperty('--color-accent', mergedPalette.accentColor);
     root.style.setProperty('--color-background', mergedPalette.backgroundColor);
@@ -2884,7 +2900,7 @@ const App: React.FC = () => {
     root.style.setProperty('--style-shadow-base', selectedShadowScale.base);
     root.style.setProperty('--style-shadow-lg', selectedShadowScale.lg);
     root.style.setProperty('--style-shadow-xl', selectedShadowScale.xl);
-  }, [websiteSettings.theme, activeTheme]);
+  }, [websiteSettings.theme, activeTheme, currentView, isMobileViewport, isDesktopSidebarViewport]);
 
   const handleWebsiteSettingsUpdate = async (newSettings: WebsiteSettings): Promise<boolean> => {
     // When admin saves, we don't want to override user's theme choice,
