@@ -1,6 +1,8 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import type { ProductWithRating, User, WebsiteSettings } from '../App';
 import type { DockCountDestination } from '../utils/dockNewContent';
+import ProfessionalIcon from './common/ProfessionalIcon';
+import type { CleanNeutralIconSlotId, ProfessionalIconName } from '../utils/cleanNeutralAdvancedCustomizer';
 
 interface BottomGlassDockProps {
   currentUser: User | null;
@@ -107,15 +109,15 @@ export const dockShadowMap = {
 
 const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, dockGlowItems = [], activeItem = '', onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenMayDay, onOpenCommunity, authButtonLabel }: BottomGlassDockProps) => {
   const defaultItems = useMemo(() => ([
-    { label: 'Home', action: onHomeClick, icon: '🏠', badge: null },
-    { label: 'Store', action: onNavigateToAllProducts, icon: '🛍️', badge: dockBadgeCounts.Store || null },
-    { label: 'Purchased', action: onNavigateToPurchases, icon: '📚', badge: (dockBadgeCounts.Purchased ?? purchasedProducts.length) || null },
-    { label: 'Wishlist', action: onNavigateToWishlist, icon: '❤️', badge: (dockBadgeCounts.Wishlist ?? wishlistCount) || null },
-    { label: 'Cart', action: onCartClick, icon: '🛒', badge: (dockBadgeCounts.Cart ?? cartCount) || null },
-    { label: 'News', action: onOpenAnnouncementsModal, icon: '📢', badge: dockBadgeCounts.News || null },
-    ...(onOpenCommunity ? [{ label: 'Community', action: onOpenCommunity, icon: '💬', badge: null }] : []),
-    { label: 'Blog', action: onOpenBlogModal, icon: '📝', badge: dockBadgeCounts.Blog || null },
-    { label: 'Free', action: onOpenFreeModal, icon: '🎁', badge: dockBadgeCounts.Free || null },
+    { label: 'Home', action: onHomeClick, icon: 'home' as ProfessionalIconName, slot: 'nav.home' as CleanNeutralIconSlotId, badge: null },
+    { label: 'Store', action: onNavigateToAllProducts, icon: 'store' as ProfessionalIconName, slot: 'nav.store' as CleanNeutralIconSlotId, badge: dockBadgeCounts.Store || null },
+    { label: 'Purchased', action: onNavigateToPurchases, icon: 'book-open' as ProfessionalIconName, slot: 'nav.purchased' as CleanNeutralIconSlotId, badge: (dockBadgeCounts.Purchased ?? purchasedProducts.length) || null },
+    { label: 'Wishlist', action: onNavigateToWishlist, icon: 'heart' as ProfessionalIconName, slot: 'nav.wishlist' as CleanNeutralIconSlotId, badge: (dockBadgeCounts.Wishlist ?? wishlistCount) || null },
+    { label: 'Cart', action: onCartClick, icon: 'shopping-cart' as ProfessionalIconName, slot: 'nav.cart' as CleanNeutralIconSlotId, badge: (dockBadgeCounts.Cart ?? cartCount) || null },
+    { label: 'News', action: onOpenAnnouncementsModal, icon: 'megaphone' as ProfessionalIconName, slot: 'nav.news' as CleanNeutralIconSlotId, badge: dockBadgeCounts.News || null },
+    ...(onOpenCommunity ? [{ label: 'Community', action: onOpenCommunity, icon: 'message-circle' as ProfessionalIconName, slot: 'nav.community' as CleanNeutralIconSlotId, badge: null }] : []),
+    { label: 'Blog', action: onOpenBlogModal, icon: 'file-text' as ProfessionalIconName, slot: 'nav.blog' as CleanNeutralIconSlotId, badge: dockBadgeCounts.Blog || null },
+    { label: 'Free', action: onOpenFreeModal, icon: 'gift' as ProfessionalIconName, slot: 'nav.free' as CleanNeutralIconSlotId, badge: dockBadgeCounts.Free || null },
     { label: isLoggedIn ? 'Profile' : authButtonLabel, action: () => {
       if (typeof onProfileClick === 'function') {
         onProfileClick();
@@ -124,19 +126,19 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
 
       window.history.pushState({}, '', '/profile');
       window.dispatchEvent(new PopStateEvent('popstate'));
-    }, icon: isLoggedIn ? '🪙' : '🔐', badge: null },
+    }, icon: (isLoggedIn ? 'user' : 'lock') as ProfessionalIconName, slot: (isLoggedIn ? 'nav.profile' : 'nav.login') as CleanNeutralIconSlotId, badge: null },
   ]), [onHomeClick, onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenCommunity, onOpenBlogModal, onOpenFreeModal, isLoggedIn, authButtonLabel, onProfileClick, dockBadgeCounts.Store, dockBadgeCounts.Purchased, dockBadgeCounts.Wishlist, dockBadgeCounts.Cart, dockBadgeCounts.News, dockBadgeCounts.Blog, dockBadgeCounts.Free]);
 
   const configuredBase = ((settings.content as any).dockItems || dockCustomizationItems) as string[];
   const configuredWithHome = configuredBase.includes('Home') ? configuredBase : ['Home', ...configuredBase];
   const configured = configuredWithHome.filter((label, index, labels) => labels.indexOf(label) === index);
   const map: any = Object.fromEntries(defaultItems.map(item => [item.label, item]));
-  map.Home = map.Home || { label: 'Home', action: onHomeClick, icon: '🏠', badge: null };
+  map.Home = map.Home || { label: 'Home', action: onHomeClick, icon: 'home' as ProfessionalIconName, slot: 'nav.home' as CleanNeutralIconSlotId, badge: null };
   map.Purchases = map.Purchased;
-  map.EduCoins = map.Profile || { label: isLoggedIn ? 'Profile' : authButtonLabel, action: onProfileClick, icon: isLoggedIn ? '🪙' : '🔐', badge: null };
-  map['Profile'] = map['Profile'] || { label: isLoggedIn ? 'Profile' : authButtonLabel, action: onProfileClick, icon: isLoggedIn ? '🪙' : '🔐', badge: null };
-  map.Subscriptions = { label: 'Subscriptions', action: onSubscriptionClick, icon: '💎', badge: null };
-  map['May Day'] = onOpenMayDay ? { label: 'May Day', action: onOpenMayDay, icon: '🗓️', badge: null, mobileOnly: true } : null;
+  map.EduCoins = map.Profile || { label: isLoggedIn ? 'Profile' : authButtonLabel, action: onProfileClick, icon: (isLoggedIn ? 'user' : 'lock') as ProfessionalIconName, slot: (isLoggedIn ? 'nav.profile' : 'nav.login') as CleanNeutralIconSlotId, badge: null };
+  map['Profile'] = map['Profile'] || { label: isLoggedIn ? 'Profile' : authButtonLabel, action: onProfileClick, icon: (isLoggedIn ? 'user' : 'lock') as ProfessionalIconName, slot: (isLoggedIn ? 'nav.profile' : 'nav.login') as CleanNeutralIconSlotId, badge: null };
+  map.Subscriptions = { label: 'Subscriptions', action: onSubscriptionClick, icon: 'gem' as ProfessionalIconName, slot: 'nav.subscriptions' as CleanNeutralIconSlotId, badge: null };
+  map['May Day'] = onOpenMayDay ? { label: 'May Day', action: onOpenMayDay, icon: 'calendar' as ProfessionalIconName, slot: 'nav.mayDay' as CleanNeutralIconSlotId, badge: null, mobileOnly: true } : null;
   const configuredItems = configured.map(label => map[label]).filter(Boolean);
   const items = map['May Day'] ? [map['May Day'], ...configuredItems.filter((item: any) => item.label !== 'May Day')] : configuredItems;
 
@@ -219,6 +221,7 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
         <div
           className="pointer-events-auto group relative max-w-[95vw] overflow-hidden border transition-[transform,opacity] duration-300 data-[hidden=true]:translate-y-[calc(100%+2rem)] data-[hidden=true]:opacity-0 lg:max-w-[min(96vw,1120px)]"
           id="main-bottom-dock"
+          data-clean-neutral-region="navigation.mobileDock"
           data-hidden={isAutoHidden ? 'true' : 'false'}
           onPointerEnter={() => setIsAutoHidden(false)}
           style={{
@@ -237,7 +240,8 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
             {items.map((item) => {
               const isLoggedOutProfileVisual = !isLoggedIn && (item.label === authButtonLabel || item.label === 'Login');
               const visualLabel = isLoggedOutProfileVisual ? 'Profile' : item.label;
-              const visualIcon = isLoggedOutProfileVisual ? '🪙' : item.icon;
+              const visualIcon = isLoggedOutProfileVisual ? 'user' as ProfessionalIconName : item.icon as ProfessionalIconName;
+              const visualSlot = isLoggedOutProfileVisual ? 'nav.profile' as CleanNeutralIconSlotId : item.slot as CleanNeutralIconSlotId;
               const tone = dockToneClasses[visualLabel] || dockToneClasses[item.label] || 'from-[var(--mobile-bg)] to-[var(--mobile-bg-soft)] hover:border-[var(--mobile-border-active)]';
               const hasNewGlow = dockGlowItems.includes(item.label as DockCountDestination);
               const isActive = activeItem === item.label || (item.label === 'Purchased' && activeItem === 'Purchases') || (visualLabel === 'Profile' && activeItem === 'Profile');
@@ -267,8 +271,19 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
                   }}
                 >
                   <span className={`absolute inset-0 bg-gradient-to-br ${tone.split(' hover:')[0]} transition duration-200 group-hover/item:opacity-75`} style={{ opacity: accentOpacity, borderRadius: itemRadius }} />
-                  <span className="relative flex items-center justify-center border bg-white/90 shadow-inner transition duration-200 group-hover/item:scale-105" style={{ width: iconSize, height: iconSize, fontSize: Math.max(16, iconSize * 0.55), borderRadius: Math.max(4, itemRadius - 4), borderColor }}>{visualIcon}</span>
-                  {showLabels && <span className="relative mt-1.5 font-black tracking-wide" style={{ fontSize: labelSize, color: isActive ? accentColor : textColor }}>{visualLabel}</span>}
+                  <ProfessionalIcon
+                    slot={visualSlot}
+                    fallbackName={visualIcon}
+                    label={visualLabel}
+                    defaultDisplayMode={showLabels ? 'icon-with-text' : 'icon-only'}
+                    defaultPosition="top"
+                    size={Math.max(18, iconSize * 0.58)}
+                    color={isActive ? accentColor : textColor}
+                    iconClassName="relative flex items-center justify-center border bg-white/90 shadow-inner transition duration-200 group-hover/item:scale-105"
+                    iconStyle={{ width: iconSize, height: iconSize, borderRadius: Math.max(4, itemRadius - 4), borderColor }}
+                    labelClassName="relative font-black tracking-wide"
+                    labelStyle={{ fontSize: labelSize, color: isActive ? accentColor : textColor }}
+                  />
                   {showBadges && item.badge ? <span className="dock-count-badge absolute -right-1 -top-1 rounded-full border border-white px-1.5 py-0.5 text-[10px] font-black text-white shadow-[0_8px_20px_rgba(15,23,42,0.24)]" style={{ backgroundColor: accentColor }}>{item.badge > 99 ? '99+' : item.badge}</span> : null}
                 </button>
               );

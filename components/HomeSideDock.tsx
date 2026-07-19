@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import type { ProductWithRating, WebsiteSettings } from '../App';
 import type { DockCountDestination } from '../utils/dockNewContent';
 import { defaultDockStyle, dockCustomizationItems, dockShadowMap, hexToRgba } from './BottomGlassDock';
+import ProfessionalIcon from './common/ProfessionalIcon';
+import type { CleanNeutralIconSlotId, ProfessionalIconName } from '../utils/cleanNeutralAdvancedCustomizer';
 
 export type DesktopSidebarCommand = 'preview-start' | 'preview-end' | 'pin' | 'hide';
 
@@ -46,7 +48,8 @@ export type DesktopSidebarState = 'expanded' | 'collapsed' | 'hidden';
 type NavigationItem = {
   id: string;
   label: string;
-  icon: string;
+  icon: ProfessionalIconName;
+  slot: CleanNeutralIconSlotId;
   badge: number | null;
   action: () => void;
 };
@@ -187,24 +190,25 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
   const profileItem: NavigationItem = {
     id: 'Profile',
     label: isLoggedIn ? 'Profile' : authButtonLabel,
-    icon: isLoggedIn ? '🪙' : '🔐',
+    icon: isLoggedIn ? 'user' : 'lock',
+    slot: isLoggedIn ? 'nav.profile' : 'nav.login',
     badge: null,
     action: onProfileClick,
   };
 
   const defaultItems: NavigationItem[] = [
-    ...(onOpenMayDay ? [{ id: 'May Day', label: 'May Day', action: onOpenMayDay, icon: '🗓️', badge: null }] : []),
-    { id: 'Home', label: 'Home', action: onHomeClick, icon: '🏠', badge: null },
-    { id: 'Store', label: 'Store', action: onNavigateToAllProducts, icon: '🛍️', badge: dockBadgeCounts.Store || null },
-    { id: 'Purchased', label: 'Purchased', action: onNavigateToPurchases, icon: '📚', badge: (dockBadgeCounts.Purchased ?? purchasedProducts.length) || null },
-    { id: 'Wishlist', label: 'Wishlist', action: onNavigateToWishlist, icon: '❤️', badge: (dockBadgeCounts.Wishlist ?? wishlistCount) || null },
-    { id: 'Cart', label: 'Cart', action: onCartClick, icon: '🛒', badge: (dockBadgeCounts.Cart ?? cartCount) || null },
-    { id: 'News', label: 'News', action: onOpenAnnouncementsModal, icon: '📢', badge: dockBadgeCounts.News || null },
-    ...(onOpenCommunity ? [{ id: 'Community', label: 'Community', action: onOpenCommunity, icon: '💬', badge: null }] : []),
-    { id: 'Blog', label: 'Blog', action: onOpenBlogModal, icon: '📝', badge: dockBadgeCounts.Blog || null },
-    { id: 'Free', label: 'Free', action: onOpenFreeModal, icon: '🎁', badge: dockBadgeCounts.Free || null },
+    ...(onOpenMayDay ? [{ id: 'May Day', label: 'May Day', action: onOpenMayDay, icon: 'calendar' as ProfessionalIconName, slot: 'nav.mayDay' as CleanNeutralIconSlotId, badge: null }] : []),
+    { id: 'Home', label: 'Home', action: onHomeClick, icon: 'home', slot: 'nav.home', badge: null },
+    { id: 'Store', label: 'Store', action: onNavigateToAllProducts, icon: 'store', slot: 'nav.store', badge: dockBadgeCounts.Store || null },
+    { id: 'Purchased', label: 'Purchased', action: onNavigateToPurchases, icon: 'book-open', slot: 'nav.purchased', badge: (dockBadgeCounts.Purchased ?? purchasedProducts.length) || null },
+    { id: 'Wishlist', label: 'Wishlist', action: onNavigateToWishlist, icon: 'heart', slot: 'nav.wishlist', badge: (dockBadgeCounts.Wishlist ?? wishlistCount) || null },
+    { id: 'Cart', label: 'Cart', action: onCartClick, icon: 'shopping-cart', slot: 'nav.cart', badge: (dockBadgeCounts.Cart ?? cartCount) || null },
+    { id: 'News', label: 'News', action: onOpenAnnouncementsModal, icon: 'megaphone', slot: 'nav.news', badge: dockBadgeCounts.News || null },
+    ...(onOpenCommunity ? [{ id: 'Community', label: 'Community', action: onOpenCommunity, icon: 'message-circle' as ProfessionalIconName, slot: 'nav.community' as CleanNeutralIconSlotId, badge: null }] : []),
+    { id: 'Blog', label: 'Blog', action: onOpenBlogModal, icon: 'file-text', slot: 'nav.blog', badge: dockBadgeCounts.Blog || null },
+    { id: 'Free', label: 'Free', action: onOpenFreeModal, icon: 'gift', slot: 'nav.free', badge: dockBadgeCounts.Free || null },
     profileItem,
-    { id: 'Subscriptions', label: 'Subscriptions', action: onSubscriptionClick, icon: '💎', badge: null },
+    { id: 'Subscriptions', label: 'Subscriptions', action: onSubscriptionClick, icon: 'gem', slot: 'nav.subscriptions', badge: null },
   ];
 
   const configuredBase = ((settings.content as any).dockItems || dockCustomizationItems) as string[];
@@ -231,7 +235,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
           aria-label="Preview or pin desktop navigation"
           title="Hover to preview · click to keep open"
         >
-          ☰
+          <ProfessionalIcon slot="nav.menu" fallbackName="menu" label="Open navigation" size={24} />
         </button>
       )}
 
@@ -244,6 +248,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
         onPointerEnter={(event) => { if (event.pointerType === 'mouse') beginHoverPreview(event.pointerType); }}
         onPointerLeave={(event) => { if (event.pointerType === 'mouse') scheduleHoverClose(event.pointerType); }}
         aria-label="Main desktop navigation"
+        data-clean-neutral-region="shell.sidebar"
       >
       <div
         className="home-side-dock-surface flex h-full w-full min-w-0 flex-col overflow-hidden border"
@@ -263,14 +268,14 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
 
             <div className={`flex shrink-0 items-center ${isVisuallyExpanded ? '' : 'w-full justify-center'}`} style={{ gap: Math.max(4, gap / 2) }}>
               {showLabels && (
-                <button type="button" onClick={() => setPersistentState(sidebarState === 'expanded' ? 'collapsed' : 'expanded')} className="flex items-center justify-center border bg-white/90 font-black transition hover:opacity-80" style={{ width: 32, height: 32, borderColor, borderRadius: Math.max(4, itemRadius - 4), color: accentColor }} aria-label={sidebarState === 'expanded' ? 'Minimize side panel' : 'Pin side panel open'} title={sidebarState === 'expanded' ? 'Minimize' : 'Pin open'}>{sidebarState === 'expanded' ? '‹' : '📌'}</button>
+                <button type="button" onClick={() => setPersistentState(sidebarState === 'expanded' ? 'collapsed' : 'expanded')} className="flex items-center justify-center border bg-white/90 font-black transition hover:opacity-80" style={{ width: 32, height: 32, borderColor, borderRadius: Math.max(4, itemRadius - 4), color: accentColor }} aria-label={sidebarState === 'expanded' ? 'Minimize side panel' : 'Pin side panel open'} title={sidebarState === 'expanded' ? 'Minimize' : 'Pin open'}>{sidebarState === 'expanded' ? <ProfessionalIcon slot="nav.menu" fallbackName="minus" label="Minimize" size={18} /> : <ProfessionalIcon slot="nav.pin" fallbackName="pin" label="Pin open" size={18} />}</button>
               )}
               <button type="button" onClick={() => setPersistentState('hidden')} className="flex items-center justify-center border bg-white/90 font-black transition hover:border-red-200 hover:bg-red-50 hover:text-red-600" style={{ width: 32, height: 32, borderColor: sidebarBorderColor, borderRadius: Math.max(4, itemRadius - 4), color: sidebarTextColor }} aria-label="Hide side panel and disable hover expansion" title="Hide panel">×</button>
             </div>
           </div>
         </div>
 
-        <nav className="min-h-0 flex-1 overflow-y-auto custom-scrollbar" style={{ padding, display: 'flex', flexDirection: 'column', gap }} aria-label="Website sections">
+        <nav data-clean-neutral-region="shell.navigation" className="min-h-0 flex-1 overflow-y-auto custom-scrollbar" style={{ padding, display: 'flex', flexDirection: 'column', gap }} aria-label="Website sections">
           {items.map(item => {
             const isActive = activeItem === item.id;
             return (
@@ -292,8 +297,20 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
                   boxShadow: isActive ? `0 8px 18px ${hexToRgba(accentColor, 22)}` : 'none',
                 }}
               >
-                <span className="relative flex shrink-0 items-center justify-center border bg-white/95 shadow-inner" style={{ width: iconSize, height: iconSize, borderColor, borderRadius: Math.max(4, itemRadius - 4), fontSize: Math.max(16, iconSize * 0.52) }}>{item.icon}</span>
-                {isVisuallyExpanded && <span className="min-w-0 flex-1 truncate font-black tracking-wide" style={{ fontSize: labelSize }}>{item.label}</span>}
+                <ProfessionalIcon
+                  slot={item.slot}
+                  fallbackName={item.icon}
+                  label={item.label}
+                  defaultDisplayMode={isVisuallyExpanded ? 'icon-with-text' : 'icon-only'}
+                  defaultPosition="left"
+                  size={Math.max(18, iconSize * 0.58)}
+                  color={isActive ? '#FFFFFF' : sidebarTextColor}
+                  className={isVisuallyExpanded ? 'min-w-0 flex-1 justify-start' : ''}
+                  iconClassName="relative flex shrink-0 items-center justify-center border bg-white/95 shadow-inner"
+                  iconStyle={{ width: iconSize, height: iconSize, borderColor, borderRadius: Math.max(4, itemRadius - 4), color: isActive ? accentColor : sidebarTextColor }}
+                  labelClassName="min-w-0 flex-1 truncate font-black tracking-wide"
+                  labelStyle={{ fontSize: labelSize }}
+                />
                 {showBadges && item.badge ? <span className={`${isVisuallyExpanded ? 'relative' : 'absolute -right-0.5 -top-0.5'} inline-flex min-w-5 items-center justify-center rounded-full border border-white px-1.5 py-0.5 text-[10px] font-black leading-none text-white shadow-sm`} style={{ backgroundColor: accentColor }}>{item.badge > 99 ? '99+' : item.badge}</span> : null}
               </button>
             );

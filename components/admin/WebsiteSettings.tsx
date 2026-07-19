@@ -7,6 +7,7 @@ import { UpcomingFeatureItem } from '../UpcomingFeatures';
 import { defaultDockStyle, dockCustomizationItems } from '../BottomGlassDock';
 import PremiumImageUrlInput from '../common/PremiumImageUrlInput';
 import CleanNeutralDesignStudio from './CleanNeutralDesignStudio';
+import CleanNeutralAdvancedStudio from './CleanNeutralAdvancedStudio';
 import {
     MembershipMessage,
     normalizeSubscriptionPageContent,
@@ -755,10 +756,16 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             </div>
                         )}
                         {cleanNeutralModeActive && (
-                            <CleanNeutralDesignStudio
-                                value={localSettings.theme.cleanNeutralCustomizer}
-                                onChange={customizer => handleNestedChange('theme', 'cleanNeutralCustomizer', customizer)}
-                            />
+                            <>
+                                <CleanNeutralDesignStudio
+                                    value={localSettings.theme.cleanNeutralCustomizer}
+                                    onChange={customizer => handleNestedChange('theme', 'cleanNeutralCustomizer', customizer)}
+                                />
+                                <CleanNeutralAdvancedStudio
+                                    value={localSettings.theme.cleanNeutralCustomizer}
+                                    onChange={customizer => handleNestedChange('theme', 'cleanNeutralCustomizer', customizer)}
+                                />
+                            </>
                         )}
                         <div className="mt-4 rounded border border-[#181818] bg-[#FFFEF8] p-4 font-mono">
                             <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">

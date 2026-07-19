@@ -1,3 +1,10 @@
+import {
+  DEFAULT_CLEAN_NEUTRAL_ADVANCED_CUSTOMIZER,
+  applyCleanNeutralAdvancedRuntime,
+  normalizeCleanNeutralAdvancedCustomizer,
+  type CleanNeutralAdvancedCustomizerSettings,
+} from './cleanNeutralAdvancedCustomizer';
+
 export const CLEAN_NEUTRAL_DEVICE_SCOPES = ['desktop', 'tablet', 'mobile'] as const;
 
 export type CleanNeutralDeviceScope = typeof CLEAN_NEUTRAL_DEVICE_SCOPES[number];
@@ -97,8 +104,9 @@ export interface CleanNeutralRuleValues {
 export type CleanNeutralTargetOverride = Partial<CleanNeutralRuleValues>;
 
 export interface CleanNeutralCustomizerSettings {
-  version: 1;
+  version: 2;
   targets: Record<string, CleanNeutralTargetOverride>;
+  advanced: CleanNeutralAdvancedCustomizerSettings;
 }
 
 export const DEFAULT_CLEAN_NEUTRAL_RULE_VALUES: CleanNeutralRuleValues = {
@@ -125,8 +133,9 @@ export const DEFAULT_CLEAN_NEUTRAL_RULE_VALUES: CleanNeutralRuleValues = {
 };
 
 export const DEFAULT_CLEAN_NEUTRAL_CUSTOMIZER: CleanNeutralCustomizerSettings = {
-  version: 1,
+  version: 2,
   targets: {},
+  advanced: DEFAULT_CLEAN_NEUTRAL_ADVANCED_CUSTOMIZER,
 };
 
 const PAGE_IDS = new Set<string>(CLEAN_NEUTRAL_PAGE_REGISTRY.map(page => page.id));
@@ -241,7 +250,11 @@ export const normalizeCleanNeutralCustomizer = (
       if (Object.keys(cleaned).length > 0) targets[targetKey] = cleaned;
     });
 
-  return { version: 1, targets };
+  return {
+    version: 2,
+    targets,
+    advanced: normalizeCleanNeutralAdvancedCustomizer(raw.advanced),
+  };
 };
 
 export const resolveCleanNeutralRuleValues = (
@@ -325,6 +338,7 @@ export const applyCleanNeutralRuntime = (
     RUNTIME_PROPERTIES.forEach(property => root.style.removeProperty(property));
     delete root.dataset.cleanNeutralPage;
     delete root.dataset.cleanNeutralDevice;
+    applyCleanNeutralAdvancedRuntime(undefined, 'home', 'desktop', false);
     return;
   }
 
@@ -370,4 +384,11 @@ export const applyCleanNeutralRuntime = (
   Object.entries(properties).forEach(([property, value]) => {
     root.style.setProperty(property, value);
   });
+
+  applyCleanNeutralAdvancedRuntime(
+    normalizeCleanNeutralCustomizer(settings).advanced,
+    pageId,
+    device,
+    true,
+  );
 };

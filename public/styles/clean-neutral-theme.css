@@ -1152,3 +1152,59 @@ html[data-color-experience="clean-neutral"] .tagmaster-admin-theme :where(
   color: var(--cn-primary-foreground) !important;
   box-shadow: var(--cn-shadow-card) !important;
 }
+
+
+/* CLEAN_NEUTRAL_ADVANCED_CUSTOMIZER_PHASE2_V2 */
+html[data-color-experience="clean-neutral"] [data-clean-neutral-region] {
+  box-sizing: border-box;
+}
+
+html[data-color-experience="clean-neutral"][data-clean-neutral-page="home"] :where(
+  .desktop-home-performance,
+  [data-clean-neutral-workspace="mobile-home"],
+  [data-clean-neutral-region="shell.page"]
+) {
+  background-color: var(--cn-page) !important;
+  background-image: none !important;
+}
+
+html[data-color-experience="clean-neutral"][data-clean-neutral-page="home"] [data-clean-neutral-region="content.hero"] {
+  background-color: var(--cn-surface) !important;
+  background-image: none !important;
+  border-color: var(--cn-border) !important;
+}
+
+html[data-color-experience="clean-neutral"] .community-ai-mentor-panel :where(
+  button[class*="rounded-full"],
+  button[class*="border-[#D9E7F8]"],
+  button[class*="bg-[#F8FBFF]"]
+) {
+  color: var(--cn-heading) !important;
+  background-color: var(--cn-control) !important;
+  border-color: var(--cn-border) !important;
+}
+
+html[data-color-experience="clean-neutral"] .community-ai-mentor-panel :where(
+  button[class*="from-[#1769FF]"],
+  button[class*="from-[#5B4BFF]"],
+  button[class*="bg-[#7B61FF]"]
+) {
+  color: var(--cn-primary-foreground) !important;
+  background: var(--cn-primary) !important;
+}
+
+html[data-color-experience="clean-neutral"] :where(
+  [class*="course-player"] button,
+  [class*="course-player"] [role="button"]
+) :where(svg, [data-clean-neutral-icon-slot]) {
+  color: currentColor !important;
+  stroke: currentColor !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+html[data-color-experience="clean-neutral"] [data-clean-neutral-icon-slot] svg {
+  color: inherit !important;
+  stroke: currentColor !important;
+  fill: none !important;
+}

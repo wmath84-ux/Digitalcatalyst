@@ -8,6 +8,8 @@ import { ensureUserCoinWallet, watchUserCoinWallet } from '../utils/coinWallet';
 import LiquidMetalButton from './ui/LiquidMetalButton';
 import { pillClassForProductRoundness, resolveProductRoundnessSettings } from '../utils/productRoundness';
 import MobileProductSearchPage from './MobileProductSearchPage';
+import ProfessionalIcon from './common/ProfessionalIcon';
+import type { CleanNeutralIconSlotId, ProfessionalIconName } from '../utils/cleanNeutralAdvancedCustomizer';
 
 interface MobileAppHomeProps {
   settings: WebsiteSettings;
@@ -131,18 +133,18 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
 
-  const chips = [
-    { label: 'My Purchases', icon: '📚', action: onNavigateToPurchases, active: true },
-    { label: 'Free Resources', icon: '🎁', action: onNavigateToFreeProducts },
-    { label: 'Top Rated', icon: '⭐', action: () => scrollToMobileSection('mobile-top-rated-products') },
-    { label: 'Coupons', icon: '🏷️', action: () => scrollToMobileSection('mobile-coupons'), count: activeCoupons.length },
-    { label: 'News', icon: '📰', action: onOpenNews },
+  const chips: Array<{ label: string; icon: ProfessionalIconName; slot: CleanNeutralIconSlotId; action: () => void; active?: boolean; count?: number }> = [
+    { label: 'My Purchases', icon: 'book-open', slot: 'nav.purchased', action: onNavigateToPurchases, active: true },
+    { label: 'Free Resources', icon: 'gift', slot: 'nav.free', action: onNavigateToFreeProducts },
+    { label: 'Top Rated', icon: 'star', slot: 'home.topRated', action: () => scrollToMobileSection('mobile-top-rated-products') },
+    { label: 'Coupons', icon: 'tag', slot: 'home.coupons', action: () => scrollToMobileSection('mobile-coupons'), count: activeCoupons.length },
+    { label: 'News', icon: 'megaphone', slot: 'nav.news', action: onOpenNews },
   ];
 
   return (
-    <div data-clean-neutral-workspace="mobile-home" className="min-h-[100dvh] bg-[radial-gradient(circle_at_12%_3%,rgba(191,215,255,0.78),transparent_30%),radial-gradient(circle_at_92%_12%,rgba(220,203,255,0.52),transparent_28%),linear-gradient(180deg,#F5F9FF_0%,#EEF6FF_44%,#FFFFFF_100%)] px-4 pb-44 pt-[max(14px,env(safe-area-inset-top))] text-[#64708F]">
-      <header className="sticky top-2 z-30 mb-5 flex items-center gap-3 rounded-[28px] border border-[#D8E6FF]/90 bg-white/86 p-3 shadow-[0_18px_50px_rgba(11,99,255,0.12)] backdrop-blur-2xl">
-        <button type="button" onClick={onNavigateToAllProducts} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#0B63FF] to-[#7C4DFF] text-xl shadow-[0_10px_24px_rgba(11,99,255,0.28)]">⚡</button>
+    <div data-clean-neutral-workspace="mobile-home" data-clean-neutral-region="shell.page" className="min-h-[100dvh] bg-[radial-gradient(circle_at_12%_3%,rgba(191,215,255,0.78),transparent_30%),radial-gradient(circle_at_92%_12%,rgba(220,203,255,0.52),transparent_28%),linear-gradient(180deg,#F5F9FF_0%,#EEF6FF_44%,#FFFFFF_100%)] px-4 pb-44 pt-[max(14px,env(safe-area-inset-top))] text-[#64708F]">
+      <header data-clean-neutral-region="shell.header" className="sticky top-2 z-30 mb-5 flex items-center gap-3 rounded-[28px] border border-[#D8E6FF]/90 bg-white/86 p-3 shadow-[0_18px_50px_rgba(11,99,255,0.12)] backdrop-blur-2xl">
+        <button type="button" onClick={onNavigateToAllProducts} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#0B63FF] to-[#7C4DFF] text-white shadow-[0_10px_24px_rgba(11,99,255,0.28)]"><ProfessionalIcon slot="home.storeShortcut" fallbackName="sparkle" label="Open Store" color="currentColor" size={24} /></button>
         <div className="min-w-0 flex-1">
           <p className="truncate text-base font-black text-[#081A44]">{siteName}</p>
           <p className="text-[11px] font-bold text-[#64708F]">Premium learning store</p>
@@ -160,7 +162,7 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
         )}
       </header>
 
-      <section className="relative overflow-hidden rounded-[28px] border border-[#D8E6FF] bg-[linear-gradient(135deg,#FFFFFF_0%,#EEF6FF_42%,#EDE7FF_100%)] p-5 shadow-[0_24px_70px_rgba(11,99,255,0.14)]">
+      <section data-clean-neutral-region="content.hero" className="relative overflow-hidden rounded-[28px] border border-[#D8E6FF] bg-[linear-gradient(135deg,#FFFFFF_0%,#EEF6FF_42%,#EDE7FF_100%)] p-5 shadow-[0_24px_70px_rgba(11,99,255,0.14)]">
         <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-[#DCCBFF]/70 blur-2xl" />
         <div className="absolute bottom-0 right-3 h-28 w-28 rounded-full bg-[#BFD7FF]/80 blur-2xl" />
         <div className="relative grid grid-cols-[1.1fr_0.9fr] gap-2">
@@ -189,8 +191,8 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
         </label>
       </section>
 
-      <nav className="-mx-4 mt-4 flex gap-3 overflow-x-auto px-4 pb-2 custom-scrollbar">
-        {chips.map(chip => <button key={chip.label} type="button" onClick={chip.action} className={`shrink-0 rounded-full border px-4 py-3 text-xs font-black shadow-[0_10px_24px_rgba(11,99,255,0.08)] ${chip.active ? 'border-[#0B63FF] bg-[#0B63FF] text-white' : 'border-[#D8E6FF] bg-white text-[#081A44]'}`}>{chip.icon} {chip.label}{chip.count ? ` (${chip.count})` : ''}</button>)}
+      <nav data-clean-neutral-region="shell.navigation" className="-mx-4 mt-4 flex gap-3 overflow-x-auto px-4 pb-2 custom-scrollbar">
+        {chips.map(chip => <button key={chip.label} type="button" onClick={chip.action} className={`shrink-0 rounded-full border px-4 py-3 text-xs font-black shadow-[0_10px_24px_rgba(11,99,255,0.08)] ${chip.active ? 'border-[#0B63FF] bg-[#0B63FF] text-white' : 'border-[#D8E6FF] bg-white text-[#081A44]'}`}><ProfessionalIcon slot={chip.slot} fallbackName={chip.icon} label={`${chip.label}${chip.count ? ` (${chip.count})` : ''}`} defaultDisplayMode="icon-with-text" defaultPosition="left" size={16} /></button>)}
       </nav>
 
       <section className="mt-5"><SectionHead title="Continue Learning" subtitle="Access your purchased products instantly." onViewAll={onNavigateToPurchases} />
