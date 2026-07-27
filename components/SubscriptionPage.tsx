@@ -141,12 +141,12 @@ const SubscriptionPage: React.FC<{
           </div>
 
           <div className="mt-6 flex items-center justify-center overflow-hidden rounded-[18px] border border-blue-200 bg-white p-1 text-[11px] font-black leading-none text-slate-800 shadow-sm sm:mt-7" aria-label="Billing preview toggle">
-            <button type="button" aria-pressed={billingPreview === 'monthly'} onClick={() => setBillingPreview('monthly')} className={`h-9 min-w-24 rounded-[14px] px-5 outline-none transition focus-visible:ring-2 focus-visible:ring-blue-500/40 ${billingPreview === 'monthly' ? 'bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)]' : 'bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-700'}`}>
+            <button type="button" aria-pressed={billingPreview === 'monthly'} onClick={() => setBillingPreview('monthly')} className={`h-9 min-w-24 rounded-[14px] px-5 outline-none transition focus-visible:ring-2 focus-visible:ring-blue-500/40 ${billingPreview === 'monthly' ? 'bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)]' : 'bg-white text-slate-800 hover:bg-blue-50 hover:text-blue-700'}`}>
               {pageContent.monthlyLabel}
             </button>
-            <button type="button" aria-pressed={billingPreview === 'yearly'} onClick={() => setBillingPreview('yearly')} className={`flex h-9 min-w-24 items-center justify-center gap-1.5 rounded-[14px] px-5 outline-none transition focus-visible:ring-2 focus-visible:ring-blue-500/40 ${billingPreview === 'yearly' ? 'bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)]' : 'bg-white text-slate-600 hover:bg-blue-50 hover:text-blue-700'}`}>
+            <button type="button" aria-pressed={billingPreview === 'yearly'} onClick={() => setBillingPreview('yearly')} className={`flex h-9 min-w-24 items-center justify-center gap-1.5 rounded-[14px] px-5 outline-none transition focus-visible:ring-2 focus-visible:ring-blue-500/40 ${billingPreview === 'yearly' ? 'bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)]' : 'bg-white text-slate-800 hover:bg-blue-50 hover:text-blue-700'}`}>
               <span>{pageContent.yearlyLabel}</span>
-              <span className="border border-[#181818] bg-white px-1 py-0.5 text-[8px] leading-none">{pageContent.yearlyBadge}</span>
+              <span className="border border-slate-300 bg-white px-1 py-0.5 text-[8px] leading-none text-slate-800">{pageContent.yearlyBadge}</span>
             </button>
           </div>
 

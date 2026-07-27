@@ -30,6 +30,7 @@ interface MobileAppHomeProps {
   onNavigateToPurchases: () => void;
   onNavigateToFreeProducts: () => void;
   onOpenNews: () => void;
+  onOpenNotifications: () => void;
   onCartClick: () => void;
   onProfileClick: () => void;
   onAuthClick: (mode: 'login' | 'signup') => void;
@@ -80,6 +81,7 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   onNavigateToPurchases,
   onNavigateToFreeProducts,
   onOpenNews,
+  onOpenNotifications,
   onCartClick,
   onProfileClick,
   onAuthClick,
@@ -143,24 +145,19 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
 
   return (
     <div data-clean-neutral-workspace="mobile-home" data-clean-neutral-region="shell.page" className="min-h-[100dvh] bg-[radial-gradient(circle_at_12%_3%,rgba(191,215,255,0.78),transparent_30%),radial-gradient(circle_at_92%_12%,rgba(220,203,255,0.52),transparent_28%),linear-gradient(180deg,#F5F9FF_0%,#EEF6FF_44%,#FFFFFF_100%)] px-4 pb-44 pt-[max(14px,env(safe-area-inset-top))] text-[#64708F]">
-      <header data-clean-neutral-region="shell.header" className="sticky top-2 z-30 mb-5 flex items-center gap-3 rounded-[28px] border border-[#D8E6FF]/90 bg-white/86 p-3 shadow-[0_18px_50px_rgba(11,99,255,0.12)] backdrop-blur-2xl">
-        <button type="button" onClick={onNavigateToAllProducts} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#0B63FF] to-[#7C4DFF] text-white shadow-[0_10px_24px_rgba(11,99,255,0.28)]"><ProfessionalIcon slot="home.storeShortcut" fallbackName="sparkle" label="Open Store" color="currentColor" size={24} /></button>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-black text-[#081A44]">{siteName}</p>
-          <p className="text-[11px] font-bold text-[#64708F]">Premium learning store</p>
+      <div data-clean-neutral-region="shell.secondaryHeader" className="sticky top-2 z-30 mb-5 flex items-center justify-between gap-3 rounded-[28px] border border-[#D8E6FF]/90 bg-white/86 p-3 shadow-[0_18px_50px_rgba(11,99,255,0.12)] backdrop-blur-2xl">
+        <div className="flex items-center gap-3">
+          <button type="button" onClick={onNavigateToAllProducts} className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-gradient-to-br from-[#0B63FF] to-[#7C4DFF] text-white shadow-[0_10px_24px_rgba(11,99,255,0.28)]"><ProfessionalIcon slot="home.storeShortcut" fallbackName="sparkle" label="Open Store" color="currentColor" size={24} /></button>
+          <div className="min-w-0">
+            <p className="truncate text-base font-black text-[#081A44]">{siteName}</p>
+            <p className="text-[11px] font-bold text-[#64708F]">Premium learning store</p>
+          </div>
         </div>
-        <button type="button" onClick={onCartClick} className="relative grid h-10 w-10 place-items-center rounded-2xl border border-[#D8E6FF] bg-[#F5F9FF] text-lg text-[#081A44]">🛒{cartCount > 0 ? <span className="absolute -right-1 -top-1 rounded-full bg-[#0B63FF] px-1.5 text-[10px] font-black text-white">{cartCount}</span> : null}</button>
-        {isLoggedIn && currentUser ? (
-          <>
-            <button type="button" onClick={onProfileClick} className="grid h-10 w-10 place-items-center rounded-2xl border border-[#D8E6FF] bg-white text-lg" aria-label="Open profile"><UserAvatar name={currentUser.name} email={currentUser.email} photoURL={resolvedPhotoURL} size={34} /></button>
-            <button type="button" onClick={onProfileClick} className="flex h-10 items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-3 text-xs font-black text-[#081A44]">🪙 {coins}</button>
-          </>
-        ) : (
-          <button type="button" onClick={() => onAuthClick(loggedOutAuthMode)} className="flex h-10 shrink-0 items-center rounded-full border border-[#BFD7FF] bg-white/95 px-3 text-xs font-black text-[#081A44] shadow-[0_10px_24px_rgba(11,99,255,0.10)] transition hover:-translate-y-0.5 hover:border-[#0B63FF] hover:text-[#0B63FF]" aria-label={loggedOutAuthLabel}>
-            {loggedOutAuthLabel}
-          </button>
-        )}
-      </header>
+        <div className="flex items-center gap-2">
+          <button type="button" onClick={onOpenNotifications} className="grid h-10 w-10 place-items-center rounded-2xl border border-[#D8E6FF] bg-[#F5F9FF] text-lg text-[#081A44]" aria-label="Open notifications">🔔</button>
+          <button type="button" onClick={onCartClick} className="relative grid h-10 w-10 place-items-center rounded-2xl border border-[#D8E6FF] bg-[#F5F9FF] text-lg text-[#081A44]" aria-label="Open cart">🛒{cartCount > 0 ? <span className="absolute -right-1 -top-1 rounded-full bg-[#0B63FF] px-1.5 text-[10px] font-black text-white">{cartCount}</span> : null}</button>
+        </div>
+      </div>
 
       <section data-clean-neutral-region="content.hero" className="relative overflow-hidden rounded-[28px] border border-[#D8E6FF] bg-[linear-gradient(135deg,#FFFFFF_0%,#EEF6FF_42%,#EDE7FF_100%)] p-5 shadow-[0_24px_70px_rgba(11,99,255,0.14)]">
         <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-[#DCCBFF]/70 blur-2xl" />
