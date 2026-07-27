@@ -5,6 +5,7 @@ import { getProductImage, getProductImageFallback } from '../utils/productImages
 import SafeImage from './common/SafeImage';
 import { pillClassForProductRoundness, resolveProductRoundnessSettings } from '../utils/productRoundness';
 import type { ProductRoundnessKey } from '../utils/productRoundness';
+import { getProductPriceDetails } from '../utils/productPrice';
 
 type ProductCardRoundnessSurface = 'store' | 'homeFeatured' | 'wishlist';
 
@@ -48,6 +49,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
     const actionButtonRoundClass = productRoundness.productActionButtons !== false ? 'rounded-full' : 'rounded-lg';
 
     const displayImage = getProductImage(product, 'card');
+    const priceDetails = React.useMemo(() => getProductPriceDetails(product), [product]);
+    const hasDiscount = priceDetails.hasSalePrice;
     // Coupon availability logic
     const associatedCoupon = product.couponCode ? coupons.find(c => c.code === product.couponCode) : null;
     let isCouponAvailable = false;
@@ -115,7 +118,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                                     {product.couponCode}
                                 </button>
                             )}
-                            {!product.isFree && product.salePrice && settings.features.showSaleBadges && (
+                            {!product.isFree && hasDiscount && settings.features.showSaleBadges && (
                                 <span className={`w-fit ${badgeRoundClass} bg-[#e11d48] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(225,29,72,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs`}>
                                     Sale
                                 </span>
@@ -168,10 +171,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                                         <span className={`${compactMobile ? 'text-[8px] sm:text-xs' : 'text-xs'} text-slate-600`}>(₹3 fee)</span>
                                     </div>
                                 </>
-                            ) : product.salePrice ? (
+                            ) : hasDiscount ? (
                                 <>
                                     <span className={`${compactMobile ? 'text-[9px] sm:text-xs' : 'text-xs'} text-slate-600 font-medium line-through`}>{product.price}</span>
-                                    <span className={`${compactMobile ? 'text-sm sm:text-xl' : 'text-lg sm:text-xl'} font-bold text-gray-900`}>{product.salePrice}</span>
+                                    <span className={`${compactMobile ? 'text-sm sm:text-xl' : 'text-lg sm:text-xl'} font-bold text-gray-900`}>{priceDetails.displayPriceText}</span>
                                 </>
                             ) : (
                                 <>

@@ -3,6 +3,7 @@ import { ProductWithRating, WebsiteSettings, Coupon } from '../App';
 import ProductCard from './ProductCard';
 import { isProductSearchVisible, normalizeSearchValue, rankProductForQuery } from '../utils/productSearch';
 import MobileProductSearchPage from './MobileProductSearchPage';
+import { getProductPriceDetails } from '../utils/productPrice';
 
 interface ProductShowcaseProps {
   settings: WebsiteSettings;
@@ -116,7 +117,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
     return ['All', ...Array.from(new Set(values)).sort()];
   }, [catalogProducts]);
 
-  const getPrice = (product: ProductWithRating) => parseFloat((product.salePrice || product.price || '0').replace(/[^\d.]/g, '')) || 0;
+  const getPrice = (product: ProductWithRating) => getProductPriceDetails(product).currentPrice;
   const activeQuery = normalizeSearchValue([debouncedSearchQuery, externalSearchQuery].filter(Boolean).join(' '));
   const isSearching = searchQuery !== debouncedSearchQuery;
 

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef } from 'react';
 import type { ProductWithRating } from '../App';
 import { getProductImage, getProductImageFallback } from '../utils/productImages';
 import { isProductSearchVisible, rankProductForQuery } from '../utils/productSearch';
+import { getProductPriceDetails } from '../utils/productPrice';
 import SafeImage from './common/SafeImage';
 
 interface MobileProductSearchPageProps {
@@ -17,7 +18,7 @@ interface MobileProductSearchPageProps {
 }
 
 const HISTORY_KEY = 'dcMobileProductSearch';
-const formatPrice = (product: ProductWithRating) => product.salePrice || product.price || '₹0';
+const formatPrice = (product: ProductWithRating) => getProductPriceDetails(product).displayPriceText;
 
 const MobileProductSearchPage: React.FC<MobileProductSearchPageProps> = ({ source, products, query, onQueryChange, onClose, onViewProduct, wishlist, onToggleWishlist, purchasedProductIds = [] }) => {
   const inputRef = useRef<HTMLInputElement>(null);

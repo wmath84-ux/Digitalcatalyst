@@ -12,34 +12,16 @@ import { getProductImage, getProductImageFallback } from '../utils/productImages
 import SafeImage from './common/SafeImage';
 import LiquidMetalButton from './ui/LiquidMetalButton';
 import { pillClassForProductRoundness, resolveProductRoundnessSettings } from '../utils/productRoundness';
+import { getProductPriceDetails, getProductPriceHistoryPoints } from '../utils/productPrice';
 
 type ProductPriceHistoryPoint = {
     label: string;
     price: number;
 };
 
-const parseProductPriceValue = (value: unknown): number | null => {
-    if (typeof value === 'number' && Number.isFinite(value)) return value;
-    if (typeof value === 'string') {
-        const parsed = Number(value.replace(/[^0-9.]/g, ''));
-        return Number.isFinite(parsed) ? parsed : null;
-    }
-    return null;
-};
-
 const formatPriceHistoryMoney = (value: number): string => {
     if (!Number.isFinite(value)) return '₹0';
     return `₹${value % 1 === 0 ? value.toFixed(0) : value.toFixed(2)}`;
-};
-
-const formatPriceHistoryLabel = (value: unknown, fallback: string): string => {
-    const raw = String(value || '').trim();
-    if (!raw) return fallback;
-    const parsedDate = new Date(raw);
-    if (!Number.isNaN(parsedDate.getTime())) {
-        return parsedDate.toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-    }
-    return raw.length > 14 ? raw.slice(0, 14) : raw;
 };
 
 interface ProductPriceHistoryChartProps {
@@ -236,41 +218,12 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     return () => { if (currentRef) observer.unobserve(currentRef); };
   }, []);
 
-  const originalPriceNum = parseFloat(product.price.replace('₹', ''));
-  const salePriceNum = product.salePrice && product.salePrice !== '₹' ? parseFloat(product.salePrice.replace('₹', '')) : null;
-  const currentPriceNum = salePriceNum ?? originalPriceNum;
+  const priceDetails = React.useMemo(() => getProductPriceDetails(product), [product]);
+  const originalPriceNum = priceDetails.originalPrice;
+  const salePriceNum = priceDetails.hasSalePrice ? priceDetails.currentPrice : null;
+  const currentPriceNum = priceDetails.currentPrice;
 
-  const productPriceHistoryPoints = React.useMemo<ProductPriceHistoryPoint[]>(() => {
-    const rawHistory = Array.isArray((product as ProductWithRating & { priceHistory?: unknown[] }).priceHistory)
-      ? ((product as ProductWithRating & { priceHistory?: unknown[] }).priceHistory || [])
-      : [];
-
-    const historyPoints = rawHistory
-      .map((entry, index) => {
-        const item = entry as { date?: unknown; createdAt?: unknown; updatedAt?: unknown; label?: unknown; price?: unknown; salePrice?: unknown; value?: unknown; amount?: unknown; };
-        const price = parseProductPriceValue(item.price ?? item.salePrice ?? item.value ?? item.amount);
-        if (price === null) return null;
-        return {
-          label: formatPriceHistoryLabel(item.label ?? item.date ?? item.createdAt ?? item.updatedAt, `Update ${index + 1}`),
-          price,
-        };
-      })
-      .filter((point): point is ProductPriceHistoryPoint => Boolean(point));
-
-    const points = historyPoints.slice(-6);
-
-    if (points.length === 0 && Number.isFinite(originalPriceNum) && Number.isFinite(currentPriceNum) && Math.abs(originalPriceNum - currentPriceNum) >= 0.01) {
-      points.push(
-        { label: 'Original', price: originalPriceNum },
-        { label: 'Current', price: currentPriceNum },
-      );
-    } else if (points.length === 1 && Number.isFinite(currentPriceNum) && Math.abs(points[0].price - currentPriceNum) >= 0.01) {
-      points.push({ label: 'Current', price: currentPriceNum });
-    }
-
-    const distinctPrices = new Set(points.map(point => point.price.toFixed(2)));
-    return distinctPrices.size > 1 ? points : [];
-  }, [currentPriceNum, originalPriceNum, product]);
+  const productPriceHistoryPoints = React.useMemo<ProductPriceHistoryPoint[]>(() => getProductPriceHistoryPoints(product as { price?: string; salePrice?: string | null | undefined; priceHistory?: Array<Record<string, unknown>> | undefined }), [product]);
 
   const preDiscountTotal = currentPriceNum;
 
