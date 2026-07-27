@@ -1366,6 +1366,9 @@ const CoursePlayer: React.FC<{
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(() => getViewportMetrics().width < 900);
+  useEffect(() => {
+    if (viewport.isCompactWidth) setIsSidebarOpen(true);
+  }, [viewport.isCompactWidth]);
   const [modulePanelResetKey, setModulePanelResetKey] = useState(0);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
@@ -2283,9 +2286,15 @@ const CoursePlayer: React.FC<{
           <aside id={modulePanelId} className={`${useDesktopSidebar ? 'lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-lg' : ''} fixed inset-y-0 left-0 z-40 w-[min(88svw,20rem)] max-w-full transform transition sm:w-80 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
             <div className="flex h-full flex-col border-r border-[#ded8ff] bg-white/85 shadow-sm backdrop-blur-xl lg:rounded-lg lg:border lg:border-[#ded8ff] lg:bg-white/85 lg:shadow-sm">
               <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#E3E8F5] bg-white/90 px-4 py-3">
-                <div className="min-w-0">
-                  <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#5B4BFF]">Course modules</p>
-                  <p className="truncate text-xs font-bold text-[#667085]">{activeFile?.name || 'Choose a lesson'}</p>
+                <div className="min-w-0 flex items-center gap-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-xl text-white shadow-[0_12px_34px_rgba(91,75,255,0.20)]" style={{ background: 'linear-gradient(135deg,#5B4BFF 0%, #7B61FF 100%)' }}>
+                    <ModuleIcon className="h-5 w-5" />
+                  </div>
+                  <div className="min-w-0">
+                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#5B4BFF]">Course modules</p>
+                    <h2 className="truncate text-sm font-black leading-tight text-[#071735]">{product.title}</h2>
+                    <p className="truncate text-xs font-bold text-[#667085]">{activeFile?.name || 'Choose a lesson'}</p>
+                  </div>
                 </div>
                 <button type="button" onClick={closeCourseSidebar} className="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[#D9E7F8] bg-white text-lg font-black text-[#071735] shadow-sm transition hover:bg-[#F1EEFF] focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50 lg:hidden" aria-label="Close modules">×</button>
               </div>

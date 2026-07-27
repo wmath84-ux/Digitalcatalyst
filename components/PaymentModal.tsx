@@ -707,7 +707,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       <div className="grid gap-3">
         <button disabled={isCompleting} onClick={() => handlePayNow(false)} className={`payment-primary-action eduvora-primary-action ${checkoutType === 'latest-update' ? 'latest-update-payment-action' : ''} rounded-[18px] px-5 py-4 text-base font-black disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-5 sm:text-lg`}>
           <span className="block">{primaryPaymentLabel}</span>
-          <span className="mt-1 block text-xs font-bold text-white/80">{primaryPaymentHint}</span>
+          <span className="mt-1 block text-xs font-bold opacity-90">{primaryPaymentHint}</span>
         </button>
         <button disabled={isCompleting} onClick={() => { const pending = readPendingCheckout(); if (pending?.orderId) void reconcilePendingCheckout(pending.orderId, 'manual'); }} className="rounded-2xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-black text-blue-900 shadow-sm transition hover:-translate-y-0.5 hover:border-blue-200 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-base">
           ↻ Check payment status
@@ -751,7 +751,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         <div className="space-y-3">
           <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className={`payment-primary-action eduvora-primary-action ${checkoutType === 'latest-update' ? 'latest-update-payment-action' : ''} w-full rounded-[18px] px-5 py-4 text-base font-black disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg`}>
             <span className="block">{primaryPaymentLabel}</span>
-            <span className="mt-1 block text-xs font-bold text-white/80">{primaryPaymentHint}</span>
+            <span className="mt-1 block text-xs font-bold opacity-90">{primaryPaymentHint}</span>
           </button>
           {isCoinCheckoutEnabled && appliedEduCoins <= 0 && (
             <button disabled={isCompleting} onClick={handleCoinCheckout} className={`w-full rounded-2xl border px-5 py-3.5 text-base font-black shadow-sm transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg ${canPayWithCoins ? 'border-amber-200/60 bg-white/80 text-amber-700' : 'border-amber-200 bg-amber-50/90 text-amber-800'}`}>
