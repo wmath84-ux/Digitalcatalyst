@@ -6232,7 +6232,6 @@ const App: React.FC = () => {
               onNavigateToPurchases={handleNavigateToPurchases}
               onNavigateToFreeProducts={handleNavigateToFreeProducts}
               onOpenNews={() => openReadingHub('news')}
-              onOpenNotifications={() => setIsSiteNotificationCenterOpen(true)}
               onCartClick={openCartSidebar}
               onProfileClick={handleNavigateToProfile}
               onAuthClick={openAuthPage}
