@@ -23,15 +23,15 @@
           const storedMode = JSON.parse(localStorage.getItem('siteColorExperience') || 'null');
           const cachedSettings = JSON.parse(localStorage.getItem('websiteSettings') || 'null');
           const cachedMode = cachedSettings?.theme?.colorExperience;
-          const supportedModes = ['original', 'immersive', 'warm', 'modern-white', 'clean-neutral', 'classic'];
+          const supportedModes = ['original', 'clean-neutral'];
           const mode = supportedModes.includes(storedMode)
             ? storedMode
             : supportedModes.includes(cachedMode)
               ? cachedMode
-              : 'immersive';
+              : 'clean-neutral';
           document.documentElement.dataset.colorExperience = mode;
         } catch (error) {
-          document.documentElement.dataset.colorExperience = 'immersive';
+          document.documentElement.dataset.colorExperience = 'clean-neutral';
         }
       })();
     </script>
@@ -586,6 +586,23 @@
       }
       .cart-sidebar.is-open {
         transform: translateX(0);
+      }
+      .cart-page {
+        position: relative;
+        width: min(100%, 1040px);
+        min-height: calc(100dvh - 6rem);
+        margin: 0 auto;
+        border: 1px solid rgba(226, 232, 240, 0.95);
+        border-radius: 28px;
+        overflow: hidden;
+        background: #ffffff;
+        box-shadow: 0 24px 70px rgba(15, 23, 42, 0.10);
+      }
+      @media (min-width: 768px) {
+        .cart-page {
+          margin-top: 2rem;
+          margin-bottom: 2rem;
+        }
       }
 
       /* Modal Basics */

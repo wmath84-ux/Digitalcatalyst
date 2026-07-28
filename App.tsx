@@ -698,7 +698,7 @@ export const themes: Record<ThemeName, { name: string; palette: ThemePalette }> 
 // Comprehensive settings for the entire website, manageable from the admin panel
 export interface WebsiteSettings {
     theme: {
-        colorExperience: 'original' | 'immersive' | 'warm' | 'modern-white' | 'clean-neutral' | 'classic';
+        colorExperience: 'original' | 'clean-neutral';
         classicWorkspaceTheme?: boolean;
         cleanNeutralCustomizer?: CleanNeutralCustomizerSettings;
         primaryColor: string;
@@ -921,7 +921,7 @@ const initialAdminUsers: AdminUser[] = [];
 
 const defaultWebsiteSettings: WebsiteSettings = {
     theme: {
-        colorExperience: 'immersive',
+        colorExperience: 'clean-neutral',
         primaryColor: '#1769FF',
         accentColor: '#7B61FF',
         backgroundColor: '#F8FBFF',
@@ -1457,6 +1457,7 @@ const PERSISTABLE_APP_VIEWS = new Set([
   'community',
   'news',
   'blog',
+  'cart',
 ]);
 
 const PRODUCT_BOUND_APP_VIEWS = new Set(['product', 'coursePlayer', 'eduCoinGuide', 'congratulations']);
@@ -2800,49 +2801,17 @@ const App: React.FC = () => {
     const requestedColorExperience = adminTheme.colorExperience;
     const colorExperience: WebsiteSettings['theme']['colorExperience'] =
       requestedColorExperience === 'original' ||
-      requestedColorExperience === 'immersive' ||
-      requestedColorExperience === 'warm' ||
-      requestedColorExperience === 'modern-white' ||
-      requestedColorExperience === 'clean-neutral' ||
-      requestedColorExperience === 'classic'
+      requestedColorExperience === 'clean-neutral'
         ? requestedColorExperience
-        : 'immersive';
+        : 'clean-neutral';
 
-    const experiencePalettes: Record<'immersive' | 'warm' | 'modern-white' | 'clean-neutral' | 'classic', ThemePalette> = {
-      immersive: {
-        primaryColor: '#315BCA',
-        accentColor: '#315BCA',
-        backgroundColor: '#F2F5F9',
-        textColor: '#0D1B3E',
-        textMutedColor: '#46556D',
-      },
-      warm: {
-        primaryColor: '#7A4A3A',
-        accentColor: '#A56A4F',
-        backgroundColor: '#F7F4EC',
-        textColor: '#2F2925',
-        textMutedColor: '#6F625B',
-      },
-      'modern-white': {
-        primaryColor: '#2563EB',
-        accentColor: '#0EA5E9',
-        backgroundColor: '#F7F8FA',
-        textColor: '#111827',
-        textMutedColor: '#64748B',
-      },
+    const experiencePalettes: Record<'clean-neutral', ThemePalette> = {
       'clean-neutral': {
         primaryColor: '#171717',
         accentColor: '#171717',
         backgroundColor: '#F7F7F8',
         textColor: '#171717',
         textMutedColor: '#737373',
-      },
-      classic: {
-        primaryColor: '#111111',
-        accentColor: '#F4F35B',
-        backgroundColor: '#FFFEF8',
-        textColor: '#111111',
-        textMutedColor: '#676767',
       },
     };
 
@@ -2851,7 +2820,7 @@ const App: React.FC = () => {
       : experiencePalettes[colorExperience];
 
     root.dataset.colorExperience = colorExperience;
-    root.dataset.classicWorkspaceTheme = colorExperience === 'classic' && adminTheme.classicWorkspaceTheme !== false ? 'on' : 'off';
+    root.dataset.classicWorkspaceTheme = 'off';
     applyCleanNeutralRuntime(
       root,
       adminTheme.cleanNeutralCustomizer,
@@ -2878,9 +2847,9 @@ const App: React.FC = () => {
     const classicFontSans = 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, \"Liberation Mono\", \"Courier New\", monospace';
     const classicFontSerif = 'ui-serif, Georgia, Cambria, \"Times New Roman\", Times, serif';
     const cleanNeutralFont = 'Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, \"Segoe UI\", sans-serif';
-    root.style.setProperty('--font-sans', colorExperience === 'classic' ? classicFontSans : colorExperience === 'clean-neutral' ? cleanNeutralFont : selectedFonts.sans);
-    root.style.setProperty('--font-serif', colorExperience === 'classic' ? classicFontSerif : colorExperience === 'clean-neutral' ? cleanNeutralFont : selectedFonts.serif);
-    root.style.setProperty('--style-corner-radius', colorExperience === 'classic' ? '0.25rem' : colorExperience === 'clean-neutral' ? '0.625rem' : adminTheme.cornerRadius);
+    root.style.setProperty('--font-sans', colorExperience === 'clean-neutral' ? cleanNeutralFont : selectedFonts.sans);
+    root.style.setProperty('--font-serif', colorExperience === 'clean-neutral' ? cleanNeutralFont : selectedFonts.serif);
+    root.style.setProperty('--style-corner-radius', colorExperience === 'clean-neutral' ? '0.625rem' : adminTheme.cornerRadius);
 
     const shadowScales = {
       light: {
@@ -3280,6 +3249,11 @@ const App: React.FC = () => {
   // --- Cart Handlers ---
   const openCartSidebar = () => {
       acknowledgeDockDestination('Cart');
+      if (typeof window !== 'undefined' && !isMobileViewport) {
+          setCurrentView('cart');
+          window.scrollTo(0, 0);
+          return;
+      }
       if (typeof window !== 'undefined' && !isCartOpenRef.current) {
           window.history.pushState({ ...(window.history.state || {}), dcView: currentViewRef.current, dcOverlay: 'cart' }, '', window.location.href);
       }
@@ -6434,6 +6408,7 @@ const App: React.FC = () => {
       case 'news':
       case 'blog': return <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={true} presentation="page" view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={currentView === 'news' ? 'news' : 'blog'} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={() => handleNavigateBack('home')} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={() => handleNavigateBack('home')} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
+      case 'cart': return <CartSidebar presentation="page" isOpen={true} onClose={() => handleNavigateBack('home')} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onClearWishlist={handleClearWishlist} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
       case 'mayDay': return (
         <MayDayMobile
@@ -6507,6 +6482,7 @@ const App: React.FC = () => {
             freeProducts: 'Free',
             profile: 'Profile',
             subscription: 'Subscriptions',
+            cart: 'Cart',
           } as Record<string, string>)[currentView] || '';
 
   const shouldShowMainPageBackButtonOnMobile =
@@ -6695,7 +6671,7 @@ const App: React.FC = () => {
                 <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} isAdmin={!!currentAdminUser} onAdminClick={handleNavigateToAdminLogin} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenMayDay={handleNavigateToMayDay} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>
             )}
-            <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
+            {currentView !== 'cart' && <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />}
             {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={(payment) => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins, payment)} currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser} coinPrice={hasPremiumMembership(effectiveAppUser) && cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={hasPremiumMembership(effectiveAppUser) ? handleConfirmCartCoinPurchase : undefined} onInsufficientCoins={handleInsufficientEduCoins} checkoutType="cart" checkoutUserId={effectiveAppUser?.id} checkoutTargetId="cart" />}
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />

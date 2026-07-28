@@ -21,12 +21,13 @@ interface CartSidebarProps {
     appliedEduCoins: number;
     eduCoinDiscount: number;
     finalPrice: number;
+    presentation?: 'overlay' | 'page';
 }
 
 const CartSidebar: React.FC<CartSidebarProps> = ({ 
     isOpen, onClose, cartItems, onUpdateQuantity, onRemoveItem, onViewProduct, onCheckout,
     onApplyCoupon, appliedCoupon, couponError, onRemoveCoupon, coinBalance, coinRedeemRate,
-    applyEduCoins, onToggleEduCoins, appliedEduCoins, eduCoinDiscount, finalPrice
+    applyEduCoins, onToggleEduCoins, appliedEduCoins, eduCoinDiscount, finalPrice, presentation = 'overlay'
 }) => {
     const [flash, setFlash] = useState(false);
     const [couponInput, setCouponInput] = useState('');
@@ -63,11 +64,14 @@ const CartSidebar: React.FC<CartSidebarProps> = ({
         }
     };
 
+    const isPage = presentation === 'page';
+
     return (
         <>
-            {/* FIX: Wrapped event handler in an arrow function to prevent passing implicit event arguments. */}
-            <div className={`cart-overlay ${isOpen ? 'is-open' : ''}`} onClick={() => onClose()}></div>
-            <aside className={`cart-sidebar bg-white border-l border-slate-200 shadow-xl ${isOpen ? 'is-open' : ''}`}>
+            {!isPage && (
+                <div className={`cart-overlay ${isOpen ? 'is-open' : ''}`} onClick={() => onClose()}></div>
+            )}
+            <aside className={`${isPage ? 'cart-page' : 'cart-sidebar'} bg-white border-l border-slate-200 shadow-xl ${isOpen ? 'is-open' : ''}`}>
                 <div className="flex flex-col h-full">
                     <header className="p-6 border-b border-slate-200 flex justify-between items-center bg-white">
                         <h2 className="text-2xl font-bold text-slate-900">Your Cart</h2>
