@@ -3311,15 +3311,11 @@ const App: React.FC = () => {
 
   const getNormalizedMobile = (mobile?: string | null) => String(mobile || '').replace(/\D/g, '').slice(-10);
 
-  const hasCompletedMobile = (user?: Pick<User, 'mobile'> | null) => getNormalizedMobile(user?.mobile).length === 10;
-
-  const getResolvedSavedMobile = (user?: Pick<User, 'mobile'> | null, firebaseUser?: FirebaseUser | null) =>
-    getNormalizedMobile(user?.mobile) || getNormalizedMobile(firebaseUser?.phoneNumber);
-
   const shouldAskForMobileCompletion = () => {
-    if (!isLoggedIn || !effectiveAppUser) return false;
-    if (profileStatus === 'loading' || profileStatus === 'idle') return false;
-    return getResolvedSavedMobile(effectiveAppUser, effectiveFirebaseUser).length !== 10;
+    // Mobile completion is intentionally optional: email sign-up stores the
+    // submitted number, while Google accounts should never be interrupted by a
+    // second mobile-number prompt.
+    return false;
   };
 
   const mergeCompletedMobileIntoCurrentUser = (mobile: string) => {
@@ -3644,7 +3640,7 @@ const App: React.FC = () => {
       const generatedDisplayName = String(existing.generatedDisplayName || buildStableDisplayName(firebaseUser.uid || firebaseUser.email)).trim();
       const generatedUsername = String(existing.generatedUsername || buildStableUsername(firebaseUser.uid || firebaseUser.email)).trim();
       const nextName = profile?.name || existingName || generatedDisplayName;
-      const nextMobile = profile?.mobile || existing.mobile || firebaseUser.phoneNumber || '';
+      const nextMobile = getNormalizedMobile(profile?.mobile) || getNormalizedMobile(existing.mobile) || getNormalizedMobile(firebaseUser.phoneNumber) || '';
       const nextPhotoURL = getSavedProfilePhotoURL(existing);
       const profilePhotoSet = Boolean(nextPhotoURL);
       const existingBalance = existing.coinBalance ?? existing.eduCoins ?? 0;
@@ -3895,9 +3891,18 @@ const App: React.FC = () => {
       } catch (error) {
           console.warn('PURCHASE_RESTORE_FAILED_NON_BLOCKING', error);
           console.warn('Purchase access restore failed; keeping login active.', error);
-          setPurchaseStatus('error');
-          setAuthRestoreError('Login restored, but purchases could not be refreshed. Showing saved purchases if available.');
-          console.info('AUTH_PURCHASES_READY', { uid: firebaseUser.uid, status: 'error' });
+          const fallbackPurchasedIds = mergePurchasedProductIds(
+              normalizePurchaseIds((nextUser as any).purchasedProductIds),
+              normalizePurchaseIds(safeGetItem(`purchasedProducts:${firebaseUser.uid}`, [])),
+          );
+          const fallbackPurchasedUpdates = normalizePurchasedProductUpdateIds((nextUser as any).purchasedProductUpdateIds || safeGetItem(`purchasedProductUpdates:${firebaseUser.uid}`, {}));
+          nextUser = { ...(nextUser as any), purchasedProductIds: fallbackPurchasedIds, purchasedProductUpdateIds: fallbackPurchasedUpdates } as User;
+          setPurchasedProductIds(fallbackPurchasedIds);
+          setPurchasedProductUpdateIds(fallbackPurchasedUpdates);
+          rememberAndStoreUser(nextUser, firebaseUser);
+          setPurchaseStatus('fallback');
+          setAuthRestoreError(null);
+          console.info('AUTH_PURCHASES_READY', { uid: firebaseUser.uid, status: 'fallback', count: fallbackPurchasedIds.length });
       }
       if (logoutInProgressRef.current || auth.currentUser?.uid !== firebaseUser.uid) {
           console.info('AUTH_HYDRATION_CANCELLED_AFTER_LOGOUT', { uid: firebaseUser.uid });
@@ -6393,7 +6398,7 @@ const App: React.FC = () => {
         if (!selectedProduct) return renderMobileSessionStatus('Restoring product…', 'Please wait while we restore the product you were viewing.');
         return <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity, payment) => handlePurchaseComplete(appliedCouponCode, quantity, payment)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} productAccess={productAccessById[selectedProduct.id] || null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onOpenPurchases={handleNavigateToPurchases} onCoinPurchase={hasPremiumMembership(appUser) ? (product, quantity, options) => handleProductCoinPurchase(product, quantity, options) : undefined} />;
       case 'coursePlayer':
-        if (isAuthRestoring || authRestoreError) return renderAuthRestoreStatus();
+        if (isAuthRestoring) return renderAuthRestoreStatus();
         return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} currentUser={appUser} onBack={handleBackFromCoursePlayer} onUpgrade={handleNavigateToSubscription} onQuizReward={hasPremiumMembership(appUser) ? handleQuizReward : undefined} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onEducoinUnlockComplete={handleEducoinUpdateUnlockComplete} /> : renderAuthRestoreStatus();
       case 'eduCoinGuide': return appUser && hasPremiumMembership(appUser) ? <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={appUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} /> : <MembershipUpgradeCard message={normalizeSubscriptionPageContent((websiteSettings.content as any).subscriptionPage).profileUpgrade} onUpgrade={handleNavigateToSubscription} onBack={handleBackFromEduCoinGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
