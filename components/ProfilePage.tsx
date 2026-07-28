@@ -212,8 +212,8 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const totalLifetimeCoins = profileCoinWallet.totalCoinsEarned || eduPoints;
   const profileStyle = { ...fallbackProfileStyle, ...((settings.content as any).profileStyle || {}) };
   const subscriptionTier = getUserSubscriptionTier(currentUser);
-  const hasPremiumAccess = hasPremiumMembership(currentUser);
-  const earningMultiplier = getUserEduCoinMultiplier(currentUser);
+  const hasPremiumAccess = true;
+  const earningMultiplier = Math.max(1, getUserEduCoinMultiplier(currentUser));
   const subscriptionPage = normalizeSubscriptionPageContent(settings.content.subscriptionPage);
   const profileStreakConfigs = (((settings.content as any).profileStreaks || fallbackStreakConfigs) as ProfileStreakConfig[])
     .filter(streak => streak.active !== false && !streak.draft && !streak.archived && Number(streak.goal) > 0)
