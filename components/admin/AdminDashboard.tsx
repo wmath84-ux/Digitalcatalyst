@@ -19,8 +19,6 @@ import CoinEconomyManagement from './CoinEconomyManagement';
 import NewsletterSubscribers from './NewsletterSubscribers';
 import AdminPostManagement from './AdminPostManagement';
 import AdminOverview from './AdminOverview';
-import { auth, db } from '../../firebase';
-import { doc, getDoc } from 'firebase/firestore';
 import './adminShipNowPages.css'; // ADMIN_SHIPNOW_PAGES_THEME_V1
 
 interface AdminDashboardProps {
@@ -48,12 +46,11 @@ interface AdminDashboardProps {
     onSwitchToHome: () => void;
 }
 
-export type AdminView = 'dashboard' | 'firebaseAdmin' | 'adminPosts' | 'economy' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'subscribers' | 'analytics' | 'websiteSettings';
+export type AdminView = 'dashboard' | 'adminPosts' | 'economy' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'subscribers' | 'analytics' | 'websiteSettings';
 
 const ADMIN_VIEW_SESSION_KEY = 'eduvora.adminView.v1';
 const ADMIN_VIEWS: AdminView[] = [
     'dashboard',
-    'firebaseAdmin',
     'adminPosts',
     'economy',
     'products',
@@ -98,53 +95,6 @@ const DashboardCard: React.FC<{ title: string; value: string | number; subtitle?
 );
 
 
-const FirebaseAdminSetup: React.FC = () => {
-    const [status, setStatus] = useState<{ uid: string; email: string; role: string; isAdmin: boolean; message: string }>({ uid: '', email: '', role: '', isAdmin: false, message: 'Checking Firebase admin session...' });
-
-    const refresh = async () => {
-        const user = auth.currentUser;
-
-        if (!user) {
-            setStatus({ uid: '', email: '', role: '', isAdmin: false, message: 'Firebase admin login required before uploading files.' });
-            return;
-        }
-
-        const userSnap = await getDoc(doc(db, 'users', user.uid));
-        const role = userSnap.exists() ? String(userSnap.data().role || '') : '';
-        const isAdmin = role === 'admin' || role === 'super_admin';
-
-        setStatus({
-            uid: user.uid,
-            email: user.email || 'No email found',
-            role: role || 'missing',
-            isAdmin,
-            message: isAdmin ? 'Firebase admin permission is ready for product uploads.' : `Your Firebase user is not marked as admin. Add role: admin in users/${user.uid}.`,
-        });
-    };
-
-    useEffect(() => {
-        void refresh();
-    }, []);
-
-    return (
-        <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
-            <div className="rounded-[2rem] border border-white/60 bg-white/80 p-6 shadow-sm backdrop-blur-xl">
-                <p className="text-xs font-black uppercase tracking-[0.28em] text-blue-600">Firebase Admin Setup</p>
-                <h1 className="mt-2 text-3xl font-black text-slate-900">Upload permission check</h1>
-                <p className="mt-3 text-sm font-semibold leading-6 text-slate-600">Product file uploads use Firebase Auth admin identity. Local admin login alone is not enough for Storage or Firestore writes.</p>
-                <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                    <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Firebase UID</p><p className="mt-1 break-all font-bold text-slate-900">{status.uid || 'Not signed in'}</p></div>
-                    <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Firebase Email</p><p className="mt-1 break-all font-bold text-slate-900">{status.email || 'Not signed in'}</p></div>
-                    <div className="rounded-2xl bg-slate-50 p-4"><p className="text-xs font-black uppercase text-slate-500">Firestore Role</p><p className="mt-1 break-all font-bold text-slate-900">{status.role || 'missing'}</p></div>
-                    <div className={`rounded-2xl p-4 ${status.isAdmin ? 'bg-emerald-50' : 'bg-rose-50'}`}><p className="text-xs font-black uppercase text-slate-500">Admin permission</p><p className={`mt-1 font-bold ${status.isAdmin ? 'text-emerald-700' : 'text-rose-700'}`}>{status.isAdmin ? 'PASS' : 'BLOCKED'}</p></div>
-                </div>
-                <div className={`mt-5 rounded-2xl p-4 text-sm font-bold ${status.isAdmin ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'}`}>{status.message}</div>
-                <button type="button" onClick={refresh} className="mt-5 rounded-2xl bg-blue-600 px-5 py-3 text-sm font-black text-white">Refresh Firebase admin status</button>
-            </div>
-        </div>
-    );
-};
-
 const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
     const [currentView, setCurrentView] = useState<AdminView>(() => readInitialAdminView());
     const [isMobileSidebarOpen, setIsMobileSidebarOpen] = useState(false);
@@ -173,7 +123,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
     const viewMeta: Record<AdminView, { title: string; subtitle: string }> = {
         dashboard: { title: 'Dashboard', subtitle: 'Overview of your store operations' },
-        firebaseAdmin: { title: 'Firebase Admin', subtitle: 'Verify Firebase permissions and upload access' },
         adminPosts: { title: 'Admin Post', subtitle: 'Publish and manage official community updates' },
         economy: { title: 'EduCoin Economy', subtitle: 'Control coin pricing and product economy' },
         products: { title: 'Products', subtitle: 'Create, update, and organize store products' },
@@ -194,7 +143,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
     const renderView = () => {
         switch (currentView) {
-            case 'firebaseAdmin': return <FirebaseAdminSetup />;
             case 'adminPosts': return <AdminPostManagement />;
             case 'economy': return <CoinEconomyManagement economySettings={props.economySettings} products={props.products} websiteSettings={props.websiteSettings} />;
             case 'products': return <ProductManagement products={props.products} users={props.users} coupons={props.coupons} onAddProduct={props.onAddProduct} onUpdateProduct={props.onUpdateProduct} onDeleteProduct={props.onDeleteProduct} onEditorStateChange={setIsProductEditorOpen} />;
@@ -273,9 +221,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
             <div
                 data-admin-shell="SHIPNOW_ADMIN_SHELL_V1"
-                className="admin-mobile-scope tagmaster-admin-theme h-[100dvh] min-h-[100dvh] w-full max-w-full overflow-hidden bg-[#fbfbfb] p-0 font-sans"
+                className="admin-mobile-scope tagmaster-admin-theme min-h-screen w-full max-w-full bg-[#f6f7fb] p-0 font-sans"
             >
-                <div className="flex h-full w-full max-w-none overflow-hidden border-0 bg-[#fbfbfb] shadow-none">
+                <div className="flex min-h-screen w-full max-w-none border-0 bg-[radial-gradient(circle_at_top_left,rgba(37,99,235,0.08),transparent_30%),#f6f7fb] shadow-none">
                     <Sidebar
                         onNavigate={setCurrentView}
                         onSwitchToHome={props.onSwitchToHome}
@@ -286,7 +234,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                         adminEmail={props.currentAdminUser.email}
                     />
 
-                    <div className="flex min-w-0 flex-1 flex-col overflow-hidden bg-[#fbfbfb]">
+                    <div className="flex min-w-0 flex-1 flex-col bg-transparent">
                         {!isProductEditorShellOpen && (
                             <header className="z-30 flex shrink-0 items-center justify-between border-b border-[#ece8e8] bg-white px-3 py-2.5 md:hidden">
                                 <div className="flex min-w-0 items-center gap-3">
@@ -326,7 +274,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
                             </header>
                         )}
 
-                        <main className={`shipnow-admin-content shipnow-admin-scrollbar min-h-0 flex-1 overflow-y-auto overflow-x-hidden bg-[#fbfbfb] ${isProductEditorShellOpen ? 'p-0' : 'p-0'}`}>
+                        <main className={`shipnow-admin-content shipnow-admin-scrollbar min-h-0 flex-1 overflow-x-hidden bg-transparent ${isProductEditorShellOpen ? 'p-0' : 'p-0'}`}>
                             <div className={isProductEditorShellOpen ? 'w-full max-w-none' : 'w-full max-w-none'}>
                                 {currentView === 'analytics' ? renderView() : (
                                     <div

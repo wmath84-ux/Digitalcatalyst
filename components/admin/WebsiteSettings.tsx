@@ -487,18 +487,12 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
             Number(milestone.coinReward || 0) < 0 ? `${milestone.title || milestone.id} cannot have negative coins.` : '',
         ].filter(Boolean)),
     ];
-    const classicWorkspaceTheme = localSettings.theme.classicWorkspaceTheme !== false;
-    const selectedColorExperience = localSettings.theme.colorExperience || 'immersive';
+    const selectedColorExperience = localSettings.theme.colorExperience || 'clean-neutral';
     const originalPaletteActive = selectedColorExperience === 'original';
-    const classicModeActive = selectedColorExperience === 'classic';
     const cleanNeutralModeActive = selectedColorExperience === 'clean-neutral';
-    const fixedProfessionalModeActive = classicModeActive || cleanNeutralModeActive;
+    const fixedProfessionalModeActive = cleanNeutralModeActive;
     const themePreviewPalettes = {
-        immersive: { background: '#F4F8FF', surface: '#FFFFFF', primary: '#1769FF', accent: '#6D5CFF', text: '#081A45' },
-        warm: { background: '#FFF9F1', surface: '#FFFEFB', primary: '#7A4A3A', accent: '#A56A4F', text: '#2F2925' },
-        'modern-white': { background: '#F8FAFC', surface: '#FFFFFF', primary: '#0F172A', accent: '#2563EB', text: '#111827' },
         'clean-neutral': { background: '#F7F7F8', surface: '#FFFFFF', primary: '#171717', accent: '#EDEDED', text: '#262626' },
-        classic: { background: '#FFFEEB', surface: '#FFFEF8', primary: '#111111', accent: '#F4F35B', text: '#111111' },
     };
     const selectedThemePreviewPalette = originalPaletteActive
         ? {
@@ -508,17 +502,15 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
             accent: localSettings.theme.accentColor,
             text: localSettings.theme.textColor,
         }
-        : themePreviewPalettes[selectedColorExperience as keyof typeof themePreviewPalettes] || themePreviewPalettes.immersive;
-    const themePreviewFont = classicModeActive
-        ? 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace'
-        : cleanNeutralModeActive
-            ? 'Inter, ui-sans-serif, system-ui, sans-serif'
-            : localSettings.theme.fontPairing === 'roboto-merriweather'
+        : themePreviewPalettes[selectedColorExperience as keyof typeof themePreviewPalettes] || themePreviewPalettes['clean-neutral'];
+    const themePreviewFont = cleanNeutralModeActive
+        ? 'Inter, ui-sans-serif, system-ui, sans-serif'
+        : localSettings.theme.fontPairing === 'roboto-merriweather'
             ? 'Roboto, sans-serif'
             : localSettings.theme.fontPairing === 'montserrat-oswald'
                 ? 'Montserrat, sans-serif'
                 : 'Inter, sans-serif';
-    const themePreviewRadius = classicModeActive ? '0.25rem' : cleanNeutralModeActive ? '0.625rem' : localSettings.theme.cornerRadius;
+    const themePreviewRadius = cleanNeutralModeActive ? '0.625rem' : localSettings.theme.cornerRadius;
     const themePreviewShadows = {
         light: '0 7px 20px rgba(15,23,42,0.07)',
         medium: '0 14px 36px rgba(15,23,42,0.10)',
@@ -668,84 +660,32 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             <h2 className="text-xl font-black text-slate-950">Choose the complete website colour mode</h2>
                             <p className="text-sm font-semibold leading-6 text-slate-600">This selection controls every public page, Community screen, modal, card, button, form and Admin page. Choose a mode, then click Save Changes.</p>
                         </div>
-                        <div className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6">
+                        <div className="mt-4 grid gap-3 sm:grid-cols-2">
                             <button
                                 type="button"
-                                aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'original'}
+                                aria-pressed={(localSettings.theme.colorExperience || 'clean-neutral') === 'original'}
                                 onClick={() => handleNestedChange('theme', 'colorExperience', 'original')}
                                 className={`rounded-2xl border p-4 text-left transition ${
-                                    (localSettings.theme.colorExperience || 'immersive') === 'original'
+                                    (localSettings.theme.colorExperience || 'clean-neutral') === 'original'
                                         ? 'border-blue-600 bg-blue-600 text-white shadow-lg'
                                         : 'border-slate-200 bg-white text-slate-900 hover:border-blue-300'
                                 }`}
                             >
-                                <span className="block text-base font-black">Current / Original Colours</span>
-                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'original' ? 'text-white/85' : 'text-slate-500'}`}>Restores the website appearance exactly as it exists before the immersive layer.</span>
+                                <span className="block text-base font-black">Original Colours</span>
+                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'clean-neutral') === 'original' ? 'text-white/85' : 'text-slate-500'}`}>Use the original brand colour controls below.</span>
                             </button>
                             <button
                                 type="button"
-                                aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'immersive'}
-                                onClick={() => handleNestedChange('theme', 'colorExperience', 'immersive')}
-                                className={`rounded-2xl border p-4 text-left transition ${
-                                    (localSettings.theme.colorExperience || 'immersive') === 'immersive'
-                                        ? 'border-blue-600 bg-blue-600 text-white shadow-lg'
-                                        : 'border-slate-200 bg-white text-slate-900 hover:border-blue-300'
-                                }`}
-                            >
-                                <span className="block text-base font-black">Immersive Colours</span>
-                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'immersive' ? 'text-white/85' : 'text-slate-500'}`}>Applies the solid, eye-comfortable palette across the complete website without decorative gradients.</span>
-                            </button>
-                            <button
-                                type="button"
-                                aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'warm'}
-                                onClick={() => handleNestedChange('theme', 'colorExperience', 'warm')}
-                                className={`rounded-2xl border p-4 text-left transition ${
-                                    (localSettings.theme.colorExperience || 'immersive') === 'warm'
-                                        ? 'border-[#7A4A3A] bg-[#7A4A3A] text-white shadow-lg'
-                                        : 'border-[#DED4C6] bg-[#FFFEFB] text-[#2F2925] hover:border-[#A56A4F]'
-                                }`}
-                            >
-                                <span className="block text-base font-black">Warm Chocolate Cream</span>
-                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'warm' ? 'text-white/85' : 'text-[#6F625B]'}`}>Uses the calm cream, ivory and chocolate colour direction from the Community profile experience.</span>
-                            </button>
-                            <button
-                                type="button"
-                                aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'modern-white'}
-                                onClick={() => handleNestedChange('theme', 'colorExperience', 'modern-white')}
-                                className={`rounded-2xl border p-4 text-left transition ${
-                                    (localSettings.theme.colorExperience || 'immersive') === 'modern-white'
-                                        ? 'border-slate-950 bg-slate-950 text-white shadow-lg'
-                                        : 'border-slate-200 bg-white text-slate-900 hover:border-blue-300'
-                                }`}
-                            >
-                                <span className="block text-base font-black">Modern White</span>
-                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'modern-white' ? 'text-white/85' : 'text-slate-500'}`}>Uses crisp white cards, soft neutral pages and modern blue actions like current premium apps.</span>
-                            </button>
-                            <button
-                                type="button"
-                                aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'clean-neutral'}
+                                aria-pressed={(localSettings.theme.colorExperience || 'clean-neutral') === 'clean-neutral'}
                                 onClick={() => handleNestedChange('theme', 'colorExperience', 'clean-neutral')}
                                 className={`rounded-2xl border p-4 text-left transition ${
-                                    (localSettings.theme.colorExperience || 'immersive') === 'clean-neutral'
+                                    (localSettings.theme.colorExperience || 'clean-neutral') === 'clean-neutral'
                                         ? 'border-[#171717] bg-[#171717] text-white shadow-none'
                                         : 'border-[#E5E5E5] bg-white text-[#171717] hover:border-[#A3A3A3]'
                                 }`}
                             >
                                 <span className="block text-base font-black">Clean Neutral</span>
-                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'clean-neutral' ? 'text-white/80' : 'text-[#737373]'}`}>Applies the complete 20-rule professional system: soft off-white pages, pure-white cards, black typography and icons, neutral active states, restrained borders, fixed radii and subtle shadows across every workspace.</span>
-                            </button>
-                            <button
-                                type="button"
-                                aria-pressed={(localSettings.theme.colorExperience || 'immersive') === 'classic'}
-                                onClick={() => handleNestedChange('theme', 'colorExperience', 'classic')}
-                                className={`rounded border p-4 text-left font-mono transition ${
-                                    (localSettings.theme.colorExperience || 'immersive') === 'classic'
-                                        ? 'border-[#181818] bg-[#F4F35B] text-[#111111] shadow-[0_2px_0_rgba(17,17,17,0.18)]'
-                                        : 'border-[#181818] bg-[#FFFEF8] text-[#111111] hover:bg-[#FFFDBA]'
-                                }`}
-                            >
-                                <span className="block text-base font-black">Classic Trust</span>
-                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'immersive') === 'classic' ? 'text-[#111111]' : 'text-[#676767]'}`}>Subscription-page look: sharp cards, black borders, pale-yellow active states, warm paper background and editorial monospace typography.</span>
+                                <span className={`mt-1 block text-xs font-semibold leading-5 ${(localSettings.theme.colorExperience || 'clean-neutral') === 'clean-neutral' ? 'text-white/80' : 'text-[#737373]'}`}>Soft pages, white cards, black typography, restrained borders and professional UX across every page.</span>
                             </button>
                         </div>
                         {cleanNeutralModeActive && (
@@ -767,26 +707,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                 />
                             </>
                         )}
-                        <div className="mt-4 rounded border border-[#181818] bg-[#FFFEF8] p-4 font-mono">
-                            <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                                <div>
-                                    <p className="text-xs font-black uppercase tracking-[0.2em] text-[#676767]">Classic Trust workspace layer</p>
-                                    <h3 className="mt-1 text-base font-black text-[#111111]">Apply to Community + Admin pages</h3>
-                                    <p className="mt-1 max-w-2xl text-xs font-semibold leading-5 text-[#676767]">When Classic Trust is selected, this switch forces the same sharp edges, pale-yellow action states, black borders and readable controls inside Community, Admin, course player and checkout workspace screens.</p>
-                                </div>
-                                <button
-                                    type="button"
-                                    role="switch"
-                                    aria-checked={classicWorkspaceTheme}
-                                    disabled={!classicModeActive}
-                                    onClick={() => handleNestedChange('theme', 'classicWorkspaceTheme', !classicWorkspaceTheme)}
-                                    className={`theme-control-availability inline-flex min-h-11 shrink-0 items-center gap-3 rounded border border-[#181818] px-3 py-2 text-sm font-black transition disabled:cursor-not-allowed disabled:opacity-45 ${classicWorkspaceTheme ? 'bg-[#F4F35B] text-[#111111]' : 'bg-white text-[#676767]'}`}
-                                >
-                                    <span className={`relative h-5 w-10 rounded border border-[#181818] bg-white after:absolute after:top-0.5 after:h-4 after:w-4 after:rounded-sm after:bg-[#111111] after:transition-transform ${classicWorkspaceTheme ? 'after:left-[1.25rem]' : 'after:left-0.5'}`} />
-                                    {classicWorkspaceTheme ? 'Applied' : 'Off'}
-                                </button>
-                            </div>
-                        </div>
                     </section>
                     <div className="mb-4">
                         <h3 className="text-lg font-black text-slate-900">Original palette controls</h3>
@@ -809,14 +729,14 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             <input type="color" value={localSettings.theme.textColor} onChange={e => handleNestedChange('theme', 'textColor', e.target.value)} className="h-10 w-full rounded-md border p-1 disabled:cursor-not-allowed" />
                         </FormRow>
                     </fieldset>
-                    <FormRow label="Typography" description={classicModeActive ? 'Classic Trust uses its fixed editorial monospace typography.' : cleanNeutralModeActive ? 'Clean Neutral uses fixed Inter typography for consistent professional hierarchy.' : 'Choose a real loaded font pairing for the complete website.'}>
+                    <FormRow label="Typography" description={cleanNeutralModeActive ? 'Clean Neutral uses fixed Inter typography for consistent professional hierarchy.' : 'Choose a real loaded font pairing for the complete website.'}>
                         <select disabled={fixedProfessionalModeActive} value={localSettings.theme.fontPairing} onChange={e => handleNestedChange('theme', 'fontPairing', e.target.value)} className="theme-control-availability w-full rounded border p-2 disabled:cursor-not-allowed disabled:bg-slate-100 disabled:opacity-55">
                             <option value="inter-lato">Inter & Lato</option>
                             <option value="roboto-merriweather">Roboto & Merriweather</option>
                             <option value="montserrat-oswald">Montserrat & Oswald</option>
                         </select>
                     </FormRow>
-                     <FormRow label="Corner Radius" description={classicModeActive ? 'Classic Trust intentionally uses a fixed sharp 0.25rem radius.' : cleanNeutralModeActive ? 'Clean Neutral locks controls to 10px and cards to 14px for consistent hierarchy.' : `Controls global cards and buttons. Current: ${localSettings.theme.cornerRadius}`}>
+                     <FormRow label="Corner Radius" description={cleanNeutralModeActive ? 'Clean Neutral locks controls to 10px and cards to 14px for consistent hierarchy.' : `Controls global cards and buttons. Current: ${localSettings.theme.cornerRadius}`}>
                         <input disabled={fixedProfessionalModeActive} type="range" min="0" max="2" step="0.1" value={parseFloat(localSettings.theme.cornerRadius)} onChange={e => handleNestedChange('theme', 'cornerRadius', `${e.target.value}rem`)} className="theme-control-availability w-full disabled:cursor-not-allowed disabled:opacity-45" />
                     </FormRow>
                      <FormRow label="Shadow Intensity" description={cleanNeutralModeActive ? 'Clean Neutral locks cards to an ultra-subtle shadow and reserves stronger elevation for floating overlays.' : 'Controls base, large, and extra-large shadow depth across the real website.'}>
