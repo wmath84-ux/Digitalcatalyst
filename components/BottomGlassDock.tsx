@@ -45,6 +45,7 @@ const dockToneClasses: Record<string, string> = {
   Login: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
   Subscriptions: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border)] hover:border-[var(--mobile-border-active)]',
   Community: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
+  Admin: 'from-[#EEF2FF] to-[var(--mobile-bg-soft)] hover:border-[#7C8DFF]',
 };
 
 export const dockCustomizationItems = ['Home', 'Store', 'Purchased', 'Wishlist', 'Cart', 'News', 'Community', 'Blog', 'Free', 'Profile', 'Subscriptions'];
@@ -143,7 +144,8 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
   map.Subscriptions = { label: 'Subscriptions', action: onSubscriptionClick, icon: 'gem' as ProfessionalIconName, slot: 'nav.subscriptions' as CleanNeutralIconSlotId, badge: null };
   map['May Day'] = onOpenMayDay ? { label: 'May Day', action: onOpenMayDay, icon: 'calendar' as ProfessionalIconName, slot: 'nav.mayDay' as CleanNeutralIconSlotId, badge: null, mobileOnly: true } : null;
   const configuredItems = configured.map(label => map[label]).filter(Boolean);
-  const items = map['May Day'] ? [map['May Day'], ...configuredItems.filter((item: any) => item.label !== 'May Day')] : configuredItems;
+  const configuredWithAdmin = isAdmin && map.Admin && !configuredItems.some((item: any) => item.label === 'Admin') ? [...configuredItems, map.Admin] : configuredItems;
+  const items = map['May Day'] ? [map['May Day'], ...configuredWithAdmin.filter((item: any) => item.label !== 'May Day')] : configuredWithAdmin;
 
   const dockStyle = { ...defaultDockStyle, ...((settings.content as any).dockStyle || {}) };
   const dockBackground = hexToRgba(dockStyle.backgroundColor, dockStyle.backgroundOpacity);

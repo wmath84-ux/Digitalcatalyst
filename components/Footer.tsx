@@ -4,7 +4,6 @@ import { WebsiteSettings } from '../App';
 interface FooterProps {
     settings: WebsiteSettings;
     socialLinks: { [key: string]: string };
-    onAdminLoginClick?: () => void;
     onLoginClick: () => void;
     onNavigateToAllProducts: () => void;
     onNavigateToHomeAndScroll: (sectionId: string) => void;
@@ -18,7 +17,7 @@ const LogoIcon = () => (
     </svg>
 );
 
-const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClick, onLoginClick, onNavigateToAllProducts, onNavigateToHomeAndScroll, onNavigateToPolicies, onSubscribe }) => {
+const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onLoginClick, onNavigateToAllProducts, onNavigateToHomeAndScroll, onNavigateToPolicies, onSubscribe }) => {
   const footerText = settings.content.footerText.replace('{year}', new Date().getFullYear().toString());
   const [email, setEmail] = useState('');
   const [isSubscribed, setIsSubscribed] = useState(false);

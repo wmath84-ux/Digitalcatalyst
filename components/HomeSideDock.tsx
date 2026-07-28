@@ -221,7 +221,8 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
   const itemMap = Object.fromEntries(defaultItems.map(item => [item.id, item])) as Record<string, NavigationItem>;
   itemMap.EduCoins = profileItem;
   itemMap.Purchases = itemMap.Purchased;
-  const items = configuredItems.map(label => itemMap[label]).filter((item): item is NavigationItem => Boolean(item));
+  const baseItems = configuredItems.map(label => itemMap[label]).filter((item): item is NavigationItem => Boolean(item));
+  const items = isAdmin && itemMap.Admin && !baseItems.some(item => item.id === 'Admin') ? [...baseItems, itemMap.Admin] : baseItems;
   const siteName = String((settings.content as any).siteName || 'Digital Catalyst');
   const logoUrl = String((settings.content as any).logoUrl || '/icons/icon-192x192.svg');
 
