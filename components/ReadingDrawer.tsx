@@ -30,6 +30,7 @@ interface ReadingDrawerProps {
   promoDescription?: string;
   promoCtaLabel?: string;
   onReadingReward?: (article: NewsArticle) => boolean;
+  presentation?: 'overlay' | 'page';
 }
 
 
@@ -397,7 +398,7 @@ const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: s
   );
 };
 
-const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings, isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward }) => {
+const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings, isOpen, view, articles, announcements, listType, selectedArticle, selectedAnnouncement, currentUser, onClose, onSelectArticle, onSelectAnnouncement, onBackToList, onExploreFeature, promoTitle, promoDescription, promoCtaLabel, onReadingReward, presentation = 'overlay' }) => {
   const scrollRef = useRef<HTMLDivElement>(null);
   const listScrollPositionsRef = useRef<Record<ReadingListType, number>>({ news: 0, blog: 0 });
   const previousViewRef = useRef<ReadingView>(view);
@@ -422,9 +423,11 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
       return undefined;
     }
 
+    if (presentation !== 'overlay') return undefined;
+
     document.body.style.overflow = 'hidden';
     return () => { document.body.style.overflow = ''; };
-  }, [isOpen]);
+  }, [isOpen, presentation]);
 
   useEffect(() => {
     if (!isOpen) return;
@@ -675,23 +678,23 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
 
   return (
     <div
-      className="fixed inset-0 z-[1200] pointer-events-auto"
-      role="dialog"
-      aria-modal="true"
+      className={presentation === 'page' ? "relative min-h-[100dvh] pointer-events-auto" : "fixed inset-0 z-[1200] pointer-events-auto"}
+      role={presentation === 'page' ? undefined : "dialog"}
+      aria-modal={presentation === 'page' ? undefined : "true"}
       aria-labelledby="reading-drawer-title"
-      onPointerDownCapture={handleOverlayPointerDownCapture}
-      onClickCapture={absorbOverlayClick}
+      onPointerDownCapture={presentation === 'overlay' ? handleOverlayPointerDownCapture : undefined}
+      onClickCapture={presentation === 'overlay' ? absorbOverlayClick : undefined}
     >
       <div
-        className="absolute inset-0 pointer-events-auto touch-none backdrop-blur-sm"
+        className={presentation === 'page' ? "fixed inset-0 pointer-events-none" : "absolute inset-0 pointer-events-auto touch-none backdrop-blur-sm"}
         style={{ backgroundColor: readingBackground }}
         aria-hidden="true"
       />
-      <div className="absolute inset-y-0 right-0 flex w-full justify-end pointer-events-none">
+      <div className={presentation === 'page' ? "relative flex min-h-[100dvh] w-full justify-end pointer-events-none" : "absolute inset-y-0 right-0 flex w-full justify-end pointer-events-none"}>
         <section
           data-reading-drawer-panel="true"
           onPointerDown={(event) => event.stopPropagation()}
-          className="relative flex h-full w-full flex-col overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw] pointer-events-auto"
+          className={presentation === 'page' ? "relative flex min-h-[100dvh] w-full flex-col overflow-hidden border-x shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl pointer-events-auto" : "relative flex h-full w-full flex-col overflow-hidden border-l shadow-[0_8px_30px_rgba(60,64,67,0.10)] backdrop-blur-3xl animate-slide-in-right md:w-[88vw] xl:w-[85vw] pointer-events-auto"}
           style={{ backgroundColor: panelBackground, borderColor: chatPalette.cardBorder, ...readingCssVariables }}
         >
           <style>{`

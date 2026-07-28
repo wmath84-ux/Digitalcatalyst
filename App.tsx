@@ -1455,6 +1455,8 @@ const PERSISTABLE_APP_VIEWS = new Set([
   'admin',
   'adminLogin',
   'community',
+  'news',
+  'blog',
 ]);
 
 const PRODUCT_BOUND_APP_VIEWS = new Set(['product', 'coursePlayer', 'eduCoinGuide', 'congratulations']);
@@ -5832,6 +5834,17 @@ const App: React.FC = () => {
 
   const openReadingHub = (type: ReadingListType = 'blog') => {
     acknowledgeDockDestination(type === 'news' ? 'News' : 'Blog');
+    setCurrentView(type);
+    window.scrollTo(0, 0);
+    setSelectedArticle(null);
+    setSelectedAnnouncement(null);
+    setReadingListType(type);
+    setReadingDrawerView(type);
+    setIsReadingDrawerOpen(false);
+  };
+
+  const openReadingOverlay = (type: ReadingListType = 'blog') => {
+    acknowledgeDockDestination(type === 'news' ? 'News' : 'Blog');
     if (!isReadingDrawerOpenRef.current) pushReadingHistory(type, type, undefined, 1);
     else if (window.history.state?.dcOverlay === 'reading') {
       window.history.replaceState({ ...(window.history.state || {}), dcReadingView: type, dcReadingListType: type, dcReadingItemId: null, dcReadingDepth: Math.max(1, Number(window.history.state?.dcReadingDepth) || 1) }, '', window.location.href);
@@ -5844,30 +5857,42 @@ const App: React.FC = () => {
   };
 
   const handleViewAnnouncement = (announcement: Announcement) => {
-    if (!isReadingDrawerOpenRef.current) pushReadingHistory('news', 'news', undefined, 1);
-    if (window.history.state?.dcReadingTopBack === true) {
-      window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'announcement', dcReadingListType: 'news', dcReadingItemId: String(announcement.id), dcReadingDepth: 2, dcReadingTopBack: false }, '', window.location.href);
-    } else if (readingDrawerViewRef.current === 'blog' || readingDrawerViewRef.current === 'news' || !isReadingDrawerOpenRef.current) pushReadingHistory('announcement', 'news', announcement.id, 2);
-    else window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'announcement', dcReadingListType: 'news', dcReadingItemId: String(announcement.id), dcReadingDepth: 2, dcReadingTopBack: false }, '', window.location.href);
+    const isReadingPage = currentViewRef.current === 'news' || currentViewRef.current === 'blog';
+    if (!isReadingPage) {
+      setCurrentView('news');
+      window.scrollTo(0, 0);
+    } else if (window.history.state?.dcOverlay === 'reading') {
+      if (!isReadingDrawerOpenRef.current) pushReadingHistory('news', 'news', undefined, 1);
+      if (window.history.state?.dcReadingTopBack === true) {
+        window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'announcement', dcReadingListType: 'news', dcReadingItemId: String(announcement.id), dcReadingDepth: 2, dcReadingTopBack: false }, '', window.location.href);
+      } else if (readingDrawerViewRef.current === 'blog' || readingDrawerViewRef.current === 'news' || !isReadingDrawerOpenRef.current) pushReadingHistory('announcement', 'news', announcement.id, 2);
+      else window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'announcement', dcReadingListType: 'news', dcReadingItemId: String(announcement.id), dcReadingDepth: 2, dcReadingTopBack: false }, '', window.location.href);
+    }
     setSelectedAnnouncement(announcement);
     setSelectedArticle(null);
     setReadingListType('news');
     setReadingDrawerView('announcement');
-    setIsReadingDrawerOpen(true);
+    setIsReadingDrawerOpen(false);
   };
 
   const handleViewBlogArticle = (article: NewsArticle) => {
     const type: ReadingListType = article.type === 'news' ? 'news' : 'blog';
-    if (!isReadingDrawerOpenRef.current) pushReadingHistory(type, type, undefined, 1);
-    if (window.history.state?.dcReadingTopBack === true) {
-      window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'article', dcReadingListType: type, dcReadingItemId: String(article.id), dcReadingDepth: 2, dcReadingTopBack: false }, '', window.location.href);
-    } else if (readingDrawerViewRef.current === 'blog' || readingDrawerViewRef.current === 'news' || !isReadingDrawerOpenRef.current) pushReadingHistory('article', type, article.id, 2);
-    else window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'article', dcReadingListType: type, dcReadingItemId: String(article.id), dcReadingDepth: 2, dcReadingTopBack: false }, '', window.location.href);
+    const isReadingPage = currentViewRef.current === 'news' || currentViewRef.current === 'blog';
+    if (!isReadingPage) {
+      setCurrentView(type);
+      window.scrollTo(0, 0);
+    } else if (window.history.state?.dcOverlay === 'reading') {
+      if (!isReadingDrawerOpenRef.current) pushReadingHistory(type, type, undefined, 1);
+      if (window.history.state?.dcReadingTopBack === true) {
+        window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'article', dcReadingListType: type, dcReadingItemId: String(article.id), dcReadingDepth: 2, dcReadingTopBack: false }, '', window.location.href);
+      } else if (readingDrawerViewRef.current === 'blog' || readingDrawerViewRef.current === 'news' || !isReadingDrawerOpenRef.current) pushReadingHistory('article', type, article.id, 2);
+      else window.history.replaceState({ ...(window.history.state || {}), dcReadingView: 'article', dcReadingListType: type, dcReadingItemId: String(article.id), dcReadingDepth: 2, dcReadingTopBack: false }, '', window.location.href);
+    }
     setSelectedArticle(article);
     setSelectedAnnouncement(null);
     setReadingListType(type);
     setReadingDrawerView('article');
-    setIsReadingDrawerOpen(true);
+    setIsReadingDrawerOpen(false);
   };
 
   const handleBackToReadingList = () => {
@@ -6406,6 +6431,8 @@ const App: React.FC = () => {
         if (!isAuthStateReady) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
         return isLoggedIn && appUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={appUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} orders={orders} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} onUpgrade={handleNavigateToSubscription} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onAdminGoogleLogin={handleAdminGoogleLogin} onAdminEmailLogin={handleAdminEmailLogin} onBack={handleBackFromAuth} />;
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={() => handleNavigateBack('home')} onActivatePlan={handleActivateSubscription} currentUser={appUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
+      case 'news':
+      case 'blog': return <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={true} presentation="page" view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={currentView === 'news' ? 'news' : 'blog'} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={() => handleNavigateBack('home')} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={() => handleNavigateBack('home')} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onClearWishlist={handleClearWishlist} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
       case 'mayDay': return (
@@ -6580,19 +6607,13 @@ const App: React.FC = () => {
           className="h-full min-w-0 transition-[padding-left] duration-300 ease-out"
           style={{ paddingLeft: useCommunityDesktopSidebar ? 'var(--desktop-site-sidebar-offset, 320px)' : undefined }}
         >
-          {hasPremiumMembership(effectiveAppUser) ? (
-            <EduvoraCommunity
-              settings={websiteSettings}
-              onClose={() => handleNavigateBack('home')}
-              isAuthenticated={isLoggedIn}
-              currentUser={effectiveAppUser}
-              siteSidebarState={useCommunityDesktopSidebar ? desktopSidebarState : 'hidden'}
-            />
-          ) : (
-            <div className="flex min-h-full items-center justify-center">
-              <MembershipUpgradeCard message={normalizeSubscriptionPageContent(websiteSettings.content.subscriptionPage).communityLocked} onUpgrade={handleNavigateToSubscription} onBack={() => handleNavigateBack('home')} />
-            </div>
-          )}
+          <EduvoraCommunity
+            settings={websiteSettings}
+            onClose={() => handleNavigateBack('home')}
+            isAuthenticated={isLoggedIn}
+            currentUser={effectiveAppUser}
+            siteSidebarState={useCommunityDesktopSidebar ? desktopSidebarState : 'hidden'}
+          />
         </div>
       </div>
     );
@@ -6678,7 +6699,7 @@ const App: React.FC = () => {
             {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={(payment) => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins, payment)} currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser} coinPrice={hasPremiumMembership(effectiveAppUser) && cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={hasPremiumMembership(effectiveAppUser) ? handleConfirmCartCoinPurchase : undefined} onInsufficientCoins={handleInsufficientEduCoins} checkoutType="cart" checkoutUserId={effectiveAppUser?.id} checkoutTargetId="cart" />}
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
-            <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={closeReadingDrawer} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={hasPremiumMembership(effectiveAppUser) ? handleReadingReward : undefined} />
+            <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={closeReadingDrawer} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
             <SiteNotificationCenter
               isOpen={isSiteNotificationCenterOpen}
               notifications={siteNotifications}
