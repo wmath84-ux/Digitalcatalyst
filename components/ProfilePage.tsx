@@ -57,33 +57,32 @@ interface MilestoneReward extends ProfileMilestoneConfig {
 const glassCard =
   'profile-glass-card profile-performance-card border border-[#D2E3FC] shadow-[0_8px_24px_rgba(26,115,232,0.10)] transition-[border-color,box-shadow] duration-200 lg:hover:border-[#C2E7FF] lg:hover:shadow-[0_12px_30px_rgba(26,115,232,0.13)]';
 
-
 const fallbackProfileStyle = { backgroundColor: '#F8FAFD', backgroundTint: '#E8F0FE', cardOpacity: 95, heroOverlayOpacity: 76, accentColor: '#1A73E8' };
 
 const fallbackStreakConfigs: ProfileStreakConfig[] = [
-  { id: 'daily-login', title: 'Daily Login Spark', icon: '🔥', metric: 'dailyLogin', goal: 1, unit: 'day', coinReward: 10, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Open your hub every day and claim today’s flame.', active: true },
-  { id: 'study-15', title: '15 Minute Focus', icon: '⏱️', metric: 'studyMinutes', goal: 15, unit: 'mins', coinReward: 15, accent: 'from-[#1A73E8] via-[#1967D2] to-[#174EA6]', note: 'Watch lessons or read learning content for 15 minutes.', active: true },
-  { id: 'study-45', title: 'Deep Work Sprint', icon: '⚡', metric: 'studyMinutes', goal: 45, unit: 'mins', coinReward: 25, accent: 'from-[#D3E3FD] via-[#1A73E8] to-[#174EA6]', note: 'Build a longer study session and earn a bigger boost.', active: true },
-  { id: 'watch-60', title: 'Video Warrior', icon: '🎬', metric: 'watchMinutes', goal: 60, unit: 'mins', coinReward: 30, accent: 'from-[#1A73E8] via-[#1967D2] to-[#C2E7FF]', note: 'Complete one hour of course video watch time.', active: true },
-  { id: 'pdf-3', title: 'PDF Reader', icon: '📄', metric: 'pdfsRead', goal: 3, unit: 'PDFs', coinReward: 20, accent: 'from-[#E6F4EA] via-[#D3E3FD] to-[#1A73E8]', note: 'Read premium notes and document resources.', active: true },
-  { id: 'article-3', title: 'Knowledge Hunter', icon: '🧠', metric: 'articlesRead', goal: 3, unit: 'reads', coinReward: 20, accent: 'from-[#E6F4EA] via-[#E8F0FE] to-[#1A73E8]', note: 'Read news or blog lessons to keep learning daily.', active: true },
-  { id: 'quiz-1', title: 'Quiz Ignition', icon: '🎯', metric: 'quizWins', goal: 1, unit: 'win', coinReward: 25, accent: 'from-[#D3E3FD] via-[#1A73E8] to-[#C2E7FF]', note: 'Finish a quiz and claim your first quiz streak.', active: true },
-  { id: 'quiz-3', title: 'Quiz Momentum', icon: '🏹', metric: 'quizWins', goal: 3, unit: 'wins', coinReward: 40, accent: 'from-[#D3E3FD] via-[#1A73E8] to-[#174EA6]', note: 'Stack multiple quiz rewards to keep momentum alive.', active: true },
-  { id: 'course-1', title: 'Course Starter', icon: '📚', metric: 'coursesOwned', goal: 1, unit: 'course', coinReward: 25, accent: 'from-[#1A73E8] via-[#1967D2] to-[#C2E7FF]', note: 'Own your first course and start your premium path.', active: true },
-  { id: 'complete-1', title: 'Completion Charge', icon: '✅', metric: 'completedCourses', goal: 1, unit: 'done', coinReward: 50, accent: 'from-[#E6F4EA] via-[#D3E3FD] to-[#1A73E8]', note: 'Complete one tracked course.', active: true },
-  { id: 'wallet-500', title: 'Coin Collector', icon: '🪙', metric: 'lifetimeCoins', goal: 500, unit: 'coins', coinReward: 35, accent: 'from-[#FEF7E0] via-[#D3E3FD] to-[#1A73E8]', note: 'Earn lifetime coins from real activity.', active: true },
-  { id: 'badge-3', title: 'Badge Builder', icon: '🏅', metric: 'badgesUnlocked', goal: 3, unit: 'badges', coinReward: 30, accent: 'from-[#5F6368] via-[#1A73E8] to-[#174EA6]', note: 'Unlock badges by learning and completing.', active: true },
+  { id: 'daily-login', title: 'Daily Login Spark', icon: '\u{1F525}', metric: 'dailyLogin', goal: 1, unit: 'day', coinReward: 10, accent: 'from-[#1A73E8] via-[#D3E3FD] to-[#C2E7FF]', note: 'Open your hub every day and claim today\u2019s flame.', active: true },
+  { id: 'study-15', title: '15 Minute Focus', icon: '\u23F1\uFE0F', metric: 'studyMinutes', goal: 15, unit: 'mins', coinReward: 15, accent: 'from-[#1A73E8] via-[#1967D2] to-[#174EA6]', note: 'Watch lessons or read learning content for 15 minutes.', active: true },
+  { id: 'study-45', title: 'Deep Work Sprint', icon: '\u26A1', metric: 'studyMinutes', goal: 45, unit: 'mins', coinReward: 25, accent: 'from-[#D3E3FD] via-[#1A73E8] to-[#174EA6]', note: 'Build a longer study session and earn a bigger boost.', active: true },
+  { id: 'watch-60', title: 'Video Warrior', icon: '\u{1F3AC}', metric: 'watchMinutes', goal: 60, unit: 'mins', coinReward: 30, accent: 'from-[#1A73E8] via-[#1967D2] to-[#C2E7FF]', note: 'Complete one hour of course video watch time.', active: true },
+  { id: 'pdf-3', title: 'PDF Reader', icon: '\u{1F4C4}', metric: 'pdfsRead', goal: 3, unit: 'PDFs', coinReward: 20, accent: 'from-[#E6F4EA] via-[#D3E3FD] to-[#1A73E8]', note: 'Read premium notes and document resources.', active: true },
+  { id: 'article-3', title: 'Knowledge Hunter', icon: '\u{1F9E0}', metric: 'articlesRead', goal: 3, unit: 'reads', coinReward: 20, accent: 'from-[#E6F4EA] via-[#E8F0FE] to-[#1A73E8]', note: 'Read news or blog lessons to keep learning daily.', active: true },
+  { id: 'quiz-1', title: 'Quiz Ignition', icon: '\u{1F3AF}', metric: 'quizWins', goal: 1, unit: 'win', coinReward: 25, accent: 'from-[#D3E3FD] via-[#1A73E8] to-[#C2E7FF]', note: 'Finish a quiz and claim your first quiz streak.', active: true },
+  { id: 'quiz-3', title: 'Quiz Momentum', icon: '\u{1F3F9}', metric: 'quizWins', goal: 3, unit: 'wins', coinReward: 40, accent: 'from-[#D3E3FD] via-[#1A73E8] to-[#174EA6]', note: 'Stack multiple quiz rewards to keep momentum alive.', active: true },
+  { id: 'course-1', title: 'Course Starter', icon: '\u{1F4DA}', metric: 'coursesOwned', goal: 1, unit: 'course', coinReward: 25, accent: 'from-[#1A73E8] via-[#1967D2] to-[#C2E7FF]', note: 'Own your first course and start your premium path.', active: true },
+  { id: 'complete-1', title: 'Completion Charge', icon: '\u2705', metric: 'completedCourses', goal: 1, unit: 'done', coinReward: 50, accent: 'from-[#E6F4EA] via-[#D3E3FD] to-[#1A73E8]', note: 'Complete one tracked course.', active: true },
+  { id: 'wallet-500', title: 'Coin Collector', icon: '\u{1FA99}', metric: 'lifetimeCoins', goal: 500, unit: 'coins', coinReward: 35, accent: 'from-[#FEF7E0] via-[#D3E3FD] to-[#1A73E8]', note: 'Earn lifetime coins from real activity.', active: true },
+  { id: 'badge-3', title: 'Badge Builder', icon: '\u{1F3C5}', metric: 'badgesUnlocked', goal: 3, unit: 'badges', coinReward: 30, accent: 'from-[#5F6368] via-[#1A73E8] to-[#174EA6]', note: 'Unlock badges by learning and completing.', active: true },
 ];
 
 const fallbackMilestoneConfigs: ProfileMilestoneConfig[] = [
-  { id: 'first-login-flame', title: 'First Login Flame', icon: '🔥', metric: 'studyMinutes', requirement: 1, description: 'Start learning with your first active minute.', actionLabel: 'Claim Coins', coinReward: 25, active: true },
-  { id: 'article-reader', title: 'Article Reader', icon: '📰', metric: 'articlesRead', requirement: 3, description: 'Read three learning articles or blog lessons.', actionLabel: 'Claim Reading Bonus', coinReward: 40, active: true },
-  { id: 'video-hour', title: 'One Hour Video Charge', icon: '🎬', metric: 'watchMinutes', requirement: 60, description: 'Complete 60 minutes of course video watch time.', actionLabel: 'Claim Watch Bonus', coinReward: 60, active: true },
-  { id: 'quiz-master-real', title: 'Quiz Master', icon: '🎯', metric: 'quizWins', requirement: 3, description: 'Claim rewards from three unique quizzes.', actionLabel: 'Claim Quiz Bonus', coinReward: 75, active: true },
-  { id: 'pdf-scholar', title: 'PDF Scholar', icon: '📄', metric: 'pdfsRead', requirement: 5, description: 'Read or own five PDF/document resources.', actionLabel: 'Download Scholar Pack', coinReward: 50, downloadContent: 'Digital Catalyst PDF Scholar Pack\n\n- Reading checklist\n- Revision tracker\n- Daily active planner', active: true },
-  { id: 'course-finisher', title: 'Course Finisher', icon: '✅', metric: 'completedCourses', requirement: 1, description: 'Reach 100% completion on a course tracker.', actionLabel: 'Claim Completion Bonus', coinReward: 100, active: true },
-  { id: 'wallet-elite', title: 'Wallet Elite', icon: '💎', metric: 'lifetimeCoins', requirement: 1000, description: 'Earn 1000 lifetime EduCoins.', actionLabel: 'Claim Elite Badge', coinReward: 125, active: true },
-  { id: 'premium-unlocker', title: 'Premium Unlocker', icon: '🎓', metric: 'coursesOwned', requirement: 2, description: 'Own two premium learning products.', actionLabel: 'Unlock Bonus Access', coinReward: 80, unlockProductIds: [], active: true },
+  { id: 'first-login-flame', title: 'First Login Flame', icon: '\u{1F525}', metric: 'studyMinutes', requirement: 1, description: 'Start learning with your first active minute.', actionLabel: 'Claim Coins', coinReward: 25, active: true },
+  { id: 'article-reader', title: 'Article Reader', icon: '\u{1F4F0}', metric: 'articlesRead', requirement: 3, description: 'Read three learning articles or blog lessons.', actionLabel: 'Claim Reading Bonus', coinReward: 40, active: true },
+  { id: 'video-hour', title: 'One Hour Video Charge', icon: '\u{1F3AC}', metric: 'watchMinutes', requirement: 60, description: 'Complete 60 minutes of course video watch time.', actionLabel: 'Claim Watch Bonus', coinReward: 60, active: true },
+  { id: 'quiz-master-real', title: 'Quiz Master', icon: '\u{1F3AF}', metric: 'quizWins', requirement: 3, description: 'Claim rewards from three unique quizzes.', actionLabel: 'Claim Quiz Bonus', coinReward: 75, active: true },
+  { id: 'pdf-scholar', title: 'PDF Scholar', icon: '\u{1F4C4}', metric: 'pdfsRead', requirement: 5, description: 'Read or own five PDF/document resources.', actionLabel: 'Download Scholar Pack', coinReward: 50, downloadContent: 'Digital Catalyst PDF Scholar Pack\n\n- Reading checklist\n- Revision tracker\n- Daily active planner', active: true },
+  { id: 'course-finisher', title: 'Course Finisher', icon: '\u2705', metric: 'completedCourses', requirement: 1, description: 'Reach 100% completion on a course tracker.', actionLabel: 'Claim Completion Bonus', coinReward: 100, active: true },
+  { id: 'wallet-elite', title: 'Wallet Elite', icon: '\u{1F48E}', metric: 'lifetimeCoins', requirement: 1000, description: 'Earn 1000 lifetime EduCoins.', actionLabel: 'Claim Elite Badge', coinReward: 125, active: true },
+  { id: 'premium-unlocker', title: 'Premium Unlocker', icon: '\u{1F393}', metric: 'coursesOwned', requirement: 2, description: 'Own two premium learning products.', actionLabel: 'Unlock Bonus Access', coinReward: 80, unlockProductIds: [], active: true },
 ];
 
 const clamp = (value: number, min = 0, max = 100) => Math.min(max, Math.max(min, value));
@@ -97,6 +96,13 @@ const formatLedgerTime = (value: string) => {
   if (date.getTime() >= startToday) return `Today, ${time}`;
   if (date.getTime() >= startYesterday) return `Yesterday, ${time}`;
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+};
+
+const TAB_ICONS: Record<string, string> = {
+  overview: '\u{1F3E0}',
+  learning: '\u{1F4DA}',
+  rewards: '\u{1F3C6}',
+  wallet: '\u{1F4B0}',
 };
 
 const ProfilePage: React.FC<ProfilePageProps> = ({
@@ -131,6 +137,17 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   });
   const [profileCoinError, setProfileCoinError] = React.useState('');
   const profileUid = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
+
+  const [expandedSections, setExpandedSections] = React.useState<Record<string, boolean>>({
+    streaks: true,
+    milestones: false,
+    rewardsVault: false,
+    coupons: false,
+  });
+
+  const toggleSection = (section: string) => {
+    setExpandedSections(prev => ({ ...prev, [section]: !prev[section] }));
+  };
 
   React.useEffect(() => {
     if (!profileUid) {
@@ -253,7 +270,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     const backendCompletion = Number(progressRecord?.completionPercentage ?? progressRecord?.completion ?? 0);
     if (Number.isFinite(backendCompletion) && backendCompletion > 0) return clamp(backendCompletion);
 
-    // Read-only legacy fallback: old browser progress can display continuity, but it never awards coins.
     if (!currentUser?.id) return 0;
     const stored = Number(localStorage.getItem(`courseProgress-${currentUser.id}-${productId}`) || localStorage.getItem(`courseCompletion-${currentUser.id}-${productId}`) || 0);
     return Number.isFinite(stored) ? clamp(stored) : 0;
@@ -344,12 +360,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
 
   const badges: Badge[] = [
-    { id: 'quiz-master', label: 'Quiz Starter', icon: '🎯', unlocked: quizWinCount >= 1, description: 'Complete 1 verified quiz', currentValue: quizWinCount, goal: 1 },
-    { id: 'watch-hour', label: 'Video Learner', icon: '🎬', unlocked: watchTimeMinutes >= 60, description: 'Watch 60 verified minutes', currentValue: watchTimeMinutes, goal: 60 },
-    { id: 'first-course', label: 'Course Finisher', icon: '🏆', unlocked: completedCourses >= 1, description: 'Reach 100% course progress', currentValue: completedCourses, goal: 1 },
-    { id: 'streak-flame', label: 'Streak Flame', icon: '🔥', unlocked: streakDays >= 5, description: 'Keep a 5-day backend streak', currentValue: streakDays, goal: 5 },
-    { id: 'collector', label: 'Course Collector', icon: '💎', unlocked: purchasedProducts.length >= 3, description: 'Own 3 premium courses', currentValue: purchasedProducts.length, goal: 3 },
-    { id: 'coin-builder', label: 'Coin Builder', icon: '🪙', unlocked: totalLifetimeCoins >= 500, description: 'Earn 500 lifetime EduCoins', currentValue: totalLifetimeCoins, goal: 500 },
+    { id: 'quiz-master', label: 'Quiz Starter', icon: '\u{1F3AF}', unlocked: quizWinCount >= 1, description: 'Complete 1 verified quiz', currentValue: quizWinCount, goal: 1 },
+    { id: 'watch-hour', label: 'Video Learner', icon: '\u{1F3AC}', unlocked: watchTimeMinutes >= 60, description: 'Watch 60 verified minutes', currentValue: watchTimeMinutes, goal: 60 },
+    { id: 'first-course', label: 'Course Finisher', icon: '\u{1F3C6}', unlocked: completedCourses >= 1, description: 'Reach 100% course progress', currentValue: completedCourses, goal: 1 },
+    { id: 'streak-flame', label: 'Streak Flame', icon: '\u{1F525}', unlocked: streakDays >= 5, description: 'Keep a 5-day backend streak', currentValue: streakDays, goal: 5 },
+    { id: 'collector', label: 'Course Collector', icon: '\u{1F48E}', unlocked: purchasedProducts.length >= 3, description: 'Own 3 premium courses', currentValue: purchasedProducts.length, goal: 3 },
+    { id: 'coin-builder', label: 'Coin Builder', icon: '\u{1FA99}', unlocked: totalLifetimeCoins >= 500, description: 'Earn 500 lifetime EduCoins', currentValue: totalLifetimeCoins, goal: 500 },
   ];
 
   const syncProfileUser = (updated: User, entry?: CoinTransaction) => {
@@ -373,7 +389,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         userId,
         amount: coinReward,
         source: 'profile_streak',
-        title: `🔥 ${streak.title}`,
+        title: `\u{1F525} ${streak.title}`,
         description: `Claimed ${coinReward} EduCoins for ${streak.title}`,
         profileStreakClaim: {
           streakId: streak.id,
@@ -389,7 +405,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
         amount: creditedReward,
         type: 'credit',
         source: 'profile_streak',
-        title: `🔥 ${streak.title}`,
+        title: `\u{1F525} ${streak.title}`,
         description: `Claimed ${creditedReward} EduCoins for ${streak.title}`,
         createdAt: new Date().toISOString(),
       };
@@ -456,30 +472,30 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   };
 
   const statCards = [
-    { label: 'Courses Owned', value: purchasedProducts.length, icon: '📚' },
-    { label: 'Video Watch Time', value: `${Math.floor(watchTimeMinutes / 60)}h ${watchTimeMinutes % 60}m`, icon: '⏱️' },
-    { label: 'Badges Unlocked', value: `${badges.filter(badge => badge.unlocked).length}/${badges.length}`, icon: '🏅' },
+    { label: 'Courses', value: purchasedProducts.length, icon: '\u{1F4DA}' },
+    { label: 'Watch Time', value: `${Math.floor(watchTimeMinutes / 60)}h ${watchTimeMinutes % 60}m`, icon: '\u23F1\uFE0F' },
+    { label: 'Badges', value: `${badges.filter(badge => badge.unlocked).length}/${badges.length}`, icon: '\u{1F3C5}' },
+    { label: 'Streak', value: `${streakDays}d`, icon: '\u{1F525}' },
   ];
-  const profileFilters = [
-    { id: 'overview' as const, label: 'Overview', helper: 'Profile summary' },
+
+  const profileTabs = [
+    { id: 'overview' as const, label: 'Overview', helper: 'Summary' },
     { id: 'learning' as const, label: 'Learning', helper: `${learningProgress.length} courses` },
     { id: 'rewards' as const, label: 'Rewards', helper: `${streakCards.filter(streak => streak.claimable).length} ready` },
     { id: 'wallet' as const, label: 'Wallet', helper: `${profileCoinWallet.coinBalance} coins` },
   ];
-  const showOverview = activeProfileFilter === 'overview';
-  const showLearning = activeProfileFilter === 'overview' || activeProfileFilter === 'learning';
-  const showRewards = activeProfileFilter === 'overview' || activeProfileFilter === 'rewards';
-  const showWallet = activeProfileFilter === 'overview' || activeProfileFilter === 'wallet';
+
+  const showSection = (filter: string) => activeProfileFilter === 'overview' || activeProfileFilter === filter;
 
   if (!hasPremiumAccess) {
     return (
       <div className="min-h-[100dvh] w-full overflow-x-hidden text-[#202124]" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}, ${profileStyle.backgroundTint}, #C2E7FF)` }}>
-        <main className="mx-auto w-full max-w-6xl px-4 py-5 pb-28 sm:px-6 sm:py-8">
-          <button onClick={onBack} className="mb-5 rounded-2xl border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-sm font-black text-[#202124] shadow-sm transition hover:bg-[#E8F0FE]">← Back</button>
+        <main className="mx-auto w-full max-w-6xl px-4 py-5 pb-36 sm:px-6 sm:py-8">
+          <button onClick={onBack} className="mb-5 flex min-h-[44px] items-center gap-2 rounded-2xl border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-sm font-black text-[#202124] shadow-sm transition active:scale-95">\u2190 Back</button>
 
           <section className="overflow-hidden rounded-[2rem] border border-[#D2E3FC] bg-white/95 shadow-[0_22px_70px_rgba(26,115,232,0.14)]">
             <div className="bg-gradient-to-br from-[#174EA6] via-[#1A73E8] to-[#7B61FF] p-5 text-white sm:p-8">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="flex flex-col items-center gap-4 text-center sm:flex-row sm:text-left">
                 <UserAvatar name={currentUser?.name} email={currentUser?.email} photoURL={currentUser?.profilePhotoSet ? currentUser.photoURL : ''} size={112} className="!h-24 !w-24 rounded-[1.5rem] border-4 border-white/80 text-3xl shadow-xl" imageClassName="rounded-[1.25rem]" />
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-[#C2E7FF]">Learning Profile</p>
@@ -498,10 +514,10 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </section>
 
           <section className="mt-5 rounded-[2rem] border border-[#D2E3FC] bg-white/95 p-5 shadow-sm sm:p-6">
-            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.2em] text-[#1967D2]">Purchased Learning</p><h2 className="mt-2 text-2xl font-black">Continue Your Courses</h2></div><button type="button" onClick={onExplore} className="rounded-2xl bg-[#1769FF] px-4 py-2.5 text-sm font-black text-white">Explore Store</button></div>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between"><div><p className="text-xs font-black uppercase tracking-[0.2em] text-[#1967D2]">Purchased Learning</p><h2 className="mt-2 text-2xl font-black">Continue Your Courses</h2></div><button type="button" onClick={onExplore} className="min-h-[44px] rounded-2xl bg-[#1769FF] px-4 py-2.5 text-sm font-black text-white active:scale-95 transition">Explore Store</button></div>
             {courseAccessError && <p className="mt-4 rounded-2xl bg-red-50 p-3 text-sm font-bold text-red-700">{courseAccessError}</p>}
             <div className="mt-5 grid gap-3">
-              {learningProgress.length ? learningProgress.map(course => <article key={course.id} className="rounded-2xl border border-[#D2E3FC] bg-[#F8FAFD] p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black">{course.title}</h3><p className="mt-1 text-sm font-semibold text-[#5F6368]">{course.category} • {course.completion}% complete</p></div><button type="button" onClick={() => handleContinueLearning(course)} className="rounded-xl border border-[#1769FF] bg-white px-4 py-2 text-sm font-black text-[#1769FF]">Continue</button></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-[#DADCE0]"><div className="h-full rounded-full bg-gradient-to-r from-[#1769FF] to-[#7B61FF]" style={{ width: `${course.completion}%` }} /></div></article>) : <p className="rounded-2xl border border-dashed border-[#D2E3FC] p-4 text-sm font-semibold text-[#5F6368]">No purchased courses yet. You can browse the store and buy learning content without a subscription.</p>}
+              {learningProgress.length ? learningProgress.map(course => <article key={course.id} className="rounded-2xl border border-[#D2E3FC] bg-[#F8FAFD] p-4"><div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between"><div><h3 className="font-black">{course.title}</h3><p className="mt-1 text-sm font-semibold text-[#5F6368]">{course.category} \u2022 {course.completion}% complete</p></div><button type="button" onClick={() => handleContinueLearning(course)} className="min-h-[44px] rounded-xl border border-[#1769FF] bg-white px-4 py-2 text-sm font-black text-[#1769FF] active:scale-95 transition">Continue</button></div><div className="mt-3 h-2 overflow-hidden rounded-full bg-[#DADCE0]"><div className="h-full rounded-full bg-gradient-to-r from-[#1769FF] to-[#7B61FF]" style={{ width: `${course.completion}%` }} /></div></article>) : <p className="rounded-2xl border border-dashed border-[#D2E3FC] p-4 text-sm font-semibold text-[#5F6368]">No purchased courses yet. You can browse the store and buy learning content without a subscription.</p>}
             </div>
           </section>
         </main>
@@ -510,301 +526,391 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   }
 
   return (
-    <div className="profile-performance-root relative isolate min-h-[100dvh] w-full max-w-full overflow-x-clip text-[#202124]" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}, ${profileStyle.backgroundTint}, #C2E7FF)`, '--profile-card-opacity': String(Number(profileStyle.cardOpacity) / 100) } as React.CSSProperties}>
+    <div className="mobile-profile-root relative isolate min-h-[100dvh] w-full max-w-full overflow-x-clip text-[#202124]" style={{ background: `linear-gradient(135deg, ${profileStyle.backgroundColor}, ${profileStyle.backgroundTint}, #C2E7FF)`, '--profile-card-opacity': String(Number(profileStyle.cardOpacity) / 100), '--profile-accent': profileStyle.accentColor } as React.CSSProperties}>
       <style>{`
-        @keyframes hubFadeUp {
-          from { opacity: 0; transform: translateY(28px); }
+        /* ---------- animations ---------- */
+        @keyframes mobileProfileFadeUp {
+          from { opacity: 0; transform: translateY(20px); }
           to { opacity: 1; transform: translateY(0); }
         }
-
-        .hub-animate {
-          opacity: 1;
-          transform: translateY(0);
+        @keyframes mobileProfileSlideUp {
+          from { opacity: 0; transform: translateY(40px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes mobileProfilePulse {
+          0%, 100% { box-shadow: 0 0 0 0 rgba(26,115,232,0.35); }
+          50% { box-shadow: 0 0 0 8px rgba(26,115,232,0); }
+        }
+        @keyframes mobileProfileShimmer {
+          0% { background-position: -200% 0; }
+          100% { background-position: 200% 0; }
+        }
+        @keyframes mobileProfileCoinBounce {
+          0%, 100% { transform: translateY(0); }
+          40% { transform: translateY(-6px); }
+          60% { transform: translateY(-2px); }
         }
 
-        @media (prefers-reduced-motion: no-preference) {
-          .hub-animate {
-            animation: hubFadeUp 680ms ease-out both;
+        .mobile-profile-root .mp-animate {
+          animation: mobileProfileFadeUp 500ms ease-out both;
+        }
+
+        .mobile-profile-root .mp-slide-up {
+          animation: mobileProfileSlideUp 550ms cubic-bezier(0.16, 1, 0.3, 1) both;
+        }
+
+        .mobile-profile-root .profile-glass-card {
+          background-color: rgba(255,255,255,var(--profile-card-opacity,0.95));
+        }
+
+        .mobile-profile-root .mp-stats-scroll {
+          -webkit-overflow-scrolling: touch;
+          scroll-snap-type: x mandatory;
+          scrollbar-width: none;
+        }
+        .mobile-profile-root .mp-stats-scroll::-webkit-scrollbar { display: none; }
+        .mobile-profile-root .mp-stats-scroll > * { scroll-snap-align: start; }
+
+        .mobile-profile-root .mp-section-collapse {
+          display: grid;
+          grid-template-rows: 1fr;
+          transition: grid-template-rows 350ms cubic-bezier(0.16, 1, 0.3, 1);
+        }
+        .mobile-profile-root .mp-section-collapse.mp-collapsed {
+          grid-template-rows: 0fr;
+        }
+        .mobile-profile-root .mp-section-collapse > div { overflow: hidden; }
+
+        .mobile-profile-root .mp-claimable-pulse {
+          animation: mobileProfilePulse 2s ease-in-out infinite;
+        }
+
+        .mobile-profile-root .mp-coin-icon {
+          animation: mobileProfileCoinBounce 2.5s ease-in-out infinite;
+        }
+
+        /* bottom tab bar */
+        .mobile-profile-root .mp-bottom-tabs {
+          backdrop-filter: blur(24px);
+          -webkit-backdrop-filter: blur(24px);
+          box-shadow: 0 -4px 24px rgba(15,23,42,0.08), 0 -1px 0 rgba(15,23,42,0.04);
+        }
+
+        @media (min-width: 768px) {
+          .mobile-profile-root .mp-bottom-tabs {
+            display: none;
+          }
+          .mobile-profile-root .mp-desktop-tabs {
+            display: flex;
           }
         }
 
-        .animations-off .hub-animate {
-          opacity: 1 !important;
-          transform: none !important;
-          animation: none !important;
+        @media (max-width: 767px) {
+          .mobile-profile-root .mp-bottom-tabs {
+            display: flex;
+          }
+          .mobile-profile-root .mp-desktop-tabs {
+            display: none;
+          }
         }
 
-        .profile-glass-card {
-          background-color: rgba(255,255,255,var(--profile-card-opacity,0.95));
-          -webkit-backdrop-filter: none;
-          backdrop-filter: none;
-        }
-
-        .profile-performance-backdrop {
-          contain: paint;
-        }
-
-        .profile-deferred-section {
-          content-visibility: auto;
-          contain-intrinsic-size: 1px 760px;
-        }
-
-        @media (hover: none), (pointer: coarse), (max-width: 1024px) {
-          .profile-performance-root .hub-animate {
+        /* reduced motion */
+        @media (prefers-reduced-motion: reduce) {
+          .mobile-profile-root .mp-animate,
+          .mobile-profile-root .mp-slide-up {
             animation: none !important;
             opacity: 1 !important;
-            transform: none !important;
-          }
-
-          .profile-performance-root .profile-performance-card,
-          .profile-performance-root article {
-            transform: none !important;
-            box-shadow: 0 5px 16px rgba(26,115,232,0.08) !important;
-          }
-
-          .profile-performance-root button,
-          .profile-performance-root article,
-          .profile-performance-root .profile-performance-card {
-            transition-duration: 120ms !important;
           }
         }
       `}</style>
 
-      <div
-        className="profile-performance-backdrop pointer-events-none absolute inset-0 z-0 opacity-70"
-        aria-hidden="true"
-        style={{ background: `radial-gradient(circle at 10% 12%, ${profileStyle.accentColor}1f 0, transparent 34%), radial-gradient(circle at 92% 38%, rgba(194,231,255,0.42) 0, transparent 32%), radial-gradient(circle at 42% 92%, rgba(26,115,232,0.10) 0, transparent 28%)` }}
-      />
+      {/* background ambient blobs */}
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden" aria-hidden="true">
+        <div className="absolute -top-20 -left-20 h-64 w-64 rounded-full opacity-20" style={{ background: `radial-gradient(circle, ${profileStyle.accentColor}44, transparent 70%)` }} />
+        <div className="absolute top-[40%] -right-16 h-80 w-80 rounded-full opacity-15" style={{ background: `radial-gradient(circle, #C2E7FF, transparent 70%)` }} />
+        <div className="absolute -bottom-24 left-[20%] h-72 w-72 rounded-full opacity-10" style={{ background: `radial-gradient(circle, ${profileStyle.accentColor}33, transparent 70%)` }} />
+      </div>
 
-      <main className="relative z-10 mx-auto min-w-0 w-full max-w-[1600px] px-3 py-4 pb-32 sm:px-6 sm:py-5 sm:pb-36 lg:px-8 xl:px-10">
+      <main className="relative z-10 mx-auto min-w-0 w-full max-w-[1600px] px-4 py-4 pb-24 sm:px-6 sm:py-5 sm:pb-28 lg:px-8 xl:px-10">
 
-        <button
-          onClick={onBack}
-          className="hub-animate mb-4 rounded-2xl border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-xs font-black uppercase tracking-[0.16em] text-[#202124] transition-[border-color,background-color,box-shadow,transform] duration-200 lg:hover:-translate-y-0.5 hover:bg-[#E8F0FE] hover:shadow-sm hover:shadow-sm hover:shadow-black/5 sm:mb-5 sm:px-5 sm:py-3 sm:text-sm sm:tracking-[0.2em]"
-        >
-          ← Back
-        </button>
+        {/* ---- header ---- */}
+        <div className="mp-animate flex items-center justify-between mb-4 sm:mb-5" style={{ animationDelay: '0ms' }}>
+          <button
+            onClick={onBack}
+            className="flex min-h-[44px] items-center gap-2 rounded-2xl border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-xs font-black uppercase tracking-[0.16em] text-[#202124] transition active:scale-95 sm:px-5 sm:py-3 sm:text-sm sm:tracking-[0.2em]"
+          >
+            \u2190 Back
+          </button>
+          <div className="flex items-center gap-2 rounded-full border border-[#D2E3FC] bg-white/95 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-[#1967D2] shadow-sm sm:px-4 sm:text-xs">
+            <span className="text-lg leading-none">{'\u{1F525}'}</span> {streakDays}d
+          </div>
+        </div>
 
-        <section className={`hub-animate w-full max-w-full overflow-hidden rounded-[1.5rem] sm:rounded-[2rem] ${glassCard}`} style={{ animationDelay: '80ms' }}>
-          <div className="relative min-h-[min(360px,calc(100dvh-9rem))] w-full max-w-full overflow-hidden bg-gradient-to-br from-[#174EA6] via-[#1A73E8] to-[#C2E7FF] sm:min-h-[340px]">
-
-            <div className="absolute inset-0 bg-gradient-to-t from-[#202124] via-[#202124]/35 to-[#174EA6]/18" style={{ opacity: Number(profileStyle.heroOverlayOpacity) / 100 }} />
-            <div className="absolute inset-x-0 top-0 flex min-w-0 flex-wrap items-start justify-between gap-2 p-3 sm:items-center sm:p-6">
-              <div className="max-w-[min(100%,9.5rem)] shrink rounded-full border border-[#D2E3FC] bg-white/95 px-3 py-1.5 text-[9px] font-black uppercase leading-4 tracking-[0.18em] text-[#1967D2] sm:max-w-none sm:px-4 sm:py-2 sm:text-xs sm:tracking-[0.28em]">
-                Verified Learning Profile
-              </div>
-
+        {/* ---- hero card ---- */}
+        <section className={`mp-slide-up w-full max-w-full overflow-hidden rounded-[1.75rem] sm:rounded-[2rem] ${glassCard}`} style={{ animationDelay: '60ms' }}>
+          <div className="relative w-full max-w-full overflow-hidden bg-gradient-to-br from-[#174EA6] via-[#1A73E8] to-[#7B61FF]">
+            <div className="absolute inset-0 bg-gradient-to-t from-[#202124] via-[#202124]/30 to-transparent" style={{ opacity: Number(profileStyle.heroOverlayOpacity) / 100 }} />
+            <div className="absolute inset-0 overflow-hidden">
+              <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-white/8" />
+              <div className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-white/5" />
             </div>
-            <div className="absolute -bottom-1 left-0 right-0 p-4 sm:p-8 lg:p-10">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:gap-5">
-                  <UserAvatar name={currentUser?.name} email={currentUser?.email} photoURL={currentUser?.profilePhotoSet ? currentUser.photoURL : ''} size={144} className="!h-20 !w-20 rounded-[1.5rem] border-4 border-[#D2E3FC] text-3xl shadow-[0_8px_30px_rgb(0,0,0,0.04)] shadow-black/5 sm:!h-36 sm:!w-36 sm:rounded-[2rem] sm:text-5xl" imageClassName="rounded-[1.5rem] sm:rounded-[2rem]" />
-                  <div className="pb-2">
-                    <div className="flex flex-wrap items-center gap-2"><p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#C2E7FF] sm:text-sm sm:tracking-[0.35em]">Level {level} Scholar</p><span className="rounded-full border border-white/60 bg-white/15 px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-white">{subscriptionTier === 'elite' ? 'Elite Member' : 'Pro Member'} • {earningMultiplier}× EduCoins</span></div>
-                    <h1 className="mt-1 text-3xl font-black tracking-tight text-white drop-shadow sm:mt-2 sm:text-6xl">{currentUser?.name || 'Student'}</h1>
-                    <p className="mt-1 max-w-2xl break-words text-xs font-semibold text-[#F8FAFD] sm:mt-2 sm:text-base">
-                      {currentUser?.email || 'student@learninghub.dev'} {currentUser?.mobile ? `• +91 ${currentUser.mobile}` : ''}
-                    </p>
+
+            <div className="relative flex flex-col items-center px-4 pb-5 pt-5 text-center sm:flex-row sm:items-end sm:px-8 sm:pb-8 sm:pt-0 sm:text-left">
+              <div className="relative mb-3 sm:mb-0 sm:mr-6 sm:mt-24">
+                <div className="absolute -inset-1 rounded-[2rem] bg-white/15 blur-sm" />
+                <UserAvatar name={currentUser?.name} email={currentUser?.email} photoURL={currentUser?.profilePhotoSet ? currentUser.photoURL : ''} size={96} className="!h-[88px] !w-[88px] rounded-[1.5rem] border-[3px] border-white/80 text-2xl shadow-[0_8px_30px_rgba(0,0,0,0.12)] relative sm:!h-[120px] sm:!w-[120px] sm:rounded-[2rem] sm:text-4xl" imageClassName="rounded-[1.5rem] sm:rounded-[2rem]" />
+              </div>
+              <div className="flex-1 pb-0 sm:pb-2">
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
+                  <span className="rounded-full border border-white/50 bg-white/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] text-white sm:px-3 sm:text-xs">Level {level}</span>
+                  <span className="rounded-full border border-white/40 bg-white/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#C2E7FF] sm:text-xs">{subscriptionTier === 'elite' ? 'Elite' : 'Pro'} \u2022 {earningMultiplier}x</span>
+                </div>
+                <h1 className="mt-1.5 text-2xl font-black tracking-tight text-white drop-shadow sm:mt-2 sm:text-5xl">{currentUser?.name || 'Student'}</h1>
+                <p className="mt-1 text-xs font-semibold text-[#E8F0FE]/90 sm:text-sm">
+                  {currentUser?.email || 'student@learninghub.dev'}
+                  {currentUser?.mobile ? ` \u2022 +91 ${currentUser.mobile}` : ''}
+                </p>
+                {/* level progress bar */}
+                <div className="mx-auto mt-3 max-w-[280px] sm:mx-0">
+                  <div className="flex justify-between text-[10px] font-black uppercase tracking-[0.16em] text-[#C2E7FF]/90">
+                    <span>Level {level}</span>
+                    <span>{pointsRemaining} to Level {level + 1}</span>
+                  </div>
+                  <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/20">
+                    <div className="h-full rounded-full bg-gradient-to-r from-[#C2E7FF] via-white to-[#C2E7FF] shadow-[0_0_10px_rgba(255,255,255,0.4)]" style={{ width: `${nextLevelProgress}%` }} />
                   </div>
                 </div>
-                <div className="w-fit rounded-2xl border border-[#D2E3FC]/70 bg-[#202124]/55 px-4 py-3 text-left text-white shadow-[0_18px_45px_rgba(15,23,42,0.22)] sm:rounded-3xl sm:px-5 sm:py-4 sm:text-right">
-                  <p className="text-sm font-bold text-[#E8F0FE]">Backend Streak</p>
-                  <p className="mt-1 text-2xl font-black sm:text-3xl">🔥 {streakDays} Days</p>
-                  <p className="text-xs uppercase tracking-[0.2em] text-[#C2E7FF]/90">server tracked</p>
+              </div>
+
+              {/* coin balance chip */}
+              <div className="mt-3 sm:mt-0 sm:ml-4 sm:self-end sm:pb-2">
+                <div className="flex items-center gap-2 rounded-2xl border border-white/25 bg-[#202124]/50 px-4 py-2.5 text-white shadow-lg sm:rounded-3xl sm:px-5 sm:py-3">
+                  <span className="mp-coin-icon text-xl sm:text-2xl">{'\u{1FA99}'}</span>
+                  <div className="text-left sm:text-right">
+                    <p className="text-xl font-black leading-none sm:text-2xl">{profileCoinWallet.coinBalance}</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#C2E7FF]/90">EduCoins</p>
+                  </div>
                 </div>
               </div>
             </div>
           </div>
         </section>
 
-        <section className="hub-animate sticky top-3 z-30 mt-4 rounded-[1.4rem] border border-[#D2E3FC] bg-white/95 p-2 shadow-[0_18px_45px_rgba(15,23,42,0.10)] sm:mt-5 sm:rounded-[1.75rem] sm:p-3" style={{ animationDelay: '140ms' }} aria-label="Profile filters">
-          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-            {profileFilters.map(filter => {
-              const isActive = activeProfileFilter === filter.id;
+        {/* ---- quick stats: horizontal scroll on mobile ---- */}
+        <div className="mp-animate mp-stats-scroll mt-4 flex gap-3 overflow-x-auto sm:mt-5 sm:grid sm:grid-cols-4 sm:gap-4 sm:overflow-visible" style={{ animationDelay: '120ms' }}>
+          {statCards.map((stat, i) => (
+            <div key={stat.label} className={`flex min-w-[130px] shrink-0 items-center gap-3 rounded-[1.25rem] border border-[#D2E3FC] bg-white/95 p-3.5 shadow-sm sm:min-w-0 sm:rounded-[1.5rem] sm:p-4 ${glassCard}`}>
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-[#E8F0FE] to-[#C2E7FF]/60 text-lg sm:h-11 sm:w-11 sm:text-xl">{stat.icon}</div>
+              <div className="min-w-0">
+                <p className="truncate text-[11px] font-bold uppercase tracking-[0.12em] text-[#5F6368]">{stat.label}</p>
+                <p className="mt-0.5 text-lg font-black leading-tight sm:text-xl">{stat.value}</p>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        {/* ---- desktop tab bar ---- */}
+        <div className="mp-desktop-tabs mp-animate sticky top-3 z-30 mt-4 hidden rounded-[1.4rem] border border-[#D2E3FC] bg-white/95 p-2 shadow-[0_18px_45px_rgba(15,23,42,0.10)] sm:mt-5 sm:rounded-[1.75rem] sm:p-3" style={{ animationDelay: '160ms' }}>
+          <div className="grid grid-cols-4 gap-2">
+            {profileTabs.map(tab => {
+              const isActive = activeProfileFilter === tab.id;
               return (
                 <button
-                  key={filter.id}
+                  key={tab.id}
                   type="button"
-                  onClick={() => setActiveProfileFilter(filter.id)}
+                  onClick={() => setActiveProfileFilter(tab.id)}
                   className={`rounded-2xl px-3 py-3 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 sm:px-4 ${isActive ? 'border border-[#1A73E8] bg-[#E8F0FE] text-[#174EA6] shadow-sm' : 'border border-transparent bg-transparent text-[#5F6368] hover:bg-[#F8FAFD]'}`}
                   aria-pressed={isActive}
                 >
-                  <span className="block text-sm font-black sm:text-base">{filter.label}</span>
-                  <span className="mt-0.5 block text-[11px] font-bold uppercase tracking-[0.14em] opacity-75 sm:text-xs">{filter.helper}</span>
+                  <span className="block text-sm font-black sm:text-base">{TAB_ICONS[tab.id]} {tab.label}</span>
+                  <span className="mt-0.5 block text-[11px] font-bold uppercase tracking-[0.14em] opacity-75 sm:text-xs">{tab.helper}</span>
                 </button>
               );
             })}
           </div>
-        </section>
+        </div>
 
-        {showOverview && (
-          <section className="mt-4 grid gap-4 sm:mt-5 lg:grid-cols-[1.3fr_0.7fr]">
-            <div className="rounded-[1.5rem] border border-[#D2E3FC] bg-white/95 p-5 shadow-sm sm:rounded-[2rem] sm:p-6">
-              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1967D2]">Account snapshot</p>
-              <h2 className="mt-2 text-2xl font-black text-[#202124] sm:text-3xl">Clean progress, clear next actions.</h2>
-              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#5F6368]">Use the filters above to focus on courses, rewards, or wallet activity without scanning the entire profile.</p>
-            </div>
-            <div className="rounded-[1.5rem] border border-[#D2E3FC] bg-white/95 p-5 shadow-sm sm:rounded-[2rem] sm:p-6">
-              <p className="text-sm font-semibold text-slate-500">EduCoin Balance</p>
-              <h2 className="mt-1 text-3xl font-black text-slate-900">{profileCoinWallet.coinBalance} EduCoins</h2>
-              <div className="mt-4 grid grid-cols-2 gap-3">
-                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center"><p className="text-xs font-semibold text-slate-500">Earned</p><p className="text-lg font-black text-emerald-700">{profileCoinWallet.totalCoinsEarned}</p></div>
-                <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-center"><p className="text-xs font-semibold text-slate-500">Spent</p><p className="text-lg font-black text-rose-700">{profileCoinWallet.totalCoinsSpent}</p></div>
+        {/* ============================================= */}
+        {/* OVERVIEW + GENERAL SECTIONS                    */}
+        {/* ============================================= */}
+
+        {showSection('overview') && (
+          <>
+            {/* snapshot + coin balance */}
+            <div className="mp-animate mt-4 grid gap-4 sm:mt-5 lg:grid-cols-[1.3fr_0.7fr]" style={{ animationDelay: '200ms' }}>
+              <div className={`rounded-[1.5rem] p-5 sm:rounded-[2rem] sm:p-6 ${glassCard}`}>
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1967D2]">Account Snapshot</p>
+                <h2 className="mt-2 text-xl font-black text-[#202124] sm:text-2xl">Your learning, your pace.</h2>
+                <p className="mt-2 text-sm font-semibold leading-6 text-[#5F6368]">Use the tabs to jump between courses, rewards, and wallet activity.</p>
               </div>
-              {profileCoinError && <p className="mt-3 rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{profileCoinError}</p>}
+              <div className={`rounded-[1.5rem] p-5 sm:rounded-[2rem] sm:p-6 ${glassCard}`}>
+                <p className="text-sm font-semibold text-slate-500">EduCoin Balance</p>
+                <h2 className="mt-1 text-3xl font-black text-slate-900">{profileCoinWallet.coinBalance} EduCoins</h2>
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center"><p className="text-xs font-semibold text-slate-500">Earned</p><p className="text-lg font-black text-emerald-700">{profileCoinWallet.totalCoinsEarned}</p></div>
+                  <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-center"><p className="text-xs font-semibold text-slate-500">Spent</p><p className="text-lg font-black text-rose-700">{profileCoinWallet.totalCoinsSpent}</p></div>
+                </div>
+                {profileCoinError && <p className="mt-3 rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{profileCoinError}</p>}
+              </div>
+            </div>
+          </>
+        )}
+
+        {/* ============================================= */}
+        {/* STREAK REWARDS (collapsible)                   */}
+        {/* ============================================= */}
+        {showSection('rewards') && (
+          <section className={`mp-animate mt-4 sm:mt-5 ${glassCard} rounded-[1.5rem] sm:rounded-[2rem]`} style={{ animationDelay: '260ms' }}>
+            <button
+              type="button"
+              onClick={() => toggleSection('streaks')}
+              className="flex w-full items-center justify-between p-4 text-left sm:p-5"
+            >
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Streak Goals</p>
+                <div className="flex items-center gap-2 mt-1">
+                  <h2 className="text-xl font-black sm:text-2xl">Backend-Verified Rewards</h2>
+                  {streakCards.filter(streak => streak.claimable).length > 0 && (
+                    <span className="mp-claimable-pulse rounded-full bg-[#1A73E8] px-2.5 py-0.5 text-[10px] font-black text-white">{streakCards.filter(streak => streak.claimable).length} ready</span>
+                  )}
+                </div>
+              </div>
+              <span className={`text-xl text-[#5F6368] transition-transform duration-300 ${expandedSections.streaks ? 'rotate-180' : ''}`}>&#9660;</span>
+            </button>
+
+            <div className={`mp-section-collapse ${expandedSections.streaks ? '' : 'mp-collapsed'}`}>
+              <div>
+                <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+                  <p className="text-xs font-bold leading-5 text-[#5F6368] sm:text-sm">Goals are tracked from wallet, course, quiz, watch, and backend streak data only.</p>
+                  <div className="mt-4 grid gap-3 sm:gap-4 xl:grid-cols-2">
+                    {streakCards.map((streak) => (
+                      <article key={streak.id} className="group relative overflow-hidden rounded-[1.25rem] border border-[#E0E3EB] bg-white/95 p-3.5 shadow-[0_6px_18px_rgba(26,115,232,0.08)] sm:rounded-[1.5rem] sm:p-4">
+                        <div className={`absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b ${streak.accent}`} />
+                        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                          <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${streak.accent} text-2xl shadow-[0_12px_30px_rgba(26,115,232,0.18)] sm:h-14 sm:w-14 sm:text-3xl`}>{streak.icon}</div>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <h3 className="text-base font-black text-[#202124] sm:text-lg">{streak.title}</h3>
+                              <span className="rounded-full bg-[#FEF7E0] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#1967D2]">+{streak.coinReward}</span>
+                            </div>
+                            <p className="mt-1 text-xs font-bold leading-5 text-[#5F6368] line-clamp-2">{streak.note}</p>
+                            <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#DADCE0]/80">
+                              <div className={`h-full rounded-full bg-gradient-to-r ${streak.accent} shadow-[0_0_18px_rgba(26,115,232,0.25)]`} style={{ width: `${streak.progress}%` }} />
+                            </div>
+                            <div className="mt-2 flex items-center justify-between text-xs font-black text-[#5F6368]">
+                              <span>{streak.value} / {streak.goal} {streak.unit}</span>
+                              <span>{Math.round(streak.progress)}%</span>
+                            </div>
+                          </div>
+                          <button
+                            type="button"
+                            disabled={!streak.claimable}
+                            onClick={() => handleStreakClaim(streak)}
+                            className={`min-h-[44px] w-full rounded-2xl px-4 py-2.5 text-xs font-black transition active:scale-95 sm:w-40 sm:py-3 sm:text-sm ${streak.claimedToday ? 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]' : streak.claimable ? 'bg-gradient-to-r from-[#1A73E8] to-[#174EA6] text-white shadow-[0_12px_30px_rgba(26,115,232,0.22)]' : 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]'}`}
+                          >
+                            {streak.claimedToday ? 'Claimed Today' : streak.claimable ? 'Claim Coins' : 'Complete Target'}
+                          </button>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                </div>
+              </div>
             </div>
           </section>
         )}
 
-        <section className={`mt-4 grid gap-4 sm:mt-6 sm:grid-cols-3 sm:gap-5 ${showOverview ? '' : 'hidden'}`}>
-          {statCards.map((stat, index) => (
-            <div key={stat.label} className={`hub-animate rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-5 ${glassCard}`} style={{ animationDelay: `${160 + index * 80}ms` }}>
-              <div className="flex items-center justify-between gap-4">
+        {/* ============================================= */}
+        {/* LEARNING                                     */}
+        {/* ============================================= */}
+        {showSection('learning') && (
+          <section className="mp-animate mt-4 grid gap-4 sm:mt-5 sm:gap-6 lg:grid-cols-[1.15fr_0.85fr]" style={{ animationDelay: '320ms' }}>
+            {/* courses */}
+            <div className={`overflow-hidden rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`}>
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
                 <div>
-                  <p className="text-sm font-bold text-[#5F6368]">{stat.label}</p>
-                  <p className="mt-1 text-2xl font-black sm:text-3xl">{stat.value}</p>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Learning Analytics</p>
+                  <h2 className="mt-1 text-xl font-black sm:text-2xl">Course Completion</h2>
                 </div>
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl border border-[#D2E3FC] bg-white/95 text-xl sm:h-14 sm:w-14 sm:text-2xl">{stat.icon}</div>
-              </div>
-            </div>
-          ))}
-        </section>
-
-        <section className={`profile-deferred-section hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${showRewards ? '' : 'hidden'} ${glassCard}`} style={{ animationDelay: '320ms' }}>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Verified Reward Progress</p>
-              <h2 className="mt-2 text-2xl font-black sm:text-4xl">Backend-Connected Reward Goals</h2>
-              <p className="mt-2 text-xs font-bold leading-5 text-[#5F6368] sm:text-sm">Goals are shown from wallet, course, quiz, watch, and backend streak data only. Browser-only activity does not unlock rewards.</p>
-            </div>
-            <div className="w-fit rounded-full border border-[#D2E3FC] bg-[#E8F0FE] px-3 py-2 text-xs font-black text-[#1967D2] shadow-sm sm:px-4 sm:text-sm">🔥 {streakCards.filter(streak => streak.claimable).length} claimable</div>
-          </div>
-          <div className="mt-4 grid gap-3 sm:mt-6 xl:grid-cols-2">
-            {streakCards.map((streak, index) => (
-              <article key={streak.id} className="group relative overflow-hidden rounded-[1.25rem] border border-[#E0E3EB] bg-white/95 p-3.5 shadow-[0_6px_18px_rgba(26,115,232,0.08)] transition-[border-color,background-color,box-shadow,transform] duration-200 lg:hover:-translate-y-0.5 lg:hover:shadow-[0_10px_26px_rgba(26,115,232,0.11)] sm:rounded-[1.5rem] sm:p-4" style={{ animationDelay: `${360 + index * 45}ms` }}>
-                <div className={`absolute inset-y-0 left-0 w-1.5 bg-gradient-to-b ${streak.accent}`} />
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-                  <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br ${streak.accent} text-2xl shadow-[0_12px_30px_rgba(26,115,232,0.18)] transition group-hover:scale-110 sm:h-14 sm:w-14 sm:text-3xl`}>{streak.icon}</div>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <h3 className="text-base font-black text-[#202124] sm:text-lg">{streak.title}</h3>
-                      <span className="rounded-full bg-[#FEF7E0] px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.18em] text-[#1967D2]">+{streak.coinReward} coins</span>
-                    </div>
-                    <p className="mt-1 text-xs font-bold leading-5 text-[#5F6368]">{streak.note}</p>
-                    <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#DADCE0]/80">
-                      <div className={`h-full rounded-full bg-gradient-to-r ${streak.accent} shadow-[0_0_18px_rgba(26,115,232,0.25)]`} style={{ width: `${streak.progress}%` }} />
-                    </div>
-                    <div className="mt-2 flex items-center justify-between text-xs font-black text-[#5F6368]">
-                      <span>{streak.value} / {streak.goal} {streak.unit}</span>
-                      <span>{Math.round(streak.progress)}%</span>
-                    </div>
-                  </div>
-                  <button
-                    type="button"
-                    disabled={!streak.claimable}
-                    onClick={() => handleStreakClaim(streak)}
-                    className={`w-full rounded-2xl px-4 py-2.5 text-xs font-black transition active:scale-95 sm:w-40 sm:py-3 sm:text-sm ${streak.claimedToday ? 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]' : streak.claimable ? 'bg-gradient-to-r from-[#1A73E8] to-[#174EA6] text-white shadow-[0_12px_30px_rgba(26,115,232,0.22)] hover:-translate-y-0.5' : 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]'}`}
-                  >
-                    {streak.claimedToday ? 'Claimed Today' : streak.claimable ? 'Claim Coins' : 'Complete Target'}
+                {!purchasedProducts.length && (
+                  <button onClick={onExplore} className="min-h-[44px] w-full rounded-full bg-[#1A73E8] px-4 py-2 text-xs font-black text-white shadow-sm transition active:scale-95 sm:w-auto sm:text-sm">
+                    Explore Courses
                   </button>
-                </div>
-              </article>
-            ))}
-          </div>
-        </section>
-
-        <section className={`profile-deferred-section mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[1.15fr_0.85fr] ${showLearning ? '' : 'hidden'}`}>
-          <div className={`hub-animate overflow-hidden rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '360ms' }}>
-            <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-r from-[#E8F0FE] via-[#C2E7FF] to-[#D3E3FD] opacity-55" />
-            <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Learning Analytics</p>
-                <h2 className="mt-2 text-2xl font-black sm:text-3xl">Course Completion</h2>
-                <p className="mt-2 text-xs font-bold leading-5 text-[#5F6368] sm:text-sm">Every purchased course gets its own live progress card.</p>
+                )}
               </div>
-              {!purchasedProducts.length && (
-                <button onClick={onExplore} className="w-full rounded-full bg-white/95 px-4 py-2 text-xs font-black text-[#202124] shadow-sm transition-[border-color,background-color,box-shadow,transform] duration-200 lg:hover:-translate-y-0.5 hover:shadow-md sm:w-auto sm:text-sm">
-                  Explore Courses
-                </button>
+              {courseAccessError && (
+                <div className="mt-4 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F] shadow-sm" role="alert">{courseAccessError}</div>
               )}
-            </div>
-            {courseAccessError && (
-              <div className="relative mt-5 rounded-2xl border border-[#FAD2CF] bg-[#FCE8E6] px-4 py-3 text-sm font-black text-[#C5221F] shadow-sm" role="alert">
-                {courseAccessError}
+              <div className="mt-4 grid gap-3 sm:mt-5 sm:gap-4">
+                {learningProgress.length ? learningProgress.map((course, index) => {
+                  const circumference = 2 * Math.PI * 38;
+                  const dashOffset = circumference - (course.completion / 100) * circumference;
+                  const accent = [
+                    'from-[#1A73E8] via-[#1967D2] to-[#174EA6]',
+                    'from-[#D3E3FD] via-[#1A73E8] to-[#174EA6]',
+                    'from-[#FEF7E0] via-[#D3E3FD] to-[#1A73E8]',
+                    'from-[#E6F4EA] via-[#E8F0FE] to-[#1A73E8]',
+                  ][index % 4];
+                  return (
+                    <article key={course.id} className="group relative overflow-hidden rounded-[1.25rem] border border-[#E0E3EB] bg-white/95 p-4 shadow-[0_6px_18px_rgba(26,115,232,0.08)] sm:rounded-[1.75rem] sm:p-5">
+                      <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${accent}`} />
+                      <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+                        <div className="relative mx-auto h-20 w-20 shrink-0 sm:mx-0 sm:h-24 sm:w-24">
+                          <svg viewBox="0 0 100 100" className="relative h-full w-full -rotate-90 drop-shadow-sm">
+                            <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-[#202124]/10" />
+                            <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} className={index % 2 === 0 ? 'text-[#1A73E8]' : 'text-[#1967D2]'} />
+                          </svg>
+                          <div className="absolute inset-0 flex flex-col items-center justify-center rounded-full">
+                            <span className="text-xl font-black text-[#202124]">{course.completion}%</span>
+                            <span className="text-[10px] font-black uppercase tracking-widest text-[#5F6368]">Done</span>
+                          </div>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="rounded-full border border-[#D2E3FC] bg-white/95 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.22em] text-[#1967D2]">{course.category}</span>
+                            <span className="rounded-full bg-[#F8FAFD] px-2.5 py-0.5 text-xs font-black text-[#5F6368]">{course.totalLessons || 1} lessons</span>
+                          </div>
+                          <h3 className="mt-2 line-clamp-2 text-lg font-black text-[#202124] sm:text-xl">{course.title}</h3>
+                          <div className="mt-3 h-2.5 overflow-hidden rounded-full bg-[#E8F0FE]">
+                            <div className={`h-full rounded-full bg-gradient-to-r ${accent}`} style={{ width: `${course.completion}%` }} />
+                          </div>
+                          <div className="mt-2 flex items-center justify-between text-[11px] font-black uppercase tracking-[0.16em] text-[#5F6368]">
+                            <span>{course.completion >= 100 ? 'Completed' : 'In Progress'}</span>
+                            <span>{Math.max(0, 100 - course.completion)}% left</span>
+                          </div>
+                        </div>
+                        <button type="button" onClick={() => handleContinueLearning(course)} className={`min-h-[44px] w-full rounded-2xl bg-gradient-to-r ${accent} px-4 py-2.5 text-xs font-black text-white shadow-[0_10px_25px_rgba(26,115,232,0.22)] transition active:scale-95 sm:w-auto sm:px-5 sm:py-3 sm:text-sm`}>
+                          {course.completion >= 100 ? 'Continue' : 'Resume'}
+                        </button>
+                      </div>
+                    </article>
+                  );
+                }) : <div className="rounded-2xl border border-dashed border-[#D2E3FC] bg-white/95 p-5 text-center text-sm font-bold text-[#5F6368] sm:rounded-3xl sm:p-6 sm:text-base">No purchased course progress yet. Buy or open a course to start real completion tracking.</div>}
               </div>
-            )}
-            <div className="relative mt-4 grid gap-3 sm:mt-6 sm:gap-4">
-              {learningProgress.length ? learningProgress.map((course, index) => {
-                const circumference = 2 * Math.PI * 38;
-                const dashOffset = circumference - (course.completion / 100) * circumference;
-                const accent = [
-                  'from-[#1A73E8] via-[#1967D2] to-[#174EA6]',
-                  'from-[#D3E3FD] via-[#1A73E8] to-[#174EA6]',
-                  'from-[#FEF7E0] via-[#D3E3FD] to-[#1A73E8]',
-                  'from-[#E6F4EA] via-[#E8F0FE] to-[#1A73E8]',
-                ][index % 4];
-                return (
-                  <article key={course.id} className="group relative overflow-hidden rounded-[1.35rem] border border-[#E0E3EB] bg-white/95 p-4 shadow-[0_6px_18px_rgba(26,115,232,0.08)] transition-[border-color,background-color,box-shadow,transform] duration-200 lg:hover:-translate-y-0.5 hover:bg-[#F8FAFD] lg:hover:shadow-[0_10px_26px_rgba(26,115,232,0.10)] sm:rounded-[1.75rem] sm:p-5">
-                    <div className={`absolute inset-x-0 top-0 h-1.5 bg-gradient-to-r ${accent}`} />
-                    <div className="flex flex-col gap-5 sm:flex-row sm:items-center">
-                      <div className="relative mx-auto h-24 w-24 shrink-0 sm:mx-0 sm:h-28 sm:w-28">
-                        <div className={`absolute inset-2 rounded-full bg-gradient-to-br ${accent} opacity-20 transition-opacity group-hover:opacity-30`} />
-                        <svg viewBox="0 0 100 100" className="relative h-full w-full -rotate-90 drop-shadow-sm">
-                          <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" className="text-[#202124]/10" />
-                          <circle cx="50" cy="50" r="38" stroke="currentColor" strokeWidth="10" fill="transparent" strokeLinecap="round" strokeDasharray={circumference} strokeDashoffset={dashOffset} className={index % 2 === 0 ? 'text-[#1A73E8]' : 'text-[#1967D2]'} />
-                        </svg>
-                        <div className="absolute inset-0 flex flex-col items-center justify-center rounded-full">
-                          <span className="text-2xl font-black text-[#202124]">{course.completion}%</span>
-                          <span className="text-[10px] font-black uppercase tracking-widest text-[#5F6368]">Done</span>
-                        </div>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="rounded-full border border-[#D2E3FC] bg-white/95 px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] text-[#1967D2] shadow-sm">{course.category}</span>
-                          <span className="rounded-full bg-[#F8FAFD] px-3 py-1 text-xs font-black text-[#5F6368]">{course.totalLessons || 1} lessons</span>
-                        </div>
-                        <h3 className="mt-3 line-clamp-2 text-xl font-black text-[#202124] sm:truncate sm:text-2xl">{course.title}</h3>
-                        <div className="mt-4 h-3 overflow-hidden rounded-full bg-[#E8F0FE] ring-1 ring-white/70">
-                          <div className={`h-full rounded-full bg-gradient-to-r ${accent} shadow-[0_0_20px_rgba(59,130,246,0.35)]`} style={{ width: `${course.completion}%` }} />
-                        </div>
-                        <div className="mt-3 flex items-center justify-between text-xs font-black uppercase tracking-[0.18em] text-[#5F6368]">
-                          <span>{course.completion >= 100 ? 'Completed' : 'In Progress'}</span>
-                          <span>{Math.max(0, 100 - course.completion)}% left</span>
-                        </div>
-                      </div>
-                      <button type="button" onClick={() => handleContinueLearning(course)} className={`w-full rounded-2xl bg-gradient-to-r ${accent} px-4 py-2.5 text-xs font-black text-white shadow-[0_14px_35px_rgba(26,115,232,0.24)] transition active:scale-95 hover:-translate-y-0.5 hover:shadow-[0_18px_45px_rgba(26,115,232,0.30)] sm:w-auto sm:px-5 sm:py-3 sm:text-sm`}>
-                        {course.completion >= 100 ? 'Continue Learning' : 'Complete Your Course'}
-                      </button>
-                    </div>
-                  </article>
-                );
-              }) : <div className="rounded-2xl border border-dashed border-[#D2E3FC] bg-white/95 p-4 text-center text-sm font-bold text-[#5F6368] sm:rounded-3xl sm:p-6 sm:text-base">No purchased course progress yet. Buy or open a course to start real completion tracking.</div>}
             </div>
-          </div>
 
-          <div className={`hub-animate overflow-hidden rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '440ms' }}>
-            <div className="absolute -right-16 -top-16 h-44 w-44 rounded-full bg-[#C2E7FF]/25 opacity-70" />
-            <div className="relative">
+            {/* badges */}
+            <div className={`overflow-hidden rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`}>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Verified Badges</p>
-              <h2 className="mt-2 text-2xl font-black sm:text-3xl">Achievement Progress</h2>
-              <div className="mt-5 grid gap-3 sm:grid-cols-2">
+              <h2 className="mt-1 text-xl font-black sm:text-2xl">Achievement Progress</h2>
+              <div className="mt-4 grid gap-3">
                 {badges.map((badge) => {
                   const progress = clamp((badge.currentValue / Math.max(1, badge.goal)) * 100);
                   return (
-                    <article key={badge.id} className={`rounded-2xl border p-4 transition ${badge.unlocked ? 'border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_12px_30px_rgba(52,168,83,0.14)]' : 'border-[#D2E3FC] bg-white/80 opacity-85'}`}>
+                    <article key={badge.id} className={`rounded-2xl border p-3.5 transition sm:p-4 ${badge.unlocked ? 'border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_8px_20px_rgba(52,168,83,0.12)]' : 'border-[#D2E3FC] bg-white/80 opacity-80'}`}>
                       <div className="flex items-start gap-3">
-                        <div className={`flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl text-2xl ${badge.unlocked ? 'bg-white shadow-sm' : 'bg-[#F8FAFD] grayscale'}`}>{badge.icon}</div>
+                        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-xl text-xl sm:h-12 sm:w-12 sm:text-2xl ${badge.unlocked ? 'bg-white shadow-sm' : 'bg-[#F8FAFD] grayscale'}`}>{badge.icon}</div>
                         <div className="min-w-0 flex-1">
                           <div className="flex items-center justify-between gap-2">
                             <h3 className="truncate text-sm font-black text-[#202124] sm:text-base">{badge.label}</h3>
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] ${badge.unlocked ? 'bg-[#CEEAD6] text-[#137333]' : 'bg-[#DADCE0] text-[#5F6368]'}`}>{badge.unlocked ? 'Unlocked' : 'Locked'}</span>
+                            <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] ${badge.unlocked ? 'bg-[#CEEAD6] text-[#137333]' : 'bg-[#DADCE0] text-[#5F6368]'}`}>{badge.unlocked ? 'Unlocked' : 'Locked'}</span>
                           </div>
-                          <p className="mt-1 text-xs font-bold leading-5 text-[#5F6368]">{badge.description}</p>
-                          <div className="mt-3 h-2 overflow-hidden rounded-full bg-[#E8F0FE]">
+                          <p className="mt-0.5 text-xs font-bold leading-5 text-[#5F6368]">{badge.description}</p>
+                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-[#E8F0FE]">
                             <div className="h-full rounded-full bg-gradient-to-r from-[#1A73E8] to-[#174EA6]" style={{ width: `${progress}%` }} />
                           </div>
-                          <div className="mt-2 flex justify-between text-[11px] font-black uppercase tracking-[0.14em] text-[#5F6368]">
-                            <span>{badge.currentValue} / {badge.goal}</span>
+                          <div className="mt-1.5 flex justify-between text-[10px] font-black uppercase tracking-[0.14em] text-[#5F6368]">
+                            <span>{badge.currentValue}/{badge.goal}</span>
                             <span>{Math.round(progress)}%</span>
                           </div>
                         </div>
@@ -815,165 +921,250 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
               </div>
               {!badges.some(badge => badge.unlocked) && <div className="mt-4 rounded-2xl border border-dashed border-[#D2E3FC] bg-white/95 p-3 text-xs font-bold text-[#5F6368] sm:p-4 sm:text-sm">No verified badges unlocked yet. Start watching eligible course videos or complete a quiz to begin.</div>}
             </div>
-          </div>
-        </section>
+          </section>
+        )}
 
-        <section className={`profile-deferred-section hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${showRewards ? '' : 'hidden'} ${glassCard}`} style={{ animationDelay: '520ms' }}>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Actionable Milestones</p>
-              <h2 className="mt-2 text-2xl font-black sm:text-3xl">Glowing Milestones</h2>
-            </div>
-            <p className="text-xs leading-5 text-[#5F6368] sm:text-sm">Lifetime earned: 🪙 {totalLifetimeCoins}. Reached milestones unlock real downloads or access.</p>
-          </div>
-          <div className="mt-4 grid gap-3 sm:mt-6 sm:gap-4 lg:grid-cols-3">
-            {milestoneRewards.map(reward => {
-              const claimed = (currentUser?.claimedRewardIds || []).includes(reward.id);
-              return (
-                <article key={reward.id} className={`relative overflow-hidden rounded-[1.35rem] border p-4 transition-[border-color,background-color,box-shadow,transform] duration-200 lg:hover:-translate-y-0.5 sm:rounded-[1.75rem] sm:p-5 ${claimed ? 'border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_0_22px_rgba(52,168,83,0.18)]' : reward.reached ? 'border-[#1A73E8] bg-white/95 shadow-[0_0_24px_rgba(26,115,232,0.30)]' : 'border-[#D2E3FC] bg-white/72 opacity-90'}`}>
-                  <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#D3E3FD] via-[#1A73E8] to-[#C2E7FF]" />
-                  <div className="flex items-start gap-4">
-                    <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl border border-white/60 bg-white/95 text-2xl shadow-sm sm:h-16 sm:w-16 sm:text-3xl">{reward.icon}</div>
-                    <div>
-                      <h3 className="text-base font-black text-[#202124] sm:text-lg">{reward.title}</h3>
-                      <p className="mt-1 text-xs font-bold leading-5 text-[#5F6368] sm:text-sm sm:leading-6">{reward.description}</p>
-                      <p className="mt-2 text-xs font-black uppercase tracking-[0.2em] text-[#1967D2]">{reward.currentValue} / {reward.requirement} {reward.metric}</p>
-                    </div>
-                  </div>
-                  <div className="mt-5 h-2.5 overflow-hidden rounded-full bg-[#DADCE0]/80">
-                    <div className="h-full rounded-full bg-gradient-to-r from-[#D3E3FD] via-[#1A73E8] to-[#C2E7FF]" style={{ width: `${reward.progress}%` }} />
-                  </div>
-                  <button type="button" disabled={!reward.reached || claimed} onClick={() => handleMilestoneClaim(reward)} className={`mt-4 w-full rounded-2xl px-4 py-2.5 text-xs font-black shadow-sm transition active:scale-95 sm:mt-5 sm:py-3 sm:text-sm ${claimed ? 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]' : reward.reached ? 'bg-gradient-to-r from-[#1A73E8] to-[#174EA6] text-white hover:-translate-y-0.5' : 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]'}`}>
-                    {claimed ? 'Claimed / Unlocked' : reward.reached ? `${reward.actionLabel}${reward.coinReward ? ` (+${reward.coinReward})` : ''}` : `${Math.max(0, reward.requirement - reward.currentValue)} more to unlock`}
-                  </button>
-                </article>
-              );
-            })}
-          </div>
-        </section>
-
-        <section className={`mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2 ${showRewards ? '' : 'hidden'}`}>
-          <div className={`hub-animate rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '600ms' }}>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#137333] sm:text-sm sm:tracking-[0.3em]">Rewards Vault</p>
-            <h2 className="mt-2 text-2xl font-black sm:text-3xl">What You Can Claim</h2>
-            <p className="mt-2 text-xs leading-5 text-[#5F6368] sm:text-sm">Live wallet: 🪙 {eduPoints} • {coinRedeemRate} EduCoins = ₹1 discount.</p>
-            <div className="mt-5 grid gap-3">
-              {dynamicClaimCards.length ? dynamicClaimCards.map((reward) => {
-                const { isActive, isRedeemed } = getRewardButtonState(reward);
-                const isDisabled = isRedeemed || !reward.claimable;
-                const buttonLabel = isRedeemed ? 'Redeemed / Disabled' : isActive ? 'Applied - Click to Remove' : reward.claimable ? 'Apply & Checkout' : 'Keep Earning';
-                return (
-                  <article
-                    key={reward.id}
-                    className={`rounded-2xl border p-3.5 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 sm:p-4 ${isRedeemed ? 'border-[#DADCE0] bg-[#F8FAFD] opacity-75' : isActive ? 'border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_0_20px_rgba(52,168,83,0.18)]' : reward.claimable ? 'border-[#1A73E8] bg-white/95 shadow-[0_0_15px_rgba(26,115,232,0.28)] lg:hover:-translate-y-0.5 hover:bg-[#F8FAFD]' : 'border-[#D2E3FC] bg-white/95 shadow-sm'}`}
-                  >
-                    <div className="flex items-start justify-between gap-4">
-                      <div>
-                        <span className={`rounded-full border px-3 py-1 text-[10px] font-black uppercase tracking-[0.22em] ${isRedeemed ? 'border-[#DADCE0] bg-[#DADCE0] text-[#5F6368]' : isActive ? 'border-[#CEEAD6] bg-[#E6F4EA] text-[#137333]' : 'border-[#D2E3FC] bg-[#FEF7E0] text-[#B06000]'}`}>{reward.type}</span>
-                        <h3 className="mt-3 text-base font-black text-[#202124] sm:text-lg">{reward.mode === 'unlock' ? `Unlock ${reward.name} for ${reward.requiredCoins} Coins` : `Claim ₹${reward.discount} Discount on ${reward.name}`}</h3>
-                        <p className="mt-1 text-xs font-bold text-[#5F6368]">{isRedeemed ? 'This reward is already used and cannot be selected again.' : reward.mode === 'unlock' ? 'Full access via EduCoin wallet.' : `Uses 🪙 ${reward.requiredCoins} at checkout.`} {!isRedeemed && (reward.claimable ? 'Ready to apply now.' : `Earn ${Math.max(0, reward.requiredCoins - eduPoints)} more coins.`)}</p>
-                      </div>
-                      <span className="text-2xl">{isRedeemed ? '✅' : isActive ? '🔥' : reward.claimable ? '✨' : '🔒'}</span>
-                    </div>
-                    <button
-                      type="button"
-                      disabled={isDisabled}
-                      onClick={() => handleRewardToggle(reward)}
-                      className={`mt-3 w-full rounded-2xl px-4 py-2.5 text-xs font-black shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition active:scale-95 sm:mt-4 sm:py-3 sm:text-sm ${isRedeemed ? 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]' : isActive ? 'bg-gradient-to-r from-[#1A73E8] to-[#174EA6] text-white hover:-translate-y-0.5' : reward.claimable ? 'bg-gradient-to-r from-[#1A73E8] to-[#174EA6] text-white hover:-translate-y-0.5' : 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]'}`}
-                    >
-                      {buttonLabel}
-                    </button>
-                  </article>
-                );
-              }) : <p className="rounded-2xl border border-[#D2E3FC] bg-white/95 p-3 text-sm text-[#5F6368] sm:p-4">Reward claims will appear here once products or subscriptions are available.</p>}
-            </div>
-          </div>
-
-          <div className={`hub-animate rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '680ms' }}>
-            <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Personalization</p>
-            <h2 className="mt-2 text-2xl font-black sm:text-3xl">Theme & Coupons</h2>
-            <div className="mt-4 grid grid-cols-2 gap-2 sm:mt-5 sm:gap-3">
-              {Object.values(themes).filter(theme => theme.name !== 'Midnight').map(theme => {
-                const key = theme.name.toLowerCase() as ThemeName;
-                return (
-                  <button
-                    key={theme.name}
-                    onClick={() => onThemeChange(key)}
-                    className={`rounded-2xl border p-2.5 text-left transition-[border-color,background-color,box-shadow,transform] duration-200 lg:hover:-translate-y-0.5 sm:p-3 ${activeTheme === key ? 'border-[#C2E7FF] bg-[#E8F0FE]' : 'border-[#D2E3FC] bg-white/95'}`}
-                  >
-                    <div className="flex -space-x-1">
-                      <span className="h-4 w-4 rounded-full border border-white" style={{ background: '#1A73E8' }} />
-                      <span className="h-4 w-4 rounded-full border border-white" style={{ background: '#E8F0FE' }} />
-                    </div>
-                    <div className="mt-2 text-sm font-bold">{theme.name}</div>
-                  </button>
-                );
-              })}
-            </div>
-            <div className="mt-6">
-              <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
-                <div>
-                  <h3 className="text-xl font-black text-[#202124]">Available Coupons</h3>
-                  <p className="text-xs font-bold text-[#5F6368] sm:text-sm">Admin panel mein listed sabhi coupons yahan live status ke saath dikhte hain.</p>
-                </div>
-                <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[#1967D2] shadow-sm">{profileCoupons.length} total</span>
+        {/* ============================================= */}
+        {/* MILESTONES (collapsible)                       */}
+        {/* ============================================= */}
+        {showSection('rewards') && (
+          <section className={`mp-animate mt-4 sm:mt-5 ${glassCard} rounded-[1.5rem] sm:rounded-[2rem]`} style={{ animationDelay: '380ms' }}>
+            <button
+              type="button"
+              onClick={() => toggleSection('milestones')}
+              className="flex w-full items-center justify-between p-4 text-left sm:p-5"
+            >
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Milestones</p>
+                <h2 className="mt-1 text-xl font-black sm:text-2xl">Glowing Milestones</h2>
               </div>
-              <div className="mt-3 grid gap-3">
-                {profileCoupons.length ? profileCoupons.map(coupon => {
-                  const isCouponActive = coupon.isActive;
-                  const buttonLabel = isCouponActive ? (redeemedCouponCode === coupon.code ? 'Code copied' : 'Redeem') : 'Not available';
-                  return (
-                    <div key={coupon.id} className={`rounded-2xl border p-3 transition-[border-color,background-color,box-shadow,transform] duration-200 sm:p-4 ${isCouponActive ? 'border-dashed border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_10px_30px_rgba(16,185,129,0.10)]' : 'border-[#E0E3EB] bg-[#F8FAFD] opacity-80'}`}>
-                      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                        <div>
-                          <div className="flex flex-wrap items-center gap-2">
-                            <span className={`font-black ${isCouponActive ? 'text-[#137333]' : 'text-[#5F6368]'}`}>{coupon.code}</span>
-                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${isCouponActive ? 'bg-[#E6F4EA] text-[#137333]' : 'bg-[#DADCE0] text-[#5F6368]'}`}>{isCouponActive ? 'Active' : 'Inactive'}</span>
+              <span className={`text-xl text-[#5F6368] transition-transform duration-300 ${expandedSections.milestones ? 'rotate-180' : ''}`}>&#9660;</span>
+            </button>
+
+            <div className={`mp-section-collapse ${expandedSections.milestones ? '' : 'mp-collapsed'}`}>
+              <div>
+                <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+                  <p className="text-xs leading-5 text-[#5F6368] sm:text-sm">Lifetime earned: {'\u{1FA99}'} {totalLifetimeCoins}. Reached milestones unlock downloads or access.</p>
+                  <div className="mt-4 grid gap-3 sm:gap-4 lg:grid-cols-3">
+                    {milestoneRewards.map(reward => {
+                      const claimed = (currentUser?.claimedRewardIds || []).includes(reward.id);
+                      return (
+                        <article key={reward.id} className={`relative overflow-hidden rounded-[1.25rem] border p-4 sm:rounded-[1.75rem] sm:p-5 ${claimed ? 'border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_0_18px_rgba(52,168,83,0.14)]' : reward.reached ? 'border-[#1A73E8] bg-white/95 shadow-[0_0_20px_rgba(26,115,232,0.22)]' : 'border-[#D2E3FC] bg-white/72 opacity-85'}`}>
+                          <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-[#D3E3FD] via-[#1A73E8] to-[#C2E7FF]" />
+                          <div className="flex items-start gap-3">
+                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-white/60 bg-white/95 text-xl shadow-sm sm:h-12 sm:w-12 sm:text-2xl">{reward.icon}</div>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="text-sm font-black text-[#202124] sm:text-base">{reward.title}</h3>
+                              <p className="mt-0.5 text-xs font-bold leading-5 text-[#5F6368] sm:text-sm sm:leading-6">{reward.description}</p>
+                              <p className="mt-1.5 text-[11px] font-black uppercase tracking-[0.16em] text-[#1967D2]">{reward.currentValue} / {reward.requirement} {reward.metric}</p>
+                            </div>
                           </div>
-                          <p className="mt-1 text-sm font-bold text-[#5F6368]">{coupon.type === 'percentage' ? `${coupon.value}% off` : `₹${coupon.value} off`} • expires {coupon.expiryDate}</p>
-                        </div>
-                        <button
-                          type="button"
-                          disabled={!isCouponActive}
-                          onClick={() => handleCouponRedeem(coupon)}
-                          className={`w-full rounded-2xl px-4 py-2.5 text-sm font-black transition active:scale-95 sm:w-auto ${isCouponActive ? 'bg-gradient-to-r from-[#1A73E8] to-[#174EA6] text-white shadow-[0_10px_25px_rgba(26,115,232,0.22)] hover:-translate-y-0.5' : 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]'}`}
-                        >
-                          {buttonLabel}
-                        </button>
+                          <div className="mt-4 h-2 overflow-hidden rounded-full bg-[#DADCE0]/80">
+                            <div className="h-full rounded-full bg-gradient-to-r from-[#D3E3FD] via-[#1A73E8] to-[#C2E7FF]" style={{ width: `${reward.progress}%` }} />
+                          </div>
+                          <button type="button" disabled={!reward.reached || claimed} onClick={() => handleMilestoneClaim(reward)} className={`mt-4 min-h-[44px] w-full rounded-2xl px-4 py-2.5 text-xs font-black shadow-sm transition active:scale-95 sm:py-3 sm:text-sm ${claimed ? 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]' : reward.reached ? 'bg-gradient-to-r from-[#1A73E8] to-[#174EA6] text-white' : 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]'}`}>
+                            {claimed ? 'Claimed / Unlocked' : reward.reached ? `${reward.actionLabel}${reward.coinReward ? ` (+${reward.coinReward})` : ''}` : `${Math.max(0, reward.requirement - reward.currentValue)} more to unlock`}
+                          </button>
+                        </article>
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            </div>
+          </section>
+        )}
+
+        {/* ============================================= */}
+        {/* REWARDS VAULT + THEME/COUPONS                 */}
+        {/* ============================================= */}
+        {showSection('rewards') && (
+          <div className="mt-4 grid gap-4 sm:mt-5 sm:gap-6 lg:grid-cols-2">
+            {/* rewards vault - collapsible */}
+            <div className={`mp-animate ${glassCard} rounded-[1.5rem] sm:rounded-[2rem]`} style={{ animationDelay: '440ms' }}>
+              <button
+                type="button"
+                onClick={() => toggleSection('rewardsVault')}
+                className="flex w-full items-center justify-between p-4 text-left sm:p-5"
+              >
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#137333] sm:text-sm sm:tracking-[0.3em]">Rewards Vault</p>
+                  <h2 className="mt-1 text-xl font-black sm:text-2xl">What You Can Claim</h2>
+                </div>
+                <span className={`text-xl text-[#5F6368] transition-transform duration-300 ${expandedSections.rewardsVault ? 'rotate-180' : ''}`}>&#9660;</span>
+              </button>
+              <div className={`mp-section-collapse ${expandedSections.rewardsVault ? '' : 'mp-collapsed'}`}>
+                <div>
+                  <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+                    <p className="text-xs leading-5 text-[#5F6368] sm:text-sm">Live wallet: {'\u{1FA99}'} {eduPoints} {'\u2022'} {coinRedeemRate} EduCoins = {'\u20B9'}1 discount.</p>
+                    <div className="mt-4 grid gap-3">
+                      {dynamicClaimCards.length ? dynamicClaimCards.map((reward) => {
+                        const { isActive, isRedeemed } = getRewardButtonState(reward);
+                        const isDisabled = isRedeemed || !reward.claimable;
+                        const buttonLabel = isRedeemed ? 'Redeemed / Disabled' : isActive ? 'Applied - Tap to Remove' : reward.claimable ? 'Apply & Checkout' : 'Keep Earning';
+                        return (
+                          <article
+                            key={reward.id}
+                            className={`rounded-2xl border p-3.5 text-left transition sm:p-4 ${isRedeemed ? 'border-[#DADCE0] bg-[#F8FAFD] opacity-70' : isActive ? 'border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_0_16px_rgba(52,168,83,0.14)]' : reward.claimable ? 'border-[#1A73E8] bg-white/95 shadow-[0_0_12px_rgba(26,115,232,0.22)]' : 'border-[#D2E3FC] bg-white/95 shadow-sm'}`}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <span className={`rounded-full border px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.18em] ${isRedeemed ? 'border-[#DADCE0] bg-[#DADCE0] text-[#5F6368]' : isActive ? 'border-[#CEEAD6] bg-[#E6F4EA] text-[#137333]' : 'border-[#D2E3FC] bg-[#FEF7E0] text-[#B06000]'}`}>{reward.type}</span>
+                                <h3 className="mt-2 text-sm font-black text-[#202124] sm:text-base">{reward.mode === 'unlock' ? `Unlock ${reward.name} for ${reward.requiredCoins} Coins` : `Claim \u20B9${reward.discount} Discount on ${reward.name}`}</h3>
+                                <p className="mt-1 text-xs font-bold text-[#5F6368]">{isRedeemed ? 'Already used.' : reward.mode === 'unlock' ? 'Full access via EduCoin wallet.' : `Uses \u{1FA99} ${reward.requiredCoins} at checkout.`} {!isRedeemed && (reward.claimable ? 'Ready to apply.' : `Earn ${Math.max(0, reward.requiredCoins - eduPoints)} more coins.`)}</p>
+                              </div>
+                              <span className="text-xl shrink-0">{isRedeemed ? '\u2705' : isActive ? '\u{1F525}' : reward.claimable ? '\u2728' : '\u{1F512}'}</span>
+                            </div>
+                            <button
+                              type="button"
+                              disabled={isDisabled}
+                              onClick={() => handleRewardToggle(reward)}
+                              className={`mt-3 min-h-[44px] w-full rounded-2xl px-4 py-2.5 text-xs font-black shadow-[0_8px_30px_rgb(0,0,0,0.08)] transition active:scale-95 sm:py-3 sm:text-sm ${isRedeemed ? 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]' : isActive ? 'bg-gradient-to-r from-[#1A73E8] to-[#174EA6] text-white' : reward.claimable ? 'bg-gradient-to-r from-[#1A73E8] to-[#174EA6] text-white' : 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]'}`}
+                            >
+                              {buttonLabel}
+                            </button>
+                          </article>
+                        );
+                      }) : <p className="rounded-2xl border border-[#D2E3FC] bg-white/95 p-3 text-sm text-[#5F6368] sm:p-4">Reward claims will appear here once products or subscriptions are available.</p>}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* theme + coupons - collapsible */}
+            <div className={`mp-animate ${glassCard} rounded-[1.5rem] sm:rounded-[2rem]`} style={{ animationDelay: '500ms' }}>
+              <button
+                type="button"
+                onClick={() => toggleSection('coupons')}
+                className="flex w-full items-center justify-between p-4 text-left sm:p-5"
+              >
+                <div>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Personalization</p>
+                  <h2 className="mt-1 text-xl font-black sm:text-2xl">Theme & Coupons</h2>
+                </div>
+                <span className={`text-xl text-[#5F6368] transition-transform duration-300 ${expandedSections.coupons ? 'rotate-180' : ''}`}>&#9660;</span>
+              </button>
+              <div className={`mp-section-collapse ${expandedSections.coupons ? '' : 'mp-collapsed'}`}>
+                <div>
+                  <div className="px-4 pb-4 sm:px-5 sm:pb-5">
+                    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 sm:gap-3">
+                      {Object.values(themes).filter(theme => theme.name !== 'Midnight').map(theme => {
+                        const key = theme.name.toLowerCase() as ThemeName;
+                        return (
+                          <button
+                            key={theme.name}
+                            onClick={() => onThemeChange(key)}
+                            className={`rounded-2xl border p-3 text-left transition active:scale-95 ${activeTheme === key ? 'border-[#C2E7FF] bg-[#E8F0FE]' : 'border-[#D2E3FC] bg-white/95'}`}
+                          >
+                            <div className="flex -space-x-1">
+                              <span className="h-4 w-4 rounded-full border border-white" style={{ background: '#1A73E8' }} />
+                              <span className="h-4 w-4 rounded-full border border-white" style={{ background: '#E8F0FE' }} />
+                            </div>
+                            <div className="mt-2 text-sm font-bold">{theme.name}</div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-5">
+                      <div className="flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+                        <h3 className="text-lg font-black text-[#202124]">Available Coupons</h3>
+                        <span className="rounded-full bg-white/95 px-3 py-1 text-xs font-black text-[#1967D2] shadow-sm">{profileCoupons.length} total</span>
+                      </div>
+                      <div className="mt-3 grid gap-3">
+                        {profileCoupons.length ? profileCoupons.map(coupon => {
+                          const isCouponActive = coupon.isActive;
+                          const buttonLabel = isCouponActive ? (redeemedCouponCode === coupon.code ? 'Code copied' : 'Redeem') : 'Not available';
+                          return (
+                            <div key={coupon.id} className={`rounded-2xl border p-3 transition sm:p-4 ${isCouponActive ? 'border-dashed border-[#CEEAD6] bg-[#E6F4EA] shadow-[0_6px_20px_rgba(16,185,129,0.08)]' : 'border-[#E0E3EB] bg-[#F8FAFD] opacity-75'}`}>
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div>
+                                  <div className="flex flex-wrap items-center gap-2">
+                                    <span className={`font-black ${isCouponActive ? 'text-[#137333]' : 'text-[#5F6368]'}`}>{coupon.code}</span>
+                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-black uppercase tracking-[0.12em] ${isCouponActive ? 'bg-[#E6F4EA] text-[#137333]' : 'bg-[#DADCE0] text-[#5F6368]'}`}>{isCouponActive ? 'Active' : 'Inactive'}</span>
+                                  </div>
+                                  <p className="mt-1 text-sm font-bold text-[#5F6368]">{coupon.type === 'percentage' ? `${coupon.value}% off` : `\u20B9${coupon.value} off`} \u2022 expires {coupon.expiryDate}</p>
+                                </div>
+                                <button
+                                  type="button"
+                                  disabled={!isCouponActive}
+                                  onClick={() => handleCouponRedeem(coupon)}
+                                  className={`min-h-[44px] w-full rounded-2xl px-4 py-2.5 text-sm font-black transition active:scale-95 sm:w-auto ${isCouponActive ? 'bg-gradient-to-r from-[#1A73E8] to-[#174EA6] text-white shadow-[0_8px_20px_rgba(26,115,232,0.18)]' : 'cursor-not-allowed bg-[#DADCE0] text-[#5F6368]'}`}
+                                >
+                                  {buttonLabel}
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        }) : (
+                          <p className="rounded-2xl border border-[#D2E3FC] bg-white/95 p-3 text-sm text-[#5F6368] sm:p-4">No coupons are listed from admin panel yet.</p>
+                        )}
                       </div>
                     </div>
-                  );
-                }) : (
-                  <p className="rounded-2xl border border-[#D2E3FC] bg-white/95 p-3 text-sm text-[#5F6368] sm:p-4">No coupons are listed from admin panel yet.</p>
-                )}
-              </div>
-            </div>
-          </div>
-        </section>
-
-        <section className={`profile-deferred-section hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${showWallet ? '' : 'hidden'} ${glassCard}`} style={{ animationDelay: '760ms' }}>
-          <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-            <div>
-              <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Coin History</p>
-              <h2 className="mt-2 text-2xl font-black sm:text-3xl">Live Earning Ledger</h2>
-            </div>
-            <p className="text-xs leading-5 text-[#5F6368] sm:text-sm">Synced from your coinTransactions wallet ledger.</p>
-          </div>
-          <div className="mt-5 grid gap-3">
-            {coinTransactions.length ? coinTransactions.slice(0, 8).map((entry) => (
-              <div key={entry.id || `${entry.createdAt}-${entry.description}`} className="flex flex-col items-start gap-3 rounded-2xl border border-[#D2E3FC] bg-white/95 p-3 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-4">
-                <div>
-                  <p className="font-black text-[#202124]">{entry.amount >= 0 ? '🟢' : '🔴'} {entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</p>
-                  <p className="mt-1 text-xs leading-5 text-[#5F6368] sm:text-sm">{entry.amount >= 0 ? '📝' : '🛒'} <span className="font-bold">{entry.title || entry.source}</span> — {entry.description}</p>
+                  </div>
                 </div>
-                <div className="text-left sm:text-right"><div className={`text-lg font-black ${entry.amount >= 0 ? 'text-[#137333]' : 'text-[#C5221F]'}`}>{entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</div><div className="mt-1 text-xs font-bold text-[#5F6368]">{formatLedgerTime(entry.timestamp || entry.createdAt)}</div></div>
               </div>
-            )) : (
-              <div className="rounded-2xl border border-[#D2E3FC] bg-white/95 p-4 text-sm text-[#5F6368] sm:p-5 sm:text-base">No coin movements yet. Read an article or complete a purchase to start your live ledger.</div>
-            )}
+            </div>
           </div>
-        </section>
+        )}
+
+        {/* ============================================= */}
+        {/* WALLET LEDGER                                */}
+        {/* ============================================= */}
+        {showSection('wallet') && (
+          <section className={`mp-animate mt-4 sm:mt-5 ${glassCard} rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6`} style={{ animationDelay: '540ms' }}>
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Coin History</p>
+                <h2 className="mt-1 text-xl font-black sm:text-2xl">Live Earning Ledger</h2>
+              </div>
+              <p className="text-xs leading-5 text-[#5F6368] sm:text-sm">Synced from your wallet ledger.</p>
+            </div>
+            <div className="mt-4 grid gap-2.5 sm:mt-5">
+              {coinTransactions.length ? coinTransactions.slice(0, 8).map((entry) => (
+                <div key={entry.id || `${entry.createdAt}-${entry.description}`} className="flex flex-col items-start gap-3 rounded-2xl border border-[#D2E3FC] bg-white/95 p-3.5 shadow-sm sm:flex-row sm:items-center sm:justify-between sm:gap-4 sm:p-4">
+                  <div>
+                    <p className="font-black text-[#202124]">{entry.amount >= 0 ? '\u{1F7E2}' : '\u{1F534}'} {entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</p>
+                    <p className="mt-1 text-xs leading-5 text-[#5F6368] sm:text-sm"><span className="font-bold">{entry.title || entry.source}</span> \u2014 {entry.description}</p>
+                  </div>
+                  <div className="text-left sm:text-right"><div className={`text-lg font-black ${entry.amount >= 0 ? 'text-[#137333]' : 'text-[#C5221F]'}`}>{entry.amount >= 0 ? '+' : ''}{entry.amount} Coins</div><div className="mt-1 text-xs font-bold text-[#5F6368]">{formatLedgerTime(entry.timestamp || entry.createdAt)}</div></div>
+                </div>
+              )) : (
+                <div className="rounded-2xl border border-[#D2E3FC] bg-white/95 p-4 text-sm text-[#5F6368] sm:p-5 sm:text-base">No coin movements yet. Start learning to earn!</div>
+              )}
+            </div>
+          </section>
+        )}
+
       </main>
+
+      {/* ============================================= */}
+      {/* MOBILE BOTTOM TAB BAR                         */}
+      {/* ============================================= */}
+      <nav className="mp-bottom-tabs fixed bottom-0 left-0 right-0 z-40 border-t border-[#D2E3FC]/60 bg-white/92 sm:hidden" aria-label="Profile navigation">
+        <div className="mx-auto flex max-w-lg items-center justify-around px-2 py-1.5">
+          {profileTabs.map(tab => {
+            const isActive = activeProfileFilter === tab.id;
+            const claimableCount = tab.id === 'rewards' ? streakCards.filter(s => s.claimable).length : 0;
+            return (
+              <button
+                key={tab.id}
+                type="button"
+                onClick={() => setActiveProfileFilter(tab.id)}
+                className={`relative flex min-h-[52px] flex-1 flex-col items-center justify-center gap-0.5 rounded-xl px-1 transition active:scale-90 ${isActive ? 'text-[#174EA6]' : 'text-[#5F6368]'}`}
+              >
+                {claimableCount > 0 && (
+                  <span className="absolute -top-0.5 right-1/4 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-[#C5221F] px-1 text-[10px] font-black text-white shadow-sm">{claimableCount}</span>
+                )}
+                <span className="text-xl leading-none">{TAB_ICONS[tab.id]}</span>
+                <span className={`text-[10px] font-black uppercase tracking-[0.1em] ${isActive ? 'opacity-100' : 'opacity-60'}`}>{tab.label}</span>
+                {isActive && <span className="absolute -bottom-0.5 left-1/4 right-1/4 h-0.5 rounded-full bg-[#1A73E8]" />}
+              </button>
+            );
+          })}
+        </div>
+      </nav>
+
     </div>
   );
 };
