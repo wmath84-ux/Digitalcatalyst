@@ -123,6 +123,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const [coinTransactions, setCoinTransactions] = React.useState<CoinTransaction[]>([]);
   const [locallyRedeemedRewardIds, setLocallyRedeemedRewardIds] = React.useState<string[]>([]);
   const [courseAccessError, setCourseAccessError] = React.useState('');
+  const [activeProfileFilter, setActiveProfileFilter] = React.useState<'overview' | 'learning' | 'rewards' | 'wallet'>('overview');
   const [profileCoinWallet, setProfileCoinWallet] = React.useState({
     coinBalance: 0,
     totalCoinsEarned: 0,
@@ -459,6 +460,16 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     { label: 'Video Watch Time', value: `${Math.floor(watchTimeMinutes / 60)}h ${watchTimeMinutes % 60}m`, icon: '⏱️' },
     { label: 'Badges Unlocked', value: `${badges.filter(badge => badge.unlocked).length}/${badges.length}`, icon: '🏅' },
   ];
+  const profileFilters = [
+    { id: 'overview' as const, label: 'Overview', helper: 'Profile summary' },
+    { id: 'learning' as const, label: 'Learning', helper: `${learningProgress.length} courses` },
+    { id: 'rewards' as const, label: 'Rewards', helper: `${streakCards.filter(streak => streak.claimable).length} ready` },
+    { id: 'wallet' as const, label: 'Wallet', helper: `${profileCoinWallet.coinBalance} coins` },
+  ];
+  const showOverview = activeProfileFilter === 'overview';
+  const showLearning = activeProfileFilter === 'overview' || activeProfileFilter === 'learning';
+  const showRewards = activeProfileFilter === 'overview' || activeProfileFilter === 'rewards';
+  const showWallet = activeProfileFilter === 'overview' || activeProfileFilter === 'wallet';
 
   if (!hasPremiumAccess) {
     return (
@@ -567,21 +578,6 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
       <main className="relative z-10 mx-auto min-w-0 w-full max-w-[1600px] px-3 py-4 pb-32 sm:px-6 sm:py-5 sm:pb-36 lg:px-8 xl:px-10">
 
-        <div className="mb-6 rounded-3xl border border-blue-100 bg-white/90 p-5 shadow-sm">
-          <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <p className="text-sm font-semibold text-slate-500">EduCoin Balance</p>
-              <h2 className="mt-1 text-3xl font-black text-slate-900">{profileCoinWallet.coinBalance} EduCoins</h2>
-              <p className="mt-1 text-sm text-slate-500">Start watching eligible YouTube course videos to earn.</p>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center"><p className="text-xs font-semibold text-slate-500">EduCoins earned</p><p className="text-lg font-black text-emerald-700">{profileCoinWallet.totalCoinsEarned}</p></div>
-              <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-center"><p className="text-xs font-semibold text-slate-500">EduCoins spent</p><p className="text-lg font-black text-rose-700">{profileCoinWallet.totalCoinsSpent}</p></div>
-            </div>
-          </div>
-          {profileCoinError && <p className="mt-3 rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{profileCoinError}</p>}
-        </div>
-
         <button
           onClick={onBack}
           className="hub-animate mb-4 rounded-2xl border border-[#D2E3FC] bg-white/95 px-4 py-2.5 text-xs font-black uppercase tracking-[0.16em] text-[#202124] transition-[border-color,background-color,box-shadow,transform] duration-200 lg:hover:-translate-y-0.5 hover:bg-[#E8F0FE] hover:shadow-sm hover:shadow-sm hover:shadow-black/5 sm:mb-5 sm:px-5 sm:py-3 sm:text-sm sm:tracking-[0.2em]"
@@ -621,7 +617,46 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </section>
 
-        <section className="mt-4 grid gap-4 sm:mt-6 sm:grid-cols-3 sm:gap-5">
+        <section className="hub-animate sticky top-3 z-30 mt-4 rounded-[1.4rem] border border-[#D2E3FC] bg-white/95 p-2 shadow-[0_18px_45px_rgba(15,23,42,0.10)] sm:mt-5 sm:rounded-[1.75rem] sm:p-3" style={{ animationDelay: '140ms' }} aria-label="Profile filters">
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {profileFilters.map(filter => {
+              const isActive = activeProfileFilter === filter.id;
+              return (
+                <button
+                  key={filter.id}
+                  type="button"
+                  onClick={() => setActiveProfileFilter(filter.id)}
+                  className={`rounded-2xl px-3 py-3 text-left transition-[background-color,border-color,box-shadow,transform] duration-200 sm:px-4 ${isActive ? 'border border-[#1A73E8] bg-[#E8F0FE] text-[#174EA6] shadow-sm' : 'border border-transparent bg-transparent text-[#5F6368] hover:bg-[#F8FAFD]'}`}
+                  aria-pressed={isActive}
+                >
+                  <span className="block text-sm font-black sm:text-base">{filter.label}</span>
+                  <span className="mt-0.5 block text-[11px] font-bold uppercase tracking-[0.14em] opacity-75 sm:text-xs">{filter.helper}</span>
+                </button>
+              );
+            })}
+          </div>
+        </section>
+
+        {showOverview && (
+          <section className="mt-4 grid gap-4 sm:mt-5 lg:grid-cols-[1.3fr_0.7fr]">
+            <div className="rounded-[1.5rem] border border-[#D2E3FC] bg-white/95 p-5 shadow-sm sm:rounded-[2rem] sm:p-6">
+              <p className="text-xs font-black uppercase tracking-[0.22em] text-[#1967D2]">Account snapshot</p>
+              <h2 className="mt-2 text-2xl font-black text-[#202124] sm:text-3xl">Clean progress, clear next actions.</h2>
+              <p className="mt-2 max-w-2xl text-sm font-semibold leading-6 text-[#5F6368]">Use the filters above to focus on courses, rewards, or wallet activity without scanning the entire profile.</p>
+            </div>
+            <div className="rounded-[1.5rem] border border-[#D2E3FC] bg-white/95 p-5 shadow-sm sm:rounded-[2rem] sm:p-6">
+              <p className="text-sm font-semibold text-slate-500">EduCoin Balance</p>
+              <h2 className="mt-1 text-3xl font-black text-slate-900">{profileCoinWallet.coinBalance} EduCoins</h2>
+              <div className="mt-4 grid grid-cols-2 gap-3">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-center"><p className="text-xs font-semibold text-slate-500">Earned</p><p className="text-lg font-black text-emerald-700">{profileCoinWallet.totalCoinsEarned}</p></div>
+                <div className="rounded-2xl border border-rose-100 bg-rose-50 px-4 py-3 text-center"><p className="text-xs font-semibold text-slate-500">Spent</p><p className="text-lg font-black text-rose-700">{profileCoinWallet.totalCoinsSpent}</p></div>
+              </div>
+              {profileCoinError && <p className="mt-3 rounded-2xl bg-red-50 px-3 py-2 text-xs font-semibold text-red-600">{profileCoinError}</p>}
+            </div>
+          </section>
+        )}
+
+        <section className={`mt-4 grid gap-4 sm:mt-6 sm:grid-cols-3 sm:gap-5 ${showOverview ? '' : 'hidden'}`}>
           {statCards.map((stat, index) => (
             <div key={stat.label} className={`hub-animate rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-5 ${glassCard}`} style={{ animationDelay: `${160 + index * 80}ms` }}>
               <div className="flex items-center justify-between gap-4">
@@ -635,7 +670,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           ))}
         </section>
 
-        <section className={`profile-deferred-section hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '320ms' }}>
+        <section className={`profile-deferred-section hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${showRewards ? '' : 'hidden'} ${glassCard}`} style={{ animationDelay: '320ms' }}>
           <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Verified Reward Progress</p>
@@ -678,7 +713,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </section>
 
-        <section className="profile-deferred-section mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[1.15fr_0.85fr]">
+        <section className={`profile-deferred-section mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-[1.15fr_0.85fr] ${showLearning ? '' : 'hidden'}`}>
           <div className={`hub-animate overflow-hidden rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '360ms' }}>
             <div className="absolute inset-x-0 top-0 h-28 bg-gradient-to-r from-[#E8F0FE] via-[#C2E7FF] to-[#D3E3FD] opacity-55" />
             <div className="relative flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -783,7 +818,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </section>
 
-        <section className={`profile-deferred-section hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '520ms' }}>
+        <section className={`profile-deferred-section hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${showRewards ? '' : 'hidden'} ${glassCard}`} style={{ animationDelay: '520ms' }}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Actionable Milestones</p>
@@ -817,7 +852,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </section>
 
-        <section className="mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2">
+        <section className={`mt-4 grid gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2 ${showRewards ? '' : 'hidden'}`}>
           <div className={`hub-animate rounded-[1.5rem] p-4 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '600ms' }}>
             <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#137333] sm:text-sm sm:tracking-[0.3em]">Rewards Vault</p>
             <h2 className="mt-2 text-2xl font-black sm:text-3xl">What You Can Claim</h2>
@@ -916,7 +951,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
           </div>
         </section>
 
-        <section className={`profile-deferred-section hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${glassCard}`} style={{ animationDelay: '760ms' }}>
+        <section className={`profile-deferred-section hub-animate mt-4 rounded-[1.5rem] p-4 sm:mt-6 sm:rounded-[2rem] sm:p-6 ${showWallet ? '' : 'hidden'} ${glassCard}`} style={{ animationDelay: '760ms' }}>
           <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
             <div>
               <p className="text-[11px] font-black uppercase tracking-[0.18em] text-[#1967D2] sm:text-sm sm:tracking-[0.3em]">Coin History</p>
