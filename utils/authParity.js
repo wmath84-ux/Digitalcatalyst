@@ -38,10 +38,10 @@ export const isBlockedUserStatus = (status) => status === 'blocked';
 export const shouldRestoreEntitlementStatus = (status) => VALID_ENTITLEMENT_STATUSES.includes(String(status || ''));
 
 export const FIREBASE_AUTH_ERROR_MESSAGES = Object.freeze({
-  'auth/email-already-in-use': 'This email already has an account. Please login instead or use password reset.',
+  'auth/email-already-in-use': 'This email is already registered. Please login instead or use password reset.',
   'auth/invalid-credential': 'Invalid email or password. Please check your details.',
   'auth/user-not-found': 'No account found with this email. Please sign up first.',
-  'auth/wrong-password': 'Incorrect password.',
+  'auth/wrong-password': 'Incorrect password. If you forgot your password, use the reset link below.',
   'auth/weak-password': 'Password should be at least 6 characters.',
   'auth/invalid-email': 'Please enter a valid email address.',
   'auth/configuration-not-found': 'Firebase Email/Password authentication is not enabled for this project. Please enable the Email/Password sign-in provider in Firebase Console, then try again.',

@@ -5535,6 +5535,7 @@ const App: React.FC = () => {
     const activatedAt = activatedAtDate.toISOString();
     const expiresAtDate = new Date(activatedAtDate);
     expiresAtDate.setMonth(expiresAtDate.getMonth() + getSubscriptionPeriodMonths(billingCycle));
+    const expiresAt = expiresAtDate.toISOString();
     const synced = syncCurrentUser(user => ({
       ...user,
       subscriptionTier: nextTier,
@@ -5542,7 +5543,7 @@ const App: React.FC = () => {
       subscriptionPlanName: nextTier === requestedTier ? plan.name : user.subscriptionPlanName,
       subscriptionBillingCycle: nextTier === requestedTier ? billingCycle : user.subscriptionBillingCycle,
       subscriptionActivatedAt: activatedAt,
-      subscriptionExpiresAt: expiresAtDate.toISOString(),
+      subscriptionExpiresAt: expiresAt,
       eduCoinMultiplier: nextMultiplier,
       eliteStatus: nextTier === 'elite',
     }));
@@ -5552,6 +5553,36 @@ const App: React.FC = () => {
     }
     setPurchasedProductIds(newPurchasedIds);
     persistUserPurchasedProducts(newPurchasedIds);
+    void setDoc(doc(db, 'users', String(currentUser.id)), {
+      subscriptionTier: nextTier,
+      subscriptionPlanId: nextTier === requestedTier ? String(plan.id) : currentUser.subscriptionPlanId,
+      subscriptionPlanName: nextTier === requestedTier ? plan.name : currentUser.subscriptionPlanName,
+      subscriptionBillingCycle: nextTier === requestedTier ? billingCycle : currentUser.subscriptionBillingCycle,
+      subscriptionActivatedAt: activatedAt,
+      subscriptionExpiresAt: expiresAt,
+      eduCoinMultiplier: nextMultiplier,
+      eliteStatus: nextTier === 'elite',
+      purchasedProductIds: arrayUnion(...(plan.unlockProductIds || [])),
+      updatedAt: serverTimestamp(),
+    }, { merge: true }).catch(error => {
+      console.warn('Subscription Firestore sync failed; retrying...', error);
+      setTimeout(() => {
+        setDoc(doc(db, 'users', String(currentUser?.id || '')), {
+          subscriptionTier: nextTier,
+          subscriptionPlanId: nextTier === requestedTier ? String(plan.id) : (currentUser?.subscriptionPlanId || ''),
+          subscriptionPlanName: nextTier === requestedTier ? plan.name : (currentUser?.subscriptionPlanName || ''),
+          subscriptionBillingCycle: nextTier === requestedTier ? billingCycle : (currentUser?.subscriptionBillingCycle || 'monthly'),
+          subscriptionActivatedAt: activatedAt,
+          subscriptionExpiresAt: expiresAt,
+          eduCoinMultiplier: nextMultiplier,
+          eliteStatus: nextTier === 'elite',
+          purchasedProductIds: arrayUnion(...(plan.unlockProductIds || [])),
+          updatedAt: serverTimestamp(),
+        }, { merge: true }).catch(retryError => {
+          console.warn('Subscription Firestore retry also failed.', retryError);
+        });
+      }, 2000);
+    });
     if (!options.silent) setInfoModal({ title: 'Subscription active', message: `${plan.name} activated successfully via ${paymentLabel}.`, icon: '✅' });
     return true;
   };
