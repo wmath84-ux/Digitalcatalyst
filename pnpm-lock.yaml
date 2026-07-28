@@ -22,7 +22,7 @@ importers:
         version: 19.2.7(react@19.2.7)
     devDependencies:
       '@types/node':
-        specifier: ^22.14.0
+        specifier: ^22.20.1
         version: 22.20.1
       '@vitejs/plugin-react':
         specifier: ^5.0.0
