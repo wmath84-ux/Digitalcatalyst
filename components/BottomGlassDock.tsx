@@ -25,6 +25,8 @@ interface BottomGlassDockProps {
   onSubscriptionClick: () => void;
   onOpenMayDay?: () => void;
   onOpenCommunity?: () => void;
+  isAdmin?: boolean;
+  onAdminClick?: () => void;
   authButtonLabel: string;
   settings: WebsiteSettings;
 }
@@ -107,7 +109,7 @@ export const dockShadowMap = {
   strong: '0 24px 60px rgba(15,23,42,0.24)',
 };
 
-const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, dockGlowItems = [], activeItem = '', onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenMayDay, onOpenCommunity, authButtonLabel }: BottomGlassDockProps) => {
+const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, dockGlowItems = [], activeItem = '', onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenMayDay, onOpenCommunity, isAdmin = false, onAdminClick, authButtonLabel }: BottomGlassDockProps) => {
   const defaultItems = useMemo(() => ([
     { label: 'Home', action: onHomeClick, icon: 'home' as ProfessionalIconName, slot: 'nav.home' as CleanNeutralIconSlotId, badge: null },
     { label: 'Store', action: onNavigateToAllProducts, icon: 'store' as ProfessionalIconName, slot: 'nav.store' as CleanNeutralIconSlotId, badge: dockBadgeCounts.Store || null },
@@ -127,7 +129,8 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
       window.history.pushState({}, '', '/profile');
       window.dispatchEvent(new PopStateEvent('popstate'));
     }, icon: (isLoggedIn ? 'user' : 'lock') as ProfessionalIconName, slot: (isLoggedIn ? 'nav.profile' : 'nav.login') as CleanNeutralIconSlotId, badge: null },
-  ]), [onHomeClick, onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenCommunity, onOpenBlogModal, onOpenFreeModal, isLoggedIn, authButtonLabel, onProfileClick, dockBadgeCounts.Store, dockBadgeCounts.Purchased, dockBadgeCounts.Wishlist, dockBadgeCounts.Cart, dockBadgeCounts.News, dockBadgeCounts.Blog, dockBadgeCounts.Free]);
+    ...(isAdmin && onAdminClick ? [{ label: 'Admin', action: onAdminClick, icon: 'shield' as ProfessionalIconName, slot: 'nav.admin' as CleanNeutralIconSlotId, badge: null }] : []),
+  ]), [onHomeClick, onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onNavigateToWishlist, wishlistCount, onCartClick, cartCount, onOpenAnnouncementsModal, onOpenCommunity, onOpenBlogModal, onOpenFreeModal, isLoggedIn, authButtonLabel, onProfileClick, dockBadgeCounts.Store, dockBadgeCounts.Purchased, dockBadgeCounts.Wishlist, dockBadgeCounts.Cart, dockBadgeCounts.News, dockBadgeCounts.Blog, dockBadgeCounts.Free, isAdmin, onAdminClick]);
 
   const configuredBase = ((settings.content as any).dockItems || dockCustomizationItems) as string[];
   const configuredWithHome = configuredBase.includes('Home') ? configuredBase : ['Home', ...configuredBase];

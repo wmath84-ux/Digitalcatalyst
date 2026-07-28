@@ -32,6 +32,8 @@ interface HomeSideDockProps {
   onSubscriptionClick: () => void;
   onOpenMayDay?: () => void;
   onOpenCommunity?: () => void;
+  isAdmin?: boolean;
+  onAdminClick?: () => void;
   authButtonLabel: string;
   settings: WebsiteSettings;
   activeItem?: string;
@@ -74,7 +76,7 @@ const clamp = (value: unknown, minimum: number, maximum: number, fallback: numbe
   return Math.min(maximum, Math.max(minimum, number));
 };
 
-const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenMayDay, onOpenCommunity, authButtonLabel, activeItem = '', showDetachedTrigger = true, overlayMode = false, openExpandedOnMount = false, elevatedLayer = false, detachedTriggerPlacement = 'default', onStateChange }: HomeSideDockProps) => {
+const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenMayDay, onOpenCommunity, isAdmin = false, onAdminClick, authButtonLabel, activeItem = '', showDetachedTrigger = true, overlayMode = false, openExpandedOnMount = false, elevatedLayer = false, detachedTriggerPlacement = 'default', onStateChange }: HomeSideDockProps) => {
   const [sidebarState, setSidebarState] = useState<DesktopSidebarState>(() => openExpandedOnMount ? 'expanded' : readDesktopSidebarState());
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const hoverCloseTimerRef = useRef<number | null>(null);
@@ -209,6 +211,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
     { id: 'Free', label: 'Free', action: onOpenFreeModal, icon: 'gift', slot: 'nav.free', badge: dockBadgeCounts.Free || null },
     profileItem,
     { id: 'Subscriptions', label: 'Subscriptions', action: onSubscriptionClick, icon: 'gem', slot: 'nav.subscriptions', badge: null },
+    ...(isAdmin && onAdminClick ? [{ id: 'Admin', label: 'Admin', action: onAdminClick, icon: 'shield' as ProfessionalIconName, slot: 'nav.admin' as CleanNeutralIconSlotId, badge: null }] : []),
   ];
 
   const configuredBase = ((settings.content as any).dockItems || dockCustomizationItems) as string[];

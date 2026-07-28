@@ -3858,6 +3858,16 @@ const App: React.FC = () => {
           nextUser = { ...(fallbackUser as any), ...(ensuredUser as any), isFallbackProfile: false } as User;
           rememberAndStoreUser(nextUser, firebaseUser);
           setProfileStatus('ready');
+          if (ensuredUser?.role === 'admin') {
+              const adminUser: AdminUser = {
+                  id: firebaseUser.uid,
+                  email: firebaseUser.email || '',
+                  role: 'Admin',
+                  firebaseRole: 'admin',
+              };
+              setCurrentAdminUser(adminUser);
+              safeSetItem('currentAdminUser', adminUser);
+          }
           console.info('AUTH_PROFILE_READY', { uid: firebaseUser.uid, status: 'ready' });
       } catch (error) {
           console.warn('User profile hydration failed; keeping Firebase Auth fallback profile.', error);
@@ -6534,6 +6544,8 @@ const App: React.FC = () => {
             onNavigateToPurchases={() => { setCurrentView('home'); window.setTimeout(handleNavigateToPurchases, 0); }}
             onCartClick={() => { setCurrentView('home'); window.setTimeout(openCartSidebar, 0); }}
             onProfileClick={() => { setCurrentView('home'); window.setTimeout(handleNavigateToProfile, 0); }}
+            isAdmin={!!currentAdminUser}
+            onAdminClick={handleNavigateToAdminLogin}
             authButtonLabel={authButtonLabel}
             onSubscriptionClick={() => { setCurrentView('home'); window.setTimeout(handleNavigateToSubscription, 0); }}
             onOpenMayDay={() => { setCurrentView('mayDay'); window.scrollTo(0, 0); }}
@@ -6613,6 +6625,8 @@ const App: React.FC = () => {
                 onNavigateToPurchases={handleNavigateToPurchases}
                 onCartClick={openCartSidebar}
                 onProfileClick={handleNavigateToProfile}
+                isAdmin={!!currentAdminUser}
+                onAdminClick={handleNavigateToAdminLogin}
                 authButtonLabel={authButtonLabel}
                 onSubscriptionClick={handleNavigateToSubscription}
                 onOpenMayDay={handleNavigateToMayDay}
@@ -6633,7 +6647,7 @@ const App: React.FC = () => {
             <div className={`mobile-site-header ${currentView === 'home' || currentView === 'mayDay' ? 'hidden' : ''}`}><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} notificationCount={siteNotifications.filter(notification => !notification.read).length} onOpenNotifications={() => setIsSiteNotificationCenterOpen(true)} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={`${shouldHideMainDockOnMobile ? 'max-md:hidden' : ''} ${useDesktopSidebar ? 'lg:hidden' : ''}`}>
-                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenMayDay={handleNavigateToMayDay} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
+                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} isAdmin={!!currentAdminUser} onAdminClick={handleNavigateToAdminLogin} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenMayDay={handleNavigateToMayDay} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>
             )}
             <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />
@@ -6719,7 +6733,6 @@ const App: React.FC = () => {
                 <Footer
                   settings={websiteSettings}
                   socialLinks={websiteSettings.content.socialLinks}
-                  onAdminLoginClick={handleNavigateToAdminLogin}
                   onLoginClick={handleNavigateToAuth}
                   onNavigateToAllProducts={handleNavigateToAllProducts}
                   onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll}

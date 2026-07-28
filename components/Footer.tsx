@@ -4,7 +4,7 @@ import { WebsiteSettings } from '../App';
 interface FooterProps {
     settings: WebsiteSettings;
     socialLinks: { [key: string]: string };
-    onAdminLoginClick: () => void;
+    onAdminLoginClick?: () => void;
     onLoginClick: () => void;
     onNavigateToAllProducts: () => void;
     onNavigateToHomeAndScroll: (sectionId: string) => void;
@@ -90,7 +90,6 @@ const Footer: React.FC<FooterProps> = ({ settings, socialLinks, onAdminLoginClic
               <li><button onClick={() => onNavigateToPolicies('privacy-policy')} className="hover:text-slate-900 transition-colors">Privacy Policy</button></li>
               <li><button onClick={() => onNavigateToPolicies('refund-policy')} className="hover:text-slate-900 transition-colors">Refund Policy</button></li>
               <li><button onClick={onLoginClick} className="hover:text-slate-900 transition-colors">Login / Register</button></li>
-              <li><button onClick={onAdminLoginClick} className="hover:text-slate-900 transition-colors">Admin Login</button></li>
             </ul>
           </div>
 
