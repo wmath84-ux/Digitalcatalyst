@@ -108,6 +108,11 @@ googleProvider.setCustomParameters({
   prompt: 'select_account',
 });
 
+const PRIMARY_ADMIN_EMAIL = 'wmath84@gmail.com';
+const normalizeEmail = (email?: string | null) => String(email || '').trim().toLowerCase();
+const isPrimaryAdminEmail = (email?: string | null) => normalizeEmail(email) === PRIMARY_ADMIN_EMAIL;
+
+
 // --- SAFETY & UTILS ---
 
 interface ErrorBoundaryProps {
@@ -3680,7 +3685,7 @@ const App: React.FC = () => {
           canonicalUid: firebaseUser.uid,
           generatedDisplayName,
           generatedUsername,
-          role: existing.role === 'admin' ? 'admin' : 'user',
+          role: existing.role === 'admin' || existing.role === 'super_admin' || isPrimaryAdminEmail(firebaseUser.email || existing.email) ? 'admin' : 'user',
           status: existing.status === 'blocked' ? 'blocked' : 'active',
           blocked: existing.blocked === true,
           suspended: existing.suspended === true,
@@ -3821,6 +3826,14 @@ const App: React.FC = () => {
 
       setProductToBuyAfterLogin(null);
       setResumeCartCheckoutAfterLogin(false);
+      const signedInEmail = normalizeEmail((welcomeUser as any)?.email || auth.currentUser?.email || currentUser?.email);
+      if (currentAdminUser || isPrimaryAdminEmail(signedInEmail)) {
+          console.info('AUTH_REDIRECT_AFTER_COMMIT', { uid, target: 'admin' });
+          currentViewRef.current = 'admin';
+          setCurrentView('admin');
+          window.scrollTo(0, 0);
+          return;
+      }
       if (isMobileViewport && welcomeUser) {
           console.info('AUTH_REDIRECT_AFTER_COMMIT', { uid, target: 'home' });
           currentViewRef.current = 'home';
@@ -3858,15 +3871,21 @@ const App: React.FC = () => {
           nextUser = { ...(fallbackUser as any), ...(ensuredUser as any), isFallbackProfile: false } as User;
           rememberAndStoreUser(nextUser, firebaseUser);
           setProfileStatus('ready');
-          if (ensuredUser?.role === 'admin') {
+          const firebaseRole = ensuredUser?.role === 'admin' ? 'admin' : '';
+          if (firebaseRole === 'admin' || isPrimaryAdminEmail(firebaseUser.email || ensuredUser?.email)) {
               const adminUser: AdminUser = {
                   id: firebaseUser.uid,
-                  email: firebaseUser.email || '',
+                  email: firebaseUser.email || ensuredUser?.email || '',
                   role: 'Admin',
                   firebaseRole: 'admin',
               };
               setCurrentAdminUser(adminUser);
               safeSetItem('currentAdminUser', adminUser);
+              if (currentViewRef.current === 'auth' || currentViewRef.current === 'home') {
+                  currentViewRef.current = 'admin';
+                  setCurrentView('admin');
+                  window.scrollTo(0, 0);
+              }
           }
           console.info('AUTH_PROFILE_READY', { uid: firebaseUser.uid, status: 'ready' });
       } catch (error) {
@@ -3926,6 +3945,11 @@ const App: React.FC = () => {
       committedFirebaseUidRef.current = firebaseUser.uid;
       setFirebaseAuthUser(firebaseUser);
       rememberAndStoreUser(fallbackUser, firebaseUser);
+      if (isPrimaryAdminEmail(firebaseUser.email)) {
+          const adminUser: AdminUser = { id: firebaseUser.uid, email: firebaseUser.email || PRIMARY_ADMIN_EMAIL, role: 'Admin', firebaseRole: 'admin' };
+          setCurrentAdminUser(adminUser);
+          safeSetItem('currentAdminUser', adminUser);
+      }
       setIsAuthStateReady(true);
       setIsAuthRestoring(false);
       setAuthRestoreError(null);
@@ -6005,7 +6029,7 @@ const App: React.FC = () => {
       const firebaseUser = credential.user;
       const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
       const firebaseRole = userSnap.exists() ? String(userSnap.data().role || '') : '';
-      const isFirebaseAdmin = firebaseRole === 'admin' || firebaseRole === 'super_admin';
+      const isFirebaseAdmin = firebaseRole === 'admin' || firebaseRole === 'super_admin' || isPrimaryAdminEmail(firebaseUser.email || email);
 
       if (!isFirebaseAdmin) {
         await signOut(auth);
@@ -6037,7 +6061,7 @@ const App: React.FC = () => {
     try {
       const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
       const firebaseRole = userSnap.exists() ? String(userSnap.data().role || '') : '';
-      const isFirebaseAdmin = firebaseRole === 'admin' || firebaseRole === 'super_admin';
+      const isFirebaseAdmin = firebaseRole === 'admin' || firebaseRole === 'super_admin' || isPrimaryAdminEmail(firebaseUser.email);
 
       if (!isFirebaseAdmin) {
         await signOut(auth);
@@ -6124,14 +6148,14 @@ const App: React.FC = () => {
   };
 
   const handleAdminSwitchToHome = () => {
-    void signOut(auth).catch(error => console.warn('Firebase admin auto sign-out failed.', error));
-    setCurrentAdminUser(null);
-    localStorage.removeItem('currentAdminUser');
     setCurrentView('home');
   };
 
   const handleAdminLogout = () => {
-    handleAdminSwitchToHome();
+    void signOut(auth).catch(error => console.warn('Firebase admin sign-out failed.', error));
+    setCurrentAdminUser(null);
+    localStorage.removeItem('currentAdminUser');
+    setCurrentView('home');
   };
 
   const persistProductsLocalFallback = (nextProducts: Product[]) => {
