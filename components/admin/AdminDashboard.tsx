@@ -39,6 +39,7 @@ interface AdminDashboardProps {
     onUpdateProduct: (product: Product) => Promise<boolean>;
     onDeleteProduct: (id: number) => Promise<boolean>;
     onDeleteUser: (id: string) => void;
+    onDeleteAllUsers?: () => void;
     onAdminUsersUpdate: (users: AdminUser[]) => void;
     onCouponsUpdate: (coupons: Coupon[]) => void;
     onTicketsUpdate: (tickets: SupportTicket[]) => void;
@@ -200,7 +201,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
             case 'newsBlog': return <NewsBlogManagement settings={props.websiteSettings} onSettingsChange={props.onWebsiteSettingsChange} />;
             case 'reviews': return <AdminReviewManagement products={props.products} reviews={props.reviews} />;
             case 'reports': return <Reports products={props.products} reviews={props.reviews} orders={props.orders} users={props.users} tickets={props.tickets} />;
-            case 'users': return <UserManagement users={props.users} onDeleteUser={props.onDeleteUser} />;
+            case 'users': return <UserManagement users={props.users} onDeleteUser={props.onDeleteUser} onDeleteAllUsers={props.onDeleteAllUsers} />;
             case 'admins': return <AdminManagement adminUsers={props.adminUsers} currentAdminUser={props.currentAdminUser} onUpdateAdminUsers={props.onAdminUsersUpdate} />;
             case 'orders': return <OrderManagement orders={props.orders} />;
             case 'coupons': return <CouponManagement coupons={props.coupons} onUpdate={props.onCouponsUpdate} />;

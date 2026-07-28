@@ -6,6 +6,7 @@ import { cleanupLegacyIdentityRecords, LegacyIdentityCleanupResult } from '../..
 interface UserManagementProps {
   users: User[];
   onDeleteUser: (userId: string) => void;
+  onDeleteAllUsers?: () => void;
 }
 
 const normalizeCustomerIdentity = (value: unknown) => String(value || '').trim().toLowerCase();
@@ -52,7 +53,7 @@ const dedupeAdminCustomersForDisplay = (users: User[]) => {
 };
 
 
-const UserManagement: React.FC<UserManagementProps> = ({ users, onDeleteUser }) => {
+const UserManagement: React.FC<UserManagementProps> = ({ users, onDeleteUser, onDeleteAllUsers }) => {
   const [cleanupBusy, setCleanupBusy] = useState(false);
   const [cleanupError, setCleanupError] = useState('');
   const [cleanupResult, setCleanupResult] = useState<LegacyIdentityCleanupResult | null>(null);
@@ -85,6 +86,11 @@ const UserManagement: React.FC<UserManagementProps> = ({ users, onDeleteUser }) 
         <button type="button" disabled={cleanupBusy} onClick={() => void runCleanup()} className="rounded-2xl bg-slate-900 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-55">
           {cleanupBusy ? 'Cleaning legacy IDs…' : 'Clean legacy IDs'}
         </button>
+        {onDeleteAllUsers && (
+          <button type="button" onClick={() => void onDeleteAllUsers()} className="rounded-2xl bg-red-600 px-5 py-3 text-sm font-black text-white shadow-sm transition hover:bg-red-700">
+            Delete All Users
+          </button>
+        )}
       </div>
 
       <section className="rounded-2xl border border-amber-200 bg-amber-50 p-4">

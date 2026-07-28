@@ -2635,7 +2635,10 @@ const App: React.FC = () => {
     const storedSubscribers = localStorage.getItem('newsletterSubscribers');
     if (storedSubscribers) setNewsletterSubscribers(JSON.parse(storedSubscribers));
 
-    localStorage.removeItem('currentAdminUser');
+    const storedAdminUser = safeGetItem<AdminUser | null>('currentAdminUser', null);
+    if (storedAdminUser) {
+      setCurrentAdminUser(storedAdminUser);
+    }
 
     const storedTheme = localStorage.getItem('activeTheme') as ThemeName;
     if (storedTheme && themes[storedTheme]) {
@@ -4016,6 +4019,10 @@ const App: React.FC = () => {
               void completeFirebaseUserSession(user, { source: 'auth-listener', explicit: false, redirect: false }).catch(error => {
                   console.warn('Firebase session restore failed.', error);
               });
+              const savedAdmin = safeGetItem<AdminUser | null>('currentAdminUser', null);
+              if (savedAdmin && savedAdmin.id === user.uid) {
+                  setCurrentAdminUser(savedAdmin);
+              }
               return;
           }
 
@@ -4037,6 +4044,8 @@ const App: React.FC = () => {
           setIsMobileCompletionModalOpen(false);
           setMobileCompletionInput('');
           setMobileCompletionError('');
+          setCurrentAdminUser(null);
+          localStorage.removeItem('currentAdminUser');
       });
       return () => {
           window.clearTimeout(redirectTimeout);
@@ -4190,7 +4199,11 @@ const App: React.FC = () => {
               return { success: true, message: 'Account created successfully.' };
           }
           return { success: false, message: 'Account could not be completed. Please try again.' };
-      } catch (error) {
+      } catch (error: any) {
+          const code = error?.code;
+          if (code === 'auth/email-already-in-use') {
+              return { success: false, message: 'This email is already registered. Please switch to Login tab, or use Forgot Password if you cannot remember your password.' };
+          }
           return { success: false, message: getFirebaseAuthErrorMessage(error) };
       } finally {
           endAuthOperation();
@@ -5999,6 +6012,7 @@ const App: React.FC = () => {
       };
 
       setCurrentAdminUser(admin);
+      safeSetItem('currentAdminUser', admin);
       setCurrentView('admin');
       return true;
     } catch (error) {
@@ -6006,6 +6020,96 @@ const App: React.FC = () => {
       localStorage.removeItem('currentAdminUser');
       setCurrentAdminUser(null);
       return false;
+    }
+  };
+
+  const commitAdminSession = async (firebaseUser: FirebaseUser): Promise<{ success: boolean; message: string }> => {
+    try {
+      const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
+      const firebaseRole = userSnap.exists() ? String(userSnap.data().role || '') : '';
+      const isFirebaseAdmin = firebaseRole === 'admin' || firebaseRole === 'super_admin';
+
+      if (!isFirebaseAdmin) {
+        await signOut(auth);
+        localStorage.removeItem('currentAdminUser');
+        setCurrentAdminUser(null);
+        return { success: false, message: 'This account does not have admin access. Please contact the site owner.' };
+      }
+
+      const admin: AdminUser = {
+        id: firebaseUser.uid,
+        email: firebaseUser.email || '',
+        role: firebaseRole === 'super_admin' ? 'Developer' : 'Admin',
+        firebaseRole: firebaseRole as 'admin' | 'super_admin',
+      };
+
+      setCurrentAdminUser(admin);
+      safeSetItem('currentAdminUser', admin);
+      logoutInProgressRef.current = false;
+      setIsLocalLogoutPending(false);
+      setCurrentView('admin');
+      return { success: true, message: 'Admin login successful.' };
+    } catch (error) {
+      console.warn('Admin session commit failed.', error);
+      return { success: false, message: 'Could not verify admin access. Please try again.' };
+    }
+  };
+
+  const handleAdminEmailLogin = async (email: string, password: string): Promise<{ success: boolean; message: string }> => {
+    beginAuthOperation();
+    try {
+      await ensureAuthPersistence();
+      const credential = await signInWithEmailAndPassword(auth, email.trim(), password);
+      await credential.user.getIdToken(true);
+      const result = await commitAdminSession(credential.user);
+      if (!result.success) return result;
+      return { success: true, message: 'Admin login successful.' };
+    } catch (error) {
+      return { success: false, message: getFirebaseAuthErrorMessage(error) };
+    } finally {
+      endAuthOperation();
+    }
+  };
+
+  const handleAdminGoogleLogin = async (): Promise<{ success: boolean; message: string }> => {
+    setAuthError(null);
+    setAuthRestoreError(null);
+    beginAuthOperation();
+    try {
+      const source = 'admin-google-popup';
+      console.info('ADMIN_LOGIN_START', { source });
+      await ensureAuthPersistence();
+      const credential = await signInWithPopup(auth, googleProvider);
+      await credential.user.getIdToken(true);
+      console.info('ADMIN_LOGIN_FIREBASE_SUCCESS', { uid: credential.user.uid, source });
+      const result = await commitAdminSession(credential.user);
+      if (!result.success) return result;
+      return { success: true, message: 'Admin Google login successful.' };
+    } catch (error: any) {
+      console.warn('Admin Google login failed.', error);
+      const shouldFallbackToRedirect = [
+        'auth/popup-blocked',
+        'auth/cancelled-popup-request',
+        'auth/operation-not-supported-in-this-environment',
+      ].includes(error?.code) || (shouldUseGoogleRedirect() && error?.code !== 'auth/popup-closed-by-user');
+      if (shouldFallbackToRedirect) {
+        try {
+          console.info('ADMIN_LOGIN_START', { source: 'admin-google-redirect' });
+          await ensureAuthPersistence();
+          console.info('ADMIN_GOOGLE_REDIRECT_START');
+          markGoogleRedirectAttempt();
+          isRedirectResultPendingRef.current = true;
+          setIsRedirectResultPending(true);
+          await signInWithRedirect(auth, googleProvider);
+          return { success: true, message: 'Opening Google login...' };
+        } catch (redirectError) {
+          console.warn('Admin Google redirect fallback failed.', redirectError);
+          return { success: false, message: getFirebaseAuthErrorMessage(redirectError) };
+        }
+      }
+      return { success: false, message: getFirebaseAuthErrorMessage(error) };
+    } finally {
+      if (auth.currentUser || !isRedirectResultPendingRef.current) endAuthOperation();
     }
   };
 
@@ -6132,11 +6236,50 @@ const App: React.FC = () => {
       }
   };
 
-  const handleDeleteUser = (userId: string) => {
+  const handleDeleteUser = async (userId: string) => {
     if (window.confirm("Delete this user? This cannot be undone.")) {
+        try {
+            await deleteDoc(doc(db, 'users', userId));
+            console.info('USER_DELETED_FROM_FIRESTORE', { uid: userId });
+        } catch (error) {
+            console.warn('Could not delete user doc from Firestore.', error);
+        }
         const updatedUsers = users.filter(u => u.id !== userId);
         setUsers(updatedUsers);
         safeSetItem('siteUsers', updatedUsers);
+    }
+  };
+
+  const handleDeleteAllUsers = async () => {
+    if (!window.confirm("DELETE ALL USERS? This will permanently remove ALL user data from Firestore and the app. This cannot be undone. Are you absolutely sure?")) return;
+    if (!window.confirm("FINAL WARNING: This deletes all customer accounts, profiles, purchases, coin wallets, and all related data. Continue?")) return;
+
+    try {
+      const usersSnap = await getDocs(collection(db, 'users'));
+      const batchSize = 500;
+      const docs = usersSnap.docs;
+      for (let i = 0; i < docs.length; i += batchSize) {
+        const batch = writeBatch(db);
+        const chunk = docs.slice(i, i + batchSize);
+        chunk.forEach(docSnap => {
+          batch.delete(docSnap.ref);
+        });
+        await batch.commit();
+        console.info(`Deleted users batch ${Math.floor(i / batchSize) + 1}, ${chunk.length} users`);
+      }
+      console.info('ALL_USERS_DELETED_FROM_FIRESTORE', { count: docs.length });
+      setUsers([]);
+      safeSetItem('siteUsers', []);
+      localStorage.removeItem('purchasedProducts');
+      localStorage.removeItem('productWishlist');
+      localStorage.removeItem('shoppingCart');
+      localStorage.removeItem('currentUser');
+      localStorage.removeItem('rememberedAuth');
+      sessionStorage.clear();
+      alert(`Successfully deleted ${docs.length} users from Firestore.`);
+    } catch (error) {
+      console.error('Failed to delete all users.', error);
+      alert('Failed to delete all users. Check console for details.');
     }
   };
 
@@ -6224,10 +6367,10 @@ const App: React.FC = () => {
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
       case 'myPurchases':
         if (!isAuthStateReady) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
-        return isLoggedIn ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+        return isLoggedIn ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onAdminGoogleLogin={handleAdminGoogleLogin} onAdminEmailLogin={handleAdminEmailLogin} onBack={handleBackFromAuth} />;
       case 'profile':
         if (!isAuthStateReady) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
-        return isLoggedIn && appUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={appUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} orders={orders} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} onUpgrade={handleNavigateToSubscription} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} />;
+        return isLoggedIn && appUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={appUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} orders={orders} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} onUpgrade={handleNavigateToSubscription} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onAdminGoogleLogin={handleAdminGoogleLogin} onAdminEmailLogin={handleAdminEmailLogin} onBack={handleBackFromAuth} />;
       case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={() => handleNavigateBack('home')} onActivatePlan={handleActivateSubscription} currentUser={appUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} coupons={coupons} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={() => handleNavigateBack('home')} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
       case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onClearWishlist={handleClearWishlist} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
@@ -6362,10 +6505,10 @@ const App: React.FC = () => {
     const requiresAuthForView = protectedViews.has(currentView);
     console.info('AUTH_GATE_DECISION', { isLoggedIn, hasFirebaseUser, hasAppUser: Boolean(effectiveAppUser), currentView, isMobileViewport, authStatus, isRedirectResultPending });
     if (isAuthChecking && requiresAuthForView) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
-    if (currentView === 'auth' && !hasFirebaseUser) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
-    if (isSignedOut && requiresAuthForView) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onBack={handleBackFromAuth} /></div>;
+    if (currentView === 'auth' && !hasFirebaseUser) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onAdminGoogleLogin={handleAdminGoogleLogin} onAdminEmailLogin={handleAdminEmailLogin} onBack={handleBackFromAuth} /></div>;
+    if (isSignedOut && requiresAuthForView) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onAdminGoogleLogin={handleAdminGoogleLogin} onAdminEmailLogin={handleAdminEmailLogin} onBack={handleBackFromAuth} /></div>;
     if (currentView === 'policies') return <div key="policies" className={appleOpenClass}><PolicyPage settings={websiteSettings} onBack={() => handleNavigateBack('home')} scrollToSection={scrollToPolicySection} onSectionScrolled={() => setScrollToPolicySection(null)} /></div>;
-    if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onCouponsUpdate={handleCouponsUpdate} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); }} /></div>;
+    if (currentView === 'admin' && currentAdminUser) return <div key="admin" className={appleOpenClass}><AdminDashboard economySettings={economySettings} websiteSettings={websiteSettings} onWebsiteSettingsChange={handleWebsiteSettingsUpdate} products={productsWithRatings} reviews={reviews} users={users} coupons={coupons} orders={orders} tickets={tickets} newsletterSubscribers={newsletterSubscribers} onSubscribersUpdate={(updatedSubscribers) => { setNewsletterSubscribers(updatedSubscribers); safeSetItem('newsletterSubscribers', updatedSubscribers); }} onTicketsUpdate={handleTicketsUpdate} onAddProduct={handleAddProduct} onUpdateProduct={handleUpdateProduct} onDeleteProduct={handleDeleteProduct} onDeleteUser={handleDeleteUser} onDeleteAllUsers={handleDeleteAllUsers} onCouponsUpdate={handleCouponsUpdate} onSwitchToHome={handleAdminSwitchToHome} adminUsers={adminUsers} currentAdminUser={currentAdminUser} onAdminUsersUpdate={(updatedUsers) => { setAdminUsers(updatedUsers); }} /></div>;
     if (currentView === 'adminLogin') return <div key="adminLogin" className={appleOpenClass}><AdminLogin settings={websiteSettings} onLogin={handleAdminLogin} onBack={() => handleNavigateBack('home')} /></div>;
     if (currentView === 'coursePlayer') return <div key="coursePlayer" className={appleOpenClass}>{renderContent(effectiveAppUser)}</div>;
     if (currentView === 'community') return (

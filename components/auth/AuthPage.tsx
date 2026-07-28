@@ -4,7 +4,7 @@ import UserAvatar from '../common/UserAvatar';
 import { RememberedAuthAccount } from '../../utils/rememberedAuth';
 import LiquidMetalButton from '../ui/LiquidMetalButton';
 
-type AuthMode = 'login' | 'signup';
+type AuthMode = 'login' | 'signup' | 'admin';
 
 type AuthResult = { success: boolean; message: string };
 
@@ -23,10 +23,12 @@ interface AuthPageProps {
     onEmailLogin: (email: string, password: string) => Promise<AuthResult> | AuthResult;
     onEmailSignup: (profile: SignupProfile, password: string) => Promise<AuthResult> | AuthResult;
     onPasswordReset: (email: string) => Promise<AuthResult> | AuthResult;
+    onAdminGoogleLogin: () => Promise<AuthResult> | AuthResult;
+    onAdminEmailLogin: (email: string, password: string) => Promise<AuthResult> | AuthResult;
     onBack: () => void;
 }
 
-const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', rememberedAccount, onForgetRememberedAccount, onGoogleLogin, onEmailLogin, onEmailSignup, onPasswordReset, onBack }) => {
+const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', rememberedAccount, onForgetRememberedAccount, onGoogleLogin, onEmailLogin, onEmailSignup, onPasswordReset, onAdminGoogleLogin, onAdminEmailLogin, onBack }) => {
     const [mode, setMode] = useState<AuthMode>(initialMode);
     const [name, setName] = useState('');
     const [email, setEmail] = useState('');
@@ -59,7 +61,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
         setSuccess('');
         setIsGoogleLoading(true);
         try {
-            const result = await onGoogleLogin();
+            const result = mode === 'admin' ? await onAdminGoogleLogin() : await onGoogleLogin();
             if (!result.success) setError(result.message);
             else if (result.message) setSuccess(result.message);
         } finally {
@@ -115,11 +117,17 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
 
         setIsSubmitting(true);
         try {
-            const result = mode === 'login'
-                ? await onEmailLogin(email.trim().toLowerCase(), password)
-                : await onEmailSignup({ name: name.trim(), email: email.trim().toLowerCase(), mobile: normalizedMobile }, password);
-            if (!result.success) setError(result.message);
-            else if (result.message) setSuccess(result.message);
+            if (mode === 'admin') {
+                const result = await onAdminEmailLogin(email.trim().toLowerCase(), password);
+                if (!result.success) setError(result.message);
+                else if (result.message) setSuccess(result.message);
+            } else {
+                const result = mode === 'login'
+                    ? await onEmailLogin(email.trim().toLowerCase(), password)
+                    : await onEmailSignup({ name: name.trim(), email: email.trim().toLowerCase(), mobile: normalizedMobile }, password);
+                if (!result.success) setError(result.message);
+                else if (result.message) setSuccess(result.message);
+            }
         } finally {
             setIsSubmitting(false);
         }
@@ -147,13 +155,14 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
             <div className="relative z-10 w-full max-w-xl overflow-hidden rounded-[1.5rem] border border-slate-200 bg-white/95 p-4 text-slate-950 shadow-[0_24px_80px_rgba(15,23,42,0.10)] backdrop-blur-2xl sm:rounded-[2rem] sm:p-10 lg:p-12">
                     <div className="mb-5 sm:mb-8">
                         <p className="text-xs font-bold uppercase tracking-[0.22em] text-primary sm:text-sm sm:tracking-[0.25em]">{settings.content.siteName}</p>
-                        <h2 className="mt-2 text-2xl font-black sm:text-3xl">{mode === 'login' ? 'Login' : 'Create your account'}</h2>
-                        <p className="text-slate-700 mt-2">{mode === 'login' ? 'Welcome back. Login to restore your purchases and learning progress.' : 'We will use your name for reviews, email for receipts, and mobile for account support.'}</p>
+                        <h2 className="mt-2 text-2xl font-black sm:text-3xl">{mode === 'login' ? 'Login' : mode === 'signup' ? 'Create your account' : 'Admin Login'}</h2>
+                        <p className="text-slate-700 mt-2">{mode === 'login' ? 'Welcome back. Login to restore your purchases and learning progress.' : mode === 'signup' ? 'We will use your name for reviews, email for receipts, and mobile for account support.' : 'Sign in with admin credentials to access the dashboard.'}</p>
                     </div>
 
-                    <div className="mb-5 grid grid-cols-2 gap-2 rounded-2xl bg-slate-100 p-1">
+                    <div className="mb-5 grid grid-cols-3 gap-2 rounded-2xl bg-slate-100 p-1">
                         <button type="button" onClick={() => handleModeChange('login')} className={`rounded-xl px-4 py-2.5 text-sm font-black transition-colors ${mode === 'login' ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-600 hover:text-slate-950'}`}>Login</button>
                         <button type="button" onClick={() => handleModeChange('signup')} className={`rounded-xl px-4 py-2.5 text-sm font-black transition-colors ${mode === 'signup' ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-600 hover:text-slate-950'}`}>Sign up</button>
+                        <button type="button" onClick={() => handleModeChange('admin')} className={`rounded-xl px-4 py-2.5 text-sm font-black transition-colors ${mode === 'admin' ? 'bg-white text-blue-900 shadow-sm' : 'text-slate-600 hover:text-slate-950'}`}>Admin</button>
                     </div>
 
                     {rememberedAccount && (
@@ -180,7 +189,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
                             <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z" />
                         </svg>
-                        {isGoogleLoading ? 'Opening Google...' : mode === 'login' ? 'Login with Google' : 'Continue with Google'}
+                        {isGoogleLoading ? 'Opening Google...' : mode === 'admin' ? 'Admin login with Google' : mode === 'login' ? 'Login with Google' : 'Continue with Google'}
                     </button>
                     <div className="mb-5 flex items-center gap-3 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
                         <span className="h-px flex-1 bg-slate-200" />
@@ -226,6 +235,11 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
                                 <button type="button" onClick={handleForgotPassword} disabled={isSubmitting || isGoogleLoading} className="text-sm font-bold text-blue-800 hover:text-blue-950 disabled:cursor-not-allowed disabled:opacity-60">Forgot password?</button>
                             </div>
                         )}
+                        {mode === 'admin' && (
+                            <div className="flex justify-end">
+                                <button type="button" onClick={handleForgotPassword} disabled={isSubmitting || isGoogleLoading} className="text-sm font-bold text-blue-800 hover:text-blue-950 disabled:cursor-not-allowed disabled:opacity-60">Forgot password?</button>
+                            </div>
+                        )}
                         {success && (
                             <div className="text-sm text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-xl p-3">
                                 <p>{success}</p>
@@ -233,7 +247,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
                             </div>
                         )}
                         {error && <p className="text-sm text-red-700 bg-red-50 border border-red-100 rounded-xl p-3">{error}</p>}
-                        <LiquidMetalButton tone="dark" type="submit" disabled={isSubmitting || isGoogleLoading} className="w-full rounded-2xl px-6 py-3.5 font-black disabled:cursor-not-allowed disabled:opacity-70 sm:px-8 sm:py-4">{isSubmitting ? 'Please wait...' : mode === 'login' ? 'Login to learning store' : 'Create account'}</LiquidMetalButton>
+                        <LiquidMetalButton tone="dark" type="submit" disabled={isSubmitting || isGoogleLoading} className="w-full rounded-2xl px-6 py-3.5 font-black disabled:cursor-not-allowed disabled:opacity-70 sm:px-8 sm:py-4">{isSubmitting ? 'Please wait...' : mode === 'admin' ? 'Login to admin dashboard' : mode === 'login' ? 'Login to learning store' : 'Create account'}</LiquidMetalButton>
                     </form>
                     <p className="mt-5 text-xs text-slate-700 text-center">Firebase Auth secures this session; purchases restore from your account after login.</p>
             </div>
