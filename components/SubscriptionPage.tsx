@@ -124,29 +124,38 @@ const SubscriptionPage: React.FC<{
       }}
     >
       <main className="relative mx-auto flex min-h-screen max-w-6xl flex-col px-4 py-5 sm:px-7 sm:py-7 lg:px-10">
-        <button type="button" onClick={onBack} className="w-fit rounded-[18px] border border-blue-200 bg-white px-4 py-2 text-[11px] font-black uppercase tracking-[0.08em] text-blue-800 shadow-sm outline-none transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-blue-500/40">
+<button
+            type="button"
+            onClick={onBack}
+            className="w-fit rounded-full border border-blue-200 bg-white px-4 py-2 text-[11px] font-black uppercase tracking-[0.08em] text-blue-800 shadow-sm outline-none transition hover:-translate-y-0.5 hover:border-blue-300 hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-blue-500/40"
+          >
           ← Back
         </button>
 
         <section className="flex flex-1 flex-col items-center py-9 sm:py-12 lg:py-14">
           <div className="text-center">
             <p className="text-[10px] font-bold uppercase tracking-[0.28em] text-[#676767]">{pageContent.eyebrow}</p>
-            <h1 className="mt-4 text-3xl font-black leading-tight tracking-[-0.04em] text-[#111111] sm:text-5xl">{pageContent.title}</h1>
+            <h1 className="mt-4 text-3xl font-black leading-tight tracking-[-0.04em] text-[#111111] sm:text-5xl">
+              {pageContent.title}
+            </h1>
             <p className="mx-auto mt-4 max-w-xl text-[12px] leading-5 text-[#676767]">{pageContent.subtitle}</p>
             {currentTier !== 'normal' && (
               <p className="mx-auto mt-4 w-fit border border-[#181818] bg-[#F4F35B] px-3 py-1 text-[10px] font-black uppercase tracking-[0.12em]">
-                Current membership: {currentTier}
+                <span className="inline-flex items-center gap-1">
+                  <span>⭐</span>
+                  <span>Current membership: {currentTier}</span>
+                </span>
               </p>
             )}
           </div>
 
-          <div className="mt-6 flex items-center justify-center overflow-hidden rounded-[18px] border border-blue-200 bg-white p-1 text-[11px] font-black leading-none text-slate-800 shadow-sm sm:mt-7" aria-label="Billing preview toggle">
-            <button type="button" aria-pressed={billingPreview === 'monthly'} onClick={() => setBillingPreview('monthly')} className={`h-9 min-w-24 rounded-[14px] px-5 outline-none transition focus-visible:ring-2 focus-visible:ring-blue-500/40 ${billingPreview === 'monthly' ? 'bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)]' : 'bg-white text-slate-800 hover:bg-blue-50 hover:text-blue-700'}`}>
+          <div className="mt-mt-6 flex items-center justify-center overflow-hidden rounded-full border border-blue-200 bg-white p-1 text-[11px] font-black leading-none text-slate-800 shadow-sm sm:mt-7" aria-label="Billing preview toggle">
+            <button type="button" aria-pressed={billingPreview === 'monthly'} onClick={() => setBillingPreview('monthly')} className={`h-9 min-w-24 rounded-full px-5 outline-none transition focus-visible:ring-2 focus-visible:ring-blue-500/40 ${billingPreview === 'monthly' ? 'bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,999,235,0.22)]' : 'bg-white text-slate-800 hover:bg-blue-50 hover:text-blue-700'}`}>
               {pageContent.monthlyLabel}
             </button>
-            <button type="button" aria-pressed={billingPreview === 'yearly'} onClick={() => setBillingPreview('yearly')} className={`flex h-9 min-w-24 items-center justify-center gap-1.5 rounded-[14px] px-5 outline-none transition focus-visible:ring-2 focus-visible:ring-blue-500/40 ${billingPreview === 'yearly' ? 'bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)]' : 'bg-white text-slate-800 hover:bg-blue-50 hover:text-blue-700'}`}>
+            <button type="button" aria-pressed={billingPreview === 'yearly'} onClick={() => setBillingPreview('yearly')} className={`flex h-9 min-w-24 items-center justify-center gap-1.5 rounded-full px-5 outline-none transition focus-visible:ring-2 focus-visible:ring-blue-500/40 ${billingPreview === 'yearly' ? 'bg-blue-600 text-white shadow-[0_8px_20px_rgba(37,99,235,0.22)]' : 'bg-white text-slate-800 hover:bg-blue-50 hover:text-blue-700'}`}>
               <span>{pageContent.yearlyLabel}</span>
-              <span className="border border-slate-300 bg-white px-1 py-0.5 text-[8px] leading-none text-slate-800">{pageContent.yearlyBadge}</span>
+              <span className="border border-slate-300 bg-white px-1 py-0.5 text-[8px] leading-none text-slate-800 rounded-sm">{pageContent.yearlyBadge}</span>
             </button>
           </div>
 
@@ -191,10 +200,26 @@ const SubscriptionPage: React.FC<{
                   )}
 
                   <div className="flex flex-wrap items-start gap-2">
-                    <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em]">{plan.accessTier}</span>
-                    <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.04em]">{plan.earningMultiplier}× earning</span>
-                    {availableCoupon && <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.04em]">Coupon available</span>}
-                  </div>
+            <span className="rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.08em]">
+              <span className="inline-flex items-center gap-1">
+                <span>🔑</span>
+                <span>{plan.accessTier}</span>
+              </span>
+            </span>
+            <span className="rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.04em]">
+              <span className="inline-flex items-center gap-1">
+                <span>💰</span>
+                <span>{plan.earningMultiplier}× earning</span>
+              </span>
+            </span>
+            {availableCoupon && (
+              <span className="rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.04em]">
+                <span className="inline-flex items-center gap-1">
+                  <span>🎫</span>
+                  <span>Coupon available</span>
+                </span>
+              </span>
+            )}
 
                   <div className="mt-7 text-center">
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#676767]">{plan.audienceLabel}</p>
@@ -204,35 +229,79 @@ const SubscriptionPage: React.FC<{
                       <span className="text-4xl font-black leading-none tracking-[-0.05em] sm:text-5xl">₹{finalPlanPrice.toFixed(0)}</span>
                     </div>
                     <p className="mt-2 text-[11px] font-bold lowercase tracking-[0.03em] text-[#676767]">per {billingLabel} secure access</p>
-                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.10em] text-[#676767]">Switch to {alternateBillingCycle}: ₹{alternatePrice.toFixed(0)} / {alternateLabel}</p>
+                    <p className="mt-2 text-[10px] font-black uppercase tracking-[0.10em] text-[#676767]">
+                <span className="inline-flex items-center justify-center gap-1">
+                  <span>💡</span>
+                  <span>Switch to {alternateBillingCycle}: ₹{alternatePrice.toFixed(0)} / {alternateLabel}</span>
+                </span>
+              </p>
                   </div>
 
-                  <p className="mx-auto mt-5 max-w-sm text-center text-[12px] font-bold leading-5 text-[#676767]">{plan.description}</p>
+                  <p className="mx-auto mt-5 max-w-sm text-center text-[12px] font-bold leading-5 text-[#676767]">
+                <span className="inline-flex items-center justify-center gap-1">
+                  <span>ℹ️</span>
+                  <span>{plan.description}</span>
+                </span>
+              </p>
 
                   <div className="mt-6 border-t border-[#181818] pt-5">
-                    <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#676767]">Includes</p>
-                    <ul className="mt-3 space-y-2.5">
-                      {plan.benefits.map(benefit => <li key={benefit} className="flex items-start gap-2 text-[12px] font-bold leading-5"><span className="mt-0.5 text-[#1769FF]">✓</span><span>{benefit}</span></li>)}
-                    </ul>
+                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#676767]">
+                  <span className="inline-flex items-center gap-1">
+                    <span>✨</span>
+                    <span>Includes</span>
+                  </span>
+                </p>
+                <ul className="mt-3 space-y-2.5">
+                  {plan.benefits.map((benefit) => (
+                    <li key={benefit} className="flex items-start gap-2 text-[12px] font-bold leading-5">
+                      <span className="mt-0.5 text-[#1769FF]">✓</span>
+                      <span>{benefit}</span>
+                    </li>
+                  ))}
                   </div>
 
-                  {unlockedProducts.length > 0 && (
-                    <div className="mt-5 rounded-[18px] border border-blue-100 bg-blue-50/60 p-4">
-                      <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#676767]">Selected content access</p>
-                      <p className="mt-2 text-[11px] font-bold leading-5">{unlockedProducts.join(' • ')}</p>
-                    </div>
-                  )}
+                  <div className="mt-5 rounded-[18px] border border-blue-100 bg-blue-50/60 p-4">
+                    <p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#676767]">
+                      <span className="inline-flex items-center gap-1">
+                        <span>🎁</span>
+                        <span>Selected content access</span>
+                      </span>
+                    </p>
+                    <p className="mt-2 text-[11px] font-bold leading-5">{unlockedProducts.join(' • ')}</p>
+                  </div>
 
                   {(activeDiscount || validAppliedCoupon) && (
                     <div className="mt-5 rounded-[18px] border border-blue-100 bg-blue-50/60 p-4 text-[11px] font-bold">
-                      <div className="flex justify-between gap-3"><span>Subtotal</span><span>₹{planPrice}</span></div>
-                      {validAppliedCoupon && <div className="mt-1 flex justify-between gap-3"><span>Coupon ({validAppliedCoupon.code})</span><span>-₹{couponDiscount.toFixed(2)}</span></div>}
-                      {activeDiscount && <div className="mt-1 flex justify-between gap-3"><span>EduCoin Discount</span><span>-₹{eduCoinDiscount}</span></div>}
-                      <div className="mt-2 flex justify-between gap-3 border-t border-[#181818] pt-2 font-black"><span>Final Price</span><span>₹{finalPlanPrice.toFixed(2)}</span></div>
+                      <div className="flex justify-between gap-3">
+                        <span>Subtotal</span>
+                        <span>₹{planPrice}</span>
+                      </div>
+                      {validAppliedCoupon && (
+                        <div className="mt-1 flex justify-between gap-3">
+                          <span className="inline-flex items-center gap-1">
+                            <span>🎫</span>
+                            <span>Coupon ({validAppliedCoupon.code})</span>
+                          </span>
+                          <span className="text-emerald-700">-₹{couponDiscount.toFixed(2)}</span>
+                        </div>
+                      )}
+                      {activeDiscount && (
+                        <div className="mt-1 flex justify-between gap-3">
+                          <span className="inline-flex items-center gap-1">
+                            <span>💰</span>
+                            <span>EduCoin Discount</span>
+                          </span>
+                          <span className="text-emerald-700">-₹{eduCoinDiscount}</span>
+                        </div>
+                      )}
+                      <div className="mt-2 flex justify-between gap-3 border-t border-[#181818] pt-2 font-black">
+                        <span>Final Price</span>
+                        <span className="text-blue-600">₹{finalPlanPrice.toFixed(2)}</span>
+                      </div>
                     </div>
                   )}
 
-                  <div className="mt-auto space-y-2.5 pt-6">
+                  <div className="mt-auto space-y-3 pt-6">
                     <button type="button" disabled={disabled} onClick={() => onActivatePlan(plan, billingCycle, validAppliedCoupon?.code || null)} className={`subscription-primary-action block min-h-12 w-full rounded-[18px] border px-4 py-3 text-center text-[12px] font-black uppercase tracking-[0.08em] outline-none transition active:scale-[0.99] ${disabled ? 'cursor-not-allowed border-slate-300 bg-gradient-to-r from-slate-100 to-white text-slate-500 shadow-sm' : 'eduvora-primary-action border-blue-500 text-white shadow-[0_18px_42px_rgba(23,105,255,0.28)] hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(23,105,255,0.34)]'}`}>
                       {disabled ? `${currentTier === 'elite' ? 'Elite' : 'Pro'} subscription active` : `${plan.ctaLabel} · ₹${finalPlanPrice.toFixed(0)} / ${billingLabel}`}
                     </button>
@@ -245,18 +314,46 @@ const SubscriptionPage: React.FC<{
                   </div>
 
                   <div className="mt-4 rounded-[18px] border border-blue-100 bg-slate-50/90 p-4">
-                    <label htmlFor={`coupon-${planId}`} className="text-[10px] font-black uppercase tracking-[0.12em] text-[#676767]">Coupon code</label>
+                    <label htmlFor={`coupon-${planId}`} className="text-[10px] font-black uppercase tracking-[0.12em] text-[#676767]">
+                      <span className="inline-flex items-center gap-1">
+                        <span>🎫</span>
+                        <span>Coupon code</span>
+                      </span>
+                    </label>
                     <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] gap-2">
-                      <input id={`coupon-${planId}`} type="text" value={couponInputs[planId] || ''} onChange={event => handleCouponInputChange(planId, event.target.value)} onKeyDown={event => { if (event.key === 'Enter' && !validAppliedCoupon) handleApplyCoupon(planId, couponInputs[planId] || ''); }} placeholder="Code" disabled={disabled} className="h-10 w-full min-w-0 border border-[#181818] bg-white px-3 text-[12px] font-black uppercase tracking-[0.08em] outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-[#676767] focus:bg-[#FFFBC4] disabled:bg-[#F2F2EE]" />
-                      <button type="button" disabled={disabled} onClick={() => validAppliedCoupon ? handleRemoveCoupon(planId) : handleApplyCoupon(planId, couponInputs[planId] || '')} className="h-10 border border-[#181818] bg-white px-3 text-[10px] font-black uppercase tracking-[0.08em] hover:bg-[#F4F35B] disabled:bg-[#F2F2EE]">
-                        {validAppliedCoupon ? 'Remove' : 'Apply'}
+                      <input
+                        id={`coupon-${planId}`}
+                        type="text"
+                        value={couponInputs[planId] || ''}
+                        onChange={(event) => handleCouponInputChange(planId, event.target.value)}
+                        onKeyDown={(event) => {
+                          if (event.key === 'Enter' && !validAppliedCoupon) handleApplyCoupon(planId, couponInputs[planId] || '');
+                        }}
+                        placeholder="Enter coupon code"
+                        disabled={disabled}
+                        className="h-10 w-full min-w-0 border border-[#181818] bg-white px-3 text-[12px] font-black uppercase tracking-[0.08em] outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-[#676767] focus:bg-[#FFFBC4] disabled:bg-[#F2F2EE] rounded-lg"
+                      />
+                      <button
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => validAppliedCoupon ? handleRemoveCoupon(planId) : handleApplyCoupon(planId, couponInputs[planId] || '')}
+                        className="h-10 border border-[#181818] bg-white px-3 text-[10px] font-black uppercase tracking-[0.08em] hover:bg-[#F4F35B] disabled:bg-[#F2F2EE] rounded-lg"
+                      >
+                        {validAppliedCoupon ? '✓ Remove' : 'Apply'}
                       </button>
                     </div>
                     {couponErrors[planId] && <p className="mt-2 text-[10px] font-bold text-red-700">{couponErrors[planId]}</p>}
-                    {validAppliedCoupon && <p className="mt-2 text-[10px] font-bold text-emerald-700">{validAppliedCoupon.code} applied successfully.</p>}
+                    {validAppliedCoupon && <p className="mt-2 text-[10px] font-bold text-emerald-700">✓ {validAppliedCoupon.code} applied successfully.</p>}
                   </div>
 
-                  {allProductsUnlocked && !currentPlanOrHigher && <p className="mt-3 text-center text-[10px] font-bold text-[#676767]">Your selected products are already owned; membership benefits will still be activated.</p>}
+                  {allProductsUnlocked && !currentPlanOrHigher && (
+                    <p className="mt-3 text-center text-[10px] font-bold text-[#676767]">
+                      <span className="inline-flex items-center justify-center gap-1">
+                        <span>🔍</span>
+                        <span>Your selected products are already owned; membership benefits will still be activated.</span>
+                      </span>
+                    </p>
+                  )}
                 </article>
               );
             })}
