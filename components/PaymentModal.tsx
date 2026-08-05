@@ -92,6 +92,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   billingCycle,
 }) => {
   const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>(initialCheckoutStep);
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
   const [isCompleting, setIsCompleting] = useState(false);
   const [isRazorpayLaunching, setIsRazorpayLaunching] = useState(false);
   const [coinStatus, setCoinStatus] = useState<string | null>(null);
@@ -736,38 +737,133 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     </div>
   );
 
-  const checkoutContent = showCoinGuide ? coinGuideContent : checkoutStep === 'razorpay' ? razorpayDemoPage : checkoutStep === 'loading' ? loadingContent : (
-    <>
-      <div className="payment-action-section space-y-4 border-t border-blue-100 bg-[#f8fbff] p-4 sm:space-y-6 sm:p-8">
-        <div className="rounded-[22px] border border-blue-100 bg-white p-4 sm:p-5">
-          <p className="text-xs font-black uppercase tracking-[0.25em] text-blue-600">Payment action</p>
-          <h3 className="mt-2 text-xl font-black sm:text-2xl">Understand details, pay safely, unlock instantly</h3>
-          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Every discount, EduCoin adjustment, final payable amount, and unlock rule is shown before checkout.</p>
-        </div>
-        {summaryCard}
-        {paymentNoticeCard}
-        {!paymentNotice && coinStatus && <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-black text-blue-800">{coinStatus}</div>}
+  const wizardSteps: { num: 1 | 2 | 3; label: string }[] = [
+    { num: 1, label: 'Details' },
+    { num: 2, label: 'Summary' },
+    { num: 3, label: 'Pay' },
+  ];
 
-        <div className="space-y-3">
-          <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className={`payment-primary-action eduvora-primary-action ${checkoutType === 'latest-update' ? 'latest-update-payment-action' : ''} w-full rounded-[18px] px-5 py-4 text-base font-black disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg`}>
-            <span className="block">{primaryPaymentLabel}</span>
-            <span className="mt-1 block text-xs font-bold opacity-90">{primaryPaymentHint}</span>
-          </button>
-          {isCoinCheckoutEnabled && appliedEduCoins <= 0 && (
-            <button disabled={isCompleting} onClick={handleCoinCheckout} className={`w-full rounded-2xl border px-5 py-3.5 text-base font-black shadow-sm transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg ${canPayWithCoins ? 'border-amber-200/60 bg-white/80 text-amber-700' : 'border-amber-200 bg-amber-50/90 text-amber-800'}`}>
-              <span className="block">
-                {isCompleting ? 'Checking live DB balance...' : canPayWithCoins ? 'Pay with EduCoins' : `Need ${missingCoins} more EduCoins`}
-              </span>
-              <span className="mt-1 block text-[11px] font-bold text-slate-600">
-                Required: {normalizedCoinPrice} EduCoins · Balance: {eduCoinBalance} EduCoins
-              </span>
-            </button>
+  const checkoutStepper = (
+    <div className="flex items-center gap-2 px-4 pt-5 sm:gap-3 sm:px-6">
+      {wizardSteps.map((step, index) => (
+        <div key={step.num} className={`flex items-center gap-2 sm:gap-3 ${index < wizardSteps.length - 1 ? 'flex-1' : ''}`}>
+          <div className="flex items-center gap-2 sm:gap-2.5">
+            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-xs font-black sm:h-9 sm:w-9 sm:text-sm ${step.num === wizardStep ? 'bg-blue-600 text-white shadow-[0_8px_18px_rgba(37,99,235,0.3)]' : step.num < wizardStep ? 'bg-blue-100 text-blue-600' : 'bg-slate-200 text-slate-500'}`}>
+              {step.num < wizardStep ? '✓' : step.num}
+            </span>
+            <span className={`whitespace-nowrap text-xs font-black sm:text-sm ${step.num === wizardStep ? 'text-blue-600' : step.num < wizardStep ? 'text-slate-700' : 'text-slate-400'}`}>{step.label}</span>
+          </div>
+          {index < wizardSteps.length - 1 && (
+            <div className={`h-0.5 min-w-2 flex-1 rounded-full ${step.num < wizardStep ? 'bg-blue-600' : 'bg-slate-200'}`} />
           )}
         </div>
+      ))}
+    </div>
+  );
 
-        <p className="text-center text-[11px] font-bold uppercase tracking-widest text-slate-500">Secured by Razorpay • EduCoin wallet checked before unlock</p>
+  const detailsStep = (
+    <div className="p-4 sm:p-6">
+      <div className="flex items-start gap-4">
+        <span className="relative flex h-24 w-24 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-slate-100 bg-slate-50 shadow-sm">
+          {productImage ? (
+            <img src={productImage} alt={primaryItemTitle} className="h-full w-full object-contain" />
+          ) : (
+            <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-600 to-cyan-500 px-1 text-center text-[11px] font-black uppercase leading-4 text-white">{checkoutType === 'subscription' ? 'PRO' : checkoutType === 'cart' ? 'CART' : checkoutType === 'latest-update' ? 'UPDATE' : 'PRODUCT'}</span>
+          )}
+        </span>
+        <div className="min-w-0">
+          <h3 className="text-xl font-black leading-tight text-slate-900">{primaryItemTitle}</h3>
+          <span className="mt-2 inline-flex rounded-full bg-emerald-50 px-2.5 py-0.5 text-[11px] font-black text-emerald-700">{checkoutTypeLabel}</span>
+          <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{paymentDetailSubtitle}</p>
+        </div>
       </div>
-    </>
+
+      <div className="mt-6">
+        <h4 className="text-xs font-black uppercase tracking-[0.18em] text-slate-400">What you unlock</h4>
+        <ul className="mt-3 space-y-2.5">
+          {unlockDetails.map(item => (
+            <li key={item} className="flex items-start gap-2.5 text-sm font-semibold leading-5 text-slate-700">
+              <span className="mt-0.5 shrink-0 text-emerald-500">✓</span>
+              <span>{item}</span>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <button onClick={() => setWizardStep(2)} className="mt-6 w-full rounded-xl bg-blue-600 px-5 py-3.5 text-base font-black text-white shadow-[0_12px_28px_rgba(37,99,235,0.24)] transition hover:bg-blue-700 active:scale-[0.99]">
+        Continue
+      </button>
+    </div>
+  );
+
+  const summaryStep = (
+    <div className="p-4 sm:p-6">
+      <h3 className="text-base font-black text-slate-900">Price breakdown</h3>
+      <div className="mt-4 space-y-3 rounded-2xl border border-slate-100 bg-slate-50/70 p-4 text-sm font-semibold text-slate-600">
+        <div className="flex justify-between gap-4"><span>Original</span><span className="font-bold text-slate-900">{formatCheckoutMoney(originalAmount)}</span></div>
+        {saleAmount !== originalAmount && <div className="flex justify-between gap-4"><span>Sale</span><span className="font-bold text-slate-900">{formatCheckoutMoney(saleAmount)}</span></div>}
+        <div className="flex justify-between gap-4"><span>Coupon</span><span className="font-black text-emerald-600">- {formatCheckoutMoney(couponSavings)}</span></div>
+        <div className="flex justify-between gap-4"><span>EduCoins</span><span className="font-black text-emerald-600">- {formatCheckoutMoney(coinSavings)}</span></div>
+        {appliedEduCoins > 0 && <div className="flex justify-between gap-4 text-amber-700"><span>EduCoins applied</span><span className="font-black">{appliedEduCoins} coins</span></div>}
+        {totalSavings > 0 && <div className="flex justify-between gap-4 text-emerald-700"><span>Total savings</span><span className="font-black">- {formatCheckoutMoney(totalSavings)}</span></div>}
+      </div>
+
+      <div className="mt-5 flex items-center justify-between gap-4 border-t border-dashed border-slate-200 pt-5">
+        <span className="text-lg font-black text-slate-900">Total Payable</span>
+        <span className="text-2xl font-black text-blue-600">{formatCheckoutMoney(finalPayable)}</span>
+      </div>
+
+      <div className="mt-6 grid grid-cols-2 gap-3">
+        <button onClick={() => setWizardStep(1)} className="rounded-xl border border-slate-200 bg-white px-5 py-3.5 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50">Back</button>
+        <button onClick={() => setWizardStep(3)} className="rounded-xl bg-blue-600 px-5 py-3.5 text-sm font-black text-white shadow-[0_12px_28px_rgba(37,99,235,0.24)] transition hover:bg-blue-700">Proceed</button>
+      </div>
+    </div>
+  );
+
+  const payStep = (
+    <div className="space-y-5 p-4 sm:p-6">
+      <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-500 p-5 text-center shadow-[0_14px_34px_rgba(37,99,235,0.28)]">
+        <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-100">Final price</p>
+        <p className="mt-1 text-3xl font-black text-white sm:text-4xl">{formatCheckoutMoney(finalPayable)}</p>
+        <p className="mt-2 text-xs font-bold text-blue-100">{primaryPaymentHint}</p>
+      </div>
+
+      {paymentNoticeCard}
+      {!paymentNotice && coinStatus && <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-black text-blue-800">{coinStatus}</div>}
+
+      <div className="space-y-3">
+        <button disabled={isCompleting} onClick={finalPrice <= 0 ? handleFreeCheckout : () => handlePayNow()} className={`payment-primary-action eduvora-primary-action ${checkoutType === 'latest-update' ? 'latest-update-payment-action' : ''} w-full rounded-xl bg-blue-600 px-5 py-4 text-base font-black text-white shadow-[0_12px_28px_rgba(37,99,235,0.25)] transition hover:bg-blue-700 disabled:cursor-wait disabled:opacity-70`}>
+          <span className="block">{primaryPaymentLabel}</span>
+          <span className="mt-1 block text-xs font-bold opacity-90">{primaryPaymentHint}</span>
+        </button>
+        {isCoinCheckoutEnabled && appliedEduCoins <= 0 && (
+          <button disabled={isCompleting} onClick={handleCoinCheckout} className={`w-full rounded-xl border px-5 py-3.5 text-base font-black shadow-sm transition hover:-translate-y-0.5 active:scale-95 disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-4 sm:text-lg ${canPayWithCoins ? 'border-amber-200/60 bg-white/80 text-amber-700' : 'border-amber-200 bg-amber-50/90 text-amber-800'}`}>
+            <span className="block">
+              {isCompleting ? 'Checking live DB balance...' : canPayWithCoins ? 'Pay with EduCoins' : `Need ${missingCoins} more EduCoins`}
+            </span>
+            <span className="mt-1 block text-[11px] font-bold text-slate-600">
+              Required: {normalizedCoinPrice} EduCoins · Balance: {eduCoinBalance} EduCoins
+            </span>
+          </button>
+        )}
+        <button onClick={() => setWizardStep(2)} className="w-full rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50">Back</button>
+      </div>
+
+      <button onClick={() => { const pending = readPendingCheckout(); if (pending?.orderId) void reconcilePendingCheckout(pending.orderId, 'manual'); }} disabled={isCompleting} className="w-full text-center text-sm font-black text-blue-600 underline-offset-2 transition hover:underline disabled:cursor-wait disabled:opacity-60">
+        ↻ Check payment status
+      </button>
+    </div>
+  );
+
+  const checkoutContent = showCoinGuide ? coinGuideContent : checkoutStep === 'razorpay' ? razorpayDemoPage : checkoutStep === 'loading' ? loadingContent : (
+    <div className="bg-white">
+      {checkoutStepper}
+      <div className="border-t border-slate-100">
+        {wizardStep === 1 && detailsStep}
+        {wizardStep === 2 && summaryStep}
+        {wizardStep === 3 && payStep}
+      </div>
+    </div>
   );
 
   if (presentation === 'page') {

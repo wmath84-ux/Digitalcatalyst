@@ -220,6 +220,7 @@ const SubscriptionPage: React.FC<{
                 </span>
               </span>
             )}
+          </div>
 
                   <div className="mt-7 text-center">
                     <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#676767]">{plan.audienceLabel}</p>
@@ -258,6 +259,7 @@ const SubscriptionPage: React.FC<{
                       <span>{benefit}</span>
                     </li>
                   ))}
+                  </ul>
                   </div>
 
                   <div className="mt-5 rounded-[18px] border border-blue-100 bg-blue-50/60 p-4">

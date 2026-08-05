@@ -1,7 +1,7 @@
 
 // FIX: Imported useState, useEffect, and useRef hooks from React to resolve 'Cannot find name' errors.
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ActiveCoinDiscount, ProductWithRating, Product, Coupon, WebsiteSettings, User, ProductAccessState } from '../App';
+import { ActiveCoinDiscount, ProductWithRating, Product, Coupon, WebsiteSettings, User, ProductAccessState, Review } from '../App';
 import { EconomySettings, normalizeCoinPrice, shouldShowCoinButton } from '../utils/economy';
 import { getProductCoinPrice, redeemProductWithEduCoins, watchUserCoinWallet } from '../utils/coinWallet';
 import PaymentModal, { PaymentVerificationDetails } from './PaymentModal';
