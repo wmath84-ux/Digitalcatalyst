@@ -111,6 +111,13 @@ googleProvider.setCustomParameters({
 const PRIMARY_ADMIN_EMAIL = 'wmath84@gmail.com';
 const normalizeEmail = (email?: string | null) => String(email || '').trim().toLowerCase();
 const isPrimaryAdminEmail = (email?: string | null) => normalizeEmail(email) === PRIMARY_ADMIN_EMAIL;
+const isPrimaryAdminUser = (user?: { email?: string | null } | null) => isPrimaryAdminEmail(user?.email);
+const buildPrimaryAdminSession = (firebaseUser: FirebaseUser, firebaseRole = 'admin'): AdminUser => ({
+  id: firebaseUser.uid,
+  email: firebaseUser.email || PRIMARY_ADMIN_EMAIL,
+  role: firebaseRole === 'super_admin' ? 'Developer' : 'Admin',
+  firebaseRole: firebaseRole === 'super_admin' ? 'super_admin' : 'admin',
+});
 
 
 // --- SAFETY & UTILS ---
@@ -3657,7 +3664,7 @@ const App: React.FC = () => {
           canonicalUid: firebaseUser.uid,
           generatedDisplayName,
           generatedUsername,
-          role: existing.role === 'admin' || existing.role === 'super_admin' || isPrimaryAdminEmail(firebaseUser.email || existing.email) ? 'admin' : 'user',
+          role: isPrimaryAdminEmail(firebaseUser.email || existing.email) || existing.role === 'admin' || existing.role === 'super_admin' ? 'admin' : 'user',
           status: existing.status === 'blocked' ? 'blocked' : 'active',
           blocked: existing.blocked === true,
           suspended: existing.suspended === true,
@@ -3799,7 +3806,7 @@ const App: React.FC = () => {
       setProductToBuyAfterLogin(null);
       setResumeCartCheckoutAfterLogin(false);
       const signedInEmail = normalizeEmail((welcomeUser as any)?.email || auth.currentUser?.email || currentUser?.email);
-      if (currentAdminUser || isPrimaryAdminEmail(signedInEmail)) {
+      if (isPrimaryAdminUser(currentAdminUser) || isPrimaryAdminEmail(signedInEmail)) {
           console.info('AUTH_REDIRECT_AFTER_COMMIT', { uid, target: 'admin' });
           currentViewRef.current = 'admin';
           setCurrentView('admin');
@@ -3844,13 +3851,8 @@ const App: React.FC = () => {
           rememberAndStoreUser(nextUser, firebaseUser);
           setProfileStatus('ready');
           const firebaseRole = ensuredUser?.role === 'admin' ? 'admin' : '';
-          if (firebaseRole === 'admin' || isPrimaryAdminEmail(firebaseUser.email || ensuredUser?.email)) {
-              const adminUser: AdminUser = {
-                  id: firebaseUser.uid,
-                  email: firebaseUser.email || ensuredUser?.email || '',
-                  role: 'Admin',
-                  firebaseRole: 'admin',
-              };
+          if (isPrimaryAdminEmail(firebaseUser.email || ensuredUser?.email)) {
+              const adminUser = buildPrimaryAdminSession(firebaseUser, firebaseRole);
               setCurrentAdminUser(adminUser);
               safeSetItem('currentAdminUser', adminUser);
               if (currentViewRef.current === 'auth' || currentViewRef.current === 'home') {
@@ -3927,7 +3929,7 @@ const App: React.FC = () => {
       setFirebaseAuthUser(firebaseUser);
       rememberAndStoreUser(fallbackUser, firebaseUser);
       if (isPrimaryAdminEmail(firebaseUser.email)) {
-          const adminUser: AdminUser = { id: firebaseUser.uid, email: firebaseUser.email || PRIMARY_ADMIN_EMAIL, role: 'Admin', firebaseRole: 'admin' };
+          const adminUser = buildPrimaryAdminSession(firebaseUser);
           setCurrentAdminUser(adminUser);
           safeSetItem('currentAdminUser', adminUser);
       }
@@ -4035,7 +4037,7 @@ const App: React.FC = () => {
                   console.warn('Firebase session restore failed.', error);
               });
               const savedAdmin = safeGetItem<AdminUser | null>('currentAdminUser', null);
-              if (savedAdmin && savedAdmin.id === user.uid) {
+              if (savedAdmin && savedAdmin.id === user.uid && isPrimaryAdminEmail(user.email || savedAdmin.email)) {
                   setCurrentAdminUser(savedAdmin);
               }
               return;
@@ -6033,7 +6035,7 @@ const App: React.FC = () => {
       const firebaseUser = credential.user;
       const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
       const firebaseRole = userSnap.exists() ? String(userSnap.data().role || '') : '';
-      const isFirebaseAdmin = firebaseRole === 'admin' || firebaseRole === 'super_admin' || isPrimaryAdminEmail(firebaseUser.email || email);
+      const isFirebaseAdmin = isPrimaryAdminEmail(firebaseUser.email || email);
 
       if (!isFirebaseAdmin) {
         await signOut(auth);
@@ -6042,12 +6044,7 @@ const App: React.FC = () => {
         return false;
       }
 
-      const admin: AdminUser = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email || email.trim(),
-        role: firebaseRole === 'super_admin' ? 'Developer' : 'Admin',
-        firebaseRole: firebaseRole as 'admin' | 'super_admin',
-      };
+      const admin = buildPrimaryAdminSession(firebaseUser, firebaseRole);
 
       setCurrentAdminUser(admin);
       safeSetItem('currentAdminUser', admin);
@@ -6065,7 +6062,7 @@ const App: React.FC = () => {
     try {
       const userSnap = await getDoc(doc(db, 'users', firebaseUser.uid));
       const firebaseRole = userSnap.exists() ? String(userSnap.data().role || '') : '';
-      const isFirebaseAdmin = firebaseRole === 'admin' || firebaseRole === 'super_admin' || isPrimaryAdminEmail(firebaseUser.email);
+      const isFirebaseAdmin = isPrimaryAdminEmail(firebaseUser.email);
 
       if (!isFirebaseAdmin) {
         await signOut(auth);
@@ -6074,12 +6071,7 @@ const App: React.FC = () => {
         return { success: false, message: 'This account does not have admin access. Please contact the site owner.' };
       }
 
-      const admin: AdminUser = {
-        id: firebaseUser.uid,
-        email: firebaseUser.email || '',
-        role: firebaseRole === 'super_admin' ? 'Developer' : 'Admin',
-        firebaseRole: firebaseRole as 'admin' | 'super_admin',
-      };
+      const admin = buildPrimaryAdminSession(firebaseUser, firebaseRole);
 
       setCurrentAdminUser(admin);
       safeSetItem('currentAdminUser', admin);
@@ -6576,7 +6568,7 @@ const App: React.FC = () => {
             onNavigateToPurchases={() => { setCurrentView('home'); window.setTimeout(handleNavigateToPurchases, 0); }}
             onCartClick={() => { setCurrentView('home'); window.setTimeout(openCartSidebar, 0); }}
             onProfileClick={() => { setCurrentView('home'); window.setTimeout(handleNavigateToProfile, 0); }}
-            isAdmin={!!currentAdminUser}
+            isAdmin={isPrimaryAdminUser(currentAdminUser)}
             onAdminClick={handleNavigateToAdminLogin}
             authButtonLabel={authButtonLabel}
             onSubscriptionClick={() => { setCurrentView('home'); window.setTimeout(handleNavigateToSubscription, 0); }}
@@ -6651,7 +6643,7 @@ const App: React.FC = () => {
                 onNavigateToPurchases={handleNavigateToPurchases}
                 onCartClick={openCartSidebar}
                 onProfileClick={handleNavigateToProfile}
-                isAdmin={!!currentAdminUser}
+                isAdmin={isPrimaryAdminUser(currentAdminUser)}
                 onAdminClick={handleNavigateToAdminLogin}
                 authButtonLabel={authButtonLabel}
                 onSubscriptionClick={handleNavigateToSubscription}
@@ -6673,7 +6665,7 @@ const App: React.FC = () => {
             <div className={`mobile-site-header ${currentView === 'home' ? 'hidden md:block' : currentView === 'mayDay' ? 'hidden' : ''}`}><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} notificationCount={siteNotifications.filter(notification => !notification.read).length} onOpenNotifications={() => setIsSiteNotificationCenterOpen(true)} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={`${shouldHideMainDockOnMobile ? 'max-md:hidden' : ''} ${useDesktopSidebar ? 'lg:hidden' : ''}`}>
-                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} isAdmin={!!currentAdminUser} onAdminClick={handleNavigateToAdminLogin} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenMayDay={handleNavigateToMayDay} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
+                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} isAdmin={isPrimaryAdminUser(currentAdminUser)} onAdminClick={handleNavigateToAdminLogin} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenMayDay={handleNavigateToMayDay} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>
             )}
             {currentView !== 'cart' && <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />}
