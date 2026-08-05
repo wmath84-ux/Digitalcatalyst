@@ -1,7 +1,7 @@
 
 // FIX: Imported useState, useEffect, and useRef hooks from React to resolve 'Cannot find name' errors.
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ActiveCoinDiscount, ProductWithRating, Product, Coupon, WebsiteSettings, User, ProductAccessState, Review } from '../App';
+import { ActiveCoinDiscount, ProductWithRating, Product, Coupon, WebsiteSettings, User, ProductAccessState, Review, CourseModule } from '../App';
 import { EconomySettings, normalizeCoinPrice, shouldShowCoinButton } from '../utils/economy';
 import { getProductCoinPrice, redeemProductWithEduCoins, watchUserCoinWallet } from '../utils/coinWallet';
 import PaymentModal, { PaymentVerificationDetails } from './PaymentModal';
@@ -160,6 +160,10 @@ const ShareIcon = () => (
 );
 
 
+type ProductDetailFocus = 'summary' | 'details' | 'price' | 'payment';
+
+const countCourseContentItems = (modules: CourseModule[] = []): number => modules.reduce((total, module) => total + (module.files?.length || 0) + countCourseContentItems(module.modules || []), 0);
+
 const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
     settings, economySettings, activeCoinDiscount = null, onConsumeCoinDiscount, product, onBack, onPurchase, onAddToCart, isWishlisted, onToggleWishlist, reviews,
     onAddReview, isLoggedIn, onLoginRequired, autoOpenPaymentModal, onModalOpened, coupons,
@@ -190,6 +194,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [couponInput, setCouponInput] = useState('');
   const [couponError, setCouponError] = useState<string | null>(null);
   const [priceJustUpdated, setPriceJustUpdated] = useState(false);
+  const [activeFocus, setActiveFocus] = useState<ProductDetailFocus | null>(null);
 
   // Layout toggle: false = new professional layout, true = old layout
   const [useLegacyLayout, setUseLegacyLayout] = useState(() => {
@@ -237,6 +242,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const currentPriceNum = priceDetails.currentPrice;
 
   const productPriceHistoryPoints = React.useMemo<ProductPriceHistoryPoint[]>(() => getProductPriceHistoryPoints(product as { price?: string; salePrice?: string | null | undefined; priceHistory?: Array<Record<string, unknown>> | undefined }), [product]);
+  const productModuleCount = product.courseContent?.length || 0;
+  const productContentCount = countCourseContentItems(product.courseContent || []);
+  const productImageCount = Math.max(1, detailGalleryImages.length || (product.images?.length || 0));
+  const showSummaryFocus = activeFocus === null || activeFocus === 'summary';
+  const showDetailsFocus = activeFocus === null || activeFocus === 'details';
+  const showPriceFocus = activeFocus === null || activeFocus === 'price';
+  const showPaymentFocus = activeFocus === null || activeFocus === 'payment';
 
   const preDiscountTotal = currentPriceNum;
 
@@ -604,6 +616,13 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
   const relatedProducts = allProducts.filter(p => p.category === product.category && p.id !== product.id).slice(0, 3);
 
+  const focusToggles: Array<{ key: ProductDetailFocus; label: string; icon: string; description: string }> = [
+    { key: 'summary', label: 'Summary', icon: '🖼️', description: 'Image & modules' },
+    { key: 'details', label: 'Details', icon: '📘', description: 'Description' },
+    { key: 'price', label: 'Price chart', icon: '📈', description: 'Price movement' },
+    { key: 'payment', label: 'Payment', icon: '💳', description: 'Checkout' },
+  ];
+
   return (
     <>
       <section className="product-detail-performance-scope relative overflow-hidden bg-slate-50 bg-gradient-to-br from-slate-50 via-indigo-50/30 to-cyan-50/40 py-10 text-slate-900 sm:py-20">
@@ -626,23 +645,37 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 {!isPurchased && isWishlisted && <span className="absolute right-3 top-3 rounded-full bg-red-500 px-3 py-1.5 text-xs font-black text-white shadow-lg sm:right-5 sm:top-5 sm:px-4 sm:py-2 sm:text-sm">♥ Wishlisted</span>}
               </div>
 
-              <div className="mt-4 grid grid-cols-1 gap-3 sm:mt-5 sm:grid-cols-3">
-                <div className="rounded-[22px] border border-blue-100 bg-gradient-to-br from-white via-blue-50/80 to-white p-4 shadow-[0_16px_42px_rgba(37,99,235,0.09)] ring-1 ring-white/80">
-                  <p className="flex h-10 w-10 items-center justify-center rounded-2xl bg-blue-600 text-xl text-white shadow-[0_10px_24px_rgba(37,99,235,0.24)]">⚡</p>
-                  <p className="mt-3 text-xs font-black uppercase tracking-[0.2em] text-blue-600">Instant access</p>
-                  <p className="mt-1 text-sm font-black text-slate-950">Unlock after verified payment</p>
-                </div>
-                <div className="rounded-[22px] border border-amber-100 bg-gradient-to-br from-white via-amber-50/90 to-white p-4 shadow-[0_16px_42px_rgba(245,158,11,0.09)] ring-1 ring-white/80">
-                  <p className="flex h-10 w-10 items-center justify-center rounded-2xl bg-amber-500 text-xl text-white shadow-[0_10px_24px_rgba(245,158,11,0.22)]">🪙</p>
-                  <p className="mt-3 text-xs font-black uppercase tracking-[0.2em] text-amber-700">Payment choice</p>
-                  <p className="mt-1 text-sm font-black text-slate-950">{canShowProductCoinCheckout ? `${productCoinPrice} EduCoins` : 'Razorpay secure pay'}</p>
-                </div>
-                <div className="rounded-[22px] border border-emerald-100 bg-gradient-to-br from-white via-emerald-50/90 to-white p-4 shadow-[0_16px_42px_rgba(16,185,129,0.09)] ring-1 ring-white/80">
-                  <p className="flex h-10 w-10 items-center justify-center rounded-2xl bg-emerald-600 text-xl text-white shadow-[0_10px_24px_rgba(16,185,129,0.22)]">⭐</p>
-                  <p className="mt-3 text-xs font-black uppercase tracking-[0.2em] text-emerald-700">Learner trust</p>
-                  <p className="mt-1 text-sm font-black text-slate-950">{product.rating.toFixed(1)} / 5 rating</p>
-                </div>
+              <div className="mt-4 grid grid-cols-4 gap-2 rounded-[24px] border border-white/80 bg-white/80 p-2 shadow-[0_18px_48px_rgba(37,99,235,0.10)] ring-1 ring-blue-100/60" aria-label="Product detail filters">
+                {focusToggles.map(toggle => {
+                  const isActive = activeFocus === toggle.key;
+                  return (
+                    <button key={toggle.key} type="button" onClick={() => setActiveFocus(isActive ? null : toggle.key)} className={`min-w-0 rounded-[18px] border px-2 py-3 text-center transition ${isActive ? 'border-blue-500 bg-blue-600 text-white shadow-[0_12px_28px_rgba(37,99,235,0.22)]' : 'border-blue-100 bg-blue-50/70 text-slate-700 hover:border-blue-300 hover:bg-white'}`} aria-pressed={isActive}>
+                      <span className="block text-xl" aria-hidden="true">{toggle.icon}</span>
+                      <span className="mt-1 block truncate text-[11px] font-black uppercase tracking-[0.08em]">{toggle.label}</span>
+                      <span className={`mt-0.5 hidden text-[10px] font-bold sm:block ${isActive ? 'text-white/80' : 'text-slate-500'}`}>{toggle.description}</span>
+                    </button>
+                  );
+                })}
               </div>
+
+              {showSummaryFocus && (
+                <section id="product-live-summary" className="mt-4 overflow-hidden rounded-[26px] border border-blue-100 bg-white p-4 shadow-[0_22px_56px_rgba(15,23,42,0.10)] ring-1 ring-white/90 sm:p-5" aria-label="Live product summary">
+                  <SafeImage src={mainImage || getProductImage(product, 'detailMobile')} fallbackSrc={getProductImageFallback(product)} alt={`${product.title} live summary`} wrapperClassName="block aspect-[16/10] w-full overflow-hidden rounded-[18px] border border-slate-100 bg-slate-50" className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Product'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="video" />
+                  <div className="mt-4">
+                    <p className="text-xs font-black uppercase tracking-[0.2em] text-slate-500">Live summary</p>
+                    <h2 className="mt-2 line-clamp-2 text-2xl font-black leading-tight text-slate-950">{product.title}</h2>
+                    <p className="mt-2 line-clamp-2 text-sm font-semibold leading-6 text-slate-600">{product.description || product.longDescription}</p>
+                    <div className="mt-5 grid grid-cols-3 overflow-hidden rounded-[18px] border border-slate-200 bg-white text-center">
+                      {[{ value: productImageCount, label: 'Images' }, { value: productModuleCount, label: 'Modules' }, { value: productContentCount, label: 'Content' }].map((stat, index) => (
+                        <div key={stat.label} className={`px-3 py-3 ${index > 0 ? 'border-l border-slate-200' : ''}`}>
+                          <p className="text-xl font-black text-slate-950">{stat.value}</p>
+                          <p className="mt-1 text-xs font-black text-slate-500">{stat.label}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </section>
+              )}
 
               {detailGalleryImages.length > 1 && (
                 <div className="mt-4 flex gap-2 overflow-x-auto pb-1 sm:flex-wrap sm:gap-3 sm:overflow-visible sm:pb-0" aria-label={`${product.title} image gallery`}>
@@ -654,6 +687,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 </div>
               )}
 
+              {showDetailsFocus && (
               <div className={`mt-5 ${detailPanelRoundClass} border border-white/70 bg-white/75 p-4 shadow-[0_18px_55px_rgba(15,23,42,0.07)] sm:mt-8 sm:p-8`}>
                 <div className="mb-4 flex gap-2 overflow-x-auto pb-1 sm:mb-6 sm:flex-wrap sm:overflow-visible sm:pb-0">
                   {isPurchased ? (
@@ -718,14 +752,17 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   </section>
                 )}
 
-                {productPriceHistoryPoints.length > 0 && (
-                  <div className="mt-8">
-                    <ProductPriceHistoryChart points={productPriceHistoryPoints} />
-                  </div>
-                )}
               </div>
+              )}
+
+              {showPriceFocus && productPriceHistoryPoints.length > 0 && (
+                <div className="mt-5 sm:mt-8">
+                  <ProductPriceHistoryChart points={productPriceHistoryPoints} />
+                </div>
+              )}
             </div>
 
+            {showPaymentFocus && (
             <aside className="md:col-span-5">
               <div id="price-section" className={`product-checkout-panel overflow-hidden ${detailPanelRoundClass} border border-blue-100/80 bg-gradient-to-br from-white via-blue-50/80 to-cyan-50/70 p-4 shadow-[0_30px_90px_rgba(37,99,235,0.16)] ring-1 ring-white/80 sm:p-6 md:sticky md:top-24 ${priceJustUpdated ? 'price-flash' : ''}`}>
                 <div className="pointer-events-none absolute -right-14 -top-14 h-40 w-40 rounded-full bg-indigo-300/20 blur-3xl" />
@@ -860,7 +897,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   </button>
                 </div>
 
-                <div className="mt-5 grid grid-cols-1 gap-2 text-xs font-bold text-slate-600 sm:grid-cols-3 md:grid-cols-1 lg:grid-cols-3">
+                <div className="mt-5 grid grid-cols-1 gap-2 text-xs font-bold text-slate-600">
                   <div className="rounded-[22px] border border-blue-100 bg-white/85 p-3 text-center shadow-sm"><span className="block text-lg">🔒</span><span className="block font-black text-blue-700">Razorpay</span><span className="text-[11px] text-slate-500">verified pay</span></div>
                   <div className="rounded-[22px] border border-amber-100 bg-white/85 p-3 text-center shadow-sm"><span className="block text-lg">🪙</span><span className="block font-black text-amber-700">EduCoins</span><span className="text-[11px] text-slate-500">student discount</span></div>
                   <div className="rounded-[22px] border border-emerald-100 bg-white/85 p-3 text-center shadow-sm"><span className="block text-lg">📚</span><span className="block font-black text-emerald-700">Lifetime</span><span className="text-[11px] text-slate-500">My Purchases</span></div>
@@ -868,6 +905,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                 </div>
               </div>
             </aside>
+            )}
           </div>
         </div>
       </section>
