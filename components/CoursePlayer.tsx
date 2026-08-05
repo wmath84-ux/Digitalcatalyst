@@ -15,8 +15,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { isDirectAudioUrl, isDirectVideoUrl, isGoogleDriveUrl, normalizeDriveUrl, normalizeMediaSource } from '../utils/mediaCompat';
 import MediaFallbackCard from './common/MediaFallbackCard';
-import MembershipUpgradeCard from './MembershipUpgradeCard';
-import { getUserEduCoinMultiplier, hasPremiumMembership, normalizeSubscriptionPageContent } from '../utils/subscriptionAccess';
+import { getUserEduCoinMultiplier, hasPremiumMembership } from '../utils/subscriptionAccess';
 
 declare global {
   interface Window {
@@ -1356,12 +1355,11 @@ const CoursePlayer: React.FC<{
   product: ProductWithRating;
   currentUser?: User | null;
   onBack: () => void;
-  onUpgrade: () => void;
   onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean;
   productAccess?: ProductAccessState | null;
   onPurchaseLatestUpdate?: (product: ProductWithRating, updateId?: string) => void;
   onEducoinUnlockComplete?: (product: ProductWithRating, updateIds: string[]) => void;
-}> = ({ settings, economySettings, product, currentUser = null, onBack, onUpgrade, onQuizReward, productAccess = null, onPurchaseLatestUpdate, onEducoinUnlockComplete }) => {
+}> = ({ settings, economySettings, product, currentUser = null, onBack, onQuizReward, productAccess = null, onPurchaseLatestUpdate, onEducoinUnlockComplete }) => {
   const viewport = useViewportSize();
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
@@ -1402,7 +1400,6 @@ const CoursePlayer: React.FC<{
   const currentUserId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
   const hasPremiumAccess = hasPremiumMembership(currentUser);
   const eduCoinMultiplier = getUserEduCoinMultiplier(currentUser);
-  const subscriptionPage = normalizeSubscriptionPageContent(settings.content.subscriptionPage);
   const courseContent = useMemo(() => ensureCourseIntroModule(product), [product]);
 
 
@@ -2329,22 +2326,17 @@ const CoursePlayer: React.FC<{
             {isMentorOpen && (
               <div className="absolute inset-0 z-50 flex items-stretch justify-end bg-slate-950/20 p-2 backdrop-blur-[2px] sm:p-3" aria-label="AI Mentor overlay">
                 <div className="h-full w-full max-w-full overflow-y-auto sm:max-w-[34rem] lg:max-w-[40rem]">
-                  {hasPremiumAccess ? (
-                    <AiMentor
-                      productTitle={product.title}
-                      productId={product.id}
-                      courseId={product.id}
-                      activeFileId={activeFile?.id || null}
-                      activeFileType={activeFile?.type || null}
-                      activeContentName={activeFile?.name || null}
-                      userId={currentUserId}
-                      onClose={closeCourseMentor}
-                    />
-                  ) : (
-                    <div className="flex min-h-full items-center justify-center p-2">
-                      <MembershipUpgradeCard message={subscriptionPage.aiMentorLocked} onUpgrade={onUpgrade} onBack={closeCourseMentor} compact />
-                    </div>
-                  )}
+                  {/* AI Mentor is free for all users — no premium subscription required. */}
+                  <AiMentor
+                    productTitle={product.title}
+                    productId={product.id}
+                    courseId={product.id}
+                    activeFileId={activeFile?.id || null}
+                    activeFileType={activeFile?.type || null}
+                    activeContentName={activeFile?.name || null}
+                    userId={currentUserId}
+                    onClose={closeCourseMentor}
+                  />
                 </div>
               </div>
             )}
