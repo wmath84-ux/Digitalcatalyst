@@ -6416,7 +6416,7 @@ const App: React.FC = () => {
           currentUser={appUser}
           isLoggedIn={isLoggedIn}
           isPremium={hasPremiumMembership(appUser)}
-          onBack={() => handleNavigateBack('home')}
+          onBack={handleBackToHome}
           onUpgrade={handleNavigateToSubscription}
           desktop={!isMobileViewport}
         />

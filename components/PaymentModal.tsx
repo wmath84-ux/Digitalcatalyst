@@ -225,12 +225,12 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         setCoinStatus('Payment not completed yet. No access was unlocked. You can retry or check status again.');
       }
 
-      setCheckoutStep('razorpay');
+      setCheckoutStep('checkout');
       setIsCompleting(false);
       return false;
     } catch (error) {
       setCoinStatus(error instanceof Error ? error.message : 'Payment status check failed.');
-      setCheckoutStep('razorpay');
+      setCheckoutStep('checkout');
       setIsCompleting(false);
       return false;
     } finally {
@@ -784,6 +784,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const checkoutContent = showCoinGuide ? coinGuideContent : checkoutStep === 'razorpay' ? razorpayDemoPage : checkoutStep === 'loading' ? loadingContent : (
     <div className="bg-white">
       {checkoutStepper}
+      {wizardStep !== 3 && (paymentNotice || coinStatus) && (
+        <div className="space-y-3 px-4 pt-4 sm:px-6">
+          {paymentNoticeCard}
+          {!paymentNotice && coinStatus && (
+            <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-black text-blue-800">{coinStatus}</div>
+          )}
+        </div>
+      )}
       <div className="border-t border-slate-100">
         {wizardStep === 1 && detailsStep}
         {wizardStep === 2 && summaryStep}
