@@ -571,9 +571,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         onStartEarning={onStartEarning}
         onInsufficientCoins={(details) => onInsufficientCoins?.({ ...details, productTitle: product.title })}
         initialShowCoinGuide={openCoinGuideOnMount}
-        initialCheckoutStep={openRazorpayOnMount ? 'razorpay' : 'checkout'}
+        initialCheckoutStep="checkout"
         presentation="page"
-        razorpayAlreadyOpened={openRazorpayOnMount}
         checkoutType="product"
         checkoutUserId={currentUser?.id}
         checkoutTargetId={product.id}

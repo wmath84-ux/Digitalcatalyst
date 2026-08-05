@@ -26,7 +26,7 @@ test('paid module and latest update actions use the same focused payment design'
   assert.match(course, /course-player-paid-update-action eduvora-primary-action/);
   assert.match(payment, /latest-update-payment-action/);
   assert.match(payment, /Pay \$\{formatCheckoutMoney\(finalPayable\)\} & unlock update/);
-  assert.match(payment, /Paid module update checkout/);
+  assert.match(payment, /label: 'Pay'/);
   assert.match(app, /initialCheckoutStep="checkout"/);
   assert.match(app, /checkoutType="latest-update"/);
 });

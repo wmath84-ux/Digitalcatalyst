@@ -14,6 +14,10 @@ import LiquidMetalButton from './ui/LiquidMetalButton';
 import { pillClassForProductRoundness, resolveProductRoundnessSettings } from '../utils/productRoundness';
 import { getProductPriceDetails, getProductPriceHistoryPoints } from '../utils/productPrice';
 
+// TEMPORARY PREVIEW FLAG: allows opening the payment checkout page without login.
+// Set to false to restore the login requirement.
+const ALLOW_GUEST_CHECKOUT_PREVIEW = false;
+
 type ProductPriceHistoryPoint = {
     label: string;
     price: number;
@@ -178,7 +182,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const [isRedeemingWithCoins, setIsRedeemingWithCoins] = useState(false);
   const [coinRedeemModal, setCoinRedeemModal] = useState<{ open: boolean; title: string; message: string; showProfileButton?: boolean; }>({ open: false, title: '', message: '' });
   const [openCoinGuideOnMount, setOpenCoinGuideOnMount] = useState(false);
-  const [openRazorpayOnMount, setOpenRazorpayOnMount] = useState(false);
   const [appliedCoupon, setAppliedCoupon] = useState<Coupon | null>(null);
   const gridRef = useRef<HTMLDivElement>(null);
   const [openAccordion, setOpenAccordion] = useState<number | null>(0);
@@ -405,12 +408,11 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
 
   const handleBuyClick = () => {
-    if (!isLoggedIn) {
+    if (!isLoggedIn && !ALLOW_GUEST_CHECKOUT_PREVIEW) {
       onLoginRequired();
       return;
     }
     setOpenCoinGuideOnMount(false);
-    setOpenRazorpayOnMount(true);
     window.scrollTo(0, 0);
     setModalOpen(true);
   };
@@ -526,7 +528,6 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
   const handleModalClose = () => {
     setModalOpen(false);
     setOpenCoinGuideOnMount(false);
-    setOpenRazorpayOnMount(false);
     window.setTimeout(() => window.scrollTo(0, 0), 0);
   };
 
@@ -583,9 +584,8 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
         onStartEarning={onStartEarning}
         onInsufficientCoins={(details) => onInsufficientCoins?.({ ...details, productTitle: product.title })}
         initialShowCoinGuide={openCoinGuideOnMount}
-        initialCheckoutStep={openRazorpayOnMount ? 'razorpay' : 'checkout'}
+        initialCheckoutStep="checkout"
         presentation="page"
-        razorpayAlreadyOpened={openRazorpayOnMount}
         checkoutType="product"
         checkoutUserId={currentUser?.id}
         checkoutTargetId={product.id}

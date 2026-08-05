@@ -22,18 +22,20 @@ test('product detail shows purchased stamp and latest update count badge', () =>
   assert.match(product, /new paid content item/);
 });
 
-test('payment page uses detail-first classic trust checkout for every checkout type', () => {
-  assert.match(payment, /payment-detail-trust-panel/);
-  assert.match(payment, /Payment details/);
-  assert.match(payment, /Price breakdown/);
-  assert.match(payment, /Original price/);
-  assert.match(payment, /Coupon discount/);
-  assert.match(payment, /EduCoin discount/);
-  assert.match(payment, /Final payable/);
+test('payment page uses focused detail-summary-pay checkout with a clear top heading', () => {
+  assert.match(payment, /payment-checkout-long-page/);
+  assert.match(payment, /Complete your checkout/);
+  assert.match(payment, /label: 'Details'/);
+  assert.match(payment, /label: 'Summary'/);
+  assert.match(payment, /label: 'Pay'/);
+  assert.match(payment, /Final price/);
   assert.match(payment, /What you unlock/);
   assert.match(payment, /Secure payment processing by Razorpay/);
   assert.match(payment, /Open verified Razorpay checkout/);
   assert.match(payment, /Check payment status/);
+  assert.match(payment, /Pay with EduCoins/);
+  assert.doesNotMatch(payment, /payment-detail-trust-panel/);
+  assert.doesNotMatch(payment, /Amount payable/);
   assert.doesNotMatch(payment, /Review\. Pay\. Unlock\./);
 });
 

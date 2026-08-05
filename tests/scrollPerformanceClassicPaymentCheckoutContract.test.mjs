@@ -35,17 +35,16 @@ test('shared primary actions use the same professional royal-blue payment design
   assert.match(cartSidebar, /cart-primary-action eduvora-primary-action/);
 });
 
-test('payment checkout is one long blue-white page with item, price, actions and trust footer', () => {
+test('payment checkout is one focused blue-white page with heading, detail-summary-pay steps and trust footer', () => {
   assert.match(paymentModal, /payment-checkout-long-page/);
   assert.match(paymentModal, /payment-checkout-blue-hero/);
   assert.match(paymentModal, /Eduvora secure payment/);
   assert.match(paymentModal, /Complete your checkout/);
-  assert.match(paymentModal, /Amount payable/);
-  assert.match(paymentModal, /payment-detail-trust-panel/);
   assert.match(paymentModal, /Price summary/);
-  assert.match(paymentModal, /Payment action/);
   assert.match(paymentModal, /Razorpay protected/);
   assert.match(paymentModal, /Payment recovery available/);
+  assert.doesNotMatch(paymentModal, /Amount payable/);
+  assert.doesNotMatch(paymentModal, /payment-detail-trust-panel/);
   assert.doesNotMatch(paymentModal, /bg-gradient-to-br from-slate-950 via-indigo-950 to-slate-900/);
   assert.doesNotMatch(paymentModal, /pointer-events-none absolute -left-24 top-16/);
 });

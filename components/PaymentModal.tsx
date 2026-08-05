@@ -40,7 +40,6 @@ interface PaymentModalProps {
   onInsufficientCoins?: (details: { requiredCoins: number; balance: number; missingCoins: number }) => void;
   initialShowCoinGuide?: boolean;
   presentation?: 'modal' | 'page';
-  razorpayAlreadyOpened?: boolean;
   checkoutType?: 'product' | 'cart' | 'subscription' | 'latest-update';
   checkoutUserId?: string;
   checkoutTargetId?: string | number;
@@ -85,7 +84,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   initialShowCoinGuide = false,
   initialCheckoutStep = 'checkout',
   presentation = 'modal',
-  razorpayAlreadyOpened = false,
   checkoutType = 'product',
   checkoutUserId = '',
   checkoutTargetId,
@@ -99,7 +97,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const [paymentNotice, setPaymentNotice] = useState<string | null>(null);
   const [showCoinGuide, setShowCoinGuide] = useState(initialShowCoinGuide);
   const pageRef = useRef<HTMLDivElement>(null);
-  const autoStartedRazorpayRef = useRef(false);
   const pendingStatusCheckRef = useRef(false);
   const razorpayCheckoutSource = 'https://checkout.razorpay.com/v1/checkout.js';
   const checkoutStorageKey = useMemo(
@@ -271,7 +268,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     }
   };
 
-  const handlePayNow = async (_openRazorpayWindow = true) => {
+  const handlePayNow = async () => {
     if (isCompleting || checkoutStep === 'loading') return;
     if (finalPrice <= 0) {
       await completeFreeCheckout();
@@ -417,13 +414,8 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     const pendingCheckout = readPendingCheckout();
     if (pendingCheckout?.orderId && Math.abs(Number(pendingCheckout.amount || 0) - finalPrice) < 0.01) {
       window.setTimeout(() => void reconcilePendingCheckout(pendingCheckout.orderId!, 'mount'), 250);
-      return;
     }
-
-    if (initialCheckoutStep !== 'razorpay' || autoStartedRazorpayRef.current) return;
-    autoStartedRazorpayRef.current = true;
-    window.setTimeout(() => handlePayNow(!razorpayAlreadyOpened), 0);
-  }, [checkoutStorageKey, finalPrice, initialCheckoutStep, razorpayAlreadyOpened]);
+  }, [checkoutStorageKey, finalPrice]);
 
   useEffect(() => {
     const handleReturnToApp = () => {
@@ -522,6 +514,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   );
 
   const formatCheckoutMoney = (value: number) => `₹${Math.max(0, Number(value) || 0).toFixed(2)}`;
+  const backLabel = checkoutType === 'cart'
+    ? '← Back to cart'
+    : checkoutType === 'subscription'
+      ? '← Back to plans'
+      : checkoutType === 'latest-update'
+        ? '← Back to course'
+        : '← Back to product';
   const originalAmount = Math.max(0, Number(originalPrice) || 0);
   const saleAmount = salePrice !== null && salePrice !== undefined ? Math.max(0, Number(salePrice) || 0) : originalAmount;
   const couponSavings = Math.max(0, Number(couponDiscount) || 0);
@@ -566,24 +565,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       ? 'Open verified Razorpay checkout to activate the selected membership cycle'
       : 'Open verified Razorpay checkout to unlock access instantly';
 
-  const priceBreakdownRows = (
-    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm">
-      <h4 className="text-base font-black text-slate-950">Price breakdown</h4>
-      <div className="mt-3 space-y-2 text-sm font-semibold text-slate-600">
-        <div className="flex justify-between gap-4"><span>Original price</span><span className="font-bold text-slate-900">{formatCheckoutMoney(originalAmount)}</span></div>
-        {saleAmount !== originalAmount && <div className="flex justify-between gap-4"><span>Sale price</span><span className="font-bold text-slate-900">{formatCheckoutMoney(saleAmount)}</span></div>}
-        <div className="flex justify-between gap-4"><span>Coupon discount</span><span className="font-black text-emerald-700">- {formatCheckoutMoney(couponSavings)}</span></div>
-        <div className="flex justify-between gap-4"><span>EduCoin discount</span><span className="font-black text-emerald-700">- {formatCheckoutMoney(coinSavings)}</span></div>
-        {appliedEduCoins > 0 && <div className="flex justify-between gap-4 text-amber-700"><span>EduCoins applied</span><span className="font-black">{appliedEduCoins} coins</span></div>}
-        {totalSavings > 0 && <div className="flex justify-between gap-4 text-emerald-700"><span>Total savings</span><span className="font-black">- {formatCheckoutMoney(totalSavings)}</span></div>}
-      </div>
-      <div className="mt-3 flex items-center justify-between gap-4 border-t border-dashed border-slate-200 pt-3">
-        <span className="text-lg font-black text-slate-950">Final payable</span>
-        <span className="text-2xl font-black text-slate-950">{formatCheckoutMoney(finalPayable)}</span>
-      </div>
-    </div>
-  );
-
   const summaryCard = (
     <div className="payment-item-summary space-y-4 rounded-[22px] border border-blue-100 bg-white p-4 shadow-[0_10px_28px_rgba(37,99,235,0.08)] sm:p-5">
       <div className="flex items-center justify-between gap-4">
@@ -620,65 +601,6 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     </div>
   );
 
-  const paymentDetailsAside = (
-    <aside className="payment-detail-trust-panel bg-white p-4 text-slate-900 sm:p-8 lg:p-10">
-      <div className="flex h-full min-h-0 flex-col gap-5">
-        <header className="flex items-start gap-4">
-          <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[22px] border border-blue-100 bg-blue-600 text-2xl text-white shadow-[0_14px_34px_rgba(37,99,235,0.22)]">📄</span>
-          <div>
-            <h2 className="text-2xl font-black tracking-tight text-slate-950 sm:text-3xl"><span className="sr-only">Payment details</span>{checkoutType === 'latest-update' ? 'Update purchase details' : checkoutType === 'subscription' ? 'Subscription payment details' : checkoutType === 'cart' ? 'Cart payment details' : 'Product payment details'}</h2>
-            <p className="mt-1 text-sm font-semibold text-slate-600">A simple view of the product, unlocks, final price, and payment safety.</p>
-            {checkoutType === 'latest-update' && <span className="mt-3 inline-flex rounded-full border border-blue-200 bg-blue-50 px-3 py-1 text-[10px] font-black uppercase tracking-[0.16em] text-blue-700">Paid module update checkout</span>}
-          </div>
-        </header>
-
-        <section className="rounded-[22px] border border-blue-100 bg-white/90 p-4 shadow-[0_14px_42px_rgba(37,99,235,0.08)]">
-          <div className="flex gap-4">
-            <span className="relative flex h-20 w-24 shrink-0 items-center justify-center overflow-hidden rounded-[22px] border border-blue-100 bg-blue-50 shadow-sm sm:h-24 sm:w-28">
-              {productImage ? (
-                <img src={productImage} alt={primaryItemTitle} className="h-full w-full object-contain" />
-              ) : (
-                <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-600 to-cyan-500 text-center text-xs font-black uppercase leading-4 text-white">{checkoutType === 'subscription' ? 'PRO' : checkoutType === 'cart' ? 'CART' : checkoutType === 'latest-update' ? 'UPDATE' : 'PRODUCT'}</span>
-              )}
-            </span>
-            <div className="min-w-0">
-              <h3 className="text-lg font-black leading-tight text-slate-950">{primaryItemTitle}</h3>
-              <span className="mt-2 inline-flex rounded-full bg-emerald-50 px-3 py-1 text-xs font-black text-emerald-700">{checkoutTypeLabel}</span>
-              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">{paymentDetailSubtitle}</p>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-[22px] border border-emerald-100 bg-white/90 p-4 shadow-[0_14px_42px_rgba(16,185,129,0.08)]">
-          <div className="flex gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-emerald-600 text-xl text-white shadow-[0_10px_28px_rgba(16,185,129,0.22)]">🎁</span>
-            <div className="min-w-0">
-              <h3 className="text-lg font-black text-slate-950">What you unlock</h3>
-              <ul className="mt-3 space-y-2 text-sm font-semibold text-slate-700">
-                {unlockDetails.map(item => <li key={item} className="flex gap-2"><span className="text-emerald-600">✓</span><span>{item}</span></li>)}
-              </ul>
-            </div>
-          </div>
-        </section>
-
-        <section className="rounded-[22px] border border-amber-100 bg-white/90 p-4 shadow-[0_14px_42px_rgba(245,158,11,0.08)]">
-          <div className="flex gap-4">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-xl text-white shadow-[0_10px_28px_rgba(245,158,11,0.20)]">🛡️</span>
-            <div>
-              <h3 className="text-lg font-black text-slate-950">Access information</h3>
-              <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Access unlocks only after server-side payment verification. If the payment window closes, use “Check payment status” to recover a completed payment safely.</p>
-            </div>
-          </div>
-        </section>
-
-        {priceBreakdownRows}
-
-        <div className="rounded-[22px] border border-blue-100 bg-white/90 px-4 py-3 text-sm font-bold text-blue-700 shadow-sm">🔒 Access unlocks only after verified payment. If payment is interrupted, status recovery is available.</div>
-      </div>
-    </aside>
-  );
-
-
   const paymentNoticeCard = paymentNotice ? (
     <div className="payment-not-completed-notice rounded-[18px] border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-900 shadow-sm" role="status">
       <span className="block">{paymentNotice}</span>
@@ -706,7 +628,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       {summaryCard}
       {paymentNoticeCard}
       <div className="grid gap-3">
-        <button disabled={isCompleting} onClick={() => handlePayNow(false)} className={`payment-primary-action eduvora-primary-action ${checkoutType === 'latest-update' ? 'latest-update-payment-action' : ''} rounded-[18px] px-5 py-4 text-base font-black disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-5 sm:text-lg`}>
+        <button disabled={isCompleting} onClick={() => handlePayNow()} className={`payment-primary-action eduvora-primary-action ${checkoutType === 'latest-update' ? 'latest-update-payment-action' : ''} rounded-[18px] px-5 py-4 text-base font-black disabled:cursor-wait disabled:opacity-70 sm:px-6 sm:py-5 sm:text-lg`}>
           <span className="block">{primaryPaymentLabel}</span>
           <span className="mt-1 block text-xs font-bold opacity-90">{primaryPaymentHint}</span>
         </button>
@@ -821,11 +743,13 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   );
 
   const payStep = (
-    <div className="space-y-5 p-4 sm:p-6">
-      <div className="rounded-2xl bg-gradient-to-br from-blue-600 to-blue-500 p-5 text-center shadow-[0_14px_34px_rgba(37,99,235,0.28)]">
-        <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-100">Final price</p>
-        <p className="mt-1 text-3xl font-black text-white sm:text-4xl">{formatCheckoutMoney(finalPayable)}</p>
-        <p className="mt-2 text-xs font-bold text-blue-100">{primaryPaymentHint}</p>
+    <div className="space-y-4 p-4 sm:p-6">
+      <div className="flex items-center justify-between gap-4 rounded-2xl border border-blue-100 bg-gradient-to-br from-blue-50 via-white to-cyan-50 p-4 shadow-sm sm:p-5">
+        <div>
+          <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-600">Final price</p>
+          <p className="mt-1 text-3xl font-black text-slate-950 sm:text-4xl">{formatCheckoutMoney(finalPayable)}</p>
+        </div>
+        <span className="inline-flex shrink-0 items-center gap-1.5 rounded-full bg-emerald-50 px-3 py-1.5 text-[11px] font-black uppercase tracking-[0.14em] text-emerald-700">🛡️ Razorpay secure</span>
       </div>
 
       {paymentNoticeCard}
@@ -846,12 +770,14 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
             </span>
           </button>
         )}
-        <button onClick={() => setWizardStep(2)} className="w-full rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50">Back</button>
       </div>
 
-      <button onClick={() => { const pending = readPendingCheckout(); if (pending?.orderId) void reconcilePendingCheckout(pending.orderId, 'manual'); }} disabled={isCompleting} className="w-full text-center text-sm font-black text-blue-600 underline-offset-2 transition hover:underline disabled:cursor-wait disabled:opacity-60">
-        ↻ Check payment status
-      </button>
+      <div className="flex items-center justify-between gap-3 border-t border-dashed border-slate-200 pt-4">
+        <button onClick={() => setWizardStep(2)} className="rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-600 shadow-sm transition hover:bg-slate-50">← Back to Summary</button>
+        <button onClick={() => { const pending = readPendingCheckout(); if (pending?.orderId) void reconcilePendingCheckout(pending.orderId, 'manual'); }} disabled={isCompleting} className="text-sm font-black text-blue-600 underline-offset-2 transition hover:underline disabled:cursor-wait disabled:opacity-60">
+          ↻ Check payment status
+        </button>
+      </div>
     </div>
   );
 
@@ -871,26 +797,20 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       <div ref={pageRef} className="payment-checkout-page fixed inset-0 z-[9999] overflow-y-auto bg-[#eaf1fb] px-3 pb-10 pt-4 text-slate-900 sm:px-6 sm:pb-16 sm:pt-6 lg:px-8">
         <div className="mx-auto w-full max-w-3xl">
           <button onClick={onClose} className="mb-4 inline-flex items-center gap-2 rounded-[16px] border border-blue-200 bg-white px-4 py-2.5 text-xs font-black text-blue-800 shadow-sm transition hover:border-blue-300 sm:px-5 sm:py-3 sm:text-sm">
-            ← Back to product
+            {backLabel}
           </button>
 
           <main className="payment-checkout-long-page overflow-hidden rounded-[22px] border border-blue-100 bg-white shadow-[0_22px_64px_rgba(20,70,150,0.16)]">
-            <header className="payment-checkout-blue-hero bg-gradient-to-br from-[#0b4bd8] via-[#1769ff] to-[#4f7cff] px-5 py-7 text-white sm:px-8 sm:py-10">
-              <div className="flex items-start justify-between gap-5">
+            <header className="payment-checkout-blue-hero bg-gradient-to-br from-[#0b4bd8] via-[#1769ff] to-[#4f7cff] px-5 py-7 text-white sm:px-8 sm:py-8">
+              <div className="flex items-center justify-between gap-5">
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.28em] text-blue-100">Eduvora secure payment</p>
                   <h1 className="mt-3 text-3xl font-black tracking-tight sm:text-4xl">Complete your checkout</h1>
-                  <p className="mt-3 max-w-xl text-sm font-semibold leading-6 text-blue-50 sm:text-base">Review the product, item summary, savings, and access rules on one clear page before paying.</p>
                 </div>
                 <span className="flex h-14 w-14 shrink-0 items-center justify-center rounded-[18px] border border-white/30 bg-white/15 text-2xl" aria-hidden="true">▣</span>
               </div>
-              <div className="mt-7 flex items-end justify-between gap-4 border-t border-white/20 pt-5">
-                <span className="text-sm font-bold text-blue-100">Amount payable</span>
-                <span className="text-3xl font-black">{formatCheckoutMoney(finalPayable)}</span>
-              </div>
             </header>
 
-            {paymentDetailsAside}
             <section className="bg-white">{checkoutContent}</section>
 
             <footer className="border-t border-blue-100 bg-[#f8fbff] px-5 py-6 text-center sm:px-8">

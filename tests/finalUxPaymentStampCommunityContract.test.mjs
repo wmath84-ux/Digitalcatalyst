@@ -33,8 +33,7 @@ test('checkout has real product image and context-specific product/update detail
   assert.match(payment,/itemDescription\?: string/);
   assert.match(payment,/unlockDetails\?: string\[\]/);
   assert.match(payment,/<img src=\{productImage\}/);
-  assert.match(payment,/Update purchase details/);
-  assert.match(payment,/Product payment details/);
+  assert.match(payment,/Pay \$\{formatCheckoutMoney\(finalPayable\)\} & unlock update/);
   assert.match(product,/productImage=\{mainImage \|\| getProductImage/);
   assert.match(app,/productImage=\{getProductImage\(latestUpdateCheckout\.product/);
   assert.match(app,/This payment unlocks only/);

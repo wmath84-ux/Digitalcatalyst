@@ -1564,6 +1564,10 @@ const readPersistedReadingRoute = (): PersistedReadingRoute | null => {
 };
 
 const App: React.FC = () => {
+  // TEMPORARY PREVIEW FLAG: allows opening the payment checkout page without login.
+  // Set to false to restore the login requirement.
+  const ALLOW_GUEST_CHECKOUT_PREVIEW = false;
+
   // Initialize products with default data immediately to prevent "white screen" or empty state
   const [products, setProducts] = useState<Product[]>([]);
   const [notificationContentReady, setNotificationContentReady] = useState({ products: false, settings: false });
@@ -3359,7 +3363,7 @@ const App: React.FC = () => {
 
   const handleInitiateCheckout = () => {
     if (cart.length === 0) return;
-    if (!hasFirebaseUser) {
+    if (!hasFirebaseUser && !ALLOW_GUEST_CHECKOUT_PREVIEW) {
       setResumeCartCheckoutAfterLogin(true);
       setIsCartOpen(false);
       setIsCartPaymentModalOpen(false);
@@ -4872,7 +4876,7 @@ const App: React.FC = () => {
       window.scrollTo(0, 0);
       return;
     }
-    if (!hasFirebaseUser) {
+    if (!hasFirebaseUser && !ALLOW_GUEST_CHECKOUT_PREVIEW) {
       handleLoginRequired(product);
       return;
     }
@@ -5252,7 +5256,7 @@ const App: React.FC = () => {
   };
 
   const handleOpenLatestUpdateCheckout = (product: ProductWithRating, updateId?: string) => {
-    if (!hasFirebaseUser) {
+    if (!hasFirebaseUser && !ALLOW_GUEST_CHECKOUT_PREVIEW) {
       handleLoginRequired(product);
       return;
     }
@@ -6669,7 +6673,7 @@ const App: React.FC = () => {
               </div>
             )}
             {currentView !== 'cart' && <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />}
-            {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={(payment) => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins, payment)} currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser} coinPrice={hasPremiumMembership(effectiveAppUser) && cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={hasPremiumMembership(effectiveAppUser) ? handleConfirmCartCoinPurchase : undefined} onInsufficientCoins={handleInsufficientEduCoins} checkoutType="cart" checkoutUserId={effectiveAppUser?.id} checkoutTargetId="cart" />}
+            {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={(payment) => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins, payment)} currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser} coinPrice={hasPremiumMembership(effectiveAppUser) && cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={hasPremiumMembership(effectiveAppUser) ? handleConfirmCartCoinPurchase : undefined} onInsufficientCoins={handleInsufficientEduCoins} presentation="page" initialCheckoutStep="checkout" checkoutType="cart" checkoutUserId={effectiveAppUser?.id} checkoutTargetId="cart" />}
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />
             <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={isReadingDrawerOpen} view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={readingListType} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={closeReadingDrawer} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />
@@ -6803,6 +6807,7 @@ const App: React.FC = () => {
               checkoutTargetId={subscriptionCheckoutRequest.plan.id}
               billingCycle={subscriptionCheckoutRequest.billingCycle}
               presentation="page"
+              initialCheckoutStep="checkout"
             />
           );
         })()}
