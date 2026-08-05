@@ -1134,6 +1134,74 @@
           padding: 0.5rem 0.65rem !important;
           font-size: 0.78rem !important;
         }
+
+        /* MayDay mobile readability pass: larger text, whiter canvas, stronger contrast. */
+        .mayday-mobile-scope {
+          background-color: #F8F9FB !important;
+        }
+
+        .mayday-mobile-scope :is([class*="text-[8px]"]) {
+          font-size: 0.625rem !important;
+          line-height: 0.875rem !important;
+        }
+
+        .mayday-mobile-scope :is([class*="text-[9px]"]) {
+          font-size: 0.75rem !important;
+          line-height: 1rem !important;
+        }
+
+        .mayday-mobile-scope :is([class*="text-[10px]"]) {
+          font-size: 0.8125rem !important;
+          line-height: 1.125rem !important;
+        }
+
+        .mayday-mobile-scope :is([class*="text-[11px]"]) {
+          font-size: 0.8125rem !important;
+          line-height: 1.125rem !important;
+        }
+
+        .mayday-mobile-scope :is([class*="text-xs"], [class*="text-[12px]"]) {
+          font-size: 0.875rem !important;
+          line-height: 1.25rem !important;
+        }
+
+        .mayday-mobile-scope :is([class*="text-[13px]"]) {
+          font-size: 0.875rem !important;
+          line-height: 1.25rem !important;
+        }
+
+        .mayday-mobile-scope :is([class*="text-sm"], [class*="text-[14px]"]) {
+          font-size: 0.9375rem !important;
+          line-height: 1.375rem !important;
+        }
+
+        .mayday-mobile-scope :is([class*="text-[15px]"]) {
+          font-size: 1rem !important;
+          line-height: 1.5rem !important;
+        }
+
+        .mayday-mobile-scope :is([class*="text-[17px]"]) {
+          font-size: 1.125rem !important;
+          line-height: 1.55rem !important;
+        }
+
+        .mayday-mobile-scope :is(input, select, textarea) {
+          font-size: 1rem !important;
+        }
+
+        .mayday-mobile-scope :is(
+          [class*="text-[#7A8499]"], [class*="text-[#8A94A8]"],
+          [class*="text-[#98A2B3]"], [class*="text-[#A3ACBB]"],
+          [class*="text-[#C3CAD7]"], [class*="text-[#596579]"],
+          [class*="text-[#667085]"]
+        ) {
+          color: #475467 !important;
+        }
+
+        .mayday-mobile-scope button {
+          -webkit-tap-highlight-color: transparent;
+          touch-action: manipulation;
+        }
       }
 
     </style>

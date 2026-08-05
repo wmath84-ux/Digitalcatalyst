@@ -993,7 +993,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
           <div className="mt-3 grid grid-cols-3 gap-3">{[15, 30, 45].map(minutesOption => <button key={minutesOption} type="button" onClick={() => selectFocusMinutes(minutesOption)} className={`rounded-[18px] border px-3 py-4 text-center ${focusMinutes === minutesOption ? 'border-[#315CEB] bg-gradient-to-b from-[#4169F6] to-[#315CEB] text-white' : 'border-black bg-white text-[#344054]'}`}><span className="block text-lg font-black">{minutesOption}</span><span className="text-[9px] font-bold">min</span></button>)}</div>
         </section>
         <section className="relative mt-4 overflow-hidden rounded-[24px] border border-black bg-white p-5">
-          <div className="absolute -bottom-10 -left-8 h-32 w-32 rounded-full bg-[#F2F2F2]" /><div className="absolute -right-8 top-10 h-28 w-28 rounded-full bg-[#F2F2F2]" />
+          <div className="absolute -bottom-10 -left-8 h-32 w-32 rounded-full bg-[#F0F2F5]" /><div className="absolute -right-8 top-10 h-28 w-28 rounded-full bg-[#F0F2F5]" />
           <div className="relative flex items-center justify-between text-xs font-black text-[#101828]"><span>Deep Focus</span><span>{focusMinutes}:00</span></div>
           <p className="relative mt-8 text-center text-5xl font-black tracking-tight text-[#101828]">{pad(minutes)}:{pad(seconds)}</p>
           <p className="relative mt-3 text-center text-xs font-semibold text-[#667085]">Stay focused. Great things take time.</p>
@@ -1162,7 +1162,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   };
 
   const renderDesktopDashboard = () => (
-    <div className="min-h-full bg-[#F2F2F2]">
+    <div className="min-h-full bg-[#F8F9FB]">
       {desktopHeader('Dashboard', 'Plan today, focus deeply and see meaningful progress at a glance.')}
       <div className="grid gap-4 p-5 2xl:grid-cols-[minmax(0,1fr)_300px]">
         <div className="min-w-0 space-y-4">
@@ -1249,7 +1249,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   );
 
   const renderDesktopNotes = () => (
-    <div className="min-h-full bg-[#F2F2F2]">
+    <div className="min-h-full bg-[#F8F9FB]">
       {desktopHeader('Notes & Planning', 'Capture ideas, organize today and move directly into a focus block.')}
       <div className="grid gap-4 p-5 2xl:grid-cols-[minmax(0,1fr)_360px]">
         <div className="min-w-0 space-y-4">
@@ -1302,7 +1302,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   );
 
   const renderDesktopGoalsReminders = () => (
-    <div className="min-h-full bg-[#F2F2F2]">
+    <div className="min-h-full bg-[#F8F9FB]">
       {desktopHeader('Goals & Reminders', 'Track meaningful deadlines and create reminders that work across desktop and mobile.')}
       <div className="grid gap-4 p-5 xl:grid-cols-2">
         <section className="rounded-[20px] border border-black bg-white p-4">
@@ -1336,7 +1336,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   );
 
   const renderDesktopFocus = () => (
-    <div className="min-h-full bg-[#F2F2F2]">
+    <div className="min-h-full bg-[#F8F9FB]">
       {desktopHeader('Focus Session', 'Run a distraction-free timer; completed minutes feed your real May Day analytics.')}
       <div className="mx-auto grid max-w-6xl gap-4 p-5 xl:grid-cols-[minmax(0,1fr)_320px]">
         <section className="overflow-hidden rounded-[24px] border border-black bg-white">
@@ -1359,7 +1359,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   );
 
   const renderDesktopInsights = () => (
-    <div className="min-h-full bg-[#F2F2F2]">
+    <div className="min-h-full bg-[#F8F9FB]">
       {desktopHeader('Streaks & Insights', 'Every chart below is calculated from your saved May Day tasks and focus sessions.')}
       <div className="space-y-4 p-5">
         <div className="grid gap-4 xl:grid-cols-[0.9fr_1.2fr_0.9fr]">
@@ -1383,7 +1383,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
 
   if (desktop) {
     return (
-      <div data-feature="MAY_DAY_DESKTOP_V1" className="min-h-[calc(100vh-5rem)] bg-[#F2F2F2] text-[#101828]">
+      <div data-feature="MAY_DAY_DESKTOP_V1" className="min-h-[calc(100vh-5rem)] bg-[#F8F9FB] text-[#101828]">
         {activeTab === 'dashboard' ? renderDesktopDashboard() : null}
         {activeTab === 'notes' || activeTab === 'home' ? renderDesktopNotes() : null}
         {activeTab === 'goals' || activeTab === 'reminders' ? renderDesktopGoalsReminders() : null}
@@ -1403,7 +1403,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   ];
 
   return (
-    <div data-feature={MAY_DAY_MARKER} className="min-h-[100dvh] bg-[#F2F2F2] pb-[calc(env(safe-area-inset-bottom)+6.6rem)] text-[#101828]">
+    <div data-feature={MAY_DAY_MARKER} className="mayday-mobile-scope min-h-[100dvh] bg-[#F8F9FB] pb-[calc(env(safe-area-inset-bottom)+6.6rem)] text-[#101828]">
       {renderHeader()}
       {activeTab === 'home' ? renderHome() : null}
       {activeTab === 'goals' ? renderGoals() : null}
