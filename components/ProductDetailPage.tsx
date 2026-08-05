@@ -639,13 +639,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
           <div ref={gridRef} className={`grid grid-cols-1 gap-5 sm:gap-8 md:grid-cols-12 ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
             <div className="md:col-span-7">
-              <div className={`relative w-full overflow-hidden ${detailPanelRoundClass} border border-white/70 bg-white/80 shadow-[0_24px_70px_rgba(15,23,42,0.10)]`}>
-                <SafeImage src={mainImage || getProductImage(product, 'detailMobile')} fallbackSrc={getProductImageFallback(product)} alt={product.title} wrapperClassName="block aspect-[4/3] w-full lg:hidden" className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Product'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="video" />
-                <SafeImage src={mainImage || getProductImage(product, 'detailDesktop')} fallbackSrc={getProductImageFallback(product)} alt={product.title} wrapperClassName="hidden aspect-video w-full lg:block" className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Product'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect="video" />
-                {!isPurchased && isWishlisted && <span className="absolute right-3 top-3 rounded-full bg-red-500 px-3 py-1.5 text-xs font-black text-white shadow-lg sm:right-5 sm:top-5 sm:px-4 sm:py-2 sm:text-sm">♥ Wishlisted</span>}
-              </div>
-
-              <div className="mt-4 grid grid-cols-4 gap-2 rounded-[24px] border border-white/80 bg-white/80 p-2 shadow-[0_18px_48px_rgba(37,99,235,0.10)] ring-1 ring-blue-100/60" aria-label="Product detail filters">
+              <div className="sticky top-[calc(env(safe-area-inset-top)+4.25rem)] z-30 mt-0 grid grid-cols-4 gap-2 rounded-[24px] border border-white/80 bg-white/95 p-2 shadow-[0_18px_48px_rgba(37,99,235,0.14)] ring-1 ring-blue-100/70 backdrop-blur-2xl" aria-label="Product detail filters">
                 {focusToggles.map(toggle => {
                   const isActive = activeFocus === toggle.key;
                   return (

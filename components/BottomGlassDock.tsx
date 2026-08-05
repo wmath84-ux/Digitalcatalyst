@@ -165,7 +165,8 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
   const blur = clampNumber(dockStyle.blur, 0, 36, defaultDockStyle.blur);
   const showLabels = dockStyle.showLabels !== false;
   const showBadges = dockStyle.showBadges !== false;
-  const autoHideOnScroll = dockStyle.autoHideOnScroll === true;
+  // Keep the navigation dock pinned like a header; admin/user actions must remain visible while scrolling.
+  const autoHideOnScroll = false;
   const showOnDesktop = settings.desktop.navigationMode === 'dock';
   const shadowStrength = dockStyle.shadowStrength === 'none' || dockStyle.shadowStrength === 'strong' ? dockStyle.shadowStrength : 'soft';
   const [isAutoHidden, setIsAutoHidden] = useState(false);
