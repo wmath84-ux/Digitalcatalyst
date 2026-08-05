@@ -346,7 +346,7 @@ const ModuleItem: React.FC<{
         }}
         className={`module-item-button group flex w-full items-center gap-3 rounded-2xl px-3 py-3 text-left transition sm:py-4 ${
           moduleUnlocked
-            ? 'border border-transparent bg-white/65 text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.04)] hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]'
+            ? 'border border-transparent bg-white/85 text-[#071735] shadow-[0_8px_24px_rgba(8,26,69,0.05)] hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]'
             : 'paid-module-unlock-action border border-blue-300 bg-gradient-to-r from-blue-600 via-[#1769ff] to-cyan-500 text-white shadow-[0_16px_38px_rgba(23,105,255,0.24)] hover:-translate-y-0.5 hover:shadow-[0_20px_46px_rgba(23,105,255,0.30)]'
         }`}
         aria-expanded={isExpanded}
@@ -359,7 +359,7 @@ const ModuleItem: React.FC<{
           <ModuleIcon className="h-5 w-5" />
         </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate text-[15px] font-black leading-tight">{module.title}</span>
+          <span className="block truncate text-base font-black leading-tight">{module.title}</span>
           <span className="mt-1 block text-xs font-bold text-[#667085]">
             {visibleFiles.length} lessons • {visibleModules.length} sections
           </span>
@@ -388,11 +388,11 @@ const ModuleItem: React.FC<{
                   type="button"
                   aria-disabled={!fileUnlocked}
                   onClick={() => fileUnlocked ? onSelectFile(file) : onPurchaseLatestUpdate?.(filePurchaseUpdateId)}
-                  className={`module-item-button flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left text-sm transition sm:py-3 ${
+                  className={`module-item-button flex w-full items-center gap-3 rounded-2xl border px-3 py-2.5 text-left text-[15px] transition sm:py-3 ${
                     isActive
                       ? "border-[#C9C2FF] bg-white font-black text-[#5B4BFF] shadow-[0_14px_34px_rgba(91,75,255,0.16)]"
                       : fileUnlocked
-                        ? "border-transparent bg-white/45 font-semibold text-[#344054] hover:border-[#E3E8F5] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]"
+                        ? "border-transparent bg-white/70 font-semibold text-[#344054] hover:border-[#E3E8F5] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]"
                         : "paid-lesson-unlock-action cursor-pointer border-blue-300 bg-blue-50 font-black text-blue-800 hover:-translate-y-0.5 hover:bg-blue-100"
                   }`}
                 >
@@ -924,7 +924,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
 
   return (
     <div className="relative flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-white text-slate-900">
-      <div className="open-docs-toolbar flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-b border-[#D9E7F8] bg-white p-2 shadow-sm sm:gap-2 sm:p-3 custom-scrollbar">
+      <div className="open-docs-toolbar order-2 flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-t border-[#D9E7F8] bg-white p-2 shadow-sm sm:gap-2 sm:p-3 lg:order-1 lg:border-b lg:border-t-0 custom-scrollbar">
         <button type="button" onClick={() => setIsSidebarOpen(value => !value)} className={`min-h-11 shrink-0 rounded-2xl border px-4 py-2 text-xs font-black uppercase tracking-widest shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/45 ${isSidebarOpen ? 'border-[#7B61FF] bg-gradient-to-r from-[#5B4BFF] to-[#7B61FF] text-white' : 'border-[#D9E7F8] bg-white/90 text-[#5B4BFF] hover:bg-[#F7F5FF]'}`} aria-label={isSidebarOpen ? 'Close Open Docs panel' : 'Open Open Docs panel'} aria-expanded={isSidebarOpen} aria-controls="open-docs-panel">Open Docs</button>
         <button type="button" onClick={() => { saveCurrentPage(); setIsReadingMode(true); }} className="min-h-11 shrink-0 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-2 text-xs font-black uppercase tracking-widest text-[#536178] shadow-sm transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF] hover:shadow-md">Reading Mode</button>
         {(smartDocToolbarCommands || []).map(([cmd, label]) => (<button key={cmd} type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand(cmd)} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 shadow-sm transition active:scale-95 hover:bg-white/90 hover:shadow-sm">{label}</button>))}
@@ -937,7 +937,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
         <span className="ml-auto shrink-0 rounded-full bg-white/60 px-3 py-1 text-xs font-bold text-slate-600/90">{savedAt}</span>
       </div>
 
-      <div className="relative min-h-0 flex-1 overflow-hidden">
+      <div className="relative order-1 min-h-0 flex-1 overflow-hidden lg:order-2">
         {isSidebarOpen && isCompactDocs && (<button type="button" aria-label="Close Open Docs panel" onClick={() => setIsSidebarOpen(false)} className="absolute inset-0 z-10 bg-[#081A45]/35 backdrop-blur-[2px]" />)}
         {isSidebarOpen && (
           <div
@@ -991,7 +991,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
 
       {isReadingMode && (
         <div className="absolute inset-2 z-20 flex min-h-0 flex-col overflow-hidden rounded-[1.5rem] border border-white/50 bg-white/70 shadow-[0_8px_30px_rgb(0,0,0,0.04)] backdrop-blur-2xl sm:inset-4 sm:rounded-[2rem]">
-          <div className="open-docs-toolbar flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-b border-white/50 bg-white/70 p-2 sm:gap-2 sm:p-3 custom-scrollbar">
+          <div className="open-docs-toolbar order-2 flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-t border-white/50 bg-white/70 p-2 sm:gap-2 sm:p-3 lg:order-1 lg:border-b lg:border-t-0 custom-scrollbar">
             <div className="flex shrink-0 items-center gap-2">
               <button type="button" onClick={() => setIsReadingMode(false)} aria-label="Close reading mode" className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black hover:bg-white/90 hover:shadow-sm">Close</button>
               <span className="shrink-0 text-sm font-black text-slate-900 sm:text-base">Reading Mode</span>
@@ -1005,7 +1005,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
               {(readingThemeOptions || []).map(option => (<button key={option} type="button" onClick={() => setTheme(option)} className={`min-h-9 shrink-0 rounded-xl px-3 py-2 text-sm font-black capitalize ${theme === option ? 'bg-cyan-200 text-slate-900' : 'bg-white/75 hover:bg-white/90 hover:shadow-sm'}`}>{option}</button>))}
             </div>
           </div>
-          <div className={`min-h-0 flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar ${readingThemeClass}`}>
+          <div className={`order-1 min-h-0 flex-1 overflow-y-auto p-4 md:p-8 custom-scrollbar lg:order-2 ${readingThemeClass}`}>
             <style>{`.reader-content, .reader-content * { line-height: ${lineSpacing} !important; } .reader-content p, .reader-content li, .reader-content div, .reader-content span, .reader-content blockquote { font-size: ${fontSize}px !important; } .reader-content h1 { font-size: ${Math.round(fontSize * 2)}px !important; } .reader-content h2 { font-size: ${Math.round(fontSize * 1.65)}px !important; } .reader-content h3 { font-size: ${Math.round(fontSize * 1.35)}px !important; }`}</style>
             <article className={`reader-content mx-auto max-w-3xl ${fontStyle === 'serif' ? 'font-serif' : 'font-sans'} [&_h1]:mb-5 [&_h1]:font-black [&_h2]:mb-4 [&_h2]:font-black [&_p]:mb-4 [&_ul]:mb-4 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:mb-4 [&_ol]:list-decimal [&_ol]:pl-6`} dangerouslySetInnerHTML={{ __html: editorRef.current?.innerHTML || activeContent }} />
           </div>
@@ -1363,7 +1363,7 @@ const CoursePlayer: React.FC<{
   const viewport = useViewportSize();
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(() => getViewportMetrics().width < 900);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   useEffect(() => {
     if (viewport.isCompactWidth) setIsSidebarOpen(true);
   }, [viewport.isCompactWidth]);
@@ -1401,6 +1401,29 @@ const CoursePlayer: React.FC<{
   const hasPremiumAccess = hasPremiumMembership(currentUser);
   const eduCoinMultiplier = getUserEduCoinMultiplier(currentUser);
   const courseContent = useMemo(() => ensureCourseIntroModule(product), [product]);
+
+  const orderedCourseFiles = useMemo(() => {
+    const result: ProductFile[] = [];
+    const walk = (modules?: CourseModule[]) => {
+      for (const module of modules || []) {
+        if (!hasCoursePlayerItemAccess(product.id, module, productAccess)) continue;
+        for (const file of module.files || []) {
+          if (hasCoursePlayerItemAccess(product.id, file, productAccess)) result.push(file);
+        }
+        walk(module.modules || []);
+      }
+    };
+    walk(courseContent);
+    return result;
+  }, [courseContent, product.id, productAccess]);
+
+  const activeFileIndex = Math.max(0, orderedCourseFiles.findIndex(file => file.id === activeFile?.id));
+
+  const navigateAdjacentLesson = (direction: -1 | 1) => {
+    const currentIndex = orderedCourseFiles.findIndex(file => file.id === activeFile?.id);
+    const target = orderedCourseFiles[currentIndex + direction];
+    if (target) onSelectFile(target);
+  };
 
 
   const stopYoutubeTickTimer = useCallback(() => {
@@ -2212,22 +2235,40 @@ const CoursePlayer: React.FC<{
       case 'ebook': return <SmartDocsWorkspace file={activeFile} productId={product.id} />;
       case 'link': return isHostedDocsFile(activeFile) ? <HostedDocumentViewer file={activeFile} /> : <ExternalResourceCard file={activeFile} />;
       case 'quiz': return <QuizPlayer file={activeFile} economySettings={economySettings} canEarnEduCoins={hasPremiumAccess} eduCoinMultiplier={eduCoinMultiplier} onQuizReward={onQuizReward} />;
+      case 'image': {
+        const imageUrl = activeFile.url || activeFile.embedUrl || '';
+        return imageUrl ? (
+          <div className="course-image-stage flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-white/85 p-3 text-slate-900 sm:p-6 custom-scrollbar">
+            <figure className="w-full max-w-4xl text-center">
+              <img
+                src={imageUrl}
+                alt={activeFile.name || 'Course diagram or chart'}
+                loading="lazy"
+                className="mx-auto max-h-[72vh] w-auto max-w-full rounded-[1.5rem] border border-white/70 bg-white object-contain shadow-[0_20px_60px_rgba(8,26,69,0.10)] sm:rounded-[1.75rem]"
+              />
+              <figcaption className="mt-4 text-base font-black text-slate-700">{activeFile.name}</figcaption>
+            </figure>
+          </div>
+        ) : <GlassDownloadCard file={activeFile} headline="Image preview unavailable" />;
+      }
       default: return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
     }
   };
 
   return (
-    <div className="course-player-mobile-scope relative flex h-[100dvh] min-h-[100dvh] w-full max-w-full min-w-0 flex-col overflow-hidden text-slate-900 bg-[#f3f0ff]">
-      <div className={`absolute inset-0 scale-110 bg-cover bg-center blur-2xl ${isAudioExperience ? 'opacity-[0.08]' : 'opacity-10'}`} style={{ backgroundImage: `url(${backgroundImage})` }} />
-      <div className={isAudioExperience ? "absolute inset-0 bg-[linear-gradient(180deg,#d5fbff_0%,#c9f8ff_48%,#d8fbff_100%)]" : "absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(111,82,255,0.16),transparent_28%),radial-gradient(circle_at_88%_18%,rgba(199,190,255,0.32),transparent_20%),linear-gradient(135deg,rgba(255,255,255,0.9),rgba(246,243,255,0.86),rgba(238,233,255,0.94))]"} />
-      <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-50 blur-2xl" style={{ backgroundColor: isAudioExperience ? '#bdf7ff' : '#8b75ff' }} />
-      <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-[#c9f8ff]/70' : 'bg-[#d9d2ff]/45'}`} />
+    <div className="course-player-mobile-scope relative flex h-[100dvh] min-h-[100dvh] w-full max-w-full min-w-0 flex-col overflow-hidden text-slate-900 bg-[#f8f8ff]">
+      <div className={`absolute inset-0 scale-110 bg-cover bg-center blur-2xl ${isAudioExperience ? 'opacity-[0.06]' : 'opacity-[0.07]'}`} style={{ backgroundImage: `url(${backgroundImage})` }} />
+      <div className={isAudioExperience ? "absolute inset-0 bg-[linear-gradient(180deg,#f2feff_0%,#e4fcff_48%,#f0fdff_100%)]" : "absolute inset-0 bg-[radial-gradient(circle_at_20%_25%,rgba(111,82,255,0.10),transparent_30%),radial-gradient(circle_at_88%_18%,rgba(199,190,255,0.20),transparent_22%),linear-gradient(135deg,rgba(255,255,255,0.98),rgba(251,250,255,0.96),rgba(244,243,255,0.92))]"} />
+      <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-35 blur-2xl" style={{ backgroundColor: isAudioExperience ? '#d8faff' : '#a9a0ff' }} />
+      <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-[#e0fbff]/55' : 'bg-[#e6e2ff]/40'}`} />
 
-      <header className={`relative z-30 flex min-h-[56px] min-w-0 items-center gap-2 border-b border-[#ded8ff] bg-white/88 shadow-sm backdrop-blur-xl ${forceOverlaySidebar ? '' : 'lg:hidden'} ${compactPlayerChrome ? 'px-2 py-1.5' : 'px-3 py-2.5 sm:px-3 sm:py-3'}`} style={{ paddingLeft: 'max(0.75rem, env(safe-area-inset-left))', paddingRight: 'max(0.75rem, env(safe-area-inset-right))', paddingTop: 'max(0.375rem, env(safe-area-inset-top))' }}>
+      <header className={`course-player-bottom-header relative z-30 order-2 flex min-h-[58px] min-w-0 items-center gap-1.5 border-t border-[#ded8ff] bg-white/95 shadow-[0_-8px_30px_rgba(8,26,69,0.06)] backdrop-blur-xl lg:order-1 lg:border-b lg:border-t-0 lg:shadow-sm ${forceOverlaySidebar ? '' : 'lg:hidden'} ${compactPlayerChrome ? 'px-2 py-1.5' : 'px-3 py-2 sm:px-4 sm:py-2.5'}`} style={{ paddingLeft: 'max(0.75rem, env(safe-area-inset-left))', paddingRight: 'max(0.75rem, env(safe-area-inset-right))', paddingTop: 'max(0.375rem, env(safe-area-inset-top))', paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}>
+        <button type="button" onClick={() => navigateAdjacentLesson(-1)} disabled={activeFileIndex <= 0} aria-label="Previous lesson" className={`${viewport.isTinyPlayer ? 'h-10 w-9 text-xl' : 'h-11 w-10 text-2xl'} inline-flex shrink-0 items-center justify-center rounded-2xl border border-[#ded8ff] bg-white font-black leading-none text-[#5B4BFF] shadow-[0_10px_30px_rgba(89,71,242,0.10)] transition hover:bg-[#f7f5ff] disabled:cursor-not-allowed disabled:opacity-35 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50`}>‹</button>
+        <button type="button" onClick={() => navigateAdjacentLesson(1)} disabled={activeFileIndex >= orderedCourseFiles.length - 1 || orderedCourseFiles.length === 0} aria-label="Next lesson" className={`${viewport.isTinyPlayer ? 'h-10 w-9 text-xl' : 'h-11 w-10 text-2xl'} inline-flex shrink-0 items-center justify-center rounded-2xl border border-[#ded8ff] bg-white font-black leading-none text-[#5B4BFF] shadow-[0_10px_30px_rgba(89,71,242,0.10)] transition hover:bg-[#f7f5ff] disabled:cursor-not-allowed disabled:opacity-35 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50`}>›</button>
         <div className="flex min-w-0 flex-1 items-center gap-2">
           <div className="min-w-0 flex-1">
-            <p className="truncate text-[10px] font-black uppercase tracking-[0.22em] text-[#6b5cff]/80 sm:text-[11px]">Now learning</p>
-            <h1 className="truncate text-sm font-black leading-tight text-[#071735] sm:text-lg" title={activeFile?.name || product.title}>{activeFile?.name || product.title}</h1>
+            <p className="truncate text-[11px] font-black uppercase tracking-[0.2em] text-[#6b5cff]/80">Now learning</p>
+            <h1 className="truncate text-base font-black leading-tight text-[#071735] sm:text-lg" title={activeFile?.name || product.title}>{activeFile?.name || product.title}</h1>
           </div>
           <YoutubeRewardChip compact />
           <button onClick={() => toggleCourseMentor()} className={`${viewport.isTinyPlayer ? 'h-10 px-2 text-xs' : 'h-11 px-3 text-xs sm:text-sm'} shrink-0 rounded-2xl border border-[#ded8ff] bg-white/85 font-black text-[#5947f2] shadow-[0_10px_30px_rgba(89,71,242,0.10)] transition hover:-translate-y-0.5 hover:bg-[#f7f5ff] focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50`}>🧠 AI</button>
@@ -2250,10 +2291,10 @@ const CoursePlayer: React.FC<{
         </button>
       </header>
 
-      <div onClick={closeCourseSidebar} className={`fixed inset-0 z-30 bg-white/70 backdrop-blur-sm transition ${useDesktopSidebar ? 'lg:hidden' : ''} ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
+      <div onClick={closeCourseSidebar} className={`fixed inset-0 z-30 bg-white/60 backdrop-blur-sm transition ${useDesktopSidebar ? 'lg:hidden' : ''} ${isSidebarOpen ? "opacity-100" : "pointer-events-none opacity-0"}`} />
 
-      <main className={`relative flex min-h-0 flex-1 flex-col overflow-hidden ${compactPlayerChrome ? 'gap-1 p-1.5' : 'gap-2 p-2 sm:gap-3 sm:p-3 lg:p-3'}`} style={{ paddingLeft: 'max(0.375rem, env(safe-area-inset-left))', paddingRight: 'max(0.375rem, env(safe-area-inset-right))', paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}>
-        <div className={`${forceOverlaySidebar ? 'hidden' : 'hidden lg:flex'} shrink-0 items-center gap-2 rounded-xl border border-[#E3E8F5] bg-white/92 px-3 py-2.5 text-[#071735] shadow-[0_12px_32px_rgba(8,26,69,0.07)] backdrop-blur-2xl`}>
+      <main className={`relative order-1 flex min-h-0 flex-1 flex-col overflow-hidden lg:order-2 ${compactPlayerChrome ? 'gap-1 p-1.5' : 'gap-2 p-2 sm:gap-3 sm:p-3 lg:p-3'}`} style={{ paddingLeft: 'max(0.375rem, env(safe-area-inset-left))', paddingRight: 'max(0.375rem, env(safe-area-inset-right))', paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}>
+        <div className={`${forceOverlaySidebar ? 'hidden' : 'hidden lg:flex'} shrink-0 items-center gap-2 rounded-xl border border-[#E3E8F5] bg-white/95 px-3 py-2.5 text-[#071735] shadow-[0_12px_32px_rgba(8,26,69,0.07)] backdrop-blur-2xl`}>
           <div className="flex min-w-0 flex-1 items-center gap-3">
             <div className="course-panel-icon-contrast flex h-10 w-10 shrink-0 items-center justify-center rounded-xl text-white shadow-[0_10px_24px_rgba(91,75,255,0.20)]" style={{ background: 'linear-gradient(135deg, #4F46E5 0%, #7C3AED 100%)' }}>
               <ModuleIcon className="h-5 w-5" />
@@ -2267,6 +2308,8 @@ const CoursePlayer: React.FC<{
 
           <div className="flex shrink-0 items-center gap-2">
             <YoutubeRewardChip compact />
+            <button type="button" onClick={() => navigateAdjacentLesson(-1)} disabled={activeFileIndex <= 0} aria-label="Previous lesson" title="Previous lesson" className="shrink-0 rounded-xl border border-[#D9E7F8] bg-white px-3 py-2 text-base font-black leading-none text-[#5B4BFF] shadow-sm transition hover:border-[#C9C2FF] hover:bg-[#F1EEFF] disabled:cursor-not-allowed disabled:opacity-35">‹</button>
+            <button type="button" onClick={() => navigateAdjacentLesson(1)} disabled={activeFileIndex >= orderedCourseFiles.length - 1 || orderedCourseFiles.length === 0} aria-label="Next lesson" title="Next lesson" className="shrink-0 rounded-xl border border-[#D9E7F8] bg-white px-3 py-2 text-base font-black leading-none text-[#5B4BFF] shadow-sm transition hover:border-[#C9C2FF] hover:bg-[#F1EEFF] disabled:cursor-not-allowed disabled:opacity-35">›</button>
             <button onClick={() => { setIsDesktopSidebarCollapsed(value => !value); }} className="shrink-0 rounded-xl border border-[#D9E7F8] bg-white px-3 py-2 text-xs font-black text-[#071735] shadow-sm transition hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF]">
               {isDesktopSidebarCollapsed ? 'Show modules' : 'Minimize'}
             </button>
@@ -2279,17 +2322,44 @@ const CoursePlayer: React.FC<{
           </div>
         </div>
 
-        <section className={`${useDesktopSidebar ? 'lg:grid-cols-[var(--course-sidebar-width)_minmax(0,1fr)]' : 'grid-cols-1'} grid min-h-0 min-w-0 flex-1 overflow-hidden gap-2 sm:gap-3`} style={{ ['--course-sidebar-width' as any]: 'clamp(17rem, 22vw, 21rem)' }}>
-          <aside id={modulePanelId} className={`${useDesktopSidebar ? 'lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-lg' : ''} fixed inset-y-0 left-0 z-40 w-[min(88svw,20rem)] max-w-full transform transition sm:w-80 ${isSidebarOpen ? "translate-x-0" : "-translate-x-full"}`}>
-            <div className="flex h-full flex-col border-r border-[#ded8ff] bg-white/85 shadow-sm backdrop-blur-xl lg:rounded-lg lg:border lg:border-[#ded8ff] lg:bg-white/85 lg:shadow-sm">
-              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#E3E8F5] bg-white/90 px-4 py-3">
+        <section className={`${useDesktopSidebar ? 'lg:grid-cols-[minmax(0,1fr)_var(--course-sidebar-width)]' : 'grid-cols-1'} grid min-h-0 min-w-0 flex-1 overflow-hidden gap-2 sm:gap-3`} style={{ ['--course-sidebar-width' as any]: 'clamp(17rem, 22vw, 21rem)' }}>
+          <div className={`course-player-content-frame relative min-h-0 min-w-0 overflow-hidden backdrop-blur-2xl ${
+            isAudioExperience
+              ? 'rounded-none border-0 bg-transparent shadow-none'
+              : activeFile?.type === 'youtube'
+                ? 'course-youtube-frame rounded-2xl border border-[#111827]/10 bg-black shadow-[0_20px_60px_rgba(8,26,69,0.10)] sm:rounded-3xl'
+                : 'rounded-2xl border border-[#E3E8F5] bg-white/92 shadow-[0_20px_60px_rgba(8,26,69,0.06)] sm:rounded-3xl'
+          }`}>
+            {renderMedia()}
+            {isMentorOpen && (
+              <div className="absolute inset-0 z-50 flex items-stretch justify-end bg-slate-950/20 p-2 backdrop-blur-[2px] sm:p-3" aria-label="AI Mentor overlay">
+                <div className="h-full w-full max-w-full overflow-y-auto sm:max-w-[34rem] lg:max-w-[40rem]">
+                  {/* AI Mentor is free for all users — no premium subscription required. */}
+                  <AiMentor
+                    productTitle={product.title}
+                    productId={product.id}
+                    courseId={product.id}
+                    activeFileId={activeFile?.id || null}
+                    activeFileType={activeFile?.type || null}
+                    activeContentName={activeFile?.name || null}
+                    userId={currentUserId}
+                    onClose={closeCourseMentor}
+                  />
+                </div>
+              </div>
+            )}
+          </div>
+
+          <aside id={modulePanelId} className={`${useDesktopSidebar ? 'lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-lg' : ''} fixed inset-y-0 right-0 z-40 w-[min(90svw,21rem)] max-w-full transform transition ${isSidebarOpen ? "translate-x-0" : "translate-x-full"}`}>
+            <div className="flex h-full flex-col rounded-l-2xl border-l border-[#ded8ff] bg-white/95 shadow-sm backdrop-blur-xl lg:rounded-lg lg:border lg:border-[#ded8ff] lg:bg-white/95 lg:shadow-sm">
+              <div className="flex shrink-0 items-center justify-between gap-3 border-b border-[#E3E8F5] bg-white/95 px-4 py-3.5">
                 <div className="min-w-0 flex items-center gap-3">
                   <div className="flex h-11 w-11 items-center justify-center rounded-xl text-white shadow-[0_12px_34px_rgba(91,75,255,0.20)]" style={{ background: 'linear-gradient(135deg,#5B4BFF 0%, #7B61FF 100%)' }}>
                     <ModuleIcon className="h-5 w-5" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-[10px] font-black uppercase tracking-[0.2em] text-[#5B4BFF]">Course modules</p>
-                    <h2 className="truncate text-sm font-black leading-tight text-[#071735]">{product.title}</h2>
+                    <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#5B4BFF]">Course modules</p>
+                    <h2 className="truncate text-base font-black leading-tight text-[#071735]">{product.title}</h2>
                     <p className="truncate text-xs font-bold text-[#667085]">{activeFile?.name || 'Choose a lesson'}</p>
                   </div>
                 </div>
@@ -2314,33 +2384,6 @@ const CoursePlayer: React.FC<{
               </nav>
             </div>
           </aside>
-
-          <div className={`course-player-content-frame relative min-h-0 min-w-0 overflow-hidden backdrop-blur-2xl ${
-            isAudioExperience
-              ? 'rounded-none border-0 bg-transparent shadow-none'
-              : activeFile?.type === 'youtube'
-                ? 'course-youtube-frame rounded-2xl border border-[#111827]/10 bg-black shadow-[0_20px_60px_rgba(8,26,69,0.10)] sm:rounded-3xl'
-                : 'rounded-2xl border border-[#E3E8F5] bg-white/76 shadow-[0_20px_60px_rgba(8,26,69,0.06)] sm:rounded-3xl'
-          }`}>
-            {renderMedia()}
-            {isMentorOpen && (
-              <div className="absolute inset-0 z-50 flex items-stretch justify-end bg-slate-950/20 p-2 backdrop-blur-[2px] sm:p-3" aria-label="AI Mentor overlay">
-                <div className="h-full w-full max-w-full overflow-y-auto sm:max-w-[34rem] lg:max-w-[40rem]">
-                  {/* AI Mentor is free for all users — no premium subscription required. */}
-                  <AiMentor
-                    productTitle={product.title}
-                    productId={product.id}
-                    courseId={product.id}
-                    activeFileId={activeFile?.id || null}
-                    activeFileType={activeFile?.type || null}
-                    activeContentName={activeFile?.name || null}
-                    userId={currentUserId}
-                    onClose={closeCourseMentor}
-                  />
-                </div>
-              </div>
-            )}
-          </div>
           {educoinNotice && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-900">{educoinNotice}</div>}
         </section>
       </main>

@@ -215,7 +215,7 @@ const safeGetItem = <T,>(key: string, fallback: T): T => {
 };
 
 // Interface for uploaded product files with specific types
-export type ProductFileType = 'youtube' | 'video' | 'audio' | 'pdf' | 'doc' | 'sheet' | 'link' | 'ebook' | 'quiz';
+export type ProductFileType = 'youtube' | 'video' | 'audio' | 'pdf' | 'doc' | 'sheet' | 'link' | 'ebook' | 'quiz' | 'image';
 export interface QuizQuestion {
   prompt: string;
   options: string[];

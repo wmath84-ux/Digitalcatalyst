@@ -468,6 +468,7 @@ const MAX_AUDIO_UPLOAD_BYTES = 50 * 1024 * 1024;
 const MAX_VIDEO_UPLOAD_BYTES = 75 * 1024 * 1024;
 const MAX_DOCUMENT_UPLOAD_BYTES = 25 * 1024 * 1024;
 const MAX_SHEET_UPLOAD_BYTES = 10 * 1024 * 1024;
+const MAX_IMAGE_UPLOAD_BYTES = 12 * 1024 * 1024;
 const MAX_PRODUCT_IMAGE_BYTES = 8 * 1024 * 1024;
 const MAX_FIRESTORE_INLINE_UPLOAD_BYTES = 700 * 1024;
 
@@ -541,6 +542,7 @@ const getAdminContentMaxBytes = (type: ProductFileType) => {
     if (type === 'video') return MAX_VIDEO_UPLOAD_BYTES;
     if (type === 'pdf' || type === 'ebook') return MAX_DOCUMENT_UPLOAD_BYTES;
     if (type === 'sheet') return MAX_SHEET_UPLOAD_BYTES;
+    if (type === 'image') return MAX_IMAGE_UPLOAD_BYTES;
     return MAX_DOCUMENT_UPLOAD_BYTES;
 };
 
@@ -1078,12 +1080,12 @@ const ContentComposer: React.FC<{
     const quizListRef = useRef<HTMLDivElement>(null);
     const previousQuizQuestionCountRef = useRef(quizQuestions.length);
 
-    const buildContentAccessMeta = (state: ContentComposerFormState) => {
-        const accessLevel = normaliseCourseAccessLevel(state.accessLevel);
-        const updateId = String(state.paidUpdateId || '').trim();
-        const updateTitle = String(state.paidUpdateTitle || '').trim();
-        const updatePrice = String(state.paidUpdatePrice || '').trim();
-        const updateCoinPrice = normalizeCoinPrice(state.paidUpdateCoinPrice).normalizedCoinPrice;
+    const buildContentAccessMeta = (state: ContentComposerFormState | null | undefined) => {
+        const accessLevel = normaliseCourseAccessLevel(state?.accessLevel);
+        const updateId = String(state?.paidUpdateId || '').trim();
+        const updateTitle = String(state?.paidUpdateTitle || '').trim();
+        const updatePrice = String(state?.paidUpdatePrice || '').trim();
+        const updateCoinPrice = normalizeCoinPrice(state?.paidUpdateCoinPrice).normalizedCoinPrice;
 
         return {
             accessLevel,
@@ -1106,6 +1108,7 @@ const ContentComposer: React.FC<{
         { type: 'link', title: 'External Link', description: 'Reference any hosted resource.', icon: '🔗' },
         { type: 'sheet', title: 'Spreadsheet', description: 'Upload CSV/XLS study material.', icon: '📊', accept: '.csv,.xls,.xlsx' },
         { type: 'ebook', title: 'E-book', description: 'Upload EPUB or PDF book content.', icon: '📚', accept: '.epub,.pdf' },
+        { type: 'image', title: 'Image / Diagram', description: 'Upload diagrams, charts and reference images for lessons.', icon: '🖼️', accept: 'image/*' },
         { type: 'audio', title: 'Audio Upload', description: 'File upload requires Firebase Storage. Use URL media for now.', icon: '🎧', accept: 'audio/*' },
         { type: 'audio', title: 'Audio URL', description: 'Paste direct MP3/M4A/WAV or hosted audio URL.', icon: '🎧', action: 'audioUrl' },
         { type: 'audio', title: 'Google Drive Audio URL', description: 'Paste a public Drive audio share link.', icon: '☁️', action: 'driveAudioUrl' },
@@ -1114,7 +1117,8 @@ const ContentComposer: React.FC<{
     ];
 
     const triggerFileUpload = (type: ProductFileType, accept: string) => {
-        if (!isStorageUploadEnabled()) {
+        const storageRequiredTypes = ['audio', 'video', 'pdf', 'ebook', 'sheet'];
+        if (storageRequiredTypes.includes(type) && !isStorageUploadEnabled()) {
             setUploadError(getStorageDisabledMessage(type));
             setLastUploadRequest(null);
             return;
@@ -1451,10 +1455,10 @@ const ContentComposer: React.FC<{
             contentType: provider === 'direct_pdf' || provider === 'google_drive_pdf' ? 'application/pdf' : undefined,
             createdAt: initialFile?.createdAt || now,
             updatedAt: now,
-            content: '',
-            ...buildContentAccessMeta(formState),
-            quiz: { questions: [] },
-        });
+                content: '',
+                ...buildContentAccessMeta(formState),
+                quiz: { questions: [] },
+            });
 
         onClose();
     };

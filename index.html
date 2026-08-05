@@ -1102,7 +1102,24 @@
         }
 
         .course-player-mobile-scope .module-item-button {
-          padding: 0.65rem !important;
+          padding: 0.72rem 0.75rem !important;
+          border-radius: 1rem !important;
+        }
+
+        .course-player-mobile-scope .module-item-button span[class*="text-[15px]"] {
+          font-size: 0.95rem !important;
+          line-height: 1.35rem !important;
+        }
+
+        .course-player-mobile-scope .course-player-bottom-header {
+          padding-bottom: max(0.5rem, env(safe-area-inset-bottom));
+          border-radius: 1.25rem 1.25rem 0 0;
+          -webkit-tap-highlight-color: transparent;
+        }
+
+        .course-player-mobile-scope .course-player-bottom-header button {
+          -webkit-tap-highlight-color: transparent;
+          touch-action: manipulation;
         }
 
         .course-player-mobile-scope .smart-docs-toolbar {
