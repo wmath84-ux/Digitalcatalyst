@@ -323,9 +323,7 @@ const goalTones = [
 
 const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, isPremium, onBack, onUpgrade, desktop = false }) => {
   const allowedTabs: MayDayTab[] = ['dashboard', 'home', 'notes', 'goals', 'reminders', 'focus', 'progress'];
-  const initialTab = typeof window !== 'undefined' && allowedTabs.includes(String(window.history.state?.dcMayDayTab) as MayDayTab)
-    ? window.history.state.dcMayDayTab as MayDayTab
-    : desktop ? 'dashboard' : 'home';
+  const initialTab: MayDayTab = desktop ? 'dashboard' : 'home';
   const [activeTab, setActiveTab] = useState<MayDayTab>(initialTab);
   const [workspace, setWorkspace] = useState<MayDayWorkspace>({ ...EMPTY_WORKSPACE });
   const [syncStatus, setSyncStatus] = useState<SyncStatus>('loading');
