@@ -82,13 +82,23 @@ interface FreeProductsPageProps {
 }
 
 export const FreeProductsPage: React.FC<FreeProductsPageProps> = ({ settings, products, onBack, onAddToCart, onBuyNow, onViewProduct }) => (
-  <section className="min-h-screen bg-gradient-to-br from-white via-cyan-50 to-indigo-50 px-4 py-8 text-slate-900 sm:px-6 sm:py-12">
+  <section className="min-h-screen bg-gradient-to-b from-[#F2FAF5] via-[#F7F9FC] to-[#F7F9FC] px-4 py-8 text-slate-900 sm:px-6 sm:py-12">
     <div className="mx-auto max-w-6xl">
-      <button onClick={onBack} className="rounded-full border border-cyan-100 bg-white/90 px-5 py-2.5 text-sm font-black text-slate-700 shadow-sm backdrop-blur-xl transition hover:-translate-y-0.5 hover:bg-cyan-50">← Back</button>
-      <div className="mx-auto mt-8 max-w-3xl text-center">
-        <p className="text-sm font-black uppercase tracking-[0.28em] text-cyan-700">Free product library</p>
-        <h1 className="mt-3 text-3xl font-black tracking-tight text-primary sm:text-5xl">Free Digital Goodies</h1>
-        <p className="mt-4 text-base font-semibold leading-7 text-slate-600 sm:text-lg">Browse every available free product in a full page experience.</p>
+      <button onClick={onBack} className="inline-flex items-center gap-2 rounded-full border border-[#CDEBDC] bg-white px-5 py-2.5 text-sm font-black text-[#0E7A4D] shadow-sm transition hover:-translate-y-0.5 hover:border-[#9BD9B9] hover:bg-[#F4FBF6]">
+        <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M10 19l-7-7m0 0l7-7m-7 7h18" /></svg>
+        Back to store
+      </button>
+
+      <div className="mx-auto mt-10 max-w-3xl text-center">
+        <div className="mx-auto grid h-16 w-16 place-items-center rounded-[1.35rem] bg-gradient-to-br from-[#10B981] to-[#0E7A4D] text-white shadow-[0_14px_34px_rgba(16,185,129,0.28)]">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 12v9H4v-9" /><path d="M2 7h20v5H2z" /><path d="M12 7v14" /><path d="M12 7s-1-5-4-5c-2 0-3 1.5-3 3s1 2 3 2h4z" /><path d="M12 7s1-5 4-5c2 0 3 1.5 3 3s-1 2-3 2h-4z" /></svg>
+        </div>
+        <p className="mt-6 text-sm font-black uppercase tracking-[0.2em] text-[#0E7A4D]">Free product library</p>
+        <h1 className="mt-3 text-balance text-3xl font-black tracking-tight text-[#10213F] sm:text-5xl">Free Digital Goodies</h1>
+        <p className="mx-auto mt-4 max-w-2xl text-base font-bold leading-7 text-[#526179] sm:text-lg">Every free resource in one place. Grab them anytime — no payment, no catch.</p>
+        <span className="mt-6 inline-flex items-center gap-2 rounded-full border border-[#CDEBDC] bg-white px-4 py-2 text-xs font-black uppercase tracking-[0.16em] text-[#0E7A4D] shadow-sm">
+          {products.length} free resource{products.length === 1 ? '' : 's'}
+        </span>
       </div>
 
       {products.length > 0 ? (
@@ -109,10 +119,15 @@ export const FreeProductsPage: React.FC<FreeProductsPageProps> = ({ settings, pr
           ))}
         </div>
       ) : (
-        <div className="mx-auto mt-12 max-w-2xl rounded-[2rem] border border-dashed border-cyan-200 bg-white/85 p-8 text-center shadow-sm backdrop-blur-xl sm:p-10">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-cyan-50 text-3xl">🎁</div>
-          <h2 className="mt-5 text-2xl font-black text-slate-900">There is no free product available right now.</h2>
-          <p className="mt-3 text-base font-bold leading-7 text-slate-600">Contact to your master, tag your master in Eduvora community.</p>
+        <div className="mx-auto mt-12 max-w-2xl rounded-[2rem] border border-dashed border-[#CDEBDC] bg-white p-8 text-center shadow-sm sm:p-10">
+          <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#EAF7F0] text-[#0E7A4D]">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M20 12v9H4v-9" /><path d="M2 7h20v5H2z" /><path d="M12 7v14" /></svg>
+          </div>
+          <h2 className="mt-5 text-2xl font-black text-[#10213F]">No free products right now</h2>
+          <p className="mt-3 text-base font-bold leading-7 text-[#526179]">Check back soon for new complimentary resources.</p>
+          <button onClick={onBack} className="mt-6 rounded-full bg-gradient-to-r from-[#10B981] to-[#0E7A4D] px-6 py-3 text-sm font-black text-white shadow-[0_12px_30px_rgba(16,185,129,0.25)] transition hover:opacity-90 active:scale-95">
+            Back to store
+          </button>
         </div>
       )}
     </div>

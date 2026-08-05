@@ -111,18 +111,26 @@ const PurchasedProducts: React.FC<PurchasedProductsProps> = ({ settings, product
   return (
     <section
       ref={sectionRef}
-      className={`${isMobileHome ? 'py-8' : 'py-20'} bg-blue-50 ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+      className={`${isMobileHome ? 'py-8 bg-blue-50' : 'py-14 sm:py-24 bg-[#F7F9FC]'} ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
     >
       <div className={`container mx-auto ${isMobileHome ? 'px-4' : 'px-6'}`}>
-        <div className={`${isMobileHome ? 'mb-5 items-start' : 'mb-12 items-end'} flex flex-col md:flex-row justify-between animate-child animate-delay-1`}>
+        <div className={`${isMobileHome ? 'mb-5 items-start' : 'mb-10 items-end'} flex flex-col md:flex-row justify-between animate-child animate-delay-1`}>
             <div className="max-w-2xl">
-                <h2 className={`${isMobileHome ? 'text-2xl' : 'text-3xl'} font-bold text-primary`}>{title}</h2>
-                <p className={`${isMobileHome ? 'mt-1 text-sm' : 'mt-2'} text-text-muted`}>
-                    {subtitle}
-                </p>
+                {isMobileHome ? (
+                    <>
+                        <h2 className="text-2xl font-bold text-primary">{title}</h2>
+                        <p className="mt-1 text-sm text-text-muted">{subtitle}</p>
+                    </>
+                ) : (
+                    <>
+                        <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#1557B0]">Your learning library</p>
+                        <h2 className="mt-3 text-3xl font-black tracking-tight text-[#10213F] sm:text-5xl">{title}</h2>
+                        <p className="mt-3 max-w-2xl text-base font-bold leading-7 text-[#526179] sm:text-lg">{subtitle}</p>
+                    </>
+                )}
             </div>
-            <div className={`${isMobileHome ? 'mt-2 text-xs' : 'mt-4 md:mt-0 text-sm'} text-slate-600`}>
-                Showing {products.length} item{products.length !== 1 && 's'}
+            <div className={isMobileHome ? 'mt-2 text-xs text-slate-600' : 'mt-5 shrink-0 rounded-full border border-[#D9E7F8] bg-white px-4 py-2 text-sm font-black text-[#1557B0] shadow-sm md:mt-0'}>
+                {products.length} item{products.length === 1 ? '' : 's'} unlocked
             </div>
         </div>
 
@@ -138,6 +146,16 @@ const PurchasedProducts: React.FC<PurchasedProductsProps> = ({ settings, product
             />
           ))}
         </div>
+
+        {!isMobileHome && products.length === 0 ? (
+          <div className="mx-auto mt-4 max-w-2xl rounded-[2rem] border border-dashed border-[#D7E7F8] bg-white p-10 text-center shadow-sm">
+            <div className="mx-auto grid h-16 w-16 place-items-center rounded-2xl bg-[#EEF4FF] text-[#1769FF]">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 016.5 17H20" /><path d="M6.5 2H20v20H6.5A2.5 2.5 0 014 19.5v-15A2.5 2.5 0 016.5 2z" /></svg>
+            </div>
+            <h3 className="mt-5 text-2xl font-black text-[#10213F]">Your library is waiting</h3>
+            <p className="mt-3 text-base font-bold leading-7 text-[#526179]">Products you purchase will appear here, ready to access anytime.</p>
+          </div>
+        ) : null}
 
         {!isMobileHome ? (
           <footer className="purchase-page-tablet-scroll-footer mt-10 hidden md:block 2xl:hidden" aria-label="Purchase page scroll footer">
