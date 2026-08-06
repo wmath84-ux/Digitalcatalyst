@@ -6,7 +6,7 @@ import { db } from '../firebase';
 import UserAvatar from './common/UserAvatar';
 import { creditUserCoinWallet, ensureUserCoinWallet, watchUserCoinWallet } from '../utils/coinWallet';
 import MembershipUpgradeCard from './MembershipUpgradeCard';
-import { getUserEduCoinMultiplier, getUserSubscriptionTier, hasPremiumMembership, normalizeSubscriptionPageContent } from '../utils/subscriptionAccess';
+import { canEarnEduCoins, canSpendEduCoins, getUserEduCoinMultiplier, getUserSubscriptionTier, hasSubscriptionFeature, normalizeSubscriptionPageContent } from '../utils/subscriptionAccess';
 
 interface ProfilePageProps {
   settings: WebsiteSettings;
@@ -212,7 +212,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   const totalLifetimeCoins = profileCoinWallet.totalCoinsEarned || eduPoints;
   const profileStyle = { ...fallbackProfileStyle, ...((settings.content as any).profileStyle || {}) };
   const subscriptionTier = getUserSubscriptionTier(currentUser);
-  const hasPremiumAccess = true;
+  const hasPremiumAccess = hasSubscriptionFeature(currentUser, 'educoins');
   const earningMultiplier = Math.max(1, getUserEduCoinMultiplier(currentUser));
   const subscriptionPage = normalizeSubscriptionPageContent(settings.content.subscriptionPage);
   const profileStreakConfigs = (((settings.content as any).profileStreaks || fallbackStreakConfigs) as ProfileStreakConfig[])
@@ -379,7 +379,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   };
 
   const handleStreakClaim = async (streak: typeof streakCards[number]) => {
-    if (!currentUser || !hasPremiumAccess || !profileUid || !streak.claimable) return;
+    if (!currentUser || !canEarnEduCoins(currentUser) || !profileUid || !streak.claimable) return;
     const coinReward = Math.max(0, Number(streak.coinReward || 0));
     const userId = currentUser.uid || (currentUser.id ? String(currentUser.id) : '');
     if (!userId || coinReward <= 0) return;
@@ -435,7 +435,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
 
   const handleMilestoneClaim = (reward: MilestoneReward) => {
-    if (!hasPremiumAccess) return;
+    if (!canEarnEduCoins(currentUser)) return;
     const claimed = onClaimMilestoneReward(reward);
     if (!claimed) return;
     if (reward.downloadContent) {
@@ -461,7 +461,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
   };
 
   const handleRewardToggle = (reward: typeof dynamicClaimCards[number]) => {
-    if (!hasPremiumAccess) return;
+    if (!canSpendEduCoins(currentUser)) return;
     const { isActive, isRedeemed } = getRewardButtonState(reward);
     if (isRedeemed || !reward.claimable) return;
     if (isActive) {
@@ -663,7 +663,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
               <div className="flex-1 pb-0 sm:pb-2">
                 <div className="flex flex-wrap items-center justify-center gap-2 sm:justify-start">
                   <span className="rounded-full border border-white/50 bg-white/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] text-white sm:px-3 sm:text-xs">Level {level}</span>
-                  <span className="rounded-full border border-white/40 bg-white/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#C2E7FF] sm:text-xs">{subscriptionTier === 'elite' ? 'Elite' : 'Pro'} \u2022 {earningMultiplier}x</span>
+                  <span className="rounded-full border border-white/40 bg-white/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#C2E7FF] sm:text-xs">{subscriptionTier === 'elite' ? 'Elite Member' : 'Pro Member'} \u2022 {earningMultiplier}x</span>
                 </div>
                 <h1 className="mt-1.5 text-2xl font-black tracking-tight text-white drop-shadow sm:mt-2 sm:text-5xl">{currentUser?.name || 'Student'}</h1>
                 <p className="mt-1 text-xs font-semibold text-[#E8F0FE]/90 sm:text-sm">

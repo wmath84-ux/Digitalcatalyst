@@ -15,7 +15,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { isDirectAudioUrl, isDirectVideoUrl, isGoogleDriveUrl, normalizeDriveUrl, normalizeMediaSource } from '../utils/mediaCompat';
 import MediaFallbackCard from './common/MediaFallbackCard';
-import { getUserEduCoinMultiplier, hasPremiumMembership } from '../utils/subscriptionAccess';
+import { getUserEduCoinMultiplier, hasSubscriptionFeature, normalizeSubscriptionPageContent } from '../utils/subscriptionAccess';
 
 declare global {
   interface Window {
@@ -1355,11 +1355,12 @@ const CoursePlayer: React.FC<{
   product: ProductWithRating;
   currentUser?: User | null;
   onBack: () => void;
+  onUpgrade?: () => void;
   onQuizReward?: (quizId: string, quizTitle: string, correctAnswers: number, coins: number) => boolean;
   productAccess?: ProductAccessState | null;
   onPurchaseLatestUpdate?: (product: ProductWithRating, updateId?: string) => void;
   onEducoinUnlockComplete?: (product: ProductWithRating, updateIds: string[]) => void;
-}> = ({ settings, economySettings, product, currentUser = null, onBack, onQuizReward, productAccess = null, onPurchaseLatestUpdate, onEducoinUnlockComplete }) => {
+}> = ({ settings, economySettings, product, currentUser = null, onBack, onUpgrade, onQuizReward, productAccess = null, onPurchaseLatestUpdate, onEducoinUnlockComplete }) => {
   const viewport = useViewportSize();
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
@@ -1370,6 +1371,7 @@ const CoursePlayer: React.FC<{
   const [modulePanelResetKey, setModulePanelResetKey] = useState(0);
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
+  const [mentorLockNotice, setMentorLockNotice] = useState(false);
   const youtubePlayerRef = useRef<any>(null);
   const nativeVideoRef = useRef<HTMLVideoElement | null>(null);
   const videoFullscreenSnapshotRef = useRef<{
@@ -1398,7 +1400,10 @@ const CoursePlayer: React.FC<{
   const [youtubeWatchSeconds, setYoutubeWatchSeconds] = useState(0);
 
   const currentUserId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
-  const hasPremiumAccess = hasPremiumMembership(currentUser);
+  const hasPremiumAccess = hasSubscriptionFeature(currentUser, 'educoins');
+  const canAccessAiMentor = hasSubscriptionFeature(currentUser, 'aiMentor');
+  const subscriptionPage = normalizeSubscriptionPageContent((settings?.content as any)?.subscriptionPage);
+  const mentorUpgradeNotice = hasPremiumAccess ? (null) : (!canAccessAiMentor ? subscriptionPage.aiMentorLocked : null);
   const eduCoinMultiplier = getUserEduCoinMultiplier(currentUser);
   const courseContent = useMemo(() => ensureCourseIntroModule(product), [product]);
 
@@ -1689,9 +1694,15 @@ const CoursePlayer: React.FC<{
   }, [closeCourseLayerHistory]);
 
   const openCourseMentor = useCallback(() => {
+    if (!canAccessAiMentor) {
+      setMentorLockNotice(true);
+      return;
+    }
     if (forceOverlaySidebarRef.current) setIsSidebarOpen(false);
     setIsMentorOpen(true);
-  }, []);
+  }, [canAccessAiMentor]);
+
+  const closeMentorLockNotice = useCallback(() => setMentorLockNotice(false), []);
 
   const toggleCourseMentor = useCallback(() => {
     if (isMentorOpenRef.current) closeCourseMentor();
@@ -2373,7 +2384,6 @@ const CoursePlayer: React.FC<{
 
       {isMentorOpen && (
         <div className="fixed inset-0 z-50 bg-white" aria-label="AI Mentor overlay">
-          {/* AI Mentor is free for all users — no premium subscription required. */}
           <AiMentor
             productTitle={product.title}
             productId={product.id}
@@ -2384,6 +2394,29 @@ const CoursePlayer: React.FC<{
             userId={currentUserId}
             onClose={closeCourseMentor}
           />
+        </div>
+      )}
+
+      {mentorLockNotice && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" aria-label="AI Mentor upgrade required">
+          <div className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-6 shadow-2xl">
+            <h3 className="text-lg font-black text-gray-900">AI Mentor is a paid feature</h3>
+            <p className="mt-2 text-sm font-medium leading-relaxed text-gray-600">{subscriptionPage.aiMentorLocked}</p>
+            <div className="mt-6 flex gap-3">
+              <button
+                onClick={closeMentorLockNotice}
+                className="rounded-xl border border-gray-200 px-4 py-2.5 text-sm font-bold text-gray-700 transition hover:bg-gray-50"
+              >
+                Later
+              </button>
+              <button
+                onClick={() => { closeMentorLockNotice(); onUpgrade?.(); }}
+                className="flex-1 rounded-xl bg-gray-900 px-4 py-2.5 text-sm font-bold text-white transition hover:bg-gray-800"
+              >
+                Upgrade to unlock
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

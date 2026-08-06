@@ -71,11 +71,11 @@ test('normal profile hides wallet gamification and renders the upgrade experienc
   assert.match(profileSource, /subscriptionTier === 'elite' \? 'Elite Member' : 'Pro Member'/);
 });
 
-test('all coin earning and spending helpers require premium membership', () => {
+test('all coin earning and spending helpers require the premium membership feature', () => {
   assert.match(walletSource, /if \(!hasPremiumMembership\(userData\)\)/);
   assert.match(walletSource, /reason: 'membership_required'/);
   assert.match(walletSource, /getUserEduCoinMultiplier\(userData\)/);
-  assert.match(appSource, /if \(!currentUser \|\| amount <= 0 \|\| !hasPremiumMembership\(currentUser\)\) return false/);
+  assert.match(appSource, /if \(!currentUser \|\| amount <= 0 \|\| !canSpendEduCoins\(currentUser\)\) return false/);
   assert.match(appSource, /EduCoin purchases are available only with Pro or Elite membership/);
   assert.match(appSource, /Paid-module EduCoin unlocks are available only with Pro or Elite membership/);
 });
@@ -128,4 +128,33 @@ test('subscription billing cycle supports once, weekly, monthly, quarterly and y
   assert.match(appSource, /getSubscriptionExpiryDate/);
   assert.match(appSource, /subscriptionBillingCycle: billingCycle/);
   assert.match(appSource, /subscriptionPeriodMonths: getSubscriptionPeriodMonths\(billingCycle\)/);
+});
+
+test('build-your-bundle page keeps feature selection across billing cycle changes', () => {
+  assert.match(subscriptionSource, /aria-label="Billing cycle toggle"/);
+  assert.match(subscriptionSource, /setBillingCycle\(cycle\)/);
+  assert.match(subscriptionSource, /toggleFeature\(feature\.key\)/);
+  assert.match(subscriptionSource, /selectedFeatures\.filter\(key => !ownedFeatureKeys\.includes\(key\)\)/);
+  assert.match(subscriptionSource, /getFeatureBundleCycleTotal/);
+});
+
+test('feature gating helpers power EduCoin earning and spending', () => {
+  assert.match(accessSource, /export const canEarnEduCoins/);
+  assert.match(accessSource, /export const canSpendEduCoins/);
+  assert.match(accessSource, /export const hasSubscriptionFeature/);
+  assert.match(accessSource, /SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY = 499/);
+});
+
+test('expiry locks all features, persists no auto-renew, and pushes a renewal notification', () => {
+  assert.match(appSource, /subscriptionFeatures: \[\]/);
+  assert.match(appSource, /subscriptionAutoRenew: false/);
+  assert.match(appSource, /title: 'Your subscription has expired'/);
+  assert.match(appSource, /category: 'unlock'/);
+  assert.match(appSource, /target: \{ type: 'purchases' \}/);
+});
+
+test('subscription activation persists selected features and never auto-renews', () => {
+  assert.match(appSource, /unlockSubscriptionPlan\(plan, paymentLabel, billingCycle, \{\}, selectedFeatures\)/);
+  assert.match(appSource, /getFeatureBundleCycleTotal\(selectedFeatures, billingCycle, bundleMonthly\)/);
+  assert.match(appSource, /subscriptionAutoRenew: false/);
 });

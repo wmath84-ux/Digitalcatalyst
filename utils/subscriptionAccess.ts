@@ -5,6 +5,165 @@ export type SubscriptionBillingCycle = 'once' | 'weekly' | 'monthly' | 'quarterl
 export const FREE_TRIAL_DAYS = 7;
 export const SUBSCRIPTION_BILLING_CYCLES: SubscriptionBillingCycle[] = ['once', 'weekly', 'monthly', 'quarterly', 'yearly'];
 
+/**
+ * Build-your-bundle feature model. A user buys exactly the features they
+ * select and the cart price updates instantly from the chosen set. Every
+ * feature is unlockable on its own, addable later during an upgrade, and
+ * locked again as soon as the subscription expires.
+ */
+export type SubscriptionFeatureKey = 'aiMentor' | 'community' | 'educoins' | 'coinDiscounts' | 'mayday' | 'contentAccess';
+
+export interface SubscriptionFeature {
+  key: SubscriptionFeatureKey;
+  name: string;
+  icon: string;
+  description: string;
+  monthlyPrice: number;
+  badge?: string;
+}
+
+export const ALL_SUBSCRIPTION_FEATURE_KEYS: SubscriptionFeatureKey[] = [
+  'aiMentor',
+  'community',
+  'educoins',
+  'coinDiscounts',
+  'mayday',
+  'contentAccess',
+];
+
+export const SUBSCRIPTION_FEATURES: SubscriptionFeature[] = [
+  {
+    key: 'aiMentor',
+    name: 'AI Mentor',
+    icon: '🧠',
+    monthlyPrice: 149,
+    badge: 'Best for doubts',
+    description: 'Real-time AI study partner inside every course and the community. Ask doubts, get lesson summaries, and prepare better while you study.',
+  },
+  {
+    key: 'community',
+    name: 'Learning Community',
+    icon: '💬',
+    monthlyPrice: 99,
+    description: 'Join serious learners. Share progress, ask questions, follow creators, and stay motivated in a focused study space.',
+  },
+  {
+    key: 'educoins',
+    name: 'EduCoins & Rewards',
+    icon: '🪙',
+    monthlyPrice: 99,
+    badge: 'Study & earn',
+    description: 'Earn EduCoins for every serious study action, unlock streaks, badges, milestone rewards, and grow your learning wallet.',
+  },
+  {
+    key: 'coinDiscounts',
+    name: 'EduCoin Discounts',
+    icon: '🏷️',
+    monthlyPrice: 49,
+    description: 'Spend your EduCoins to get discounts on paid products, modules, and your subscription itself.',
+  },
+  {
+    key: 'mayday',
+    name: 'MayDay Pro',
+    icon: '🚨',
+    monthlyPrice: 49,
+    description: 'Premium planner: weekly streaks, milestone tracking, and deeper progress insights inside MayDay.',
+  },
+  {
+    key: 'contentAccess',
+    name: 'Premium Content',
+    icon: '📚',
+    monthlyPrice: 129,
+    badge: 'Courses unlocked',
+    description: 'Unlock selected premium products and courses that are bundled with your subscription.',
+  },
+];
+
+export const SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY = 499;
+
+export const getSubscriptionFeature = (key: SubscriptionFeatureKey): SubscriptionFeature =>
+  SUBSCRIPTION_FEATURES.find(feature => feature.key === key) || SUBSCRIPTION_FEATURES[0];
+
+export const isSubscriptionFeatureKey = (value: unknown): value is SubscriptionFeatureKey =>
+  typeof value === 'string' && (ALL_SUBSCRIPTION_FEATURE_KEYS as string[]).includes(value);
+
+/**
+ * Derive the price of a monthly amount for any billing cycle.
+ * Weekly ≈ a quarter of a month, Yearly ≈ 40% off the monthly rate,
+ * One-time ≈ lifetime access at a fixed premium.
+ */
+export const getSubscriptionCyclePrice = (monthly: number, billingCycle: SubscriptionBillingCycle): number => {
+  const safeMonthly = Math.max(0, Number(monthly) || 0);
+  switch (billingCycle) {
+    case 'weekly': return Math.max(1, Math.round(safeMonthly * 0.26));
+    case 'quarterly': return Math.max(1, Math.round(safeMonthly * 3));
+    case 'yearly': return Math.max(1, Math.round(safeMonthly * 12 * 0.6));
+    case 'once': return Math.max(1, Math.round(safeMonthly * 12 * 1.3));
+    default: return safeMonthly;
+  }
+};
+
+export const getSubscriptionFeaturePrice = (feature: SubscriptionFeature, billingCycle: SubscriptionBillingCycle): number =>
+  getSubscriptionCyclePrice(Math.max(0, Number(feature.monthlyPrice) || 0), billingCycle);
+
+export const getSubscriptionCycleSavingsPercent = (billingCycle: SubscriptionBillingCycle): number => {
+  const monthly = 1;
+  const cycle = getSubscriptionCyclePrice(monthly, billingCycle);
+  if (billingCycle === 'once' || billingCycle === 'monthly') return 0;
+  return Math.round((1 - cycle / (monthly * getPeriodCountForCycle(billingCycle))) * 100);
+};
+
+const getPeriodCountForCycle = (billingCycle: SubscriptionBillingCycle): number => {
+  switch (billingCycle) {
+    case 'weekly': return 4.33;
+    case 'quarterly': return 3;
+    case 'yearly': return 12;
+    default: return 1;
+  }
+};
+
+/**
+ * Total monthly amount for a set of chosen features. When every feature is
+ * selected the cheaper full-bundle price applies automatically.
+ */
+export const getFeatureBundleMonthlyTotal = (featureKeys: SubscriptionFeatureKey[], bundleMonthly = SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY): number => {
+  const allSelected = ALL_SUBSCRIPTION_FEATURE_KEYS.every(key => featureKeys.includes(key));
+  if (allSelected) return Math.max(0, Number(bundleMonthly) || SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY);
+  return SUBSCRIPTION_FEATURES
+    .filter(feature => featureKeys.includes(feature.key))
+    .reduce((sum, feature) => sum + Math.max(0, Number(feature.monthlyPrice) || 0), 0);
+};
+
+export const getFeatureBundleCycleTotal = (featureKeys: SubscriptionFeatureKey[], billingCycle: SubscriptionBillingCycle, bundleMonthly?: number): number =>
+  getSubscriptionCyclePrice(getFeatureBundleMonthlyTotal(featureKeys, bundleMonthly), billingCycle);
+
+/**
+ * Features the user currently owns. An active full membership without an
+ * explicit feature list (legacy accounts) is treated as owning everything.
+ * An expired subscription returns an empty list so all features lock.
+ */
+export const getSubscriptionFeatureKeys = (user: unknown): SubscriptionFeatureKey[] => {
+  const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
+  if (getUserSubscriptionTier(record) === 'normal') return [];
+  const stored = Array.isArray(record.subscriptionFeatures)
+    ? (record.subscriptionFeatures as unknown[]).filter(isSubscriptionFeatureKey)
+    : [];
+  if (stored.length > 0) return stored;
+  return [...ALL_SUBSCRIPTION_FEATURE_KEYS];
+};
+
+export const hasSubscriptionFeature = (user: unknown, key: SubscriptionFeatureKey): boolean => {
+  if (getUserSubscriptionTier(user) === 'normal') return false;
+  return getSubscriptionFeatureKeys(user).includes(key);
+};
+
+export const isSubscriptionActive = (user: unknown): boolean => getUserSubscriptionTier(user) !== 'normal';
+
+export const canEarnEduCoins = (user: unknown): boolean => hasSubscriptionFeature(user, 'educoins');
+
+export const canSpendEduCoins = (user: unknown): boolean =>
+  hasSubscriptionFeature(user, 'educoins') || hasSubscriptionFeature(user, 'coinDiscounts');
+
 export interface MembershipMessage {
   eyebrow: string;
   title: string;
@@ -320,6 +479,7 @@ export const hasPremiumMembership = (user: unknown): boolean => getSubscriptionT
 export const getUserEduCoinMultiplier = (user: unknown): number => {
   const tier = getUserSubscriptionTier(user);
   if (tier === 'normal') return 0;
+  if (!hasSubscriptionFeature(user, 'educoins')) return 0;
   const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
   return clampMultiplier(record.eduCoinMultiplier, tier === 'elite' ? 2 : 1);
 };
