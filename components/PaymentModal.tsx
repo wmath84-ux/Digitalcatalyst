@@ -45,6 +45,7 @@ interface PaymentModalProps {
   checkoutUserId?: string;
   checkoutTargetId?: string | number;
   billingCycle?: SubscriptionBillingCycle;
+  trialDays?: number;
 }
 
 type CheckoutStep = 'checkout' | 'razorpay' | 'loading';
@@ -89,6 +90,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   checkoutUserId = '',
   checkoutTargetId,
   billingCycle,
+  trialDays,
 }) => {
   const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>(initialCheckoutStep);
   const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
@@ -529,7 +531,9 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const totalSavings = couponSavings + coinSavings;
   const finalPayable = Math.max(0, Number(finalPrice) || 0);
   const checkoutTypeLabel = checkoutType === 'subscription'
-    ? `${billingCycle ? getSubscriptionBillingCycleName(billingCycle) : 'Monthly'} subscription`
+    ? trialDays && trialDays > 0
+      ? `${trialDays}-day Free Trial`
+      : `${billingCycle ? getSubscriptionBillingCycleName(billingCycle) : 'Monthly'} subscription`
     : checkoutType === 'latest-update'
       ? 'Latest course update'
       : checkoutType === 'cart'
@@ -538,12 +542,16 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const paymentDetailSubtitle = itemDescription || (checkoutType === 'latest-update'
     ? 'This checkout unlocks only the new paid update, features, explanations, or additional content for a product you already own.'
     : checkoutType === 'subscription'
-      ? 'Premium membership benefits unlock after verified payment.'
+      ? trialDays && trialDays > 0
+        ? `Full Eduvora Plus+ access for ${trialDays} free days. No payment needed — the same secure framework, just without the bill.`
+        : 'Premium membership benefits unlock after verified payment.'
       : checkoutType === 'cart'
         ? 'Review every item, discount, and wallet adjustment before paying.'
         : 'Unlock the complete digital product with lifetime access from My Purchases.');
   const defaultUnlockDetails = checkoutType === 'subscription'
-    ? ['Selected membership access and plan benefits', 'AI Mentor and Community access where included', 'EduCoin benefits linked to the selected plan', 'Access remains active for the selected billing cycle']
+    ? trialDays && trialDays > 0
+      ? [`${trialDays}-day full access to Eduvora Plus+ — ₹0, no payment`, 'AI Mentor inside the course player and community', 'EduCoins, streaks, rewards and discounts', 'All plan benefits unlocked instantly for the trial']
+      : ['Selected membership access and plan benefits', 'AI Mentor and Community access where included', 'EduCoin benefits linked to the selected plan', 'Access remains active for the selected billing cycle']
     : checkoutType === 'latest-update'
       ? ['Only the selected latest paid update', 'New features, files, explanations, or practice content', 'Update access attached to the product you already own', 'Instant access after verified payment']
       : checkoutType === 'cart'
@@ -551,20 +559,24 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         : ['Complete digital product access', 'Lifetime access from My Purchases', 'All included files and course content', 'Instant access after verified payment'];
   const unlockDetails = providedUnlockDetails?.length ? providedUnlockDetails : defaultUnlockDetails;
   const primaryItemTitle = productTitle || (isCartMode ? 'Selected cart items' : 'Eduvora checkout');
-  const primaryPaymentLabel = finalPrice <= 0
-    ? 'Complete ₹0 Checkout'
+  const primaryPaymentLabel = trialDays && trialDays > 0
+    ? `Start ${trialDays}-Day Free Trial`
+    : finalPrice <= 0
+      ? 'Complete ₹0 Checkout'
+      : checkoutType === 'latest-update'
+        ? `Pay ${formatCheckoutMoney(finalPayable)} & unlock update`
+        : checkoutType === 'subscription'
+          ? `Pay ${formatCheckoutMoney(finalPayable)} & activate plan`
+          : checkoutType === 'cart'
+            ? `Pay ${formatCheckoutMoney(finalPayable)} for cart`
+            : `Pay ${formatCheckoutMoney(finalPayable)} with Razorpay`;
+  const primaryPaymentHint = trialDays && trialDays > 0
+    ? 'No payment needed — full access unlocks instantly'
     : checkoutType === 'latest-update'
-      ? `Pay ${formatCheckoutMoney(finalPayable)} & unlock update`
+      ? 'Open verified Razorpay checkout to unlock this paid module/update only'
       : checkoutType === 'subscription'
-        ? `Pay ${formatCheckoutMoney(finalPayable)} & activate plan`
-        : checkoutType === 'cart'
-          ? `Pay ${formatCheckoutMoney(finalPayable)} for cart`
-          : `Pay ${formatCheckoutMoney(finalPayable)} with Razorpay`;
-  const primaryPaymentHint = checkoutType === 'latest-update'
-    ? 'Open verified Razorpay checkout to unlock this paid module/update only'
-    : checkoutType === 'subscription'
-      ? 'Open verified Razorpay checkout to activate the selected membership cycle'
-      : 'Open verified Razorpay checkout to unlock access instantly';
+        ? 'Open verified Razorpay checkout to activate the selected membership cycle'
+        : 'Open verified Razorpay checkout to unlock access instantly';
 
   const summaryCard = (
     <div className="payment-item-summary space-y-4 rounded-[22px] border border-blue-100 bg-white p-4 shadow-[0_10px_28px_rgba(37,99,235,0.08)] sm:p-5">
@@ -594,10 +606,19 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
       </div>
       <div className="flex items-center justify-between gap-3 rounded-2xl border border-emerald-100 bg-white/85 px-4 py-3 text-sm font-bold text-emerald-800">
         <div className="flex min-w-0 flex-col">
-          <span>🛡️ Secure payment processing by Razorpay</span>
-          <span className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">Verified Razorpay payment before unlock</span>
+          {trialDays && trialDays > 0 ? (
+            <>
+              <span>🎁 Free trial · No payment</span>
+              <span className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">Full access unlocks instantly for {trialDays} days</span>
+            </>
+          ) : (
+            <>
+              <span>🛡️ Secure payment processing by Razorpay</span>
+              <span className="text-xs font-black uppercase tracking-[0.12em] text-emerald-700">Verified Razorpay payment before unlock</span>
+            </>
+          )}
         </div>
-        <span className="font-black text-blue-800">Safe</span>
+        <span className="font-black text-blue-800">{trialDays && trialDays > 0 ? 'Free' : 'Safe'}</span>
       </div>
     </div>
   );
@@ -691,7 +712,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
           {productImage ? (
             <img src={productImage} alt={primaryItemTitle} className="h-full w-full object-contain" />
           ) : (
-            <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-600 to-cyan-500 px-1 text-center text-[11px] font-black uppercase leading-4 text-white">{checkoutType === 'subscription' ? 'PRO' : checkoutType === 'cart' ? 'CART' : checkoutType === 'latest-update' ? 'UPDATE' : 'PRODUCT'}</span>
+            <span className="flex h-full w-full items-center justify-center bg-gradient-to-br from-blue-600 to-cyan-500 px-1 text-center text-[11px] font-black uppercase leading-4 text-white">{checkoutType === 'subscription' ? (trialDays && trialDays > 0 ? 'TRIAL' : 'PRO') : checkoutType === 'cart' ? 'CART' : checkoutType === 'latest-update' ? 'UPDATE' : 'PRODUCT'}</span>
           )}
         </span>
         <div className="min-w-0">
@@ -824,11 +845,21 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
 
             <footer className="border-t border-blue-100 bg-[#f8fbff] px-5 py-6 text-center sm:px-8">
               <div className="flex flex-wrap items-center justify-center gap-x-6 gap-y-2 text-xs font-black text-slate-600">
-                <span>🔒 Razorpay protected</span>
-                <span>✓ Server verified access</span>
-                <span>↻ Payment recovery available</span>
+                {trialDays && trialDays > 0 ? (
+                  <>
+                    <span>🎁 No payment needed</span>
+                    <span>✓ Full access unlocks instantly</span>
+                    <span>↻ Same secure framework, ₹0</span>
+                  </>
+                ) : (
+                  <>
+                    <span>🔒 Razorpay protected</span>
+                    <span>✓ Server verified access</span>
+                    <span>↻ Payment recovery available</span>
+                  </>
+                )}
               </div>
-              <p className="mt-4 text-xs font-semibold leading-5 text-slate-500">Eduvora unlocks access only after verified payment. A completed payment can be recovered safely through payment-status checking.</p>
+              <p className="mt-4 text-xs font-semibold leading-5 text-slate-500">{trialDays && trialDays > 0 ? `Eduvora gives you ${trialDays} full free days of Eduvora Plus+. No card, no charges — just start learning.` : 'Eduvora unlocks access only after verified payment. A completed payment can be recovered safely through payment-status checking.'}</p>
             </footer>
           </main>
         </div>

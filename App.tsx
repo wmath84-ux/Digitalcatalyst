@@ -28,6 +28,7 @@ import CartSidebar from './components/CartSidebar';
 import PaymentModal, { PaymentVerificationDetails } from './components/PaymentModal';
 import UpcomingFeatures, { UpcomingFeatureItem } from './components/UpcomingFeatures';
 import SubscriptionSuccessModal from './components/SubscriptionSuccessModal';
+import SubscriptionActivatedModal, { SubscriptionActivatedInfo } from './components/SubscriptionActivatedModal';
 import LatestNews from './components/LatestNews';
 import ComingSoonModal from './components/ComingSoonModal';
 import { FreeProductsModal, FreeProductsPage } from './components/ContentModals';
@@ -1746,6 +1747,8 @@ const App: React.FC = () => {
   const [purchasedProductUpdateIds, setPurchasedProductUpdateIds] = useState<Record<string, string[]>>({});
   const [latestUpdateCheckout, setLatestUpdateCheckout] = useState<{ product: ProductWithRating; updateId?: string } | null>(null);
   const [subscriptionCheckoutRequest, setSubscriptionCheckoutRequest] = useState<{ plan: SubscriptionPlanConfig; billingCycle: SubscriptionBillingCycle; couponCode?: string | null } | null>(null);
+  const [subscriptionTrialCheckoutRequest, setSubscriptionTrialCheckoutRequest] = useState<{ plan: SubscriptionPlanConfig; trialDays: number } | null>(null);
+  const [subscriptionActivatedInfo, setSubscriptionActivatedInfo] = useState<SubscriptionActivatedInfo | null>(null);
   const [purchaseCelebration, setPurchaseCelebration] = useState<{ title: string; message: string; icon: string; at: number } | null>(null);
   const [isAuthRestoring, setIsAuthRestoring] = useState(false);
   const [authRestoreError, setAuthRestoreError] = useState<string | null>(null);
@@ -5737,6 +5740,7 @@ const App: React.FC = () => {
     });
 
     setSubscriptionCheckoutRequest(null);
+    setSubscriptionActivatedInfo({ mode: 'purchase', plan, billingCycle: getSubscriptionBillingCycleName(billingCycle), message: `${plan.name} ${getSubscriptionBillingCycleName(billingCycle)} is active. Your unlocked products are ready in My Purchases.` });
     showPurchasePageCelebration('Subscription active', `${plan.name} ${getSubscriptionBillingCycleName(billingCycle)} is active. Your unlocked products are ready in My Purchases.`);
   };
 
@@ -5777,13 +5781,28 @@ const App: React.FC = () => {
     if (!hasFirebaseUser) { openAuthPage('login'); return; }
     if (!currentUser) return;
     if (!canStartFreeTrial(currentUser)) {
-      setInfoModal({ title: 'Trial unavailable', message: 'The 7-day free trial is available only for new users who have never activated a subscription.', icon: '🎁' });
+      setInfoModal({ title: 'Trial unavailable', message: 'The free trial is available only for new users who have never activated a subscription.', icon: '🎁' });
       return;
     }
 
     const plan = normalizeSubscriptionPlans((websiteSettings.content as any).subscriptionPlans)[0];
+    const trialDays = normalizeSubscriptionPageContent((websiteSettings.content as any).subscriptionPage).freeTrialDays;
+    setSubscriptionTrialCheckoutRequest({ plan, trialDays });
+  };
+
+  const completeFreeTrialActivation = (plan: SubscriptionPlanConfig, trialDays: number, payment?: PaymentVerificationDetails) => {
+    if (!hasFirebaseUser || !currentUser) { openAuthPage('login'); return; }
+    if (!isCheckoutUnlockVerified(0, payment)) {
+      blockUnverifiedPaymentUnlock(plan.name);
+      return;
+    }
+    if (!canStartFreeTrial(currentUser)) {
+      setInfoModal({ title: 'Trial unavailable', message: 'The free trial is available only for new users who have never activated a subscription.', icon: '🎁' });
+      return;
+    }
+
     const activatedAtDate = new Date();
-    const trialEndsAtDate = new Date(activatedAtDate.getTime() + FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000);
+    const trialEndsAtDate = new Date(activatedAtDate.getTime() + Math.max(1, trialDays) * (FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000) / FREE_TRIAL_DAYS);
     const activatedAt = activatedAtDate.toISOString();
     const trialEndsAt = trialEndsAtDate.toISOString();
 
@@ -5828,7 +5847,8 @@ const App: React.FC = () => {
       purchasedProductIds: arrayUnion(...(trialUnlockIds || [])),
       updatedAt: serverTimestamp(),
     }, { merge: true }).catch(error => console.warn('Trial Firestore sync failed.', error));
-    setInfoModal({ title: '7-day trial activated!', message: `Welcome to ${plan.name}! Aapka 7-din ka FREE trial shuru ho gaya hai. AI Mentor, Community, EduCoins aur sab kuch ab unlocked hai. 7 din baad subscription purchase karke streak jaari rakho!`, icon: '🎁' });
+    setSubscriptionTrialCheckoutRequest(null);
+    setSubscriptionActivatedInfo({ mode: 'trial', plan, trialDays, expiresAt: trialEndsAt, message: `Aapka ${Math.max(1, trialDays)}-din ka FREE trial ab live hai. AI Mentor, Community, EduCoins aur sab kuch ab unlocked hai.` });
     window.scrollTo(0, 0);
   };
 
@@ -6892,6 +6912,45 @@ const App: React.FC = () => {
             />
           );
         })()}
+        {subscriptionTrialCheckoutRequest && (() => {
+          const { plan, trialDays } = subscriptionTrialCheckoutRequest;
+          return (
+            <PaymentModal
+              settings={websiteSettings}
+              economySettings={economySettings}
+              productTitle={`${plan.name} · ${trialDays}-Day Free Trial`}
+              itemDescription={`Full Eduvora Plus+ access for ${trialDays} free days — AI Mentor, Community, EduCoins, streaks aur rewards. Same secure framework, ₹0, no payment.`}
+              unlockDetails={[
+                `${trialDays}-day full access to Eduvora Plus+ — ₹0, no payment`,
+                ...(plan.benefits || []),
+                ...(plan.unlockProductIds || []).map(id => productsWithRatings.find(product => product.id === id)?.title || `Product #${id}`),
+              ].filter(Boolean).slice(0, 10)}
+              originalPrice={0}
+              salePrice={0}
+              couponDiscount={0}
+              finalPrice={0}
+              eduCoinDiscount={0}
+              appliedEduCoins={0}
+              coinRedeemRate={eduCoinRedeemRate}
+              onClose={() => setSubscriptionTrialCheckoutRequest(null)}
+              onConfirm={(payment) => completeFreeTrialActivation(plan, trialDays, payment)}
+              currentUser={effectiveAppUser}
+              checkoutType="subscription"
+              checkoutUserId={effectiveAppUser?.id}
+              checkoutTargetId={plan.id}
+              billingCycle="monthly"
+              trialDays={trialDays}
+              presentation="page"
+              initialCheckoutStep="checkout"
+            />
+          );
+        })()}
+        <SubscriptionActivatedModal
+          info={subscriptionActivatedInfo}
+          onClose={() => setSubscriptionActivatedInfo(null)}
+          onGoToPurchases={() => { setSubscriptionActivatedInfo(null); handleNavigateToPurchases(); }}
+          onExploreProducts={() => { setSubscriptionActivatedInfo(null); handleNavigateToAllProducts(); }}
+        />
         {renderLatestUpdateCheckoutOverlay()}
         <ComingSoonModal isOpen={!!infoModal} onClose={() => setInfoModal(null)} title={infoModal?.title} message={infoModal?.message} icon={infoModal?.icon} />
       </ErrorBoundary>

@@ -25,6 +25,8 @@ export interface SubscriptionPageContent {
   trialTitle: string;
   trialSubtitle: string;
   trialCta: string;
+  freeTrialDays: number;
+  freeTrialEnabled: boolean;
   valueTitle: string;
   valueDescription: string;
   renewalNote: string;
@@ -109,6 +111,8 @@ export const DEFAULT_SUBSCRIPTION_PAGE_CONTENT: SubscriptionPageContent = {
   trialTitle: '7 din FREE Trial — sirf naye students ke liye',
   trialSubtitle: 'Redeem karo abhi aur dekho Eduvora Plus+ ka asli magic. 7 din baad, jo plan chaho choose karke purchase karo.',
   trialCta: 'Start 7-Day Free Trial',
+  freeTrialDays: FREE_TRIAL_DAYS,
+  freeTrialEnabled: true,
   valueTitle: 'Sirf ek subscription, lekin itna sab kuch',
   valueDescription: 'Eduvora Plus+ sirf ek membership nahi — yeh aapka apna study partner hai. Har feature isliye bana hai taaki aap bina atke, bina bore hue, roz aage badho.',
   renewalNote: 'Auto-renew on karo toh subscription apne aap renew hoti hai — bilkul transparent. Cancel anytime, koi tension nahi.',
@@ -345,6 +349,8 @@ export const normalizeSubscriptionPageContent = (value: unknown): SubscriptionPa
     trialTitle: cleanText(record.trialTitle, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.trialTitle),
     trialSubtitle: cleanText(record.trialSubtitle, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.trialSubtitle),
     trialCta: cleanText(record.trialCta, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.trialCta),
+    freeTrialDays: Math.max(1, Math.min(60, Math.round(Number(record.freeTrialDays) || FREE_TRIAL_DAYS))),
+    freeTrialEnabled: record.freeTrialEnabled !== false,
     valueTitle: cleanText(record.valueTitle, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.valueTitle),
     valueDescription: cleanText(record.valueDescription, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.valueDescription),
     renewalNote: cleanText(record.renewalNote, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.renewalNote),

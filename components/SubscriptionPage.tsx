@@ -51,10 +51,14 @@ const SubscriptionPage: React.FC<{
   const [appliedCouponCodes, setAppliedCouponCodes] = React.useState<Record<string, string>>({});
   const [couponErrors, setCouponErrors] = React.useState<Record<string, string>>({});
 
-  const trialAllowed = canStartFreeTrial(currentUser);
+  const freeTrialDays = pageContent.freeTrialDays;
+  const trialEnabled = pageContent.freeTrialEnabled !== false;
+  const trialAllowed = trialEnabled && canStartFreeTrial(currentUser);
   const trialActive = isTrialActive(currentUser);
   const trialDaysLeft = getTrialDaysLeft(currentUser);
   const membershipActive = currentTier !== 'normal';
+  const [checkoutMode, setCheckoutMode] = React.useState<'trial' | 'buy'>(trialAllowed && !membershipActive ? 'trial' : 'buy');
+  const inTrialMode = checkoutMode === 'trial' && trialAllowed && !membershipActive;
 
   const calculateCouponDiscount = React.useCallback((coupon: Coupon, price: number) => {
     const safePrice = Math.max(0, Number(price) || 0);
@@ -169,7 +173,7 @@ const SubscriptionPage: React.FC<{
 
   const primaryCta = isOwned
     ? `${currentTier === 'elite' ? 'Eduvora Plus+' : 'Pro'} active`
-    : trialAllowed
+    : inTrialMode
       ? pageContent.trialCta
       : `${plan.ctaLabel} · ₹${finalPlanPrice.toFixed(0)} / ${billingLabel}`;
 
@@ -213,23 +217,70 @@ const SubscriptionPage: React.FC<{
             )}
           </div>
 
-          {trialAllowed && (
-            <div className="mt-8 w-full max-w-3xl overflow-hidden rounded-[24px] border border-indigo-200 bg-gradient-to-r from-indigo-600 via-violet-600 to-fuchsia-600 p-[1px] shadow-[0_24px_60px_rgba(109,40,217,0.22)]">
-              <div className="flex flex-col gap-4 rounded-[23px] bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5 sm:flex-row sm:items-center sm:p-7">
-                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-fuchsia-600 text-2xl shadow-[0_14px_30px_rgba(109,40,217,0.3)]">🎁</div>
+          {trialAllowed && !isOwned && (
+            <div className="mt-8 w-full max-w-3xl">
+              <p className="text-center text-[11px] font-black uppercase tracking-[0.22em] text-slate-600">Kaise join karna hai?</p>
+              <div className="mt-3 grid grid-cols-2 gap-2 rounded-[20px] border border-indigo-200 bg-white/90 p-1.5 shadow-[0_14px_40px_rgba(79,70,229,0.1)]" role="tablist" aria-label="Choose free trial or buy now">
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={checkoutMode === 'trial'}
+                  onClick={() => setCheckoutMode('trial')}
+                  className={`flex flex-col items-center gap-0.5 rounded-[16px] px-3 py-3 text-center outline-none transition focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${
+                    checkoutMode === 'trial'
+                      ? 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-[0_14px_30px_rgba(16,185,129,0.3)]'
+                      : 'text-slate-600 hover:bg-emerald-50'
+                  }`}
+                >
+                  <span className="text-[12px] font-black uppercase tracking-[0.08em]">🎁 Free Trial</span>
+                  <span className={`text-[11px] font-bold ${checkoutMode === 'trial' ? 'text-emerald-50' : 'text-emerald-700'}`}>{freeTrialDays} din · ₹0 · No payment</span>
+                </button>
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={checkoutMode === 'buy'}
+                  onClick={() => setCheckoutMode('buy')}
+                  className={`flex flex-col items-center gap-0.5 rounded-[16px] px-3 py-3 text-center outline-none transition focus-visible:ring-2 focus-visible:ring-indigo-500/40 ${
+                    checkoutMode === 'buy'
+                      ? 'bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-[0_14px_30px_rgba(79,70,229,0.3)]'
+                      : 'text-slate-600 hover:bg-indigo-50'
+                  }`}
+                >
+                  <span className="text-[12px] font-black uppercase tracking-[0.08em]">💳 Buy Now</span>
+                  <span className={`text-[11px] font-bold ${checkoutMode === 'buy' ? 'text-indigo-100' : 'text-indigo-700'}`}>Full plan · ₹{finalPlanPrice.toFixed(0)} / {billingLabel}</span>
+                </button>
+              </div>
+              {checkoutMode === 'trial' && (
+                <p className="mt-3 text-center text-[12px] font-bold leading-5 text-emerald-700">
+                  Pehle {freeTrialDays} din bilkul FREE — bina payment ke. Trial ke baad, jo cycle chaho choose karke purchase karo.
+                </p>
+              )}
+            </div>
+          )}
+
+          {trialAllowed && !isOwned && checkoutMode === 'trial' && (
+            <div className="mt-6 w-full max-w-3xl overflow-hidden rounded-[24px] border border-emerald-200 bg-gradient-to-r from-emerald-500 via-teal-600 to-emerald-600 p-[1px] shadow-[0_24px_60px_rgba(16,185,129,0.22)]">
+              <div className="flex flex-col gap-4 rounded-[23px] bg-gradient-to-br from-emerald-50 via-white to-teal-50 p-5 sm:flex-row sm:items-center sm:p-7">
+                <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 text-2xl shadow-[0_14px_30px_rgba(16,185,129,0.3)]">🎁</div>
                 <div className="min-w-0 flex-1 text-left">
-                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-indigo-600">Free for new students</p>
+                  <p className="text-[11px] font-black uppercase tracking-[0.18em] text-emerald-600">Free for new students · {freeTrialDays} din</p>
                   <h2 className="mt-1 text-xl font-black tracking-[-0.02em] text-slate-900 sm:text-2xl">{pageContent.trialTitle}</h2>
-                  <p className="mt-1.5 text-[12px] font-semibold leading-5 text-slate-600 sm:text-[13px]">{pageContent.trialSubtitle}</p>
+                  <p className="mt-1.5 text-[13px] font-semibold leading-5 text-slate-700 sm:text-[14px]">{pageContent.trialSubtitle}</p>
                 </div>
                 <button
                   type="button"
                   onClick={onStartFreeTrial}
-                  className="shrink-0 rounded-2xl bg-gradient-to-r from-indigo-600 to-fuchsia-600 px-5 py-3 text-[12px] font-black uppercase tracking-[0.08em] text-white shadow-[0_16px_34px_rgba(109,40,217,0.28)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_42px_rgba(109,40,217,0.34)] active:translate-y-0"
+                  className="shrink-0 rounded-2xl bg-gradient-to-r from-emerald-500 to-teal-600 px-5 py-3 text-[12px] font-black uppercase tracking-[0.08em] text-white shadow-[0_16px_34px_rgba(16,185,129,0.32)] transition hover:-translate-y-0.5 hover:shadow-[0_20px_42px_rgba(16,185,129,0.4)] active:translate-y-0"
                 >
                   {pageContent.trialCta}
                 </button>
               </div>
+            </div>
+          )}
+
+          {trialAllowed && !isOwned && checkoutMode !== 'trial' && (
+            <div className="mt-6 hidden w-full max-w-3xl rounded-[20px] border border-emerald-200 bg-emerald-50/70 px-4 py-3 text-center text-[13px] font-bold text-emerald-800">
+              🎁 New student ho? Pehle <button type="button" onClick={() => setCheckoutMode('trial')} className="font-black text-emerald-700 underline underline-offset-2">{freeTrialDays}-day Free Trial</button> try karo — ₹0, no payment.
             </div>
           )}
 
@@ -240,13 +291,13 @@ const SubscriptionPage: React.FC<{
                 {trialDaysLeft} day{trialDaysLeft === 1 ? '' : 's'} free bacha hai. Uske baad subscription purchase karni hogi — abhi plan lock karo aur streaks na todo.
               </p>
               <div className="mt-4 h-2 w-full overflow-hidden rounded-full bg-amber-100">
-                <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500" style={{ width: `${Math.max(10, Math.min(100, (trialDaysLeft / 7) * 100))}%` }} />
+                <div className="h-full rounded-full bg-gradient-to-r from-amber-500 to-orange-500" style={{ width: `${Math.max(10, Math.min(100, (trialDaysLeft / Math.max(1, freeTrialDays)) * 100))}%` }} />
               </div>
             </div>
           )}
 
           <div className="mt-8 w-full max-w-3xl" aria-label="Billing cycle toggle">
-            <p className="text-center text-[10px] font-black uppercase tracking-[0.22em] text-slate-500">Choose your billing cycle</p>
+            <p className="text-center text-[11px] font-black uppercase tracking-[0.22em] text-slate-600">Choose your billing cycle</p>
             <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-5 sm:gap-3">
               {cycleOptions.map(option => {
                 const selected = billingCycle === option.value;
@@ -307,9 +358,9 @@ const SubscriptionPage: React.FC<{
                   )}
                 </div>
 
-                <p className="mt-5 text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">{plan.audienceLabel}</p>
+                <p className="mt-5 text-[11px] font-black uppercase tracking-[0.16em] text-slate-600">{plan.audienceLabel}</p>
                 <h2 className="mt-1.5 text-2xl font-black tracking-[-0.02em] text-slate-900 sm:text-3xl">{plan.name}</h2>
-                <p className="mt-2 text-[12px] font-semibold leading-5 text-slate-600">{plan.description}</p>
+                <p className="mt-2 text-[13px] font-semibold leading-6 text-slate-700">{plan.description}</p>
               </div>
 
               <div className="shrink-0 text-left lg:max-w-[220px] lg:text-right">
@@ -317,7 +368,7 @@ const SubscriptionPage: React.FC<{
                   {(couponDiscount + eduCoinDiscount) > 0 && <span className="mb-1 text-sm font-bold text-slate-400 line-through">₹{planPrice.toFixed(0)}</span>}
                   <span className="text-5xl font-black leading-none tracking-[-0.05em] text-indigo-700">₹{finalPlanPrice.toFixed(0)}</span>
                 </div>
-                <p className="mt-2 text-[11px] font-bold text-slate-500">
+                <p className="mt-2 text-[12px] font-bold text-slate-600">
                   {billingCycle === 'once' ? 'one-time · lifetime access' : `per ${billingLabel} · ${getSubscriptionBillingCycleName(billingCycle)} billing`}
                 </p>
                 {billingCycle !== 'monthly' && billingCycle !== 'once' && savingsPercent > 0 && (
@@ -328,7 +379,7 @@ const SubscriptionPage: React.FC<{
 
             <div className="mt-7 grid gap-6 lg:grid-cols-[1fr_240px]">
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.16em] text-slate-500">
+                <p className="text-[11px] font-black uppercase tracking-[0.16em] text-slate-600">
                   <span className="inline-flex items-center gap-1">
                     <span>✨</span>
                     <span>Everything included</span>
@@ -336,7 +387,7 @@ const SubscriptionPage: React.FC<{
                 </p>
                 <ul className="mt-3 space-y-2.5">
                   {plan.benefits.map((benefit) => (
-                    <li key={benefit} className="flex items-start gap-2 text-[12px] font-bold leading-5 text-slate-700">
+                    <li key={benefit} className="flex items-start gap-2 text-[13px] font-bold leading-6 text-slate-800">
                       <span className="mt-0.5 text-indigo-600">✓</span>
                       <span>{benefit}</span>
                     </li>
@@ -346,17 +397,17 @@ const SubscriptionPage: React.FC<{
 
               <div className="min-w-0">
                 <div className="rounded-[18px] border border-indigo-100 bg-indigo-50/60 p-4">
-                  <p className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+                  <p className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-600">
                     <span className="inline-flex items-center gap-1">
                       <span>🎁</span>
                       <span>Selected content access</span>
                     </span>
                   </p>
-                  <p className="mt-2 text-[11px] font-bold leading-5 text-slate-700">{unlockedProducts.join(' • ')}</p>
+                  <p className="mt-2 text-[12px] font-bold leading-5 text-slate-800">{unlockedProducts.join(' • ')}</p>
                 </div>
 
                 {(activeDiscount || validAppliedCoupon) && (
-                  <div className="mt-4 rounded-[18px] border border-indigo-100 bg-indigo-50/60 p-4 text-[11px] font-bold text-slate-700">
+                  <div className="mt-4 rounded-[18px] border border-indigo-100 bg-indigo-50/60 p-4 text-[12px] font-bold text-slate-800">
                     <div className="flex justify-between gap-3">
                       <span>Subtotal</span>
                       <span>₹{planPrice}</span>
@@ -392,11 +443,13 @@ const SubscriptionPage: React.FC<{
               <button
                 type="button"
                 disabled={isOwned}
-                onClick={() => (trialAllowed ? onStartFreeTrial?.() : onActivatePlan(plan, billingCycle, validAppliedCoupon?.code || null))}
+                onClick={() => (inTrialMode ? onStartFreeTrial?.() : onActivatePlan(plan, billingCycle, validAppliedCoupon?.code || null))}
                 className={`subscription-primary-action block min-h-12 w-full rounded-[18px] border px-4 py-3 text-center text-[12px] font-black uppercase tracking-[0.08em] outline-none transition active:scale-[0.99] ${
                   isOwned
                     ? 'cursor-not-allowed border-slate-300 bg-gradient-to-r from-slate-100 to-white text-slate-500 shadow-sm'
-                    : 'eduvora-primary-action border-indigo-600 text-white shadow-[0_18px_42px_rgba(79,70,229,0.32)] hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(79,70,229,0.38)]'
+                    : inTrialMode
+                      ? 'eduvora-primary-action border-emerald-600 bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-[0_18px_42px_rgba(16,185,129,0.32)] hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(16,185,129,0.38)]'
+                      : 'eduvora-primary-action border-indigo-600 bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-[0_18px_42px_rgba(79,70,229,0.32)] hover:-translate-y-0.5 hover:shadow-[0_22px_50px_rgba(79,70,229,0.38)]'
                 }`}
               >
                 {primaryCta}
@@ -415,7 +468,7 @@ const SubscriptionPage: React.FC<{
             </div>
 
             <div className="mt-4 rounded-[18px] border border-indigo-100 bg-slate-50/90 p-4">
-              <label htmlFor={`coupon-${planId}`} className="text-[10px] font-black uppercase tracking-[0.12em] text-slate-500">
+              <label htmlFor={`coupon-${planId}`} className="text-[11px] font-black uppercase tracking-[0.12em] text-slate-600">
                 <span className="inline-flex items-center gap-1">
                   <span>🎫</span>
                   <span>Redeem coupon code</span>
@@ -432,34 +485,34 @@ const SubscriptionPage: React.FC<{
                   }}
                   placeholder="Enter coupon code"
                   disabled={isOwned}
-                  className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-[12px] font-black uppercase tracking-[0.08em] outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-400 focus:border-indigo-400 disabled:bg-slate-100"
+                  className="h-10 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-[12px] font-black uppercase tracking-[0.08em] outline-none placeholder:normal-case placeholder:tracking-normal placeholder:text-slate-500 focus:border-indigo-400 disabled:bg-slate-100"
                 />
                 <button
                   type="button"
                   disabled={isOwned}
                   onClick={() => validAppliedCoupon ? handleRemoveCoupon(planId) : handleApplyCoupon(planId, couponInputs[planId] || '')}
-                  className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-[10px] font-black uppercase tracking-[0.08em] hover:bg-indigo-50 disabled:bg-slate-100"
+                  className="h-10 rounded-lg border border-slate-300 bg-white px-3 text-[11px] font-black uppercase tracking-[0.08em] hover:bg-indigo-50 disabled:bg-slate-100"
                 >
                   {validAppliedCoupon ? '✓ Remove' : 'Apply'}
                 </button>
               </div>
-              {couponErrors[planId] && <p className="mt-2 text-[10px] font-bold text-red-700">{couponErrors[planId]}</p>}
-              {validAppliedCoupon && <p className="mt-2 text-[10px] font-bold text-emerald-700">✓ {validAppliedCoupon.code} applied successfully.</p>}
+              {couponErrors[planId] && <p className="mt-2 text-[11px] font-bold text-red-700">{couponErrors[planId]}</p>}
+              {validAppliedCoupon && <p className="mt-2 text-[11px] font-bold text-emerald-700">✓ {validAppliedCoupon.code} applied successfully.</p>}
             </div>
           </article>
 
           <div className="mt-14 w-full max-w-4xl">
             <div className="text-center">
-              <p className="text-[10px] font-black uppercase tracking-[0.22em] text-indigo-600">Benefits</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.22em] text-indigo-600">Benefits</p>
               <h2 className="mt-2 text-2xl font-black tracking-[-0.02em] text-slate-900 sm:text-4xl">{pageContent.valueTitle}</h2>
-              <p className="mx-auto mt-3 max-w-2xl text-[12px] font-semibold leading-6 text-slate-600 sm:text-sm">{pageContent.valueDescription}</p>
+              <p className="mx-auto mt-3 max-w-2xl text-[13px] font-semibold leading-6 text-slate-700 sm:text-sm sm:leading-7">{pageContent.valueDescription}</p>
             </div>
             <div className="mt-8 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {featureHighlights.map(feature => (
                 <div key={feature.title} className="rounded-[20px] border border-indigo-100 bg-white/90 p-5 text-left shadow-[0_14px_40px_rgba(79,70,229,0.08)] transition hover:-translate-y-1 hover:shadow-[0_20px_48px_rgba(79,70,229,0.14)]">
                   <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-fuchsia-600 text-xl shadow-[0_10px_24px_rgba(109,40,217,0.24)]">{feature.icon}</div>
-                  <h3 className="mt-4 text-[14px] font-black text-slate-900">{feature.title}</h3>
-                  <p className="mt-1.5 text-[12px] font-semibold leading-5 text-slate-600">{feature.desc}</p>
+                  <h3 className="mt-4 text-[15px] font-black text-slate-900">{feature.title}</h3>
+                  <p className="mt-1.5 text-[13px] font-semibold leading-5 text-slate-700">{feature.desc}</p>
                 </div>
               ))}
             </div>
@@ -469,12 +522,12 @@ const SubscriptionPage: React.FC<{
             <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
               <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-600 to-fuchsia-600 text-2xl shadow-[0_14px_30px_rgba(109,40,217,0.3)]">💎</div>
               <div className="min-w-0">
-                <p className="text-[10px] font-black uppercase tracking-[0.18em] text-indigo-600">Sach jo aapko jaanna chahiye</p>
+                <p className="text-[11px] font-black uppercase tracking-[0.18em] text-indigo-600">Sach jo aapko jaanna chahiye</p>
                 <h2 className="mt-2 text-xl font-black tracking-[-0.02em] text-slate-900 sm:text-2xl">Subscription kyu zaroori hai?</h2>
-                <p className="mt-3 text-[13px] font-semibold leading-6 text-slate-600 sm:text-sm sm:leading-7">
+                <p className="mt-3 text-[14px] font-semibold leading-7 text-slate-700 sm:text-[15px]">
                   Eduvora Plus+ koi adhoora feature nahi hai. AI Mentor, Community, EduCoins system aur MayDay — yeh sab real Google AI services, secure servers, aur premium tools par chalta hai jo humein paid lagte hain (Google Console, AI APIs, hosting sab ke paise). Aapka subscription in costs ko cover karta hai taaki aapko milta rahe — best quality, bina ads, bina kisi tension ke. Yeh humara tarika hai aapke sapne ko seriously lene ka.
                 </p>
-                <p className="mt-3 text-[12px] font-bold leading-6 text-indigo-700">{pageContent.renewalNote}</p>
+                <p className="mt-3 text-[13px] font-bold leading-6 text-indigo-800">{pageContent.renewalNote}</p>
               </div>
             </div>
           </div>
@@ -488,8 +541,8 @@ const SubscriptionPage: React.FC<{
               <div key={item.title} className="flex items-start gap-3 rounded-[18px] border border-indigo-100 bg-white/90 p-4 text-left shadow-sm">
                 <span className="text-xl">{item.icon}</span>
                 <div className="min-w-0">
-                  <p className="text-[12px] font-black text-slate-900">{item.title}</p>
-                  <p className="mt-0.5 text-[11px] font-semibold leading-5 text-slate-600">{item.desc}</p>
+                  <p className="text-[13px] font-black text-slate-900">{item.title}</p>
+                  <p className="mt-0.5 text-[12px] font-semibold leading-5 text-slate-700">{item.desc}</p>
                 </div>
               </div>
             ))}
