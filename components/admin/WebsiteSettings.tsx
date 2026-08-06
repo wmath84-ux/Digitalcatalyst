@@ -920,8 +920,8 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                 <div className="space-y-6">
                     <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5">
                         <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">Subscription Page</p>
-                        <h2 className="mt-2 text-2xl font-black text-slate-900">Pro & Elite Access Customizer</h2>
-                        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">Normal users stay free and can browse, buy, and consume purchased content. Community, AI Mentor, EduCoin earning, badges, streaks, and milestones unlock only after Pro or Elite activation.</p>
+                        <h2 className="mt-2 text-2xl font-black text-slate-900">Eduvora Plus+ Subscription Customizer</h2>
+                        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">A single Eduvora Plus+ subscription unlocks everything: AI Mentor, Community, EduCoin earning, badges, streaks, milestones, rewards, and MayDay. New users get a 7-day free trial, then purchase a one-time, weekly, monthly, quarterly, or yearly cycle.</p>
                     </div>
 
                     <div className="rounded-2xl border bg-white p-4">
@@ -933,6 +933,12 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             <label className="text-sm font-semibold text-slate-700">Monthly Label<input value={subscriptionPage.monthlyLabel} onChange={e => updateSubscriptionPage({ monthlyLabel: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
                             <label className="text-sm font-semibold text-slate-700">Yearly Label<input value={subscriptionPage.yearlyLabel} onChange={e => updateSubscriptionPage({ yearlyLabel: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
                             <label className="text-sm font-semibold text-slate-700">Yearly Badge<input value={subscriptionPage.yearlyBadge} onChange={e => updateSubscriptionPage({ yearlyBadge: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                            <label className="md:col-span-2 text-sm font-semibold text-slate-700">Trial Title<input value={subscriptionPage.trialTitle} onChange={e => updateSubscriptionPage({ trialTitle: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                            <label className="md:col-span-2 text-sm font-semibold text-slate-700">Trial Subtitle<textarea value={subscriptionPage.trialSubtitle} onChange={e => updateSubscriptionPage({ trialSubtitle: e.target.value })} rows={2} className="mt-1 w-full rounded-lg border p-2" /></label>
+                            <label className="text-sm font-semibold text-slate-700">Trial CTA<input value={subscriptionPage.trialCta} onChange={e => updateSubscriptionPage({ trialCta: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                            <label className="md:col-span-2 text-sm font-semibold text-slate-700">Value Section Title<input value={subscriptionPage.valueTitle} onChange={e => updateSubscriptionPage({ valueTitle: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                            <label className="md:col-span-2 text-sm font-semibold text-slate-700">Value Section Description<textarea value={subscriptionPage.valueDescription} onChange={e => updateSubscriptionPage({ valueDescription: e.target.value })} rows={2} className="mt-1 w-full rounded-lg border p-2" /></label>
+                            <label className="md:col-span-2 text-sm font-semibold text-slate-700">Renewal Note<textarea value={subscriptionPage.renewalNote} onChange={e => updateSubscriptionPage({ renewalNote: e.target.value })} rows={2} className="mt-1 w-full rounded-lg border p-2" /></label>
                         </div>
                     </div>
 
@@ -945,7 +951,10 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                 </div>
                                 <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
                                     <label className="text-sm font-semibold text-slate-700">Plan Name<input value={plan.name} onChange={e => updatePlan(planIndex, { name: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                                    <label className="text-sm font-semibold text-slate-700">One-time Price (₹)<input type="number" min="0" value={plan.oncePrice ?? ''} onChange={e => updatePlan(planIndex, { oncePrice: Number(e.target.value) || 0 })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                                    <label className="text-sm font-semibold text-slate-700">Weekly Price (₹)<input type="number" min="0" value={plan.weeklyPrice ?? ''} onChange={e => updatePlan(planIndex, { weeklyPrice: Number(e.target.value) || 0 })} className="mt-1 w-full rounded-lg border p-2" /></label>
                                     <label className="text-sm font-semibold text-slate-700">Monthly Price (₹)<input type="number" min="0" value={plan.monthlyPrice ?? plan.price} onChange={e => { const nextPrice = Number(e.target.value) || 0; updatePlan(planIndex, { monthlyPrice: nextPrice, price: nextPrice }); }} className="mt-1 w-full rounded-lg border p-2" /></label>
+                                    <label className="text-sm font-semibold text-slate-700">Quarterly Price (₹)<input type="number" min="0" value={plan.quarterlyPrice ?? ''} onChange={e => updatePlan(planIndex, { quarterlyPrice: Number(e.target.value) || 0 })} className="mt-1 w-full rounded-lg border p-2" /></label>
                                     <label className="text-sm font-semibold text-slate-700">Yearly Price (₹)<input type="number" min="0" value={plan.yearlyPrice ?? ((plan.monthlyPrice ?? plan.price) * 12)} onChange={e => updatePlan(planIndex, { yearlyPrice: Number(e.target.value) || 0 })} className="mt-1 w-full rounded-lg border p-2" /></label>
                                     <label className="text-sm font-semibold text-slate-700">EduCoin Price<input type="number" min="0" value={plan.coinPrice || 0} onChange={e => updatePlan(planIndex, { coinPrice: Number(e.target.value) || 0 })} className="mt-1 w-full rounded-lg border p-2" /></label>
                                     <label className="text-sm font-semibold text-slate-700">Earning Multiplier<input type="number" min="1" max="5" step="0.25" value={plan.earningMultiplier} onChange={e => updatePlan(planIndex, { earningMultiplier: Math.max(1, Number(e.target.value) || 1) })} className="mt-1 w-full rounded-lg border p-2" /></label>

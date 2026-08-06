@@ -12,24 +12,27 @@ const accessSource = readFileSync(new URL('../utils/subscriptionAccess.ts', impo
 
 const assertContainsAll = (source, values) => values.forEach(value => assert.ok(source.includes(value), `Missing contract text: ${value}`));
 
-test('subscription access model contains exactly normal, pro and elite tiers', () => {
+test('subscription access model keeps internal tiers and a single unified Eduvora Plus+ plan', () => {
   assert.match(accessSource, /export type SubscriptionTier = 'normal' \| 'pro' \| 'elite'/);
-  assert.match(accessSource, /accessTier: 'pro'/);
+  assert.match(accessSource, /id: 'eduvora-plus'/);
+  assert.match(accessSource, /name: 'Eduvora Plus\+'/);
   assert.match(accessSource, /accessTier: 'elite'/);
   assert.match(accessSource, /earningMultiplier: 2/);
   assert.match(accessSource, /monthlyPrice: 499/);
-  assert.match(accessSource, /yearlyPrice: 499 \* 12/);
-  assert.match(accessSource, /return DEFAULT_SUBSCRIPTION_PLANS\.map/);
+  assert.match(accessSource, /yearlyPrice: 2999/);
+  assert.match(accessSource, /FREE_TRIAL_DAYS = 7/);
+  assert.match(accessSource, /canStartFreeTrial/);
+  assert.match(accessSource, /return \[unified\]/);
 });
 
 test('locked messages preserve the approved student-facing copy', () => {
   assertContainsAll(accessSource, [
-    'Unlock AI Mentor with Pro or Elite',
-    'Upgrade to Pro or Elite to start learning with AI Mentor.',
-    'Unlock Learning Community with Pro or Elite',
-    'Upgrade to Pro or Elite to join the learning community.',
-    'Start earning EduCoins with Pro or Elite',
-    'Upgrade to Pro or Elite and start building your learning wallet.',
+    'Unlock AI Mentor with Eduvora Plus+',
+    'Upgrade to Eduvora Plus+ to start learning with AI Mentor.',
+    'Unlock Learning Community with Eduvora Plus+',
+    'Upgrade to Eduvora Plus+ to join the learning community.',
+    'Start earning EduCoins with Eduvora Plus+',
+    'Upgrade to Eduvora Plus+ and start building your learning wallet.',
   ]);
 });
 
@@ -39,6 +42,18 @@ test('subscription activation persists tier and earning multiplier without downg
   assert.match(appSource, /subscriptionTier: nextTier/);
   assert.match(appSource, /eduCoinMultiplier: nextMultiplier/);
   assert.match(appSource, /eliteStatus: nextTier === 'elite'/);
+});
+
+test('new users can start a 7-day free trial once and it sets a trial window', () => {
+  assert.match(appSource, /const handleStartFreeTrial = \(\) =>/);
+  assert.match(appSource, /canStartFreeTrial\(currentUser\)/);
+  assert.match(appSource, /FREE_TRIAL_DAYS \* 24 \* 60 \* 60 \* 1000/);
+  assert.match(appSource, /subscriptionTrialStartedAt: activatedAt/);
+  assert.match(appSource, /subscriptionTrialEndsAt: trialEndsAt/);
+  assert.match(appSource, /subscriptionTrialUsed: true/);
+  assert.match(appSource, /onStartFreeTrial=\{handleStartFreeTrial\}/);
+  assert.match(accessSource, /getTrialDaysLeft/);
+  assert.match(accessSource, /isTrialActive/);
 });
 
 test('normal users receive Community and AI Mentor upgrade gates', () => {
@@ -73,15 +88,20 @@ test('Elite reward UI shows multiplied quiz earnings', () => {
 
 test('admin has a dedicated subscription customizer for page copy, plans and locks', () => {
   assert.match(settingsSource, /'subscriptions'/);
-  assert.match(settingsSource, /Pro & Elite Access Customizer/);
+  assert.match(settingsSource, /Eduvora Plus\+ Subscription Customizer/);
   assert.match(settingsSource, /Page Header & Billing Labels/);
+  assert.match(settingsSource, /Weekly Price \(₹\)/);
   assert.match(settingsSource, /Monthly Price \(₹\)/);
+  assert.match(settingsSource, /Quarterly Price \(₹\)/);
   assert.match(settingsSource, /Yearly Price \(₹\)/);
+  assert.match(settingsSource, /One-time Price \(₹\)/);
   assert.match(settingsSource, /Earning Multiplier/);
   assert.match(settingsSource, /Selected premium products\/content/);
   assert.match(settingsSource, /AI Mentor Locked Message/);
   assert.match(settingsSource, /Community Locked Message/);
   assert.match(settingsSource, /Normal User Profile Message/);
+  assert.match(settingsSource, /Trial Title/);
+  assert.match(settingsSource, /Renewal Note/);
 });
 
 test('subscription cards use admin data and prevent normal EduCoin checkout', () => {
@@ -93,15 +113,19 @@ test('subscription cards use admin data and prevent normal EduCoin checkout', ()
   assert.match(subscriptionSource, /EduCoin use unlocks with Pro/);
   assert.match(subscriptionSource, /plan\.benefits\.map/);
   assert.match(subscriptionSource, /plan\.unlockProductIds/);
+  assert.match(subscriptionSource, /onStartFreeTrial/);
+  assert.match(subscriptionSource, /SUBSCRIPTION_BILLING_CYCLES/);
+  assert.match(subscriptionSource, /One-time/);
+  assert.match(subscriptionSource, /Quarterly/);
 });
 
-test('subscription billing cycle is stored in user and order metadata', () => {
-  assert.match(accessSource, /export type SubscriptionBillingCycle = 'monthly' \| 'yearly'/);
+test('subscription billing cycle supports once, weekly, monthly, quarterly and yearly', () => {
+  assert.match(accessSource, /export type SubscriptionBillingCycle = 'once' \| 'weekly' \| 'monthly' \| 'quarterly' \| 'yearly'/);
   assert.match(accessSource, /getSubscriptionPeriodMonths/);
   assert.match(accessSource, /getSubscriptionBillingPrice/);
   assert.match(accessSource, /const monthlyPrice = Math\.max\(0, Number\(record\.monthlyPrice/);
   assert.match(appSource, /subscriptionBillingCycle: nextTier === requestedTier \? billingCycle/);
-  assert.match(appSource, /subscriptionExpiresAt: expiresAtDate\.toISOString\(\)/);
+  assert.match(appSource, /getSubscriptionExpiryDate/);
   assert.match(appSource, /subscriptionBillingCycle: billingCycle/);
   assert.match(appSource, /subscriptionPeriodMonths: getSubscriptionPeriodMonths\(billingCycle\)/);
 });

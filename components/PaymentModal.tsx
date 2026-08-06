@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { WebsiteSettings, ProductWithRating, CartItem, User } from '../App';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, normalizeCoinPrice } from '../utils/economy';
+import { getSubscriptionBillingCycleName, SubscriptionBillingCycle } from '../utils/subscriptionAccess';
 import MacWindowModal from './ui/MacWindowModal';
 
 export interface PaymentVerificationDetails {
@@ -43,7 +44,7 @@ interface PaymentModalProps {
   checkoutType?: 'product' | 'cart' | 'subscription' | 'latest-update';
   checkoutUserId?: string;
   checkoutTargetId?: string | number;
-  billingCycle?: 'monthly' | 'yearly';
+  billingCycle?: SubscriptionBillingCycle;
 }
 
 type CheckoutStep = 'checkout' | 'razorpay' | 'loading';
@@ -56,7 +57,7 @@ interface PendingCheckoutSession {
   checkoutUserId?: string;
   checkoutTargetId?: string | number;
   productTitle?: string;
-  billingCycle?: 'monthly' | 'yearly';
+  billingCycle?: SubscriptionBillingCycle;
   createdAt: number;
 }
 
@@ -160,7 +161,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
         checkoutUserId: parsed.checkoutUserId ? String(parsed.checkoutUserId) : checkoutUserId,
         checkoutTargetId: parsed.checkoutTargetId,
         productTitle: parsed.productTitle ? String(parsed.productTitle) : productTitle,
-        billingCycle: parsed.billingCycle === 'yearly' ? 'yearly' : parsed.billingCycle === 'monthly' ? 'monthly' : billingCycle,
+        billingCycle: parsed.billingCycle === 'once' || parsed.billingCycle === 'weekly' || parsed.billingCycle === 'quarterly' || parsed.billingCycle === 'yearly' || parsed.billingCycle === 'monthly' ? parsed.billingCycle : billingCycle,
         createdAt,
       };
     } catch {
@@ -528,7 +529,7 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
   const totalSavings = couponSavings + coinSavings;
   const finalPayable = Math.max(0, Number(finalPrice) || 0);
   const checkoutTypeLabel = checkoutType === 'subscription'
-    ? `${billingCycle === 'yearly' ? 'Yearly' : 'Monthly'} subscription`
+    ? `${billingCycle ? getSubscriptionBillingCycleName(billingCycle) : 'Monthly'} subscription`
     : checkoutType === 'latest-update'
       ? 'Latest course update'
       : checkoutType === 'cart'
