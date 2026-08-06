@@ -2331,23 +2331,6 @@ const CoursePlayer: React.FC<{
                 : 'rounded-2xl border border-[#E3E8F5] bg-white/92 shadow-[0_20px_60px_rgba(8,26,69,0.06)] sm:rounded-3xl'
           }`}>
             {renderMedia()}
-            {isMentorOpen && (
-              <div className="absolute inset-0 z-50 flex items-stretch justify-end bg-slate-950/20 p-2 backdrop-blur-[2px] sm:p-3" aria-label="AI Mentor overlay">
-                <div className="h-full w-full max-w-full overflow-y-auto sm:max-w-[34rem] lg:max-w-[40rem]">
-                  {/* AI Mentor is free for all users — no premium subscription required. */}
-                  <AiMentor
-                    productTitle={product.title}
-                    productId={product.id}
-                    courseId={product.id}
-                    activeFileId={activeFile?.id || null}
-                    activeFileType={activeFile?.type || null}
-                    activeContentName={activeFile?.name || null}
-                    userId={currentUserId}
-                    onClose={closeCourseMentor}
-                  />
-                </div>
-              </div>
-            )}
           </div>
 
           <aside id={modulePanelId} className={`${useDesktopSidebar ? 'lg:relative lg:inset-auto lg:z-auto lg:w-auto lg:translate-x-0 lg:overflow-hidden lg:rounded-lg' : ''} fixed inset-y-0 right-0 z-40 w-[min(90svw,21rem)] max-w-full transform transition ${isSidebarOpen ? "translate-x-0" : "translate-x-full"}`}>
@@ -2387,6 +2370,22 @@ const CoursePlayer: React.FC<{
           {educoinNotice && <div className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-black text-amber-900">{educoinNotice}</div>}
         </section>
       </main>
+
+      {isMentorOpen && (
+        <div className="fixed inset-0 z-50 bg-white" aria-label="AI Mentor overlay">
+          {/* AI Mentor is free for all users — no premium subscription required. */}
+          <AiMentor
+            productTitle={product.title}
+            productId={product.id}
+            courseId={product.id}
+            activeFileId={activeFile?.id || null}
+            activeFileType={activeFile?.type || null}
+            activeContentName={activeFile?.name || null}
+            userId={currentUserId}
+            onClose={closeCourseMentor}
+          />
+        </div>
+      )}
 
     </div>
   );
