@@ -42,7 +42,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
     const surfaceRoundnessKey = productCardRoundnessKeyBySurface[roundnessSurface];
     const isSurfaceRounded = productRoundness[surfaceRoundnessKey] !== false;
     const isInnerFrameRounded = productRoundness.mediaInnerFrame !== false;
-    const cardRoundClass = isSurfaceRounded ? 'rounded-[22px]' : 'rounded-xl';
+    const cardRoundClass = isSurfaceRounded ? 'rounded-[24px]' : 'rounded-xl';
     const mediaPaddingClass = isInnerFrameRounded ? 'p-2 sm:p-3' : '';
     const mediaFrameRoundClass = isInnerFrameRounded ? 'rounded-[18px] bg-white/85 shadow-inner ring-1 ring-white/80' : 'rounded-none bg-transparent';
     const badgeRoundClass = pillClassForProductRoundness(productRoundness.productBadges !== false);
@@ -72,7 +72,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
     }
 
     return (
-        <article className={`product-card-shine ${compactMobile ? 'product-card-mobile-compact' : ''} group relative flex min-h-full flex-col overflow-hidden ${cardRoundClass} border border-[#D6E4F5] bg-gradient-to-b from-white to-[#F8FBFF] shadow-[0_14px_38px_rgba(16,33,63,0.08)] ring-1 ring-white/70 transition duration-300 ease-out hover:-translate-y-1 hover:border-[#AFC8EC] hover:shadow-[0_24px_60px_rgba(16,33,63,0.15)] ${animationClass}`}>
+        <article className={`product-card-shine ${compactMobile ? 'product-card-mobile-compact' : ''} group relative flex min-h-full flex-col overflow-hidden ${cardRoundClass} border border-[#D6E4F5] bg-[#FFFBFE] shadow-none transition duration-300 ease-out ${animationClass}`}>
             {/* Image Container */}
             <div className={`relative aspect-[4/3] w-full overflow-hidden border-b border-[#E1EAF6] bg-gradient-to-br from-[#F6FAFF] via-white to-[#EEF4FF] ${mediaPaddingClass}`}>
                 <div className={`product-card-media-safe-frame relative h-full w-full overflow-hidden ${mediaFrameRoundClass}`}>
@@ -81,7 +81,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                     fallbackSrc={getProductImageFallback(product)}
                     alt={product.title}
                     wrapperClassName="absolute inset-0"
-                    className="h-full w-full object-contain p-1"
+                    className="h-full w-full object-cover"
                     fallbackTitle={product.title}
                     fallbackBadge={product.category || 'Product'}
                     fallbackIcon="🎓"
@@ -106,7 +106,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                         <>
                             {product.isFree && (
                                 <span className={`w-fit ${badgeRoundClass} bg-gradient-to-r from-[#0757d8] to-[#6d28d9] px-3.5 py-1.5 text-[10px] font-black uppercase tracking-[0.18em] text-white shadow-[0_10px_28px_rgba(37,99,235,0.45)] ring-2 ring-white/95 backdrop-blur-md [text-shadow:0_1px_2px_rgba(0,0,0,0.35)] sm:px-4 sm:text-xs`}>
-                                    Free
+                                    ₹0
                                 </span>
                             )}
                             {isCouponAvailable && product.couponCode && !product.isFree && settings.features.showSaleBadges && (
@@ -158,6 +158,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                         {product.title}
                     </button>
                 </h3>
+                <p className={`${compactMobile ? 'text-[11px]' : 'text-xs'} mb-2 font-medium text-[#625B71]`}>by Physics Master</p>
                 <p className={`${compactMobile ? 'hidden sm:block' : 'block'} mb-3 line-clamp-2 flex-grow text-[13px] font-semibold leading-5 text-[#64708F] sm:mb-4 sm:text-sm`}>{product.description}</p>
 
                 {displayMode === 'showcase' ? (
@@ -167,7 +168,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                                 <>
                                     <span className={`${compactMobile ? 'text-[9px] sm:text-xs' : 'text-xs'} text-slate-600 font-medium line-through`}>Price</span>
                                     <div className="flex items-baseline gap-1">
-                                        <span className={`${compactMobile ? 'text-sm sm:text-xl' : 'text-lg sm:text-xl'} font-bold text-blue-600`}>Free</span>
+                                        <span className={`${compactMobile ? 'text-sm sm:text-xl' : 'text-lg sm:text-xl'} font-bold text-blue-600`}>₹0</span>
                                         <span className={`${compactMobile ? 'text-[8px] sm:text-xs' : 'text-xs'} text-slate-600`}>(₹3 fee)</span>
                                     </div>
                                 </>
@@ -183,9 +184,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                                 </>
                             )}
                         </div>
-                        <button onClick={() => onViewDetails()} className={`flex shrink-0 items-center justify-center ${actionButtonRoundClass} bg-gradient-to-r from-[#1769FF] to-[#6D5CFF] font-black text-white shadow-[0_8px_18px_rgba(23,105,255,0.22)] transition active:scale-95 ${compactMobile ? 'min-h-8 px-2 py-2 text-[9px] sm:min-h-0 sm:px-4 sm:py-2.5 sm:text-sm' : 'px-3.5 py-2.5 text-xs sm:px-4 sm:text-sm'}`}>
-                            {isPurchased ? 'Purchased' : 'Details'}
-                            {!isPurchased && <span className={`${compactMobile ? 'hidden sm:inline' : 'inline'} ml-1`}>&rarr;</span>}
+                        <button onClick={() => onViewDetails()} className={`flex w-full shrink-0 items-center justify-center rounded-full bg-[#6750A4] font-black uppercase tracking-wide text-white shadow-none transition active:scale-95 ${compactMobile ? 'min-h-10 px-3 py-2 text-[10px] sm:min-h-0 sm:px-4 sm:py-2.5 sm:text-sm' : 'px-3.5 py-2.5 text-xs sm:px-4 sm:text-sm'}`}>
+                            {isPurchased ? 'PURCHASED' : 'DETAILS'}
                         </button>
                     </div>
                 ) : (

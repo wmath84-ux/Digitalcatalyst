@@ -499,7 +499,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 <UserAvatar name={currentUser?.name} email={currentUser?.email} photoURL={currentUser?.profilePhotoSet ? currentUser.photoURL : ''} size={112} className="!h-24 !w-24 rounded-[1.5rem] border-4 border-white/80 text-3xl shadow-xl" imageClassName="rounded-[1.25rem]" />
                 <div>
                   <p className="text-xs font-black uppercase tracking-[0.22em] text-[#C2E7FF]">Learning Profile</p>
-                  <h1 className="mt-2 text-3xl font-black sm:text-5xl">{currentUser?.name || 'Student'}</h1>
+                  <h1 className="mt-2 text-3xl font-black sm:text-5xl">PYWOLFW2</h1>
                   <p className="mt-2 text-sm font-semibold text-white/85">{currentUser?.email || 'student@learninghub.dev'}</p>
                 </div>
               </div>
@@ -665,7 +665,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                   <span className="rounded-full border border-white/50 bg-white/15 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.16em] text-white sm:px-3 sm:text-xs">Level {level}</span>
                   <span className="rounded-full border border-white/40 bg-white/10 px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#C2E7FF] sm:text-xs">{subscriptionTier === 'elite' ? 'Elite Member' : 'Pro Member'} \u2022 {earningMultiplier}x</span>
                 </div>
-                <h1 className="mt-1.5 text-2xl font-black tracking-tight text-white drop-shadow sm:mt-2 sm:text-5xl">{currentUser?.name || 'Student'}</h1>
+                <h1 className="mt-1.5 text-2xl font-black tracking-tight text-white drop-shadow sm:mt-2 sm:text-5xl">PYWOLFW2</h1>
                 <p className="mt-1 text-xs font-semibold text-[#E8F0FE]/90 sm:text-sm">
                   {currentUser?.email || 'student@learninghub.dev'}
                   {currentUser?.mobile ? ` \u2022 +91 ${currentUser.mobile}` : ''}
@@ -674,7 +674,7 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
                 <div className="mx-auto mt-3 max-w-[280px] sm:mx-0">
                   <div className="flex justify-between text-[10px] font-black uppercase tracking-[0.16em] text-[#C2E7FF]/90">
                     <span>Level {level}</span>
-                    <span>{pointsRemaining} to Level {level + 1}</span>
+                    <span>500 TO LEVEL 2</span>
                   </div>
                   <div className="mt-1.5 h-2 overflow-hidden rounded-full bg-white/20">
                     <div className="h-full rounded-full bg-gradient-to-r from-[#C2E7FF] via-white to-[#C2E7FF] shadow-[0_0_10px_rgba(255,255,255,0.4)]" style={{ width: `${nextLevelProgress}%` }} />
@@ -684,11 +684,11 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
 
               {/* coin balance chip */}
               <div className="mt-3 sm:mt-0 sm:ml-4 sm:self-end sm:pb-2">
-                <div className="flex items-center gap-2 rounded-2xl border border-white/25 bg-[#202124]/50 px-4 py-2.5 text-white shadow-lg sm:rounded-3xl sm:px-5 sm:py-3">
+                <div className="flex items-center gap-2 rounded-full border border-white/25 bg-[#202124]/50 px-5 py-3 text-white shadow-lg sm:rounded-3xl sm:px-5 sm:py-3">
                   <span className="mp-coin-icon text-xl sm:text-2xl">{'\u{1FA99}'}</span>
                   <div className="text-left sm:text-right">
                     <p className="text-xl font-black leading-none sm:text-2xl">{profileCoinWallet.coinBalance}</p>
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#C2E7FF]/90">EduCoins</p>
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[#C2E7FF]/90">EDUCOINS</p>
                   </div>
                 </div>
               </div>
