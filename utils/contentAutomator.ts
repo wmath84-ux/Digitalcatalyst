@@ -109,8 +109,9 @@ MARKDOWN RULES FOR content:
 
 IMAGE DIRECTION:
 - imagePrompt must be a concise English visual concept for this exact title and category.
-- Describe a clean 16:9 education editorial illustration with no logos, no written text, no watermark, and no realistic noisy stock-photo look.
-- News visuals should feel current and alert-oriented; blog visuals should feel calm, practical, and tutorial-oriented.
+- Describe a REAL-LIFE 16:9 PHOTOGRAPH, photorealistic with natural lighting and real people in authentic education settings. No illustration, no vector art, no clip art, no cartoon, no 3D render, no icons.
+- News visuals should look like a current editorial news photograph; blog visuals should look like a calm, practical real-life tutorial photo.
+- No logos, no written text, no words, no watermark, no text overlays.
 
 Return only the schema-compliant JSON response.
 `;
@@ -127,7 +128,7 @@ const buildContentResponseSchema = (type: ContentPostType) => ({
           type: { type: Type.STRING, enum: [type], description: `Must be ${type}.` },
           category: { type: Type.STRING, description: 'Short category label.' },
           excerpt: { type: Type.STRING, description: 'Two-sentence card summary.' },
-          imagePrompt: { type: Type.STRING, description: 'Topic-specific 16:9 editorial illustration prompt. No URL and no written text in the image.' },
+          imagePrompt: { type: Type.STRING, description: 'Topic-specific 16:9 real-life photograph prompt. Photorealistic, natural lighting, real people, authentic education settings. No URL, no written text, no illustration, no watermark.' },
           content: { type: Type.STRING, description: 'Complete Markdown article following the requested headings, lists, short paragraphs, and Key Takeaways section.' },
         },
         required: ['title', 'type', 'category', 'excerpt', 'imagePrompt', 'content'],
@@ -248,23 +249,26 @@ const stableImageSeed = (value: string) => {
 const premiumImagePromptForPost = (post: Pick<GeneratedContentPost, 'title' | 'type' | 'category' | 'imagePrompt'>) => {
   const topic = `${post.category || (post.type === 'news' ? 'Student News' : 'Study Blog')} ${post.title || ''}`.trim();
   const typeDirection = post.type === 'news'
-    ? 'current student education alert, clean editorial newsroom energy, exam scholarship technology symbols'
-    : 'calm student study desk, practical learning roadmap, notebooks course progress and skill building symbols';
+    ? 'current editorial news photograph of real students, campus, exams, scholarship and technology moments, alert documentary energy'
+    : 'real-life photograph of a student study desk, notebooks, laptop, library, practical learning and skill-building moments, calm tutorial energy';
   return [
-    'premium Eduvora education editorial illustration',
+    'professional photorealistic real-life photograph',
     topic,
     post.imagePrompt || typeDirection,
     typeDirection,
-    'soft white and ice blue background',
-    'deep navy and royal blue accents',
-    'subtle violet gradient',
-    'clean modern vector illustration',
-    'spacious balanced composition',
-    'no letters',
-    'no words',
+    'real people',
+    'natural lighting',
+    'sharp focus',
+    'authentic education scene',
+    'editorial news photography',
+    'no illustration',
+    'no vector art',
+    'no clip art',
+    'no cartoon',
     'no logo',
+    'no text',
+    'no words',
     'no watermark',
-    'no realistic noisy stock photo',
     '16:9',
   ].filter(Boolean).join(', ').slice(0, 900);
 };

@@ -4,7 +4,7 @@ import { Announcement, NewsArticle, User, WebsiteSettings } from '../App';
 import { EconomySettings } from '../utils/economy';
 import GoogleAd from './GoogleAd';
 import { countVisibleWords, hasUnsafePublicPlaceholder } from '../utils/reviewStableMode';
-import { buildArticleImageFallback, resolveNewsCover } from '../utils/mediaCompat';
+import { buildArticleImageFallback, buildArticleRealImageCandidates, resolveNewsCover } from '../utils/mediaCompat';
 import SafeImage from './common/SafeImage';
 
 type ReadingListType = 'news' | 'blog';
@@ -141,7 +141,10 @@ const buildPremiumArticleImage = (article: NewsArticle) => {
   const title = escapeSvgText((article.title || 'Premium Reading').slice(0, 82));
   return `data:image/svg+xml;utf8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 675"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${gradientStart}"/><stop offset="0.55" stop-color="${gradientEnd}"/><stop offset="1" stop-color="${gradientEnd}"/></linearGradient><radialGradient id="r" cx="22%" cy="18%" r="70%"><stop stop-color="#FFFFFF" stop-opacity="0.34"/><stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/></radialGradient></defs><rect width="1200" height="675" rx="42" fill="url(#g)"/><rect width="1200" height="675" fill="url(#r)"/><circle cx="1010" cy="125" r="170" fill="#ffffff" opacity="0.12"/><circle cx="180" cy="575" r="210" fill="#ffffff" opacity="0.10"/><path d="M70 470 C230 380 310 525 470 430 S760 300 1125 400" fill="none" stroke="#ffffff" stroke-opacity="0.22" stroke-width="18" stroke-linecap="round"/><rect x="78" y="74" width="220" height="58" rx="29" fill="#ffffff" opacity="0.95"/><text x="188" y="112" text-anchor="middle" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="900" fill="${isNews ? NewsPalette.primaryCyan : BlogPalette.primaryViolet}" letter-spacing="5">${badge}</text><text x="82" y="230" font-family="Inter,Arial,sans-serif" font-size="32" font-weight="800" fill="#E8F2FF" letter-spacing="2">${category}</text><foreignObject x="78" y="265" width="900" height="230"><div xmlns="http://www.w3.org/1999/xhtml" style="font-family:Inter,Arial,sans-serif;font-size:56px;line-height:1.05;font-weight:900;color:white;letter-spacing:-1.8px;">${title}</div></foreignObject><text x="82" y="590" font-family="Inter,Arial,sans-serif" font-size="24" font-weight="800" fill="#E8F2FF">Premium reading cover · URL image fallback</text></svg>`)}`;
 };
-const getArticleImage = (article: NewsArticle, size = '900/540') => resolveNewsCover(article) || buildPremiumArticleImage(article);
+const getArticleImage = (article: NewsArticle, size = '900/540') => {
+  const cover = resolveNewsCover(article);
+  return cover.startsWith('data:image') ? '' : cover;
+};
 const getArticleType = (article: NewsArticle): ReadingListType => article.type === 'news' ? 'news' : 'blog';
 const shouldShowPremiumLearningCta = (article: NewsArticle | null) => Boolean((article as (NewsArticle & { showPremiumLearningCta?: boolean }) | null)?.showPremiumLearningCta);
 const stripMarkdown = (value = '') => value.replace(/[#*_`>-]/g, ' ').replace(/\s+/g, ' ').trim();
@@ -376,13 +379,14 @@ const SponsoredPartnerCard: React.FC<{
   );
 };
 
-const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: string; imageSeed?: string; fallbackImage?: string; onClick: () => void; listType: ReadingListType; }> = ({ title, meta, excerpt, badge, imageSeed, fallbackImage, onClick, listType }) => {
+const HubCard: React.FC<{ title: string; meta: string; excerpt: string; badge: string; imageSeed?: string; fallbackImage?: string; fallbackCandidates?: string[]; onClick: () => void; listType: ReadingListType; }> = ({ title, meta, excerpt, badge, imageSeed, fallbackImage, fallbackCandidates, onClick, listType }) => {
   const palette = getPalette(listType);
+  const hasImageSource = Boolean(imageSeed) || (Array.isArray(fallbackCandidates) && fallbackCandidates.length > 0);
   return (
     <button onClick={onClick} className="reading-hub-mobile-card group relative flex min-h-[13rem] flex-col overflow-hidden rounded-[1.25rem] border text-left shadow-[0_6px_18px_rgba(60,64,67,0.09)] transition-[border-color,box-shadow,transform] duration-200 sm:min-h-0 sm:rounded-[2rem] sm:hover:-translate-y-1 sm:hover:shadow-[0_16px_38px_rgba(60,64,67,0.14)]" style={{ backgroundColor: palette.cardSurface, borderColor: palette.cardBorder }}>
-      {imageSeed && (
+      {hasImageSource && (
         <div className="aspect-[4/3] w-full overflow-hidden sm:aspect-[16/9]" style={{ backgroundColor: palette.searchBlue }}>
-          <SafeImage src={imageSeed || ''} fallbackSrc={fallbackImage || ''} alt={title} wrapperClassName="h-full w-full" className="h-full w-full object-cover opacity-95 transition-transform duration-300 sm:group-hover:scale-105" fallbackTitle={title} fallbackBadge={badge} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
+          <SafeImage src={imageSeed || ''} fallbackCandidates={fallbackCandidates || []} fallbackSrc={fallbackImage || ''} alt={title} wrapperClassName="h-full w-full" className="h-full w-full object-cover opacity-95 transition-transform duration-300 sm:group-hover:scale-105" fallbackTitle={title} fallbackBadge={badge} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" loadTimeoutMs={6000} referrerPolicy="no-referrer" />
         </div>
       )}
       <div className="flex flex-1 flex-col p-3 sm:p-6">
@@ -780,7 +784,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                     )}
                     {visibleArticles.map((article, index) => (
                       <React.Fragment key={`article-${article.id}`}>
-                        <HubCard title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(stripMarkdown(article.content))} min`} excerpt={article.excerpt} badge={article.type === 'news' ? 'News' : article.category || 'Blog'} imageSeed={getArticleImage(article)} fallbackImage={buildPremiumArticleImage(article)} onClick={() => handleSelectArticleFromList(article)} listType={listType} />
+                        <HubCard title={article.title} meta={`${formatDate(article.date)} · ${estimateReadMinutes(stripMarkdown(article.content))} min`} excerpt={article.excerpt} badge={article.type === 'news' ? 'News' : article.category || 'Blog'} imageSeed={getArticleImage(article)} fallbackImage={buildPremiumArticleImage(article)} fallbackCandidates={buildArticleRealImageCandidates(article)} onClick={() => handleSelectArticleFromList(article)} listType={listType} />
                         {(index + 1) % 3 === 0 && index < visibleArticles.length - 1 && (
                           <GoogleAd
                             variant="inFeed"
@@ -816,7 +820,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                     </div>
                     {!isExternalArticle(selectedArticleForDisplay) && (
                       <div className="hidden overflow-hidden rounded-[2rem] border shadow-sm backdrop-blur-2xl lg:block" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
-                        <SafeImage src={getArticleImage(selectedArticleForDisplay, '900/700')} fallbackSrc={buildArticleImageFallback(selectedArticleForDisplay)} alt={selectedArticleForDisplay.title} wrapperClassName="aspect-[4/3] h-full w-full" className="h-full w-full object-cover opacity-90 animate-article-hero-image" fallbackTitle={selectedArticleForDisplay.title} fallbackBadge={selectedArticleForDisplay.type === 'news' ? 'News' : selectedArticleForDisplay.category || 'Blog'} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
+                        <SafeImage src={getArticleImage(selectedArticleForDisplay, '900/700')} fallbackCandidates={buildArticleRealImageCandidates(selectedArticleForDisplay)} fallbackSrc={buildArticleImageFallback(selectedArticleForDisplay)} alt={selectedArticleForDisplay.title} wrapperClassName="aspect-[4/3] h-full w-full" className="h-full w-full object-cover opacity-90 animate-article-hero-image" fallbackTitle={selectedArticleForDisplay.title} fallbackBadge={selectedArticleForDisplay.type === 'news' ? 'News' : selectedArticleForDisplay.category || 'Blog'} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" loadTimeoutMs={6000} referrerPolicy="no-referrer" />
                       </div>
                     )}
                   </div>
@@ -849,7 +853,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
                   ) : (
                     <>
                       <div className="mb-6 mt-8 aspect-video overflow-hidden rounded-2xl border shadow-sm backdrop-blur-2xl lg:hidden" style={{ backgroundColor: chatPalette.cardSurface, borderColor: chatPalette.cardBorder }}>
-                        <SafeImage src={getArticleImage(selectedArticleForDisplay, '1400/800')} fallbackSrc={buildArticleImageFallback(selectedArticleForDisplay)} alt={selectedArticleForDisplay.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" fallbackTitle={selectedArticleForDisplay.title} fallbackBadge={selectedArticleForDisplay.type === 'news' ? 'News' : selectedArticleForDisplay.category || 'Blog'} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" />
+                        <SafeImage src={getArticleImage(selectedArticleForDisplay, '1400/800')} fallbackCandidates={buildArticleRealImageCandidates(selectedArticleForDisplay)} fallbackSrc={buildArticleImageFallback(selectedArticleForDisplay)} alt={selectedArticleForDisplay.title} className="h-full w-full object-cover opacity-90 animate-article-hero-image" fallbackTitle={selectedArticleForDisplay.title} fallbackBadge={selectedArticleForDisplay.type === 'news' ? 'News' : selectedArticleForDisplay.category || 'Blog'} fallbackIcon="📰" fallbackMessage="Image preview unavailable" aspect="video" loadTimeoutMs={6000} referrerPolicy="no-referrer" />
                       </div>
                       <div className="reading-article-content reading-article-body mx-auto mt-8 rounded-[2rem] border p-6 shadow-[0_18px_50px_rgba(60,64,67,0.08)] sm:p-8 lg:mt-10" style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }}>
                         <MarkdownContent

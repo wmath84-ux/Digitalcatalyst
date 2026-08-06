@@ -244,6 +244,60 @@ export const buildProductImageFallback = (product: { title?: string; category?: 
 export const buildPostImageFallback = (post: { title?: string; body?: string; type?: string; postType?: string }) => buildPremiumImageFallback({ title: post.title || post.body || 'Community post', badge: post.type || post.postType || 'Post', icon: '💬' });
 export const buildArticleImageFallback = (article: { title?: string; category?: string; type?: string }) => buildPremiumImageFallback({ title: article.title || 'Premium Reading', badge: article.type === 'news' ? 'News' : article.category || 'Blog', icon: '📰' });
 
+const ARTICLE_TOPIC_PHOTO_KEYWORDS: Record<string, string> = {
+  'education news': 'students,school,university,education',
+  exam: 'exam,study,students,writing',
+  scholarship: 'scholarship,graduation,students,celebration',
+  'student success': 'students,studying,library,success',
+  career: 'students,career,office,job',
+  technology: 'students,technology,laptop,digital',
+  'study tips': 'study,notebook,coffee,desk',
+  health: 'students,health,fitness,wellness',
+  science: 'science,laboratory,students,research',
+  sports: 'students,sports,stadium,team',
+  arts: 'arts,students,painting,creative',
+  business: 'business,students,finance,startup',
+};
+
+const normalizeTopicKeyword = (value = '') => String(value).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
+const pickTopicPhotoKeywords = (post: AnyMediaRecord) => {
+  const combined = `${normalizeTopicKeyword(post?.category)} ${normalizeTopicKeyword(post?.title)}`;
+  const matched = Object.keys(ARTICLE_TOPIC_PHOTO_KEYWORDS).find((key) => combined.includes(key));
+  if (matched) return ARTICLE_TOPIC_PHOTO_KEYWORDS[matched];
+  const categoryWords = normalizeTopicKeyword(post?.category).split(/\s+/).filter(Boolean).slice(0, 3);
+  return [...categoryWords, 'students', 'education'].filter(Boolean).join(',') || 'students,education,library';
+};
+
+const stablePostPhotoLock = (post: AnyMediaRecord) => {
+  const base = String(post?.id || post?.imageSeed || post?.title || 'article');
+  let hash = 2166136261;
+  for (let index = 0; index < base.length; index += 1) {
+    hash ^= base.charCodeAt(index);
+    hash = Math.imul(hash, 16777619);
+  }
+  return Math.abs(hash >>> 0) % 10000;
+};
+
+export const buildTopicRealPhotoUrl = (post: AnyMediaRecord, size = '1200/675') =>
+  `https://loremflickr.com/${size}/${pickTopicPhotoKeywords(post)}?lock=${stablePostPhotoLock(post)}`;
+
+export const buildSeededRealPhotoUrl = (post: AnyMediaRecord, size = '1200/675') => {
+  const seed = String(post?.imageSeed || post?.id || post?.title || 'education-reading').replace(/[^a-zA-Z0-9_-]/g, '');
+  return `https://picsum.photos/seed/${encodeURIComponent(seed)}/${size}`;
+};
+
+const isSvgDataUrl = (url = '') => /^data:image\/svg/i.test(cleanUrl(url));
+
+export const buildArticleRealImageCandidates = (post: AnyMediaRecord): string[] => {
+  const cover = cleanUrl(post?.coverImage) || cleanUrl(post?.thumbnailImage);
+  const candidates: string[] = [];
+  if ((isValidHttpsUrl(cover) || isDataImageUrl(cover)) && !isSvgDataUrl(cover)) candidates.push(cover);
+  candidates.push(buildTopicRealPhotoUrl(post));
+  candidates.push(buildSeededRealPhotoUrl(post));
+  return Array.from(new Set(candidates.map(cleanUrl).filter(Boolean)));
+};
+
 
 const getProductImageRawCandidates = (product: AnyMediaRecord, slot = 'card') => {
   const slotCandidates = PRODUCT_IMAGE_SLOT_FALLBACKS[slot] || [slot, 'card'];
