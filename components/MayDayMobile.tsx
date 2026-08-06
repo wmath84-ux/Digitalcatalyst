@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import type { User } from '../App';
 import { auth, db } from '../firebase';
+import { buildMayDayReportHtml } from '../utils/mayDayReport';
 
 type MayDayTab = 'dashboard' | 'home' | 'notes' | 'goals' | 'reminders' | 'focus' | 'progress';
 type NoteCategory = 'pinned' | 'study' | 'shopping';
@@ -765,11 +766,12 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   const syncLabel = syncStatus === 'saving' ? 'Saving…' : syncStatus === 'saved' ? 'Synced' : syncStatus === 'offline' ? 'Offline copy' : syncStatus === 'loading' ? 'Loading…' : 'Saved locally';
 
   const exportWorkspace = () => {
-    const blob = new Blob([JSON.stringify(workspaceRef.current, null, 2)], { type: 'application/json' });
+    const html = buildMayDayReportHtml(workspaceRef.current, displayName);
+    const blob = new Blob([html], { type: 'text/html;charset=utf-8' });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement('a');
     anchor.href = url;
-    anchor.download = `may-day-${todayKey()}.json`;
+    anchor.download = `may-day-report-${todayKey()}.html`;
     document.body.appendChild(anchor);
     anchor.click();
     anchor.remove();
