@@ -11,6 +11,7 @@ import { validateProductImageUpload } from '../../utils/productImageUpload.js';
 import { isCloudinaryImageUploadConfigured, uploadImageToCloudinary } from '../../utils/cloudinaryUpload';
 import PremiumImageUrlInput, { PremiumImageUrlStatus } from '../common/PremiumImageUrlInput';
 import PremiumMediaUrlInput from '../common/PremiumMediaUrlInput';
+import RichTextInput from '../common/RichTextInput';
 import './productEditorWorkspace.css'; // PRODUCT_EDITOR_WIZARD_V2
 import { buildUrlMediaSource, getFriendlyStorageErrorMessage, getStorageDisabledMessage, isStorageUploadEnabled } from '../../utils/mediaMode';
 
@@ -1678,14 +1679,28 @@ const ContentComposer: React.FC<{
                                     {(quizQuestions || []).map((question, questionIndex) => (
                                         <div key={questionIndex} className="rounded-2xl border border-white/50 bg-white/80 p-4">
                                             <label className={labelClass}>Question {questionIndex + 1}</label>
-                                            <input value={question.prompt} onChange={event => updateQuizQuestion(questionIndex, q => ({ ...q, prompt: event.target.value }))} className={fieldClass} placeholder="What should learners answer?" />
+                                            <RichTextInput
+                                                value={question.prompt}
+                                                onChange={prompt => updateQuizQuestion(questionIndex, q => ({ ...q, prompt }))}
+                                                className={fieldClass}
+                                                placeholder="Paste your question here — superscripts, subscripts, fractions, math symbols and rich formatting are preserved."
+                                                ariaLabel={`Question ${questionIndex + 1}`}
+                                                compact
+                                            />
 
                                             <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
                                                 {(question.options || []).map((option, optionIndex) => (
                                                     <label key={optionIndex} className="block">
                                                         <span className="mb-2 block text-xs font-bold text-slate-600">Option {optionIndex + 1}</span>
                                                         <div className="flex gap-2">
-                                                            <input value={option} onChange={event => updateQuizQuestion(questionIndex, q => ({ ...q, options: (q.options || []).map((current, idx) => idx === optionIndex ? event.target.value : current) }))} className={fieldClass} />
+                                                            <RichTextInput
+                                                                value={option}
+                                                                onChange={value => updateQuizQuestion(questionIndex, q => ({ ...q, options: (q.options || []).map((current, idx) => idx === optionIndex ? value : current) }))}
+                                                                className={fieldClass}
+                                                                placeholder={`Paste option ${optionIndex + 1}`}
+                                                                ariaLabel={`Option ${optionIndex + 1}`}
+                                                                compact
+                                                            />
                                                             <button type="button" onClick={() => updateQuizQuestion(questionIndex, q => ({ ...q, correctAnswer: optionIndex }))} className={`rounded-2xl px-4 text-xs font-black ${question.correctAnswer === optionIndex ? 'bg-emerald-400 text-slate-900' : 'border border-white/50 text-slate-600'}`}>
                                                                 Correct
                                                             </button>

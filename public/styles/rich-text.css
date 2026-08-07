@@ -1,0 +1,40 @@
+.rich-text-input {
+  min-height: 3.1rem;
+  cursor: text;
+  white-space: normal;
+  overflow-wrap: break-word;
+  word-break: break-word;
+  line-height: 1.55;
+}
+
+.rich-text-input-compact {
+  min-height: 2.9rem;
+}
+
+.rich-text-input:empty::before {
+  content: attr(data-placeholder);
+  color: #64748b;
+  pointer-events: none;
+  display: inline-block;
+}
+
+.rich-text-input:focus {
+  outline: none;
+}
+
+.rich-text-input:focus::before {
+  content: attr(data-placeholder);
+}
+
+.rich-text-input sup,
+.rich-text-input sub {
+  font-size: 0.72em;
+  line-height: 0;
+}
+
+.rich-text-input img,
+.rich-text-input video {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
+}
