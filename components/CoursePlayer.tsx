@@ -15,6 +15,7 @@ import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebase';
 import { isDirectAudioUrl, isDirectVideoUrl, isGoogleDriveUrl, normalizeDriveUrl, normalizeMediaSource } from '../utils/mediaCompat';
 import MediaFallbackCard from './common/MediaFallbackCard';
+import CoursePlayerHeader from './CoursePlayerHeader';
 import { getUserEduCoinMultiplier, hasSubscriptionFeature, normalizeSubscriptionPageContent } from '../utils/subscriptionAccess';
 import { stripHtml, toDisplayHtml } from '../utils/richText';
 
@@ -1735,6 +1736,8 @@ const CoursePlayer: React.FC<{
   const forceOverlaySidebarRef = useRef(forceOverlaySidebar);
   const courseHistoryRestoringRef = useRef(false);
   const courseHistoryReadyRef = useRef(false);
+  const lastCoursePopStateAtRef = useRef(0);
+  const fastDoubleBackEscapeRef = useRef(false);
 
   useEffect(() => {
     isSidebarOpenRef.current = isSidebarOpen;
@@ -1888,7 +1891,25 @@ const CoursePlayer: React.FC<{
     if (typeof window === 'undefined') return undefined;
     const handleCoursePopState = (event: PopStateEvent) => {
       const state = event.state || {};
+
+      if (fastDoubleBackEscapeRef.current) {
+        fastDoubleBackEscapeRef.current = false;
+        if (state.dcView !== 'coursePlayer') return;
+        window.setTimeout(() => window.history.back(), 0);
+        return;
+      }
+
       if (state.dcView !== 'coursePlayer') return;
+
+      const now = Date.now();
+      const isFastDoubleBack = now - lastCoursePopStateAtRef.current <= 50;
+      lastCoursePopStateAtRef.current = now;
+
+      if (isFastDoubleBack) {
+        fastDoubleBackEscapeRef.current = true;
+        window.setTimeout(() => window.history.back(), 0);
+        return;
+      }
 
       courseHistoryRestoringRef.current = true;
       const layer = state.dcCourseLayer === 'mentor' || state.dcCourseLayer === 'modules'
@@ -2438,6 +2459,11 @@ const CoursePlayer: React.FC<{
       <div className="absolute -bottom-20 left-8 h-96 w-24 rotate-12 rounded-full opacity-35 blur-2xl" style={{ backgroundColor: isAudioExperience ? '#d8faff' : '#a9a0ff' }} />
       <div className={`absolute -top-12 right-12 h-72 w-72 rounded-full blur-3xl ${isAudioExperience ? 'bg-[#e0fbff]/55' : 'bg-[#e6e2ff]/40'}`} />
 
+      <CoursePlayerHeader
+        currentUser={currentUser}
+        className="course-player-synergy-header order-first rounded-t-2xl border-b border-[#1A2B4C]/8 shadow-[0_10px_30px_rgba(26,43,76,0.06)] lg:hidden"
+      />
+
       <header className={`course-player-bottom-header relative z-30 order-2 flex min-h-[58px] min-w-0 items-center gap-1.5 border-t border-[#ded8ff] bg-white/95 shadow-[0_-8px_30px_rgba(8,26,69,0.06)] backdrop-blur-xl lg:order-1 lg:border-b lg:border-t-0 lg:shadow-sm ${forceOverlaySidebar ? '' : 'lg:hidden'} ${compactPlayerChrome ? 'px-2 py-1.5' : 'px-3 py-2 sm:px-4 sm:py-2.5'}`} style={{ paddingLeft: 'max(0.75rem, env(safe-area-inset-left))', paddingRight: 'max(0.75rem, env(safe-area-inset-right))', paddingTop: 'max(0.375rem, env(safe-area-inset-top))', paddingBottom: 'max(0.375rem, env(safe-area-inset-bottom))' }}>
         <button type="button" onClick={() => navigateAdjacentLesson(-1)} disabled={activeFileIndex <= 0} aria-label="Previous lesson" className={`${viewport.isTinyPlayer ? 'h-10 w-9 text-xl' : 'h-11 w-10 text-2xl'} inline-flex shrink-0 items-center justify-center rounded-2xl border border-[#ded8ff] bg-white font-black leading-none text-[#5B4BFF] shadow-[0_10px_30px_rgba(89,71,242,0.10)] transition hover:bg-[#f7f5ff] disabled:cursor-not-allowed disabled:opacity-35 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50`}>‹</button>
         <button type="button" onClick={() => navigateAdjacentLesson(1)} disabled={activeFileIndex >= orderedCourseFiles.length - 1 || orderedCourseFiles.length === 0} aria-label="Next lesson" className={`${viewport.isTinyPlayer ? 'h-10 w-9 text-xl' : 'h-11 w-10 text-2xl'} inline-flex shrink-0 items-center justify-center rounded-2xl border border-[#ded8ff] bg-white font-black leading-none text-[#5B4BFF] shadow-[0_10px_30px_rgba(89,71,242,0.10)] transition hover:bg-[#f7f5ff] disabled:cursor-not-allowed disabled:opacity-35 focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/50`}>›</button>
@@ -2548,17 +2574,23 @@ const CoursePlayer: React.FC<{
       </main>
 
       {isMentorOpen && (
-        <div className="fixed inset-0 z-50 bg-white" aria-label="AI Mentor overlay">
-          <AiMentor
-            productTitle={product.title}
-            productId={product.id}
-            courseId={product.id}
-            activeFileId={activeFile?.id || null}
-            activeFileType={activeFile?.type || null}
-            activeContentName={activeFile?.name || null}
-            userId={currentUserId}
-            onClose={closeCourseMentor}
+        <div className="fixed inset-0 z-50 flex flex-col bg-white" aria-label="AI Mentor overlay">
+          <CoursePlayerHeader
+            currentUser={currentUser}
+            className="course-player-synergy-header shrink-0 rounded-none border-b border-[#1A2B4C]/8 shadow-[0_10px_30px_rgba(26,43,76,0.06)] lg:hidden"
           />
+          <div className="min-h-0 flex-1">
+            <AiMentor
+              productTitle={product.title}
+              productId={product.id}
+              courseId={product.id}
+              activeFileId={activeFile?.id || null}
+              activeFileType={activeFile?.type || null}
+              activeContentName={activeFile?.name || null}
+              userId={currentUserId}
+              onClose={closeCourseMentor}
+            />
+          </div>
         </div>
       )}
 
