@@ -1627,16 +1627,12 @@ const App: React.FC = () => {
   useEffect(() => {
     if (typeof document === 'undefined' || currentView !== 'allProducts') return undefined;
     const root = document.documentElement;
-    const body = document.body;
     const rootAlreadyEnabled = root.classList.contains('store-page-scroll-enabled');
-    const bodyAlreadyEnabled = body.classList.contains('store-page-scroll-enabled');
 
     root.classList.add('store-page-scroll-enabled');
-    body.classList.add('store-page-scroll-enabled');
 
     return () => {
       if (!rootAlreadyEnabled) root.classList.remove('store-page-scroll-enabled');
-      if (!bodyAlreadyEnabled) body.classList.remove('store-page-scroll-enabled');
     };
   }, [currentView]);
   const [networkBanner, setNetworkBanner] = useState(() => (typeof navigator !== 'undefined' && !navigator.onLine ? 'You are offline. Some features may not work until internet is back.' : ''));
@@ -2497,9 +2493,6 @@ const App: React.FC = () => {
 
   useEffect(() => {
     const getDock = () => document.getElementById('main-bottom-dock');
-    const shouldUseDesktopPointerReveal = () => window.matchMedia('(hover: hover) and (pointer: fine) and (min-width: 768px)').matches;
-    const revealZonePx = 180;
-    let lastPointerY = Number.POSITIVE_INFINITY;
 
     const applyDockVisibility = () => {
       const dock = getDock();
@@ -2509,52 +2502,24 @@ const App: React.FC = () => {
       dock.dataset.hidden = isScrollHidden && !isPointerRevealActive ? 'true' : 'false';
     };
 
-    const updatePointerReveal = (clientY: number) => {
+    const onPointerMove = () => {
       const dock = getDock();
       if (!dock) return;
-      if (!shouldUseDesktopPointerReveal()) {
-        dock.dataset.pointerReveal = 'false';
-        applyDockVisibility();
-        return;
-      }
-      lastPointerY = clientY;
-      dock.dataset.pointerReveal = window.innerHeight - clientY <= revealZonePx ? 'true' : 'false';
+      dock.dataset.pointerReveal = 'false';
       applyDockVisibility();
-    };
-
-    const onScroll = () => {
-      const dock = getDock();
-      if (!dock) return;
-      const y = window.scrollY;
-      const last = Number(dock.dataset.lastY || 0);
-      const delta = y - last;
-      if (Math.abs(delta) > 2) {
-        dock.dataset.scrollHidden = delta > 0 && y > 120 ? 'true' : 'false';
-        dock.dataset.lastY = String(y);
-      }
-      if (Number.isFinite(lastPointerY)) updatePointerReveal(lastPointerY);
-      else applyDockVisibility();
-    };
-
-    const onPointerMove = (event: PointerEvent | MouseEvent) => {
-      updatePointerReveal(event.clientY);
     };
 
     const onPointerLeave = () => {
       const dock = getDock();
       if (!dock) return;
-      lastPointerY = Number.POSITIVE_INFINITY;
       dock.dataset.pointerReveal = 'false';
       applyDockVisibility();
     };
 
     const pointerMoveEventName: 'pointermove' | 'mousemove' = typeof window.PointerEvent === 'function' ? 'pointermove' : 'mousemove';
-    window.addEventListener('scroll', onScroll, { passive: true });
     window.addEventListener(pointerMoveEventName, onPointerMove, { passive: true });
     document.addEventListener('mouseleave', onPointerLeave);
-    onScroll();
     return () => {
-      window.removeEventListener('scroll', onScroll);
       window.removeEventListener(pointerMoveEventName, onPointerMove);
       document.removeEventListener('mouseleave', onPointerLeave);
     };
