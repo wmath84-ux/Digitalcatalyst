@@ -900,6 +900,17 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   const [lineSpacing, setLineSpacing] = useState(1.7);
   const [fontStyle, setFontStyle] = useState<'sans' | 'serif'>('sans');
   const [theme, setTheme] = useState<'dark' | 'sepia' | 'light'>('dark');
+  const [isActionMenuOpen, setIsActionMenuOpen] = useState(false);
+  const [hasRuledLines, setHasRuledLines] = useState(false);
+  const [paperColor, setPaperColor] = useState('#ffffff');
+  const [highlightColor, setHighlightColor] = useState('#fef08a');
+  const [dragOffset, setDragOffset] = useState(0);
+  const [isPageFlipped, setIsPageFlipped] = useState(false);
+  const [flipDirection, setFlipDirection] = useState<-1 | 1>(-1);
+  const [incomingPageId, setIncomingPageId] = useState('');
+  const pageShellRef = useRef<HTMLDivElement>(null);
+  const swipeStartXRef = useRef<number | null>(null);
+  const swipeStartYRef = useRef<number | null>(null);
   const [learnerUid, setLearnerUid] = useState(() => auth.currentUser?.uid || '');
   const cloudSaveTimerRef = useRef<number | null>(null);
   const cloudDocId = useMemo(
@@ -1092,6 +1103,113 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
     saveCurrentPage();
   };
 
+  const updateActivePageTitle = (title: string) => {
+    if (!activePage) return;
+
+    const nextTitle = title.trimStart();
+    const nextPages = pages.map(page =>
+      page.id === activePage.id ? { ...page, title: nextTitle, updatedAt: Date.now() } : page
+    );
+
+    persistPages(nextPages, 'Unsaved changes…');
+  };
+
+  const runHighlightCommand = (color: string) => {
+    setHighlightColor(color);
+    runCommand('backColor', color);
+  };
+
+  const handleEditorKeyDown = (event: React.KeyboardEvent<HTMLDivElement>) => {
+    if (event.key !== ' ') return;
+
+    const selection = window.getSelection();
+    if (!selection || selection.rangeCount === 0) return;
+
+    const range = selection.getRangeAt(0);
+    const block = range.startContainer.parentElement?.closest('p,div,h1,h2,li');
+    const text = (block?.textContent || '').trim();
+
+    if (text === '#') {
+      event.preventDefault();
+      runCommand('formatBlock', '<h1>');
+      if (block) block.textContent = '';
+      saveCurrentPage();
+    }
+
+    if (text === '*') {
+      event.preventDefault();
+      if (block) block.textContent = '';
+      runCommand('insertUnorderedList');
+      saveCurrentPage();
+    }
+  };
+
+  const beginSwipe = (clientX: number, clientY: number) => {
+    swipeStartXRef.current = clientX;
+    swipeStartYRef.current = clientY;
+    setIsPageFlipped(false);
+  };
+
+  const moveSwipe = (clientX: number, clientY: number) => {
+    const startX = swipeStartXRef.current;
+    const startY = swipeStartYRef.current;
+    if (startX === null || startY === null) return;
+
+    const deltaX = clientX - startX;
+    const deltaY = clientY - startY;
+    if (Math.abs(deltaY) > Math.abs(deltaX) * 1.25) return;
+
+    setDragOffset(deltaX);
+  };
+
+  const endSwipe = () => {
+    const width = pageShellRef.current?.offsetWidth || editorRef.current?.offsetWidth || 1;
+    const shouldFlip = Math.abs(dragOffset) > width * 0.3;
+    const direction: -1 | 1 = dragOffset < 0 ? -1 : 1;
+
+    if (shouldFlip && pages.length > 1) {
+      const currentIndex = Math.max(0, pages.findIndex(page => page.id === activePageId));
+      const nextIndex = direction < 0
+        ? (currentIndex + 1) % pages.length
+        : (currentIndex - 1 + pages.length) % pages.length;
+
+      saveCurrentPage();
+      setFlipDirection(direction);
+      setIncomingPageId(pages[nextIndex]?.id || activePageId);
+      setIsPageFlipped(true);
+      window.setTimeout(() => {
+        setActivePageId(pages[nextIndex]?.id || activePageId);
+        setIsPageFlipped(false);
+        setIncomingPageId('');
+      }, 360);
+    }
+
+    setDragOffset(0);
+    swipeStartXRef.current = null;
+    swipeStartYRef.current = null;
+  };
+
+
+  const paperBackground = hasRuledLines
+    ? `repeating-linear-gradient(to bottom, transparent 0, transparent 30px, rgba(125, 184, 230, 0.38) 31px, transparent 32px), linear-gradient(${paperColor}, ${paperColor})`
+    : paperColor;
+  const activePageIndex = Math.max(0, pages.findIndex(page => page.id === activePageId));
+  const liveSwipeDirection: -1 | 1 = dragOffset < 0 ? -1 : 1;
+  const previewDirection = isPageFlipped ? flipDirection : liveSwipeDirection;
+  const previewPageIndex = previewDirection < 0
+    ? (activePageIndex + 1) % Math.max(1, pages.length)
+    : (activePageIndex - 1 + Math.max(1, pages.length)) % Math.max(1, pages.length);
+  const incomingPreviewPage = pages.find(page => page.id === incomingPageId) || (dragOffset && pages.length > 1 ? pages[previewPageIndex] : null);
+  const swipeProgress = pageShellRef.current ? Math.min(1, Math.abs(dragOffset) / Math.max(1, pageShellRef.current.offsetWidth * 0.3)) : 0;
+  const pageTransform = dragOffset
+    ? `perspective(1000px) rotateY(${Math.max(-24, Math.min(24, dragOffset / 10))}deg) translateX(${dragOffset * 0.05}px)`
+    : isPageFlipped ? `perspective(1000px) rotateY(${flipDirection < 0 ? -180 : 180}deg)` : undefined;
+  const incomingTransform = isPageFlipped
+    ? 'perspective(1000px) rotateY(0deg) translateX(0) scale(1)'
+    : dragOffset
+      ? `perspective(1000px) rotateY(${previewDirection < 0 ? 34 - swipeProgress * 34 : -34 + swipeProgress * 34}deg) translateX(${previewDirection < 0 ? 22 - swipeProgress * 22 : -22 + swipeProgress * 22}%) scale(${0.96 + swipeProgress * 0.04})`
+      : undefined;
+
   const readingThemeClass = {
     dark: 'bg-white/70 text-slate-900',
     sepia: 'bg-[#2b2118]/95 text-[#f7e7c6]',
@@ -1100,6 +1218,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
 
   return (
     <div className="relative flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-white text-slate-900">
+      <style>{`.open-docs-paper-shell::before{content:"";position:absolute;right:0;top:0;width:74px;height:74px;background:linear-gradient(135deg,rgba(255,255,255,.15) 0%,rgba(255,255,255,.9) 46%,rgba(184,201,222,.7) 50%,rgba(8,26,69,.14) 100%);clip-path:polygon(100% 0,0 0,100% 100%);border-top-right-radius:1.6rem;filter:drop-shadow(-8px 8px 10px rgba(8,26,69,.14));pointer-events:none}.open-docs-paper-shell::after{content:"";position:absolute;right:8px;top:70px;width:60px;height:12px;background:radial-gradient(ellipse at center,rgba(8,26,69,.22),transparent 68%);transform:rotate(-42deg);pointer-events:none}.open-docs-page-flipped{box-shadow:-20px 20px 60px rgba(8,26,69,.24)!important}`}</style>
       <div className="open-docs-toolbar order-2 flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-t border-[#D9E7F8] bg-white p-2 shadow-sm sm:gap-2 sm:p-3 lg:order-1 lg:border-b lg:border-t-0 custom-scrollbar">
         <button type="button" onClick={() => setIsSidebarOpen(value => !value)} className={`min-h-11 shrink-0 rounded-2xl border px-4 py-2 text-xs font-black uppercase tracking-widest shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/45 ${isSidebarOpen ? 'border-[#7B61FF] bg-gradient-to-r from-[#5B4BFF] to-[#7B61FF] text-white' : 'border-[#D9E7F8] bg-white/90 text-[#5B4BFF] hover:bg-[#F7F5FF]'}`} aria-label={isSidebarOpen ? 'Close Open Docs panel' : 'Open Open Docs panel'} aria-expanded={isSidebarOpen} aria-controls="open-docs-panel">Open Docs</button>
         <button type="button" onClick={() => { saveCurrentPage(); setIsReadingMode(true); }} className="min-h-11 shrink-0 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-2 text-xs font-black uppercase tracking-widest text-[#536178] shadow-sm transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF] hover:shadow-md">Reading Mode</button>
@@ -1110,7 +1229,23 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
         <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('justifyLeft')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">Left</button>
         <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('justifyCenter')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">Center</button>
         <button type="button" onPointerDown={event => event.preventDefault()} onClick={() => runCommand('justifyRight')} className="min-h-9 shrink-0 rounded-xl border border-white/50 bg-white/75 px-3 py-2 text-sm font-black text-slate-900 hover:bg-white/90 hover:shadow-sm">Right</button>
-        <span className="ml-auto shrink-0 rounded-full bg-white/60 px-3 py-1 text-xs font-bold text-slate-600/90">{savedAt}</span>
+        <div className="relative ml-auto shrink-0">
+          <button type="button" onClick={() => setIsActionMenuOpen(value => !value)} className="inline-flex min-h-10 w-10 items-center justify-center rounded-2xl border border-[#D9E7F8] bg-white text-xl font-black text-[#081A45] shadow-sm hover:bg-[#F8FBFF]" aria-expanded={isActionMenuOpen} aria-label="Open docs page actions">⋮</button>
+        </div>
+        {isActionMenuOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#081A45]/28 p-4 backdrop-blur-[3px]" role="dialog" aria-modal="true" aria-label="Docs page actions" onClick={() => setIsActionMenuOpen(false)}>
+            <div className="w-full max-w-sm rounded-[2rem] border border-[#D9E7F8] bg-white p-4 text-left shadow-[0_28px_80px_rgba(8,26,69,0.24)]" onClick={event => event.stopPropagation()}>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <p className="text-xs font-black uppercase tracking-[0.22em] text-[#5B4BFF]">Page tools</p>
+                <button type="button" onClick={() => setIsActionMenuOpen(false)} className="flex h-9 w-9 items-center justify-center rounded-full bg-[#F8FBFF] text-lg font-black text-[#081A45]">×</button>
+              </div>
+              <button type="button" onClick={() => setHasRuledLines(value => !value)} className="w-full rounded-2xl px-3 py-3 text-left text-sm font-black text-[#081A45] hover:bg-[#F1EEFF]">{hasRuledLines ? 'Hide' : 'Toggle'} Ruled Lines</button>
+              <label className="mt-2 flex items-center justify-between rounded-2xl px-3 py-3 text-sm font-black text-[#081A45] hover:bg-[#F8FBFF]">Page Color<input type="color" value={paperColor} onChange={event => setPaperColor(event.target.value)} className="h-9 w-12 cursor-pointer rounded-lg" /></label>
+              <label className="mt-2 flex items-center justify-between rounded-2xl px-3 py-3 text-sm font-black text-[#081A45] hover:bg-[#F8FBFF]">Highlight Text<input type="color" value={highlightColor} onChange={event => runHighlightCommand(event.target.value)} className="h-9 w-12 cursor-pointer rounded-lg" /></label>
+            </div>
+          </div>
+        )}
+        <span className="shrink-0 rounded-full bg-white/60 px-3 py-1 text-xs font-bold text-slate-600/90">{savedAt}</span>
       </div>
 
       <div className="relative order-1 min-h-0 flex-1 overflow-hidden lg:order-2">
@@ -1156,12 +1291,37 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
                 <button type="button" onClick={renamePage} className="min-h-11 w-full rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-black text-[#536178] transition hover:border-[#C9C2FF] hover:bg-[#F7F5FF] hover:text-[#5B4BFF]">Rename Page</button>
                 {pages.length > 1 && (<button type="button" onClick={deletePage} className="min-h-11 w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700 transition hover:bg-rose-100">Delete Page</button>)}
               </div>
-              <p className="mt-4 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-3 text-xs font-bold leading-5 text-[#536178]">{savedAt.includes('cloud') ? savedAt : `${savedAt} · saved locally and synced when available`}</p>
             </div>
           </div>
         )}
-        <div className={`h-full min-h-0 overflow-y-auto p-3 transition-[padding] duration-300 sm:p-4 md:p-8 custom-scrollbar ${editorShellClass}`}>
-          <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={saveCurrentPage} onBlur={saveCurrentPage} onKeyUp={() => saveEditorSelection(editorRef.current, selectionRef)} onMouseUp={() => saveEditorSelection(editorRef.current, selectionRef)} onTouchEnd={() => saveEditorSelection(editorRef.current, selectionRef)} onFocus={() => saveEditorSelection(editorRef.current, selectionRef)} className={`open-docs-page mx-auto min-h-full w-full ${editorPageWidthClass} rounded-[1.25rem] border border-white/50 bg-white/80 px-4 py-6 text-base leading-7 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] outline-none backdrop-blur-xl transition-[max-width] duration-300 sm:rounded-[1.5rem] sm:px-8 sm:py-10 sm:text-lg sm:leading-8 md:px-14 [&_h1]:text-3xl sm:[&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-2xl sm:[&_h2]:text-3xl [&_h2]:font-black [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6`} />
+        <div className={`h-full min-h-0 overflow-y-auto bg-[#F1F7FF] p-3 transition-[padding] duration-300 sm:p-4 md:p-8 custom-scrollbar ${editorShellClass}`}>
+          <div className={`relative mx-auto min-h-full w-full ${editorPageWidthClass}`}>
+            {incomingPreviewPage && (
+              <div
+                className="open-docs-paper-shell pointer-events-none absolute inset-0 z-0 min-h-full w-full rounded-[1.6rem] border border-white/80 p-4 shadow-[0_28px_75px_rgba(8,26,69,0.14)] sm:p-7 md:p-10"
+                style={{ background: paperBackground, transform: incomingTransform, transformOrigin: previewDirection < 0 ? 'right center' : 'left center', transition: dragOffset ? 'none' : 'transform 0.42s ease, opacity 0.42s ease', opacity: isPageFlipped ? 1 : Math.max(0.18, swipeProgress) }}
+                aria-hidden="true"
+              >
+                <div className="mb-5 truncate text-4xl font-black tracking-tight text-[#081A45] sm:text-5xl">{incomingPreviewPage.title}</div>
+                <div className="open-docs-page min-h-[62vh] w-full bg-transparent text-base leading-8 text-[#081A45] outline-none sm:text-lg [&_h1]:text-3xl sm:[&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-2xl sm:[&_h2]:text-3xl [&_h2]:font-black [&_mark]:rounded [&_mark]:px-1 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6" dangerouslySetInnerHTML={{ __html: incomingPreviewPage.content || OPEN_DOCS_DEFAULT_HTML }} />
+              </div>
+            )}
+            <div
+              ref={pageShellRef}
+              className={`open-docs-paper-shell relative z-10 min-h-full w-full rounded-[1.6rem] border border-white/80 p-4 shadow-[0_28px_75px_rgba(8,26,69,0.16)] transition-[max-width,opacity] duration-300 sm:p-7 md:p-10 ${isPageFlipped ? 'open-docs-page-flipped' : ''}`}
+              style={{ background: paperBackground, transform: pageTransform, transformOrigin: previewDirection < 0 ? 'left center' : 'right center', transition: dragOffset ? 'none' : 'transform 0.6s ease, max-width 0.3s ease, opacity 0.2s ease', opacity: dragOffset ? Math.max(0.72, 1 - Math.abs(dragOffset) / 900) : 1 }}
+              onMouseDown={event => beginSwipe(event.clientX, event.clientY)}
+              onMouseMove={event => moveSwipe(event.clientX, event.clientY)}
+              onMouseUp={endSwipe}
+              onMouseLeave={endSwipe}
+              onTouchStart={event => beginSwipe(event.touches[0]?.clientX || 0, event.touches[0]?.clientY || 0)}
+              onTouchMove={event => moveSwipe(event.touches[0]?.clientX || 0, event.touches[0]?.clientY || 0)}
+              onTouchEnd={endSwipe}
+            >
+              <input value={activePage?.title || ''} onChange={event => updateActivePageTitle(event.target.value)} className="mb-5 w-full border-0 bg-transparent text-4xl font-black tracking-tight text-[#081A45] outline-none placeholder:text-[#9AA4B5] sm:text-5xl" placeholder="Untitled document" aria-label="Document title" />
+              <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={() => { setSavedAt('Unsaved changes…'); saveCurrentPage(); }} onBlur={saveCurrentPage} onKeyDown={handleEditorKeyDown} onKeyUp={() => saveEditorSelection(editorRef.current, selectionRef)} onMouseUp={() => saveEditorSelection(editorRef.current, selectionRef)} onTouchEnd={() => saveEditorSelection(editorRef.current, selectionRef)} onFocus={() => saveEditorSelection(editorRef.current, selectionRef)} className="open-docs-page min-h-[62vh] w-full bg-transparent text-base leading-8 text-[#081A45] outline-none sm:text-lg [&_h1]:text-3xl sm:[&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-2xl sm:[&_h2]:text-3xl [&_h2]:font-black [&_mark]:rounded [&_mark]:px-1 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6" />
+            </div>
+          </div>
         </div>
       </div>
 
