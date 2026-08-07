@@ -4215,46 +4215,88 @@ const App: React.FC = () => {
       }
       googleIdentityClientIdRef.current = clientId;
 
-      const startPrompt = (): boolean => {
-          const initialized = initializeGoogleIdentityServices({
-              clientId,
-              callback: response => void handleGoogleCredential(response),
-          });
-          if (!initialized) return false;
-
-          if (!googleChooserHostRef.current) {
-              googleChooserHostRef.current = mountGoogleAccountChooserHost();
-              renderGoogleAccountChooserButton(googleChooserHostRef.current);
-          }
-
-          promptGoogleOneTap(moment => {
-              if (moment?.type === 'skipped' || moment?.type === 'suppressed') {
-                  console.info('ONE_TAP_SKIPPED_FALLBACK_TO_ACCOUNT_CHOOSER', { type: moment.type });
-                  if (googleFlowPendingRef.current) triggerGoogleAccountChooser(googleChooserHostRef.current);
-              }
-          });
-          return true;
+      let chooserSettled = false;
+      let chooserOpenedResolve: ((opened: boolean) => void) | null = null;
+      const settleChooser = (opened: boolean) => {
+          if (chooserSettled) return;
+          chooserSettled = true;
+          if (chooserOpenedResolve) chooserOpenedResolve(opened);
       };
 
-      if (isGoogleIdentityLoaded()) {
-          if (!startPrompt()) {
-              resetGoogleFlowPending();
-              return { success: false, message: 'Google sign-in could not start. Please try again.' };
-          }
-          return { success: true, message: 'Choose your Google account to continue.' };
-      }
+      const originalWindowOpen = window.open.bind(window);
+      (window as { open?: typeof window.open }).open = ((...args: Parameters<typeof window.open>) => {
+          const popup = originalWindowOpen(...args);
+          if (popup) settleChooser(true);
+          return popup;
+      }) as typeof window.open;
 
       try {
-          await loadGoogleIdentityServices();
-          if (!startPrompt()) {
+          const startPrompt = (): boolean => {
+              const initialized = initializeGoogleIdentityServices({
+                  clientId,
+                  callback: response => void handleGoogleCredential(response),
+              });
+              if (!initialized) return false;
+
+              if (!googleChooserHostRef.current) {
+                  googleChooserHostRef.current = mountGoogleAccountChooserHost();
+                  renderGoogleAccountChooserButton(googleChooserHostRef.current);
+              }
+
+              promptGoogleOneTap(moment => {
+                  if (moment?.type === 'display') settleChooser(true);
+                  if (moment?.type === 'skipped' || moment?.type === 'suppressed') {
+                      console.info('ONE_TAP_SKIPPED_FALLBACK_TO_ACCOUNT_CHOOSER', { type: moment.type });
+                      if (googleFlowPendingRef.current) triggerGoogleAccountChooser(googleChooserHostRef.current);
+                  }
+                  if (moment?.type === 'dismissed' || moment?.type === 'expired') settleChooser(false);
+              });
+              return true;
+          };
+
+          let started: boolean;
+          if (isGoogleIdentityLoaded()) {
+              started = startPrompt();
+          } else {
+              try {
+                  await Promise.race([
+                      loadGoogleIdentityServices(),
+                      new Promise<never>((_, reject) => window.setTimeout(() => reject(new Error('Google Identity Services load timed out.')), 12000)),
+                  ]);
+                  started = startPrompt();
+              } catch (error: any) {
+                  console.warn('Google Identity Services failed to load.', error);
+                  resetGoogleFlowPending();
+                  return { success: false, message: 'Google sign-in could not start. Please try again.' };
+              }
+          }
+
+          if (!started) {
               resetGoogleFlowPending();
               return { success: false, message: 'Google sign-in could not start. Please try again.' };
           }
-          return { success: true, message: 'Choose your Google account to continue.' };
-      } catch (error: any) {
-          console.warn('Google Identity Services failed to load.', error);
-          resetGoogleFlowPending();
-          return { success: false, message: 'Google sign-in could not start. Please try again.' };
+
+          const chooserOpened = await new Promise<boolean>(resolve => {
+              let settled = false;
+              let intervalId = 0;
+              let timeoutId = 0;
+              const settle = (val: boolean) => {
+                  if (settled) return;
+                  settled = true;
+                  if (intervalId) window.clearInterval(intervalId);
+                  if (timeoutId) window.clearTimeout(timeoutId);
+                  resolve(val);
+              };
+              chooserOpenedResolve = settle;
+              intervalId = window.setInterval(() => {
+                  if (!googleFlowPendingRef.current) settle(false);
+              }, 250);
+              timeoutId = window.setTimeout(() => settle(false), 12000);
+          });
+          console.info('GOOGLE_CHOOSER_UI', { opened: chooserOpened });
+          return { success: true, message: '' };
+      } finally {
+          (window as { open?: typeof window.open }).open = originalWindowOpen;
       }
   };
 

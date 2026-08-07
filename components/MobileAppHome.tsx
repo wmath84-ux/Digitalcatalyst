@@ -151,7 +151,7 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
       </section>
 
       <section className="mt-5">
-        <label className="flex items-center gap-3 rounded-full bg-[#ECE6F0] px-4 py-3">
+        <label className="flex items-center gap-3 rounded-xl border border-[#BFD7FF] bg-[#F7FAFF] px-4 py-3 focus-within:border-[#0B63FF] focus-within:ring-4 focus-within:ring-blue-100">
           <span>🔎</span><input value={searchQuery} readOnly onFocus={() => setIsMobileSearchOpen(true)} onClick={() => setIsMobileSearchOpen(true)} placeholder="Search notes, courses, resources..." aria-label="Open product search" className="min-w-0 flex-1 cursor-pointer bg-transparent text-sm font-bold text-[#081A44] outline-none placeholder:text-[#64708F]/75" /><button type="button" onClick={() => setIsMobileSearchOpen(true)} aria-label="Voice search">🎙️</button>
         </label>
       </section>
