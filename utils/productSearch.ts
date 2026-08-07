@@ -29,6 +29,14 @@ const collectCourseText = (modules: CourseModule[] = []): string[] => modules.fl
   ...collectCourseText(module.modules || []),
 ].filter(Boolean) as string[]);
 
+const compactLetters = (value: string): string => value.replace(/\s+/g, '');
+
+const buildAcronym = (value: string): string => value
+  .split(' ')
+  .filter(Boolean)
+  .map(word => word[0])
+  .join('');
+
 export const buildProductSearchIndex = (product: Partial<Product>) => {
   const keywords = parseKeywordList((product as any).keywords || (product as any).searchKeywords || []);
   const searchableParts = [
@@ -43,12 +51,21 @@ export const buildProductSearchIndex = (product: Partial<Product>) => {
     (product as any).class,
     (product as any).grade,
     (product as any).subject,
+    (product as any).board,
+    (product as any).exam,
+    (product as any).language,
+    (product as any).publisher,
+    (product as any).edition,
+    (product as any).format,
+    (product as any).author,
     ...(product.tags || []),
     ...(product.features || []),
     ...keywords,
     ...collectCourseText(product.courseContent || []),
   ];
   const searchableText = normalizeSearchValue(searchableParts.join(' '));
+  const compactText = compactLetters(searchableText);
+  const acronymText = compactLetters(buildAcronym(searchableText));
   return {
     keywords,
     normalizedTitle: normalizeSearchValue(product.title),
@@ -57,6 +74,8 @@ export const buildProductSearchIndex = (product: Partial<Product>) => {
     normalizedKeywords: keywords,
     searchableText,
     normalizedSearchText: searchableText,
+    compactText,
+    acronymText,
     searchTokens: splitSearchTokens(searchableText),
   };
 };
@@ -103,13 +122,21 @@ export const rankProductForQuery = (product: ProductWithRating, query: string): 
   const categories = [index.normalizedCategory, ...(product.tags || []).map(normalizeSearchValue)];
   const keywords = index.normalizedKeywords;
   const description = normalizeSearchValue([product.description, product.longDescription].join(' '));
-  const allTokensMatch = tokens.every(token => index.searchableText.includes(token) || index.searchTokens.some(fieldToken => looseTokenMatch(token, fieldToken)));
-  if (!allTokensMatch) return 0;
+  const compactQuery = compactLetters(normalizedQuery);
+  const lettersMatch = compactQuery.length >= 2 && (index.compactText.includes(compactQuery) || index.acronymText.includes(compactQuery));
+  const allTokensMatch = tokens.every(token =>
+    index.searchableText.includes(token)
+    || index.compactText.includes(token)
+    || index.acronymText.includes(token)
+    || index.searchTokens.some(fieldToken => looseTokenMatch(token, fieldToken))
+  );
+  if (!allTokensMatch && !lettersMatch) return 0;
 
   let score = 10;
   if (title === normalizedQuery) score += 1000;
   else if (title.startsWith(normalizedQuery)) score += 800;
   else if (title.includes(normalizedQuery)) score += 650;
+  if (lettersMatch) score += 60;
   score += tokens.reduce((sum, token) => {
     if (title.includes(token)) return sum + 120;
     if (categories.some(item => item.includes(token))) return sum + 90;

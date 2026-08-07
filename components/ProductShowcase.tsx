@@ -18,6 +18,7 @@ interface ProductShowcaseProps {
   variant?: 'default' | 'mobileHome';
   externalSearchQuery?: string;
   hideInternalSearch?: boolean;
+  onOpenSearchPage?: (query: string) => void;
 }
 
 type SortOption = 'recommended' | 'newest' | 'rating' | 'price-asc' | 'price-desc' | 'free-first' | 'popular';
@@ -26,7 +27,7 @@ const SEARCH_STORAGE_KEY = 'eduvoraProductSearchQuery';
 const RECENT_SEARCHES_KEY = 'eduvoraRecentProductSearches';
 const popularKeywords = ['Math', 'Physics', 'Class 10', 'PCM', 'NEET', 'PDF', 'Course'];
 
-const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, coupons, purchasedProductIds = [], variant = 'default', externalSearchQuery = '', hideInternalSearch = false }) => {
+const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, onViewProduct, wishlist, onToggleWishlist, onAddToCart, onBuyNow, coupons, purchasedProductIds = [], variant = 'default', externalSearchQuery = '', hideInternalSearch = false, onOpenSearchPage }) => {
   const [searchQuery, setSearchQuery] = useState(() => typeof window !== 'undefined' ? sessionStorage.getItem(SEARCH_STORAGE_KEY) || '' : '');
   const [debouncedSearchQuery, setDebouncedSearchQuery] = useState(searchQuery);
   const [recentSearches, setRecentSearches] = useState<string[]>(() => {
@@ -35,8 +36,10 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
   });
   const [sortBy, setSortBy] = useState<SortOption>('recommended');
   const [activeFilter, setActiveFilter] = useState<string>('All');
+  const [searchBoxExpanded, setSearchBoxExpanded] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
   const gridRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
   const [isStoreFilterCompact, setIsStoreFilterCompact] = useState(false);
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
   const isMobileHome = variant === 'mobileHome';
@@ -172,8 +175,27 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
                 <div className="pointer-events-none absolute left-3 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full bg-gradient-to-br from-[#EAF2FF] to-[#F4F0FF] text-[#1769FF]">
                   <svg className="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 </div>
-                <input id="product-search" type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={(event) => { if (window.matchMedia('(max-width: 767px)').matches) { event.currentTarget.blur(); setIsMobileSearchOpen(true); } }} onClick={(event) => { if (window.matchMedia('(max-width: 767px)').matches) { event.currentTarget.blur(); setIsMobileSearchOpen(true); } }} onKeyDown={(event) => { if (event.key === 'Escape') clearSearch(); }} placeholder="Search courses, notes, class, subject..." aria-label="Search products" className="h-[58px] w-full rounded-[1.15rem] border border-[#CFE0F7] bg-gradient-to-r from-white to-[#F7FAFF] py-3 pl-16 pr-14 text-[15px] font-black text-[#081A45] outline-none transition placeholder:text-[#8794AA] focus:border-[#1769FF] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:rounded-[1.35rem] sm:text-base" />
-                {searchQuery && <button type="button" onClick={clearSearch} aria-label="Clear product search" className="absolute right-3 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-[#E1EAF7] bg-white text-lg font-black text-[#536178] transition hover:border-[#1769FF] hover:text-[#1769FF]">×</button>}
+                {!searchBoxExpanded ? (
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      if (window.matchMedia('(max-width: 767px)').matches) {
+                        setIsMobileSearchOpen(true);
+                        return;
+                      }
+                      setSearchBoxExpanded(true);
+                      window.setTimeout(() => searchInputRef.current?.focus(), 30);
+                      event.currentTarget.blur();
+                    }}
+                    aria-label="Expand product search"
+                    className="h-[58px] w-full rounded-[1.15rem] border border-[#CFE0F7] bg-gradient-to-r from-white to-[#F7FAFF] py-3 pl-16 pr-14 text-left text-[15px] font-black text-[#8794AA] outline-none transition hover:border-[#1769FF] hover:bg-white hover:text-[#081A45] focus:border-[#1769FF] focus:ring-4 focus:ring-blue-100 sm:rounded-[1.35rem] sm:text-base"
+                  >
+                    <span className="inline-flex items-center gap-2">Search courses, notes, class, subject... <span className="rounded-full bg-[#EEF4FF] px-2.5 py-0.5 text-[10px] font-black uppercase tracking-[0.14em] text-[#1557B0]">Enter ↵</span></span>
+                  </button>
+                ) : (
+                  <input ref={searchInputRef} id="product-search" type="search" value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} onFocus={(event) => { if (window.matchMedia('(max-width: 767px)').matches) { event.currentTarget.blur(); setIsMobileSearchOpen(true); } }} onClick={(event) => { if (window.matchMedia('(max-width: 767px)').matches) { event.currentTarget.blur(); setIsMobileSearchOpen(true); } }} onKeyDown={(event) => { if (event.key === 'Escape') { clearSearch(); setSearchBoxExpanded(false); } if (event.key === 'Enter' && onOpenSearchPage && searchQuery.trim()) { onOpenSearchPage(searchQuery.trim()); } }} placeholder="Search courses, notes, class, subject..." aria-label="Search products" className="h-[58px] w-full rounded-[1.15rem] border border-[#CFE0F7] bg-gradient-to-r from-white to-[#F7FAFF] py-3 pl-16 pr-14 text-[15px] font-black text-[#081A45] outline-none transition placeholder:text-[#8794AA] focus:border-[#1769FF] focus:bg-white focus:ring-4 focus:ring-blue-100 sm:rounded-[1.35rem] sm:text-base" />
+                )}
+                {searchQuery && <button type="button" onClick={() => { clearSearch(); if (!searchBoxExpanded) setSearchBoxExpanded(true); }} aria-label="Clear product search" className="absolute right-3 top-1/2 grid h-10 w-10 -translate-y-1/2 place-items-center rounded-full border border-[#E1EAF7] bg-white text-lg font-black text-[#536178] transition hover:border-[#1769FF] hover:text-[#1769FF]">×</button>}
               </div>
             )}
             <div className={`${isStoreFilterCompact ? 'hidden' : 'flex'} store-sort-actions flex-col gap-2 sm:flex-row lg:w-auto`}>

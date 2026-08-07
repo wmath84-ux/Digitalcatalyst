@@ -9,6 +9,7 @@ import MobileAppHome from './components/MobileAppHome';
 import MayDayMobile from './components/MayDayMobile';
 import Hero from './components/Hero';
 import ProductShowcase from './components/ProductShowcase';
+import ProductSearchPage from './components/ProductSearchPage';
 import Services, { ServiceItem } from './components/Services';
 import AboutUs from './components/AboutUs';
 import Faq, { FaqItem } from './components/Faq';
@@ -1473,6 +1474,7 @@ const PERSISTABLE_APP_VIEWS = new Set([
   'home',
   'mayDay',
   'allProducts',
+  'search',
   'product',
   'myPurchases',
   'coursePlayer',
@@ -1603,6 +1605,7 @@ const App: React.FC = () => {
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [newsletterSubscribers, setNewsletterSubscribers] = useState<NewsletterSubscriber[]>([]);
   const [currentView, setCurrentView] = useState(() => readInitialAppView());
+  const [searchPageQuery, setSearchPageQuery] = useState(() => readSessionText('eduvoraProductSearchQuery') || '');
   const [desktopSidebarState, setDesktopSidebarState] = useState<DesktopSidebarState>(() => readDesktopSidebarState());
 
   useEffect(() => {
@@ -5566,6 +5569,14 @@ const App: React.FC = () => {
     window.scrollTo(0, 0);
   };
 
+  const handleOpenSearchPage = (query: string) => {
+    acknowledgeDockDestination('Store');
+    setSearchPageQuery(query || '');
+    syncStackForHistoryView('search');
+    setCurrentView('search');
+    window.scrollTo(0, 0);
+  };
+
   const handleNavigateToPurchases = () => {
     acknowledgeDockDestination('Purchased');
     const originProduct = currentViewRef.current === 'product' ? selectedProductRef.current : null;
@@ -6510,7 +6521,7 @@ const App: React.FC = () => {
                   case 'hero': return <React.Fragment key={section.id}><div className="mobile-home-secondary"><Hero settings={websiteSettings} onNavigateToPolicies={() => handleNavigateToPolicies()} onNavigateToAllProducts={handleNavigateToAllProducts} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} realMetrics={realMetrics} /><PlatformExperience settings={websiteSettings} /></div></React.Fragment>;
                   case 'purchased': return purchasedProducts.length > 0 && <PurchasedProducts settings={websiteSettings} key={section.id} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} />;
                   case 'topRated': return <FeaturedProducts settings={websiteSettings} key={section.id} title={section.title || "Top Rated Products"} subtitle="A quick look at the courses learners rate highest right now." products={topRatedProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} coupons={coupons} variant="mobileHome" purchasedProductIds={purchasedProductIds} />;
-                  case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
+                  case 'allProducts': return <ProductShowcase settings={websiteSettings} key={section.id} products={visibleProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} coupons={coupons} purchasedProductIds={purchasedProductIds} onOpenSearchPage={handleOpenSearchPage} />;
                   case 'services': return <div className="mobile-home-secondary"><Services settings={websiteSettings} key={section.id} services={websiteSettings.content.services} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} /></div>;
                   case 'news': return <div className="mobile-home-secondary"><LatestNews settings={websiteSettings} key={section.id} title={section.title || 'Latest News & Blog'} articles={websiteSettings.content.newsArticles} onReadMoreClick={handleViewBlogArticle} onOpenHub={openReadingHub} /></div>;
                   case 'about': return <div className="mobile-home-secondary"><AboutUs settings={websiteSettings} key={section.id} title={websiteSettings.content.aboutUsTitle} text={websiteSettings.content.aboutUsText} imageSeed={websiteSettings.content.aboutUsImageSeed} /></div>;
@@ -6534,7 +6545,8 @@ const App: React.FC = () => {
         return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} currentUser={appUser} onBack={handleBackFromCoursePlayer} onQuizReward={hasSubscriptionFeature(appUser, 'educoins') ? handleQuizReward : undefined} onUpgrade={handleNavigateToSubscription} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onEducoinUnlockComplete={handleEducoinUpdateUnlockComplete} /> : renderAuthRestoreStatus();
       case 'eduCoinGuide': return appUser && canSpendEduCoins(appUser) ? <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={appUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} /> : <MembershipUpgradeCard message={normalizeSubscriptionPageContent((websiteSettings.content as any).subscriptionPage).profileUpgrade} onUpgrade={handleNavigateToSubscription} onBack={handleBackFromEduCoinGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
-      case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
+      case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} coupons={coupons} purchasedProductIds={purchasedProductIds} onOpenSearchPage={handleOpenSearchPage} />;
+      case 'search': return <ProductSearchPage settings={websiteSettings} products={visibleProducts} initialQuery={searchPageQuery} onBack={() => handleNavigateBack('allProducts')} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
       case 'myPurchases':
         if (!isAuthStateReady) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
         return isLoggedIn ? <PurchasedProducts settings={websiteSettings} products={purchasedProducts} onViewPurchasedProduct={handleViewPurchasedProduct} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onAdminGoogleLogin={handleAdminGoogleLogin} onAdminEmailLogin={handleAdminEmailLogin} onBack={handleBackFromAuth} />;
@@ -6612,6 +6624,7 @@ const App: React.FC = () => {
             home: 'Home',
             mayDay: 'May Day',
             allProducts: 'Store',
+            search: 'Store',
             product: 'Store',
             myPurchases: 'Purchases',
             coursePlayer: 'Purchases',
@@ -6626,7 +6639,8 @@ const App: React.FC = () => {
     currentView !== 'home' &&
     currentView !== 'mayDay' &&
     currentView !== 'admin' &&
-    currentView !== 'adminLogin';
+    currentView !== 'adminLogin' &&
+    currentView !== 'search';
 
   const appleOpenClass = "animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]";
 

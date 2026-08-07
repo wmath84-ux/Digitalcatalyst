@@ -2034,6 +2034,24 @@
         touch-action: pan-y;
       }
 
+      /* Product search page: fade out non-matching, blink in matching cards */
+      .product-search-fade-out {
+        opacity: 0;
+        transform: scale(0.92) translateY(10px);
+        pointer-events: none;
+        transition: opacity 0.42s cubic-bezier(0.16, 1, 0.3, 1), transform 0.42s cubic-bezier(0.16, 1, 0.3, 1);
+      }
+
+      @keyframes product-search-blink-in {
+        0% { opacity: 0.15; transform: scale(0.94) translateY(6px); filter: brightness(1.6); }
+        35% { opacity: 1; transform: scale(1.03) translateY(0); filter: brightness(1.35); }
+        60% { transform: scale(1); filter: brightness(1.15); }
+        100% { opacity: 1; transform: scale(1); filter: brightness(1); }
+      }
+      .product-search-blink-in {
+        animation: product-search-blink-in 0.62s cubic-bezier(0.16, 1, 0.3, 1) both;
+      }
+
       .store-search-sticky {
         isolation: isolate;
         transform: translateZ(0);
