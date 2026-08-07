@@ -6229,6 +6229,10 @@ const App: React.FC = () => {
         setCurrentView('community');
         window.scrollTo(0, 0);
         return;
+      case 'mayday':
+        setCurrentView('mayDay');
+        window.scrollTo(0, 0);
+        return;
       default: {
         const exhaustiveTarget: never = target;
         console.warn('Unsupported notification target.', exhaustiveTarget);
@@ -6614,6 +6618,7 @@ const App: React.FC = () => {
           isPremium={hasSubscriptionFeature(appUser, 'mayday')}
           onBack={handleBackToHome}
           onUpgrade={handleNavigateToSubscription}
+          onNotify={pushSiteNotifications}
           desktop={!isMobileViewport}
         />
       );
@@ -6648,9 +6653,9 @@ const App: React.FC = () => {
   const shouldHideFooterOnMobile = Boolean(websiteSettings.mobile?.hideFooter);
   // A single consistent mobile header + bottom dock is used on these app pages.
   // The dock never auto-hides on scroll; it is only hidden behind full-page overlays.
-  const mobileAppChromeViews = new Set(['home', 'allProducts', 'myPurchases', 'profile', 'news', 'blog', 'wishlist', 'freeProducts']);
+  const mobileAppChromeViews = new Set(['home', 'allProducts', 'myPurchases', 'profile', 'news', 'blog', 'wishlist', 'freeProducts', 'subscription']);
   const dockPersistAcrossPages = (websiteSettings.content as any).dockStyle?.persistAcrossPages !== false;
-  const dockAlwaysVisibleViews = new Set(['home', 'allProducts', 'myPurchases', 'blog', 'news', 'profile', 'wishlist', 'freeProducts']);
+  const dockAlwaysVisibleViews = new Set(['home', 'allProducts', 'myPurchases', 'blog', 'news', 'profile', 'wishlist', 'freeProducts', 'subscription']);
   const shouldHideMainDockOnMobile =
     (websiteSettings.content.dockStyle?.mobileEnabled === false) ||
     (dockPersistAcrossPages ? !dockAlwaysVisibleViews.has(currentView) : currentView !== 'home') ||
@@ -6879,7 +6884,7 @@ const App: React.FC = () => {
             )}
             <div className={`mobile-site-header ${mobileAppChromeViews.has(currentView) || currentView === 'mayDay' ? 'hidden md:block' : ''}`}><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} notificationCount={siteNotifications.filter(notification => !notification.read).length} onOpenNotifications={() => setIsSiteNotificationCenterOpen(true)} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {mobileAppChromeViews.has(currentView) && (
-              <MobileTopBar currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} rememberedAccount={rememberedAuthAccount} cartCount={cartItemCount} currentView={currentView} onHomeClick={handleBackToHome} onNavigateToSubscriptions={handleNavigateToSubscription} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToFreeProducts={handleNavigateToFreeProducts} onOpenNews={() => openReadingHub('news')} onOpenBlog={() => openReadingHub('blog')} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} onAuthClick={openAuthPage} onLogout={handleLogout} />
+              <MobileTopBar currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} rememberedAccount={rememberedAuthAccount} cartCount={cartItemCount} notificationCount={siteNotifications.filter(notification => !notification.read).length} currentView={currentView} onHomeClick={handleBackToHome} onNavigateToSubscriptions={handleNavigateToSubscription} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToFreeProducts={handleNavigateToFreeProducts} onOpenNews={() => openReadingHub('news')} onOpenBlog={() => openReadingHub('blog')} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} onCartClick={openCartSidebar} onOpenNotifications={() => setIsSiteNotificationCenterOpen(true)} onProfileClick={handleNavigateToProfile} onAuthClick={openAuthPage} onLogout={handleLogout} />
             )}
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={`${shouldHideMainDockOnMobile ? 'max-md:hidden' : ''} ${useDesktopSidebar ? 'lg:hidden' : ''}`}>

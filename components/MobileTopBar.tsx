@@ -8,6 +8,7 @@ interface MobileTopBarProps {
   isLoggedIn: boolean;
   rememberedAccount?: RememberedAuthAccount | null;
   cartCount: number;
+  notificationCount?: number;
   currentView?: string;
   onHomeClick: () => void;
   onNavigateToSubscriptions: () => void;
@@ -17,6 +18,7 @@ interface MobileTopBarProps {
   onOpenBlog: () => void;
   onOpenCommunity: () => void;
   onCartClick: () => void;
+  onOpenNotifications?: () => void;
   onProfileClick: () => void;
   onAuthClick: (mode: 'login' | 'signup') => void;
   onLogout: () => void;
@@ -27,6 +29,7 @@ const MobileTopBar: React.FC<MobileTopBarProps> = ({
   isLoggedIn,
   rememberedAccount,
   cartCount,
+  notificationCount = 0,
   currentView,
   onHomeClick,
   onNavigateToSubscriptions,
@@ -36,6 +39,7 @@ const MobileTopBar: React.FC<MobileTopBarProps> = ({
   onOpenBlog,
   onOpenCommunity,
   onCartClick,
+  onOpenNotifications,
   onProfileClick,
   onAuthClick,
   onLogout,
@@ -106,6 +110,10 @@ const MobileTopBar: React.FC<MobileTopBarProps> = ({
             <p className="text-[11px] font-normal text-[#625B71]">Premium learning store</p>
           </div>
           <button type="button" onClick={onCartClick} className="relative grid h-10 w-10 place-items-center rounded-full bg-transparent text-xl text-[#1D1B20] active:bg-[#E8DEF8]" aria-label="Open cart">🛒{cartCount > 0 ? <span className="absolute -right-1 -top-1 rounded-full bg-[#0B63FF] px-1.5 text-[10px] font-black text-white">{cartCount}</span> : null}</button>
+          <button type="button" onClick={onOpenNotifications} className="relative grid h-10 w-10 place-items-center rounded-full bg-transparent text-[#1D1B20] active:bg-[#E8DEF8]" aria-label={`Open notifications with ${notificationCount} unread`}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9" /></svg>
+            {notificationCount > 0 ? <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[#0B63FF] px-1 text-[9px] font-black text-white">{notificationCount > 99 ? '99+' : notificationCount}</span> : null}
+          </button>
           {isLoggedIn && currentUser ? (
             <>
               <div className="relative" ref={profileMenuRef}>

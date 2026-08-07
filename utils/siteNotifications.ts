@@ -1,4 +1,4 @@
-export type SiteNotificationCategory = 'store' | 'reading' | 'course' | 'unlock' | 'community' | 'announcement';
+export type SiteNotificationCategory = 'store' | 'reading' | 'course' | 'unlock' | 'community' | 'announcement' | 'mayday';
 
 export type SiteNotificationTarget =
   | { type: 'product'; productId: number }
@@ -6,7 +6,8 @@ export type SiteNotificationTarget =
   | { type: 'announcement'; announcementId: string }
   | { type: 'course'; productId: number }
   | { type: 'purchases' }
-  | { type: 'community'; targetPage?: string; targetId?: string };
+  | { type: 'community'; targetPage?: string; targetId?: string }
+  | { type: 'mayday' };
 
 export interface SiteNotification {
   id: string;
@@ -29,6 +30,7 @@ export interface SiteNotificationPreferences {
   unlock: boolean;
   community: boolean;
   announcement: boolean;
+  mayday: boolean;
   browserAlerts: boolean;
 }
 
@@ -77,6 +79,7 @@ export const DEFAULT_SITE_NOTIFICATION_PREFERENCES: SiteNotificationPreferences 
   unlock: true,
   community: true,
   announcement: true,
+  mayday: true,
   browserAlerts: false,
 };
 

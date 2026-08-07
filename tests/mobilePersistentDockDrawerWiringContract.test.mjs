@@ -13,7 +13,7 @@ test('bottom dock never auto-hides on scroll and persists across main mobile pag
   assert.match(dock, /persistAcrossPages: true/);
   assert.match(app, /dockPersistAcrossPages/);
   assert.match(app, /dockAlwaysVisibleViews/);
-  assert.match(app, /new Set\(\['home', 'allProducts', 'myPurchases', 'blog', 'news', 'profile', 'wishlist', 'freeProducts'\]\)/);
+  assert.match(app, /new Set\(\['home', 'allProducts', 'myPurchases', 'blog', 'news', 'profile', 'wishlist', 'freeProducts', 'subscription'\]\)/);
   assert.match(app, /dockPersistAcrossPages \? !dockAlwaysVisibleViews\.has\(currentView\) : currentView !== 'home'/);
 });
 

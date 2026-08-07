@@ -3,6 +3,7 @@ import { doc, onSnapshot, serverTimestamp, setDoc } from 'firebase/firestore';
 import type { User } from '../App';
 import { auth, db } from '../firebase';
 import { buildMayDayReportHtml } from '../utils/mayDayReport';
+import type { SiteNotification } from '../utils/siteNotifications';
 
 type MayDayTab = 'dashboard' | 'home' | 'notes' | 'goals' | 'reminders' | 'focus' | 'progress';
 type NoteCategory = 'pinned' | 'study' | 'shopping';
@@ -73,6 +74,7 @@ interface MayDayMobileProps {
   isPremium: boolean;
   onBack: () => void;
   onUpgrade: () => void;
+  onNotify?: (notification: SiteNotification) => void;
   desktop?: boolean;
 }
 
@@ -322,7 +324,7 @@ const goalTones = [
   { icon: 'bg-[#F0478A]', bar: 'bg-[#FF69A4]' },
 ];
 
-const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, isPremium, onBack, onUpgrade, desktop = false }) => {
+const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, isPremium, onBack, onUpgrade, onNotify, desktop = false }) => {
   const allowedTabs: MayDayTab[] = ['dashboard', 'home', 'notes', 'goals', 'reminders', 'focus', 'progress'];
   const initialTab: MayDayTab = desktop ? 'dashboard' : 'home';
   const [activeTab, setActiveTab] = useState<MayDayTab>(initialTab);
@@ -526,6 +528,10 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
     }
   };
 
+  const emitSiteNotification = useCallback((notification: SiteNotification) => {
+    onNotify?.(notification);
+  }, [onNotify]);
+
   const addTask = () => {
     const title = taskTitle.trim();
     if (!title) return;
@@ -537,10 +543,26 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   };
 
   const toggleTask = (id: string) => {
+    const task = workspaceRef.current.tasks.find(item => item.id === id);
     commitWorkspace((current) => ({
       ...current,
-      tasks: current.tasks.map(task => task.id === id ? { ...task, completed: !task.completed } : task),
+      tasks: current.tasks.map(item => item.id === id ? { ...item, completed: !item.completed } : item),
     }));
+    if (task && !task.completed) {
+      const completedToday = workspaceRef.current.tasks.filter(item => item.date === todayKey() && (item.id === id ? true : item.completed)).length;
+      const title = task.category === 'Study' ? 'Study task completed' : 'Task completed';
+      const body = completedToday >= 3 ? `"${task.title}" done — ${completedToday} tasks today, daily goal reached!` : `"${task.title}" is complete. Keep the streak going in May Day.`;
+      emitSiteNotification({
+        id: `mayday:task:${id}`,
+        title,
+        body,
+        category: 'mayday',
+        createdAt: Date.now(),
+        read: false,
+        source: 'content',
+        target: { type: 'mayday' },
+      });
+    }
   };
 
   const deleteTask = (id: string) => commitWorkspace((current) => ({ ...current, tasks: current.tasks.filter(task => task.id !== id) }));
@@ -581,10 +603,26 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
     setGoalEditorOpen(false);
   };
 
-  const updateGoalProgress = (id: string, progress: number) => commitWorkspace((current) => ({
-    ...current,
-    goals: current.goals.map(goal => goal.id === id ? { ...goal, progress: clamp(progress, 0, 100) } : goal),
-  }));
+  const updateGoalProgress = (id: string, progress: number) => {
+    const goal = workspaceRef.current.goals.find(item => item.id === id);
+    const clamped = clamp(progress, 0, 100);
+    commitWorkspace((current) => ({
+      ...current,
+      goals: current.goals.map(item => item.id === id ? { ...item, progress: clamped } : item),
+    }));
+    if (goal && goal.progress < 100 && clamped >= 100) {
+      emitSiteNotification({
+        id: `mayday:goal:${id}`,
+        title: 'Goal reached',
+        body: `"${goal.title}" is now 100% complete. Great work in May Day!`,
+        category: 'mayday',
+        createdAt: Date.now(),
+        read: false,
+        source: 'content',
+        target: { type: 'mayday' },
+      });
+    }
+  };
 
   const deleteGoal = (id: string) => commitWorkspace((current) => ({ ...current, goals: current.goals.filter(goal => goal.id !== id) }));
 
@@ -651,7 +689,17 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
     } catch {
       try { new Notification(`May Day: ${reminder.title}`, options); } catch { /* permission can be revoked at any time */ }
     }
-  }, []);
+    emitSiteNotification({
+      id: `mayday:reminder:${reminder.id}`,
+      title: `May Day reminder: ${reminder.title}`,
+      body: `${formatClock(reminder.time)} • ${reminder.categories.join(', ')}`,
+      category: 'mayday',
+      createdAt: Date.now(),
+      read: false,
+      source: 'content',
+      target: { type: 'mayday' },
+    });
+  }, [emitSiteNotification]);
 
   useEffect(() => {
     const reminderMatchesDate = (reminder: MayDayReminder, now: Date) => {
@@ -691,11 +739,21 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
     commitWorkspace((current) => ({ ...current, focusSessions: [...current.focusSessions, session].slice(-500) }));
     setFocusRunning(false);
     setFocusMessage(`${focusMinutes} minute focus session completed and saved.`);
+    emitSiteNotification({
+      id: `mayday:focus:${session.id}`,
+      title: 'Focus session complete',
+      body: `${focusMinutes} focused minutes logged in May Day. You're building real momentum.`,
+      category: 'mayday',
+      createdAt: Date.now(),
+      read: false,
+      source: 'content',
+      target: { type: 'mayday' },
+    });
     window.setTimeout(() => {
       focusCompletionGuardRef.current = false;
       setFocusSeconds(focusMinutes * 60);
     }, 400);
-  }, [commitWorkspace, focusMinutes]);
+  }, [commitWorkspace, emitSiteNotification, focusMinutes]);
 
   useEffect(() => {
     if (!focusRunning) return undefined;
@@ -786,7 +844,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   };
 
   const renderHeader = () => (
-    <header className="sticky top-0 z-40 border-b border-black bg-white/96 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-xl">
+    <header className="sticky top-0 z-40 border-b border-black bg-white px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)]">
       <div className="mx-auto flex max-w-xl items-center justify-between">
         <button type="button" onClick={handleHeaderBack} aria-label="Go back" className="grid h-11 w-11 place-items-center rounded-2xl text-[#111827] transition active:bg-[#EEF3FF]">
           <Icon name="back" className="h-6 w-6" />
@@ -858,11 +916,11 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
           <p className="mt-2 line-clamp-3 text-[10px] font-semibold leading-4 text-[#59647A]">{note.body}</p>
           <p className="mt-3 text-[9px] font-bold text-[#8B94A7]">{formatNoteDate(note.updatedAt)}</p>
           <div className="absolute bottom-2 right-2 flex gap-1 opacity-100">
-            <button type="button" onClick={() => editNote(note)} className="grid h-7 w-7 place-items-center rounded-lg bg-white/80 text-[#536174]" aria-label={`Edit ${note.title}`}><Icon name="edit" className="h-3.5 w-3.5" /></button>
-            <button type="button" onClick={() => deleteNote(note.id)} className="grid h-7 w-7 place-items-center rounded-lg bg-white/80 text-[#9B4B56]" aria-label={`Delete ${note.title}`}><Icon name="trash" className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={() => editNote(note)} className="grid h-7 w-7 place-items-center rounded-lg bg-white text-[#536174]" aria-label={`Edit ${note.title}`}><Icon name="edit" className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={() => deleteNote(note.id)} className="grid h-7 w-7 place-items-center rounded-lg bg-white text-[#9B4B56]" aria-label={`Delete ${note.title}`}><Icon name="trash" className="h-3.5 w-3.5" /></button>
           </div>
         </article>
-      ))}</div> : <div className="rounded-[18px] border border-dashed border-black bg-white/70 px-4 py-6 text-center text-xs font-bold text-[#98A2B3]">No {title.toLowerCase()} yet.</div>}
+      ))}</div> : <div className="rounded-[18px] border border-dashed border-black bg-white px-4 py-6 text-center text-xs font-bold text-[#98A2B3]">No {title.toLowerCase()} yet.</div>}
     </section>
   );
 
@@ -874,7 +932,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
       <div className="mx-auto max-w-xl px-4 pb-8 pt-4">
         <section className="mb-4 overflow-hidden rounded-[26px] border border-black bg-white p-4">
           <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-[#2F66F6] to-[#14B8C4] text-white"><Icon name="note" className="h-7 w-7" /></div>
+            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#315CEB] text-white"><Icon name="note" className="h-7 w-7" /></div>
             <div className="min-w-0 flex-1">
               <p className="text-[10px] font-black uppercase tracking-[0.26em] text-[#315CEB]">Eduvora Bond</p>
               <h2 className="mt-1 text-xl font-black tracking-tight text-[#101828]">Your all-in-one May Day space.</h2>
@@ -892,7 +950,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
               <button key={category} type="button" onClick={() => setNoteCategory(category)} className={`rounded-xl px-2.5 py-2 text-[10px] font-black capitalize ${noteCategory === category ? 'bg-[#EEF1FF] text-[#315CEB]' : 'text-[#667085]'}`}>{category}</button>
             ))}
             {editingNoteId ? <button type="button" onClick={() => { setEditingNoteId(null); setNoteBody(''); }} className="ml-auto rounded-xl px-3 py-2 text-[10px] font-black text-[#7A8499]">Cancel</button> : <span className="ml-auto" />}
-            <button type="button" onClick={saveNote} disabled={!noteBody.trim()} className="rounded-[14px] bg-gradient-to-r from-[#315CEB] to-[#6255F6] px-5 py-2.5 text-xs font-black text-white disabled:opacity-40">{editingNoteId ? 'Update' : 'Save'}</button>
+            <button type="button" onClick={saveNote} disabled={!noteBody.trim()} className="rounded-[14px] bg-[#315CEB] px-5 py-2.5 text-xs font-black text-white disabled:opacity-40">{editingNoteId ? 'Update' : 'Save'}</button>
           </div>
         </section>
         {renderTaskPlanner()}
@@ -935,9 +993,9 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
         <input value={goalTitle} onChange={event => setGoalTitle(event.target.value)} placeholder="Goal title" maxLength={160} className="mt-3 w-full rounded-2xl border border-black bg-[#FAFBFD] px-4 py-3 text-sm font-bold outline-none focus:border-[#4169F6]" />
         <textarea value={goalDescription} onChange={event => setGoalDescription(event.target.value)} placeholder="Why is this goal important?" maxLength={500} rows={3} className="mt-2 w-full resize-none rounded-2xl border border-black bg-[#FAFBFD] px-4 py-3 text-sm font-semibold outline-none focus:border-[#4169F6]" />
         <input type="date" value={goalDate} min={todayKey()} onChange={event => setGoalDate(event.target.value)} className="mt-2 w-full rounded-2xl border border-black bg-[#FAFBFD] px-4 py-3 text-sm font-bold outline-none focus:border-[#4169F6]" />
-        <div className="mt-3 flex gap-2"><button type="button" onClick={() => setGoalEditorOpen(false)} className="flex-1 rounded-2xl border border-black px-4 py-3 text-sm font-black text-[#667085]">Cancel</button><button type="button" onClick={addGoal} className="flex-1 rounded-2xl bg-gradient-to-r from-[#315CEB] to-[#6255F6] px-4 py-3 text-sm font-black text-white">Save goal</button></div>
+        <div className="mt-3 flex gap-2"><button type="button" onClick={() => setGoalEditorOpen(false)} className="flex-1 rounded-2xl border border-black px-4 py-3 text-sm font-black text-[#667085]">Cancel</button><button type="button" onClick={addGoal} className="flex-1 rounded-2xl bg-[#315CEB] px-4 py-3 text-sm font-black text-white">Save goal</button></div>
       </section> : null}
-      <button type="button" onClick={() => setGoalEditorOpen(open => !open)} className="fixed bottom-[calc(env(safe-area-inset-bottom)+6.5rem)] right-5 z-30 grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-[#315CEB] to-[#6152F5] text-white" aria-label="Add goal"><Icon name="plus" className="h-7 w-7" /></button>
+      <button type="button" onClick={() => setGoalEditorOpen(open => !open)} className="fixed bottom-[calc(env(safe-area-inset-bottom)+6.5rem)] right-5 z-30 grid h-14 w-14 place-items-center rounded-full bg-[#315CEB] text-white" aria-label="Add goal"><Icon name="plus" className="h-7 w-7" /></button>
     </div>
   );
 
@@ -946,7 +1004,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
       <section>
         <p className="text-xs font-black text-[#1D2939]">Reminder Time</p>
         <div className="mt-3 grid grid-cols-4 gap-2">
-          {[['19:00', '7 PM'], ['21:00', '9 PM'], ['22:00', '10 PM']].map(([value, label]) => <button key={value} type="button" onClick={() => setReminderTime(value)} className={`rounded-2xl border px-2 py-3 text-xs font-black ${reminderTime === value ? 'border-[#315CEB] bg-gradient-to-b from-[#4169F6] to-[#315CEB] text-white' : 'border-black bg-white text-[#344054]'}`}>{label}</button>)}
+          {[['19:00', '7 PM'], ['21:00', '9 PM'], ['22:00', '10 PM']].map(([value, label]) => <button key={value} type="button" onClick={() => setReminderTime(value)} className={`rounded-2xl border px-2 py-3 text-xs font-black ${reminderTime === value ? 'border-black bg-[#315CEB] text-white' : 'border-black bg-white text-[#344054]'}`}>{label}</button>)}
           <label className="flex cursor-pointer items-center justify-center rounded-2xl border border-dashed border-[#8EA5FF] bg-white px-2 py-3 text-[10px] font-black text-[#315CEB]">Custom<input type="time" value={reminderTime} onChange={event => setReminderTime(event.target.value)} className="sr-only" /></label>
         </div>
       </section>
@@ -974,7 +1032,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
         <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[20px] border border-black bg-white">{['Study', 'Tasks', 'Habits', 'Goals'].map((category, index) => <button key={category} type="button" onClick={() => toggleReminderCategory(category)} className={`border-black px-1 py-4 text-center ${index ? 'border-l' : ''}`}><span className={`mx-auto grid h-9 w-9 place-items-center rounded-xl ${reminderCategories.includes(category) ? 'bg-[#EEF2FF] text-[#315CEB]' : 'bg-[#F6F7F9] text-[#98A2B3]'}`}><Icon name={category === 'Goals' ? 'goal' : category === 'Tasks' ? 'check' : category === 'Habits' ? 'sparkle' : 'calendar'} className="h-4 w-4" /></span><span className="mt-2 block text-[9px] font-black text-[#475467]">{category}</span><span className={`mx-auto mt-2 grid h-4 w-4 place-items-center rounded ${reminderCategories.includes(category) ? 'bg-[#315CEB] text-white' : 'border border-black text-transparent'}`}><Icon name="check" className="h-3 w-3" /></span></button>)}</div>
       </section>
 
-      <button type="button" onClick={addReminder} disabled={!reminderTitle.trim()} className="mt-5 w-full rounded-[17px] bg-gradient-to-r from-[#315CEB] to-[#6255F6] px-4 py-3.5 text-sm font-black text-white disabled:opacity-45">Save Reminder</button>
+      <button type="button" onClick={addReminder} disabled={!reminderTitle.trim()} className="mt-5 w-full rounded-[17px] bg-[#315CEB] px-4 py-3.5 text-sm font-black text-white disabled:opacity-45">Save Reminder</button>
 
       {browserPermission !== 'granted' ? <section className="mt-4 rounded-[20px] border border-black bg-white p-4"><div className="flex gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#DDF6F4] text-[#12A89C]"><Icon name="bell" className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h3 className="text-[12px] font-black text-[#1D2939]">Stay on track with reminders</h3><p className="mt-1 text-[10px] font-semibold leading-4 text-[#667085]">Allow browser notifications so May Day can alert you while the app is available.</p><button type="button" onClick={requestBrowserPermission} className="mt-3 w-full rounded-xl bg-[#315CEB] px-3 py-2.5 text-[11px] font-black text-white">Allow Notifications</button></div></div></section> : null}
 
@@ -992,7 +1050,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
       <div className="mx-auto max-w-xl px-4 pb-8 pt-4">
         <section>
           <h2 className="text-sm font-black text-[#1D2939]">Focus Session</h2>
-          <div className="mt-3 grid grid-cols-3 gap-3">{[15, 30, 45].map(minutesOption => <button key={minutesOption} type="button" onClick={() => selectFocusMinutes(minutesOption)} className={`rounded-[18px] border px-3 py-4 text-center ${focusMinutes === minutesOption ? 'border-[#315CEB] bg-gradient-to-b from-[#4169F6] to-[#315CEB] text-white' : 'border-black bg-white text-[#344054]'}`}><span className="block text-lg font-black">{minutesOption}</span><span className="text-[9px] font-bold">min</span></button>)}</div>
+          <div className="mt-3 grid grid-cols-3 gap-3">{[15, 30, 45].map(minutesOption => <button key={minutesOption} type="button" onClick={() => selectFocusMinutes(minutesOption)} className={`rounded-[18px] border px-3 py-4 text-center ${focusMinutes === minutesOption ? 'border-black bg-[#315CEB] text-white' : 'border-black bg-white text-[#344054]'}`}><span className="block text-lg font-black">{minutesOption}</span><span className="text-[9px] font-bold">min</span></button>)}</div>
         </section>
         <section className="relative mt-4 overflow-hidden rounded-[24px] border border-black bg-white p-5">
           <div className="absolute -bottom-10 -left-8 h-32 w-32 rounded-full bg-[#F0F2F5]" /><div className="absolute -right-8 top-10 h-28 w-28 rounded-full bg-[#F0F2F5]" />
@@ -1092,7 +1150,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
           : 'Saved locally';
 
   const desktopHeader = (title: string, subtitle: string) => (
-    <div className="sticky top-0 z-30 border-b border-black bg-white/95 px-5 py-3 backdrop-blur-xl">
+    <div className="sticky top-0 z-30 border-b border-black bg-white px-5 py-3">
       <div className="flex min-w-0 items-center gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2 text-[11px] font-black uppercase tracking-[0.16em] text-[#7A8499]">
@@ -1275,7 +1333,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
               {filteredDesktopNotes.map(note => (
                 <article key={note.id} className={`group min-h-36 rounded-2xl border border-black bg-white p-4`}>
                   <div className="flex items-start gap-3"><div className="min-w-0 flex-1"><h3 className="line-clamp-2 text-xs font-black leading-5 text-[#263248]">{note.title}</h3><p className="mt-2 line-clamp-4 whitespace-pre-wrap text-[10px] font-semibold leading-5 text-[#667085]">{note.body}</p></div><span className="text-[#315CEB]">{note.pinned ? '📌' : ''}</span></div>
-                  <div className="mt-4 flex items-center justify-between border-t border-black/5 pt-3"><span className="text-[8px] font-black text-[#8A94A8]">{formatNoteDate(note.updatedAt)}</span><div className="flex gap-1"><button type="button" onClick={() => editNote(note)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/70 text-[#315CEB]" aria-label={`Edit ${note.title}`}><Icon name="edit" className="h-4 w-4" /></button><button type="button" onClick={() => deleteNote(note.id)} className="grid h-8 w-8 place-items-center rounded-lg bg-white/70 text-red-500" aria-label={`Delete ${note.title}`}><Icon name="trash" className="h-4 w-4" /></button></div></div>
+                  <div className="mt-4 flex items-center justify-between border-t border-black/5 pt-3"><span className="text-[8px] font-black text-[#8A94A8]">{formatNoteDate(note.updatedAt)}</span><div className="flex gap-1"><button type="button" onClick={() => editNote(note)} className="grid h-8 w-8 place-items-center rounded-lg bg-white text-[#315CEB]" aria-label={`Edit ${note.title}`}><Icon name="edit" className="h-4 w-4" /></button><button type="button" onClick={() => deleteNote(note.id)} className="grid h-8 w-8 place-items-center rounded-lg bg-white text-red-500" aria-label={`Delete ${note.title}`}><Icon name="trash" className="h-4 w-4" /></button></div></div>
                 </article>
               ))}
               {!filteredDesktopNotes.length ? <div className="col-span-full grid min-h-40 place-items-center rounded-2xl border border-dashed border-black bg-[#FAFBFD] text-xs font-bold text-[#8A94A8]">No note matches this filter.</div> : null}
@@ -1413,7 +1471,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
       {activeTab === 'focus' ? renderFocus() : null}
       {activeTab === 'progress' ? renderProgress() : null}
 
-      <nav aria-label="May Day sections" className="fixed inset-x-0 bottom-0 z-50 border-t border-black bg-white/96 px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur-xl">
+      <nav aria-label="May Day sections" className="fixed inset-x-0 bottom-0 z-50 border-t border-black bg-white px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
         <div className="mx-auto grid max-w-xl grid-cols-5 gap-1">{navItems.map(item => {
           const active = activeTab === item.tab;
           return <button key={item.tab} type="button" onClick={() => navigateTab(item.tab)} aria-current={active ? 'page' : undefined} className={`flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 transition active:scale-95 ${active ? 'bg-[#EEF2FF] text-[#315CEB]' : 'text-[#596579]'}`}><span className={`grid h-7 w-7 place-items-center rounded-xl ${active ? 'bg-white' : ''}`}><Icon name={item.icon} className="h-[18px] w-[18px]" /></span><span className="w-full truncate text-center text-[9px] font-black">{item.label}</span></button>;

@@ -4,13 +4,15 @@ import fs from 'node:fs';
 
 const viteConfig = fs.readFileSync('vite.config.ts', 'utf8');
 const indexHtml = fs.readFileSync('index.html', 'utf8');
+const webManifest = fs.readFileSync('public/manifest.webmanifest', 'utf8');
 const installButton = fs.readFileSync('components/InstallAppButton.tsx', 'utf8');
 const coursePlayer = fs.readFileSync('components/CoursePlayer.tsx', 'utf8');
 const productDetail = fs.readFileSync('components/ProductDetailPage.tsx', 'utf8');
 
 test('installed PWA app uses Eduvora name everywhere install metadata matters', () => {
-  assert.match(viteConfig, /name: 'Eduvora'/);
-  assert.match(viteConfig, /short_name: 'Eduvora'/);
+  assert.match(webManifest, /"name": "Eduvora"/);
+  assert.match(webManifest, /"short_name": "Eduvora"/);
+  assert.match(indexHtml, /rel="manifest" href="\/manifest\.webmanifest"/);
   assert.match(indexHtml, /apple-mobile-web-app-title" content="Eduvora"/);
   assert.match(indexHtml, /<title>Eduvora \| Notes, Courses & AI Learning Store<\/title>/);
   assert.match(installButton, /Install Eduvora/);
