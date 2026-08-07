@@ -751,7 +751,7 @@ const ReadingDrawer: React.FC<ReadingDrawerProps> = ({ settings, economySettings
           </header>
 
           <div ref={scrollRef} onScroll={handleScroll} className="relative z-10 min-h-0 flex-1 overflow-y-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-            <div className="px-5 py-8 sm:px-10 lg:px-16">
+            <div className={presentation === 'page' ? 'px-5 pb-28 pt-8 sm:px-10 sm:pb-32 lg:px-16' : 'px-5 py-8 sm:px-10 lg:px-16'}>
               <div className="mx-auto max-w-3xl">
                 <div className="mb-8 rounded-[2rem] border p-6 shadow-[0_8px_30px_rgba(60,64,67,0.08)] backdrop-blur-2xl" style={{ backgroundColor: cardBackground, borderColor: chatPalette.cardBorder }}>
                   <div className="flex flex-wrap items-center gap-3 text-sm" style={{ color: chatPalette.secondaryText }}>

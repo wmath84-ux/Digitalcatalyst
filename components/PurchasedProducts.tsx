@@ -111,7 +111,7 @@ const PurchasedProducts: React.FC<PurchasedProductsProps> = ({ settings, product
   return (
     <section
       ref={sectionRef}
-      className={`${isMobileHome ? 'py-8 bg-blue-50' : 'py-14 sm:py-24 bg-[#F7F9FC]'} ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
+      className={`${isMobileHome ? 'py-8 bg-blue-50' : 'pt-14 pb-28 sm:py-24 bg-[#F7F9FC]'} ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}
     >
       <div className={`container mx-auto ${isMobileHome ? 'px-4' : 'px-6'}`}>
         <div className={`${isMobileHome ? 'mb-5 items-start' : 'mb-10 items-end'} flex flex-col md:flex-row justify-between animate-child animate-delay-1`}>

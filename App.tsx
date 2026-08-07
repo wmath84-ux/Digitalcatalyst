@@ -806,6 +806,7 @@ export interface WebsiteSettings {
             showLabels?: boolean;
             showBadges?: boolean;
             autoHideOnScroll?: boolean;
+            persistAcrossPages?: boolean;
             mobileEnabled?: boolean;
             desktopExpandedWidth?: number;
             desktopCollapsedWidth?: number;
@@ -1053,6 +1054,7 @@ const defaultWebsiteSettings: WebsiteSettings = {
             showLabels: true,
             showBadges: true,
             autoHideOnScroll: false,
+            persistAcrossPages: true,
             mobileEnabled: true,
             desktopExpandedWidth: 320,
             desktopCollapsedWidth: 88,
@@ -6651,8 +6653,12 @@ const App: React.FC = () => {
               onNavigateToPurchases={handleNavigateToPurchases}
               onNavigateToFreeProducts={handleNavigateToFreeProducts}
               onOpenNews={() => openReadingHub('news')}
+              onOpenBlog={() => openReadingHub('blog')}
+              onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }}
               onCartClick={openCartSidebar}
               onProfileClick={handleNavigateToProfile}
+              onNavigateToWishlist={handleNavigateToWishlist}
+              onNavigateToSubscriptions={handleNavigateToSubscription}
               onAuthClick={openAuthPage}
             />
           </div>
@@ -6663,9 +6669,14 @@ const App: React.FC = () => {
   };
 
   const shouldHideFooterOnMobile = Boolean(websiteSettings.mobile?.hideFooter);
+  // When persistAcrossPages is enabled the bottom dock stays pinned across the main
+  // mobile pages (store, purchases, blog/news, profile, wishlist and free products).
+  // The dock never auto-hides on scroll; it is only hidden behind full-page overlays.
+  const dockPersistAcrossPages = (websiteSettings.content as any).dockStyle?.persistAcrossPages !== false;
+  const dockAlwaysVisibleViews = new Set(['home', 'allProducts', 'myPurchases', 'blog', 'news', 'profile', 'wishlist', 'freeProducts']);
   const shouldHideMainDockOnMobile =
     (websiteSettings.content.dockStyle?.mobileEnabled === false) ||
-    currentView !== 'home' ||
+    (dockPersistAcrossPages ? !dockAlwaysVisibleViews.has(currentView) : currentView !== 'home') ||
     isCartOpen ||
     isReadingDrawerOpen ||
     isFreeModalOpen ||
@@ -6693,6 +6704,8 @@ const App: React.FC = () => {
             profile: 'Profile',
             subscription: 'Subscriptions',
             cart: 'Cart',
+            news: 'News',
+            blog: 'Blog',
           } as Record<string, string>)[currentView] || '';
 
   const shouldShowMainPageBackButtonOnMobile =

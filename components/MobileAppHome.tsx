@@ -29,7 +29,11 @@ interface MobileAppHomeProps {
   onNavigateToAllProducts: () => void;
   onNavigateToPurchases: () => void;
   onNavigateToFreeProducts: () => void;
+  onNavigateToWishlist: () => void;
+  onNavigateToSubscriptions: () => void;
   onOpenNews: () => void;
+  onOpenBlog: () => void;
+  onOpenCommunity: () => void;
   onCartClick: () => void;
   onProfileClick: () => void;
   onAuthClick: (mode: 'login' | 'signup') => void;
@@ -79,7 +83,11 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   onNavigateToAllProducts,
   onNavigateToPurchases,
   onNavigateToFreeProducts,
+  onNavigateToWishlist,
+  onNavigateToSubscriptions,
   onOpenNews,
+  onOpenBlog,
+  onOpenCommunity,
   onCartClick,
   onProfileClick,
   onAuthClick,
@@ -210,12 +218,12 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
         <div className="fixed inset-0 z-[90] bg-black/32" onClick={() => setIsDrawerOpen(false)} aria-hidden="true">
           <aside className="absolute right-0 top-0 flex h-full w-[80vw] max-w-sm flex-col rounded-l-[28px] bg-[#FFFBFE] text-[#1D1B20] shadow-none" onClick={(event) => event.stopPropagation()} aria-label="EDUVORA menu">
             <div className="flex items-start gap-3 border-b border-[#CAC4D0] p-5 pt-[max(24px,env(safe-area-inset-top))]">
-              <div className="grid h-14 w-14 shrink-0 place-items-center rounded-full bg-[#D7E3FF] text-xl font-bold text-[#0B57D0]">R</div>
-              <div className="min-w-0 flex-1 pt-1"><p className="truncate text-base font-bold">Rahul Sharma</p><p className="truncate text-sm text-[#625B71]">rahul.sharma@eduvora.com</p></div>
+              <UserAvatar name={currentUser?.name || 'Guest'} email={currentUser?.email || ''} photoURL={resolvedPhotoURL} size={52} />
+              <div className="min-w-0 flex-1 pt-1"><p className="truncate text-base font-bold">{currentUser?.name || 'Guest user'}</p><p className="truncate text-sm text-[#625B71]">{currentUser?.email || 'Sign in to sync your account'}</p></div>
               <button type="button" onClick={() => setIsDrawerOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-[#ECE6F0] text-xl" aria-label="Close menu">×</button>
             </div>
             <nav className="flex flex-col gap-1 p-3 text-sm font-medium">
-              {[['👤','Profile', onProfileClick], ['💎','Subscriptions', onProfileClick], ['♡','Wishlist', onNavigateToAllProducts], ['🛒','Cart', onCartClick], ['🎁','Free', onNavigateToFreeProducts], ['📣','News', onOpenNews], ['📄','Blog', onOpenNews], ['💬','Community', onOpenNews]].map(([icon,label,action]: any) => (
+              {[['👤','Profile', onProfileClick], ['💎','Subscriptions', onNavigateToSubscriptions], ['♡','Wishlist', onNavigateToWishlist], ['🛒','Cart', onCartClick], ['🎁','Free', onNavigateToFreeProducts], ['📣','News', onOpenNews], ['📄','Blog', onOpenBlog], ['💬','Community', onOpenCommunity]].map(([icon,label,action]: any) => (
                 <button key={label} type="button" onClick={() => { setIsDrawerOpen(false); action(); }} className="flex min-h-12 items-center gap-4 rounded-full px-4 text-left text-[#1D1B20] active:bg-[#E8DEF8]"><span className="w-6 text-center text-xl">{icon}</span><span>{label}</span></button>
               ))}
             </nav>

@@ -69,7 +69,7 @@ const WishlistPage: React.FC<WishlistPageProps> = ({ settings, products, onViewP
   }
 
   return (
-    <section ref={sectionRef} className={`py-16 sm:py-20 bg-white/90 backdrop-blur-xl min-h-[60vh] ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
+    <section ref={sectionRef} className={`pt-16 pb-28 sm:py-20 bg-white/90 backdrop-blur-xl min-h-[60vh] ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
       <div className="container mx-auto px-5 sm:px-6">
         <div className="mx-auto max-w-3xl text-center">
           <div className="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-3xl border border-[#E3E8F5] bg-gradient-to-br from-[#F1EEFF] to-white text-[#5B4BFF] shadow-[0_14px_34px_rgba(91,75,255,0.14)]">

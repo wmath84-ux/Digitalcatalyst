@@ -155,7 +155,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
   const clearSearch = () => setSearchQuery('');
   const clearAll = () => { setSearchQuery(''); setActiveFilter('All'); setSortBy('recommended'); };
   return (
-    <section id="products" ref={sectionRef} className={`store-scroll-scope relative min-h-[100dvh] touch-pan-y ${isMobileHome ? 'pb-36 pt-8 sm:py-14' : 'py-14 sm:py-24'} bg-[#EEF4FB] ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}>
+    <section id="products" ref={sectionRef} className={`store-scroll-scope relative min-h-[100dvh] touch-pan-y ${isMobileHome ? 'pb-36 pt-8 sm:py-14' : 'pt-14 pb-28 sm:py-24'} bg-[#EEF4FB] ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}>
       <div aria-hidden="true" className="pointer-events-none absolute inset-0">
         <div className="absolute -top-36 left-1/2 h-[32rem] w-[68rem] max-w-none -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(191,215,255,0.62),transparent)]" />
         <div className="absolute -left-44 top-64 h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(closest-side,rgba(123,97,255,0.15),transparent)]" />

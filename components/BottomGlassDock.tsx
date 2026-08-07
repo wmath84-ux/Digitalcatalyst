@@ -72,6 +72,7 @@ export const defaultDockStyle = {
   showLabels: true,
   showBadges: true,
   autoHideOnScroll: false,
+  persistAcrossPages: true,
   mobileEnabled: true,
   desktopExpandedWidth: 320,
   desktopCollapsedWidth: 88,
