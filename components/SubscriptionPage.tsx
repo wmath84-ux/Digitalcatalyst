@@ -125,8 +125,12 @@ const PremiumSubscriptionPage: React.FC<{
 
   const [stack, setStack] = React.useState<number[]>(() => cardImages.map((_, index) => index));
   const [leavingIndex, setLeavingIndex] = React.useState<number | null>(null);
+  const [leavingDirection, setLeavingDirection] = React.useState<-1 | 1>(-1);
   const animatingRef = React.useRef(false);
+  const touchStartX = React.useRef<number | null>(null);
   const touchStartY = React.useRef<number | null>(null);
+  const mouseStartX = React.useRef<number | null>(null);
+  const mouseStartY = React.useRef<number | null>(null);
   const ignoreClickUntil = React.useRef(0);
 
   const bundleMonthly = Math.max(0, getSubscriptionBillingPrice(plan, 'monthly')) || 499;
@@ -145,41 +149,70 @@ const PremiumSubscriptionPage: React.FC<{
     onActivatePlan(plan, billingCycle, null, chargeableFeatures);
   };
 
-  const triggerSwipe = React.useCallback(() => {
+  const triggerSwipe = React.useCallback((direction: -1 | 1 = -1) => {
     if (animatingRef.current || cardImages.length < 2) return;
     animatingRef.current = true;
     const frontCard = stack[0];
     setLeavingIndex(frontCard);
+    setLeavingDirection(direction);
     setStack(prev => {
       const next = [...prev];
-      const front = next.shift();
-      if (front !== undefined) next.push(front);
+      if (direction < 0) {
+        const front = next.shift();
+        if (front !== undefined) next.push(front);
+      } else {
+        const back = next.pop();
+        if (back !== undefined) next.unshift(back);
+      }
       return next;
     });
     window.setTimeout(() => {
       setLeavingIndex(null);
       animatingRef.current = false;
-    }, 470);
+    }, 520);
   }, [cardImages.length, stack]);
 
   const handleTouchStart = (event: React.TouchEvent) => {
+    touchStartX.current = event.touches[0]?.clientX ?? null;
     touchStartY.current = event.touches[0]?.clientY ?? null;
   };
 
   const handleTouchEnd = (event: React.TouchEvent) => {
+    const startX = touchStartX.current;
     const startY = touchStartY.current;
+    touchStartX.current = null;
     touchStartY.current = null;
-    if (startY == null) return;
+    if (startX == null || startY == null) return;
+    const deltaX = (event.changedTouches[0]?.clientX ?? startX) - startX;
     const deltaY = (event.changedTouches[0]?.clientY ?? startY) - startY;
-    if (deltaY < -48) {
-      ignoreClickUntil.current = Date.now() + 420;
-      triggerSwipe();
+    if (Math.abs(deltaX) > 48 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      ignoreClickUntil.current = Date.now() + 520;
+      triggerSwipe(deltaX < 0 ? -1 : 1);
+    }
+  };
+
+  const handleMouseDown = (event: React.MouseEvent) => {
+    mouseStartX.current = event.clientX;
+    mouseStartY.current = event.clientY;
+  };
+
+  const handleMouseUp = (event: React.MouseEvent) => {
+    const startX = mouseStartX.current;
+    const startY = mouseStartY.current;
+    mouseStartX.current = null;
+    mouseStartY.current = null;
+    if (startX == null || startY == null) return;
+    const deltaX = event.clientX - startX;
+    const deltaY = event.clientY - startY;
+    if (Math.abs(deltaX) > 48 && Math.abs(deltaX) > Math.abs(deltaY)) {
+      ignoreClickUntil.current = Date.now() + 520;
+      triggerSwipe(deltaX < 0 ? -1 : 1);
     }
   };
 
   const handleFrontClick = () => {
     if (Date.now() < ignoreClickUntil.current) return;
-    triggerSwipe();
+    triggerSwipe(-1);
   };
 
   const toggleIndex = Math.max(0, CYCLE_ORDER.findIndex(cycle => cycle === billingCycle));
@@ -228,6 +261,8 @@ const PremiumSubscriptionPage: React.FC<{
               className="psp-card-stage mt-10"
               onTouchStart={handleTouchStart}
               onTouchEnd={handleTouchEnd}
+              onMouseDown={handleMouseDown}
+              onMouseUp={handleMouseUp}
             >
               {cardImages.map((src, index) => {
                 const pos = stack.indexOf(index);
@@ -241,7 +276,7 @@ const PremiumSubscriptionPage: React.FC<{
                 return (
                   <div
                     key={index}
-                    className={`psp-card ${isLeaving ? 'is-leaving' : ''}`}
+                    className={`psp-card ${isLeaving ? (leavingDirection < 0 ? 'is-leaving-left' : 'is-leaving-right') : ''}`}
                     style={{ transform, opacity, filter, zIndex, pointerEvents: isFront && leavingIndex === null ? 'auto' : 'none' }}
                     onClick={isFront && leavingIndex === null ? handleFrontClick : undefined}
                     aria-hidden={!isFront}
@@ -254,9 +289,9 @@ const PremiumSubscriptionPage: React.FC<{
 
             <p className="psp-swipe-hint">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M12 19V5M6 11l6-6 6 6" />
+                <path d="M7 12h10M10 8l-4 4 4 4M14 8l4 4-4 4" />
               </svg>
-              Swipe up or tap to explore
+              Swipe left or right to see the features
             </p>
           </section>
 

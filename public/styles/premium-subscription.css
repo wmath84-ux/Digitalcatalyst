@@ -192,12 +192,21 @@ html[data-color-experience="clean-neutral"] .subscription-page-theme-adaptive.pr
   display: block;
 }
 
-.premium-subscription-page .psp-card.is-leaving {
-  transform: translateY(-126%) scale(0.8) rotate(-4deg);
+.premium-subscription-page .psp-card.is-leaving-left,
+.premium-subscription-page .psp-card.is-leaving-right {
   opacity: 0;
   filter: blur(10px);
   pointer-events: none;
-  transition: transform 440ms cubic-bezier(0.6, 0.04, 0.28, 0.99), opacity 360ms ease, filter 360ms ease;
+  transform-origin: left center;
+  transition: transform 520ms cubic-bezier(0.6, 0.04, 0.28, 0.99), opacity 420ms ease, filter 420ms ease;
+}
+
+.premium-subscription-page .psp-card.is-leaving-left {
+  transform: perspective(1000px) rotateY(-180deg) translateX(-18%) scale(0.86);
+}
+
+.premium-subscription-page .psp-card.is-leaving-right {
+  transform: perspective(1000px) rotateY(180deg) translateX(18%) scale(0.86);
 }
 
 .premium-subscription-page .psp-card-badge {
