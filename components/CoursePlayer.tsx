@@ -906,6 +906,8 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   const [highlightColor, setHighlightColor] = useState('#fef08a');
   const [dragOffset, setDragOffset] = useState(0);
   const [isPageFlipped, setIsPageFlipped] = useState(false);
+  const [flipDirection, setFlipDirection] = useState<-1 | 1>(-1);
+  const pageShellRef = useRef<HTMLDivElement>(null);
   const swipeStartXRef = useRef<number | null>(null);
   const swipeStartYRef = useRef<number | null>(null);
   const [learnerUid, setLearnerUid] = useState(() => auth.currentUser?.uid || '');
@@ -1156,29 +1158,41 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
     const deltaY = clientY - startY;
     if (Math.abs(deltaY) > Math.abs(deltaX) * 1.25) return;
 
-    setDragOffset(Math.min(0, deltaX));
+    setDragOffset(deltaX);
   };
 
   const endSwipe = () => {
-    const width = editorRef.current?.offsetWidth || 1;
+    const width = pageShellRef.current?.offsetWidth || editorRef.current?.offsetWidth || 1;
     const shouldFlip = Math.abs(dragOffset) > width * 0.3;
-    setIsPageFlipped(shouldFlip);
+    const direction: -1 | 1 = dragOffset < 0 ? -1 : 1;
+
+    if (shouldFlip && pages.length > 1) {
+      const currentIndex = Math.max(0, pages.findIndex(page => page.id === activePageId));
+      const nextIndex = direction < 0
+        ? (currentIndex + 1) % pages.length
+        : (currentIndex - 1 + pages.length) % pages.length;
+
+      saveCurrentPage();
+      setFlipDirection(direction);
+      setIsPageFlipped(true);
+      window.setTimeout(() => {
+        setActivePageId(pages[nextIndex]?.id || activePageId);
+        setIsPageFlipped(false);
+      }, 360);
+    }
+
     setDragOffset(0);
     swipeStartXRef.current = null;
     swipeStartYRef.current = null;
-    if (shouldFlip) window.setTimeout(() => setIsPageFlipped(false), 700);
   };
 
-  const meaningfulDocText = getMeaningfulDocText(activeContent);
-  const wordCount = meaningfulDocText ? meaningfulDocText.split(/\s+/).filter(Boolean).length : 0;
-  const charCount = meaningfulDocText.length;
 
   const paperBackground = hasRuledLines
     ? `repeating-linear-gradient(to bottom, transparent 0, transparent 30px, rgba(125, 184, 230, 0.38) 31px, transparent 32px), linear-gradient(${paperColor}, ${paperColor})`
     : paperColor;
   const pageTransform = dragOffset
-    ? `perspective(1000px) rotateY(${Math.max(-24, dragOffset / 10)}deg) translateX(${dragOffset * 0.05}px)`
-    : isPageFlipped ? 'perspective(1000px) rotateY(-180deg)' : undefined;
+    ? `perspective(1000px) rotateY(${Math.max(-24, Math.min(24, dragOffset / 10))}deg) translateX(${dragOffset * 0.05}px)`
+    : isPageFlipped ? `perspective(1000px) rotateY(${flipDirection < 0 ? -180 : 180}deg)` : undefined;
 
   const readingThemeClass = {
     dark: 'bg-white/70 text-slate-900',
@@ -1255,12 +1269,12 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
                 <button type="button" onClick={renamePage} className="min-h-11 w-full rounded-2xl border border-[#D9E7F8] bg-white px-4 py-3 text-sm font-black text-[#536178] transition hover:border-[#C9C2FF] hover:bg-[#F7F5FF] hover:text-[#5B4BFF]">Rename Page</button>
                 {pages.length > 1 && (<button type="button" onClick={deletePage} className="min-h-11 w-full rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm font-black text-rose-700 transition hover:bg-rose-100">Delete Page</button>)}
               </div>
-              <p className="mt-4 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-3 text-xs font-bold leading-5 text-[#536178]">{savedAt.includes('cloud') ? savedAt : `${savedAt} · saved locally and synced when available`}</p>
             </div>
           </div>
         )}
         <div className={`h-full min-h-0 overflow-y-auto bg-[#F1F7FF] p-3 transition-[padding] duration-300 sm:p-4 md:p-8 custom-scrollbar ${editorShellClass}`}>
           <div
+            ref={pageShellRef}
             className={`open-docs-paper-shell relative mx-auto min-h-full w-full ${editorPageWidthClass} rounded-[1.6rem] border border-white/80 p-4 shadow-[0_28px_75px_rgba(8,26,69,0.16)] transition-[max-width,opacity] duration-300 sm:p-7 md:p-10 ${isPageFlipped ? 'open-docs-page-flipped' : ''}`}
             style={{ background: paperBackground, transform: pageTransform, transformOrigin: 'left center', transition: dragOffset ? 'none' : 'transform 0.6s ease, max-width 0.3s ease, opacity 0.2s ease', opacity: dragOffset ? Math.max(0.72, 1 - Math.abs(dragOffset) / 900) : 1 }}
             onMouseDown={event => beginSwipe(event.clientX, event.clientY)}
@@ -1273,8 +1287,6 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
           >
             <input value={activePage?.title || ''} onChange={event => updateActivePageTitle(event.target.value)} className="mb-5 w-full border-0 bg-transparent text-4xl font-black tracking-tight text-[#081A45] outline-none placeholder:text-[#9AA4B5] sm:text-5xl" placeholder="Untitled document" aria-label="Document title" />
             <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={() => { setSavedAt('Unsaved changes…'); saveCurrentPage(); }} onBlur={saveCurrentPage} onKeyDown={handleEditorKeyDown} onKeyUp={() => saveEditorSelection(editorRef.current, selectionRef)} onMouseUp={() => saveEditorSelection(editorRef.current, selectionRef)} onTouchEnd={() => saveEditorSelection(editorRef.current, selectionRef)} onFocus={() => saveEditorSelection(editorRef.current, selectionRef)} className="open-docs-page min-h-[62vh] w-full bg-transparent text-base leading-8 text-[#081A45] outline-none sm:text-lg [&_h1]:text-3xl sm:[&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-2xl sm:[&_h2]:text-3xl [&_h2]:font-black [&_mark]:rounded [&_mark]:px-1 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6" />
-            <div className="pointer-events-none absolute bottom-4 left-5 rounded-full bg-white/75 px-3 py-1 text-xs font-black text-[#536178] shadow-sm">{savedAt}</div>
-            <div className="pointer-events-none absolute bottom-4 right-5 rounded-full bg-[#081A45]/90 px-3 py-1 text-xs font-black text-white shadow-sm">{wordCount} words · {charCount} chars</div>
           </div>
         </div>
       </div>
