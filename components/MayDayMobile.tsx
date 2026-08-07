@@ -1385,7 +1385,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
 
   if (desktop) {
     return (
-      <div data-feature="MAY_DAY_DESKTOP_V1" className="min-h-[calc(100vh-5rem)] bg-[#F8F9FB] text-[#101828]">
+      <div data-feature="MAY_DAY_DESKTOP_V1" className="mayday-contrast-scope min-h-[calc(100vh-5rem)] bg-[#F8F9FB] text-[#101828]">
         {activeTab === 'dashboard' ? renderDesktopDashboard() : null}
         {activeTab === 'notes' || activeTab === 'home' ? renderDesktopNotes() : null}
         {activeTab === 'goals' || activeTab === 'reminders' ? renderDesktopGoalsReminders() : null}
@@ -1405,7 +1405,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   ];
 
   return (
-    <div data-feature={MAY_DAY_MARKER} className="mayday-mobile-scope min-h-[100dvh] bg-[#F8F9FB] pb-[calc(env(safe-area-inset-bottom)+6.6rem)] text-[#101828]">
+    <div data-feature={MAY_DAY_MARKER} className="mayday-mobile-scope mayday-contrast-scope min-h-[100dvh] bg-[#F8F9FB] pb-[calc(env(safe-area-inset-bottom)+6.6rem)] text-[#101828]">
       {renderHeader()}
       {activeTab === 'home' ? renderHome() : null}
       {activeTab === 'goals' ? renderGoals() : null}

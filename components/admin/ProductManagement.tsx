@@ -351,6 +351,7 @@ const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] te
 
 type HostedDocsProvider = 'direct_pdf' | 'google_drive_pdf' | 'google_drive_doc' | 'external_docs_link' | 'open_docs';
 type MediaUrlProvider = 'direct_audio' | 'direct_video' | 'google_drive_audio' | 'google_drive_video' | 'external_media';
+type ImageUrlProvider = 'direct_image' | 'google_drive_image' | 'cloudinary_image' | 'external_image';
 type MediaComposerKind = 'audio' | 'video';
 
 type ContentComposerFormState = {
@@ -358,7 +359,7 @@ type ContentComposerFormState = {
     url: string;
     name: string;
     content: string;
-    provider?: HostedDocsProvider | MediaUrlProvider | 'upload' | 'external_url' | 'drive' | 'direct' | 'external';
+    provider?: HostedDocsProvider | MediaUrlProvider | ImageUrlProvider | 'upload' | 'external_url' | 'drive' | 'direct' | 'external';
     accessLevel?: CourseAccessLevel;
     paidUpdateId?: string;
     paidUpdateTitle?: string;
@@ -407,6 +408,18 @@ const mediaProviderHelper = (provider?: string, kind: MediaComposerKind = 'video
     return option?.helper || 'Paste a public https media URL. Google Drive links and direct audio/video URLs are supported.';
 };
 
+const imageProviderOptions: Array<{ provider: ImageUrlProvider; label: string; helper: string }> = [
+    { provider: 'direct_image', label: 'Image URL', helper: 'Paste a direct PNG/JPG/GIF/WebP/SVG link for native display in the course player.' },
+    { provider: 'google_drive_image', label: 'Google Drive Image URL', helper: 'Paste a public Google Drive image share link. Anyone with the link must be able to view.' },
+    { provider: 'cloudinary_image', label: 'Cloudinary Image Upload', helper: 'Upload the image to Cloudinary and add the hosted URL to the lesson automatically.' },
+    { provider: 'external_image', label: 'External Hosted Image URL', helper: 'Paste any secure hosted image link. It displays inside the course player preview frame.' },
+];
+const imageUrlProviders: ImageUrlProvider[] = ['direct_image', 'google_drive_image', 'cloudinary_image', 'external_image'];
+const isImageUrlProvider = (provider?: string): provider is ImageUrlProvider => Boolean(provider && imageUrlProviders.includes(provider as ImageUrlProvider));
+const imageProviderLabel = (provider?: string) => imageProviderOptions.find(option => option.provider === provider)?.label || 'Image URL';
+const imageProviderHelper = (provider?: string) => imageProviderOptions.find(option => option.provider === provider)?.helper || 'Paste a public https image URL. Google Drive links and direct image URLs are supported.';
+const imageProviderToProductProvider = (provider?: string) => provider === 'google_drive_image' ? 'drive' : provider === 'cloudinary_image' ? 'direct' : provider === 'direct_image' ? 'direct' : 'external';
+
 const extractGoogleDriveFileId = (value: string) => {
     const trimmed = value.trim();
     const patterns = [
@@ -432,6 +445,9 @@ const extractGoogleDriveFileId = (value: string) => {
 const isGoogleDriveUrl = (value: string) => /https:\/\/(?:drive|docs)\.google\.com\//i.test(value.trim());
 const isDirectAudioUrl = (value: string) => /\.(mp3|m4a|aac|wav|ogg|oga|opus)(?:$|[?#])/i.test(value.trim());
 const isDirectVideoUrl = (value: string) => /\.(mp4|webm|mov|m4v|ogv)(?:$|[?#])/i.test(value.trim());
+const isDataImageUrl = (value: string) => /^data:image\//i.test(value.trim());
+const isDirectImageUrl = (value: string) => /\.(png|jpe?g|gif|webp|avif|svg)(?:$|[?#])/i.test(value.trim()) || isDataImageUrl(value);
+const isFirebaseStorageUrl = (value: string) => /firebasestorage\.googleapis\.com|storage\.googleapis\.com/i.test(value.trim());
 const mediaProviderToProductProvider = (provider?: string) => provider === 'google_drive_audio' || provider === 'google_drive_video' ? 'drive' : provider === 'direct_audio' || provider === 'direct_video' ? 'direct' : 'external';
 const mediaProviderContentType = (type: ProductFileType, provider?: string, url = '') => type === 'audio' ? (provider === 'direct_audio' || isDirectAudioUrl(url) ? 'audio/url' : 'audio/external') : type === 'video' ? (provider === 'direct_video' || isDirectVideoUrl(url) ? 'video/url' : 'video/external') : undefined;
 
@@ -447,6 +463,13 @@ const resolveInitialMediaProvider = (file?: ProductFile | null): ContentComposer
         if (file.provider === 'drive' || isGoogleDriveUrl(file.url)) return 'google_drive_video';
         if (file.provider === 'direct' || isDirectVideoUrl(file.url)) return 'direct_video';
         if (file.provider === 'external' || file.sourceType === 'url') return 'external_media';
+    }
+    if (file.type === 'image') {
+        if (isImageUrlProvider(file.provider)) return file.provider;
+        if (file.provider === 'drive' || isGoogleDriveUrl(file.url)) return 'google_drive_image';
+        if (file.provider === 'upload' || isFirebaseStorageUrl(file.url)) return 'cloudinary_image';
+        if (file.provider === 'direct' || isDirectImageUrl(file.url)) return 'direct_image';
+        return 'external_image';
     }
     return file.provider as ContentComposerFormState['provider'];
 };
@@ -1096,7 +1119,7 @@ const ContentComposer: React.FC<{
         };
     };
 
-    const contentTypes: Array<{ type: ProductFileType; title: string; description: string; icon: string; accept?: string; action?: 'docsUrl' | 'audioUrl' | 'videoUrl' | 'driveAudioUrl' | 'driveVideoUrl' | 'externalAudioUrl' | 'externalVideoUrl' }> = [
+    const contentTypes: Array<{ type: ProductFileType; title: string; description: string; icon: string; accept?: string; action?: 'docsUrl' | 'audioUrl' | 'videoUrl' | 'driveAudioUrl' | 'driveVideoUrl' | 'externalAudioUrl' | 'externalVideoUrl' | 'imageUrl' }> = [
         { type: 'video', title: 'Video Upload', description: 'File upload requires Firebase Storage. Use URL media for now.', icon: '🎬', accept: 'video/*' },
         { type: 'video', title: 'Video URL', description: 'Paste direct MP4/WebM or hosted video URL.', icon: '🔗', action: 'videoUrl' },
         { type: 'video', title: 'Google Drive Video URL', description: 'Paste a public Drive video share link.', icon: '▶️', action: 'driveVideoUrl' },
@@ -1108,7 +1131,7 @@ const ContentComposer: React.FC<{
         { type: 'link', title: 'External Link', description: 'Reference any hosted resource.', icon: '🔗' },
         { type: 'sheet', title: 'Spreadsheet', description: 'Upload CSV/XLS study material.', icon: '📊', accept: '.csv,.xls,.xlsx' },
         { type: 'ebook', title: 'E-book', description: 'Upload EPUB or PDF book content.', icon: '📚', accept: '.epub,.pdf' },
-        { type: 'image', title: 'Image / Diagram', description: 'Upload diagrams, charts and reference images for lessons.', icon: '🖼️', accept: 'image/*' },
+        { type: 'image', title: 'Image / Diagram', description: 'Upload diagrams, charts and reference images for lessons.', icon: '🖼️', accept: 'image/*', action: 'imageUrl' },
         { type: 'audio', title: 'Audio Upload', description: 'File upload requires Firebase Storage. Use URL media for now.', icon: '🎧', accept: 'audio/*' },
         { type: 'audio', title: 'Audio URL', description: 'Paste direct MP3/M4A/WAV or hosted audio URL.', icon: '🎧', action: 'audioUrl' },
         { type: 'audio', title: 'Google Drive Audio URL', description: 'Paste a public Drive audio share link.', icon: '☁️', action: 'driveAudioUrl' },
@@ -1167,6 +1190,17 @@ const ContentComposer: React.FC<{
             provider: 'direct_pdf',
             url: '',
             name: 'PDF / Docs Resource',
+            content: '',
+        });
+        setDocError('');
+    };
+
+    const showImageUrlForm = (provider: ImageUrlProvider) => {
+        setFormState({
+            type: 'image',
+            provider,
+            url: '',
+            name: 'Image / Diagram',
             content: '',
         });
         setDocError('');
@@ -1291,6 +1325,24 @@ const ContentComposer: React.FC<{
         }
         const directPlayable = formState.type === 'audio' ? isDirectAudioUrl(trimmedUrl) : isDirectVideoUrl(trimmedUrl);
         setDocError(directPlayable || formState.provider?.startsWith('google_drive') ? 'Media preview ready. Save to course when ready.' : 'This media link may not support direct playback. It will open in a secure preview card.');
+    };
+
+    const previewImageUrl = () => {
+        if (!formState || !isImageUrlProvider(formState.provider)) return;
+        const trimmedUrl = formState.url.trim();
+        if (!trimmedUrl || !trimmedUrl.startsWith('https://')) {
+            setDocError('Please paste a valid https image URL.');
+            return;
+        }
+        if (formState.provider === 'google_drive_image' && (!isGoogleDriveUrl(trimmedUrl) || !extractGoogleDriveFileId(trimmedUrl))) {
+            setDocError('Google Drive file must be public or shared with anyone with the link.');
+            return;
+        }
+        if (formState.provider === 'direct_image' && !isDirectImageUrl(trimmedUrl)) {
+            setDocError('This URL does not point to a direct image file. Use Image URL for direct JPG/PNG/GIF/WebP/SVG links, or choose External Hosted Image URL.');
+            return;
+        }
+        setDocError('Image preview ready. Save to course when ready.');
     };
 
     const handleFormSubmit = () => {
@@ -1425,6 +1477,44 @@ const ContentComposer: React.FC<{
             return;
         }
 
+        if (isImageUrlProvider(provider)) {
+            if (!trimmedUrl || !trimmedUrl.startsWith('https://')) {
+                setDocError('Please paste a valid https image URL.');
+                return;
+            }
+
+            if (provider === 'google_drive_image') {
+                if (!isGoogleDriveUrl(trimmedUrl) || !extractGoogleDriveFileId(trimmedUrl)) {
+                    setDocError('Google Drive file must be public or shared with anyone with the link.');
+                    return;
+                }
+            }
+
+            if (provider === 'direct_image' && !isDirectImageUrl(trimmedUrl)) {
+                setDocError('This URL does not point to a direct image file. Use Image URL for direct JPG/PNG/GIF/WebP/SVG links, or choose External Hosted Image URL.');
+                return;
+            }
+
+            const now = Date.now();
+            const isDriveProvider = provider === 'google_drive_image';
+            const embedUrl = isDriveProvider ? toGoogleDrivePreviewUrl(trimmedUrl) : '';
+
+            onAdd({
+                name: trimmedName,
+                type: 'image',
+                url: trimmedUrl,
+                ...buildUrlMediaSource({ provider: imageProviderToProductProvider(provider), url: trimmedUrl, embedUrl }),
+                contentType: 'image',
+                createdAt: initialFile?.createdAt || now,
+                updatedAt: now,
+                content: '',
+                ...buildContentAccessMeta(formState),
+                quiz: { questions: [] },
+            });
+            onClose();
+            return;
+        }
+
         if (trimmedUrl && !trimmedUrl.startsWith('https://')) {
             setDocError('Resource URL must start with https://');
             return;
@@ -1481,7 +1571,7 @@ const ContentComposer: React.FC<{
                         <button
                             key={`${item.type}-${item.title}`}
                             type="button"
-                            onClick={() => item.action === 'docsUrl' ? showDocsUrlForm() : item.action === 'audioUrl' ? showMediaUrlForm('audio', 'direct_audio') : item.action === 'videoUrl' ? showMediaUrlForm('video', 'direct_video') : item.action === 'driveAudioUrl' ? showMediaUrlForm('audio', 'google_drive_audio') : item.action === 'driveVideoUrl' ? showMediaUrlForm('video', 'google_drive_video') : item.action === 'externalAudioUrl' ? showMediaUrlForm('audio', 'external_media') : item.action === 'externalVideoUrl' ? showMediaUrlForm('video', 'external_media') : item.accept ? triggerFileUpload(item.type, item.accept) : showForm(item.type)}
+                            onClick={() => item.action === 'docsUrl' ? showDocsUrlForm() : item.action === 'audioUrl' ? showMediaUrlForm('audio', 'direct_audio') : item.action === 'videoUrl' ? showMediaUrlForm('video', 'direct_video') : item.action === 'driveAudioUrl' ? showMediaUrlForm('audio', 'google_drive_audio') : item.action === 'driveVideoUrl' ? showMediaUrlForm('video', 'google_drive_video') : item.action === 'externalAudioUrl' ? showMediaUrlForm('audio', 'external_media') : item.action === 'externalVideoUrl' ? showMediaUrlForm('video', 'external_media') : item.action === 'imageUrl' ? showImageUrlForm('direct_image') : item.accept ? triggerFileUpload(item.type, item.accept) : showForm(item.type)}
                             className="rounded-2xl border border-white/50 bg-white/80 p-4 text-left transition hover:-translate-y-0.5 hover:border-cyan-300/50 hover:bg-white/80 hover:shadow-sm"
                         >
                             <span className="text-2xl">{item.icon}</span>
@@ -1649,7 +1739,26 @@ const ContentComposer: React.FC<{
                                         <p className="mt-2 text-xs font-bold leading-5 text-slate-600">{mediaProviderHelper(formState.provider, formState.type === 'audio' ? 'audio' : 'video')}</p>
                                     </div>
                                 )}
-                                {formState.provider !== 'open_docs' && (
+                                {isImageUrlProvider(formState.provider) && (
+                                    <div className="rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] p-4">
+                                        <label className={labelClass}>Provider type</label>
+                                        <select
+                                            value={formState.provider}
+                                            onChange={event => {
+                                                const nextProvider = event.target.value as ImageUrlProvider;
+                                                setDocError('');
+                                                setFormState(prev => prev ? { ...prev, provider: nextProvider, type: 'image' } : prev);
+                                            }}
+                                            className={fieldClass}
+                                        >
+                                            {imageProviderOptions.map(option => (
+                                                <option key={option.provider} value={option.provider}>{option.label}</option>
+                                            ))}
+                                        </select>
+                                        <p className="mt-2 text-xs font-bold leading-5 text-slate-600">{imageProviderHelper(formState.provider)}</p>
+                                    </div>
+                                )}
+                                {formState.provider !== 'open_docs' && !isImageUrlProvider(formState.provider) && (
                                     <div>
                                         {isMediaUrlProvider(formState.provider) ? (
                                             <PremiumMediaUrlInput kind={formState.type === 'audio' ? 'audio' : 'video'} value={formState.url} onChange={(url) => { setDocError(''); setFormState(prev => prev ? { ...prev, url } : prev); }} label={mediaProviderLabel(formState.provider, formState.type === 'audio' ? 'audio' : 'video')} helperText={mediaProviderHelper(formState.provider, formState.type === 'audio' ? 'audio' : 'video')} />
@@ -1677,6 +1786,36 @@ const ContentComposer: React.FC<{
                                         )}
                                     </div>
                                 )}
+                                {isImageUrlProvider(formState.provider) && (
+                                    <div className="space-y-3">
+                                        {formState.provider === 'cloudinary_image' ? (
+                                            <PremiumImageUrlInput
+                                                value={formState.url}
+                                                onChange={(url) => { setDocError(''); setFormState(prev => prev ? { ...prev, url } : prev); }}
+                                                label={imageProviderLabel(formState.provider)}
+                                                helperText={imageProviderHelper(formState.provider)}
+                                            />
+                                        ) : (<>
+                                            <label className={labelClass}>{imageProviderLabel(formState.provider)}</label>
+                                            <input
+                                                value={formState.url}
+                                                onChange={event => {
+                                                    setDocError('');
+                                                    setFormState(prev => prev ? { ...prev, url: event.target.value } : prev);
+                                                }}
+                                                className={fieldClass}
+                                                placeholder={formState.provider === 'google_drive_image' ? 'https://drive.google.com/file/d/FILE_ID/view' : 'https://example.com/diagram.png'}
+                                            />
+                                        </>)}
+                                        <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800">
+                                            <p>Images are shown in the lesson player with zoom controls. Drive links are normalized into a clean preview card.</p>
+                                            <div className="mt-3 flex flex-wrap gap-2">
+                                                <button type="button" onClick={previewImageUrl} className="rounded-xl bg-blue-600 px-4 py-2 text-xs font-black text-white">Preview image</button>
+                                                <button type="button" onClick={() => triggerFileUpload('image', 'image/*')} className="rounded-xl border border-blue-200 bg-white px-4 py-2 text-xs font-black text-blue-700 hover:bg-blue-50">Upload to Firebase Storage</button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                )}
                                 {isHostedDocsProvider(formState.provider) && formState.provider !== 'open_docs' && (
                                     <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-bold text-amber-800">
                                         For Google Drive files, set sharing to Anyone with the link. URL-based PDFs/docs do not use Firebase Storage and only save metadata to the product.
@@ -1693,7 +1832,7 @@ const ContentComposer: React.FC<{
                                 Back
                             </button>
                             <button type="button" onClick={handleFormSubmit} className="rounded-2xl bg-cyan-600 px-6 py-3 font-black text-white shadow-sm hover:bg-cyan-700">
-                                {isMediaUrlProvider(formState.provider) ? 'Save to course' : isEditing ? 'Save Content' : 'Add Content'}
+                                {isMediaUrlProvider(formState.provider) || isImageUrlProvider(formState.provider) ? 'Save to course' : isEditing ? 'Save Content' : 'Add Content'}
                             </button>
                         </div>
                     </div>

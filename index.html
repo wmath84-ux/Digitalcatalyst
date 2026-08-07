@@ -1204,6 +1204,56 @@
         }
       }
 
+      /* MayDay contrast pass: black borders + stronger fill intensity so small
+         circles, boxes and buttons stay clearly visible on white cards and the
+         white canvas, on both mobile and desktop MayDay pages. */
+      .mayday-contrast-scope :is(button) {
+        border: 2px solid #000 !important;
+      }
+
+      .mayday-contrast-scope :is([class*="border-"]) {
+        border-color: #000 !important;
+      }
+
+      .mayday-contrast-scope :is(
+        [class*="bg-[#EEF2FF]"], [class*="bg-[#F0F4FF]"]
+      ) {
+        background-color: #DDE5FF !important;
+      }
+
+      .mayday-contrast-scope :is(
+        [class*="bg-[#F2F4F8]"], [class*="bg-[#F6F7F9]"],
+        [class*="bg-[#F2F4F7]"], [class*="bg-[#EEF1F6]"]
+      ) {
+        background-color: #E2E7F0 !important;
+      }
+
+      .mayday-contrast-scope :is(
+        [class*="bg-[#D0D5DD]"], [class*="bg-[#C7CEDA]"],
+        [class*="bg-[#C5CBD5]"], [class*="bg-[#C6CBD6]"]
+      ) {
+        background-color: #A2AABA !important;
+      }
+
+      .mayday-contrast-scope :is(
+        [class*="bg-[#E9E0FF]"], [class*="bg-[#EAE1FF]"],
+        [class*="bg-[#F0EDFF]"], [class*="bg-[#F2EEFF]"],
+        [class*="bg-[#F1ECFF]"]
+      ) {
+        background-color: #DCD2FF !important;
+      }
+
+      .mayday-contrast-scope :is([class*="bg-[#DDF6F4]"]) {
+        background-color: #C4F0EC !important;
+      }
+
+      .mayday-contrast-scope :is(
+        [class*="bg-[#FBFCFE]"], [class*="bg-[#FAFBFD]"],
+        [class*="bg-[#F8FAFD]"]
+      ) {
+        background-color: #EEF1F7 !important;
+      }
+
     </style>
     <style id="immersive-color-experience">
       html:is([data-color-experience="immersive"], [data-color-experience="warm"], [data-color-experience="modern-white"], [data-color-experience="clean-neutral"]) {

@@ -147,6 +147,180 @@ const useViewportSize = () => {
 
 
 
+const ZoomableImageView: React.FC<{ src: string; alt?: string; caption?: string }> = ({ src, alt = 'Course diagram or chart', caption }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const imageRef = useRef<HTMLImageElement>(null);
+  const [scale, setScale] = useState(1);
+  const [translate, setTranslate] = useState({ x: 0, y: 0 });
+
+  const stateRef = useRef({ scale: 1, x: 0, y: 0 });
+  const pointersRef = useRef(new Map<number, { x: number; y: number }>());
+  const gestureRef = useRef<{ mode: 'pinch' | 'drag'; startDistance: number; startScale: number; startTx: number; startTy: number; startMid: { x: number; y: number } } | null>(null);
+  const movedRef = useRef(false);
+  const multiTouchRef = useRef(false);
+
+  const getCenter = () => {
+    const el = containerRef.current;
+    if (!el) return { cx: 0, cy: 0 };
+    const rect = el.getBoundingClientRect();
+    return { cx: rect.width / 2, cy: rect.height / 2 };
+  };
+
+  const clampTranslate = (tx: number, ty: number, s: number) => {
+    const el = containerRef.current;
+    const img = imageRef.current;
+    if (!el || !img) return { x: tx, y: ty };
+    const rect = el.getBoundingClientRect();
+    const imgRect = img.getBoundingClientRect();
+    const baseW = imgRect.width / s;
+    const baseH = imgRect.height / s;
+    const maxX = Math.max(0, (baseW * s - rect.width) / 2);
+    const maxY = Math.max(0, (baseH * s - rect.height) / 2);
+    return {
+      x: Math.max(-maxX, Math.min(maxX, tx)),
+      y: Math.max(-maxY, Math.min(maxY, ty)),
+    };
+  };
+
+  const applyTransform = (s: number, anchor?: { x: number; y: number }) => {
+    const s1 = Math.max(1, Math.min(6, s));
+    const { cx, cy } = getCenter();
+    const cur = stateRef.current;
+    let t1x: number;
+    let t1y: number;
+    if (anchor) {
+      const dx = (anchor.x - cx - cur.x) / cur.scale;
+      const dy = (anchor.y - cy - cur.y) / cur.scale;
+      t1x = anchor.x - cx - dx * s1;
+      t1y = anchor.y - cy - dy * s1;
+    } else {
+      t1x = cur.x * (s1 / cur.scale);
+      t1y = cur.y * (s1 / cur.scale);
+    }
+    const clamped = clampTranslate(t1x, t1y, s1);
+    stateRef.current = { scale: s1, x: clamped.x, y: clamped.y };
+    setScale(s1);
+    setTranslate(clamped);
+  };
+
+  const onPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    (e.currentTarget as HTMLDivElement).setPointerCapture(e.pointerId);
+    pointersRef.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    movedRef.current = false;
+
+    const pointers = [...pointersRef.current.values()];
+    if (pointers.length === 2) {
+      multiTouchRef.current = true;
+      const [p1, p2] = pointers;
+      gestureRef.current = {
+        mode: 'pinch',
+        startDistance: Math.max(1, Math.hypot(p2.x - p1.x, p2.y - p1.y)),
+        startScale: stateRef.current.scale,
+        startTx: stateRef.current.x,
+        startTy: stateRef.current.y,
+        startMid: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 },
+      };
+    } else {
+      gestureRef.current = {
+        mode: 'drag',
+        startDistance: 0,
+        startScale: stateRef.current.scale,
+        startTx: stateRef.current.x,
+        startTy: stateRef.current.y,
+        startMid: { x: e.clientX, y: e.clientY },
+      };
+    }
+  };
+
+  const onPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const prev = pointersRef.current.get(e.pointerId);
+    if (!prev) return;
+    const cur = { x: e.clientX, y: e.clientY };
+    pointersRef.current.set(e.pointerId, cur);
+    if (Math.hypot(cur.x - prev.x, cur.y - prev.y) > 2) movedRef.current = true;
+
+    const gesture = gestureRef.current;
+    if (!gesture) return;
+
+    if (pointersRef.current.size >= 2) {
+      const pointers = [...pointersRef.current.values()];
+      const [p1, p2] = pointers;
+      const distance = Math.max(1, Math.hypot(p2.x - p1.x, p2.y - p1.y));
+      const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 };
+      if (gesture.mode === 'pinch' && gesture.startDistance > 0) {
+        const s1 = Math.max(1, Math.min(6, gesture.startScale * (distance / gesture.startDistance)));
+        const { cx, cy } = getCenter();
+        const dx = (gesture.startMid.x - cx - gesture.startTx) / gesture.startScale;
+        const dy = (gesture.startMid.y - cy - gesture.startTy) / gesture.startScale;
+        const clamped = clampTranslate(mid.x - cx - dx * s1, mid.y - cy - dy * s1, s1);
+        stateRef.current = { scale: s1, x: clamped.x, y: clamped.y };
+        setScale(s1);
+        setTranslate(clamped);
+      }
+    } else if (gesture.mode === 'drag' && stateRef.current.scale > 1) {
+      const dx = cur.x - gesture.startMid.x;
+      const dy = cur.y - gesture.startMid.y;
+      const clamped = clampTranslate(gesture.startTx + dx, gesture.startTy + dy, stateRef.current.scale);
+      stateRef.current = { ...stateRef.current, x: clamped.x, y: clamped.y };
+      setTranslate(clamped);
+    }
+  };
+
+  const onPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    const wasPresent = pointersRef.current.delete(e.pointerId);
+    if (!wasPresent) return;
+
+    if (pointersRef.current.size === 1) {
+      const remaining = [...pointersRef.current.values()][0];
+      gestureRef.current = {
+        mode: 'drag',
+        startDistance: 0,
+        startScale: stateRef.current.scale,
+        startTx: stateRef.current.x,
+        startTy: stateRef.current.y,
+        startMid: { x: remaining.x, y: remaining.y },
+      };
+    } else if (pointersRef.current.size === 0) {
+      gestureRef.current = null;
+      multiTouchRef.current = false;
+    }
+  };
+
+  const onImageClick = (e: React.MouseEvent<HTMLImageElement>) => {
+    if (movedRef.current || multiTouchRef.current) return;
+    const anchor = { x: e.clientX, y: e.clientY };
+    applyTransform(stateRef.current.scale > 1.2 ? 1 : 2.5, anchor);
+  };
+
+  const zoomPercent = Math.round(scale * 100);
+
+  return (
+    <div ref={containerRef} onPointerDown={onPointerDown} onPointerMove={onPointerMove} onPointerUp={onPointerUp} onPointerCancel={onPointerUp} className="course-image-stage relative flex h-full min-h-0 w-full touch-none select-none items-center justify-center overflow-hidden bg-white/85 p-3 text-slate-900 sm:p-6">
+      <img
+        ref={imageRef}
+        src={src}
+        alt={alt}
+        loading="lazy"
+        draggable={false}
+        onClick={onImageClick}
+        className="max-h-[72vh] max-w-full cursor-zoom-in rounded-[1.5rem] border border-white/70 bg-white object-contain shadow-[0_20px_60px_rgba(8,26,69,0.10)] transition-transform duration-150 ease-out sm:rounded-[1.75rem]"
+        style={{ transform: `translate(${translate.x}px, ${translate.y}px) scale(${scale})`, willChange: 'transform' }}
+      />
+      {caption ? <figcaption className="pointer-events-none absolute bottom-16 left-1/2 max-w-[90%] -translate-x-1/2 truncate rounded-full bg-white/85 px-4 py-1.5 text-sm font-black text-slate-700 shadow-sm backdrop-blur-md">{caption}</figcaption> : null}
+      <div className="absolute bottom-4 right-4 z-10 flex flex-col items-end gap-2">
+        <div className="flex items-center gap-2 rounded-full border border-slate-200/80 bg-white/95 px-3 py-1.5 text-xs font-black text-slate-700 shadow-[0_8px_24px_rgba(15,23,42,0.10)] backdrop-blur-md">
+          <button type="button" onClick={() => applyTransform(stateRef.current.scale / 1.3)} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-lg font-black text-slate-800 transition hover:bg-slate-100 active:scale-95" aria-label="Zoom out">−</button>
+          <span className="min-w-12 text-center">{zoomPercent}%</span>
+          <button type="button" onClick={() => applyTransform(stateRef.current.scale * 1.3)} className="flex h-9 w-9 items-center justify-center rounded-full border border-slate-200 bg-white text-lg font-black text-slate-800 transition hover:bg-slate-100 active:scale-95" aria-label="Zoom in">+</button>
+        </div>
+        <button type="button" onClick={() => applyTransform(1)} className="rounded-full border border-slate-200/80 bg-white/95 px-4 py-2 text-xs font-black text-slate-700 shadow-[0_8px_24px_rgba(15,23,42,0.10)] backdrop-blur-md transition hover:bg-slate-100 active:scale-95" aria-label="Reset zoom">Reset</button>
+      </div>
+      <div className="pointer-events-none absolute bottom-2 left-1/2 -translate-x-1/2 whitespace-nowrap text-[10px] font-bold text-slate-500/70">Pinch or click to zoom · drag to pan</div>
+    </div>
+  );
+};
+
 const GlassDownloadCard: React.FC<{ file: ProductFile; headline?: string; onDownloadRequest?: (file: ProductFile) => void; }> = ({ file, headline = 'Your download is ready', onDownloadRequest }) => (
   <div className="flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-white/70 p-3 text-slate-900 sm:p-6 custom-scrollbar">
     <div className="absolute inset-0 bg-[radial-gradient(circle_at_25%_20%,rgba(255,255,255,0.32),transparent_26%),radial-gradient(circle_at_75%_70%,rgba(125,211,252,0.28),transparent_24%)]" />
@@ -2249,17 +2423,7 @@ const CoursePlayer: React.FC<{
       case 'image': {
         const imageUrl = activeFile.url || activeFile.embedUrl || '';
         return imageUrl ? (
-          <div className="course-image-stage flex h-full min-h-0 w-full items-center justify-center overflow-auto bg-white/85 p-3 text-slate-900 sm:p-6 custom-scrollbar">
-            <figure className="w-full max-w-4xl text-center">
-              <img
-                src={imageUrl}
-                alt={activeFile.name || 'Course diagram or chart'}
-                loading="lazy"
-                className="mx-auto max-h-[72vh] w-auto max-w-full rounded-[1.5rem] border border-white/70 bg-white object-contain shadow-[0_20px_60px_rgba(8,26,69,0.10)] sm:rounded-[1.75rem]"
-              />
-              <figcaption className="mt-4 text-base font-black text-slate-700">{activeFile.name}</figcaption>
-            </figure>
-          </div>
+          <ZoomableImageView src={imageUrl} alt={activeFile.name || 'Course diagram or chart'} caption={activeFile.name} />
         ) : <GlassDownloadCard file={activeFile} headline="Image preview unavailable" />;
       }
       default: return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
