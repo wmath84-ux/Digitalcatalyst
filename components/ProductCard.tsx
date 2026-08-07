@@ -42,7 +42,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
     const surfaceRoundnessKey = productCardRoundnessKeyBySurface[roundnessSurface];
     const isSurfaceRounded = productRoundness[surfaceRoundnessKey] !== false;
     const isInnerFrameRounded = productRoundness.mediaInnerFrame !== false;
-    const cardRoundClass = isSurfaceRounded ? 'rounded-[24px]' : 'rounded-xl';
+    const cardRoundClass = isSurfaceRounded ? 'rounded-[22px]' : 'rounded-xl';
     const mediaPaddingClass = isInnerFrameRounded ? 'p-2 sm:p-3' : '';
     const mediaFrameRoundClass = isInnerFrameRounded ? 'rounded-[18px] bg-white/85 shadow-inner ring-1 ring-white/80' : 'rounded-none bg-transparent';
     const badgeRoundClass = pillClassForProductRoundness(productRoundness.productBadges !== false);
@@ -51,6 +51,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
     const displayImage = getProductImage(product, 'card');
     const priceDetails = React.useMemo(() => getProductPriceDetails(product), [product]);
     const hasDiscount = priceDetails.hasSalePrice;
+    const discountPercent = hasDiscount && priceDetails.originalPrice > 0 ? Math.round((1 - priceDetails.currentPrice / priceDetails.originalPrice) * 100) : 0;
     // Coupon availability logic
     const associatedCoupon = product.couponCode ? coupons.find(c => c.code === product.couponCode) : null;
     let isCouponAvailable = false;
@@ -72,7 +73,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
     }
 
     return (
-        <article className={`product-card-shine ${compactMobile ? 'product-card-mobile-compact' : ''} group relative flex min-h-full flex-col overflow-hidden ${cardRoundClass} border border-[#D6E4F5] bg-[#FFFBFE] shadow-none transition duration-300 ease-out ${animationClass}`}>
+        <article className={`product-card-shine ${compactMobile ? 'product-card-mobile-compact' : ''} group relative flex min-h-full flex-col overflow-hidden ${cardRoundClass} border border-[#C7D9F2] bg-gradient-to-b from-white to-[#F8FBFF] shadow-[0_16px_44px_rgba(16,33,63,0.13)] ring-1 ring-white/80 transition duration-300 ease-out hover:-translate-y-1.5 hover:border-[#9FB9E6] hover:shadow-[0_30px_70px_rgba(16,33,63,0.20)] ${animationClass}`}>
             {/* Image Container */}
             <div className={`relative aspect-[4/3] w-full overflow-hidden border-b border-[#E1EAF6] bg-gradient-to-br from-[#F6FAFF] via-white to-[#EEF4FF] ${mediaPaddingClass}`}>
                 <div className={`product-card-media-safe-frame relative h-full w-full overflow-hidden ${mediaFrameRoundClass}`}>
@@ -81,7 +82,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                     fallbackSrc={getProductImageFallback(product)}
                     alt={product.title}
                     wrapperClassName="absolute inset-0"
-                    className="h-full w-full object-cover"
+                    className="h-full w-full object-contain p-1"
                     fallbackTitle={product.title}
                     fallbackBadge={product.category || 'Product'}
                     fallbackIcon="🎓"
@@ -166,26 +167,29 @@ const ProductCard: React.FC<ProductCardProps> = ({ settings, product, onViewDeta
                         <div className="flex flex-col">
                             {product.isFree ? (
                                 <>
-                                    <span className={`${compactMobile ? 'text-[9px] sm:text-xs' : 'text-xs'} text-slate-600 font-medium line-through`}>Price</span>
                                     <div className="flex items-baseline gap-1">
-                                        <span className={`${compactMobile ? 'text-sm sm:text-xl' : 'text-lg sm:text-xl'} font-bold text-blue-600`}>₹0</span>
-                                        <span className={`${compactMobile ? 'text-[8px] sm:text-xs' : 'text-xs'} text-slate-600`}>(₹3 fee)</span>
+                                        <span className={`${compactMobile ? 'text-sm sm:text-xl' : 'text-lg sm:text-xl'} font-black text-[#059669]`}>₹0</span>
+                                        <span className={`${compactMobile ? 'text-[8px] sm:text-xs' : 'text-xs'} text-slate-500`}>(₹3 fee)</span>
                                     </div>
                                 </>
                             ) : hasDiscount ? (
                                 <>
-                                    <span className={`${compactMobile ? 'text-[9px] sm:text-xs' : 'text-xs'} text-slate-600 font-medium line-through`}>{product.price}</span>
-                                    <span className={`${compactMobile ? 'text-sm sm:text-xl' : 'text-lg sm:text-xl'} font-bold text-gray-900`}>{priceDetails.displayPriceText}</span>
+                                    <div className="flex items-center gap-1.5">
+                                        <span className={`${compactMobile ? 'text-sm sm:text-xl' : 'text-lg sm:text-xl'} font-black text-[#0B3A82]`}>{priceDetails.displayPriceText}</span>
+                                        {discountPercent > 0 && <span className={`${compactMobile ? 'text-[8px] sm:text-[10px]' : 'text-[10px]'} rounded-full bg-emerald-50 px-1.5 py-0.5 font-black text-emerald-600 ring-1 ring-emerald-100`}>-{discountPercent}%</span>}
+                                    </div>
+                                    <span className={`${compactMobile ? 'text-[9px] sm:text-xs' : 'text-xs'} text-slate-500 font-medium line-through`}>{product.price}</span>
                                 </>
                             ) : (
                                 <>
-                                    <span className={`${compactMobile ? 'text-[9px] sm:text-xs' : 'text-xs'} text-slate-600 font-medium`}>Price</span>
-                                    <span className={`${compactMobile ? 'text-sm sm:text-xl' : 'text-lg sm:text-xl'} font-bold text-gray-900`}>{product.price}</span>
+                                    <span className={`${compactMobile ? 'text-[9px] sm:text-xs' : 'text-xs'} text-slate-500 font-medium`}>Price</span>
+                                    <span className={`${compactMobile ? 'text-sm sm:text-xl' : 'text-lg sm:text-xl'} font-black text-[#0B3A82]`}>{product.price}</span>
                                 </>
                             )}
                         </div>
-                        <button onClick={() => onViewDetails()} className={`flex w-full shrink-0 items-center justify-center rounded-full bg-[#6750A4] font-black uppercase tracking-wide text-white shadow-none transition active:scale-95 ${compactMobile ? 'min-h-10 px-3 py-2 text-[10px] sm:min-h-0 sm:px-4 sm:py-2.5 sm:text-sm' : 'px-3.5 py-2.5 text-xs sm:px-4 sm:text-sm'}`}>
-                            {isPurchased ? 'PURCHASED' : 'DETAILS'}
+                        <button onClick={() => onViewDetails()} className={`flex shrink-0 items-center justify-center ${actionButtonRoundClass} bg-gradient-to-r from-[#1769FF] to-[#6D5CFF] font-black text-white shadow-[0_8px_18px_rgba(23,105,255,0.22)] transition hover:-translate-y-0.5 hover:shadow-[0_16px_32px_rgba(23,105,255,0.38)] active:scale-95 ${compactMobile ? 'min-h-8 px-2 py-2 text-[9px] sm:min-h-0 sm:px-4 sm:py-2.5 sm:text-sm' : 'px-3.5 py-2.5 text-xs sm:px-4 sm:text-sm'}`}>
+                            {isPurchased ? 'Purchased' : 'Details'}
+                            {!isPurchased && <span className={`${compactMobile ? 'hidden sm:inline' : 'inline'} ml-1`}>&rarr;</span>}
                         </button>
                     </div>
                 ) : (

@@ -115,6 +115,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
   }, []);
 
   const catalogProducts = useMemo(() => (products || []).filter(isProductSearchVisible), [products]);
+  const freeProductCount = catalogProducts.filter(product => product.isFree).length;
   const filters = useMemo(() => {
     const values = catalogProducts.flatMap(product => [product.category, ...(product.tags || [])]).filter((value): value is string => Boolean(value));
     return ['All', ...Array.from(new Set(values)).sort()];
@@ -154,16 +155,46 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
   const clearSearch = () => setSearchQuery('');
   const clearAll = () => { setSearchQuery(''); setActiveFilter('All'); setSortBy('recommended'); };
   return (
-    <section id="products" ref={sectionRef} className={`store-scroll-scope min-h-[100dvh] touch-pan-y ${isMobileHome ? 'pb-36 pt-8 sm:py-14' : 'py-14 sm:py-24'} bg-[#F7F9FC] ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}>
-      <div className="container mx-auto px-4 sm:px-6">
+    <section id="products" ref={sectionRef} className={`store-scroll-scope relative min-h-[100dvh] touch-pan-y ${isMobileHome ? 'pb-36 pt-8 sm:py-14' : 'py-14 sm:py-24'} bg-[#EEF4FB] ${settings.animations.enabled ? 'stagger-animate-container' : ''}`}>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+        <div className="absolute -top-36 left-1/2 h-[32rem] w-[68rem] max-w-none -translate-x-1/2 rounded-full bg-[radial-gradient(closest-side,rgba(191,215,255,0.62),transparent)]" />
+        <div className="absolute -left-44 top-64 h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(closest-side,rgba(123,97,255,0.15),transparent)]" />
+        <div className="absolute -right-44 bottom-52 h-[28rem] w-[28rem] rounded-full bg-[radial-gradient(closest-side,rgba(191,215,255,0.5),transparent)]" />
+      </div>
+      <div className="relative container mx-auto px-4 sm:px-6">
         <div className={`${isMobileHome ? 'mb-5 sm:mb-8' : 'mb-7 sm:mb-9'} mx-auto max-w-6xl animate-child animate-delay-1`}>
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-3xl">
               <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#1557B0]">Learning marketplace</p>
               <h2 className="mt-3 text-balance text-3xl font-black tracking-tight text-[#10213F] sm:text-5xl">Find the right resource, faster</h2>
               <p className="mt-3 max-w-2xl text-pretty text-base leading-7 text-[#526179] sm:text-lg">{isMobileHome ? 'Find courses, notes, PDFs, and learning tools instantly.' : 'Search focused notes, courses, PDFs, and study tools by subject, class, or format.'}</p>
+              <div className="mt-5 flex flex-wrap items-center gap-2 sm:gap-2.5">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D9E7F8] bg-white/95 px-3 py-1.5 text-xs font-black text-[#1557B0] shadow-sm">
+                  <svg className="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
+                  Instant download
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D9E7F8] bg-white/95 px-3 py-1.5 text-xs font-black text-[#1557B0] shadow-sm">
+                  <svg className="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
+                  Secure checkout
+                </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D9E7F8] bg-white/95 px-3 py-1.5 text-xs font-black text-[#1557B0] shadow-sm">
+                  <svg className="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 2L3 14h7v8l10-12h-7l0-8z" /></svg>
+                  Lifetime access
+                </span>
+              </div>
             </div>
-            <p className="shrink-0 text-sm font-bold text-[#526179]" aria-live="polite">{isSearching ? 'Updating results…' : `${displayProducts.length} resource${displayProducts.length === 1 ? '' : 's'} available`}</p>
+            <div className="shrink-0 space-y-2">
+              <p className="inline-flex items-center gap-2 rounded-full border border-[#D9E7F8] bg-white/95 px-4 py-2 text-sm font-black text-[#1557B0] shadow-sm" aria-live="polite">
+                <svg className="h-4 w-4 text-[#1769FF]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
+                {isSearching ? 'Updating results…' : `${displayProducts.length} resource${displayProducts.length === 1 ? '' : 's'} available`}
+              </p>
+              {freeProductCount > 0 && (
+                <p className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#059669] to-[#0E9F6E] px-4 py-2 text-sm font-black text-white shadow-[0_8px_22px_rgba(5,150,105,0.30)]">
+                  <svg className="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82zM7 7h.01" /></svg>
+                  {freeProductCount} free
+                </p>
+              )}
+            </div>
           </div>
         </div>
 
