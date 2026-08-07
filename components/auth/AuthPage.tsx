@@ -8,6 +8,32 @@ type AuthMode = 'login' | 'signup' | 'admin';
 
 type AuthResult = { success: boolean; message: string };
 
+type AuthBusyState = { title: string; subtitle?: string } | null;
+
+const AuthLoadingOverlay: React.FC<AuthBusyState> = ({ title, subtitle }) => (
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-white/92 p-6 backdrop-blur-[6px]" role="status" aria-live="polite" aria-label={title}>
+        <div className="flex w-full max-w-sm flex-col items-center gap-7 rounded-[2rem] border border-slate-200/80 bg-white/98 px-8 py-11 text-center shadow-[0_30px_90px_rgba(15,23,42,0.16)]">
+            <div className="relative h-24 w-24">
+                <span className="absolute inset-0 rounded-full border-4 border-slate-100" />
+                <span className="absolute inset-0 animate-spin rounded-full border-4 border-transparent border-t-blue-600 border-r-blue-600" style={{ animationDuration: '0.9s' }} />
+                <span className="absolute inset-2.5 animate-spin rounded-full border-4 border-transparent border-b-emerald-500 border-l-indigo-500" style={{ animationDuration: '1.3s', animationDirection: 'reverse' }} />
+                <span className="absolute inset-0 grid place-items-center">
+                    <span className="h-3.5 w-3.5 animate-pulse rounded-full bg-gradient-to-br from-blue-600 via-indigo-600 to-emerald-500 shadow-[0_0_20px_rgba(99,102,241,0.65)]" />
+                </span>
+            </div>
+            <div>
+                <p className="text-xl font-black tracking-tight text-slate-900">{title}</p>
+                {subtitle ? <p className="mt-2 text-sm font-semibold leading-5 text-slate-500">{subtitle}</p> : null}
+                <div className="mt-5 flex items-center justify-center gap-1.5">
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-blue-600" style={{ animationDelay: '0ms' }} />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-indigo-600" style={{ animationDelay: '120ms' }} />
+                    <span className="h-1.5 w-1.5 animate-bounce rounded-full bg-emerald-500" style={{ animationDelay: '240ms' }} />
+                </div>
+            </div>
+        </div>
+    </div>
+);
+
 interface SignupProfile {
     name: string;
     email: string;
@@ -40,6 +66,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
     const [success, setSuccess] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [isGoogleLoading, setIsGoogleLoading] = useState(false);
+    const [authBusy, setAuthBusy] = useState<AuthBusyState>(null);
 
     const normalizedMobile = useMemo(() => mobile.replace(/\D/g, '').slice(-10), [mobile]);
     const isValidEmail = /\S+@\S+\.\S+/.test(email);
@@ -60,12 +87,14 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
         setError('');
         setSuccess('');
         setIsGoogleLoading(true);
+        setAuthBusy({ title: 'Loading Google account…', subtitle: "Opening Google's sign-in window. Please wait." });
         try {
             const result = mode === 'admin' ? await onAdminGoogleLogin() : await onGoogleLogin();
             if (!result.success) setError(result.message);
             else if (result.message) setSuccess(result.message);
         } finally {
             setIsGoogleLoading(false);
+            setAuthBusy(null);
         }
     };
 
@@ -116,6 +145,11 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
         }
 
         setIsSubmitting(true);
+        setAuthBusy(mode === 'admin'
+            ? { title: 'Logging into admin…', subtitle: 'Please wait while we verify your admin credentials.' }
+            : mode === 'signup'
+                ? { title: 'Creating your account…', subtitle: 'Please wait while we set up your new account.' }
+                : { title: 'Logging you in…', subtitle: 'Please wait while we verify your credentials.' });
         try {
             if (mode === 'admin') {
                 const result = await onAdminEmailLogin(email.trim().toLowerCase(), password);
@@ -130,6 +164,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
             }
         } finally {
             setIsSubmitting(false);
+            setAuthBusy(null);
         }
     };
 
@@ -138,12 +173,14 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
         setSuccess('');
         setMode('login');
         setIsSubmitting(true);
+        setAuthBusy({ title: 'Sending reset email…', subtitle: 'Please wait while we send the password reset email.' });
         try {
             const result = await onPasswordReset(email);
             if (result.success) setSuccess(result.message);
             else setError(result.message);
         } finally {
             setIsSubmitting(false);
+            setAuthBusy(null);
         }
     };
 
@@ -183,7 +220,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
                                                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                                                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                                             </svg>
-                                            <span>Opening Google sign-in…</span>
+                                            <span>Loading Google account…</span>
                                         </>
                                     ) : 'Continue with Google account'
                                 ) : 'Continue with email'}
@@ -206,7 +243,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
                                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84C6.71 7.31 9.14 5.38 12 5.38z" />
                             </svg>
                         )}
-                        {isGoogleLoading ? 'Opening Google sign-in…' : mode === 'admin' ? 'Admin login with Google' : mode === 'login' ? 'Login with Google' : 'Continue with Google'}
+                        {isGoogleLoading ? 'Loading Google account…' : mode === 'admin' ? 'Admin login with Google' : mode === 'login' ? 'Login with Google' : 'Continue with Google'}
                     </button>
                     <div className="mb-5 flex items-center gap-3 text-xs font-black uppercase tracking-[0.18em] text-slate-400">
                         <span className="h-px flex-1 bg-slate-200" />
@@ -268,6 +305,7 @@ const AuthPage: React.FC<AuthPageProps> = ({ settings, initialMode = 'login', re
                     </form>
                     <p className="mt-5 text-xs text-slate-700 text-center">Firebase Auth secures this session; purchases restore from your account after login.</p>
             </div>
+            {authBusy && <AuthLoadingOverlay {...authBusy} />}
         </div>
     );
 };

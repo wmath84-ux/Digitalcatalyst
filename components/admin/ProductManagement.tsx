@@ -1788,14 +1788,7 @@ const ContentComposer: React.FC<{
                                 )}
                                 {isImageUrlProvider(formState.provider) && (
                                     <div className="space-y-3">
-                                        {formState.provider === 'cloudinary_image' ? (
-                                            <PremiumImageUrlInput
-                                                value={formState.url}
-                                                onChange={(url) => { setDocError(''); setFormState(prev => prev ? { ...prev, url } : prev); }}
-                                                label={imageProviderLabel(formState.provider)}
-                                                helperText={imageProviderHelper(formState.provider)}
-                                            />
-                                        ) : (<>
+                                        {formState.provider === 'google_drive_image' ? (<>
                                             <label className={labelClass}>{imageProviderLabel(formState.provider)}</label>
                                             <input
                                                 value={formState.url}
@@ -1804,9 +1797,16 @@ const ContentComposer: React.FC<{
                                                     setFormState(prev => prev ? { ...prev, url: event.target.value } : prev);
                                                 }}
                                                 className={fieldClass}
-                                                placeholder={formState.provider === 'google_drive_image' ? 'https://drive.google.com/file/d/FILE_ID/view' : 'https://example.com/diagram.png'}
+                                                placeholder="https://drive.google.com/file/d/FILE_ID/view"
                                             />
-                                        </>)}
+                                        </>) : (
+                                            <PremiumImageUrlInput
+                                                value={formState.url}
+                                                onChange={(url) => { setDocError(''); setFormState(prev => prev ? { ...prev, url } : prev); }}
+                                                label={imageProviderLabel(formState.provider)}
+                                                helperText={imageProviderHelper(formState.provider)}
+                                            />
+                                        )}
                                         <div className="rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800">
                                             <p>Images are shown in the lesson player with zoom controls. Drive links are normalized into a clean preview card.</p>
                                             <div className="mt-3 flex flex-wrap gap-2">

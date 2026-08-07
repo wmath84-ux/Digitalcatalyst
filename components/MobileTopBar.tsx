@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { User } from '../App';
 import UserAvatar from './common/UserAvatar';
 import { RememberedAuthAccount } from '../utils/rememberedAuth';
@@ -8,6 +8,7 @@ interface MobileTopBarProps {
   isLoggedIn: boolean;
   rememberedAccount?: RememberedAuthAccount | null;
   cartCount: number;
+  currentView?: string;
   onHomeClick: () => void;
   onNavigateToSubscriptions: () => void;
   onNavigateToWishlist: () => void;
@@ -18,6 +19,7 @@ interface MobileTopBarProps {
   onCartClick: () => void;
   onProfileClick: () => void;
   onAuthClick: (mode: 'login' | 'signup') => void;
+  onLogout: () => void;
 }
 
 const MobileTopBar: React.FC<MobileTopBarProps> = ({
@@ -25,6 +27,7 @@ const MobileTopBar: React.FC<MobileTopBarProps> = ({
   isLoggedIn,
   rememberedAccount,
   cartCount,
+  currentView,
   onHomeClick,
   onNavigateToSubscriptions,
   onNavigateToWishlist,
@@ -35,12 +38,63 @@ const MobileTopBar: React.FC<MobileTopBarProps> = ({
   onCartClick,
   onProfileClick,
   onAuthClick,
+  onLogout,
 }) => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [isProfileMenuOpen, setIsProfileMenuOpen] = useState(false);
+  const profileOpenedRef = useRef(false);
+  const profileMenuRef = useRef<HTMLDivElement>(null);
   const siteName = 'EDUVORA';
   const resolvedPhotoURL = currentUser?.profilePhotoSet === true ? String(currentUser.photoURL || '').trim() : '';
   const loggedOutAuthMode: 'login' | 'signup' = rememberedAccount ? 'login' : 'signup';
   const loggedOutAuthLabel = rememberedAccount ? 'Login' : 'Sign Up';
+
+  useEffect(() => {
+    if (currentView === 'home') profileOpenedRef.current = false;
+    setIsProfileMenuOpen(false);
+  }, [currentView]);
+
+  useEffect(() => {
+    if (!isProfileMenuOpen) return;
+    const handleOutsideClick = (event: MouseEvent | TouchEvent) => {
+      const target = event.target;
+      if (target instanceof Node && !profileMenuRef.current?.contains(target)) setIsProfileMenuOpen(false);
+    };
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setIsProfileMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handleOutsideClick);
+    document.addEventListener('touchstart', handleOutsideClick);
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.removeEventListener('mousedown', handleOutsideClick);
+      document.removeEventListener('touchstart', handleOutsideClick);
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [isProfileMenuOpen]);
+
+  const handleProfileIconClick = () => {
+    if (isProfileMenuOpen) {
+      setIsProfileMenuOpen(false);
+      return;
+    }
+    if (profileOpenedRef.current) {
+      setIsProfileMenuOpen(true);
+      return;
+    }
+    profileOpenedRef.current = true;
+    onProfileClick();
+  };
+
+  const handleProfileMenuAction = (action: () => void) => {
+    setIsProfileMenuOpen(false);
+    action();
+  };
+
+  const handleLogoutClick = () => {
+    setIsProfileMenuOpen(false);
+    onLogout();
+  };
 
   return (
     <>
@@ -54,7 +108,19 @@ const MobileTopBar: React.FC<MobileTopBarProps> = ({
           <button type="button" onClick={onCartClick} className="relative grid h-10 w-10 place-items-center rounded-full bg-transparent text-xl text-[#1D1B20] active:bg-[#E8DEF8]" aria-label="Open cart">🛒{cartCount > 0 ? <span className="absolute -right-1 -top-1 rounded-full bg-[#0B63FF] px-1.5 text-[10px] font-black text-white">{cartCount}</span> : null}</button>
           {isLoggedIn && currentUser ? (
             <>
-              <button type="button" onClick={onProfileClick} className="grid h-10 w-10 place-items-center rounded-full bg-transparent text-lg active:bg-[#E8DEF8]" aria-label="Open profile"><UserAvatar name={currentUser.name} email={currentUser.email} photoURL={resolvedPhotoURL} size={34} /></button>
+              <div className="relative" ref={profileMenuRef}>
+                <button type="button" onClick={handleProfileIconClick} className="grid h-10 w-10 place-items-center rounded-full bg-transparent text-lg active:bg-[#E8DEF8]" aria-label="Open profile"><UserAvatar name={currentUser.name} email={currentUser.email} photoURL={resolvedPhotoURL} size={34} /></button>
+                {isProfileMenuOpen && (
+                  <div className="absolute right-0 top-full z-[100] mt-2 w-56 overflow-hidden rounded-2xl border border-slate-200 bg-white/95 py-1 shadow-[0_18px_48px_rgba(15,23,42,0.18)] backdrop-blur-xl">
+                    <div className="border-b border-[#E7E0EC] px-4 py-3">
+                      <p className="truncate text-sm font-black text-[#1D1B20]">{currentUser.name || currentUser.email.split('@')[0]}</p>
+                      <p className="truncate text-xs font-semibold text-[#625B71]">{currentUser.email}</p>
+                    </div>
+                    <button type="button" onClick={() => handleProfileMenuAction(onProfileClick)} className="flex min-h-11 w-full items-center gap-3 px-4 text-left text-sm font-bold text-[#1D1B20] active:bg-[#E8DEF8]"><span className="w-6 text-center text-base">👤</span><span>Profile &amp; EduCoins</span></button>
+                    <button type="button" onClick={handleLogoutClick} className="flex min-h-11 w-full items-center gap-3 px-4 text-left text-sm font-bold text-rose-700 active:bg-rose-50"><span className="w-6 text-center text-base">🚪</span><span>Log out</span></button>
+                  </div>
+                )}
+              </div>
               <button type="button" onClick={() => setIsDrawerOpen(true)} className="grid h-10 w-10 place-items-center rounded-full text-[#1D1B20] active:bg-[#E8DEF8]" aria-label="Open menu"><span className="flex flex-col gap-1"><i className="block h-0.5 w-5 rounded-full bg-current" /><i className="block h-0.5 w-5 rounded-full bg-current" /><i className="block h-0.5 w-5 rounded-full bg-current" /></span></button>
             </>
           ) : (
