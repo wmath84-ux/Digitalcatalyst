@@ -117,8 +117,6 @@ import {
   getSubscriptionFeatureKeys,
   getSubscriptionPeriodMonths,
   isSubscriptionExpired,
-  canStartFreeTrial,
-  FREE_TRIAL_DAYS,
   normalizeSubscriptionBillingCycle,
   getUserEduCoinMultiplier,
   getUserSubscriptionTier,
@@ -447,9 +445,6 @@ export interface User {
     subscriptionBillingCycle?: SubscriptionBillingCycle;
     subscriptionActivatedAt?: string;
     subscriptionExpiresAt?: string;
-    subscriptionTrialStartedAt?: string;
-    subscriptionTrialEndsAt?: string;
-    subscriptionTrialUsed?: boolean;
     subscriptionAutoRenew?: boolean;
     eduCoinMultiplier?: number;
     eliteStatus?: boolean;
@@ -1416,9 +1411,6 @@ const normalizeAdminUserSnapshot = (uid: string, data: Record<string, any>): Use
     subscriptionBillingCycle: normalizeSubscriptionBillingCycle(data.subscriptionBillingCycle) === 'monthly' && !data.subscriptionBillingCycle ? undefined : normalizeSubscriptionBillingCycle(data.subscriptionBillingCycle),
     subscriptionActivatedAt: normalizeFirestoreDate(data.subscriptionActivatedAt, ''),
     subscriptionExpiresAt: normalizeFirestoreDate(data.subscriptionExpiresAt, ''),
-    subscriptionTrialStartedAt: normalizeFirestoreDate(data.subscriptionTrialStartedAt, ''),
-    subscriptionTrialEndsAt: normalizeFirestoreDate(data.subscriptionTrialEndsAt, ''),
-    subscriptionTrialUsed: Boolean(data.subscriptionTrialUsed),
     subscriptionAutoRenew: Boolean(data.subscriptionAutoRenew),
     eduCoinMultiplier: getUserEduCoinMultiplier(data),
     eliteStatus: getUserSubscriptionTier(data) === 'elite',
@@ -1776,7 +1768,6 @@ const App: React.FC = () => {
   const [purchasedProductUpdateIds, setPurchasedProductUpdateIds] = useState<Record<string, string[]>>({});
   const [latestUpdateCheckout, setLatestUpdateCheckout] = useState<{ product: ProductWithRating; updateId?: string } | null>(null);
   const [subscriptionCheckoutRequest, setSubscriptionCheckoutRequest] = useState<{ plan: SubscriptionPlanConfig; billingCycle: SubscriptionBillingCycle; couponCode?: string | null; features?: SubscriptionFeatureKey[] } | null>(null);
-  const [subscriptionTrialCheckoutRequest, setSubscriptionTrialCheckoutRequest] = useState<{ plan: SubscriptionPlanConfig; trialDays: number } | null>(null);
   const [subscriptionActivatedInfo, setSubscriptionActivatedInfo] = useState<SubscriptionActivatedInfo | null>(null);
   const [purchaseCelebration, setPurchaseCelebration] = useState<{ title: string; message: string; icon: string; at: number } | null>(null);
   const [isAuthRestoring, setIsAuthRestoring] = useState(false);
@@ -3670,9 +3661,6 @@ const App: React.FC = () => {
           subscriptionBillingCycle: data.subscriptionBillingCycle === 'yearly' ? 'yearly' : data.subscriptionBillingCycle === 'monthly' ? 'monthly' : undefined,
           subscriptionActivatedAt: data.subscriptionActivatedAt || '',
           subscriptionExpiresAt: data.subscriptionExpiresAt || '',
-          subscriptionTrialStartedAt: data.subscriptionTrialStartedAt || '',
-          subscriptionTrialEndsAt: data.subscriptionTrialEndsAt || '',
-          subscriptionTrialUsed: Boolean(data.subscriptionTrialUsed),
           subscriptionAutoRenew: Boolean(data.subscriptionAutoRenew),
           eduCoinMultiplier: getUserEduCoinMultiplier(data),
           eliteStatus: getUserSubscriptionTier(data) === 'elite',
@@ -5723,7 +5711,6 @@ const App: React.FC = () => {
       subscriptionExpiresAt: expiresAt,
       subscriptionFeatures: mergedFeatureKeys,
       subscriptionAutoRenew: false,
-      subscriptionTrialUsed: true,
       eduCoinMultiplier: nextMultiplier,
       eliteStatus: nextTier === 'elite',
     }));
@@ -5742,7 +5729,6 @@ const App: React.FC = () => {
       subscriptionExpiresAt: expiresAt,
       subscriptionFeatures: mergedFeatureKeys,
       subscriptionAutoRenew: false,
-      subscriptionTrialUsed: true,
       eduCoinMultiplier: nextMultiplier,
       eliteStatus: nextTier === 'elite',
       purchasedProductIds: arrayUnion(...(plan.unlockProductIds || [])),
@@ -5759,7 +5745,6 @@ const App: React.FC = () => {
           subscriptionExpiresAt: expiresAt,
           subscriptionFeatures: mergedFeatureKeys,
           subscriptionAutoRenew: false,
-          subscriptionTrialUsed: true,
           eduCoinMultiplier: nextMultiplier,
           eliteStatus: nextTier === 'elite',
           purchasedProductIds: arrayUnion(...(plan.unlockProductIds || [])),
@@ -5908,83 +5893,6 @@ const App: React.FC = () => {
     });
   };
   const handleNavigateToSubscription = () => { setCurrentView('subscription'); window.scrollTo(0,0); };
-
-  const handleStartFreeTrial = () => {
-    if (!hasFirebaseUser) { openAuthPage('login'); return; }
-    if (!currentUser) return;
-    if (!canStartFreeTrial(currentUser)) {
-      setInfoModal({ title: 'Trial unavailable', message: 'The free trial is available only for new users who have never activated a subscription.', icon: '🎁' });
-      return;
-    }
-
-    const plan = normalizeSubscriptionPlans((websiteSettings.content as any).subscriptionPlans)[0];
-    const trialDays = normalizeSubscriptionPageContent((websiteSettings.content as any).subscriptionPage).freeTrialDays;
-    setSubscriptionTrialCheckoutRequest({ plan, trialDays });
-  };
-
-  const completeFreeTrialActivation = (plan: SubscriptionPlanConfig, trialDays: number, payment?: PaymentVerificationDetails) => {
-    if (!hasFirebaseUser || !currentUser) { openAuthPage('login'); return; }
-    if (!isCheckoutUnlockVerified(0, payment)) {
-      blockUnverifiedPaymentUnlock(plan.name);
-      return;
-    }
-    if (!canStartFreeTrial(currentUser)) {
-      setInfoModal({ title: 'Trial unavailable', message: 'The free trial is available only for new users who have never activated a subscription.', icon: '🎁' });
-      return;
-    }
-
-    const activatedAtDate = new Date();
-    const trialEndsAtDate = new Date(activatedAtDate.getTime() + Math.max(1, trialDays) * (FREE_TRIAL_DAYS * 24 * 60 * 60 * 1000) / FREE_TRIAL_DAYS);
-    const activatedAt = activatedAtDate.toISOString();
-    const trialEndsAt = trialEndsAtDate.toISOString();
-
-    const synced = syncCurrentUser(user => ({
-      ...user,
-      subscriptionTier: 'elite',
-      subscriptionPlanId: String(plan.id),
-      subscriptionPlanName: plan.name,
-      subscriptionBillingCycle: 'monthly',
-      subscriptionActivatedAt: activatedAt,
-      subscriptionExpiresAt: trialEndsAt,
-      subscriptionFeatures: [...ALL_SUBSCRIPTION_FEATURE_KEYS],
-      subscriptionTrialStartedAt: activatedAt,
-      subscriptionTrialEndsAt: trialEndsAt,
-      subscriptionTrialUsed: true,
-      subscriptionAutoRenew: false,
-      eduCoinMultiplier: 2,
-      eliteStatus: true,
-    }));
-    if (!synced) {
-      setInfoModal({ title: 'Trial not started', message: 'Your trial could not be activated. Please refresh/login again and retry.', icon: '⚠️' });
-      return;
-    }
-    const trialUnlockIds = plan.unlockProductIds || [];
-    if (trialUnlockIds.length) {
-      const merged = mergePurchasedProductIds(purchasedProductIds, trialUnlockIds);
-      setPurchasedProductIds(merged);
-      persistUserPurchasedProducts(merged);
-    }
-    void setDoc(doc(db, 'users', String(currentUser.id)), {
-      subscriptionTier: 'elite',
-      subscriptionPlanId: String(plan.id),
-      subscriptionPlanName: plan.name,
-      subscriptionBillingCycle: 'monthly',
-      subscriptionActivatedAt: activatedAt,
-      subscriptionExpiresAt: trialEndsAt,
-      subscriptionFeatures: [...ALL_SUBSCRIPTION_FEATURE_KEYS],
-      subscriptionTrialStartedAt: activatedAt,
-      subscriptionTrialEndsAt: trialEndsAt,
-      subscriptionTrialUsed: true,
-      subscriptionAutoRenew: false,
-      eduCoinMultiplier: 2,
-      eliteStatus: true,
-      purchasedProductIds: arrayUnion(...(trialUnlockIds || [])),
-      updatedAt: serverTimestamp(),
-    }, { merge: true }).catch(error => console.warn('Trial Firestore sync failed.', error));
-    setSubscriptionTrialCheckoutRequest(null);
-    setSubscriptionActivatedInfo({ mode: 'trial', plan, trialDays, expiresAt: trialEndsAt, message: `Aapka ${Math.max(1, trialDays)}-din ka FREE trial ab live hai. AI Mentor, Community, EduCoins aur sab kuch ab unlocked hai.` });
-    window.scrollTo(0, 0);
-  };
 
   const handleNavigateToWishlist = () => {
     acknowledgeDockDestination('Wishlist');
@@ -6605,7 +6513,7 @@ const App: React.FC = () => {
       case 'profile':
         if (!isAuthStateReady) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
         return isLoggedIn && appUser ? <ProfilePage economySettings={economySettings} onApplyCoinClaim={handleApplyCoinClaim} activeCoinDiscount={activeCoinDiscount} onClearCoinClaim={() => setActiveCoinDiscount(null)} settings={websiteSettings} currentUser={appUser} purchasedProducts={purchasedProducts} products={productsWithRatings} coupons={coupons} orders={orders} onBack={() => handleNavigateBack('home')} onExplore={handleNavigateToAllProducts} activeTheme={activeTheme} onThemeChange={setActiveTheme} onSyncCurrentUser={syncCurrentUser} onClaimMilestoneReward={handleClaimMilestoneReward} onOpenVerifiedCourse={handleViewPurchasedProduct} onUpgrade={handleNavigateToSubscription} /> : <AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onAdminGoogleLogin={handleAdminGoogleLogin} onAdminEmailLogin={handleAdminEmailLogin} onBack={handleBackFromAuth} />;
-      case 'subscription': return <SubscriptionPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'subscription' ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} products={productsWithRatings} purchasedProductIds={purchasedProductIds} onBack={() => handleNavigateBack('home')} onActivatePlan={handleActivateSubscription} currentUser={appUser} onActivatePlanWithCoins={handleActivateSubscriptionWithCoins} onStartFreeTrial={handleStartFreeTrial} coupons={coupons} />;
+      case 'subscription': return <SubscriptionPage settings={websiteSettings} products={productsWithRatings} onBack={() => handleNavigateBack('home')} onActivatePlan={handleActivateSubscription} currentUser={appUser} />;
       case 'news':
       case 'blog': return <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={true} presentation="page" view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={currentView === 'news' ? 'news' : 'blog'} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={() => handleNavigateBack('home')} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={() => handleNavigateBack('home')} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
@@ -7031,39 +6939,6 @@ const App: React.FC = () => {
               checkoutUserId={effectiveAppUser?.id}
               checkoutTargetId={subscriptionCheckoutRequest.plan.id}
               billingCycle={subscriptionCheckoutRequest.billingCycle}
-              presentation="page"
-              initialCheckoutStep="checkout"
-            />
-          );
-        })()}
-        {subscriptionTrialCheckoutRequest && (() => {
-          const { plan, trialDays } = subscriptionTrialCheckoutRequest;
-          return (
-            <PaymentModal
-              settings={websiteSettings}
-              economySettings={economySettings}
-              productTitle={`${plan.name} · ${trialDays}-Day Free Trial`}
-              itemDescription={`Full Eduvora Plus+ access for ${trialDays} free days — AI Mentor, Community, EduCoins, streaks aur rewards. Same secure framework, ₹0, no payment.`}
-              unlockDetails={[
-                `${trialDays}-day full access to Eduvora Plus+ — ₹0, no payment`,
-                ...(plan.benefits || []),
-                ...(plan.unlockProductIds || []).map(id => productsWithRatings.find(product => product.id === id)?.title || `Product #${id}`),
-              ].filter(Boolean).slice(0, 10)}
-              originalPrice={0}
-              salePrice={0}
-              couponDiscount={0}
-              finalPrice={0}
-              eduCoinDiscount={0}
-              appliedEduCoins={0}
-              coinRedeemRate={eduCoinRedeemRate}
-              onClose={() => setSubscriptionTrialCheckoutRequest(null)}
-              onConfirm={(payment) => completeFreeTrialActivation(plan, trialDays, payment)}
-              currentUser={effectiveAppUser}
-              checkoutType="subscription"
-              checkoutUserId={effectiveAppUser?.id}
-              checkoutTargetId={plan.id}
-              billingCycle="monthly"
-              trialDays={trialDays}
               presentation="page"
               initialCheckoutStep="checkout"
             />

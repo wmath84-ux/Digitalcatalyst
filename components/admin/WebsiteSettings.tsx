@@ -921,8 +921,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                     <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5">
                         <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">Subscription Page</p>
                         <h2 className="mt-2 text-2xl font-black text-slate-900">Eduvora Plus+ Subscription Customizer</h2>
-                        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">A single Eduvora Plus+ subscription unlocks everything: AI Mentor, Community, EduCoin earning, badges, streaks, milestones, rewards, and MayDay. New users get a free trial, then purchase a one-time, weekly, monthly, quarterly, or yearly cycle.</p>
-                        <label className="mt-4 flex w-fit items-center gap-2 rounded-full bg-white px-4 py-2 text-sm font-black text-slate-800 shadow-sm"><input type="checkbox" checked={subscriptionPage.freeTrialEnabled !== false} onChange={e => updateSubscriptionPage({ freeTrialEnabled: e.target.checked })} /> Free trial enabled for new users</label>
+                        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">A single Eduvora Plus+ subscription unlocks everything: AI Mentor, Community, EduCoin earning, badges, streaks, milestones, rewards, and MayDay. Members purchase a one-time, weekly, monthly, quarterly, or yearly cycle.</p>
                     </div>
 
                     <div className="rounded-2xl border bg-white p-4">
@@ -934,13 +933,39 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                             <label className="text-sm font-semibold text-slate-700">Monthly Label<input value={subscriptionPage.monthlyLabel} onChange={e => updateSubscriptionPage({ monthlyLabel: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
                             <label className="text-sm font-semibold text-slate-700">Yearly Label<input value={subscriptionPage.yearlyLabel} onChange={e => updateSubscriptionPage({ yearlyLabel: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
                             <label className="text-sm font-semibold text-slate-700">Yearly Badge<input value={subscriptionPage.yearlyBadge} onChange={e => updateSubscriptionPage({ yearlyBadge: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
-                            <label className="md:col-span-2 text-sm font-semibold text-slate-700">Trial Title<input value={subscriptionPage.trialTitle} onChange={e => updateSubscriptionPage({ trialTitle: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
-                            <label className="md:col-span-2 text-sm font-semibold text-slate-700">Trial Subtitle<textarea value={subscriptionPage.trialSubtitle} onChange={e => updateSubscriptionPage({ trialSubtitle: e.target.value })} rows={2} className="mt-1 w-full rounded-lg border p-2" /></label>
-                            <label className="text-sm font-semibold text-slate-700">Trial CTA<input value={subscriptionPage.trialCta} onChange={e => updateSubscriptionPage({ trialCta: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
-                            <label className="text-sm font-semibold text-slate-700">Free Trial Days<input type="number" min="1" max="60" value={subscriptionPage.freeTrialDays || 7} onChange={e => updateSubscriptionPage({ freeTrialDays: Math.max(1, Math.min(60, Number(e.target.value) || 7)) })} className="mt-1 w-full rounded-lg border p-2" /></label>
                             <label className="text-sm font-semibold text-slate-700">Value Section Title<input value={subscriptionPage.valueTitle} onChange={e => updateSubscriptionPage({ valueTitle: e.target.value })} className="mt-1 w-full rounded-lg border p-2" /></label>
                             <label className="md:col-span-2 text-sm font-semibold text-slate-700">Value Section Description<textarea value={subscriptionPage.valueDescription} onChange={e => updateSubscriptionPage({ valueDescription: e.target.value })} rows={2} className="mt-1 w-full rounded-lg border p-2" /></label>
                             <label className="md:col-span-2 text-sm font-semibold text-slate-700">Renewal Note<textarea value={subscriptionPage.renewalNote} onChange={e => updateSubscriptionPage({ renewalNote: e.target.value })} rows={2} className="mt-1 w-full rounded-lg border p-2" /></label>
+                        </div>
+                    </div>
+
+                    <div className="rounded-2xl border bg-white p-4">
+                        <div className="flex items-center justify-between gap-3">
+                            <div>
+                                <h3 className="text-lg font-black text-slate-900">Subscription Card Images</h3>
+                                <p className="mt-1 text-sm font-semibold text-slate-600">Six cards shown in the stacked subscription carousel. Upload or paste a Cloudinary URL for each slot; empty slots fall back to defaults.</p>
+                            </div>
+                        </div>
+                        <div className="mt-4 grid gap-4 md:grid-cols-2">
+                            {[0, 1, 2, 3, 4, 5].map(slot => (
+                                <div key={slot}>
+                                    <p className="mb-2 text-xs font-black uppercase tracking-[0.14em] text-indigo-600">Card {slot + 1}</p>
+                                    <PremiumImageUrlInput
+                                        value={subscriptionPage.cardImages?.[slot] || ''}
+                                        onChange={(url) => {
+                                            const cardImages = [...(subscriptionPage.cardImages?.length ? subscriptionPage.cardImages : [])];
+                                            while (cardImages.length < 6) cardImages.push('');
+                                            cardImages[slot] = url;
+                                            updateSubscriptionPage({ cardImages });
+                                        }}
+                                        label={`Card ${slot + 1} image URL`}
+                                        previewAlt={`Subscription card ${slot + 1} preview`}
+                                        aspect="portrait"
+                                        compact
+                                        helperText="Choose an image, preview it, then save settings."
+                                    />
+                                </div>
+                            ))}
                         </div>
                     </div>
 

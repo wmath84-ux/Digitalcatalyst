@@ -20,8 +20,7 @@ test('subscription access model keeps internal tiers and a single unified Eduvor
   assert.match(accessSource, /earningMultiplier: 2/);
   assert.match(accessSource, /monthlyPrice: 499/);
   assert.match(accessSource, /yearlyPrice: 2999/);
-  assert.match(accessSource, /FREE_TRIAL_DAYS = 7/);
-  assert.match(accessSource, /canStartFreeTrial/);
+  assert.match(accessSource, /DEFAULT_SUBSCRIPTION_CARD_IMAGES/);
   assert.match(accessSource, /return \[unified\]/);
 });
 
@@ -44,16 +43,14 @@ test('subscription activation persists tier and earning multiplier without downg
   assert.match(appSource, /eliteStatus: nextTier === 'elite'/);
 });
 
-test('new users can start a 7-day free trial once and it sets a trial window', () => {
-  assert.match(appSource, /const handleStartFreeTrial = \(\) =>/);
-  assert.match(appSource, /canStartFreeTrial\(currentUser\)/);
-  assert.match(appSource, /FREE_TRIAL_DAYS \* 24 \* 60 \* 60 \* 1000/);
-  assert.match(appSource, /subscriptionTrialStartedAt: activatedAt/);
-  assert.match(appSource, /subscriptionTrialEndsAt: trialEndsAt/);
-  assert.match(appSource, /subscriptionTrialUsed: true/);
-  assert.match(appSource, /onStartFreeTrial=\{handleStartFreeTrial\}/);
-  assert.match(accessSource, /getTrialDaysLeft/);
-  assert.match(accessSource, /isTrialActive/);
+test('free trial system has been fully removed from the codebase', () => {
+  assert.ok(!/FREE_TRIAL_DAYS/.test(appSource), 'App.tsx still references FREE_TRIAL_DAYS');
+  assert.ok(!/handleStartFreeTrial/.test(appSource), 'App.tsx still defines handleStartFreeTrial');
+  assert.ok(!/canStartFreeTrial/.test(accessSource), 'subscriptionAccess.ts still exports canStartFreeTrial');
+  assert.ok(!/subscriptionTrialStartedAt/.test(appSource), 'App.tsx still writes subscriptionTrialStartedAt');
+  assert.ok(!/subscriptionTrialUsed/.test(appSource), 'App.tsx still writes subscriptionTrialUsed');
+  assert.ok(!/onStartFreeTrial/.test(subscriptionSource), 'SubscriptionPage still wires onStartFreeTrial');
+  assert.ok(!/trialDays/.test(subscriptionSource), 'SubscriptionPage still references trialDays');
 });
 
 test('normal users receive Community and AI Mentor upgrade gates', () => {
@@ -100,23 +97,27 @@ test('admin has a dedicated subscription customizer for page copy, plans and loc
   assert.match(settingsSource, /AI Mentor Locked Message/);
   assert.match(settingsSource, /Community Locked Message/);
   assert.match(settingsSource, /Normal User Profile Message/);
-  assert.match(settingsSource, /Trial Title/);
+  assert.match(settingsSource, /Subscription Card Images/);
   assert.match(settingsSource, /Renewal Note/);
 });
 
-test('subscription cards use admin data and prevent normal EduCoin checkout', () => {
+test('premium subscription page renders cards, modular pricing and checkout summary', () => {
   assert.match(subscriptionSource, /normalizeSubscriptionPlans\(settings\.content\.subscriptionPlans\)/);
   assert.match(subscriptionSource, /normalizeSubscriptionPageContent\(settings\.content\.subscriptionPage\)/);
-  assert.match(subscriptionSource, /getSubscriptionBillingPrice\(plan, billingCycle\)/);
-  assert.match(subscriptionSource, /onActivatePlan\(plan, billingCycle/);
-  assert.match(subscriptionSource, /const canUseEduCoins = currentTier !== 'normal'/);
-  assert.match(subscriptionSource, /EduCoin use unlocks with Pro/);
-  assert.match(subscriptionSource, /plan\.benefits\.map/);
-  assert.match(subscriptionSource, /plan\.unlockProductIds/);
-  assert.match(subscriptionSource, /onStartFreeTrial/);
+  assert.match(subscriptionSource, /getSubscriptionBillingPrice\(plan, 'monthly'\)/);
+  assert.match(subscriptionSource, /getFeatureBundleCycleTotal\(chargeableFeatures, billingCycle, bundleMonthly\)/);
+  assert.match(subscriptionSource, /onActivatePlan\(plan, billingCycle, null, chargeableFeatures\)/);
   assert.match(subscriptionSource, /SUBSCRIPTION_BILLING_CYCLES/);
-  assert.match(subscriptionSource, /One-time/);
-  assert.match(subscriptionSource, /Quarterly/);
+  assert.match(subscriptionSource, /CYCLE_ORDER/);
+  assert.match(subscriptionSource, /DEFAULT_SUBSCRIPTION_CARD_IMAGES/);
+  assert.match(subscriptionSource, /subscription-page-theme-adaptive premium-subscription-page/);
+  assert.match(subscriptionSource, /psp-master-toggle/);
+  assert.match(subscriptionSource, /psp-card-stage/);
+  assert.match(subscriptionSource, /psp-glass-table/);
+  assert.match(subscriptionSource, /psp-summary-card/);
+  assert.match(subscriptionSource, /Total Final Price/);
+  assert.match(subscriptionSource, /Upgrade to Plus/);
+  assert.match(subscriptionSource, /One-Time/);
 });
 
 test('subscription billing cycle supports once, weekly, monthly, quarterly and yearly', () => {
@@ -130,8 +131,8 @@ test('subscription billing cycle supports once, weekly, monthly, quarterly and y
   assert.match(appSource, /subscriptionPeriodMonths: getSubscriptionPeriodMonths\(billingCycle\)/);
 });
 
-test('build-your-bundle page keeps feature selection across billing cycle changes', () => {
-  assert.match(subscriptionSource, /aria-label="Billing cycle toggle"/);
+test('premium page keeps feature selection across billing cycle changes', () => {
+  assert.match(subscriptionSource, /aria-label="Billing cycle selector"/);
   assert.match(subscriptionSource, /setBillingCycle\(cycle\)/);
   assert.match(subscriptionSource, /toggleFeature\(feature\.key\)/);
   assert.match(subscriptionSource, /selectedFeatures\.filter\(key => !ownedFeatureKeys\.includes\(key\)\)/);

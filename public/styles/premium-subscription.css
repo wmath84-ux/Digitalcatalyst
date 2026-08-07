@@ -1,0 +1,614 @@
+/* PREMIUM_SUBSCRIPTION_GOD_TIER_V1
+   Cinematic "God-Tier" dark mode for the Eduvora Plus+ subscription page.
+   Scoped under .premium-subscription-page with deliberately high specificity so
+   the existing clean-neutral theme system cannot re-light this surface. */
+
+.premium-subscription-page {
+  --psp-bg: #05060f;
+  --psp-bg-2: #0a0e1e;
+  --psp-brand: #1769ff;
+  --psp-brand-hover: #2f7cff;
+  --psp-cyan: #22d3ee;
+  --psp-cyan-soft: rgba(34, 211, 238, 0.14);
+  --psp-emerald: #34d399;
+  --psp-emerald-strong: #10b981;
+  --psp-red: #f87171;
+  --psp-red-strong: #ef4444;
+  --psp-glass: rgba(255, 255, 255, 0.045);
+  --psp-glass-strong: rgba(255, 255, 255, 0.08);
+  --psp-border: rgba(255, 255, 255, 0.11);
+  --psp-border-soft: rgba(255, 255, 255, 0.07);
+  --psp-text: #eef2ff;
+  --psp-muted: #9aa7c7;
+  --psp-muted-2: #6f7da3;
+  --psp-radius: 22px;
+  color-scheme: dark;
+  background-color: var(--psp-bg);
+}
+
+/* Neutralise the global light theme reskin on this surface. */
+html[data-color-experience="clean-neutral"] body:not(.theme-classic-editorial) .subscription-page-theme-adaptive.premium-subscription-page,
+body:not(.theme-classic-editorial) .subscription-page-theme-adaptive.premium-subscription-page {
+  background: var(--psp-bg) !important;
+  color: var(--psp-text) !important;
+  font-family: 'Inter', system-ui, -apple-system, 'SF Pro Text', sans-serif !important;
+}
+
+html[data-color-experience="clean-neutral"] .subscription-page-theme-adaptive.premium-subscription-page {
+  background: var(--psp-bg) !important;
+  color: var(--psp-text) !important;
+}
+
+/* Ambient background glows. */
+.premium-subscription-page .psp-root {
+  position: relative;
+  min-height: 100vh;
+  overflow-x: hidden;
+  background:
+    radial-gradient(900px 560px at 82% -8%, rgba(23, 105, 255, 0.22), transparent 62%),
+    radial-gradient(760px 480px at 6% 4%, rgba(124, 58, 237, 0.16), transparent 60%),
+    radial-gradient(820px 560px at 50% 112%, rgba(34, 211, 238, 0.10), transparent 60%),
+    linear-gradient(180deg, #05060f 0%, #070a17 46%, #05060f 100%);
+}
+
+.premium-subscription-page .psp-orb {
+  position: absolute;
+  border-radius: 9999px;
+  pointer-events: none;
+  filter: blur(70px);
+  opacity: 0.5;
+  z-index: 0;
+}
+
+/* ---------- Section 1 · Master Toggle ---------- */
+.premium-subscription-page .psp-master-toggle {
+  position: relative;
+  display: flex;
+  width: 100%;
+  max-width: 560px;
+  margin-left: auto;
+  margin-right: auto;
+  padding: 7px;
+  border-radius: 9999px;
+  border: 1px solid var(--psp-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02));
+  -webkit-backdrop-filter: blur(18px);
+  backdrop-filter: blur(18px);
+  box-shadow: 0 18px 48px rgba(2, 6, 23, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.10);
+}
+
+.premium-subscription-page .psp-toggle-item {
+  position: relative;
+  z-index: 1;
+  flex: 1 1 0;
+  min-height: 46px;
+  border-radius: 9999px;
+  border: none;
+  background: transparent;
+  color: var(--psp-muted);
+  font-size: 12px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  cursor: pointer;
+  outline: none;
+  transition: color 220ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.premium-subscription-page .psp-toggle-item:focus-visible {
+  outline: 2px solid rgba(34, 211, 238, 0.6);
+  outline-offset: -2px;
+}
+
+.premium-subscription-page .psp-toggle-item.is-active {
+  color: #ffffff;
+}
+
+.premium-subscription-page .psp-toggle-highlight {
+  position: absolute;
+  z-index: 0;
+  top: 7px;
+  height: 46px;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #1769ff 0%, #4f8bff 55%, #22d3ee 130%);
+  box-shadow:
+    0 0 22px rgba(23, 105, 255, 0.55),
+    0 0 52px rgba(23, 105, 255, 0.28),
+    inset 0 1px 0 rgba(255, 255, 255, 0.35);
+  transition: left 460ms cubic-bezier(0.22, 0.61, 0.36, 1) !important;
+}
+
+/* ---------- Section 2 · Hero + Card Deck ---------- */
+.premium-subscription-page .psp-hero-title {
+  font-weight: 900;
+  letter-spacing: -0.035em;
+  line-height: 1;
+}
+
+.premium-subscription-page .psp-plus-word {
+  position: relative;
+  display: inline-block;
+  background: linear-gradient(100deg, #bfe4ff 0%, #7fb8ff 30%, #22d3ee 62%, #bfe4ff 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  text-shadow: 0 0 34px rgba(34, 211, 238, 0.55);
+  filter: drop-shadow(0 0 22px rgba(34, 211, 238, 0.35));
+}
+
+.premium-subscription-page .psp-plus-icon {
+  position: absolute;
+  top: -0.08em;
+  right: -0.62em;
+  width: 0.42em;
+  height: 0.42em;
+  display: grid;
+  place-items: center;
+  color: var(--psp-cyan);
+  filter: drop-shadow(0 0 8px rgba(34, 211, 238, 0.9));
+}
+
+/* Card deck stage: strict portrait bounding box (9:12). */
+.premium-subscription-page .psp-card-stage {
+  position: relative;
+  aspect-ratio: 9 / 12;
+  width: 100%;
+  max-width: 340px;
+  margin-left: auto;
+  margin-right: auto;
+  -webkit-user-select: none;
+  user-select: none;
+  touch-action: pan-y;
+}
+
+.premium-subscription-page .psp-card-stage::after {
+  content: '';
+  position: absolute;
+  inset: -14% -10% -6%;
+  z-index: 0;
+  background: radial-gradient(58% 46% at 50% 42%, rgba(23, 105, 255, 0.22), transparent 70%);
+  filter: blur(26px);
+  pointer-events: none;
+}
+
+.premium-subscription-page .psp-card {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  border-radius: var(--psp-radius);
+  overflow: hidden;
+  border: 1px solid var(--psp-border);
+  background: #0b1024;
+  box-shadow: 0 30px 70px rgba(2, 6, 23, 0.6), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  will-change: transform, opacity, filter;
+  transition: transform 420ms cubic-bezier(0.22, 0.61, 0.36, 1), opacity 380ms ease, filter 380ms ease;
+  cursor: pointer;
+}
+
+.premium-subscription-page .psp-card img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.premium-subscription-page .psp-card.is-leaving {
+  transform: translateY(-126%) scale(0.8) rotate(-4deg);
+  opacity: 0;
+  filter: blur(10px);
+  pointer-events: none;
+  transition: transform 440ms cubic-bezier(0.6, 0.04, 0.28, 0.99), opacity 360ms ease, filter 360ms ease;
+}
+
+.premium-subscription-page .psp-card-badge {
+  position: absolute;
+  left: 12px;
+  bottom: 12px;
+  z-index: 3;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: rgba(5, 6, 15, 0.55);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  color: #eaf3ff;
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.premium-subscription-page .psp-swipe-hint {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 18px;
+  color: var(--psp-muted-2);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+/* ---------- Section 3 · Modular Pricing Table ---------- */
+.premium-subscription-page .psp-glass-table {
+  border-radius: 24px;
+  border: 1px solid var(--psp-border);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02));
+  -webkit-backdrop-filter: blur(22px);
+  backdrop-filter: blur(22px);
+  box-shadow: 0 26px 70px rgba(2, 6, 23, 0.5);
+  overflow: hidden;
+}
+
+.premium-subscription-page .psp-table-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px 76px;
+  gap: 12px;
+  align-items: center;
+  padding: 16px 18px;
+  border-bottom: 1px solid var(--psp-border-soft);
+  color: var(--psp-muted-2);
+  font-size: 10px;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+}
+
+.premium-subscription-page .psp-table-header .psp-price-col {
+  text-align: right;
+}
+
+.premium-subscription-page .psp-table-header .psp-select-col {
+  text-align: center;
+}
+
+.premium-subscription-page .psp-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 108px 76px;
+  gap: 12px;
+  align-items: center;
+  padding: 15px 18px;
+  border-bottom: 1px solid var(--psp-border-soft);
+  transition: background 180ms ease;
+}
+
+.premium-subscription-page .psp-row:last-of-type {
+  border-bottom: none;
+}
+
+.premium-subscription-page .psp-row.is-off {
+  background: rgba(248, 113, 113, 0.03);
+}
+
+.premium-subscription-page .psp-row-title {
+  min-width: 0;
+}
+
+.premium-subscription-page .psp-row-name {
+  display: block;
+  color: var(--psp-text);
+  font-size: 13.5px;
+  font-weight: 800;
+  letter-spacing: -0.01em;
+}
+
+.premium-subscription-page .psp-row-desc {
+  display: block;
+  margin-top: 3px;
+  color: var(--psp-muted-2);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+.premium-subscription-page .psp-price {
+  position: relative;
+  font-size: 14px;
+  font-weight: 900;
+  color: var(--psp-emerald);
+  text-shadow: 0 0 18px rgba(52, 211, 153, 0.28);
+  white-space: nowrap;
+  text-align: right;
+}
+
+.premium-subscription-page .psp-price.is-off {
+  color: var(--psp-red-strong);
+  text-shadow: none;
+}
+
+.premium-subscription-page .psp-price.is-off .psp-strike {
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 50%;
+  height: 2px;
+  border-radius: 9999px;
+  background: var(--psp-red);
+  transform: translateY(-50%) rotate(-6deg);
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.5);
+}
+
+.premium-subscription-page .psp-cross {
+  margin-left: 5px;
+  color: var(--psp-red);
+  font-weight: 900;
+  filter: drop-shadow(0 0 6px rgba(239, 68, 68, 0.5));
+}
+
+/* Row toggle switch. */
+.premium-subscription-page .psp-row-toggle {
+  position: relative;
+  width: 52px;
+  height: 28px;
+  justify-self: center;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  background: linear-gradient(135deg, #1769ff 0%, #22d3ee 140%);
+  box-shadow: 0 0 16px rgba(23, 105, 255, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  transition: background 220ms ease, box-shadow 220ms ease, border-color 220ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.premium-subscription-page .psp-row-toggle::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 22px;
+  height: 22px;
+  border-radius: 9999px;
+  background: #ffffff;
+  box-shadow: 0 2px 6px rgba(2, 6, 23, 0.4);
+  transition: transform 240ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.premium-subscription-page .psp-row-toggle.is-off {
+  border-color: rgba(255, 255, 255, 0.10);
+  background: rgba(255, 255, 255, 0.09);
+  box-shadow: none;
+}
+
+.premium-subscription-page .psp-row-toggle.is-off::after {
+  transform: translateX(24px);
+}
+
+.premium-subscription-page .psp-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  background: linear-gradient(180deg, rgba(23, 105, 255, 0.10), rgba(23, 105, 255, 0.02));
+}
+
+.premium-subscription-page .psp-total-label {
+  color: var(--psp-muted);
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+
+.premium-subscription-page .psp-total-price {
+  font-size: 28px;
+  font-weight: 900;
+  letter-spacing: -0.04em;
+  color: #ffffff;
+  text-shadow: 0 0 24px rgba(34, 211, 238, 0.35);
+}
+
+/* ---------- Section 4 · Dynamic Checkout Summary ---------- */
+.premium-subscription-page .psp-summary-card {
+  position: relative;
+  overflow: hidden;
+  border-radius: 26px;
+  border: 1px solid rgba(94, 130, 235, 0.32);
+  background:
+    radial-gradient(120% 90% at 15% 0%, rgba(29, 78, 216, 0.38), transparent 55%),
+    radial-gradient(120% 100% at 100% 100%, rgba(34, 211, 238, 0.16), transparent 55%),
+    linear-gradient(160deg, #101b3d 0%, #0a1130 55%, #0b1231 100%);
+  box-shadow: 0 34px 90px rgba(2, 6, 23, 0.6), 0 0 0 1px rgba(34, 211, 238, 0.06), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  padding: 24px;
+}
+
+.premium-subscription-page .psp-owned-stamp {
+  position: absolute;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  transform: translate(-50%, -50%) rotate(-6deg);
+}
+
+.premium-subscription-page .psp-owned-seal {
+  border: 3px double;
+  border-radius: 12px;
+  background-image: linear-gradient(160deg, #450a0a, #b91c1c, #450a0a);
+  color: #ffffff;
+  padding: 8px 18px;
+  font-size: 12px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  box-shadow: 0 10px 30px rgba(220, 38, 38, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+}
+
+.premium-subscription-page .psp-summary-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.premium-subscription-page .psp-summary-name {
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+  color: #ffffff;
+}
+
+.premium-subscription-page .psp-popular-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 10px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  background: rgba(255, 255, 255, 0.10);
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+  color: #dbeafe;
+  font-size: 9px;
+  font-weight: 900;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.premium-subscription-page .psp-summary-price {
+  margin-top: 18px;
+  font-size: 46px;
+  font-weight: 900;
+  letter-spacing: -0.05em;
+  line-height: 1;
+  color: #ffffff;
+  text-shadow: 0 0 34px rgba(34, 211, 238, 0.4);
+}
+
+.premium-subscription-page .psp-summary-period {
+  margin-top: 6px;
+  color: var(--psp-muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.premium-subscription-page .psp-summary-subtitle {
+  margin-top: 16px;
+  color: #c9d7f5;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.premium-subscription-page .psp-cta {
+  margin-top: 20px;
+  width: 100%;
+  min-height: 52px;
+  border-radius: 9999px;
+  border: 1px solid rgba(255, 255, 255, 0.32);
+  background: linear-gradient(135deg, #0ea5e9 0%, #22d3ee 55%, #67e8f9 130%);
+  color: #03131f;
+  font-size: 14px;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  box-shadow: 0 18px 44px rgba(34, 211, 238, 0.38), inset 0 1px 0 rgba(255, 255, 255, 0.5);
+  transition: transform 160ms ease, box-shadow 160ms ease, filter 160ms ease;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.premium-subscription-page .psp-cta:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 22px 54px rgba(34, 211, 238, 0.5), inset 0 1px 0 rgba(255, 255, 255, 0.55);
+  filter: brightness(1.04);
+}
+
+.premium-subscription-page .psp-cta:active {
+  transform: translateY(1px) scale(0.99);
+}
+
+.premium-subscription-page .psp-cta:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.premium-subscription-page .psp-feature-list {
+  margin-top: 22px;
+  border-top: 1px solid rgba(255, 255, 255, 0.10);
+  padding-top: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.premium-subscription-page .psp-feature-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #f1f5ff;
+  font-size: 13px;
+  font-weight: 700;
+  animation: psp-feature-in 300ms cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+.premium-subscription-page .psp-feature-icon {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  background: rgba(255, 255, 255, 0.06);
+  color: #ffffff;
+}
+
+.premium-subscription-page .psp-feature-row svg {
+  width: 17px;
+  height: 17px;
+  color: #ffffff;
+  stroke: currentColor;
+}
+
+/* ---------- Section 5 · Trust Footer ---------- */
+.premium-subscription-page .psp-trust {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  color: var(--psp-muted-2);
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.premium-subscription-page .psp-trust svg {
+  width: 14px;
+  height: 14px;
+  color: var(--psp-emerald);
+  stroke: currentColor;
+}
+
+.premium-subscription-page .psp-separator {
+  color: rgba(255, 255, 255, 0.22);
+}
+
+@keyframes psp-feature-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .premium-subscription-page *,
+  .premium-subscription-page *::before,
+  .premium-subscription-page *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}

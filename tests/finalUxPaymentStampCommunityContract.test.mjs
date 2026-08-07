@@ -25,7 +25,7 @@ test('product and subscription use premium owned seal and polished button states
   assert.match(product,/paid update/);
   assert.match(subscription,/Subscription purchased and active/);
   assert.match(subscription,/border-double border-red-900/);
-  assert.match(subscription,/subscription active/);
+  assert.match(subscription,/psp-owned-stamp/);
 });
 
 test('checkout has real product image and context-specific product/update detail props', () => {

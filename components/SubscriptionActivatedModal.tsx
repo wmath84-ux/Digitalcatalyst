@@ -2,10 +2,9 @@ import React, { useEffect } from 'react';
 import { SubscriptionPlanConfig } from '../utils/subscriptionAccess';
 
 export interface SubscriptionActivatedInfo {
-  mode: 'purchase' | 'trial';
+  mode: 'purchase';
   plan: SubscriptionPlanConfig;
   billingCycle?: string;
-  trialDays?: number;
   expiresAt?: string;
   message?: string;
 }
@@ -27,13 +26,9 @@ const SubscriptionActivatedModal: React.FC<SubscriptionActivatedModalProps> = ({
 
   if (!info) return null;
 
-  const isTrial = info.mode === 'trial';
-  const trialLabel = `${info.trialDays || 7}-day Free Trial`;
-  const badgeText = isTrial ? trialLabel : info.billingCycle || 'Active plan';
-  const headline = isTrial ? 'Free trial started!' : 'Eduvora Plus+ is active!';
-  const subhead = isTrial
-    ? `Aapka ${info.trialDays || 7}-din ka FREE trial ab live hai. Sab premium features abhi unlocked hain — koi payment nahi laga.`
-    : info.message || 'Aapka subscription activate ho gaya. Sab premium features ab unlocked hain — padhte raho, aage badho.';
+  const badgeText = info.billingCycle || 'Active plan';
+  const headline = 'Eduvora Plus+ is active!';
+  const subhead = info.message || 'Aapka subscription activate ho gaya. Sab premium features ab unlocked hain — padhte raho, aage badho.';
 
   return (
     <div className="fixed inset-0 z-[12000] flex items-center justify-center overflow-y-auto bg-slate-950/60 px-4 py-8 backdrop-blur-sm animate-fade-in" role="dialog" aria-modal="true" aria-label={headline}>
@@ -72,12 +67,6 @@ const SubscriptionActivatedModal: React.FC<SubscriptionActivatedModalProps> = ({
           <p className="mx-auto mt-3 max-w-md text-sm font-semibold leading-6 text-slate-700 sm:text-[15px] sm:leading-7">
             {subhead}
           </p>
-
-          {isTrial && info.trialDays && (
-            <div className="mt-4 rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-[13px] font-bold text-amber-900">
-              ⏳ {info.trialDays} free din hain. Trial khatam hone ke baad subscription purchase karni hogi — koi tension nahi, bina kisi commitment ke.
-            </div>
-          )}
 
           {info.plan.benefits?.length > 0 && (
             <div className="mt-5 rounded-[18px] border border-indigo-100 bg-indigo-50/50 p-4 text-left">

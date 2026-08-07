@@ -8,12 +8,15 @@ const course = fs.readFileSync('components/CoursePlayer.tsx', 'utf8');
 const payment = fs.readFileSync('components/PaymentModal.tsx', 'utf8');
 const app = fs.readFileSync('App.tsx', 'utf8');
 
-test('subscription page follows the default Eduvora blue and white theme', () => {
-  assert.match(subscription, /subscription-page-default-theme/);
-  assert.match(subscription, /from-slate-50 via-blue-50\/60 to-cyan-50\/40/);
-  assert.match(subscription, /subscription-plan-card[\s\S]*rounded-\[22px\]/);
-  assert.match(subscription, /subscription-primary-action/);
-  assert.match(subscription, /eduvora-primary-action/);
+test('subscription page follows the premium dark god-tier theme', () => {
+  assert.match(subscription, /subscription-page-theme-adaptive premium-subscription-page/);
+  assert.match(subscription, /psp-root/);
+  assert.match(subscription, /psp-master-toggle/);
+  assert.match(subscription, /psp-card-stage/);
+  assert.match(subscription, /psp-glass-table/);
+  assert.match(subscription, /psp-summary-card/);
+  assert.match(subscription, /psp-cta/);
+  assert.match(subscription, /psp-trust/);
   assert.doesNotMatch(subscription, /font-mono text-\[#111111\]/);
 });
 

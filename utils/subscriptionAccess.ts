@@ -2,7 +2,6 @@ export type SubscriptionTier = 'normal' | 'pro' | 'elite';
 export type PremiumSubscriptionTier = Exclude<SubscriptionTier, 'normal'>;
 export type SubscriptionBillingCycle = 'once' | 'weekly' | 'monthly' | 'quarterly' | 'yearly';
 
-export const FREE_TRIAL_DAYS = 7;
 export const SUBSCRIPTION_BILLING_CYCLES: SubscriptionBillingCycle[] = ['once', 'weekly', 'monthly', 'quarterly', 'yearly'];
 
 /**
@@ -181,15 +180,20 @@ export interface SubscriptionPageContent {
   aiMentorLocked: MembershipMessage;
   communityLocked: MembershipMessage;
   profileUpgrade: MembershipMessage;
-  trialTitle: string;
-  trialSubtitle: string;
-  trialCta: string;
-  freeTrialDays: number;
-  freeTrialEnabled: boolean;
+  cardImages: string[];
   valueTitle: string;
   valueDescription: string;
   renewalNote: string;
 }
+
+export const DEFAULT_SUBSCRIPTION_CARD_IMAGES: string[] = [
+  'https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=720&q=80',
+  'https://images.unsplash.com/photo-1456513080510-7bf3a84b82f8?auto=format&fit=crop&w=720&q=80',
+  'https://images.unsplash.com/photo-1501504905252-473c47e087f8?auto=format&fit=crop&w=720&q=80',
+  'https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=720&q=80',
+  'https://images.unsplash.com/photo-1524995997946-a1c2e315a42f?auto=format&fit=crop&w=720&q=80',
+  'https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=720&q=80',
+];
 
 export interface SubscriptionPlanConfig {
   id: string;
@@ -267,11 +271,7 @@ export const DEFAULT_SUBSCRIPTION_PAGE_CONTENT: SubscriptionPageContent = {
   aiMentorLocked: DEFAULT_AI_MENTOR_LOCKED_MESSAGE,
   communityLocked: DEFAULT_COMMUNITY_LOCKED_MESSAGE,
   profileUpgrade: DEFAULT_PROFILE_UPGRADE_MESSAGE,
-  trialTitle: '7 din FREE Trial — sirf naye students ke liye',
-  trialSubtitle: 'Redeem karo abhi aur dekho Eduvora Plus+ ka asli magic. 7 din baad, jo plan chaho choose karke purchase karo.',
-  trialCta: 'Start 7-Day Free Trial',
-  freeTrialDays: FREE_TRIAL_DAYS,
-  freeTrialEnabled: true,
+  cardImages: [...DEFAULT_SUBSCRIPTION_CARD_IMAGES],
   valueTitle: 'Sirf ek subscription, lekin itna sab kuch',
   valueDescription: 'Eduvora Plus+ sirf ek membership nahi — yeh aapka apna study partner hai. Har feature isliye bana hai taaki aap bina atke, bina bore hue, roz aage badho.',
   renewalNote: 'Auto-renew on karo toh subscription apne aap renew hoti hai — bilkul transparent. Cancel anytime, koi tension nahi.',
@@ -434,32 +434,6 @@ export const getHigherSubscriptionTier = (current: SubscriptionTier, requested: 
 
 const toUserRecord = (user: unknown): Record<string, unknown> => (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
 
-export const getTrialStartedAt = (user: unknown): string => String(toUserRecord(user).subscriptionTrialStartedAt || '');
-export const getTrialEndsAt = (user: unknown): string => String(toUserRecord(user).subscriptionTrialEndsAt || '');
-export const hasUsedFreeTrial = (user: unknown): boolean => Boolean(toUserRecord(user).subscriptionTrialUsed);
-
-export const isTrialActive = (user: unknown, now = Date.now()): boolean => {
-  if (!user) return false;
-  const started = new Date(getTrialStartedAt(user)).getTime();
-  const ends = new Date(getTrialEndsAt(user)).getTime();
-  return Number.isFinite(ends) && Number.isFinite(started) && started <= now && ends > now;
-};
-
-export const getTrialDaysLeft = (user: unknown, now = Date.now()): number => {
-  const ends = new Date(getTrialEndsAt(user)).getTime();
-  if (!Number.isFinite(ends)) return 0;
-  return Math.max(0, Math.ceil((ends - now) / 86400000));
-};
-
-export const canStartFreeTrial = (user: unknown): boolean => {
-  if (!user) return false;
-  const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
-  if (hasUsedFreeTrial(user)) return false;
-  if (String(record.subscriptionActivatedAt || '').trim()) return false;
-  if (getUserSubscriptionTier(user) !== 'normal') return false;
-  return true;
-};
-
 export const getUserSubscriptionTier = (user: unknown): SubscriptionTier => {
   if (isSubscriptionExpired(user)) return 'normal';
   const record = (user && typeof user === 'object' ? user : {}) as Record<string, unknown>;
@@ -496,6 +470,9 @@ export const normalizeMembershipMessage = (value: unknown, fallback: MembershipM
 
 export const normalizeSubscriptionPageContent = (value: unknown): SubscriptionPageContent => {
   const record = (value && typeof value === 'object' ? value : {}) as Partial<SubscriptionPageContent>;
+  const rawImages = Array.isArray(record.cardImages) ? record.cardImages.map(item => String(item || '').trim()).filter(Boolean) : [];
+  const cardImages = (rawImages.length >= 1 ? rawImages : DEFAULT_SUBSCRIPTION_CARD_IMAGES).slice(0, 6);
+  while (cardImages.length < 6) cardImages.push(DEFAULT_SUBSCRIPTION_CARD_IMAGES[cardImages.length % DEFAULT_SUBSCRIPTION_CARD_IMAGES.length]);
   return {
     eyebrow: cleanText(record.eyebrow, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.eyebrow),
     title: cleanText(record.title, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.title),
@@ -506,11 +483,7 @@ export const normalizeSubscriptionPageContent = (value: unknown): SubscriptionPa
     aiMentorLocked: normalizeMembershipMessage(record.aiMentorLocked, DEFAULT_AI_MENTOR_LOCKED_MESSAGE),
     communityLocked: normalizeMembershipMessage(record.communityLocked, DEFAULT_COMMUNITY_LOCKED_MESSAGE),
     profileUpgrade: normalizeMembershipMessage(record.profileUpgrade, DEFAULT_PROFILE_UPGRADE_MESSAGE),
-    trialTitle: cleanText(record.trialTitle, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.trialTitle),
-    trialSubtitle: cleanText(record.trialSubtitle, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.trialSubtitle),
-    trialCta: cleanText(record.trialCta, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.trialCta),
-    freeTrialDays: Math.max(1, Math.min(60, Math.round(Number(record.freeTrialDays) || FREE_TRIAL_DAYS))),
-    freeTrialEnabled: record.freeTrialEnabled !== false,
+    cardImages,
     valueTitle: cleanText(record.valueTitle, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.valueTitle),
     valueDescription: cleanText(record.valueDescription, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.valueDescription),
     renewalNote: cleanText(record.renewalNote, DEFAULT_SUBSCRIPTION_PAGE_CONTENT.renewalNote),
