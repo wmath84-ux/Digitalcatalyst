@@ -5,6 +5,7 @@ import fs from 'node:fs';
 const app = fs.readFileSync('App.tsx', 'utf8');
 const home = fs.readFileSync('components/MobileAppHome.tsx', 'utf8');
 const dock = fs.readFileSync('components/BottomGlassDock.tsx', 'utf8');
+const topBar = fs.readFileSync('components/MobileTopBar.tsx', 'utf8');
 const adminSettings = fs.readFileSync('components/admin/WebsiteSettings.tsx', 'utf8');
 
 test('bottom dock never auto-hides on scroll and persists across main mobile pages', () => {
@@ -17,14 +18,14 @@ test('bottom dock never auto-hides on scroll and persists across main mobile pag
 });
 
 test('mobile side panel menu items open their matching pages', () => {
-  assert.match(home, /\['💎','Subscriptions', onNavigateToSubscriptions\]/);
-  assert.match(home, /\['♡','Wishlist', onNavigateToWishlist\]/);
-  assert.match(home, /\['📄','Blog', onOpenBlog\]/);
-  assert.match(home, /\['💬','Community', onOpenCommunity\]/);
-  assert.match(home, /\['👤','Profile', onProfileClick\]/);
-  assert.match(home, /\['🛒','Cart', onCartClick\]/);
-  assert.match(home, /\['🎁','Free', onNavigateToFreeProducts\]/);
-  assert.match(home, /\['📣','News', onOpenNews\]/);
+  assert.match(topBar, /\['💎','Subscriptions', onNavigateToSubscriptions\]/);
+  assert.match(topBar, /\['♡','Wishlist', onNavigateToWishlist\]/);
+  assert.match(topBar, /\['📄','Blog', onOpenBlog\]/);
+  assert.match(topBar, /\['💬','Community', onOpenCommunity\]/);
+  assert.match(topBar, /\['👤','Profile', onProfileClick\]/);
+  assert.match(topBar, /\['🛒','Cart', onCartClick\]/);
+  assert.match(topBar, /\['🎁','Free', onNavigateToFreeProducts\]/);
+  assert.match(topBar, /\['📣','News', onOpenNews\]/);
 });
 
 test('mobile home wires the new side panel navigation callbacks through the app shell', () => {

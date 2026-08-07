@@ -10,6 +10,7 @@ const settings = readFileSync('components/admin/WebsiteSettings.tsx', 'utf8');
 const bottomDock = readFileSync('components/BottomGlassDock.tsx', 'utf8');
 const sideDock = readFileSync('components/HomeSideDock.tsx', 'utf8');
 const mobileHome = readFileSync('components/MobileAppHome.tsx', 'utf8');
+const mobileTopBar = readFileSync('components/MobileTopBar.tsx', 'utf8');
 const css = readFileSync('public/styles/clean-neutral-theme.css', 'utf8');
 
 test('advanced customizer has stable finite region and icon registries', () => {
@@ -69,7 +70,7 @@ test('desktop and mobile primary navigation no longer render emoji icon values',
 
 test('Home exposes stable shell hero and navigation regions', () => {
   assert.match(mobileHome, /data-clean-neutral-region="shell\.page"/);
-  assert.match(mobileHome, /data-clean-neutral-region="shell\.header"/);
+  assert.match(mobileTopBar, /data-clean-neutral-region="shell\.header"/);
   assert.match(mobileHome, /data-clean-neutral-region="content\.hero"/);
   assert.match(mobileHome, /data-clean-neutral-region="shell\.navigation"/);
 });

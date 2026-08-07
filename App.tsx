@@ -6,6 +6,7 @@ import { addDoc, arrayUnion, collection, deleteDoc, doc, getDoc, getDocs, limit,
 import Header from './components/Header';
 import SiteNotificationCenter from './components/SiteNotificationCenter';
 import MobileAppHome from './components/MobileAppHome';
+import MobileTopBar from './components/MobileTopBar';
 import MayDayMobile from './components/MayDayMobile';
 import Hero from './components/Hero';
 import ProductShowcase from './components/ProductShowcase';
@@ -6636,7 +6637,6 @@ const App: React.FC = () => {
           <div className="md:hidden">
             <MobileAppHome
               settings={websiteSettings}
-              rememberedAccount={rememberedAuthAccount}
               currentUser={appUser}
               isLoggedIn={isLoggedIn}
               purchasedProducts={purchasedProducts}
@@ -6645,7 +6645,6 @@ const App: React.FC = () => {
               purchasedProductIds={purchasedProductIds}
               wishlist={wishlist}
               coupons={coupons}
-              cartCount={cartItemCount}
               onViewPurchasedProduct={handleViewPurchasedProduct}
               onViewProduct={handleViewProduct}
               onToggleWishlist={handleToggleWishlist}
@@ -6653,13 +6652,6 @@ const App: React.FC = () => {
               onNavigateToPurchases={handleNavigateToPurchases}
               onNavigateToFreeProducts={handleNavigateToFreeProducts}
               onOpenNews={() => openReadingHub('news')}
-              onOpenBlog={() => openReadingHub('blog')}
-              onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }}
-              onCartClick={openCartSidebar}
-              onProfileClick={handleNavigateToProfile}
-              onNavigateToWishlist={handleNavigateToWishlist}
-              onNavigateToSubscriptions={handleNavigateToSubscription}
-              onAuthClick={openAuthPage}
             />
           </div>
           <div className="hidden md:block">{renderHomePageContent()}</div>
@@ -6669,9 +6661,9 @@ const App: React.FC = () => {
   };
 
   const shouldHideFooterOnMobile = Boolean(websiteSettings.mobile?.hideFooter);
-  // When persistAcrossPages is enabled the bottom dock stays pinned across the main
-  // mobile pages (store, purchases, blog/news, profile, wishlist and free products).
+  // A single consistent mobile header + bottom dock is used on these app pages.
   // The dock never auto-hides on scroll; it is only hidden behind full-page overlays.
+  const mobileAppChromeViews = new Set(['home', 'allProducts', 'myPurchases', 'profile', 'news', 'blog', 'wishlist', 'freeProducts']);
   const dockPersistAcrossPages = (websiteSettings.content as any).dockStyle?.persistAcrossPages !== false;
   const dockAlwaysVisibleViews = new Set(['home', 'allProducts', 'myPurchases', 'blog', 'news', 'profile', 'wishlist', 'freeProducts']);
   const shouldHideMainDockOnMobile =
@@ -6713,7 +6705,8 @@ const App: React.FC = () => {
     currentView !== 'mayDay' &&
     currentView !== 'admin' &&
     currentView !== 'adminLogin' &&
-    currentView !== 'search';
+    currentView !== 'search' &&
+    !mobileAppChromeViews.has(currentView);
 
   const appleOpenClass = "animate-in fade-in zoom-in-95 duration-500 ease-[cubic-bezier(0.16,1,0.3,1)]";
 
@@ -6899,7 +6892,10 @@ const App: React.FC = () => {
                 ←
               </button>
             )}
-            <div className={`mobile-site-header ${currentView === 'home' ? 'hidden md:block' : currentView === 'mayDay' ? 'hidden' : ''}`}><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} notificationCount={siteNotifications.filter(notification => !notification.read).length} onOpenNotifications={() => setIsSiteNotificationCenterOpen(true)} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
+            <div className={`mobile-site-header ${mobileAppChromeViews.has(currentView) || currentView === 'mayDay' ? 'hidden md:block' : ''}`}><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} notificationCount={siteNotifications.filter(notification => !notification.read).length} onOpenNotifications={() => setIsSiteNotificationCenterOpen(true)} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
+            {mobileAppChromeViews.has(currentView) && (
+              <MobileTopBar currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} rememberedAccount={rememberedAuthAccount} cartCount={cartItemCount} onHomeClick={handleBackToHome} onNavigateToSubscriptions={handleNavigateToSubscription} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToFreeProducts={handleNavigateToFreeProducts} onOpenNews={() => openReadingHub('news')} onOpenBlog={() => openReadingHub('blog')} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} onAuthClick={openAuthPage} />
+            )}
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={`${shouldHideMainDockOnMobile ? 'max-md:hidden' : ''} ${useDesktopSidebar ? 'lg:hidden' : ''}`}>
                 <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} isAdmin={isPrimaryAdminUser(currentAdminUser)} onAdminClick={handleNavigateToAdminLogin} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenMayDay={handleNavigateToMayDay} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />

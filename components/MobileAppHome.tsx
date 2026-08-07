@@ -1,7 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Coupon, ProductWithRating, User, WebsiteSettings } from '../App';
-import UserAvatar from './common/UserAvatar';
-import { RememberedAuthAccount } from '../utils/rememberedAuth';
 import { ProductImageSlot, getProductImage, getProductImageFallback } from '../utils/productImages';
 import SafeImage from './common/SafeImage';
 import { ensureUserCoinWallet, watchUserCoinWallet } from '../utils/coinWallet';
@@ -15,28 +13,19 @@ interface MobileAppHomeProps {
   settings: WebsiteSettings;
   currentUser: User | null;
   isLoggedIn: boolean;
-  rememberedAccount?: RememberedAuthAccount | null;
   purchasedProducts: ProductWithRating[];
   topRatedProducts: ProductWithRating[];
   visibleProducts: ProductWithRating[];
   purchasedProductIds: number[];
   wishlist: number[];
   coupons: Coupon[];
-  cartCount: number;
   onViewPurchasedProduct: (product: ProductWithRating) => void;
   onViewProduct: (product: ProductWithRating, sectionId?: string) => void;
   onToggleWishlist: (id: number) => void;
   onNavigateToAllProducts: () => void;
   onNavigateToPurchases: () => void;
   onNavigateToFreeProducts: () => void;
-  onNavigateToWishlist: () => void;
-  onNavigateToSubscriptions: () => void;
   onOpenNews: () => void;
-  onOpenBlog: () => void;
-  onOpenCommunity: () => void;
-  onCartClick: () => void;
-  onProfileClick: () => void;
-  onAuthClick: (mode: 'login' | 'signup') => void;
 }
 
 const currency = (product: ProductWithRating) => product.salePrice || product.price || '₹0';
@@ -69,33 +58,22 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   settings,
   currentUser,
   isLoggedIn,
-  rememberedAccount,
   purchasedProducts,
   topRatedProducts,
   visibleProducts,
   purchasedProductIds,
   wishlist,
   coupons,
-  cartCount,
   onViewPurchasedProduct,
   onViewProduct,
   onToggleWishlist,
   onNavigateToAllProducts,
   onNavigateToPurchases,
   onNavigateToFreeProducts,
-  onNavigateToWishlist,
-  onNavigateToSubscriptions,
   onOpenNews,
-  onOpenBlog,
-  onOpenCommunity,
-  onCartClick,
-  onProfileClick,
-  onAuthClick,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-  const siteName = 'EDUVORA';
   const ownedPreview = purchasedProducts[0];
   const allPreview = useMemo(() => visibleProducts.slice(0, 6), [visibleProducts]);
   const topPreview = topRatedProducts.slice(0, 4);
@@ -134,9 +112,6 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   const mobilePurchaseMediaRoundClass = productRoundness.myPurchasesCards !== false ? 'rounded-[22px]' : 'rounded-lg';
   const productBadgeRoundClass = pillClassForProductRoundness(productRoundness.productBadges !== false);
   const productActionButtonRoundClass = productRoundness.productActionButtons !== false ? 'rounded-2xl' : 'rounded-lg';
-  const resolvedPhotoURL = currentUser?.profilePhotoSet === true ? String(currentUser.photoURL || '').trim() : '';
-  const loggedOutAuthMode: 'login' | 'signup' = rememberedAccount ? 'login' : 'signup';
-  const loggedOutAuthLabel = rememberedAccount ? 'Login' : 'Sign Up';
   const activeCoupons = coupons.filter(coupon => coupon.isActive).slice(0, 3);
   const scrollToMobileSection = (sectionId: string) => {
     document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -151,26 +126,7 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
   ];
 
   return (
-    <div data-clean-neutral-workspace="mobile-home" data-clean-neutral-region="shell.page" className="min-h-[100dvh] bg-[#F8FAFD] px-4 pb-32 pt-[max(10px,env(safe-area-inset-top))] font-['Roboto','Inter',system-ui,sans-serif] text-[#49454F]">
-      <header data-clean-neutral-region="shell.header" className="sticky top-0 z-30 -mx-4 mb-4 flex min-h-16 items-center gap-3 border-b border-[#E7E0EC] bg-[#F8FAFD]/96 px-4 py-2 backdrop-blur-md">
-        <button type="button" onClick={onNavigateToAllProducts} aria-label="Open Store" className="grid h-12 w-12 shrink-0 place-items-center overflow-hidden rounded-full bg-gradient-to-br from-[#0B63FF] to-[#7C4DFF] text-white "><img src="/icons/icon-192x192.svg" alt="Digital Catalyst" className="h-full w-full object-cover" loading="eager" fetchPriority="high" /></button>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-base font-black tracking-wide text-[#1D1B20]">{siteName}</p>
-          <p className="text-[11px] font-normal text-[#625B71]">Premium learning store</p>
-        </div>
-        <button type="button" onClick={onCartClick} className="relative grid h-10 w-10 place-items-center rounded-full bg-transparent text-xl text-[#1D1B20] active:bg-[#E8DEF8]" aria-label="Open cart">🛒{cartCount > 0 ? <span className="absolute -right-1 -top-1 rounded-full bg-[#0B63FF] px-1.5 text-[10px] font-black text-white">{cartCount}</span> : null}</button>
-        {isLoggedIn && currentUser ? (
-          <>
-            <button type="button" onClick={onProfileClick} className="grid h-10 w-10 place-items-center rounded-full bg-transparent text-lg active:bg-[#E8DEF8]" aria-label="Open profile"><UserAvatar name={currentUser.name} email={currentUser.email} photoURL={resolvedPhotoURL} size={34} /></button>
-            <button type="button" onClick={() => setIsDrawerOpen(true)} className="grid h-10 w-10 place-items-center rounded-full text-[#1D1B20] active:bg-[#E8DEF8]" aria-label="Open menu"><span className="flex flex-col gap-1"><i className="block h-0.5 w-5 rounded-full bg-current"/><i className="block h-0.5 w-5 rounded-full bg-current"/><i className="block h-0.5 w-5 rounded-full bg-current"/></span></button>
-          </>
-        ) : (
-          <button type="button" onClick={() => onAuthClick(loggedOutAuthMode)} className="flex h-10 shrink-0 items-center rounded-full border border-[#BFD7FF] bg-white/95 px-3 text-xs font-black text-[#081A44] shadow-[0_10px_24px_rgba(11,99,255,0.10)] transition hover:-translate-y-0.5 hover:border-[#0B63FF] hover:text-[#0B63FF]" aria-label={loggedOutAuthLabel}>
-            {loggedOutAuthLabel}
-          </button>
-        )}
-      </header>
-
+    <div data-clean-neutral-workspace="mobile-home" data-clean-neutral-region="shell.page" className="min-h-[100dvh] bg-[#F8FAFD] px-4 pb-32 pt-4 font-['Roboto','Inter',system-ui,sans-serif] text-[#49454F]">
       <section data-clean-neutral-region="content.hero" className="relative overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,#EADDFF_0%,#D7E3FF_50%,#FFFBFE_100%)] p-5">
         <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-[#DCCBFF]/70 blur-2xl" />
         <div className="absolute bottom-0 right-3 h-28 w-28 rounded-full bg-[#BFD7FF]/80 blur-2xl" />
@@ -213,23 +169,6 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
       <section id="mobile-coupons" className="mt-7 scroll-mt-24"><SectionHead title="Coupons" subtitle="Apply active offers during checkout." onViewAll={onNavigateToAllProducts} /><div className="space-y-3">{activeCoupons.length > 0 ? activeCoupons.map(coupon => <article key={coupon.id} className="flex items-center justify-between gap-3 rounded-[24px] border border-[#D8E6FF] bg-white p-4 shadow-[0_14px_36px_rgba(11,99,255,0.08)]"><div><p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#0B63FF]">Active Coupon</p><h3 className="mt-1 text-lg font-black text-[#081A44]">{coupon.code}</h3><p className="mt-1 text-xs font-bold text-[#64708F]">{coupon.type === 'percentage' ? `${coupon.value}% off` : `₹${coupon.value} off`} • valid till {coupon.expiryDate || 'checkout'}</p></div><button type="button" onClick={onNavigateToAllProducts} className="shrink-0 rounded-2xl bg-[#EEF6FF] px-4 py-2 text-xs font-black text-[#0B63FF]">Use</button></article>) : <div className="rounded-[24px] border border-dashed border-[#BFD7FF] bg-white/78 p-5 text-center font-bold text-[#64708F]">No active coupons right now.</div>}</div></section>
 
       <section className="mt-7"><SectionHead title="All Products" subtitle="Browse all premium learning products." onViewAll={onNavigateToAllProducts} /><div className="space-y-3">{allPreview.length > 0 ? allPreview.map(product => <article key={product.id} className={`relative ${mobileHomePreviewCardRoundClass} border border-[#D8E6FF] bg-white p-3 shadow-[0_16px_42px_rgba(11,99,255,0.08)]`}><button onClick={() => onToggleWishlist(product.id)} className={`absolute right-4 top-4 z-30 grid h-9 w-9 place-items-center ${productBadgeRoundClass} bg-white/90 shadow`}>{wishlist.includes(product.id) ? '❤️' : '♡'}</button><div className="flex gap-3"><div className={`relative w-24 shrink-0 overflow-hidden ${mobileHomePreviewMediaRoundClass} aspect-[6/7]`}><ProductCover product={product} slot="homeList" /><button type="button" onClick={() => onViewProduct(product)} aria-label={`Open ${product.title}`} className="absolute inset-0 z-10 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-[-4px] focus-visible:outline-[#0B63FF]" /></div><div className="min-w-0 flex-1 pr-10"><div className="flex max-w-full flex-wrap items-center gap-2 overflow-visible pb-0.5">{purchasedProductIds.includes(product.id) ? (<span className={`inline-flex max-w-full shrink-0 items-center ${productBadgeRoundClass} border border-emerald-300/70 bg-emerald-500/15 px-2.5 py-1 text-[9px] font-black uppercase leading-none tracking-[0.08em] text-emerald-700 shadow-[0_6px_16px_rgba(5,150,105,0.16)] ring-1 ring-emerald-100/80`}>Purchased</span>) : (<span className={`inline-flex max-w-full items-center ${productBadgeRoundClass} border border-emerald-300/70 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-black leading-none text-emerald-700 shadow-[0_6px_16px_rgba(5,150,105,0.16)] ring-1 ring-emerald-100/80`}>{product.category || 'Learning'}</span>)}</div><h3 className="mt-2 line-clamp-1 text-base font-black text-[#081A44]"><button type="button" onClick={() => onViewProduct(product)} className="block w-full truncate text-left focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0B63FF]">{product.title}</button></h3><p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[#64708F]">{product.description}</p><div className="mt-2 flex items-center justify-between"><p className="text-[11px] font-bold text-[#64708F]">⭐ <span className="text-[#FFB020]">{product.rating.toFixed(1)}</span> ({product.reviewCount})</p><span className="font-black text-[#081A44]">{currency(product)}</span></div><button onClick={() => onViewProduct(product)} className={`mt-2 ${productActionButtonRoundClass} bg-[#0B63FF] px-3 py-2 text-xs font-black text-white`}>View Details</button></div></div></article>) : <div className="rounded-[24px] border border-[#D8E6FF] bg-white p-5 text-center font-bold text-[#64708F]">No products found. Try another search.</div>}</div></section>
-
-      {isDrawerOpen ? (
-        <div className="fixed inset-0 z-[90] bg-black/32" onClick={() => setIsDrawerOpen(false)} aria-hidden="true">
-          <aside className="absolute right-0 top-0 flex h-full w-[80vw] max-w-sm flex-col rounded-l-[28px] bg-[#FFFBFE] text-[#1D1B20] shadow-none" onClick={(event) => event.stopPropagation()} aria-label="EDUVORA menu">
-            <div className="flex items-start gap-3 border-b border-[#CAC4D0] p-5 pt-[max(24px,env(safe-area-inset-top))]">
-              <UserAvatar name={currentUser?.name || 'Guest'} email={currentUser?.email || ''} photoURL={resolvedPhotoURL} size={52} />
-              <div className="min-w-0 flex-1 pt-1"><p className="truncate text-base font-bold">{currentUser?.name || 'Guest user'}</p><p className="truncate text-sm text-[#625B71]">{currentUser?.email || 'Sign in to sync your account'}</p></div>
-              <button type="button" onClick={() => setIsDrawerOpen(false)} className="grid h-10 w-10 place-items-center rounded-full bg-[#ECE6F0] text-xl" aria-label="Close menu">×</button>
-            </div>
-            <nav className="flex flex-col gap-1 p-3 text-sm font-medium">
-              {[['👤','Profile', onProfileClick], ['💎','Subscriptions', onNavigateToSubscriptions], ['♡','Wishlist', onNavigateToWishlist], ['🛒','Cart', onCartClick], ['🎁','Free', onNavigateToFreeProducts], ['📣','News', onOpenNews], ['📄','Blog', onOpenBlog], ['💬','Community', onOpenCommunity]].map(([icon,label,action]: any) => (
-                <button key={label} type="button" onClick={() => { setIsDrawerOpen(false); action(); }} className="flex min-h-12 items-center gap-4 rounded-full px-4 text-left text-[#1D1B20] active:bg-[#E8DEF8]"><span className="w-6 text-center text-xl">{icon}</span><span>{label}</span></button>
-              ))}
-            </nav>
-          </aside>
-        </div>
-      ) : null}
 
       {isMobileSearchOpen ? <MobileProductSearchPage source="home" products={visibleProducts} query={searchQuery} onQueryChange={setSearchQuery} onClose={() => setIsMobileSearchOpen(false)} onViewProduct={(product) => onViewProduct(product)} wishlist={wishlist} onToggleWishlist={onToggleWishlist} purchasedProductIds={purchasedProductIds} /> : null}
     </div>
