@@ -4,17 +4,20 @@ import type {
   SiteNotificationCategory,
   SiteNotificationPreferences,
 } from '../utils/siteNotifications';
+import type { WebPushState } from '../utils/webPush';
 
 interface SiteNotificationCenterProps {
   isOpen: boolean;
   notifications: SiteNotification[];
   preferences: SiteNotificationPreferences;
   browserPermission: NotificationPermission | 'unsupported';
+  webPushState: WebPushState;
   onClose: () => void;
   onOpenNotification: (notification: SiteNotification) => void;
   onMarkAllRead: () => void;
   onUpdatePreferences: (preferences: SiteNotificationPreferences) => void;
   onRequestBrowserAlerts: () => void;
+  onUnsubscribeWebPush?: () => void;
 }
 
 type NotificationFilter = 'all' | SiteNotificationCategory;
@@ -64,11 +67,13 @@ const SiteNotificationCenter: React.FC<SiteNotificationCenterProps> = ({
   notifications,
   preferences,
   browserPermission,
+  webPushState,
   onClose,
   onOpenNotification,
   onMarkAllRead,
   onUpdatePreferences,
   onRequestBrowserAlerts,
+  onUnsubscribeWebPush,
 }) => {
   const [filter, setFilter] = useState<NotificationFilter>('all');
   const [showPreferences, setShowPreferences] = useState(false);
@@ -101,24 +106,29 @@ const SiteNotificationCenter: React.FC<SiteNotificationCenterProps> = ({
             <div className="rounded-[1.25rem] border border-blue-100 bg-blue-50/70 p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <h3 className="font-black text-slate-950">Browser alerts</h3>
-                  <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">Permission is requested only from this button. In-app history always works. Browser alerts are delivered while Eduvora is active; true background push requires a trusted FCM/VAPID sender.</p>
+                  <h3 className="font-black text-slate-950">Web push alerts</h3>
+                  <p className="mt-1 text-xs font-semibold leading-5 text-slate-600">Permission is requested only from this button. Enabling delivers real background push notifications on Android, Chrome and installed PWA apps, even when Eduvora is closed. In-app history always works.</p>
                 </div>
                 <button
                   type="button"
-                  disabled={browserPermission === 'unsupported' || browserPermission === 'denied'}
-                  onClick={onRequestBrowserAlerts}
+                  disabled={webPushState === 'unsupported' || webPushState === 'denied' || webPushState === 'loading'}
+                  onClick={webPushState === 'subscribed' ? onUnsubscribeWebPush : onRequestBrowserAlerts}
                   className="rounded-xl bg-blue-700 px-4 py-2 text-xs font-black text-white shadow-sm transition hover:bg-blue-800 disabled:cursor-not-allowed disabled:bg-slate-300"
                 >
-                  {browserPermission === 'granted' && preferences.browserAlerts
-                    ? 'Enabled'
-                    : browserPermission === 'denied'
+                  {webPushState === 'subscribed'
+                    ? 'Enabled · Tap to turn off'
+                    : webPushState === 'denied'
                       ? 'Blocked in browser'
-                      : browserPermission === 'unsupported'
+                      : webPushState === 'unsupported'
                         ? 'Not supported'
-                        : 'Enable alerts'}
+                        : webPushState === 'loading'
+                          ? 'Loading…'
+                          : 'Enable alerts'}
                 </button>
               </div>
+              {browserPermission === 'denied' && webPushState !== 'denied' && (
+                <p className="mt-2 text-[11px] font-bold text-amber-700">Notification permission is blocked in this browser. Enable it in the site settings to receive alerts.</p>
+              )}
             </div>
 
             <div className="mt-4 space-y-2">

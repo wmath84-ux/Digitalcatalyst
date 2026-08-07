@@ -11,23 +11,72 @@ self.addEventListener('fetch', event => {
     event.respondWith(fetch(event.request).catch(() => caches.match('/index.html')));
   }
 });
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  const notificationId = event.notification?.data?.notificationId || '';
-  event.waitUntil(
-    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(async clients => {
-      const existingClient = clients.find(client => 'focus' in client);
-      if (existingClient) {
-        await existingClient.focus();
-        existingClient.postMessage({ type: 'site-notification-open', notificationId });
-        return;
-      }
 
-      const targetUrl = notificationId ? `/?siteNotification=${encodeURIComponent(notificationId)}` : '/';
-      const openedClient = await self.clients.openWindow(targetUrl);
-      if (openedClient) {
-        openedClient.postMessage({ type: 'site-notification-open', notificationId });
-      }
-    })
-  );
+const normalizePushData = (payload) => {
+  if (!payload) return {};
+  if (typeof payload === 'object') return payload;
+  try {
+    const parsed = JSON.parse(payload);
+    return parsed && typeof parsed === 'object' ? parsed : { body: String(parsed) };
+  } catch {
+    return { body: String(payload) };
+  }
+};
+
+self.addEventListener('push', event => {
+  let data;
+  try {
+    data = event.data ? normalizePushData(event.data.json()) : {};
+  } catch {
+    data = event.data ? normalizePushData(event.data.text()) : {};
+  }
+
+  const title = data.title || 'Eduvora update';
+  const body = data.body || '';
+  const tag = data.tag || data.notificationId || 'eduvora-push';
+  const icon = data.icon || '/icons/icon-192x192.svg';
+  const badge = data.badge || '/icons/icon-192x192.svg';
+  const targetUrl = data.url || (data.notificationId ? `/?siteNotification=${encodeURIComponent(data.notificationId)}` : '/');
+  const target = data.target || null;
+
+  const options = {
+    body,
+    icon,
+    badge,
+    tag,
+    data: { notificationId: data.notificationId || '', target, url: targetUrl, timestamp: Date.now() },
+    vibrate: [120, 60, 120],
+    renotify: Boolean(data.tag || data.notificationId),
+  };
+
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+const routeNotificationClick = async (notification) => {
+  notification.close();
+  const data = notification.data || {};
+  const notificationId = data.notificationId || '';
+  const targetUrl = data.url || (notificationId ? `/?siteNotification=${encodeURIComponent(notificationId)}` : '/');
+
+  const clients = await self.clients.matchAll({ type: 'window', includeUncontrolled: true });
+  const existingClient = clients.find(client => 'focus' in client);
+  if (existingClient) {
+    await existingClient.focus();
+    if (notificationId) existingClient.postMessage({ type: 'site-notification-open', notificationId });
+    else existingClient.postMessage({ type: 'push-open', url: targetUrl, target: data.target });
+    return;
+  }
+
+  const openedClient = await self.clients.openWindow(targetUrl);
+  if (openedClient && notificationId) {
+    openedClient.postMessage({ type: 'site-notification-open', notificationId });
+  }
+};
+
+self.addEventListener('notificationclick', event => {
+  event.waitUntil(routeNotificationClick(event.notification));
+});
+
+self.addEventListener('notificationclose', event => {
+  event.waitUntil(new Promise(resolve => setTimeout(resolve, 50)));
 });

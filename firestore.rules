@@ -64,6 +64,28 @@ service cloud.firestore {
         allow delete: if sessionId == 'current' && isOwner(uid);
       }
 
+      match /webPushSubscriptions/{subscriptionId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.uid == uid
+          && request.resource.data.endpoint is string
+          && request.resource.data.endpoint.size() > 0
+          && request.resource.data.endpoint.size() <= 700
+          && request.resource.data.p256dh is string
+          && request.resource.data.p256dh.size() > 0
+          && request.resource.data.p256dh.size() <= 300
+          && request.resource.data.auth is string
+          && request.resource.data.auth.size() > 0
+          && request.resource.data.auth.size() <= 120
+          && request.resource.data.platform is string
+          && request.resource.data.userAgent is string
+          && request.resource.data.createdAt is number
+          && request.resource.data.updatedAt is number
+          && request.resource.data.lastSeenAt is number
+          && !request.resource.data.keys().hasAny(['email', 'phone', 'apiKey', 'authorization', 'secret', 'rawHtml']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
 
       match /aiMentorChats/{chatId} {
         allow read: if isOwner(uid) || isAdmin();

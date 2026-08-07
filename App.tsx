@@ -81,6 +81,14 @@ import {
   SiteNotificationPreferences,
 } from './utils/siteNotifications';
 import {
+  getCurrentPushSubscription,
+  isWebPushSupported,
+  removeWebPushSubscription,
+  saveWebPushSubscription,
+  subscribeToWebPush,
+  WebPushState,
+} from './utils/webPush';
+import {
   ALL_SUBSCRIPTION_FEATURE_KEYS,
   canEarnEduCoins,
   canSpendEduCoins,
@@ -1828,6 +1836,9 @@ const App: React.FC = () => {
   const [browserNotificationPermission, setBrowserNotificationPermission] = useState<NotificationPermission | 'unsupported'>(() =>
     typeof window !== 'undefined' && 'Notification' in window ? window.Notification.permission : 'unsupported'
   );
+  const [webPushState, setWebPushState] = useState<WebPushState>(() =>
+    typeof window !== 'undefined' && isWebPushSupported() ? (window.Notification.permission === 'denied' ? 'denied' : 'unsubscribed') : 'unsupported'
+  );
   const siteNotificationsRef = useRef<SiteNotification[]>([]);
   const siteNotificationPreferencesRef = useRef<SiteNotificationPreferences>(DEFAULT_SITE_NOTIFICATION_PREFERENCES);
   const followedCommunityUserIdsRef = useRef<string[]>([]);
@@ -2058,23 +2069,72 @@ const App: React.FC = () => {
     siteNotificationPreferencesRef.current = preferences;
     setSiteNotificationPreferences(preferences);
     saveSiteNotificationPreferences(siteNotificationViewerKey, preferences);
-  }, [siteNotificationViewerKey]);
+    const uid = effectiveFirebaseUser?.uid || '';
+    if (!preferences.browserAlerts && uid && webPushState === 'subscribed') {
+      void removeWebPushSubscription(uid).then(() => setWebPushState('unsubscribed'));
+    }
+  }, [effectiveFirebaseUser?.uid, siteNotificationViewerKey, webPushState]);
 
   const requestBrowserSiteNotifications = useCallback(async () => {
     if (typeof window === 'undefined' || !('Notification' in window)) {
       setBrowserNotificationPermission('unsupported');
+      setWebPushState('unsupported');
       return;
     }
 
+    setWebPushState('loading');
     const permission = await window.Notification.requestPermission();
     setBrowserNotificationPermission(permission);
-    if (permission === 'granted') {
+    if (permission !== 'granted') {
+      setWebPushState(permission === 'denied' ? 'denied' : 'unsubscribed');
+      return;
+    }
+
+    const uid = effectiveFirebaseUser?.uid || '';
+    const subscription = await subscribeToWebPush();
+    if (subscription && uid) {
+      const saved = await saveWebPushSubscription(uid, subscription);
+      setWebPushState(saved ? 'subscribed' : 'unsubscribed');
+    } else if (subscription) {
+      setWebPushState('subscribed');
+    } else {
+      setWebPushState('unsubscribed');
+    }
+    handleUpdateSiteNotificationPreferences({
+      ...siteNotificationPreferencesRef.current,
+      browserAlerts: true,
+    });
+  }, [effectiveFirebaseUser?.uid, handleUpdateSiteNotificationPreferences]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isWebPushSupported()) return undefined;
+    if (window.Notification.permission === 'denied') {
+      setWebPushState('denied');
+      return undefined;
+    }
+    let cancelled = false;
+    setWebPushState('loading');
+    void getCurrentPushSubscription().then(subscription => {
+      if (cancelled) return;
+      setWebPushState(subscription ? 'subscribed' : 'unsubscribed');
+    });
+    return () => { cancelled = true; };
+  }, []);
+
+  const unsubscribeWebPush = useCallback(async () => {
+    const uid = effectiveFirebaseUser?.uid || '';
+    setWebPushState('loading');
+    const removed = await removeWebPushSubscription(uid);
+    if (removed) {
+      setWebPushState('unsubscribed');
       handleUpdateSiteNotificationPreferences({
         ...siteNotificationPreferencesRef.current,
-        browserAlerts: true,
+        browserAlerts: false,
       });
+    } else {
+      setWebPushState('subscribed');
     }
-  }, [handleUpdateSiteNotificationPreferences]);
+  }, [effectiveFirebaseUser?.uid, handleUpdateSiteNotificationPreferences]);
 
   useEffect(() => {
     if (!purchaseCelebration) return;
@@ -6842,11 +6902,13 @@ const App: React.FC = () => {
               notifications={siteNotifications}
               preferences={siteNotificationPreferences}
               browserPermission={browserNotificationPermission}
+              webPushState={webPushState}
               onClose={() => setIsSiteNotificationCenterOpen(false)}
               onOpenNotification={openSiteNotification}
               onMarkAllRead={markAllSiteNotificationsRead}
               onUpdatePreferences={handleUpdateSiteNotificationPreferences}
               onRequestBrowserAlerts={requestBrowserSiteNotifications}
+              onUnsubscribeWebPush={unsubscribeWebPush}
             />
             {coinToast && <div className="fixed bottom-24 left-1/2 z-[1400] -translate-x-1/2 rounded-full border border-amber-200/60 bg-white/80 px-5 py-3 text-sm font-black text-amber-700 shadow-[0_12px_40px_rgba(99,102,241,0.18)] backdrop-blur-2xl animate-fade-in-up">{coinToast}</div>}
             {isMobileCompletionModalOpen && effectiveAppUser && shouldAskForMobileCompletion() && (

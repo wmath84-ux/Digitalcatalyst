@@ -61,7 +61,7 @@ test('notification UX covers content, courses, unlocks and Community without his
   assert.match(notificationCenter, /Mark all read/);
   assert.match(notificationCenter, /Notification preferences/);
   assert.match(notificationCenter, /permission is requested only from this button/i);
-  assert.match(notificationCenter, /true background push requires a trusted FCM\/VAPID sender/i);
+  assert.match(notificationCenter, /real background push notifications/i);
 });
 
 test('browser notification permission is contextual and service worker clicks return to the app', () => {
@@ -73,7 +73,7 @@ test('browser notification permission is contextual and service worker clicks re
   assert.match(serviceWorker, /site-notification-open/);
   assert.match(serviceWorker, /siteNotification=/);
   assert.match(app, /url\.searchParams\.get\('siteNotification'\)/);
-  assert.doesNotMatch(serviceWorker, /addEventListener\(['"]push['"]/);
+  assert.match(serviceWorker, /addEventListener\(['"]push['"]/);
 });
 
 test('Reading list scroll is restored after article Back for explicit and system navigation', () => {
