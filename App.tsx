@@ -45,7 +45,7 @@ import EduvoraCommunity from './components/EduvoraCommunity';
 import InstallAppButton from './components/InstallAppButton';
 import { getProductImage } from './utils/productImages';
 import { auth, db } from './firebase';
-import { browserLocalPersistence, createUserWithEmailAndPassword, getRedirectResult, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, setPersistence, signInWithEmailAndPassword, signInWithPopup, signInWithRedirect, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
+import { browserLocalPersistence, createUserWithEmailAndPassword, GoogleAuthProvider, onAuthStateChanged, sendPasswordResetEmail, setPersistence, signInWithCredential, signInWithEmailAndPassword, signOut, updateProfile, User as FirebaseUser } from 'firebase/auth';
 import { DEFAULT_ECONOMY_SETTINGS, EconomySettings, normalizeCoinPrice, resolveCoinPrice, subscribeEconomySettings } from './utils/economy';
 import { ensureUserCoinWallet, spendUserCoinWallet } from './utils/coinWallet';
 import { clearRememberedAuthAccount, getRememberedAuthAccount, RememberedAuthAccount, saveRememberedAuthAccount } from './utils/rememberedAuth';
@@ -59,6 +59,17 @@ import {
 import { getFirebaseAuthErrorMessageFromCode, mergePurchasedProductIds, normalizePurchaseIds as normalizeSharedPurchaseIds, shouldRestoreEntitlementStatus } from './utils/authParity';
 import { isDemoMode } from './utils/runtimeMode';
 import { isProductSearchVisible, withProductSearchIndex } from './utils/productSearch';
+import {
+  GoogleCredentialResponse,
+  getGoogleClientId,
+  initializeGoogleIdentityServices,
+  isGoogleIdentityLoaded,
+  loadGoogleIdentityServices,
+  mountGoogleAccountChooserHost,
+  promptGoogleOneTap,
+  renderGoogleAccountChooserButton,
+  triggerGoogleAccountChooser,
+} from './utils/googleIdentity';
 import MembershipUpgradeCard from './components/MembershipUpgradeCard';
 import { DEFAULT_PRODUCT_ROUNDNESS_SETTINGS } from './utils/productRoundness';
 import type { ProductRoundnessSettings } from './utils/productRoundness';
@@ -123,16 +134,10 @@ import {
   SubscriptionTier,
 } from './utils/subscriptionAccess';
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
-const GOOGLE_REDIRECT_ATTEMPT_KEY = 'digitalCatalyst.googleRedirectAttempt';
-
 type MobileAuthFlowState = 'checking' | 'logged-out' | 'completing-session' | 'authenticated';
 type AuthStatus = 'booting' | 'checking-session' | 'unauthenticated' | 'authenticated' | 'hydrating' | 'logout' | 'error';
 type HydrationStatus = 'idle' | 'loading' | 'ready' | 'fallback' | 'error';
-
-const googleProvider = new GoogleAuthProvider();
-googleProvider.setCustomParameters({
-  prompt: 'select_account',
-});
+type GoogleLoginTarget = 'user' | 'admin';
 
 const PRIMARY_ADMIN_EMAIL = 'wmath84@gmail.com';
 const normalizeEmail = (email?: string | null) => String(email || '').trim().toLowerCase();
@@ -1637,9 +1642,12 @@ const App: React.FC = () => {
   const [networkBanner, setNetworkBanner] = useState(() => (typeof navigator !== 'undefined' && !navigator.onLine ? 'You are offline. Some features may not work until internet is back.' : ''));
   const [authInitialMode, setAuthInitialMode] = useState<'login' | 'signup'>('login');
   const [isAuthStateReady, setIsAuthStateReady] = useState(false);
-  const [isRedirectResultPending, setIsRedirectResultPending] = useState(false);
-  const isRedirectResultPendingRef = useRef(false);
   const authOperationInProgressRef = useRef(false);
+  const googleFlowPendingRef = useRef(false);
+  const googleLoginTargetRef = useRef<GoogleLoginTarget>('user');
+  const googleChooserHostRef = useRef<HTMLElement | null>(null);
+  const googleIdentityClientIdRef = useRef<string | null>(null);
+  const googleFlowResetTimerRef = useRef<number | null>(null);
   const committedFirebaseUidRef = useRef<string | null>(null);
   const logoutInProgressRef = useRef(false);
   const [isLocalLogoutPending, setIsLocalLogoutPending] = useState(false);
@@ -1831,7 +1839,7 @@ const App: React.FC = () => {
   const hasFirebaseUser = Boolean(effectiveFirebaseUser);
   const effectiveAppUser = currentUser || (effectiveFirebaseUser ? createFallbackUserFromFirebase(effectiveFirebaseUser) : null);
   const isLoggedIn = Boolean(effectiveFirebaseUser);
-  const isAuthBooting = authStatus === 'booting' || authStatus === 'checking-session' || isRedirectResultPending;
+  const isAuthBooting = authStatus === 'booting' || authStatus === 'checking-session';
   const siteNotificationViewerKey = String(effectiveAppUser?.id || effectiveFirebaseUser?.uid || 'guest');
   const [siteNotifications, setSiteNotifications] = useState<SiteNotification[]>([]);
   const [siteNotificationPreferences, setSiteNotificationPreferences] = useState<SiteNotificationPreferences>(DEFAULT_SITE_NOTIFICATION_PREFERENCES);
@@ -4087,44 +4095,16 @@ const App: React.FC = () => {
 
   useEffect(() => {
       console.info('APP_START_PUBLIC_HOME');
-      const isReturningFromGoogleRedirect = consumeGoogleRedirectAttempt();
-      setAuthStatus(isReturningFromGoogleRedirect ? 'checking-session' : 'booting');
+      setAuthStatus('booting');
       setIsAuthStateReady(false);
-      isRedirectResultPendingRef.current = isReturningFromGoogleRedirect;
-      setIsRedirectResultPending(isReturningFromGoogleRedirect);
 
-      const redirectTimeout = window.setTimeout(() => {
-          if (!isRedirectResultPendingRef.current) return;
-          console.info('GOOGLE_REDIRECT_TIMEOUT_PUBLIC_HOME');
-          isRedirectResultPendingRef.current = false;
-          setIsRedirectResultPending(false);
-          setAuthStatus(auth.currentUser ? 'authenticated' : 'unauthenticated');
-          setIsAuthStateReady(true);
-      }, 6000);
-
-      void ensureAuthPersistence().then(() => getRedirectResult(auth)).then(async result => {
-          if (result?.user) {
-              console.info('GOOGLE_REDIRECT_RESULT_USER', { uid: result.user.uid });
-              setFirebaseAuthUser(result.user);
-              await result.user.getIdToken(true);
-              console.info('LOGIN_FIREBASE_SUCCESS', { uid: result.user.uid, source: 'google-redirect' });
-              const committedUser = await completeFirebaseUserSession(result.user, { redirect: false, source: 'google-redirect', explicit: true });
-              if (!committedUser) {
-                  setAuthRestoreError('Google login could not be completed. Please try again.');
-                  return;
-              }
-              redirectAfterSuccessfulAuth({ source: 'google-redirect', user: committedUser, force: true });
-              return;
-          }
-          console.info('GOOGLE_REDIRECT_RESULT_NULL_WAIT_FOR_LISTENER');
+      void ensureAuthPersistence().then(() => {
+          console.info('AUTH_PERSISTENCE_READY_WAIT_FOR_LISTENER');
       }).catch(error => {
-          console.warn('Google redirect result handling failed.', error);
+          console.warn('Auth persistence setup failed.', error);
           setAuthRestoreError(getFirebaseAuthErrorMessage(error));
-          if (auth.currentUser) void completeFirebaseUserSession(auth.currentUser, { redirect: false, source: 'redirect-error-current-user' });
+          if (auth.currentUser) void completeFirebaseUserSession(auth.currentUser, { redirect: false, source: 'persistence-error-current-user' });
       }).finally(() => {
-          window.clearTimeout(redirectTimeout);
-          isRedirectResultPendingRef.current = false;
-          setIsRedirectResultPending(false);
           setIsAuthStateReady(true);
           if (!auth.currentUser && !committedFirebaseUidRef.current) setAuthStatus('unauthenticated');
       });
@@ -4144,7 +4124,7 @@ const App: React.FC = () => {
               return;
           }
 
-          if (isRedirectResultPendingRef.current || authOperationInProgressRef.current || committedFirebaseUidRef.current) {
+          if (googleFlowPendingRef.current || authOperationInProgressRef.current || committedFirebaseUidRef.current) {
               console.info('AUTH_NULL_IGNORED_DURING_PENDING_OPERATION');
               return;
           }
@@ -4166,7 +4146,6 @@ const App: React.FC = () => {
           localStorage.removeItem('currentAdminUser');
       });
       return () => {
-          window.clearTimeout(redirectTimeout);
           unsubscribe();
           stopSessionWatchers();
       };
@@ -4188,10 +4167,10 @@ const App: React.FC = () => {
 
   useEffect(() => {
       const effectiveFirebaseUser = isLocalLogoutPending ? null : (firebaseAuthUser || auth.currentUser);
-      if (isLocalLogoutPending || !isAuthStateReady || isRedirectResultPending || !effectiveFirebaseUser || currentView !== 'auth') return;
+      if (isLocalLogoutPending || !isAuthStateReady || !effectiveFirebaseUser || currentView !== 'auth') return;
       const effectiveAppUser = currentUser || createFallbackUserFromFirebase(effectiveFirebaseUser);
       redirectAfterSuccessfulAuth({ source: 'auth-page-existing-user', user: effectiveAppUser, force: true });
-  }, [isLocalLogoutPending, isAuthStateReady, isRedirectResultPending, firebaseAuthUser?.uid, auth.currentUser?.uid, currentUser?.id, currentView]);
+  }, [isLocalLogoutPending, isAuthStateReady, firebaseAuthUser?.uid, auth.currentUser?.uid, currentUser?.id, currentView]);
 
   const handleRetryAuthRestore = () => {
       const firebaseUser = auth.currentUser;
@@ -4205,77 +4184,116 @@ const App: React.FC = () => {
 
   const getFirebaseAuthErrorMessage = (error: any) => getFirebaseAuthErrorMessageFromCode(error);
 
-  const markGoogleRedirectAttempt = () => {
+  const resetGoogleFlowPending = () => {
+      googleFlowPendingRef.current = false;
+      if (googleFlowResetTimerRef.current !== null) {
+          window.clearTimeout(googleFlowResetTimerRef.current);
+          googleFlowResetTimerRef.current = null;
+      }
+      endAuthOperation();
+  };
+
+  const handleGoogleCredential = async (response: GoogleCredentialResponse): Promise<void> => {
+      const idToken = response?.credential;
+      const target = googleLoginTargetRef.current;
+      const source = target === 'admin' ? 'google-one-tap-admin' : 'google-one-tap';
       try {
-          sessionStorage.setItem(GOOGLE_REDIRECT_ATTEMPT_KEY, String(Date.now()));
-      } catch {
-          // Redirect marker is best-effort only.
+          if (!idToken) {
+              console.warn('Google One Tap returned no credential.');
+              setAuthError('Google sign-in did not return a credential. Please try again.');
+              return;
+          }
+          console.info('LOGIN_START', { source, stage: 'credential-received' });
+          beginAuthOperation();
+          await ensureAuthPersistence();
+          const googleCredential = GoogleAuthProvider.credential(idToken);
+          const userCredential = await signInWithCredential(auth, googleCredential);
+          await userCredential.user.getIdToken(true);
+          console.info('LOGIN_FIREBASE_SUCCESS', { uid: userCredential.user.uid, source });
+
+          if (target === 'admin') {
+              const result = await commitAdminSession(userCredential.user);
+              if (!result.success) setAuthError(result.message);
+              return;
+          }
+
+          const committedUser = await completeFirebaseUserSession(userCredential.user, { redirect: false, source, explicit: true });
+          if (!committedUser) {
+              setAuthError('Google login could not be completed. Please try again.');
+              return;
+          }
+          finishMobileAuthSuccess(committedUser);
+          redirectAfterSuccessfulAuth({ source, user: committedUser, force: true });
+      } catch (error: any) {
+          console.warn('Google One Tap credential exchange failed.', error);
+          setAuthError(getFirebaseAuthErrorMessage(error));
+      } finally {
+          resetGoogleFlowPending();
       }
   };
 
-  const consumeGoogleRedirectAttempt = () => {
-      try {
-          const value = sessionStorage.getItem(GOOGLE_REDIRECT_ATTEMPT_KEY);
-          sessionStorage.removeItem(GOOGLE_REDIRECT_ATTEMPT_KEY);
-          return Boolean(value);
-      } catch {
-          return false;
-      }
-  };
-
-  const shouldUseGoogleRedirect = () => {
-      const userAgent = navigator.userAgent || '';
-      const isSmallScreen = window.matchMedia?.('(max-width: 768px)').matches;
-      const isStandalone = window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone;
-      const isWebView = /wv|FBAN|FBAV|Instagram|Line|Twitter/i.test(userAgent);
-      return Boolean(isSmallScreen || isStandalone || isWebView);
-  };
-
-  const handleGoogleLogin = async (): Promise<{ success: boolean, message: string }> => {
+  const startGoogleAccountChooserFlow = async (target: GoogleLoginTarget): Promise<{ success: boolean, message: string }> => {
+      googleLoginTargetRef.current = target;
       setAuthError(null);
       setAuthRestoreError(null);
       beginAuthOperation();
-      try {
-          const source = 'google-popup';
-          console.info('LOGIN_START', { source, mobileRedirectFallbackAvailable: shouldUseGoogleRedirect() });
-          await ensureAuthPersistence();
-          const credential = await signInWithPopup(auth, googleProvider);
-          await credential.user.getIdToken(true);
-          console.info('LOGIN_FIREBASE_SUCCESS', { uid: credential.user.uid, source: 'google-popup' });
-          const committedUser = await completeFirebaseUserSession(credential.user, { redirect: false, source: 'google-popup', explicit: true });
-          if (committedUser) {
-              finishMobileAuthSuccess(committedUser);
-              redirectAfterSuccessfulAuth({ source: 'google-popup', user: committedUser, force: true });
-              return { success: true, message: 'Google login successful.' };
+      googleFlowPendingRef.current = true;
+      if (googleFlowResetTimerRef.current !== null) window.clearTimeout(googleFlowResetTimerRef.current);
+      googleFlowResetTimerRef.current = window.setTimeout(() => {
+          if (googleFlowPendingRef.current) resetGoogleFlowPending();
+      }, 180000);
+
+      const clientId = getGoogleClientId();
+      if (!clientId) {
+          resetGoogleFlowPending();
+          return { success: false, message: 'Google sign-in is not configured yet. Set VITE_GOOGLE_CLIENT_ID to your Google OAuth web client ID.' };
+      }
+      googleIdentityClientIdRef.current = clientId;
+
+      const startPrompt = (): boolean => {
+          const initialized = initializeGoogleIdentityServices({
+              clientId,
+              callback: response => void handleGoogleCredential(response),
+          });
+          if (!initialized) return false;
+
+          if (!googleChooserHostRef.current) {
+              googleChooserHostRef.current = mountGoogleAccountChooserHost();
+              renderGoogleAccountChooserButton(googleChooserHostRef.current);
           }
-          return { success: false, message: 'Login could not be completed. Please try again.' };
-      } catch (error: any) {
-          console.warn('Google login failed.', error);
-          const shouldFallbackToRedirect = [
-              'auth/popup-blocked',
-              'auth/cancelled-popup-request',
-              'auth/operation-not-supported-in-this-environment',
-          ].includes(error?.code) || (shouldUseGoogleRedirect() && error?.code !== 'auth/popup-closed-by-user');
-          if (shouldFallbackToRedirect) {
-              try {
-                  console.info('LOGIN_START', { source: 'google-redirect' });
-                  await ensureAuthPersistence();
-                  console.info('GOOGLE_REDIRECT_START');
-                  markGoogleRedirectAttempt();
-                  isRedirectResultPendingRef.current = true;
-                  setIsRedirectResultPending(true);
-                  await signInWithRedirect(auth, googleProvider);
-                  return { success: true, message: 'Opening Google login...' };
-              } catch (redirectError) {
-                  console.warn('Google redirect fallback failed.', redirectError);
-                  return { success: false, message: getFirebaseAuthErrorMessage(redirectError) };
+
+          promptGoogleOneTap(moment => {
+              if (moment?.type === 'skipped' || moment?.type === 'suppressed') {
+                  console.info('ONE_TAP_SKIPPED_FALLBACK_TO_ACCOUNT_CHOOSER', { type: moment.type });
+                  if (googleFlowPendingRef.current) triggerGoogleAccountChooser(googleChooserHostRef.current);
               }
+          });
+          return true;
+      };
+
+      if (isGoogleIdentityLoaded()) {
+          if (!startPrompt()) {
+              resetGoogleFlowPending();
+              return { success: false, message: 'Google sign-in could not start. Please try again.' };
           }
-          return { success: false, message: getFirebaseAuthErrorMessage(error) };
-      } finally {
-          if (auth.currentUser || !isRedirectResultPendingRef.current) endAuthOperation();
+          return { success: true, message: 'Choose your Google account to continue.' };
+      }
+
+      try {
+          await loadGoogleIdentityServices();
+          if (!startPrompt()) {
+              resetGoogleFlowPending();
+              return { success: false, message: 'Google sign-in could not start. Please try again.' };
+          }
+          return { success: true, message: 'Choose your Google account to continue.' };
+      } catch (error: any) {
+          console.warn('Google Identity Services failed to load.', error);
+          resetGoogleFlowPending();
+          return { success: false, message: 'Google sign-in could not start. Please try again.' };
       }
   };
+
+  const handleGoogleLogin = async (): Promise<{ success: boolean, message: string }> => startGoogleAccountChooserFlow('user');
 
   const handleEmailLogin = async (email: string, password: string): Promise<{ success: boolean, message: string }> => {
       beginAuthOperation();
@@ -6315,47 +6333,7 @@ const App: React.FC = () => {
     }
   };
 
-  const handleAdminGoogleLogin = async (): Promise<{ success: boolean; message: string }> => {
-    setAuthError(null);
-    setAuthRestoreError(null);
-    beginAuthOperation();
-    try {
-      const source = 'admin-google-popup';
-      console.info('ADMIN_LOGIN_START', { source });
-      await ensureAuthPersistence();
-      const credential = await signInWithPopup(auth, googleProvider);
-      await credential.user.getIdToken(true);
-      console.info('ADMIN_LOGIN_FIREBASE_SUCCESS', { uid: credential.user.uid, source });
-      const result = await commitAdminSession(credential.user);
-      if (!result.success) return result;
-      return { success: true, message: 'Admin Google login successful.' };
-    } catch (error: any) {
-      console.warn('Admin Google login failed.', error);
-      const shouldFallbackToRedirect = [
-        'auth/popup-blocked',
-        'auth/cancelled-popup-request',
-        'auth/operation-not-supported-in-this-environment',
-      ].includes(error?.code) || (shouldUseGoogleRedirect() && error?.code !== 'auth/popup-closed-by-user');
-      if (shouldFallbackToRedirect) {
-        try {
-          console.info('ADMIN_LOGIN_START', { source: 'admin-google-redirect' });
-          await ensureAuthPersistence();
-          console.info('ADMIN_GOOGLE_REDIRECT_START');
-          markGoogleRedirectAttempt();
-          isRedirectResultPendingRef.current = true;
-          setIsRedirectResultPending(true);
-          await signInWithRedirect(auth, googleProvider);
-          return { success: true, message: 'Opening Google login...' };
-        } catch (redirectError) {
-          console.warn('Admin Google redirect fallback failed.', redirectError);
-          return { success: false, message: getFirebaseAuthErrorMessage(redirectError) };
-        }
-      }
-      return { success: false, message: getFirebaseAuthErrorMessage(error) };
-    } finally {
-      if (auth.currentUser || !isRedirectResultPendingRef.current) endAuthOperation();
-    }
-  };
+  const handleAdminGoogleLogin = async (): Promise<{ success: boolean; message: string }> => startGoogleAccountChooserFlow('admin');
 
   const handleAdminSwitchToHome = () => {
     setCurrentView('home');
@@ -6757,7 +6735,7 @@ const App: React.FC = () => {
     const isSignedOut = !isAuthChecking && !hasFirebaseUser;
     const protectedViews = new Set(['profile', 'myPurchases', 'coursePlayer']);
     const requiresAuthForView = protectedViews.has(currentView);
-    console.info('AUTH_GATE_DECISION', { isLoggedIn, hasFirebaseUser, hasAppUser: Boolean(effectiveAppUser), currentView, isMobileViewport, authStatus, isRedirectResultPending });
+    console.info('AUTH_GATE_DECISION', { isLoggedIn, hasFirebaseUser, hasAppUser: Boolean(effectiveAppUser), currentView, isMobileViewport, authStatus });
     if (isAuthChecking && requiresAuthForView) return renderMobileSessionStatus('Checking session…', 'Please wait while we securely check your login status.');
     if (currentView === 'auth' && !hasFirebaseUser) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onAdminGoogleLogin={handleAdminGoogleLogin} onAdminEmailLogin={handleAdminEmailLogin} onBack={handleBackFromAuth} /></div>;
     if (isSignedOut && requiresAuthForView) return <div key="auth" className={appleOpenClass}><AuthPage settings={websiteSettings} initialMode={rememberedAuthAccount ? 'login' : authInitialMode} rememberedAccount={rememberedAuthAccount} onForgetRememberedAccount={() => { clearRememberedAuthAccount(); setRememberedAuthAccount(null); }} onGoogleLogin={handleGoogleLogin} onEmailLogin={handleEmailLogin} onEmailSignup={handleEmailSignup} onPasswordReset={handlePasswordReset} onAdminGoogleLogin={handleAdminGoogleLogin} onAdminEmailLogin={handleAdminEmailLogin} onBack={handleBackFromAuth} /></div>;

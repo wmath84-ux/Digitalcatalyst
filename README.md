@@ -68,11 +68,14 @@ Digital Catalyst is configured as an installable PWA. To test installability aft
 
 ## Firebase Google login setup
 
-To use the in-app **Continue with Google** authentication flow:
+To use the in-app **Continue with Google** authentication flow (Google One Tap with a native bottom sheet account picker):
 
 - Open **Firebase Console → Authentication → Sign-in method → Google** and enable the Google provider.
 - Add a support email for the Firebase project.
 - Add authorized domains for production and local development, such as your deployed domain and `localhost`.
+- Copy the **OAuth 2.0 "Web application" client ID** from **Google Cloud Console → APIs & Services → Credentials** (the web client tied to the Firebase project) and set it as `VITE_GOOGLE_CLIENT_ID` in your environment / `.env` file.
 - Deploy after the Firebase environment/configuration is correct.
+
+The client loads Google Identity Services and opens the account picker as a native-looking bottom sheet over the current page, without navigating away or opening a new window. The returned ID token is exchanged with Firebase (`signInWithCredential`) to restore purchases and profile data.
 
 The app stores only safe profile metadata in Firestore (`users/{uid}`); passwords and Google credentials/tokens are never written to Firestore or localStorage.
