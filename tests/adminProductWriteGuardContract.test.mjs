@@ -76,7 +76,7 @@ test('admin product writes run through the Firestore write guard before setDoc/d
   assert.match(appSource, /publishProductToFirebase\(updatedProduct, 'update'\)/);
   assert.match(appSource, /writeDiagnostics = await requireAdminFirestoreWriteAccess\('delete'\);/);
   // The guard must run before the writes, not after.
-  const publishBody = appSource.match(/const publishProductToFirebase[\s\S]*?return \{ product: normalizedProduct, diagnostics \};\n  \};/);
+  const publishBody = appSource.match(/const publishProductToFirebase[\s\S]*?return \{ product: publishableProduct, diagnostics \};\n  \};/);
   assert.ok(publishBody, 'publishProductToFirebase body not found');
   assert.ok(
     publishBody[0].indexOf('requireAdminFirestoreWriteAccess(action)') < publishBody[0].indexOf('await setDoc('),

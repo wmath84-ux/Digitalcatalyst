@@ -137,6 +137,7 @@ import {
   describeAdminProductWriteError,
   type AdminFirestoreWriteDiagnostics,
 } from './utils/adminFirestoreGuard';
+import { describeOversizeProductDocument, offloadProductEmbeddedData } from './utils/productFirestoreDoc';
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
 // Admin Firestore writes (products) additionally run through ensureAdminFirestoreWriteAccess,
 // which verifies a real, fresh Firebase Auth admin credential exists before every write and
@@ -6333,12 +6334,32 @@ const App: React.FC = () => {
   const publishProductToFirebase = async (product: Product, action: 'add' | 'update'): Promise<{ product: Product; diagnostics: AdminFirestoreWriteDiagnostics }> => {
       const normalizedProduct = normalizeProductArrays(product);
       const diagnostics = await requireAdminFirestoreWriteAccess(action);
+      // Firestore rejects documents over 1 MiB. Embedded base64 media (small
+      // inline uploads, legacy data URLs) silently grows the product document
+      // past that limit, so offload those payloads to Firebase Storage and
+      // rewrite them as https URLs before writing the document.
+      const offloadResult = await offloadProductEmbeddedData(normalizedProduct, String(normalizedProduct.id));
+      if (offloadResult.offloadedCount > 0) {
+          console.info('ADMIN_PRODUCT_EMBEDDED_MEDIA_OFFLOADED', {
+              productId: normalizedProduct.id,
+              action,
+              offloadedCount: offloadResult.offloadedCount,
+              offloadedBytes: offloadResult.offloadedBytes,
+          });
+      }
+      const publishableProduct = offloadResult.product as Product;
+      const payload = stripUndefinedDeep(publishableProduct);
+      const oversizeMessage = describeOversizeProductDocument(payload);
+      if (oversizeMessage) {
+          console.error('ADMIN_PRODUCT_DOC_TOO_LARGE', { productId: normalizedProduct.id, action, oversizeMessage });
+          throw new Error(oversizeMessage);
+      }
       await setDoc(
           doc(db, GLOBAL_PRODUCTS_COLLECTION, String(normalizedProduct.id)),
-          stripUndefinedDeep(normalizedProduct),
+          payload,
           { merge: false }
       );
-      return { product: normalizedProduct, diagnostics };
+      return { product: publishableProduct, diagnostics };
   };
 
   // Product CRUD is Firebase-first. Local cache is only a fallback mirror.

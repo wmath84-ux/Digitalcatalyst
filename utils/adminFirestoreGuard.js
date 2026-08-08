@@ -127,6 +127,20 @@ export const describeAdminProductWriteError = (error, action, diagnostics = null
     return error.message;
   }
 
+  if (typeof error?.message === 'string' && error.message.startsWith('PRODUCT_DOC_TOO_LARGE')) {
+    return error.message;
+  }
+
+  if (code === 'invalid-argument' && /exceeds the maximum allowed size/.test(raw)) {
+    return (
+      `This product is too large for a single Firestore document (1 MiB hard limit).${identity}\n\n` +
+      `Exact Firebase error: ${raw}\n\n` +
+      'The app now offloads embedded images/files to Firebase Storage automatically before saving, so this ' +
+      'only happens when the document is still oversized (very long text content). Shorten the largest ' +
+      'text fields or split the content into multiple products/modules, then save again.'
+    );
+  }
+
   if (code === 'permission-denied') {
     return (
       `Firestore security rules rejected the product ${actionLabel} (permission-denied).${identity}\n\n` +

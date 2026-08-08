@@ -36,3 +36,9 @@
 - Refresh and reopen the product.
 - Confirm the audio item is still listed and its `url` is a Firebase Storage download URL, not a `data:` base64 URL.
 - Open the purchased course player and confirm the audio is visible/playable.
+
+## Production follow-up — Firestore 1 MiB document limit (fixed)
+
+After security rules were deployed, the exact-error reporting surfaced the next production failure: updating an existing product returned `[invalid-argument] Document 'siteProducts/1782545401609' cannot be written because its size (1,234,076 bytes) exceeds the maximum allowed size of 1,048,576 bytes`. Cause: embedded base64 "data:" payloads (small inline uploads + legacy localStorage-era URLs) inside the single product document silently pushed it over Firestore's hard 1 MiB per-document limit.
+
+Fix (`utils/productFirestoreDoc.js`, wired into `publishProductToFirebase`): before every product add/update, any embedded data-URL payload needed to fit the 900KB save budget is uploaded to Firebase Storage (`adminProductImages/{id}/embedded/` or `adminProductContent/{type}/{id}/` — the existing admin-only/public-read rule scopes) and rewritten to the https download URL. `describeOversizeProductDocument` remains as the final guard and names the largest fields when a document is genuinely oversized. Console markers: `ADMIN_PRODUCT_OFFLOAD_STARTED/SUCCESS/COMPLETE`, `ADMIN_PRODUCT_EMBEDDED_MEDIA_OFFLOADED`, `ADMIN_PRODUCT_DOC_TOO_LARGE`. Tests: `tests/productDocSizeOffloadContract.test.mjs`.
