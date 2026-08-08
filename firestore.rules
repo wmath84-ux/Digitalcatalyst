@@ -8,10 +8,23 @@ service cloud.firestore {
         && request.auth.token.email != null
         && request.auth.token.email.lower() == 'wmath84@gmail.com';
     }
-    function isAdmin() {
-      return isPrimaryAdminEmail()
+    // Role-based admin check: the users/{uid} role document can only be granted
+    // by an existing admin (see /users rules: owner create forces role == 'user'
+    // and owner updates cannot touch role), so this is a secure server-side gate.
+    function hasAdminUserRecord() {
+      return signedIn()
         && exists(/databases/$(database)/documents/users/$(request.auth.uid))
         && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'];
+    }
+    // Custom claims can only be set by trusted server code (Firebase Admin SDK),
+    // making this a second, equally secure admin signal for token-level admin.
+    function hasAdminCustomClaim() {
+      return signedIn() && request.auth.token.admin == true;
+    }
+    function isAdmin() {
+      return hasAdminUserRecord()
+        || hasAdminCustomClaim()
+        || isPrimaryAdminEmail();
     }
     function protectedUserFieldsUnchanged() {
       return !request.resource.data.diff(resource.data).affectedKeys().hasAny(['role', 'status', 'purchasedProductIds']);
