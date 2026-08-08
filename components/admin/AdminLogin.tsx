@@ -1,6 +1,7 @@
-
 import React, { useState } from 'react';
 import { WebsiteSettings } from '../../App';
+import { auth } from '../../firebase';
+import { fetchSignInMethodsForEmail } from 'firebase/auth';
 
 interface AdminLoginProps {
     settings: WebsiteSettings;
@@ -15,15 +16,60 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ settings, onLogin, onBack }) =>
     const [error, setError] = useState('');
     const [isSubmitting, setIsSubmitting] = useState(false);
 
-      const handleSubmit = async (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError('');
         setIsSubmitting(true);
 
+        const normalizedEmail = email.trim().toLowerCase();
+
         try {
-            const success = await onLogin(email, password);
+            // Diagnostic preflight: verify that this email exists in the Firebase project
+            // configured by firebase.ts and that Email/Password is an available provider.
+            // This does not change Firebase data and does not replace the real sign-in call.
+            try {
+                const providers = await fetchSignInMethodsForEmail(auth, normalizedEmail);
+                if (providers.length === 0) {
+                    setError('Firebase Auth: this email has no sign-in provider in the configured project. Check Firebase Authentication > Users and confirm this account exists in project my-website-761e9.');
+                    return;
+                }
+                if (!providers.includes('password')) {
+                    setError(`Firebase Auth: this email exists, but Email/Password is not linked to it. Available provider: ${providers.join(', ')}.`);
+                    return;
+                }
+            } catch (diagnosticError: any) {
+                const code = typeof diagnosticError?.code === 'string' ? diagnosticError.code : '';
+                console.error('ADMIN_AUTH_PROVIDER_DIAGNOSTIC_FAILED', diagnosticError);
+                if (code === 'auth/operation-not-allowed') {
+                    setError('Firebase Auth: Email/Password sign-in is disabled for this Firebase project. Enable it in Authentication > Sign-in method.');
+                    return;
+                }
+                if (code === 'auth/invalid-email') {
+                    setError('Firebase Auth: the email address is invalid.');
+                    return;
+                }
+                if (code === 'auth/network-request-failed') {
+                    setError('Firebase Auth: the Firebase Auth network request failed. Check your connection and try again.');
+                    return;
+                }
+                // If Firebase hides account enumeration, continue to the real sign-in.
+            }
+
+            const success = await onLogin(normalizedEmail, password);
             if (!success) {
-                setError('Incorrect admin credentials or missing Firebase admin role.');
+                setError('Firebase sign-in completed, but admin verification failed. Confirm this is wmath84@gmail.com and that users/{Firebase UID}.role is admin or super_admin.');
+            }
+        } catch (loginError: any) {
+            const code = typeof loginError?.code === 'string' ? loginError.code : '';
+            console.error('ADMIN_AUTH_LOGIN_FAILED', loginError);
+            if (code === 'auth/invalid-credential' || code === 'auth/wrong-password') {
+                setError('Firebase Auth rejected this email/password for the configured project. Reset the Firebase Auth password and try again.');
+            } else if (code === 'auth/user-not-found') {
+                setError('Firebase Auth: no account exists for this email in the configured project.');
+            } else if (code === 'auth/user-disabled') {
+                setError('Firebase Auth: this account is disabled.');
+            } else {
+                setError(`Firebase Auth error${code ? ` (${code})` : ''}. Check the browser console for ADMIN_AUTH_LOGIN_FAILED.`);
             }
         } finally {
             setIsSubmitting(false);
@@ -71,7 +117,7 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ settings, onLogin, onBack }) =>
                                 {showPassword ? (
                                     <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M3.98 8.223A10.477 10.477 0 001.934 12c1.292 4.338 5.31 7.507 10.066 7.507.993 0 1.953-.138 2.863-.395M6.228 6.228A10.45 10.45 0 0112 4.5c4.756 0 8.773 3.162 10.065 7.498a10.523 10.523 0 01-4.293 5.774M6.228 6.228L3 3m3.228 3.228l3.65 3.65m7.894 7.894L21 21m-3.228-3.228l-3.65-3.65m0 0a3 3 0 10-4.243-4.243m4.242 4.242L9.88 9.88" /></svg>
                                 ) : (
-                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z" /><path strokeLinecap="round" strokeLinejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2} viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178a10.523 10.523 0 010 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573 3.007-9.963 7.178z" /></svg>
                                 )}
                             </button>
                         </div>
@@ -83,7 +129,6 @@ const AdminLogin: React.FC<AdminLoginProps> = ({ settings, onLogin, onBack }) =>
                         <button
                             type="submit"
                             className="w-full bg-gradient-to-r from-slate-950 via-blue-900 to-indigo-800 text-white font-black px-8 py-3 rounded-xl shadow-[0_14px_34px_rgba(30,64,175,0.22)] hover:opacity-90 transition-all duration-300"
-
                             disabled={isSubmitting}
                         >
                             {isSubmitting ? 'Checking…' : 'Login'}
