@@ -2849,23 +2849,21 @@ const CoursePlayer: React.FC<{
       </main>
 
       {isMentorOpen && (
-        <div className="fixed inset-0 z-50 flex flex-col bg-white" aria-label="AI Mentor overlay">
-          <CoursePlayerHeader
-            currentUser={currentUser}
-            className="course-player-synergy-header shrink-0 rounded-none border-b border-[#1A2B4C]/8 shadow-[0_10px_30px_rgba(26,43,76,0.06)] lg:hidden"
+        <div
+          className="fixed inset-0 z-50 flex min-h-0 flex-col overflow-hidden bg-white"
+          aria-label="AI Mentor chat"
+          style={{ height: '100dvh' }}
+        >
+          <AiMentor
+            productTitle={product.title}
+            productId={product.id}
+            courseId={product.id}
+            activeFileId={activeFile?.id || null}
+            activeFileType={activeFile?.type || null}
+            activeContentName={activeFile?.name || null}
+            userId={currentUserId}
+            onClose={closeCourseMentor}
           />
-          <div className="min-h-0 flex-1">
-            <AiMentor
-              productTitle={product.title}
-              productId={product.id}
-              courseId={product.id}
-              activeFileId={activeFile?.id || null}
-              activeFileType={activeFile?.type || null}
-              activeContentName={activeFile?.name || null}
-              userId={currentUserId}
-              onClose={closeCourseMentor}
-            />
-          </div>
         </div>
       )}
 

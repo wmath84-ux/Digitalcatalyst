@@ -128,6 +128,36 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, pr
     const [settingsNotice, setSettingsNotice] = useState('');
     const [isTestingConnection, setIsTestingConnection] = useState(false);
     const chatContainerRef = useRef<HTMLDivElement>(null);
+    const [mobileViewportHeight, setMobileViewportHeight] = useState<number | null>(null);
+
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const viewport = window.visualViewport;
+        if (!viewport) return;
+
+        let frame = 0;
+        const updateViewport = () => {
+            if (frame) window.cancelAnimationFrame(frame);
+            frame = window.requestAnimationFrame(() => {
+                const nextHeight = Math.max(320, Math.floor(viewport.height || window.innerHeight));
+                setMobileViewportHeight(previous => previous === nextHeight ? previous : nextHeight);
+            });
+        };
+
+        updateViewport();
+        window.addEventListener('resize', updateViewport);
+        window.addEventListener('orientationchange', updateViewport);
+        viewport.addEventListener('resize', updateViewport);
+        viewport.addEventListener('scroll', updateViewport);
+
+        return () => {
+            if (frame) window.cancelAnimationFrame(frame);
+            window.removeEventListener('resize', updateViewport);
+            window.removeEventListener('orientationchange', updateViewport);
+            viewport.removeEventListener('resize', updateViewport);
+            viewport.removeEventListener('scroll', updateViewport);
+        };
+    }, []);
 
     useEffect(() => {
         const saved = localStorage.getItem(storageKey);
@@ -301,53 +331,90 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, pr
     };
 
     const historyPanel = (
-        <div className="flex min-h-0 flex-1 flex-col p-4">
-            <button onClick={createNewChat} className="rounded-2xl border border-slate-200 bg-white px-4 py-3 text-left font-black text-slate-900 transition hover:bg-slate-50 hover:shadow-sm">＋ New chat</button>
-            <div className="mt-4 flex-1 space-y-2 overflow-y-auto pr-1">
-                {sessions.map(session => (
-                    <button
-                        key={session.id}
-                        onClick={() => {
-                            setActiveSessionId(session.id);
-                            if (typeof window !== 'undefined' && window.innerWidth < 768) setIsHistoryOpen(false);
-                        }}
-                        className={`w-full rounded-2xl border px-4 py-3 text-left transition ${session.id === activeSession?.id ? 'border-cyan-200 bg-cyan-50 text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)]' : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50 hover:shadow-sm'}`}
-                    >
-                        <span className="block truncate text-sm font-black">{session.title}</span>
-                        <span className="mt-1 block text-xs text-slate-600/70">{new Date(session.updatedAt).toLocaleDateString()}</span>
-                    </button>
-                ))}
+        <div className="flex min-h-0 flex-1 flex-col bg-white">
+            <div className="border-b border-slate-200 px-4 py-4 sm:px-5">
+                <button
+                    onClick={createNewChat}
+                    className="flex w-full items-center justify-center rounded-xl border border-slate-300 bg-white px-4 py-3 text-sm font-semibold text-slate-900 transition hover:bg-slate-50 active:scale-[0.99]"
+                >
+                    + New chat
+                </button>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto px-2 py-2">
+                <p className="px-3 py-2 text-xs font-semibold text-slate-500">Chats</p>
+                <div className="space-y-0.5">
+                    {sessions.map(session => (
+                        <button
+                            key={session.id}
+                            onClick={() => {
+                                setActiveSessionId(session.id);
+                                if (typeof window !== 'undefined' && window.innerWidth < 768) setIsHistoryOpen(false);
+                            }}
+                            className={`w-full rounded-lg px-3 py-3 text-left transition ${
+                                session.id === activeSession?.id
+                                    ? 'bg-slate-100 text-slate-950'
+                                    : 'bg-white text-slate-700 hover:bg-slate-50'
+                            }`}
+                        >
+                            <span className="block truncate text-sm font-medium">{session.title}</span>
+                        </button>
+                    ))}
+                </div>
             </div>
         </div>
     );
 
-    return (
-        <div className="relative flex h-full min-h-0 overflow-hidden rounded-[1.25rem] border border-white bg-white text-slate-900 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:rounded-[1.75rem]">
-            <div onClick={() => setIsHistoryOpen(false)} className={`absolute inset-0 z-20 bg-slate-950/30 backdrop-blur-sm transition-opacity md:hidden ${isHistoryOpen ? 'opacity-100' : 'pointer-events-none opacity-0'}`} aria-hidden="true" />
 
-            <aside className={`${isHistoryOpen ? 'translate-x-0' : '-translate-x-full'} absolute inset-y-0 left-0 z-30 flex w-[min(86vw,18rem)] flex-col overflow-hidden border-r border-slate-200 bg-white shadow-[16px_0_45px_rgba(15,23,42,0.16)] transition-transform duration-300 md:relative md:z-auto md:block md:shrink-0 md:translate-x-0 md:shadow-none ${isHistoryOpen ? 'md:w-72' : 'md:w-0'}`}>
-                <div className="flex items-center justify-between border-b border-slate-200 bg-white px-4 py-3 md:hidden">
-                    <span className="text-sm font-black uppercase tracking-[0.2em] text-cyan-700/80">Chats</span>
-                    <button onClick={() => setIsHistoryOpen(false)} className="rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-900">Close</button>
-                </div>
+    return (
+        <div
+            className="relative flex min-h-0 w-full flex-1 overflow-hidden bg-white text-slate-900"
+            style={mobileViewportHeight ? { height: `${mobileViewportHeight}px` } : undefined}
+        >
+            <div
+                onClick={() => setIsHistoryOpen(false)}
+                className={`absolute inset-0 z-20 bg-slate-950/20 transition-opacity md:hidden ${
+                    isHistoryOpen ? 'opacity-100' : 'pointer-events-none opacity-0'
+                }`}
+                aria-hidden="true"
+            />
+
+            <aside
+                className={`${isHistoryOpen ? 'translate-x-0' : '-translate-x-full'} absolute inset-y-0 left-0 z-30 flex w-[min(86vw,20rem)] flex-col overflow-hidden border-r border-slate-200 bg-white shadow-[16px_0_45px_rgba(15,23,42,0.12)] transition-transform duration-200 md:relative md:z-auto md:block md:shrink-0 md:translate-x-0 md:shadow-none md:w-72`}
+                aria-label="Chats"
+            >
                 {historyPanel}
             </aside>
 
-            <section className="flex min-w-0 flex-1 flex-col">
-                <header className="flex shrink-0 items-center gap-2 border-b border-slate-200 bg-white px-3 py-2.5 sm:gap-3 sm:px-4 sm:py-3">
-                    <button onClick={() => setIsHistoryOpen(value => !value)} className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 font-black text-slate-900 transition hover:bg-slate-50 hover:shadow-sm" aria-label="Open mentor chat history">☰</button>
-                    <div className="min-w-0 flex-1">
-                        <p className="truncate text-[10px] font-black uppercase tracking-[0.2em] text-cyan-700/80 sm:text-xs sm:tracking-[0.32em]">Dedicated AI Workspace</p>
-                        <h2 className="truncate text-base font-black text-slate-900 sm:text-xl">AI Mentor · {activeContentName || productTitle}</h2>
-                    </div>
-                    <button onClick={() => { setSettingsDraft(readLocalAiSettings()); setSettingsNotice(''); setIsSettingsOpen(true); }} aria-label="AI settings" title="AI Settings" className="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-violet-200 bg-violet-50 text-violet-700 shadow-[0_8px_24px_rgba(123,97,255,0.16)] transition hover:-translate-y-0.5 hover:bg-violet-100 focus:outline-none focus:ring-2 focus:ring-violet-500/50 active:translate-y-0 sm:h-11 sm:w-11 sm:rounded-2xl">⚙</button>
-                    {onClose && <button onClick={onClose} aria-label="Close AI Mentor" className="shrink-0 rounded-xl border border-slate-200 bg-white px-3 py-2 text-sm font-black text-slate-900 transition hover:bg-slate-50 hover:shadow-sm sm:rounded-2xl sm:px-4 sm:text-base"><span className="sm:hidden">×</span><span className="hidden sm:inline">Close</span></button>}
+            <section className="flex min-w-0 min-h-0 flex-1 flex-col bg-white">
+                <header className="flex shrink-0 items-center justify-between border-b border-slate-200 bg-white px-4 py-3">
+                    <button
+                        onClick={() => setIsHistoryOpen(value => !value)}
+                        className="rounded-lg px-2 py-1 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+                        aria-label="Open chats"
+                    >
+                        Chat
+                    </button>
+                    <button
+                        onClick={createNewChat}
+                        className="rounded-lg px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100"
+                    >
+                        New chat
+                    </button>
                 </header>
 
-                <div ref={chatContainerRef} className="flex-1 space-y-4 overflow-y-auto px-3 py-4 sm:space-y-5 sm:px-4 sm:py-5 md:px-8">
+                <div
+                    ref={chatContainerRef}
+                    className="flex-1 min-h-0 space-y-4 overflow-y-auto px-4 py-5 sm:px-5"
+                >
                     {messages.map((msg, index) => (
                         <div key={`${msg.createdAt}-${index}`} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            <div className={`max-w-[92%] overflow-hidden rounded-[1.25rem] border p-3 shadow-[0_8px_30px_rgb(0,0,0,0.04)] sm:max-w-3xl sm:rounded-[1.5rem] sm:p-4 ${msg.sender === 'user' ? 'border-cyan-200 bg-cyan-50 text-slate-900' : 'border-slate-200 bg-white text-slate-900'}`}>
+                            <div
+                                className={`max-w-[92%] overflow-hidden rounded-2xl px-3 py-2.5 text-[15px] leading-6 sm:max-w-3xl ${
+                                    msg.sender === 'user'
+                                        ? 'bg-slate-100 text-slate-900'
+                                        : 'bg-transparent text-slate-900'
+                                }`}
+                            >
                                 <MarkdownMessage text={msg.text} />
                             </div>
                         </div>
@@ -355,48 +422,31 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, pr
                     {isChatLoading && <TypingIndicator />}
                 </div>
 
-
-
-                {isSettingsOpen && <div className="absolute inset-0 z-50 flex items-end justify-center bg-slate-950/35 p-3 backdrop-blur-sm sm:items-center" role="dialog" aria-modal="true" aria-label="AI settings panel">
-                    <div className="w-full max-w-lg rounded-[1.5rem] border border-violet-100 bg-white p-4 text-slate-900 shadow-2xl sm:p-5">
-                        <div className="flex items-center justify-between gap-3">
-                            <div><p className="text-xs font-black uppercase tracking-[0.28em] text-violet-700">AI Settings</p><h3 className="text-xl font-black">Custom API key</h3></div>
-                            <button onClick={() => setIsSettingsOpen(false)} className="h-10 w-10 rounded-2xl border border-slate-200 font-black" aria-label="Close AI settings">×</button>
-                        </div>
-                        <div className="mt-4 rounded-2xl border border-violet-100 bg-violet-50 p-3 text-sm font-bold text-violet-900">Status: {aiSettings.apiKey ? aiSettings.status === 'invalid' ? 'Key invalid' : `Custom key active (${maskKey(aiSettings.apiKey)})` : 'Using default AI / no custom key added'}</div>
-                        <div className="mt-4 grid gap-3">
-                            <label className="text-sm font-black">Provider<select value={settingsDraft.provider} onChange={e => setSettingsDraft(v => ({ ...v, provider: e.target.value as AiProvider, model: e.target.value === 'openai' ? 'gpt-4o-mini' : 'gemini-2.5-flash' }))} className="mt-1 w-full rounded-2xl border border-slate-200 p-3"><option value="gemini">Gemini</option><option value="openai">OpenAI</option></select></label>
-                            <label className="text-sm font-black">Model<input value={settingsDraft.model} onChange={e => setSettingsDraft(v => ({ ...v, model: e.target.value }))} className="mt-1 w-full rounded-2xl border border-slate-200 p-3" placeholder="gemini-2.5-flash" /></label>
-                            <label className="text-sm font-black">API key<input value={settingsDraft.apiKey} onChange={e => setSettingsDraft(v => ({ ...v, apiKey: e.target.value }))} type="password" autoComplete="off" className="mt-1 w-full rounded-2xl border border-slate-200 p-3" placeholder="Paste your own key" /></label>
-                            <label className="flex items-center gap-2 text-sm font-bold"><input type="checkbox" checked={settingsDraft.useDefaultFallback} onChange={e => setSettingsDraft(v => ({ ...v, useDefaultFallback: e.target.checked }))} /> Use default app AI if custom key fails</label>
-                        </div>
-                        <p className="mt-3 text-xs font-semibold leading-5 text-slate-600">Privacy note: your custom key is stored only in this browser's local storage, never in Firebase chat documents, logs, or analytics. Clear it before sharing this device.</p>
-                        {settingsNotice && <p className="mt-3 rounded-2xl bg-slate-100 p-3 text-sm font-bold text-slate-800">{settingsNotice}</p>}
-                        <div className="mt-4 flex flex-wrap gap-2">
-                            <button onClick={() => { const next = { ...settingsDraft, status: settingsDraft.apiKey ? 'custom' as const : 'default' as const }; localStorage.setItem(localSettingsKey, JSON.stringify(next)); setAiSettings(next); setSettingsDraft(next); setSettingsNotice(`Saved locally. ${next.apiKey ? maskKey(next.apiKey) : 'Using default AI.'}`); }} className="rounded-2xl bg-violet-600 px-4 py-3 font-black text-white">Save key</button>
-                            <button disabled={isTestingConnection || !settingsDraft.apiKey} onClick={async () => { setIsTestingConnection(true); setSettingsNotice('Testing connection…'); try { await callCustomAi('Reply with: connection successful', '', settingsDraft); setSettingsNotice('Connection successful.'); } catch { setSettingsNotice('Invalid key or provider unavailable.'); } finally { setIsTestingConnection(false); } }} className="rounded-2xl border border-violet-200 px-4 py-3 font-black text-violet-700 disabled:opacity-50">Test connection</button>
-                            <button onClick={() => { localStorage.removeItem(localSettingsKey); setAiSettings(defaultSettings); setSettingsDraft(defaultSettings); setSettingsNotice('Custom key cleared. Default app AI will be used when available.'); }} className="rounded-2xl border border-rose-200 px-4 py-3 font-black text-rose-700">Clear key</button>
-                        </div>
-                    </div>
-                </div>}
-
-                <footer className="shrink-0 border-t border-slate-200 bg-white p-2.5 sm:p-4">
-                    <div className="flex gap-2 rounded-2xl border border-slate-200 bg-slate-50 p-2 shadow-inner sm:gap-3 sm:rounded-3xl">
+                <footer className="shrink-0 border-t border-slate-200 bg-white px-3 py-3 sm:px-4">
+                    <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-2 py-1.5 shadow-sm">
                         <input
                             type="text"
                             value={chatInput}
                             onChange={(e) => setChatInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                            placeholder="Ask for a summary, quiz, explanation, or study plan..."
-                            className="min-w-0 flex-1 bg-transparent px-3 py-3 text-sm text-slate-900 outline-none placeholder:text-slate-600/60 sm:px-4 sm:text-base"
+                            placeholder="Write a message..."
+                            aria-label="Write a message"
+                            className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-slate-900 outline-none placeholder:text-slate-400"
                             disabled={isChatLoading}
                         />
-                        <button onClick={handleSendMessage} disabled={isChatLoading || !chatInput.trim()} className="shrink-0 rounded-2xl bg-cyan-200 px-4 py-3 text-sm font-black text-slate-900 transition hover:-translate-y-0.5 hover:bg-cyan-50 disabled:cursor-not-allowed disabled:opacity-50 sm:px-6 sm:text-base">Send</button>
+                        <button
+                            onClick={handleSendMessage}
+                            disabled={isChatLoading || !chatInput.trim()}
+                            className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
+                        >
+                            Send
+                        </button>
                     </div>
                 </footer>
             </section>
         </div>
     );
+
 };
 
 export default AiMentor;
