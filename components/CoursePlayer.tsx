@@ -9,6 +9,7 @@ import {
   startWatchSession,
 } from '../utils/coinWallet';
 import AiMentor from './AiMentor';
+import { collectCourseKnowledgeItems } from '../utils/aiCourseContext';
 import ProductMusicPlayer, { type AudioTrack } from './ProductMusicPlayer';
 import { doc, getDoc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
@@ -936,6 +937,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   const [isPageFlipped, setIsPageFlipped] = useState(false);
   const [flipDirection, setFlipDirection] = useState<-1 | 1>(-1);
   const [incomingPageId, setIncomingPageId] = useState('');
+  const [isFlipSettling, setIsFlipSettling] = useState(false);
   const pageShellRef = useRef<HTMLDivElement>(null);
   const swipeStartXRef = useRef<number | null>(null);
   const swipeStartYRef = useRef<number | null>(null);
@@ -1206,10 +1208,16 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
       setIncomingPageId(pages[nextIndex]?.id || activePageId);
       setIsPageFlipped(true);
       window.setTimeout(() => {
+        // Commit the swap with transitions suppressed so the front paper snaps
+        // to identity instantly instead of re-animating back from the flip.
+        setIsFlipSettling(true);
         setActivePageId(pages[nextIndex]?.id || activePageId);
         setIsPageFlipped(false);
         setIncomingPageId('');
-      }, 360);
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => setIsFlipSettling(false));
+        });
+      }, 620);
     }
 
     setDragOffset(0);
@@ -1218,25 +1226,36 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
   };
 
 
-  const paperBackground = hasRuledLines
-    ? `repeating-linear-gradient(to bottom, transparent 0, transparent 30px, rgba(125, 184, 230, 0.38) 31px, transparent 32px), linear-gradient(${paperColor}, ${paperColor})`
-    : paperColor;
+  // Paper itself stays a flat solid sheet (no shadow, no ruled lines painted on
+  // the shell — the ruled guide lines live on the text page so they always sit
+  // exactly under each line of text, whatever the shell padding is).
+  const paperBackground = paperColor;
+  const ruledLinesStyle: React.CSSProperties | undefined = hasRuledLines
+    ? {
+        // 32px period == the page's `leading-8` text line height, anchored to
+        // the text element's own top edge so rules never drift over the text.
+        backgroundImage: 'repeating-linear-gradient(to bottom, transparent 0px, transparent 31px, rgba(125, 184, 230, 0.5) 31px, rgba(125, 184, 230, 0.5) 32px)',
+        backgroundAttachment: 'local',
+        backgroundRepeat: 'repeat',
+      }
+    : undefined;
   const activePageIndex = Math.max(0, pages.findIndex(page => page.id === activePageId));
   const liveSwipeDirection: -1 | 1 = dragOffset < 0 ? -1 : 1;
   const previewDirection = isPageFlipped ? flipDirection : liveSwipeDirection;
   const previewPageIndex = previewDirection < 0
     ? (activePageIndex + 1) % Math.max(1, pages.length)
     : (activePageIndex - 1 + Math.max(1, pages.length)) % Math.max(1, pages.length);
+  // While the user is still holding the swipe the incoming page waits in a
+  // static parked pose — it only performs its entrance animation after the
+  // swipe is released, so the two pages never animate at the same time.
   const incomingPreviewPage = pages.find(page => page.id === incomingPageId) || (dragOffset && pages.length > 1 ? pages[previewPageIndex] : null);
-  const swipeProgress = pageShellRef.current ? Math.min(1, Math.abs(dragOffset) / Math.max(1, pageShellRef.current.offsetWidth * 0.3)) : 0;
   const pageTransform = dragOffset
     ? `perspective(1000px) rotateY(${Math.max(-24, Math.min(24, dragOffset / 10))}deg) translateX(${dragOffset * 0.05}px)`
     : isPageFlipped ? `perspective(1000px) rotateY(${flipDirection < 0 ? -180 : 180}deg)` : undefined;
+  const parkedIncomingTransform = `perspective(1000px) rotateY(${previewDirection < 0 ? 34 : -34}deg) translateX(${previewDirection < 0 ? 22 : -22}%) scale(0.96)`;
   const incomingTransform = isPageFlipped
     ? 'perspective(1000px) rotateY(0deg) translateX(0) scale(1)'
-    : dragOffset
-      ? `perspective(1000px) rotateY(${previewDirection < 0 ? 34 - swipeProgress * 34 : -34 + swipeProgress * 34}deg) translateX(${previewDirection < 0 ? 22 - swipeProgress * 22 : -22 + swipeProgress * 22}%) scale(${0.96 + swipeProgress * 0.04})`
-      : undefined;
+    : parkedIncomingTransform;
 
   const readingThemeClass = {
     dark: 'bg-white/70 text-slate-900',
@@ -1246,7 +1265,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
 
   return (
     <div className="relative flex h-full min-h-0 w-full max-w-full flex-col overflow-hidden bg-white text-slate-900">
-      <style>{`.open-docs-paper-shell::before{content:"";position:absolute;right:0;top:0;width:74px;height:74px;background:linear-gradient(135deg,rgba(255,255,255,.15) 0%,rgba(255,255,255,.9) 46%,rgba(184,201,222,.7) 50%,rgba(8,26,69,.14) 100%);clip-path:polygon(100% 0,0 0,100% 100%);border-top-right-radius:1.6rem;filter:drop-shadow(-8px 8px 10px rgba(8,26,69,.14));pointer-events:none}.open-docs-paper-shell::after{content:"";position:absolute;right:8px;top:70px;width:60px;height:12px;background:radial-gradient(ellipse at center,rgba(8,26,69,.22),transparent 68%);transform:rotate(-42deg);pointer-events:none}.open-docs-page-flipped{box-shadow:-20px 20px 60px rgba(8,26,69,.24)!important}`}</style>
+      <style>{`.open-docs-paper-shell::before{content:"";position:absolute;right:0;top:0;width:74px;height:74px;background:linear-gradient(135deg,rgba(255,255,255,.15) 0%,rgba(255,255,255,.9) 46%,rgba(184,201,222,.7) 50%,rgba(8,26,69,.10) 100%);clip-path:polygon(100% 0,0 0,100% 100%);border-top-right-radius:1.6rem;pointer-events:none}`}</style>
       <div className="open-docs-toolbar order-2 flex shrink-0 items-center gap-1.5 overflow-x-auto overscroll-x-contain border-t border-[#D9E7F8] bg-white p-2 shadow-sm sm:gap-2 sm:p-3 lg:order-1 lg:border-b lg:border-t-0 custom-scrollbar">
         <button type="button" onClick={() => setIsSidebarOpen(value => !value)} className={`min-h-11 shrink-0 rounded-2xl border px-4 py-2 text-xs font-black uppercase tracking-widest shadow-sm transition hover:-translate-y-0.5 hover:shadow-md focus:outline-none focus:ring-2 focus:ring-[#7B61FF]/45 ${isSidebarOpen ? 'border-[#7B61FF] bg-gradient-to-r from-[#5B4BFF] to-[#7B61FF] text-white' : 'border-[#D9E7F8] bg-white/90 text-[#5B4BFF] hover:bg-[#F7F5FF]'}`} aria-label={isSidebarOpen ? 'Close Open Docs panel' : 'Open Open Docs panel'} aria-expanded={isSidebarOpen} aria-controls="open-docs-panel">Open Docs</button>
         <button type="button" onClick={() => { saveCurrentPage(); setIsReadingMode(true); }} className="min-h-11 shrink-0 rounded-2xl border border-[#D9E7F8] bg-[#F8FBFF] px-4 py-2 text-xs font-black uppercase tracking-widest text-[#536178] shadow-sm transition hover:-translate-y-0.5 hover:border-[#C9C2FF] hover:bg-[#F1EEFF] hover:text-[#5B4BFF] hover:shadow-md">Reading Mode</button>
@@ -1326,18 +1345,18 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
           <div className={`relative mx-auto min-h-full w-full ${editorPageWidthClass}`}>
             {incomingPreviewPage && (
               <div
-                className="open-docs-paper-shell pointer-events-none absolute inset-0 z-0 min-h-full w-full rounded-[1.6rem] border border-white/80 p-4 shadow-[0_28px_75px_rgba(8,26,69,0.14)] sm:p-7 md:p-10"
-                style={{ background: paperBackground, transform: incomingTransform, transformOrigin: previewDirection < 0 ? 'right center' : 'left center', transition: dragOffset ? 'none' : 'transform 0.42s ease, opacity 0.42s ease', opacity: isPageFlipped ? 1 : Math.max(0.18, swipeProgress) }}
+                className="open-docs-paper-shell pointer-events-none absolute inset-0 z-0 min-h-full w-full rounded-[1.6rem] border border-white/80 p-4 sm:p-7 md:p-10"
+                style={{ background: paperBackground, transform: incomingTransform, transformOrigin: previewDirection < 0 ? 'right center' : 'left center', transition: dragOffset ? 'none' : 'transform 0.42s ease, opacity 0.42s ease', opacity: isPageFlipped ? 1 : 0.4 }}
                 aria-hidden="true"
               >
                 <div className="mb-5 truncate text-4xl font-black tracking-tight text-[#081A45] sm:text-5xl">{incomingPreviewPage.title}</div>
-                <div className="open-docs-page min-h-[62vh] w-full bg-transparent text-base leading-8 text-[#081A45] outline-none sm:text-lg [&_h1]:text-3xl sm:[&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-2xl sm:[&_h2]:text-3xl [&_h2]:font-black [&_mark]:rounded [&_mark]:px-1 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6" dangerouslySetInnerHTML={{ __html: incomingPreviewPage.content || OPEN_DOCS_DEFAULT_HTML }} />
+                <div className="open-docs-page min-h-[62vh] w-full bg-transparent text-base leading-8 text-[#081A45] outline-none sm:text-lg [&_h1]:text-3xl sm:[&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-2xl sm:[&_h2]:text-3xl [&_h2]:font-black [&_mark]:rounded [&_mark]:px-1 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6" style={ruledLinesStyle} dangerouslySetInnerHTML={{ __html: incomingPreviewPage.content || OPEN_DOCS_DEFAULT_HTML }} />
               </div>
             )}
             <div
               ref={pageShellRef}
-              className={`open-docs-paper-shell relative z-10 min-h-full w-full rounded-[1.6rem] border border-white/80 p-4 shadow-[0_28px_75px_rgba(8,26,69,0.16)] transition-[max-width,opacity] duration-300 sm:p-7 md:p-10 ${isPageFlipped ? 'open-docs-page-flipped' : ''}`}
-              style={{ background: paperBackground, transform: pageTransform, transformOrigin: previewDirection < 0 ? 'left center' : 'right center', transition: dragOffset ? 'none' : 'transform 0.6s ease, max-width 0.3s ease, opacity 0.2s ease', opacity: dragOffset ? Math.max(0.72, 1 - Math.abs(dragOffset) / 900) : 1 }}
+              className={`open-docs-paper-shell relative z-10 min-h-full w-full rounded-[1.6rem] border border-white/80 p-4 sm:p-7 md:p-10 ${isFlipSettling ? 'transition-none' : 'transition-[max-width,opacity] duration-300'}`}
+              style={{ background: paperBackground, transform: pageTransform, transformOrigin: previewDirection < 0 ? 'left center' : 'right center', transition: dragOffset || isFlipSettling ? 'none' : 'transform 0.6s ease, max-width 0.3s ease, opacity 0.2s ease', opacity: dragOffset ? Math.max(0.72, 1 - Math.abs(dragOffset) / 900) : 1 }}
               onMouseDown={event => beginSwipe(event.clientX, event.clientY)}
               onMouseMove={event => moveSwipe(event.clientX, event.clientY)}
               onMouseUp={endSwipe}
@@ -1347,7 +1366,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
               onTouchEnd={endSwipe}
             >
               <input value={activePage?.title || ''} onChange={event => updateActivePageTitle(event.target.value)} className="mb-5 w-full border-0 bg-transparent text-4xl font-black tracking-tight text-[#081A45] outline-none placeholder:text-[#9AA4B5] sm:text-5xl" placeholder="Untitled document" aria-label="Document title" />
-              <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={() => { setSavedAt('Unsaved changes…'); saveCurrentPage(); }} onBlur={saveCurrentPage} onKeyDown={handleEditorKeyDown} onKeyUp={() => saveEditorSelection(editorRef.current, selectionRef)} onMouseUp={() => saveEditorSelection(editorRef.current, selectionRef)} onTouchEnd={() => saveEditorSelection(editorRef.current, selectionRef)} onFocus={() => saveEditorSelection(editorRef.current, selectionRef)} className="open-docs-page min-h-[62vh] w-full bg-transparent text-base leading-8 text-[#081A45] outline-none sm:text-lg [&_h1]:text-3xl sm:[&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-2xl sm:[&_h2]:text-3xl [&_h2]:font-black [&_mark]:rounded [&_mark]:px-1 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6" />
+              <div ref={editorRef} contentEditable suppressContentEditableWarning onInput={() => { setSavedAt('Unsaved changes…'); saveCurrentPage(); }} onBlur={saveCurrentPage} onKeyDown={handleEditorKeyDown} onKeyUp={() => saveEditorSelection(editorRef.current, selectionRef)} onMouseUp={() => saveEditorSelection(editorRef.current, selectionRef)} onTouchEnd={() => saveEditorSelection(editorRef.current, selectionRef)} onFocus={() => saveEditorSelection(editorRef.current, selectionRef)} className="open-docs-page min-h-[62vh] w-full bg-transparent text-base leading-8 text-[#081A45] outline-none sm:text-lg [&_h1]:text-3xl sm:[&_h1]:text-4xl [&_h1]:font-black [&_h2]:text-2xl sm:[&_h2]:text-3xl [&_h2]:font-black [&_mark]:rounded [&_mark]:px-1 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:list-decimal [&_ol]:pl-6" style={ruledLinesStyle} />
             </div>
           </div>
         </div>
@@ -1791,6 +1810,19 @@ const CoursePlayer: React.FC<{
     };
     walk(courseContent);
     return result;
+  }, [courseContent, product.id, productAccess]);
+
+  // Every docs/quiz module the learner can access, flattened into searchable
+  // plain text so the AI mentor can ground answers in the real course material.
+  const courseKnowledgeItems = useMemo(() => {
+    const prune = (modules?: CourseModule[]): CourseModule[] => (modules || [])
+      .filter(module => hasCoursePlayerItemAccess(product.id, module, productAccess))
+      .map(module => ({
+        ...module,
+        files: (module.files || []).filter(file => hasCoursePlayerItemAccess(product.id, file, productAccess)),
+        modules: prune(module.modules || []),
+      }));
+    return collectCourseKnowledgeItems(prune(courseContent));
   }, [courseContent, product.id, productAccess]);
 
   const courseSearchItems = useMemo(() => {
@@ -2862,6 +2894,7 @@ const CoursePlayer: React.FC<{
             activeFileType={activeFile?.type || null}
             activeContentName={activeFile?.name || null}
             userId={currentUserId}
+            courseItems={courseKnowledgeItems}
             onClose={closeCourseMentor}
           />
         </div>

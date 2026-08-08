@@ -123,6 +123,7 @@ import {
   hasPremiumMembership,
   hasSubscriptionFeature,
   inferPremiumTier,
+  normalizeSubscriptionFeatures,
   normalizeSubscriptionPageContent,
   normalizeSubscriptionPlans,
   SubscriptionBillingCycle,
@@ -1308,6 +1309,7 @@ const mergeWebsiteSettings = (settings?: Partial<WebsiteSettings> | null): Websi
         ...((incoming.content as any)?.productRoundness || {}),
       },
       subscriptionPlans: normalizeSubscriptionPlans((incoming.content as any)?.subscriptionPlans || defaultWebsiteSettings.content.subscriptionPlans),
+      subscriptionFeatures: normalizeSubscriptionFeatures((incoming.content as any)?.subscriptionFeatures),
       subscriptionPage: normalizeSubscriptionPageContent((incoming.content as any)?.subscriptionPage),
     },
   } as WebsiteSettings;
@@ -5805,7 +5807,7 @@ const App: React.FC = () => {
     if (!hasFirebaseUser) { openAuthPage('login'); return; }
 
     const bundleMonthly = Math.max(0, getSubscriptionBillingPrice(plan, 'monthly'));
-    const planPrice = getFeatureBundleCycleTotal(selectedFeatures, billingCycle, bundleMonthly);
+    const planPrice = getFeatureBundleCycleTotal(selectedFeatures, billingCycle, bundleMonthly, normalizeSubscriptionFeatures((websiteSettings.content as any).subscriptionFeatures));
     const couponToApply = appliedCouponCode ? coupons.find(c => c.code.trim().toUpperCase() === appliedCouponCode.trim().toUpperCase()) : null;
     let couponDiscount = 0;
 
@@ -6988,7 +6990,7 @@ const App: React.FC = () => {
         {subscriptionCheckoutRequest && (() => {
           const checkoutFeatures = subscriptionCheckoutRequest.features || [...ALL_SUBSCRIPTION_FEATURE_KEYS];
           const checkoutBundleMonthly = Math.max(0, getSubscriptionBillingPrice(subscriptionCheckoutRequest.plan, 'monthly'));
-          const planPrice = getFeatureBundleCycleTotal(checkoutFeatures, subscriptionCheckoutRequest.billingCycle, checkoutBundleMonthly);
+          const planPrice = getFeatureBundleCycleTotal(checkoutFeatures, subscriptionCheckoutRequest.billingCycle, checkoutBundleMonthly, normalizeSubscriptionFeatures((websiteSettings.content as any).subscriptionFeatures));
           const couponToApply = subscriptionCheckoutRequest.couponCode ? coupons.find(c => c.code.trim().toUpperCase() === subscriptionCheckoutRequest.couponCode?.trim().toUpperCase()) : null;
           const couponDiscount = couponToApply && couponToApply.isActive ? calculateDiscount(couponToApply, planPrice) : 0;
           const coinDiscount = activeCoinDiscount?.targetType === 'subscription' && activeCoinDiscount.subscriptionId === String(subscriptionCheckoutRequest.plan.id) ? Math.min(planPrice - couponDiscount, activeCoinDiscount.amount) : 0;

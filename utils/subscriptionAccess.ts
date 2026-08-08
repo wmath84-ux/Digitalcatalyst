@@ -80,6 +80,33 @@ export const SUBSCRIPTION_FEATURES: SubscriptionFeature[] = [
 
 export const SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY = 0;
 
+/**
+ * Merge admin-saved feature rows (Store Config → Subscription) over the
+ * built-in defaults. Unknown keys are ignored, prices are clamped to >= 0,
+ * and every built-in feature always survives so the store never breaks.
+ */
+export const normalizeSubscriptionFeatures = (value: unknown): SubscriptionFeature[] => {
+  const source = Array.isArray(value) ? value : [];
+  const savedByKey = new Map<string, Record<string, unknown>>();
+  for (const entry of source) {
+    if (!entry || typeof entry !== 'object') continue;
+    const record = entry as Record<string, unknown>;
+    const key = String(record.key || '');
+    if (isSubscriptionFeatureKey(key)) savedByKey.set(key, record);
+  }
+  return SUBSCRIPTION_FEATURES.map(fallback => {
+    const saved = savedByKey.get(fallback.key);
+    if (!saved) return fallback;
+    return {
+      ...fallback,
+      name: cleanText(saved.name, fallback.name),
+      description: cleanText(saved.description, fallback.description),
+      badge: saved.badge === undefined ? fallback.badge : (String(saved.badge || '').trim() || undefined),
+      monthlyPrice: Math.max(0, Number(saved.monthlyPrice ?? fallback.monthlyPrice) || 0),
+    };
+  });
+};
+
 export const getSubscriptionFeature = (key: SubscriptionFeatureKey): SubscriptionFeature =>
   SUBSCRIPTION_FEATURES.find(feature => feature.key === key) || SUBSCRIPTION_FEATURES[0];
 
@@ -128,16 +155,17 @@ const getPeriodCountForCycle = (billingCycle: SubscriptionBillingCycle): number 
  * Total monthly amount for a set of chosen features. When every feature is
  * selected the cheaper full-bundle price applies automatically.
  */
-export const getFeatureBundleMonthlyTotal = (featureKeys: SubscriptionFeatureKey[], bundleMonthly = SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY): number => {
+export const getFeatureBundleMonthlyTotal = (featureKeys: SubscriptionFeatureKey[], bundleMonthly = SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY, features: SubscriptionFeature[] = SUBSCRIPTION_FEATURES): number => {
   const allSelected = ALL_SUBSCRIPTION_FEATURE_KEYS.every(key => featureKeys.includes(key));
   if (allSelected) return Number.isFinite(Number(bundleMonthly)) ? Math.max(0, Number(bundleMonthly)) : SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY;
-  return SUBSCRIPTION_FEATURES
+  const priceSource = Array.isArray(features) && features.length ? features : SUBSCRIPTION_FEATURES;
+  return priceSource
     .filter(feature => featureKeys.includes(feature.key))
     .reduce((sum, feature) => sum + Math.max(0, Number(feature.monthlyPrice) || 0), 0);
 };
 
-export const getFeatureBundleCycleTotal = (featureKeys: SubscriptionFeatureKey[], billingCycle: SubscriptionBillingCycle, bundleMonthly?: number): number =>
-  getSubscriptionCyclePrice(getFeatureBundleMonthlyTotal(featureKeys, bundleMonthly), billingCycle);
+export const getFeatureBundleCycleTotal = (featureKeys: SubscriptionFeatureKey[], billingCycle: SubscriptionBillingCycle, bundleMonthly?: number, features?: SubscriptionFeature[]): number =>
+  getSubscriptionCyclePrice(getFeatureBundleMonthlyTotal(featureKeys, bundleMonthly, features), billingCycle);
 
 /**
  * Features the user currently owns. An active full membership without an

@@ -8,10 +8,10 @@ import {
   getSubscriptionFeatureKeys,
   getSubscriptionFeaturePrice,
   getUserSubscriptionTier,
+  normalizeSubscriptionFeatures,
   normalizeSubscriptionPageContent,
   normalizeSubscriptionPlans,
   SUBSCRIPTION_BILLING_CYCLES,
-  SUBSCRIPTION_FEATURES,
   SubscriptionBillingCycle,
   SubscriptionFeatureKey,
   SubscriptionPlanConfig,
@@ -111,6 +111,7 @@ const PremiumSubscriptionPage: React.FC<{
 }> = ({ settings, onActivatePlan, currentUser }) => {
   const plans = normalizeSubscriptionPlans(settings.content.subscriptionPlans);
   const plan = plans[0];
+  const subscriptionFeatures = normalizeSubscriptionFeatures((settings.content as any).subscriptionFeatures);
   const pageContent = normalizeSubscriptionPageContent(settings.content.subscriptionPage);
   const cardImages = pageContent.cardImages.length >= 6 ? pageContent.cardImages.slice(0, 6) : DEFAULT_SUBSCRIPTION_CARD_IMAGES;
 
@@ -136,7 +137,7 @@ const PremiumSubscriptionPage: React.FC<{
   const bundleMonthly = Math.max(0, getSubscriptionBillingPrice(plan, 'monthly'));
   const addableFeatures = selectedFeatures.filter(key => !ownedFeatureKeys.includes(key));
   const chargeableFeatures = membershipActive ? addableFeatures : selectedFeatures;
-  const totalPrice = getFeatureBundleCycleTotal(chargeableFeatures, billingCycle, bundleMonthly);
+  const totalPrice = getFeatureBundleCycleTotal(chargeableFeatures, billingCycle, bundleMonthly, subscriptionFeatures);
   const canCheckout = chargeableFeatures.length > 0;
 
   const toggleFeature = (key: SubscriptionFeatureKey) => {
@@ -302,7 +303,7 @@ const PremiumSubscriptionPage: React.FC<{
                 <span className="psp-price-col">Price</span>
                 <span className="psp-select-col">Selection</span>
               </div>
-              {SUBSCRIPTION_FEATURES.map(feature => {
+              {subscriptionFeatures.map(feature => {
                 const checked = selectedFeatures.includes(feature.key);
                 const featurePrice = getSubscriptionFeaturePrice(feature, billingCycle);
                 return (
@@ -356,7 +357,7 @@ const PremiumSubscriptionPage: React.FC<{
                 Upgrade to Plus
               </button>
               <div className="psp-feature-list">
-                {SUBSCRIPTION_FEATURES.filter(feature => selectedFeatures.includes(feature.key)).map(feature => (
+                {subscriptionFeatures.filter(feature => selectedFeatures.includes(feature.key)).map(feature => (
                   <div key={feature.key} className="psp-feature-row">
                     <span className="psp-feature-icon">
                       <Glyph type={feature.key} />

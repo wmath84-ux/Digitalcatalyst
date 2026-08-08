@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { GoogleGenAI } from '@google/genai';
 import { getGeminiApiKey } from '../utils/gemini';
+import { buildCoursePromptContext, buildStarterPrompts, CourseKnowledgeItem } from '../utils/aiCourseContext';
 import { addDoc, collection, deleteDoc, doc, getDocs, limit, orderBy, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
 import { db } from '../firebase';
 
@@ -13,6 +14,8 @@ interface AiMentorProps {
     activeFileType?: string | null;
     userId?: string;
     onClose?: () => void;
+    /** Knowledge items collected from the full course tree (docs pages + quizzes). */
+    courseItems?: CourseKnowledgeItem[];
 }
 
 interface ChatMessage {
@@ -115,12 +118,18 @@ const TypingIndicator: React.FC = () => (
     </div>
 );
 
-const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, productId, courseId, activeFileId, activeFileType, userId = '', onClose }) => {
+const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, productId, courseId, activeFileId, activeFileType, userId = '', courseItems = [], onClose }) => {
     const storageKey = useMemo(() => `ai-mentor-sessions-${productTitle.replace(/\W+/g, '-').toLowerCase()}`, [productTitle]);
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [activeSessionId, setActiveSessionId] = useState('');
     const [chatInput, setChatInput] = useState('');
     const [isChatLoading, setIsChatLoading] = useState(false);
+    const [isModulePickerOpen, setIsModulePickerOpen] = useState(false);
+    const [scopedFileId, setScopedFileId] = useState<string | null>(null);
+
+    const mentorItems = useMemo(() => (Array.isArray(courseItems) ? courseItems : []), [courseItems]);
+    const scopedItem = useMemo(() => mentorItems.find(item => item.fileId === scopedFileId) || null, [mentorItems, scopedFileId]);
+    const starterPrompts = useMemo(() => buildStarterPrompts(mentorItems, 10), [mentorItems]);
     const [isHistoryOpen, setIsHistoryOpen] = useState(() => typeof window === 'undefined' ? true : window.innerWidth >= 768);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [aiSettings, setAiSettings] = useState<LocalAiSettings>(readLocalAiSettings);
@@ -263,25 +272,37 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, pr
         }
     };
 
+    const buildMentorSystemInstruction = (): string => {
+        const base = `You are a premium AI Mentor for the product "${productTitle}". The user is currently viewing "${activeContentName || 'the main product page'}". Return structured Markdown with short sections, bullets, bold emphasis, and fenced code blocks when useful. Avoid walls of text.`;
+        const contextText = buildCoursePromptContext(mentorItems, { scopeFileId: scopedItem?.fileId || null });
+        if (!contextText) return `${base}\n\nIf the question is outside the course, answer from your own knowledge and mark it clearly with "🌐 Web reference:".`;
+        const scopeRule = scopedItem
+            ? `STRICT MODULE MODE: the learner selected the module "${scopedItem.modulePath} / ${scopedItem.fileName}". Answer ONLY from that module's reference material below. If the learner is still confused and the module does not cover it, you MAY use outside/Google knowledge, but clearly label it with "🌐 Web reference:" and say the module itself does not cover that part.`
+            : `Use the course reference material below as the primary source whenever the question relates to it — quote points, pages, and quiz facts from it. If the course material does not cover the question, you MAY use outside/Google knowledge, clearly labelled "🌐 Web reference:".`;
+        return `${base}\n\n${scopeRule}\n\nCourse reference material (docs pages, quizzes, and study text from this course):\n${contextText}`;
+    };
+
     const callCustomAi = async (prompt: string, historyContext: string, settings: LocalAiSettings) => {
+        const systemInstruction = buildMentorSystemInstruction();
         if (settings.provider === 'openai') {
             const response = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${settings.apiKey}` },
-                body: JSON.stringify({ model: settings.model || 'gpt-4o-mini', messages: [{ role: 'system', content: `You are a premium AI Mentor for ${productTitle}. Current lesson: ${activeContentName || 'product details'}.` }, { role: 'user', content: `${historyContext}\n\n${prompt}` }] }),
+                body: JSON.stringify({ model: settings.model || 'gpt-4o-mini', messages: [{ role: 'system', content: systemInstruction }, { role: 'user', content: `${historyContext}\n\n${prompt}` }] }),
             });
             if (!response.ok) throw new Error(response.status === 401 ? 'Invalid key.' : response.status === 429 ? 'Quota exceeded.' : 'Provider unavailable.');
             const data = await response.json();
             return data.choices?.[0]?.message?.content || 'No response returned.';
         }
         const ai = new GoogleGenAI({ apiKey: settings.apiKey });
-        const response = await ai.models.generateContent({ model: settings.model || 'gemini-2.5-flash', contents: historyContext + `\n\nUser: ${prompt}` });
+        const response = await ai.models.generateContent({ model: settings.model || 'gemini-2.5-flash', contents: `${systemInstruction}\n\n${historyContext}\n\nUser: ${prompt}` });
         return response.text || 'No response returned.';
     };
 
-    const handleSendMessage = async () => {
-        const prompt = chatInput.trim();
+    const handleSendMessage = async (overrideText?: string) => {
+        const prompt = (overrideText ?? chatInput).trim();
         if (!prompt || isChatLoading || !activeSession) return;
+        setIsModulePickerOpen(false);
 
         const userMessage: ChatMessage = { sender: 'user', text: prompt, createdAt: new Date().toISOString() };
         updateActiveSession(session => ({
@@ -314,11 +335,21 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, pr
                 return;
             }
             const ai = new GoogleGenAI({ apiKey });
-            const systemInstruction = `You are a premium AI Mentor for the product "${productTitle}". The user is currently viewing "${activeContentName || 'the main product page'}". Return structured Markdown with short sections, bullets, bold emphasis, and fenced code blocks when useful. Avoid walls of text.`;
-            const response = await ai.models.generateContent({
-                model: 'gemini-2.5-flash',
-                contents: `${systemInstruction}\n\nRecent conversation:\n${historyContext}\n\nUser: ${prompt}`,
-            });
+            const systemInstruction = buildMentorSystemInstruction();
+            let response;
+            try {
+                response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: `${systemInstruction}\n\nRecent conversation:\n${historyContext}\n\nUser: ${prompt}`,
+                    config: { tools: [{ googleSearch: {} }] },
+                });
+            } catch (groundingError) {
+                console.warn('Google Search grounding unavailable, retrying without tools.', groundingError);
+                response = await ai.models.generateContent({
+                    model: 'gemini-2.5-flash',
+                    contents: `${systemInstruction}\n\nRecent conversation:\n${historyContext}\n\nUser: ${prompt}`,
+                });
+            }
 
             updateActiveSession(session => { const next = { ...session, providerUsed: 'default' as const, modelUsed: 'gemini-2.5-flash', updatedAt: new Date().toISOString(), messages: [...session.messages, { sender: 'ai' as const, text: response.text || 'No response returned.', createdAt: new Date().toISOString(), providerUsed: 'default' as const, modelUsed: 'gemini-2.5-flash' }] }; void persistChatToFirebase(next); return next; });
         } catch (err) {
@@ -420,28 +451,99 @@ const AiMentor: React.FC<AiMentorProps> = ({ productTitle, activeContentName, pr
                         </div>
                     ))}
                     {isChatLoading && <TypingIndicator />}
+                    {messages.length <= 1 && !isChatLoading && starterPrompts.length > 0 && (
+                        <div className="pt-1" data-testid="ai-mentor-starter-prompts">
+                            <p className="pb-2 text-xs font-semibold text-slate-500">Course se bane suggestions — tap karke pucho:</p>
+                            <div className="flex gap-2 overflow-x-auto pb-1 [scrollbar-width:thin]">
+                                {starterPrompts.map(promptText => (
+                                    <button
+                                        key={promptText}
+                                        type="button"
+                                        onClick={() => { void handleSendMessage(promptText); }}
+                                        className="max-w-56 shrink-0 truncate rounded-full border border-slate-200 bg-slate-50 px-3.5 py-2 text-left text-xs font-semibold text-slate-700 transition hover:border-cyan-300 hover:bg-cyan-50 hover:text-cyan-900"
+                                        title={promptText}
+                                    >
+                                        {promptText}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </div>
 
-                <footer className="shrink-0 border-t border-slate-200 bg-white px-3 py-3 sm:px-4">
+                <footer className="relative shrink-0 border-t border-slate-200 bg-white px-3 py-3 sm:px-4">
+                    {scopedItem && (
+                        <div className="mb-2 flex items-center gap-2" data-testid="ai-mentor-scope-chip">
+                            <span className="inline-flex max-w-full items-center gap-2 truncate rounded-full border border-cyan-200 bg-cyan-50 px-3 py-1.5 text-xs font-bold text-cyan-900">
+                                📌 {scopedItem.kind === 'quiz' ? 'Quiz' : 'Module'}: {scopedItem.fileName} — sirf isi ke reference se jawab
+                                <button
+                                    type="button"
+                                    onClick={() => setScopedFileId(null)}
+                                    className="ml-1 rounded-full px-1 text-sm font-black text-cyan-900/70 hover:text-cyan-900"
+                                    aria-label="Clear module focus"
+                                >×</button>
+                            </span>
+                        </div>
+                    )}
                     <div className="flex items-center gap-2 rounded-xl border border-slate-300 bg-white px-2 py-1.5 shadow-sm">
+                        <button
+                            type="button"
+                            onClick={() => setIsModulePickerOpen(value => !value)}
+                            aria-label="Choose module focus"
+                            aria-expanded={isModulePickerOpen}
+                            title="Module select karke sirf usi par chat karo"
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg text-lg font-black transition ${isModulePickerOpen || scopedItem ? 'bg-cyan-100 text-cyan-900' : 'text-slate-700 hover:bg-slate-100'}`}
+                        >
+                            +
+                        </button>
                         <input
                             type="text"
                             value={chatInput}
                             onChange={(e) => setChatInput(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                            placeholder="Write a message..."
+                            placeholder={scopedItem ? `Ask about "${scopedItem.fileName}"...` : 'Write a message...'}
                             aria-label="Write a message"
                             className="min-w-0 flex-1 bg-transparent px-2 py-2.5 text-[15px] text-slate-900 outline-none placeholder:text-slate-400"
                             disabled={isChatLoading}
                         />
                         <button
-                            onClick={handleSendMessage}
+                            onClick={() => handleSendMessage()}
                             disabled={isChatLoading || !chatInput.trim()}
                             className="shrink-0 rounded-lg px-3 py-2 text-sm font-semibold text-slate-900 hover:bg-slate-100 disabled:cursor-not-allowed disabled:opacity-40"
                         >
                             Send
                         </button>
                     </div>
+                    {isModulePickerOpen && (
+                        <div className="absolute bottom-full left-3 z-40 mb-2 w-[min(20rem,calc(100vw-2rem))] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-[0_18px_50px_rgba(15,23,42,0.18)]" data-testid="ai-mentor-module-picker">
+                            <p className="border-b border-slate-100 px-4 py-3 text-xs font-black uppercase tracking-widest text-slate-500">Module focus (docs & quiz)</p>
+                            <div className="max-h-64 overflow-y-auto p-2 [scrollbar-width:thin]">
+                                <button
+                                    type="button"
+                                    onClick={() => { setScopedFileId(null); setIsModulePickerOpen(false); }}
+                                    className={`w-full rounded-xl px-3 py-2.5 text-left text-sm font-semibold transition ${!scopedItem ? 'bg-cyan-50 text-cyan-900' : 'text-slate-700 hover:bg-slate-50'}`}
+                                >
+                                    🌐 Poora course (default)
+                                </button>
+                                {mentorItems.length === 0 && (
+                                    <p className="px-3 py-2 text-sm text-slate-500">Is course me docs/quiz text module nahi mila.</p>
+                                )}
+                                {mentorItems.map(item => (
+                                    <button
+                                        key={item.fileId || `${item.modulePath}-${item.fileName}`}
+                                        type="button"
+                                        onClick={() => { setScopedFileId(item.fileId); setIsModulePickerOpen(false); }}
+                                        className={`w-full rounded-xl px-3 py-2.5 text-left transition ${scopedFileId === item.fileId ? 'bg-cyan-50' : 'hover:bg-slate-50'}`}
+                                    >
+                                        <span className={`block truncate text-sm font-semibold ${scopedFileId === item.fileId ? 'text-cyan-900' : 'text-slate-800'}`}>
+                                            {item.kind === 'quiz' ? '❓' : '📖'} {item.fileName}
+                                        </span>
+                                        <span className="block truncate text-[11px] text-slate-500">{item.modulePath}</span>
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+                    )}
                 </footer>
             </section>
         </div>

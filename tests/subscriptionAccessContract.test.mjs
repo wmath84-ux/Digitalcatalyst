@@ -105,7 +105,7 @@ test('premium subscription page renders cards, modular pricing and checkout summ
   assert.match(subscriptionSource, /normalizeSubscriptionPlans\(settings\.content\.subscriptionPlans\)/);
   assert.match(subscriptionSource, /normalizeSubscriptionPageContent\(settings\.content\.subscriptionPage\)/);
   assert.match(subscriptionSource, /getSubscriptionBillingPrice\(plan, 'monthly'\)/);
-  assert.match(subscriptionSource, /getFeatureBundleCycleTotal\(chargeableFeatures, billingCycle, bundleMonthly\)/);
+  assert.match(subscriptionSource, /getFeatureBundleCycleTotal\(chargeableFeatures, billingCycle, bundleMonthly, subscriptionFeatures\)/);
   assert.match(subscriptionSource, /onActivatePlan\(plan, billingCycle, null, chargeableFeatures\)/);
   assert.match(subscriptionSource, /SUBSCRIPTION_BILLING_CYCLES/);
   assert.match(subscriptionSource, /CYCLE_ORDER/);
@@ -170,6 +170,6 @@ test('expiry locks all features, persists no auto-renew, and pushes a renewal no
 
 test('subscription activation persists selected features and never auto-renews', () => {
   assert.match(appSource, /unlockSubscriptionPlan\(plan, paymentLabel, billingCycle, \{\}, selectedFeatures\)/);
-  assert.match(appSource, /getFeatureBundleCycleTotal\(selectedFeatures, billingCycle, bundleMonthly\)/);
+  assert.match(appSource, /getFeatureBundleCycleTotal\(selectedFeatures, billingCycle, bundleMonthly, normalizeSubscriptionFeatures\(\(websiteSettings\.content as any\)\.subscriptionFeatures\)\)/);
   assert.match(appSource, /subscriptionAutoRenew: false/);
 });

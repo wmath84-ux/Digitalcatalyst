@@ -10,8 +10,10 @@ import CleanNeutralDesignStudio from './CleanNeutralDesignStudio';
 import CleanNeutralAdvancedStudio from './CleanNeutralAdvancedStudio';
 import {
     MembershipMessage,
+    normalizeSubscriptionFeatures,
     normalizeSubscriptionPageContent,
     normalizeSubscriptionPlans,
+    SubscriptionFeature,
     SubscriptionPageContent,
     SubscriptionPlanConfig,
 } from '../../utils/subscriptionAccess';
@@ -370,6 +372,12 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
 
     const subscriptionPlans = normalizeSubscriptionPlans((localSettings.content as any).subscriptionPlans) as EditableSubscriptionPlan[];
     const subscriptionPage = normalizeSubscriptionPageContent((localSettings.content as any).subscriptionPage);
+    const subscriptionFeatures = normalizeSubscriptionFeatures((localSettings.content as any).subscriptionFeatures);
+
+    const updateSubscriptionFeature = (featureKey: SubscriptionFeature['key'], updates: Partial<SubscriptionFeature>) => {
+        const nextFeatures = subscriptionFeatures.map(feature => feature.key === featureKey ? { ...feature, ...updates } : feature);
+        updateContentValue('subscriptionFeatures', nextFeatures);
+    };
     const redeemRewards = (((localSettings.content as any).redeemRewards || []) as EditableReward[]);
     const eduCoinRules = ((localSettings.content as any).eduCoinRules || { purchase: 25, redeemRate: 10 }) as { purchase: number; redeemRate: number };
     const dockItems = (((localSettings.content as any).dockItems || []) as string[]);
@@ -997,6 +1005,25 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                                 </div>
                             </div>
                         ))}
+                    </div>
+
+                    <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-sm" data-testid="subscription-feature-pricing">
+                        <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                            <div>
+                                <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">Feature-wise Pricing</p>
+                                <h3 className="text-xl font-black text-slate-900">Subscription Features</h3>
+                                <p className="text-sm text-slate-600">Har feature ka monthly price yahan set karein. 0 rakha to feature free rahega. Poora bundle (sab features) ka price upar plan ke Monthly Price se aata hai.</p>
+                            </div>
+                        </div>
+                        <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                            {subscriptionFeatures.map(feature => (
+                                <div key={feature.key} className="rounded-xl border bg-slate-50 p-3">
+                                    <p className="text-sm font-black text-slate-900">{feature.icon} {feature.name}</p>
+                                    <label className="mt-2 block text-sm font-semibold text-slate-700">Monthly Price (₹)<input type="number" min="0" value={feature.monthlyPrice} onChange={e => updateSubscriptionFeature(feature.key, { monthlyPrice: Math.max(0, Number(e.target.value) || 0) })} className="mt-1 w-full rounded-lg border p-2" /></label>
+                                    <label className="mt-2 block text-sm font-semibold text-slate-700">Badge (optional)<input value={feature.badge || ''} onChange={e => updateSubscriptionFeature(feature.key, { badge: e.target.value })} className="mt-1 w-full rounded-lg border p-2" placeholder="e.g. Best for doubts" /></label>
+                                </div>
+                            ))}
+                        </div>
                     </div>
 
                     <div className="grid gap-4 xl:grid-cols-3">
