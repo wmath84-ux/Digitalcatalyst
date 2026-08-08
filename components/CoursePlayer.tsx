@@ -2871,7 +2871,7 @@ const CoursePlayer: React.FC<{
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 px-4" aria-label="AI Mentor upgrade required">
           <div className="w-full max-w-md rounded-3xl border border-gray-100 bg-white p-6 shadow-2xl">
             <h3 className="text-lg font-black text-gray-900">AI Mentor is a paid feature</h3>
-            <p className="mt-2 text-sm font-medium leading-relaxed text-gray-600">{subscriptionPage.aiMentorLocked}</p>
+            <p className="mt-2 text-sm font-medium leading-relaxed text-gray-600">{subscriptionPage.aiMentorLocked.description}</p>
             <div className="mt-6 flex gap-3">
               <button
                 onClick={closeMentorLockNotice}
