@@ -30,7 +30,7 @@ const filters: Array<{ id: NotificationFilter; label: string }> = [
   { id: 'unlock', label: 'Unlocks' },
   { id: 'community', label: 'Community' },
   { id: 'announcement', label: 'Admin' },
-  { id: 'mayday', label: 'May Day' },
+  { id: 'mayday', label: 'My Day' },
 ];
 
 const categoryMeta: Record<SiteNotificationCategory, { icon: string; label: string }> = {
@@ -40,7 +40,7 @@ const categoryMeta: Record<SiteNotificationCategory, { icon: string; label: stri
   unlock: { icon: '🔓', label: 'Unlocked' },
   community: { icon: '💬', label: 'Community' },
   announcement: { icon: '📢', label: 'Admin' },
-  mayday: { icon: '⏰', label: 'May Day' },
+  mayday: { icon: '⏰', label: 'My Day' },
 };
 
 const formatRelativeTime = (createdAt: number) => {
@@ -62,7 +62,7 @@ const preferenceRows: Array<{ key: Exclude<keyof SiteNotificationPreferences, 'b
   { key: 'unlock', label: 'Unlocks', description: 'Purchased or reward-unlocked content.' },
   { key: 'community', label: 'Community', description: 'Replies, follows, posts, stories and reactions.' },
   { key: 'announcement', label: 'Admin alerts', description: 'Important platform announcements.' },
-  { key: 'mayday', label: 'May Day', description: 'Task, goal, reminder and focus session milestones.' },
+  { key: 'mayday', label: 'My Day', description: 'Task, goal, reminder and focus session milestones.' },
 ];
 
 const SiteNotificationCenter: React.FC<SiteNotificationCenterProps> = ({

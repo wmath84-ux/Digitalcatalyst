@@ -41,7 +41,7 @@ export const PROFESSIONAL_ICON_LIBRARY = [
 export type ProfessionalIconName = typeof PROFESSIONAL_ICON_LIBRARY[number];
 
 export const CLEAN_NEUTRAL_ICON_SLOT_REGISTRY = [
-  { id: 'nav.mayDay', label: 'May Day', group: 'Navigation', defaultIcon: 'calendar' },
+  { id: 'nav.mayDay', label: 'My Day', group: 'Navigation', defaultIcon: 'calendar' },
   { id: 'nav.home', label: 'Home', group: 'Navigation', defaultIcon: 'home' },
   { id: 'nav.store', label: 'Store', group: 'Navigation', defaultIcon: 'store' },
   { id: 'nav.purchased', label: 'Purchased', group: 'Navigation', defaultIcon: 'book-open' },

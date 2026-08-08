@@ -1808,6 +1808,7 @@ const App: React.FC = () => {
   const isCartPaymentModalOpenRef = useRef(false);
   const latestUpdateCheckoutRef = useRef<typeof latestUpdateCheckout>(null);
   const isReadingDrawerOpenRef = useRef(false);
+  const isSiteNotificationCenterOpenRef = useRef(false);
   const readingDrawerViewRef = useRef<ReadingView>('blog');
   const pendingReadingNavigationRef = useRef<string | null>(null);
   const activeSessionIdRef = useRef<string | null>(null);
@@ -2400,6 +2401,10 @@ const App: React.FC = () => {
         setIsCartOpen(false);
         return;
       }
+      if (isSiteNotificationCenterOpenRef.current) {
+        setIsSiteNotificationCenterOpen(false);
+        return;
+      }
 
       const rawNextView = normalizeHistoryView(event.state?.dcView);
       if (currentViewRef.current === 'community' && rawNextView !== 'community') {
@@ -2462,6 +2467,10 @@ const App: React.FC = () => {
   useEffect(() => {
     latestUpdateCheckoutRef.current = latestUpdateCheckout;
   }, [latestUpdateCheckout]);
+
+  useEffect(() => {
+    isSiteNotificationCenterOpenRef.current = isSiteNotificationCenterOpen;
+  }, [isSiteNotificationCenterOpen]);
 
   useEffect(() => {
     currentViewRef.current = currentView;
@@ -3326,6 +3335,26 @@ const App: React.FC = () => {
           window.history.pushState({ ...(window.history.state || {}), dcView: currentViewRef.current, dcOverlay: 'cart' }, '', window.location.href);
       }
       setIsCartOpen(true);
+  };
+
+  const openSiteNotificationCenter = () => {
+    if (typeof window !== 'undefined' && !isMobileViewport) {
+      setIsSiteNotificationCenterOpen(true);
+      return;
+    }
+    if (typeof window !== 'undefined' && !isSiteNotificationCenterOpenRef.current) {
+      window.history.pushState({ ...(window.history.state || {}), dcView: currentViewRef.current, dcOverlay: 'notification' }, '', window.location.href);
+    }
+    setIsSiteNotificationCenterOpen(true);
+  };
+
+  const closeSiteNotificationCenter = () => {
+    const state = typeof window !== 'undefined' ? (window.history.state || {}) : {};
+    if (state.dcOverlay === 'notification') {
+      window.history.back();
+      return;
+    }
+    setIsSiteNotificationCenterOpen(false);
   };
 
   const handleAddToCart = (productId: number, quantity: number = 1) => {
@@ -6094,7 +6123,7 @@ const App: React.FC = () => {
 
   const openSiteNotification = useCallback((notification: SiteNotification) => {
     markSiteNotificationRead(notification.id);
-    setIsSiteNotificationCenterOpen(false);
+    closeSiteNotificationCenter();
 
     const target = notification.target;
 
@@ -6502,7 +6531,7 @@ const App: React.FC = () => {
         return <ProductDetailPage economySettings={economySettings} activeCoinDiscount={activeCoinDiscount?.targetType === 'product' && activeCoinDiscount.productId === selectedProduct.id ? activeCoinDiscount : null} onConsumeCoinDiscount={() => setActiveCoinDiscount(null)} settings={websiteSettings} product={selectedProduct} onBack={() => handleNavigateBack('allProducts')} onPurchase={(appliedCouponCode, quantity, payment) => handlePurchaseComplete(appliedCouponCode, quantity, payment)} isWishlisted={wishlist.includes(selectedProduct.id)} onToggleWishlist={handleToggleWishlist} reviews={reviews[selectedProduct.id] || []} onAddReview={(d) => handleAddReview(selectedProduct.id, d)} isLoggedIn={isLoggedIn} onLoginRequired={() => handleLoginRequired(selectedProduct)} autoOpenPaymentModal={autoOpenPaymentModalFor === selectedProduct.id} onModalOpened={() => setAutoOpenPaymentModalFor(null)} coupons={coupons} scrollToSection={scrollToProductSection} onSectionScrolled={() => setScrollToProductSection(null)} onAddToCart={handleAddToCart} allProducts={productsWithRatings} onViewProduct={handleViewProduct} onBuyNow={handleBuyNowProduct} wishlist={wishlist} onGoHome={handleBackToHome} onStartEarning={handleNavigateToProfile} onInsufficientCoins={handleInsufficientEduCoins} isPurchased={purchasedProductIds.includes(selectedProduct.id)} currentUser={appUser} productAccess={productAccessById[selectedProduct.id] || null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onOpenPurchases={handleNavigateToPurchases} onCoinPurchase={canSpendEduCoins(appUser) ? (product, quantity, options) => handleProductCoinPurchase(product, quantity, options) : undefined} />;
       case 'coursePlayer':
         if (isAuthRestoring) return renderAuthRestoreStatus();
-        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} currentUser={appUser} onBack={handleBackFromCoursePlayer} onQuizReward={hasSubscriptionFeature(appUser, 'educoins') ? handleQuizReward : undefined} onUpgrade={handleNavigateToSubscription} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onEducoinUnlockComplete={handleEducoinUpdateUnlockComplete} /> : renderAuthRestoreStatus();
+        return isLoggedIn && appUser && selectedProduct && purchasedProductIds.includes(selectedProduct.id) ? <CoursePlayer settings={websiteSettings} economySettings={economySettings} product={selectedProduct} currentUser={appUser} onBack={handleBackFromCoursePlayer} onQuizReward={hasSubscriptionFeature(appUser, 'educoins') ? handleQuizReward : undefined} onUpgrade={handleNavigateToSubscription} productAccess={selectedProduct ? productAccessById[selectedProduct.id] : null} onPurchaseLatestUpdate={handleOpenLatestUpdateCheckout} onEducoinUnlockComplete={handleEducoinUpdateUnlockComplete} onOpenNotifications={openSiteNotificationCenter} onOpenProfile={handleNavigateToProfile} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} notificationCount={siteNotifications.filter(notification => !notification.read).length} /> : renderAuthRestoreStatus();
       case 'eduCoinGuide': return appUser && canSpendEduCoins(appUser) ? <EduCoinGuidePage settings={websiteSettings} economySettings={economySettings} currentUser={appUser} requiredCoins={eduCoinGuideRequest?.requiredCoins || 0} productTitle={eduCoinGuideRequest?.productTitle || selectedProduct?.title} onBack={handleBackFromEduCoinGuide} onExplorePurchases={handleNavigateToPurchases} onOpenProfile={handleNavigateToProfile} onOpenReadingHub={handleOpenReadingHubFromGuide} /> : <MembershipUpgradeCard message={normalizeSubscriptionPageContent((websiteSettings.content as any).subscriptionPage).profileUpgrade} onUpgrade={handleNavigateToSubscription} onBack={handleBackFromEduCoinGuide} />;
       case 'congratulations': return <Congratulations settings={websiteSettings} onBack={() => handleNavigateBack('home')} onCheckProduct={handleNavigateToPurchases} product={selectedProduct} reviews={selectedProduct ? reviews[selectedProduct.id] || [] : []} onAddReview={selectedProduct ? (d) => handleAddReview(selectedProduct.id, d) : () => {}} />;
       case 'allProducts': return <ProductShowcase settings={websiteSettings} products={visibleProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} coupons={coupons} purchasedProductIds={purchasedProductIds} onOpenSearchPage={handleOpenSearchPage} />;
@@ -6583,7 +6612,7 @@ const App: React.FC = () => {
         ? (readingListType === 'blog' ? 'Blog' : 'News')
         : ({
             home: 'Home',
-            mayDay: 'May Day',
+            mayDay: 'My Day',
             allProducts: 'Store',
             search: 'Store',
             product: 'Store',
@@ -6698,7 +6727,7 @@ const App: React.FC = () => {
           className="h-full min-w-0 transition-[padding-left] duration-300 ease-out"
           style={{ paddingLeft: useCommunityDesktopSidebar ? 'var(--desktop-site-sidebar-offset, 320px)' : undefined }}
         >
-          {isLoggedIn && effectiveAppUser && !hasSubscriptionFeature(effectiveAppUser, 'community') ? (
+          {(!effectiveAppUser || !hasSubscriptionFeature(effectiveAppUser, 'community')) ? (
             <div className="flex min-h-full items-center justify-center px-4 py-10">
               <MembershipUpgradeCard
                 message={normalizeSubscriptionPageContent((websiteSettings.content as any).subscriptionPage).communityLocked}
@@ -6790,9 +6819,9 @@ const App: React.FC = () => {
                 ←
               </button>
             )}
-            <div className={`mobile-site-header ${mobileAppChromeViews.has(currentView) || currentView === 'mayDay' ? 'hidden md:block' : ''}`}><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} notificationCount={siteNotifications.filter(notification => !notification.read).length} onOpenNotifications={() => setIsSiteNotificationCenterOpen(true)} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
+            <div className={`mobile-site-header ${mobileAppChromeViews.has(currentView) || currentView === 'mayDay' ? 'hidden md:block' : ''}`}><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} notificationCount={siteNotifications.filter(notification => !notification.read).length} onOpenNotifications={openSiteNotificationCenter} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
             {mobileAppChromeViews.has(currentView) && (
-              <MobileTopBar currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} rememberedAccount={rememberedAuthAccount} cartCount={cartItemCount} notificationCount={siteNotifications.filter(notification => !notification.read).length} currentView={currentView} onHomeClick={handleBackToHome} onNavigateToSubscriptions={handleNavigateToSubscription} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToFreeProducts={handleNavigateToFreeProducts} onOpenNews={() => openReadingHub('news')} onOpenBlog={() => openReadingHub('blog')} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} onCartClick={openCartSidebar} onOpenNotifications={() => setIsSiteNotificationCenterOpen(true)} onProfileClick={handleNavigateToProfile} onAuthClick={openAuthPage} onLogout={handleLogout} />
+              <MobileTopBar currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} rememberedAccount={rememberedAuthAccount} cartCount={cartItemCount} notificationCount={siteNotifications.filter(notification => !notification.read).length} currentView={currentView} onHomeClick={handleBackToHome} onNavigateToSubscriptions={handleNavigateToSubscription} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToFreeProducts={handleNavigateToFreeProducts} onOpenNews={() => openReadingHub('news')} onOpenBlog={() => openReadingHub('blog')} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} onCartClick={openCartSidebar} onOpenNotifications={openSiteNotificationCenter} onProfileClick={handleNavigateToProfile} onAuthClick={openAuthPage} onLogout={handleLogout} />
             )}
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={`${shouldHideMainDockOnMobile ? 'max-md:hidden' : ''} ${useDesktopSidebar ? 'lg:hidden' : ''}`}>
@@ -6810,7 +6839,7 @@ const App: React.FC = () => {
               preferences={siteNotificationPreferences}
               browserPermission={browserNotificationPermission}
               webPushState={webPushState}
-              onClose={() => setIsSiteNotificationCenterOpen(false)}
+              onClose={closeSiteNotificationCenter}
               onOpenNotification={openSiteNotification}
               onMarkAllRead={markAllSiteNotificationsRead}
               onUpdatePreferences={handleUpdateSiteNotificationPreferences}

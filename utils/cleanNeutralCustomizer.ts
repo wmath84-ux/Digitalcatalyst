@@ -17,7 +17,7 @@ export interface CleanNeutralPageDefinition {
 
 export const CLEAN_NEUTRAL_PAGE_REGISTRY = [
   { id: 'home', label: 'Home', group: 'Main pages' },
-  { id: 'mayDay', label: 'May Day', group: 'Main pages' },
+  { id: 'mayDay', label: 'My Day', group: 'Main pages' },
   { id: 'allProducts', label: 'Store / All Products', group: 'Main pages' },
   { id: 'product', label: 'Product Details', group: 'Main pages' },
   { id: 'myPurchases', label: 'My Purchases', group: 'Main pages' },

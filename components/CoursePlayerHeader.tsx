@@ -69,12 +69,30 @@ const ProfileSilhouetteIcon: React.FC<{ className?: string }> = ({ className = '
   </svg>
 );
 
+const CommunityIcon: React.FC<{ className?: string }> = ({ className = 'h-5 w-5' }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={1.8}
+    strokeLinecap="round"
+    strokeLinejoin="round"
+    aria-hidden="true"
+  >
+    <path d="M17 20h5v-2a4 4 0 00-3-3.87M9 20H4v-2a4 4 0 013-3.87" />
+    <path d="M12 12a4 4 0 100-8 4 4 0 000 8Zm6.5 1.5a3 3 0 100-6" />
+  </svg>
+);
+
 interface CoursePlayerHeaderProps {
   currentUser?: User | null;
   notificationCount?: number;
   onSearchClick?: () => void;
   onNotificationsClick?: () => void;
   onProfileClick?: () => void;
+  onCommunityClick?: () => void;
   className?: string;
 }
 
@@ -84,6 +102,7 @@ const CoursePlayerHeader: React.FC<CoursePlayerHeaderProps> = ({
   onSearchClick,
   onNotificationsClick,
   onProfileClick,
+  onCommunityClick,
   className = '',
 }) => {
   const resolvedPhotoURL = currentUser?.profilePhotoSet === true ? String(currentUser.photoURL || '').trim() : '';
@@ -136,6 +155,16 @@ const CoursePlayerHeader: React.FC<CoursePlayerHeaderProps> = ({
               {notificationCount > 99 ? '99+' : notificationCount}
             </span>
           )}
+        </button>
+
+        <button
+          type="button"
+          onClick={onCommunityClick}
+          aria-label="Open community"
+          title="Community"
+          className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-[#1A2B4C]/10 bg-white/70 text-[#1A2B4C] shadow-[0_6px_18px_rgba(26,43,76,0.06)] backdrop-blur-sm transition hover:bg-white hover:text-[#1A2B4C] hover:shadow-[0_10px_24px_rgba(26,43,76,0.10)] active:scale-95 focus:outline-none focus-visible:ring-2 focus-visible:ring-[#1A2B4C]/30"
+        >
+          <CommunityIcon />
         </button>
 
         <button

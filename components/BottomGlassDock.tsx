@@ -32,7 +32,7 @@ interface BottomGlassDockProps {
 }
 
 const dockToneClasses: Record<string, string> = {
-  'May Day': 'from-[#EEF2FF] to-[#DDE8FF] hover:border-[#7C8DFF]',
+  'My Day': 'from-[#EEF2FF] to-[#DDE8FF] hover:border-[#7C8DFF]',
   Store: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
   Purchased: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
   Purchases: 'from-[var(--mobile-bg-soft)] to-[var(--mobile-border-active)] hover:border-[var(--mobile-border-active)]',
@@ -113,7 +113,7 @@ export const dockShadowMap = {
 
 const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, dockGlowItems = [], activeItem = '', onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenMayDay, onOpenCommunity, isAdmin = false, onAdminClick, authButtonLabel }: BottomGlassDockProps) => {
   const defaultItems = useMemo(() => ([
-    { label: 'May Day', action: onOpenMayDay || onHomeClick, icon: 'calendar' as ProfessionalIconName, slot: 'nav.mayDay' as CleanNeutralIconSlotId, badge: null },
+    { label: 'My Day', action: onOpenMayDay || onHomeClick, icon: 'calendar' as ProfessionalIconName, slot: 'nav.mayDay' as CleanNeutralIconSlotId, badge: null },
     { label: 'Home', action: onHomeClick, icon: 'home' as ProfessionalIconName, slot: 'nav.home' as CleanNeutralIconSlotId, badge: null },
     { label: 'Store', action: onNavigateToAllProducts, icon: 'store' as ProfessionalIconName, slot: 'nav.store' as CleanNeutralIconSlotId, badge: dockBadgeCounts.Store || null },
     { label: 'Purchases', action: onNavigateToPurchases, icon: 'book-open' as ProfessionalIconName, slot: 'nav.purchased' as CleanNeutralIconSlotId, badge: (dockBadgeCounts.Purchased ?? purchasedProducts.length) || null },

@@ -16,6 +16,7 @@ import { auth, db } from '../firebase';
 import { isDirectAudioUrl, isDirectVideoUrl, isGoogleDriveUrl, normalizeDriveUrl, normalizeMediaSource } from '../utils/mediaCompat';
 import MediaFallbackCard from './common/MediaFallbackCard';
 import CoursePlayerHeader from './CoursePlayerHeader';
+import CourseModuleSearch from './CourseModuleSearch';
 import { getUserEduCoinMultiplier, hasSubscriptionFeature, normalizeSubscriptionPageContent } from '../utils/subscriptionAccess';
 import { stripHtml, toDisplayHtml } from '../utils/richText';
 
@@ -86,6 +87,33 @@ const ModuleIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" })
     <path strokeLinecap="round" strokeLinejoin="round" d="M3.75 3.75h6.75v6.75H3.75V3.75zM13.5 3.75h6.75v6.75H13.5V3.75zM3.75 13.5h6.75v6.75H3.75V13.5zM13.5 13.5h6.75v6.75H13.5V13.5z" />
   </svg>
 );
+
+export interface CourseModuleSearchItem {
+  id: string;
+  kind: 'module' | 'lesson';
+  title: string;
+  subtitle: string;
+  moduleId?: string;
+  locked?: boolean;
+  active?: boolean;
+  icon?: string;
+}
+
+const courseFileTypeIcon = (file: ProductFile): string => {
+  switch (file.type) {
+    case 'youtube': return '▶️';
+    case 'video': return '🎬';
+    case 'audio': return '🎧';
+    case 'pdf': return '📄';
+    case 'doc':
+    case 'ebook': return '📖';
+    case 'sheet': return '📊';
+    case 'quiz': return '❓';
+    case 'image': return '🖼️';
+    case 'link': return '🔗';
+    default: return '📎';
+  }
+};
 
 const QuizIcon: React.FC<{ className?: string }> = ({ className = "w-5 h-5" }) => (
   <svg xmlns="http://www.w3.org/2000/svg" className={className} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -1696,7 +1724,11 @@ const CoursePlayer: React.FC<{
   productAccess?: ProductAccessState | null;
   onPurchaseLatestUpdate?: (product: ProductWithRating, updateId?: string) => void;
   onEducoinUnlockComplete?: (product: ProductWithRating, updateIds: string[]) => void;
-}> = ({ settings, economySettings, product, currentUser = null, onBack, onUpgrade, onQuizReward, productAccess = null, onPurchaseLatestUpdate, onEducoinUnlockComplete }) => {
+  onOpenProfile?: () => void;
+  onOpenNotifications?: () => void;
+  onOpenCommunity?: () => void;
+  notificationCount?: number;
+}> = ({ settings, economySettings, product, currentUser = null, onBack, onUpgrade, onQuizReward, productAccess = null, onPurchaseLatestUpdate, onEducoinUnlockComplete, onOpenProfile, onOpenNotifications, onOpenCommunity, notificationCount = 2 }) => {
   const viewport = useViewportSize();
   const [activeFile, setActiveFile] = useState<ProductFile | null>(null);
   const [mediaHasError, setMediaHasError] = useState(false);
@@ -1708,6 +1740,9 @@ const CoursePlayer: React.FC<{
   const [isDesktopSidebarCollapsed, setIsDesktopSidebarCollapsed] = useState(false);
   const [isMentorOpen, setIsMentorOpen] = useState(false);
   const [mentorLockNotice, setMentorLockNotice] = useState(false);
+  const [isModuleSearchOpen, setIsModuleSearchOpen] = useState(false);
+  const isModuleSearchOpenRef = useRef(false);
+  const [moduleSearchQuery, setModuleSearchQuery] = useState('');
   const youtubePlayerRef = useRef<any>(null);
   const nativeVideoRef = useRef<HTMLVideoElement | null>(null);
   const videoFullscreenSnapshotRef = useRef<{
@@ -1757,6 +1792,41 @@ const CoursePlayer: React.FC<{
     walk(courseContent);
     return result;
   }, [courseContent, product.id, productAccess]);
+
+  const courseSearchItems = useMemo(() => {
+    const items: CourseModuleSearchItem[] = [];
+    const walk = (modules: CourseModule[], path: string[]) => {
+      for (const module of modules || []) {
+        if (isCoursePlayerItemHidden(module)) continue;
+        const moduleUnlocked = hasCoursePlayerItemAccess(product.id, module, productAccess);
+        const modulePath = [...path, module.title];
+        const visibleFiles = (module.files || []).filter(file => !isCoursePlayerItemHidden(file));
+        items.push({
+          id: `module:${module.id}`,
+          kind: 'module',
+          title: module.title,
+          subtitle: `${visibleFiles.length} lesson${visibleFiles.length === 1 ? '' : 's'}`,
+          locked: !moduleUnlocked,
+        });
+        for (const file of visibleFiles) {
+          const fileUnlocked = moduleUnlocked && hasCoursePlayerItemAccess(product.id, file, productAccess);
+          items.push({
+            id: file.id,
+            kind: 'lesson',
+            title: file.name,
+            subtitle: modulePath.join(' › '),
+            moduleId: `module:${module.id}`,
+            locked: !fileUnlocked,
+            active: activeFile?.id === file.id,
+            icon: courseFileTypeIcon(file),
+          });
+        }
+        walk(module.modules || [], modulePath);
+      }
+    };
+    walk(courseContent, []);
+    return items;
+  }, [courseContent, product.id, productAccess, activeFile?.id]);
 
   const activeFileIndex = Math.max(0, orderedCourseFiles.findIndex(file => file.id === activeFile?.id));
 
@@ -1902,10 +1972,11 @@ const CoursePlayer: React.FC<{
   useEffect(() => {
     isSidebarOpenRef.current = isSidebarOpen;
     isMentorOpenRef.current = isMentorOpen;
+    isModuleSearchOpenRef.current = isModuleSearchOpen;
     forceOverlaySidebarRef.current = forceOverlaySidebar;
-  }, [isSidebarOpen, isMentorOpen, forceOverlaySidebar]);
+  }, [isSidebarOpen, isMentorOpen, isModuleSearchOpen, forceOverlaySidebar]);
 
-  const writeCourseHistoryLayer = useCallback((layer: 'modules' | 'mentor' | null, mode: 'push' | 'replace' = 'push') => {
+  const writeCourseHistoryLayer = useCallback((layer: 'modules' | 'mentor' | 'search' | null, mode: 'push' | 'replace' = 'push') => {
     if (typeof window === 'undefined') return;
     const currentLayer = window.history.state?.dcCourseLayer || null;
     if (mode === 'push' && currentLayer === layer) return;
@@ -1916,7 +1987,7 @@ const CoursePlayer: React.FC<{
       dcCourseProductId: product.id,
       dcCourseFileId: activeFile?.id || null,
       dcCourseLessonSelection: false,
-      dcCourseBackStep: layer === 'mentor' ? 'mentor' : layer === 'modules' ? 'transient-open' : 'closed-cycle',
+      dcCourseBackStep: layer === 'mentor' ? 'mentor' : layer === 'modules' ? 'transient-open' : layer === 'search' ? 'search-open' : 'closed-cycle',
     };
 
     if (mode === 'push') window.history.pushState(nextState, '', window.location.href);
@@ -1971,7 +2042,7 @@ const CoursePlayer: React.FC<{
     };
   }, [product.id]);
 
-  const closeCourseLayerHistory = useCallback((layer: 'modules' | 'mentor') => {
+  const closeCourseLayerHistory = useCallback((layer: 'modules' | 'mentor' | 'search') => {
     if (typeof window !== 'undefined' && window.history.state?.dcView === 'coursePlayer' && window.history.state?.dcCourseLayer === layer) {
       window.history.back();
     }
@@ -2047,6 +2118,18 @@ const CoursePlayer: React.FC<{
     else openCourseMentor();
   }, [closeCourseMentor, openCourseMentor]);
 
+  const openModuleSearch = useCallback(() => {
+    setIsMentorOpen(false);
+    if (forceOverlaySidebarRef.current) setIsSidebarOpen(false);
+    setModuleSearchQuery('');
+    setIsModuleSearchOpen(true);
+  }, []);
+
+  const closeModuleSearch = useCallback(() => {
+    setIsModuleSearchOpen(false);
+    closeCourseLayerHistory('search');
+  }, [closeCourseLayerHistory]);
+
   useEffect(() => {
     if (typeof window === 'undefined') return undefined;
     const handleCoursePopState = (event: PopStateEvent) => {
@@ -2072,11 +2155,12 @@ const CoursePlayer: React.FC<{
       }
 
       courseHistoryRestoringRef.current = true;
-      const layer = state.dcCourseLayer === 'mentor' || state.dcCourseLayer === 'modules'
+      const layer = state.dcCourseLayer === 'mentor' || state.dcCourseLayer === 'modules' || state.dcCourseLayer === 'search'
         ? state.dcCourseLayer
         : null;
 
       setIsMentorOpen(layer === 'mentor');
+      setIsModuleSearchOpen(layer === 'search');
       if (forceOverlaySidebarRef.current) setIsSidebarOpen(layer === 'modules');
       window.setTimeout(() => {
         courseHistoryRestoringRef.current = false;
@@ -2089,6 +2173,10 @@ const CoursePlayer: React.FC<{
 
   useEffect(() => {
     if (!courseHistoryReadyRef.current || courseHistoryRestoringRef.current) return;
+    if (isModuleSearchOpen) {
+      writeCourseHistoryLayer('search', 'push');
+      return;
+    }
     if (isMentorOpen) {
       writeCourseHistoryLayer('mentor', 'push');
       return;
@@ -2096,7 +2184,7 @@ const CoursePlayer: React.FC<{
     if (isSidebarOpen && forceOverlaySidebar) {
       writeCourseHistoryLayer('modules', 'push');
     }
-  }, [forceOverlaySidebar, isMentorOpen, isSidebarOpen, writeCourseHistoryLayer]);
+  }, [forceOverlaySidebar, isMentorOpen, isModuleSearchOpen, isSidebarOpen, writeCourseHistoryLayer]);
 
   const captureVideoFullscreenSnapshot = useCallback((requestedMobileLandscape = false) => {
     if (!activeFile || (activeFile.type !== 'youtube' && activeFile.type !== 'video')) return;
@@ -2441,6 +2529,28 @@ const CoursePlayer: React.FC<{
     closeCourseMentor();
   };
 
+  const findFileInCourseContent = useCallback((modules: CourseModule[] | undefined, fileId: string): ProductFile | null => {
+    for (const module of modules || []) {
+      const direct = (module.files || []).find(file => file.id === fileId);
+      if (direct) return direct;
+      const nested = findFileInCourseContent(module.modules || [], fileId);
+      if (nested) return nested;
+    }
+    return null;
+  }, []);
+
+  const handleModuleSearchSelect = useCallback((item: CourseModuleSearchItem) => {
+    if (item.kind === 'lesson' && !item.locked) {
+      const file = orderedCourseFiles.find(candidate => candidate.id === item.id) || findFileInCourseContent(courseContent, item.id);
+      if (file) {
+        onSelectFile(file);
+        setIsSidebarOpen(false);
+      }
+    }
+    setIsModuleSearchOpen(false);
+    closeCourseLayerHistory('search');
+  }, [closeCourseLayerHistory, courseContent, findFileInCourseContent, onSelectFile, orderedCourseFiles]);
+
   const requestPdfDownload = (file: ProductFile) => {
     triggerFileDownload(file);
   };
@@ -2621,6 +2731,11 @@ const CoursePlayer: React.FC<{
 
       <CoursePlayerHeader
         currentUser={currentUser}
+        onProfileClick={onOpenProfile}
+        onNotificationsClick={onOpenNotifications}
+        onCommunityClick={onOpenCommunity}
+        onSearchClick={openModuleSearch}
+        notificationCount={notificationCount}
         className="course-player-synergy-header order-first rounded-t-2xl border-b border-[#1A2B4C]/8 shadow-[0_10px_30px_rgba(26,43,76,0.06)] lg:hidden"
       />
 
@@ -2775,6 +2890,17 @@ const CoursePlayer: React.FC<{
             </div>
           </div>
         </div>
+      )}
+
+      {isModuleSearchOpen && (
+        <CourseModuleSearch
+          productTitle={product.title}
+          query={moduleSearchQuery}
+          onQueryChange={setModuleSearchQuery}
+          items={courseSearchItems}
+          onSelect={handleModuleSearchSelect}
+          onClose={closeModuleSearch}
+        />
       )}
 
     </div>

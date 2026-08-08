@@ -921,7 +921,7 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
                     <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5">
                         <p className="text-xs font-black uppercase tracking-[0.2em] text-indigo-600">Subscription Page</p>
                         <h2 className="mt-2 text-2xl font-black text-slate-900">Eduvora Plus+ Subscription Customizer</h2>
-                        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">A single Eduvora Plus+ subscription unlocks everything: AI Mentor, Community, EduCoin earning, badges, streaks, milestones, rewards, and MayDay. Members purchase a one-time, weekly, monthly, quarterly, or yearly cycle.</p>
+                        <p className="mt-2 text-sm font-semibold leading-6 text-slate-600">A single Eduvora Plus+ subscription unlocks everything: AI Mentor, Community, EduCoin earning, badges, streaks, milestones, rewards, and MyDay. Members purchase a one-time, weekly, monthly, quarterly, or yearly cycle.</p>
                     </div>
 
                     <div className="rounded-2xl border bg-white p-4">

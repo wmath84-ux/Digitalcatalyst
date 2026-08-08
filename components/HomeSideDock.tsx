@@ -199,7 +199,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
   };
 
   const defaultItems: NavigationItem[] = [
-    ...(onOpenMayDay ? [{ id: 'May Day', label: 'May Day', action: onOpenMayDay, icon: 'calendar' as ProfessionalIconName, slot: 'nav.mayDay' as CleanNeutralIconSlotId, badge: null }] : []),
+    ...(onOpenMayDay ? [{ id: 'My Day', label: 'My Day', action: onOpenMayDay, icon: 'calendar' as ProfessionalIconName, slot: 'nav.mayDay' as CleanNeutralIconSlotId, badge: null }] : []),
     { id: 'Home', label: 'Home', action: onHomeClick, icon: 'home', slot: 'nav.home', badge: null },
     { id: 'Store', label: 'Store', action: onNavigateToAllProducts, icon: 'store', slot: 'nav.store', badge: dockBadgeCounts.Store || null },
     { id: 'Purchased', label: 'Purchased', action: onNavigateToPurchases, icon: 'book-open', slot: 'nav.purchased', badge: (dockBadgeCounts.Purchased ?? purchasedProducts.length) || null },
@@ -216,7 +216,7 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
 
   const configuredBase = ((settings.content as any).dockItems || dockCustomizationItems) as string[];
   const configuredWithHome = configuredBase.includes('Home') ? configuredBase : ['Home', ...configuredBase];
-  const configuredWithMayDay = onOpenMayDay ? ['May Day', ...configuredWithHome.filter(label => label !== 'May Day')] : configuredWithHome;
+  const configuredWithMayDay = onOpenMayDay ? ['My Day', ...configuredWithHome.filter(label => label !== 'My Day')] : configuredWithHome;
   const configuredItems = configuredWithMayDay.filter((label, index, labels) => labels.indexOf(label) === index);
   const itemMap = Object.fromEntries(defaultItems.map(item => [item.id, item])) as Record<string, NavigationItem>;
   itemMap.EduCoins = profileItem;
