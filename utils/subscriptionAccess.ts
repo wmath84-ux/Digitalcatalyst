@@ -35,7 +35,7 @@ export const SUBSCRIPTION_FEATURES: SubscriptionFeature[] = [
     key: 'aiMentor',
     name: 'AI Mentor',
     icon: '🧠',
-    monthlyPrice: 149,
+    monthlyPrice: 0,
     badge: 'Best for doubts',
     description: 'Real-time AI study partner inside every course and the community. Ask doubts, get lesson summaries, and prepare better while you study.',
   },
@@ -43,14 +43,14 @@ export const SUBSCRIPTION_FEATURES: SubscriptionFeature[] = [
     key: 'community',
     name: 'Learning Community',
     icon: '💬',
-    monthlyPrice: 99,
+    monthlyPrice: 0,
     description: 'Join serious learners. Share progress, ask questions, follow creators, and stay motivated in a focused study space.',
   },
   {
     key: 'educoins',
     name: 'EduCoins & Rewards',
     icon: '🪙',
-    monthlyPrice: 99,
+    monthlyPrice: 0,
     badge: 'Study & earn',
     description: 'Earn EduCoins for every serious study action, unlock streaks, badges, milestone rewards, and grow your learning wallet.',
   },
@@ -58,27 +58,27 @@ export const SUBSCRIPTION_FEATURES: SubscriptionFeature[] = [
     key: 'coinDiscounts',
     name: 'EduCoin Discounts',
     icon: '🏷️',
-    monthlyPrice: 49,
+    monthlyPrice: 0,
     description: 'Spend your EduCoins to get discounts on paid products, modules, and your subscription itself.',
   },
   {
     key: 'mayday',
     name: 'MyDay Pro',
     icon: '🚨',
-    monthlyPrice: 49,
+    monthlyPrice: 0,
     description: 'Premium planner: weekly streaks, milestone tracking, and deeper progress insights inside MyDay.',
   },
   {
     key: 'contentAccess',
     name: 'Premium Content',
     icon: '📚',
-    monthlyPrice: 129,
+    monthlyPrice: 0,
     badge: 'Courses unlocked',
     description: 'Unlock selected premium products and courses that are bundled with your subscription.',
   },
 ];
 
-export const SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY = 499;
+export const SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY = 0;
 
 export const getSubscriptionFeature = (key: SubscriptionFeatureKey): SubscriptionFeature =>
   SUBSCRIPTION_FEATURES.find(feature => feature.key === key) || SUBSCRIPTION_FEATURES[0];
@@ -93,6 +93,9 @@ export const isSubscriptionFeatureKey = (value: unknown): value is SubscriptionF
  */
 export const getSubscriptionCyclePrice = (monthly: number, billingCycle: SubscriptionBillingCycle): number => {
   const safeMonthly = Math.max(0, Number(monthly) || 0);
+  // Zero-priced plans stay free on every billing cycle; the 1 rupee floor
+  // below exists only for genuinely paid plans.
+  if (safeMonthly <= 0) return 0;
   switch (billingCycle) {
     case 'weekly': return Math.max(1, Math.round(safeMonthly * 0.26));
     case 'quarterly': return Math.max(1, Math.round(safeMonthly * 3));
@@ -127,7 +130,7 @@ const getPeriodCountForCycle = (billingCycle: SubscriptionBillingCycle): number 
  */
 export const getFeatureBundleMonthlyTotal = (featureKeys: SubscriptionFeatureKey[], bundleMonthly = SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY): number => {
   const allSelected = ALL_SUBSCRIPTION_FEATURE_KEYS.every(key => featureKeys.includes(key));
-  if (allSelected) return Math.max(0, Number(bundleMonthly) || SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY);
+  if (allSelected) return Number.isFinite(Number(bundleMonthly)) ? Math.max(0, Number(bundleMonthly)) : SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY;
   return SUBSCRIPTION_FEATURES
     .filter(feature => featureKeys.includes(feature.key))
     .reduce((sum, feature) => sum + Math.max(0, Number(feature.monthlyPrice) || 0), 0);
@@ -282,13 +285,13 @@ export const DEFAULT_SUBSCRIPTION_PLANS: SubscriptionPlanConfig[] = [
     id: 'eduvora-plus',
     name: 'Eduvora Plus+',
     accessTier: 'elite',
-    price: 499,
-    monthlyPrice: 499,
-    weeklyPrice: 149,
-    quarterlyPrice: 1199,
-    yearlyPrice: 2999,
-    oncePrice: 5999,
-    coinPrice: 1500,
+    price: 0,
+    monthlyPrice: 0,
+    weeklyPrice: 0,
+    quarterlyPrice: 0,
+    yearlyPrice: 0,
+    oncePrice: 0,
+    coinPrice: 0,
     description: 'Har serious learner ke liye. AI Mentor, Community, EduCoins, Streaks, Rewards aur MyDay — sab kuch ek hi plan mein.',
     audienceLabel: 'Har serious learner ke liye',
     benefits: [

@@ -5804,7 +5804,7 @@ const App: React.FC = () => {
   const completeVerifiedSubscriptionActivation = (plan: SubscriptionPlanConfig, billingCycle: SubscriptionBillingCycle = 'monthly', appliedCouponCode?: string | null, payment?: PaymentVerificationDetails, selectedFeatures: SubscriptionFeatureKey[] = [...ALL_SUBSCRIPTION_FEATURE_KEYS]) => {
     if (!hasFirebaseUser) { openAuthPage('login'); return; }
 
-    const bundleMonthly = Math.max(0, getSubscriptionBillingPrice(plan, 'monthly')) || 499;
+    const bundleMonthly = Math.max(0, getSubscriptionBillingPrice(plan, 'monthly'));
     const planPrice = getFeatureBundleCycleTotal(selectedFeatures, billingCycle, bundleMonthly);
     const couponToApply = appliedCouponCode ? coupons.find(c => c.code.trim().toUpperCase() === appliedCouponCode.trim().toUpperCase()) : null;
     let couponDiscount = 0;
@@ -6987,7 +6987,7 @@ const App: React.FC = () => {
         {renderPage()}
         {subscriptionCheckoutRequest && (() => {
           const checkoutFeatures = subscriptionCheckoutRequest.features || [...ALL_SUBSCRIPTION_FEATURE_KEYS];
-          const checkoutBundleMonthly = Math.max(0, getSubscriptionBillingPrice(subscriptionCheckoutRequest.plan, 'monthly')) || 499;
+          const checkoutBundleMonthly = Math.max(0, getSubscriptionBillingPrice(subscriptionCheckoutRequest.plan, 'monthly'));
           const planPrice = getFeatureBundleCycleTotal(checkoutFeatures, subscriptionCheckoutRequest.billingCycle, checkoutBundleMonthly);
           const couponToApply = subscriptionCheckoutRequest.couponCode ? coupons.find(c => c.code.trim().toUpperCase() === subscriptionCheckoutRequest.couponCode?.trim().toUpperCase()) : null;
           const couponDiscount = couponToApply && couponToApply.isActive ? calculateDiscount(couponToApply, planPrice) : 0;

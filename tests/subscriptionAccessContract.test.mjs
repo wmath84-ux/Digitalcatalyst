@@ -18,8 +18,8 @@ test('subscription access model keeps internal tiers and a single unified Eduvor
   assert.match(accessSource, /name: 'Eduvora Plus\+'/);
   assert.match(accessSource, /accessTier: 'elite'/);
   assert.match(accessSource, /earningMultiplier: 2/);
-  assert.match(accessSource, /monthlyPrice: 499/);
-  assert.match(accessSource, /yearlyPrice: 2999/);
+  assert.match(accessSource, /monthlyPrice: 0/);
+  assert.match(accessSource, /yearlyPrice: 0/);
   assert.match(accessSource, /DEFAULT_SUBSCRIPTION_CARD_IMAGES/);
   assert.match(accessSource, /return \[unified\]/);
 });
@@ -143,7 +143,21 @@ test('feature gating helpers power EduCoin earning and spending', () => {
   assert.match(accessSource, /export const canEarnEduCoins/);
   assert.match(accessSource, /export const canSpendEduCoins/);
   assert.match(accessSource, /export const hasSubscriptionFeature/);
-  assert.match(accessSource, /SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY = 499/);
+  assert.match(accessSource, /SUBSCRIPTION_FEATURE_BUNDLE_MONTHLY = 0/);
+});
+
+test('zero-priced subscriptions stay free: cycle price guards zero and no 499 fallback resurrects a price', () => {
+  // cycle price must not floor a genuinely free plan up to 1 rupee
+  assert.match(accessSource, /if \(safeMonthly <= 0\) return 0;/);
+  // an explicit 0 bundle price must not fall back to the constant
+  assert.match(accessSource, /Number\.isFinite\(Number\(bundleMonthly\)\) \? Math\.max\(0, Number\(bundleMonthly\)\)/);
+  // no hardcoded 499 fallbacks remain anywhere in the checkout math
+  assert.doesNotMatch(appSource, /\|\| 499/);
+  assert.doesNotMatch(subscriptionSource, /\|\| 499/);
+  // every subscription feature is explicitly free
+  const featurePrices = accessSource.match(/monthlyPrice: \d+/g) || [];
+  assert.ok(featurePrices.length >= 7, 'expected plan defaults + 6 features');
+  assert.ok(featurePrices.every(price => price === 'monthlyPrice: 0'), `found non-zero feature price: ${featurePrices.join(', ')}`);
 });
 
 test('expiry locks all features, persists no auto-renew, and pushes a renewal notification', () => {

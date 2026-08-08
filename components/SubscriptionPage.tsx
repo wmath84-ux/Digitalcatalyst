@@ -133,7 +133,7 @@ const PremiumSubscriptionPage: React.FC<{
   const mouseStartY = React.useRef<number | null>(null);
   const ignoreClickUntil = React.useRef(0);
 
-  const bundleMonthly = Math.max(0, getSubscriptionBillingPrice(plan, 'monthly')) || 499;
+  const bundleMonthly = Math.max(0, getSubscriptionBillingPrice(plan, 'monthly'));
   const addableFeatures = selectedFeatures.filter(key => !ownedFeatureKeys.includes(key));
   const chargeableFeatures = membershipActive ? addableFeatures : selectedFeatures;
   const totalPrice = getFeatureBundleCycleTotal(chargeableFeatures, billingCycle, bundleMonthly);
