@@ -131,13 +131,21 @@ import {
   SubscriptionPlanConfig,
   SubscriptionTier,
 } from './utils/subscriptionAccess';
+import {
+  PRIMARY_ADMIN_EMAIL,
+  ensureAdminFirestoreWriteAccess,
+  describeAdminProductWriteError,
+  type AdminFirestoreWriteDiagnostics,
+} from './utils/adminFirestoreGuard';
 // Firebase writes are best-effort with localStorage fallback so the app remains usable offline.
+// Admin Firestore writes (products) additionally run through ensureAdminFirestoreWriteAccess,
+// which verifies a real, fresh Firebase Auth admin credential exists before every write and
+// surfaces the exact Firebase error if the deployed security rules still reject it.
 type MobileAuthFlowState = 'checking' | 'logged-out' | 'completing-session' | 'authenticated';
 type AuthStatus = 'booting' | 'checking-session' | 'unauthenticated' | 'authenticated' | 'hydrating' | 'logout' | 'error';
 type HydrationStatus = 'idle' | 'loading' | 'ready' | 'fallback' | 'error';
 type GoogleLoginTarget = 'user' | 'admin';
 
-const PRIMARY_ADMIN_EMAIL = 'wmath84@gmail.com';
 const normalizeEmail = (email?: string | null) => String(email || '').trim().toLowerCase();
 const isPrimaryAdminEmail = (email?: string | null) => normalizeEmail(email) === PRIMARY_ADMIN_EMAIL;
 const isPrimaryAdminUser = (user?: { email?: string | null } | null) => isPrimaryAdminEmail(user?.email);
@@ -6311,14 +6319,26 @@ const App: React.FC = () => {
       return [...withoutCurrentProduct, normalizedProduct].sort((a, b) => Number(a.id) - Number(b.id));
   };
 
-  const publishProductToFirebase = async (product: Product): Promise<Product> => {
+  // Verify a real, fresh Firebase Auth admin credential before every product
+  // write. Without this, the admin panel (which is restored from localStorage)
+  // could attempt writes with an anonymous/expired request.auth and Firestore
+  // security rules would reject them with permission-denied while public reads
+  // kept working. Throws with an exact ADMIN_WRITE_* diagnosis on failure.
+  const requireAdminFirestoreWriteAccess = async (action: 'add' | 'update' | 'delete'): Promise<AdminFirestoreWriteDiagnostics> => {
+      const diagnostics = await ensureAdminFirestoreWriteAccess();
+      console.info('ADMIN_PRODUCT_WRITE_ACCESS_OK', { action, uid: diagnostics.uid, email: diagnostics.email, role: diagnostics.role });
+      return diagnostics;
+  };
+
+  const publishProductToFirebase = async (product: Product, action: 'add' | 'update'): Promise<{ product: Product; diagnostics: AdminFirestoreWriteDiagnostics }> => {
       const normalizedProduct = normalizeProductArrays(product);
+      const diagnostics = await requireAdminFirestoreWriteAccess(action);
       await setDoc(
           doc(db, GLOBAL_PRODUCTS_COLLECTION, String(normalizedProduct.id)),
           stripUndefinedDeep(normalizedProduct),
           { merge: false }
       );
-      return normalizedProduct;
+      return { product: normalizedProduct, diagnostics };
   };
 
   // Product CRUD is Firebase-first. Local cache is only a fallback mirror.
@@ -6329,10 +6349,13 @@ const App: React.FC = () => {
           manualRating: product.manualRating !== undefined ? product.manualRating : null,
       });
 
+      let writeDiagnostics: AdminFirestoreWriteDiagnostics | null = null;
       try {
           console.info('ADMIN_PRODUCT_SAVE_STARTED', { productId: productWithId.id, action: 'add' });
           console.info('ADMIN_PRODUCT_FIRESTORE_SAVE_STARTED', { productId: productWithId.id, action: 'add' });
-          const savedProduct = await publishProductToFirebase(productWithId);
+          const publishResult = await publishProductToFirebase(productWithId, 'add');
+          const savedProduct = publishResult.product;
+          writeDiagnostics = publishResult.diagnostics;
           console.info('ADMIN_PRODUCT_SAVE_SUCCESS', { productId: savedProduct.id, action: 'add' });
           console.info('ADMIN_PRODUCT_FIRESTORE_SAVE_SUCCESS', { productId: savedProduct.id, action: 'add' });
           console.info('ADMIN_PRODUCT_REFRESH_VERIFY_STARTED', { productId: savedProduct.id, action: 'add' });
@@ -6344,19 +6367,23 @@ const App: React.FC = () => {
           persistProductsLocalFallback(updatedProducts);
           return true;
       } catch (e) {
-          console.error('ADMIN_PRODUCT_SAVE_FAILED', { action: 'add', error: e });
-          console.error('ADMIN_PRODUCT_FIRESTORE_SAVE_FAILED', { action: 'add', error: e });
-          console.error('Firebase product add failed:', e);
-          alert('Product was not saved to Firebase. Please check Firebase admin permission/rules and try again.');
+          const message = describeAdminProductWriteError(e, 'add', writeDiagnostics);
+          console.error('ADMIN_PRODUCT_SAVE_FAILED', { action: 'add', message, error: e });
+          console.error('ADMIN_PRODUCT_FIRESTORE_SAVE_FAILED', { action: 'add', message, error: e });
+          console.error('Firebase product add failed:', message, e);
+          alert(message);
           return false;
       }
   };
 
   const handleUpdateProduct = async (updatedProduct: Product): Promise<boolean> => {
+      let writeDiagnostics: AdminFirestoreWriteDiagnostics | null = null;
       try {
           console.info('ADMIN_PRODUCT_SAVE_STARTED', { productId: updatedProduct.id, action: 'update' });
           console.info('ADMIN_PRODUCT_FIRESTORE_SAVE_STARTED', { productId: updatedProduct.id, action: 'update' });
-          const savedProduct = await publishProductToFirebase(updatedProduct);
+          const publishResult = await publishProductToFirebase(updatedProduct, 'update');
+          const savedProduct = publishResult.product;
+          writeDiagnostics = publishResult.diagnostics;
           console.info('ADMIN_PRODUCT_SAVE_SUCCESS', { productId: savedProduct.id, action: 'update' });
           console.info('ADMIN_PRODUCT_FIRESTORE_SAVE_SUCCESS', { productId: savedProduct.id, action: 'update' });
           console.info('ADMIN_PRODUCT_REFRESH_VERIFY_STARTED', { productId: savedProduct.id, action: 'update' });
@@ -6375,16 +6402,19 @@ const App: React.FC = () => {
           );
           return true;
       } catch (e) {
-          console.error('ADMIN_PRODUCT_SAVE_FAILED', { action: 'update', error: e });
-          console.error('ADMIN_PRODUCT_FIRESTORE_SAVE_FAILED', { action: 'update', error: e });
-          console.error('Firebase product update failed:', e);
-          alert('Product update was not saved to Firebase. Please check Firebase admin permission/rules and try again.');
+          const message = describeAdminProductWriteError(e, 'update', writeDiagnostics);
+          console.error('ADMIN_PRODUCT_SAVE_FAILED', { action: 'update', message, error: e });
+          console.error('ADMIN_PRODUCT_FIRESTORE_SAVE_FAILED', { action: 'update', message, error: e });
+          console.error('Firebase product update failed:', message, e);
+          alert(message);
           return false;
       }
   };
 
   const handleDeleteProduct = async (productId: number): Promise<boolean> => {
+      let writeDiagnostics: AdminFirestoreWriteDiagnostics | null = null;
       try {
+          writeDiagnostics = await requireAdminFirestoreWriteAccess('delete');
           await deleteDoc(doc(db, GLOBAL_PRODUCTS_COLLECTION, String(productId)));
 
           const updatedProducts = products.filter(product => product.id !== productId);
@@ -6400,8 +6430,10 @@ const App: React.FC = () => {
               .catch(error => logGlobalSyncWarning('Reviews cleanup', error));
           return true;
       } catch (e) {
-          console.error('Firebase product delete failed:', e);
-          alert('Product was not deleted from Firebase. Please check Firebase admin permission/rules and try again.');
+          const message = describeAdminProductWriteError(e, 'delete', writeDiagnostics);
+          console.error('ADMIN_PRODUCT_SAVE_FAILED', { action: 'delete', message, error: e });
+          console.error('Firebase product delete failed:', message, e);
+          alert(message);
           return false;
       }
   };
