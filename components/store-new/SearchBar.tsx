@@ -7,32 +7,19 @@ type SearchBarProps = {
   onSortChange: (value: string) => void;
 };
 
-const SORT_OPTIONS = [
-  "Recommended",
-  "Price: Low to High",
-  "Price: High to Low",
-  "Top Rated",
-  "Newest",
-];
+const SORT_OPTIONS = ["Recommended", "Price: Low to High", "Price: High to Low", "Top Rated", "Newest"];
 
-export default function SearchBar({
-  value,
-  onChange,
-  sort,
-  onSortChange,
-}: SearchBarProps) {
+export default function SearchBar({ value, onChange, sort, onSortChange }: SearchBarProps) {
   return (
     <div className="space-y-2 px-4">
       <div className="flex items-center gap-2 rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3.5 shadow-sm focus-within:border-indigo-300 focus-within:ring-2 focus-within:ring-indigo-100">
         <SearchIcon className="h-5 w-5 shrink-0 text-slate-400" />
-
         <input
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder="Search courses, notes, class, subject..."
           className="w-full min-w-0 bg-transparent text-[15px] text-slate-800 placeholder:text-slate-400 focus:outline-none"
         />
-
         {value ? (
           <button
             type="button"

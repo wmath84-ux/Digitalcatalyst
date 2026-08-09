@@ -102,11 +102,8 @@ export function StarIcon(props: SVGProps<SVGSVGElement>) {
   );
 }
 
-export function HeartIcon(
-  props: SVGProps<SVGSVGElement> & { filled?: boolean }
-) {
+export function HeartIcon(props: SVGProps<SVGSVGElement> & { filled?: boolean }) {
   const { filled, ...rest } = props;
-
   return (
     <svg
       viewBox="0 0 24 24"
