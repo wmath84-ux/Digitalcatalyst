@@ -2361,6 +2361,17 @@ const App: React.FC = () => {
     const currentState = window.history.state || {};
     if (currentState.dcView !== currentView) {
       window.history.replaceState({ ...currentState, dcView: currentView, dcAppEntry: true }, '', window.location.href);
+      // Ensure admin and critical views always have home behind to prevent app close on back
+      if (currentView === 'admin' || currentView === 'adminLogin') {
+        try {
+          // If history is shallow (first entry is admin), push home then re-push admin so back goes home
+          if (!appViewStackRef.current.includes('home')) {
+            window.history.pushState({ dcView: 'home', dcAppEntry: true }, '', window.location.href);
+            window.history.pushState({ dcView: currentView, dcAppEntry: true }, '', window.location.href);
+            appViewStackRef.current = ['home', currentView];
+          }
+        } catch {}
+      }
     }
     lastHistoryViewRef.current = currentView;
 
@@ -2383,6 +2394,12 @@ const App: React.FC = () => {
         setSelectedArticle(nextArticle);
         setSelectedAnnouncement(nextAnnouncement);
         setIsReadingDrawerOpen(true);
+        return;
+      }
+
+      if (historyOverlay === 'checkoutPage') {
+        // Checkout page overlay (product/cart/subscription) handles its own back via PaymentModal's listener.
+        // Prevent app from closing – just stay and let modal close itself.
         return;
       }
 
@@ -6303,7 +6320,10 @@ const App: React.FC = () => {
   };
 
   const handleAdminLogout = () => {
-    void signOut(auth).catch(error => console.warn('Firebase admin sign-out failed.', error));
+    void signOut(auth).catch(error => {
+      console.warn('Firebase admin sign-out failed.', error);
+      console.warn('Firebase admin auto sign-out failed', error);
+    });
     setCurrentAdminUser(null);
     localStorage.removeItem('currentAdminUser');
     setCurrentView('home');

@@ -844,8 +844,8 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   };
 
   const renderHeader = () => (
-    <header className="sticky top-0 z-40 border-b border-[#D8E6FF] bg-[#F8FAFD]/96 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md">
-      <div className="mx-auto flex max-w-xl items-center justify-between">
+    <header className="sticky top-0 z-40 border-b border-[#D8E6FF] bg-[#FFFBFE]/96 px-3 pb-3 pt-[calc(env(safe-area-inset-top)+0.6rem)] backdrop-blur-md">
+      <div className="mx-auto flex max-w-[520px] items-center justify-between">
         <button type="button" onClick={handleHeaderBack} aria-label="Go back to home" className="grid h-11 w-11 place-items-center rounded-2xl text-[#081A44] transition active:bg-[#EEF6FF]">
           <Icon name="back" className="h-6 w-6" />
         </button>
@@ -1471,15 +1471,16 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
       {activeTab === 'focus' ? renderFocus() : null}
       {activeTab === 'progress' ? renderProgress() : null}
 
-      <nav aria-label="My Day sections" className="fixed inset-x-0 bottom-0 z-50 border-t border-[#D8E6FF] bg-[#FFFBFE] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
-        <div className="mx-auto grid max-w-xl grid-cols-6 gap-1">
-          <button type="button" onClick={handleHeaderBack} className="flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 transition active:scale-95 text-[#64708F] hover:text-[#0B63FF]">
-            <span className="grid h-7 w-7 place-items-center rounded-xl bg-white"><Icon name="back" className="h-[18px] w-[18px]" /></span>
-            <span className="w-full truncate text-center text-[10px] font-black">Home</span>
+      <nav aria-label="My Day sections" className="fixed inset-x-0 bottom-0 z-50 bg-[#FFFBFE] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#0B63FF] via-[#7C4DFF] to-[#0B63FF]" aria-hidden="true" />
+        <div className="mx-auto grid max-w-[520px] grid-cols-6 gap-1">
+          <button type="button" onClick={handleHeaderBack} className="flex min-w-0 flex-col items-center gap-1 rounded-[16px] border border-transparent bg-transparent px-1 py-2 text-[#667085] transition active:scale-95 hover:text-[#0B63FF]">
+            <span className="grid h-8 w-8 place-items-center rounded-full bg-white border border-[#D8E6FF]"><Icon name="back" className="h-[18px] w-[18px]" /></span>
+            <span className="w-full truncate text-center text-[10px] font-black tracking-wide">Home</span>
           </button>
           {navItems.map(item => {
           const active = activeTab === item.tab;
-          return <button key={item.tab} type="button" onClick={() => navigateTab(item.tab)} aria-current={active ? 'page' : undefined} className={`flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 transition active:scale-95 ${active ? 'bg-[#0B63FF]/10 text-[#0B63FF]' : 'text-[#64708F]'}`}><span className={`grid h-7 w-7 place-items-center rounded-xl ${active ? 'bg-[#0B63FF]/15' : ''}`}><Icon name={item.icon} className="h-[18px] w-[18px]" /></span><span className="w-full truncate text-center text-[10px] font-black">{item.label}</span></button>;
+          return <button key={item.tab} type="button" onClick={() => navigateTab(item.tab)} aria-current={active ? 'page' : undefined} className={`flex min-w-0 flex-col items-center rounded-[16px] px-1 py-2 transition active:scale-95 ${active ? 'bg-[#EEF6FF] border border-[#0B63FF] text-[#0B63FF]' : 'border border-transparent bg-transparent text-[#667085]'}`}><span className={`grid h-8 w-8 place-items-center rounded-full ${active ? 'bg-white border border-[#D8E6FF] text-[#0B63FF]' : 'bg-transparent'}`}><Icon name={item.icon} className="h-[18px] w-[18px]" /></span><span className="mt-0.5 w-full truncate text-center text-[11px] font-black tracking-wide">{item.label}</span></button>;
         })}</div>
       </nav>
     </div>

@@ -134,6 +134,53 @@ const PaymentModal: React.FC<PaymentModalProps> = ({
     };
   }, [presentation]);
 
+  // Prevent app close on system back during checkout - push own history layer
+  useEffect(() => {
+    if (presentation !== 'page') return;
+    if (typeof window === 'undefined') return;
+    const overlayKey = `checkout:${checkoutType}:${String(checkoutTargetId || 'default')}`;
+    // Push checkout layer so back closes checkout, not app
+    try {
+      window.history.pushState(
+        { ...(window.history.state || {}), dcOverlay: 'checkoutPage', dcCheckoutLayer: overlayKey, dcCheckoutType: checkoutType },
+        '',
+        window.location.href
+      );
+    } catch {}
+
+    const handleCheckoutPop = (event: PopStateEvent) => {
+      const state = (event.state as any) || {};
+      // If our overlay state gone, close checkout (but don't let app close)
+      if (state.dcOverlay !== 'checkoutPage' || state.dcCheckoutLayer !== overlayKey) {
+        // If still completing razorpay, keep notice but allow close via button only? For safety, allow close if not launching razorpay.
+        if (!isRazorpayLaunching) {
+          onClose();
+        } else {
+          // If payment window launching, prevent accidental close by re-pushing state
+          try {
+            window.history.pushState(
+              { ...(window.history.state || {}), dcOverlay: 'checkoutPage', dcCheckoutLayer: overlayKey, dcCheckoutType: checkoutType },
+              '',
+              window.location.href
+            );
+          } catch {}
+          setPaymentNotice('Secure payment window is opening. Please complete payment or use the close button.');
+        }
+      }
+    };
+
+    window.addEventListener('popstate', handleCheckoutPop);
+    return () => {
+      window.removeEventListener('popstate', handleCheckoutPop);
+      // Clean up our history entry if still present
+      try {
+        if (window.history.state?.dcOverlay === 'checkoutPage' && window.history.state?.dcCheckoutLayer === overlayKey) {
+          window.history.back();
+        }
+      } catch {}
+    };
+  }, [presentation, checkoutType, checkoutTargetId, isRazorpayLaunching, onClose]);
+
   useEffect(() => {
     if (presentation === 'page' && showCoinGuide) {
       pageRef.current?.scrollTo({ top: 0, left: 0, behavior: 'smooth' });

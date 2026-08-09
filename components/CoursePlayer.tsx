@@ -14,7 +14,7 @@ import ProductMusicPlayer, { type AudioTrack } from './ProductMusicPlayer';
 import { doc, getDoc, runTransaction, serverTimestamp, setDoc } from 'firebase/firestore';
 import { onAuthStateChanged } from 'firebase/auth';
 import { auth, db } from '../firebase';
-import { isDirectAudioUrl, isDirectVideoUrl, isGoogleDriveUrl, normalizeDriveUrl, normalizeMediaSource } from '../utils/mediaCompat';
+import { isDirectAudioUrl, isDirectVideoUrl, isGoogleDriveUrl, normalizeDriveUrl, normalizeMediaSource, getGoogleDocsEmbedUrl, isValidHttpsUrl, getGoogleFormEmbedUrl } from '../utils/mediaCompat';
 import MediaFallbackCard from './common/MediaFallbackCard';
 import CoursePlayerHeader from './CoursePlayerHeader';
 import CourseModuleSearch from './CourseModuleSearch';
@@ -1313,7 +1313,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
             aria-labelledby={panelTitleId}
             aria-describedby={panelDescriptionId}
             tabIndex={-1}
-            className={`${isCompactDocs ? 'fixed inset-y-0 left-0 z-20 w-[min(92svw,24rem)] max-w-full rounded-r-[2rem] border-r border-[#D9E7F8] bg-white shadow-[0_24px_70px_rgba(8,26,69,0.24)]' : 'absolute left-4 top-4 z-20 h-[calc(100%-2rem)] w-[21rem] rounded-[1.75rem] border border-[#D9E7F8] bg-white shadow-[0_24px_70px_rgba(91,75,255,0.16)]'} flex min-h-0 flex-col overflow-hidden outline-none transition-transform duration-300`}
+            className={`${isCompactDocs ? 'fixed inset-y-0 left-0 z-20 w-[min(92svw,24rem)] max-w-full rounded-r-[2rem] border-r border-[#D9E7F8] bg-white shadow-[0_4px_12px_rgba(8,26,69,0.06)]' : 'absolute left-4 top-4 z-20 h-[calc(100%-2rem)] w-[21rem] rounded-[1.75rem] border border-[#D9E7F8] bg-white shadow-[0_4px_12px_rgba(8,26,69,0.06)]'} flex min-h-0 flex-col overflow-hidden outline-none transition-transform duration-300`}
             style={isCompactDocs ? { paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' } : undefined}
           >
             <div className="shrink-0 border-b border-[#E3E8F5] bg-gradient-to-br from-white via-[#F8FBFF] to-[#F1EEFF] p-4">
@@ -1407,7 +1407,20 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
 
 
 const HostedDocumentViewer: React.FC<{ file: ProductFile }> = ({ file }) => {
-  const previewUrl = getHostedDocsPreviewUrl(file);
+  const rawPreviewUrl = getHostedDocsPreviewUrl(file);
+  // Validate preview URL - prevent Vercel 404 from relative paths like /images/...
+  const previewUrl = React.useMemo(() => {
+    const trimmed = (rawPreviewUrl || '').trim();
+    if (!trimmed) return '';
+    // If it's a relative path or bare slug that would cause Vercel 404, treat as invalid
+    if (trimmed.startsWith('/') || (!trimmed.startsWith('http') && !trimmed.includes('://'))) {
+      // Check if it looks like an image path that doesn't exist in public/
+      if (trimmed.startsWith('/images/') || trimmed.endsWith('.jpg') || trimmed.endsWith('.png') || trimmed === 'real-numbers' || !trimmed.includes('.')) {
+        return '';
+      }
+    }
+    return isValidHttpsUrl(trimmed) ? trimmed : '';
+  }, [rawPreviewUrl]);
   const isDrive = file.provider === 'google_drive_pdf' || file.provider === 'google_drive_doc' || isGoogleDriveUrl(file.url);
   const fallbackLabel = isDrive ? 'Open Drive' : file.type === 'pdf' || file.provider === 'direct_pdf' ? 'Open PDF' : 'Open in new tab';
   const badge = isDrive ? 'Google Drive Preview' : file.type === 'pdf' || file.provider === 'direct_pdf' ? 'PDF Viewer' : 'Hosted Docs';
@@ -1518,18 +1531,64 @@ const PremiumEmbeddedResourceCard: React.FC<{
   const embedIcon = embedConfig?.icon || '🔗';
   const providerName = embedConfig?.provider || 'External';
 
-  // Generate a subtle gradient star decoration using CSS
-  const starDecoration = `
-    <svg xmlns="http://www.w3.org/2000/svg" className="absolute top-3 right-3 w-6 h-6 opacity-30" viewBox="0 0 24 24" fill="url(#starGradient)">
-      <defs>
-        <linearGradient id="starGradient" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#4A90E2"/>
-          <stop offset="100%" stop-color="#B66DFF"/>
-        </linearGradient>
-      </defs>
-      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
-    </svg>
-  `;
+  // Preserve original URL for opening externally, build correct embeddable URL only at render layer
+  const originalUrl = (embedUrl || '').trim();
+
+  const isBareId = originalUrl && !originalUrl.startsWith('http') && !originalUrl.startsWith('/') && !originalUrl.includes('.') && /^[a-zA-Z0-9_-]{15,}$/.test(originalUrl);
+  const isRelativeOrInvalid = originalUrl.startsWith('/') || (!originalUrl.startsWith('http') && !isBareId) || originalUrl === '';
+
+  // Build correct embeddable URL - core fix for Google Docs 404 bug
+  const embeddableUrl = React.useMemo(() => {
+    if (!originalUrl) return '';
+    // If it's a relative path like /images/... or a bare slug like "real-numbers" -> invalid for Google Doc embed
+    if (isRelativeOrInvalid && !isBareId) {
+      // Try to extract ID if it looks like an ID inside path? Otherwise keep as is for validation downstream
+      // For relative paths, we treat as invalid and will show fallback
+      if (originalUrl.startsWith('/') || originalUrl.includes('real-numbers') || originalUrl.includes('.jpg') || originalUrl.includes('.png')) {
+        return '';
+      }
+    }
+    if (embedType === 'google_doc') {
+      return getGoogleDocsEmbedUrl(originalUrl);
+    }
+    if (embedType === 'github_page') {
+      const trimmed = originalUrl.trim();
+      if (!trimmed) return '';
+      // If it's a github.com URL, try to convert to github.io only if it looks like a user/repo, otherwise keep original
+      // But always ensure https
+      if (isValidHttpsUrl(trimmed)) return trimmed;
+      // If it's just a path, invalid
+      return '';
+    }
+    // Default: return as is if https
+    return isValidHttpsUrl(originalUrl) ? originalUrl : '';
+  }, [originalUrl, embedType, isRelativeOrInvalid, isBareId]);
+
+  const [hasError, setHasError] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const handleIframeError = () => {
+    setHasError(true);
+    setIsLoading(false);
+  };
+
+  const handleIframeLoad = () => {
+    setIsLoading(false);
+  };
+
+  // Determine if we should show fallback instead of iframe
+  const shouldShowFallback = !embeddableUrl || hasError || isRelativeOrInvalid && !isBareId;
+
+  // Build open URL - always try to give user something useful
+  const openUrl = React.useMemo(() => {
+    if (isValidHttpsUrl(originalUrl)) return originalUrl;
+    if (isBareId) {
+      // If bare ID, open as Google Doc view URL
+      return `https://docs.google.com/document/d/${originalUrl}/view`;
+    }
+    if (embeddableUrl && isValidHttpsUrl(embeddableUrl)) return embeddableUrl.replace('/preview', '/view').replace('/embed', '').split('?')[0] || originalUrl;
+    return '';
+  }, [originalUrl, embeddableUrl, isBareId]);
 
   return (
     <div className="premium-embedded-resource-card">
@@ -1537,7 +1596,6 @@ const PremiumEmbeddedResourceCard: React.FC<{
         {/* Gradient accent band at top */}
         <div className="absolute top-0 left-0 right-0 h-1.5 rounded-t-2xl bg-gradient-to-r from-blue-400 to-purple-500" />
 
-        {/* Decorative elements */}
         <div className="absolute top-4 right-4 flex gap-1 opacity-40">
           <span className="text-2xl">✦</span>
           <span className="text-xl">✧</span>
@@ -1557,19 +1615,61 @@ const PremiumEmbeddedResourceCard: React.FC<{
         </div>
 
         <div className="resource-body mt-4">
-          {/* Decorative gradient glow */}
           <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-br from-blue-400/20 via-purple-400/20 to-pink-400/20 opacity-50 blur-sm" />
 
-          <iframe
-            src={embedUrl}
-            title={moduleTitle || 'Embedded Resource'}
-            frameBorder="0"
-            width="100%"
-            height="700px"
-            style={{ border: 'none', borderRadius: '15px', width: '100%', height: '700px', display: 'block' }}
-            allowFullScreen
-            loading="lazy"
-          />
+          {shouldShowFallback ? (
+            <div className="flex min-h-[420px] flex-col items-center justify-center rounded-[15px] bg-white p-6 text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-100 to-violet-100 text-2xl">📄</div>
+              <h3 className="text-lg font-black text-slate-900">Google Doc preview unavailable inline</h3>
+              <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
+                {isRelativeOrInvalid && !isBareId
+                  ? "The saved document link appears to be an internal image path or invalid ID, not a shareable Google Docs link. Please check the resource URL in Admin → Products → Course Content. The app is working correctly — the document link itself needs to be a public Google Docs link."
+                  : "This Google Doc can't be displayed inline. This usually happens when the document isn't shared publicly (Anyone with the link) or Google blocks embedding. The application itself is working — the document permissions need to be updated, or you can open it directly."}
+              </p>
+              <div className="mt-5 flex flex-wrap items-center justify-center gap-3">
+                {openUrl && isValidHttpsUrl(openUrl) && (
+                  <a href={openUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-indigo-600 to-violet-600 px-5 py-3 text-sm font-black text-white shadow-sm hover:brightness-110">
+                    <span>Open Document</span>
+                    <span>↗</span>
+                  </a>
+                )}
+                {embeddableUrl && isValidHttpsUrl(embeddableUrl) && !shouldShowFallback && (
+                  <a href={embeddableUrl} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-2 rounded-xl border border-slate-200 bg-white px-5 py-3 text-sm font-black text-slate-700 hover:bg-slate-50">
+                    Open Preview
+                  </a>
+                )}
+              </div>
+              <p className="mt-4 text-[11px] font-bold text-slate-400">
+                Original: {originalUrl.slice(0, 80) || 'empty'} {originalUrl.length > 80 ? '…' : ''}
+                <br />
+                Embed attempt: {embeddableUrl.slice(0, 80) || 'none'} {embeddableUrl.length > 80 ? '…' : ''}
+              </p>
+            </div>
+          ) : (
+            <div className="relative">
+              {isLoading && (
+                <div className="absolute inset-0 z-10 flex items-center justify-center rounded-[15px] bg-white/80 backdrop-blur-sm">
+                  <div className="flex flex-col items-center gap-3">
+                    <div className="h-8 w-8 animate-spin rounded-full border-4 border-indigo-100 border-t-indigo-600" />
+                    <p className="text-xs font-bold text-slate-600">Loading Google Doc…</p>
+                  </div>
+                </div>
+              )}
+              <iframe
+                src={embeddableUrl}
+                title={moduleTitle || 'Embedded Resource'}
+                frameBorder="0"
+                width="100%"
+                height="700px"
+                style={{ border: 'none', borderRadius: '15px', width: '100%', height: '700px', display: 'block' }}
+                allowFullScreen
+                loading="lazy"
+                onError={handleIframeError}
+                onLoad={handleIframeLoad}
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+          )}
         </div>
 
         <div className="resource-footer mt-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
@@ -1579,9 +1679,14 @@ const PremiumEmbeddedResourceCard: React.FC<{
             <span className="hidden sm:inline">·</span>
             <span className="hidden sm:inline">Free access</span>
           </div>
-          <div className="flex items-center gap-2 text-sm text-slate-500">
+          <div className="flex items-center gap-3 text-sm text-slate-500">
             <span>📄</span>
             <span>Module: <strong className="text-slate-700">{moduleTitle}</strong></span>
+            {openUrl && isValidHttpsUrl(openUrl) && (
+              <a href={openUrl} target="_blank" rel="noopener noreferrer" className="ml-2 inline-flex items-center gap-1 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1 text-[11px] font-black text-indigo-700 hover:bg-indigo-100">
+                Open ↗
+              </a>
+            )}
           </div>
         </div>
       </div>
@@ -2860,8 +2965,75 @@ const CoursePlayer: React.FC<{
       case 'ebook': return <SmartDocsWorkspace file={activeFile} productId={product.id} />;
       case 'link': return isHostedDocsFile(activeFile) ? <HostedDocumentViewer file={activeFile} /> : <ExternalResourceCard file={activeFile} />;
       case 'google_form': {
-        const formUrl = activeFile.url || activeFile.embedUrl || '';
-        return formUrl ? (
+        const rawFormUrl = activeFile.url || activeFile.embedUrl || '';
+        const trimmedRaw = rawFormUrl.trim();
+        // Core fix: build correct embeddable URL at rendering layer, preserve original
+        const embeddableFormUrl = React.useMemo(() => {
+          if (!trimmedRaw) return '';
+          // Detect invalid relative/bare IDs that would cause Vercel 404
+          const isBare = trimmedRaw && !trimmedRaw.startsWith('http') && !trimmedRaw.startsWith('/') && !trimmedRaw.includes('.') && /^[a-zA-Z0-9_-]{10,}$/.test(trimmedRaw);
+          const isRelative = trimmedRaw.startsWith('/') || (!trimmedRaw.startsWith('http') && !isBare);
+          if (isRelative && !isBare) {
+            // Check if it's an image path or slug like "real-numbers" -> invalid for form
+            if (trimmedRaw.startsWith('/') || trimmedRaw.includes('.jpg') || trimmedRaw.includes('.png') || trimmedRaw === 'real-numbers' || !trimmedRaw.includes('http')) {
+              return '';
+            }
+          }
+          if (isBare) {
+            // Bare ID for form? Treat as form ID
+            return `https://docs.google.com/forms/d/e/${trimmedRaw}/viewform?embedded=true`;
+          }
+          return getGoogleFormEmbedUrl(trimmedRaw);
+        }, [trimmedRaw]);
+
+        const isValidFormUrl = embeddableFormUrl && isValidHttpsUrl(embeddableFormUrl) && embeddableFormUrl.includes('docs.google.com/forms');
+
+        if (!trimmedRaw) {
+          return (
+            <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+              <div className="grid h-16 w-16 place-items-center rounded-2xl bg-[#EEF6FF] text-3xl shadow-sm">📝</div>
+              <h3 className="text-lg font-black text-[#081A44]">Google Form not configured</h3>
+              <p className="max-w-sm text-sm font-semibold text-[#64708F]">The form link has not been set up for this module. Please contact the course creator.</p>
+            </div>
+          );
+        }
+
+        if (!isValidFormUrl) {
+          // Fallback for invalid/relative URLs that previously caused Vercel 404
+          return (
+            <div className="flex h-full flex-col">
+              <div className="flex items-center gap-2 border-b border-[#D9E7F8] bg-white/95 px-4 py-2.5 backdrop-blur-sm">
+                <span className="text-lg">📝</span>
+                <div className="min-w-0 flex-1">
+                  <h3 className="truncate text-sm font-black text-[#081A45]">{activeFile.name || 'Google Form'}</h3>
+                  <p className="truncate text-[10px] font-semibold text-[#64708F]">Form preview unavailable</p>
+                </div>
+              </div>
+              <div className="flex flex-1 flex-col items-center justify-center p-8 text-center">
+                <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-gradient-to-br from-indigo-100 to-violet-100 text-2xl">📝</div>
+                <h3 className="text-lg font-black text-slate-900">Google Form link invalid</h3>
+                <p className="mt-2 max-w-md text-sm leading-6 text-slate-600">
+                  The saved form link appears to be an internal path ({trimmedRaw.slice(0, 60)}) or incomplete ID, not a shareable Google Forms link. The app itself is working correctly — the form URL needs to be updated in Admin → Products → Course Content to a public Google Forms link like <code className="rounded bg-slate-100 px-1 py-0.5 text-xs">https://docs.google.com/forms/d/e/...</code>
+                </p>
+                <div className="mt-4 flex gap-3">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (isValidHttpsUrl(trimmedRaw)) window.open(trimmedRaw, '_blank', 'noopener,noreferrer');
+                    }}
+                    disabled={!isValidHttpsUrl(trimmedRaw)}
+                    className="rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-black text-slate-700 disabled:opacity-50"
+                  >
+                    Try open original
+                  </button>
+                </div>
+                <p className="mt-3 text-[11px] text-slate-400">Original: {trimmedRaw.slice(0, 80)}{trimmedRaw.length > 80 ? '…' : ''} • Embed: {embeddableFormUrl.slice(0, 80) || 'none'}</p>
+              </div>
+            </div>
+          );
+        }
+
+        return (
           <div className="flex h-full flex-col">
             <div className="flex items-center gap-2 border-b border-[#D9E7F8] bg-white/95 px-4 py-2.5 backdrop-blur-sm">
               <span className="text-lg">📝</span>
@@ -2869,23 +3041,22 @@ const CoursePlayer: React.FC<{
                 <h3 className="truncate text-sm font-black text-[#081A45]">{activeFile.name || 'Google Form'}</h3>
                 <p className="truncate text-[10px] font-semibold text-[#64708F]">Fill the form below — your responses are saved automatically</p>
               </div>
+              <a href={trimmedRaw} target="_blank" rel="noopener noreferrer" className="shrink-0 rounded-full border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-[11px] font-black text-indigo-700 hover:bg-indigo-100">
+                Open ↗
+              </a>
             </div>
-            <div className="relative flex-1">
+            <div className="relative flex-1 bg-white">
               <iframe
-                src={formUrl}
+                src={embeddableFormUrl}
                 title={activeFile.name || 'Google Form'}
                 className="absolute inset-0 h-full w-full border-0"
                 allow="clipboard-write"
                 loading="lazy"
                 sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+                referrerPolicy="no-referrer-when-downgrade"
+                onError={() => setMediaHasError(true)}
               />
             </div>
-          </div>
-        ) : (
-          <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-[#EEF6FF] text-3xl shadow-sm">📝</div>
-            <h3 className="text-lg font-black text-[#081A44]">Google Form not configured</h3>
-            <p className="max-w-sm text-sm font-semibold text-[#64708F]">The form link has not been set up for this module. Please contact the course creator.</p>
           </div>
         );
       }
