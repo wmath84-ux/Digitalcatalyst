@@ -47,10 +47,10 @@ const ProductCover: React.FC<{ product: ProductWithRating; compact?: boolean; sl
 const SectionHead: React.FC<{ title: string; subtitle?: string; onViewAll?: () => void }> = ({ title, subtitle, onViewAll }) => (
   <div className="mb-3 flex items-end justify-between gap-3 px-1">
     <div>
-      <h2 className="text-xl font-black tracking-tight text-[#081A44]">{title}</h2>
-      {subtitle ? <p className="mt-0.5 text-xs font-semibold text-[#64708F]">{subtitle}</p> : null}
+      <h2 className="text-[20px] font-black tracking-tight text-[#081A44]">{title}</h2>
+      {subtitle ? <p className="mt-0.5 text-[12px] font-semibold text-[#64708F]">{subtitle}</p> : null}
     </div>
-    {onViewAll ? <button type="button" onClick={onViewAll} className="shrink-0 text-xs font-black text-[#0B63FF]">View All ›</button> : null}
+    {onViewAll ? <button type="button" onClick={onViewAll} className="shrink-0 text-[13px] font-black text-[#0B63FF]">View All ›</button> : null}
   </div>
 );
 
@@ -127,37 +127,42 @@ const MobileAppHome: React.FC<MobileAppHomeProps> = ({
 
   return (
     <div data-clean-neutral-workspace="mobile-home" data-clean-neutral-region="shell.page" className="min-h-[100dvh] bg-[#F8FAFD] px-4 pb-32 pt-4 font-['Roboto','Inter',system-ui,sans-serif] text-[#49454F]">
-      <section data-clean-neutral-region="content.hero" className="relative overflow-hidden rounded-[28px] bg-[linear-gradient(135deg,#EADDFF_0%,#D7E3FF_50%,#FFFBFE_100%)] p-5">
-        <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-[#DCCBFF]/70 blur-2xl" />
-        <div className="absolute bottom-0 right-3 h-28 w-28 rounded-full bg-[#BFD7FF]/80 blur-2xl" />
+      <section data-clean-neutral-region="content.hero" className="relative overflow-hidden rounded-[28px] bg-[linear-gradient(145deg,#F8F0FF_0%,#F0E8FF_30%,#FDF8FF_60%,#FFFBFE_100%)] p-5">
+        <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-[#EADDFF]/40 blur-2xl" />
+        <div className="absolute bottom-0 right-3 h-28 w-28 rounded-full bg-[#D7E3FF]/50 blur-2xl" />
         <div className="relative grid grid-cols-[1.1fr_0.9fr] gap-2">
           <div>
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#BFD7FF] bg-white/70 px-3 py-1 text-[10px] font-black uppercase tracking-wider text-[#0B63FF]">💎 Premium Learning Store</span>
+            <span className="inline-flex items-center gap-1 rounded-full border border-[#D7E3FF]/60 bg-white/50 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-[#7C4DFF]">💎 Premium Learning Store</span>
             <h1 className="mt-4 text-[28px] font-black leading-[1.03] tracking-tight text-[#081A44]">Welcome to Digital Catalyst</h1>
-            <p className="mt-3 text-[13px] font-semibold leading-5 text-[#64708F]">Learn, buy and access premium notes, courses and digital products.</p>
+            <p className="mt-3 text-[14px] font-semibold leading-5 text-[#8B94A7]">Learn, buy and access premium notes, courses and digital products.</p>
             <div className="mt-4 flex flex-col gap-2">
               <LiquidMetalButton tone="blue" type="button" onClick={onNavigateToAllProducts} className="rounded-full px-4 py-3 text-sm font-black">🛍️ Explore Products</LiquidMetalButton>
-              <button type="button" onClick={onNavigateToPurchases} className="rounded-full border border-[#79747E] bg-transparent px-4 py-3 text-sm font-black text-[#081A44]">📄 My Purchases</button>
+              <button type="button" onClick={onNavigateToPurchases} className="rounded-full border border-[#D8E6FF] bg-white/60 px-4 py-3 text-sm font-black text-[#49454F]">📄 My Purchases</button>
             </div>
           </div>
           <div className="relative flex items-center justify-center">
-            <div className="relative h-40 w-full rounded-[26px] bg-white/40">
+            <div className="relative h-40 w-full rounded-[26px] bg-white/30">
               <div className="absolute left-3 top-8 h-20 w-20 rotate-[-10deg] rounded-2xl bg-gradient-to-br from-[#071742] to-[#0B63FF] shadow-xl"><span className="absolute left-3 top-3 text-4xl">🎓</span></div>
               <div className="absolute bottom-6 right-2 h-24 w-20 rotate-6 rounded-2xl bg-gradient-to-br from-[#7C4DFF] to-[#DCCBFF] p-2 shadow-xl"><div className="h-full rounded-xl bg-white/30" /><span className="absolute bottom-2 left-4 text-3xl">📚</span></div>
               <div className="absolute right-8 top-2 h-16 w-14 -rotate-6 rounded-xl bg-white p-2 shadow-lg"><div className="h-1.5 rounded bg-[#0B63FF]/50" /><div className="mt-2 h-1.5 rounded bg-[#D8E6FF]" /><div className="mt-2 h-1.5 rounded bg-[#D8E6FF]" /></div>
+              <svg className="absolute bottom-2 left-6 h-8 w-16 text-[#0B63FF]/25" viewBox="0 0 64 32" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 16c4-8 8-8 12 0s8 8 12 0 8-8 12 0 8 8 12 0" /></svg>
             </div>
           </div>
         </div>
       </section>
 
       <section className="mt-5">
-        <label className="flex items-center gap-3 rounded-xl border border-[#BFD7FF] bg-[#F7FAFF] px-4 py-3 focus-within:border-[#0B63FF] focus-within:ring-4 focus-within:ring-blue-100">
-          <span>🔎</span><input value={searchQuery} readOnly onFocus={() => setIsMobileSearchOpen(true)} onClick={() => setIsMobileSearchOpen(true)} placeholder="Search notes, courses, resources..." aria-label="Open product search" className="min-w-0 flex-1 cursor-pointer bg-transparent text-sm font-bold text-[#081A44] outline-none placeholder:text-[#64708F]/75" /><button type="button" onClick={() => setIsMobileSearchOpen(true)} aria-label="Voice search">🎙️</button>
+        <label className="flex items-center gap-3 rounded-2xl border border-[#D0D5DD] bg-[#F0F2F5] px-4 py-3.5 shadow-[inset_0_2px_4px_rgba(0,0,0,0.06)] focus-within:border-[#0B63FF] focus-within:bg-white focus-within:shadow-none focus-within:ring-4 focus-within:ring-blue-100">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0 text-[#667085]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="7" /><path strokeLinecap="round" d="M20.5 20.5l-4.35-4.35" /></svg>
+          <input value={searchQuery} readOnly onFocus={() => setIsMobileSearchOpen(true)} onClick={() => setIsMobileSearchOpen(true)} placeholder="Search notes, courses, resources..." aria-label="Open product search" className="min-w-0 flex-1 cursor-pointer bg-transparent text-[15px] font-bold text-[#344054] outline-none placeholder:text-[#98A2B3]" />
+          <button type="button" onClick={() => setIsMobileSearchOpen(true)} aria-label="Voice search" className="shrink-0 text-[#667085]">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 1a3 3 0 013 3v8a3 3 0 01-6 0V4a3 3 0 013-3z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19 10v2a7 7 0 01-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
+          </button>
         </label>
       </section>
 
-      <nav data-clean-neutral-region="shell.navigation" className="-mx-4 mt-4 flex gap-3 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {chips.map(chip => <button key={chip.label} type="button" onClick={chip.action} className={`shrink-0 rounded-full border px-4 py-3 text-xs font-black shadow-[0_10px_24px_rgba(11,99,255,0.08)] ${chip.active ? 'border-[#0B63FF] bg-[#0B63FF] text-white' : 'border-[#D8E6FF] bg-white text-[#081A44]'}`}><ProfessionalIcon slot={chip.slot} fallbackName={chip.icon} label={`${chip.label}${chip.count ? ` (${chip.count})` : ''}`} defaultDisplayMode="icon-with-text" defaultPosition="left" size={16} /></button>)}
+      <nav data-clean-neutral-region="shell.navigation" className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+        {chips.map(chip => <button key={chip.label} type="button" onClick={chip.action} className={`shrink-0 rounded-full px-4 py-2.5 text-[13px] font-black ${chip.active ? 'bg-[#EEF6FF] text-[#0B63FF]' : 'bg-[#F2F4F7] text-[#667085]'}`}><ProfessionalIcon slot={chip.slot} fallbackName={chip.icon} label={`${chip.label}${chip.count ? ` (${chip.count})` : ''}`} defaultDisplayMode="icon-with-text" defaultPosition="left" size={14} /></button>)}
       </nav>
 
       <section className="mt-5"><SectionHead title="Continue Learning" subtitle="Access your purchased products instantly." onViewAll={onNavigateToPurchases} />

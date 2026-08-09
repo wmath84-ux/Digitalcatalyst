@@ -113,8 +113,8 @@ export const dockShadowMap = {
 
 const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, dockGlowItems = [], activeItem = '', onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenMayDay, onOpenCommunity, isAdmin = false, onAdminClick, authButtonLabel }: BottomGlassDockProps) => {
   const defaultItems = useMemo(() => ([
-    { label: 'My Day', action: onOpenMayDay || onHomeClick, icon: 'calendar' as ProfessionalIconName, slot: 'nav.mayDay' as CleanNeutralIconSlotId, badge: null },
     { label: 'Home', action: onHomeClick, icon: 'home' as ProfessionalIconName, slot: 'nav.home' as CleanNeutralIconSlotId, badge: null },
+    { label: 'My Day', action: onOpenMayDay || onHomeClick, icon: 'calendar' as ProfessionalIconName, slot: 'nav.mayDay' as CleanNeutralIconSlotId, badge: null },
     { label: 'Store', action: onNavigateToAllProducts, icon: 'store' as ProfessionalIconName, slot: 'nav.store' as CleanNeutralIconSlotId, badge: dockBadgeCounts.Store || null },
     { label: 'Purchases', action: onNavigateToPurchases, icon: 'book-open' as ProfessionalIconName, slot: 'nav.purchased' as CleanNeutralIconSlotId, badge: (dockBadgeCounts.Purchased ?? purchasedProducts.length) || null },
     { label: 'Wallet', action: onProfileClick, icon: 'gem' as ProfessionalIconName, slot: 'nav.profile' as CleanNeutralIconSlotId, badge: null },
@@ -127,7 +127,7 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
   const itemBackground = hexToRgba(dockStyle.itemColor, dockStyle.itemOpacity);
   const accentColor = normalizeHex(dockStyle.accentColor, defaultDockStyle.accentColor);
   const textColor = normalizeHex(dockStyle.textColor, defaultDockStyle.textColor);
-  const borderColor = '#E7E0EC';
+  const borderColor = '#D8E6FF';
   const accentOpacity = clampPercent(dockStyle.accentOpacity, defaultDockStyle.accentOpacity) / 100;
   const dockHeight = 80;
   const iconSize = 28;
@@ -200,7 +200,7 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
         style={{ bottom: `max(${bottomOffset}px, env(safe-area-inset-bottom))` }}
       >
         <div
-          className="pointer-events-auto group relative w-full max-w-none overflow-hidden border-t transition-[transform,opacity] duration-300 data-[hidden=true]:translate-y-[calc(100%+2rem)] data-[hidden=true]:opacity-0"
+          className="pointer-events-auto group relative w-full max-w-none overflow-hidden transition-[transform,opacity] duration-300 data-[hidden=true]:translate-y-[calc(100%+2rem)] data-[hidden=true]:opacity-0"
           id="main-bottom-dock"
           data-clean-neutral-region="navigation.mobileDock"
           data-hidden={isAutoHidden ? 'true' : 'false'}
@@ -209,13 +209,13 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
             backgroundColor: '#FFFBFE',
             minHeight: dockHeight,
             padding: dockPadding,
-            borderColor: '#E7E0EC',
             borderRadius: dockRadius,
             boxShadow: 'none',
             backdropFilter: `blur(${blur}px)`,
             WebkitBackdropFilter: `blur(${blur}px)`,
           }}
         >
+          <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px]" style={{ background: 'linear-gradient(90deg, #0B63FF, #7C4DFF, #0B63FF)' }} />
           <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(circle at 20% 10%, ${hexToRgba(accentColor, accentOpacity * 100)}, transparent 36%), linear-gradient(180deg, rgba(255,255,255,0.22), transparent)` }} />
           <div ref={dockScrollRef} onScroll={preserveDockScroll} className="relative grid grid-cols-5 items-center" style={{ gap: dockGap }}>
             {items.map((item) => {
@@ -240,18 +240,19 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
                       if (dockScrollRef.current) dockScrollRef.current.scrollLeft = dockScrollLeftRef.current;
                     });
                   }}
-                  className={`group/item relative ${item.mobileOnly ? 'md:hidden' : ''} flex shrink-0 flex-col items-center transition duration-200 focus:outline-none focus:ring-4 ${hasNewGlow ? 'dock-new-content-glow' : ''} ${tone}`}
+                  className={`group/item relative ${item.mobileOnly ? 'md:hidden' : ''} flex shrink-0 flex-col items-center transition duration-200 focus:outline-none focus:ring-4 ${hasNewGlow ? 'dock-new-content-glow' : ''}`}
                   style={{
-                    backgroundColor: isActive ? hexToRgba(accentColor, 18) : itemBackground,
-                    borderColor: isActive ? accentColor : borderColor,
-                    borderRadius: itemRadius,
-                    color: isActive ? accentColor : textColor,
-                    padding: Math.max(7, dockPadding - 3),
+                    backgroundColor: isActive ? '#EEF6FF' : 'transparent',
+                    borderColor: isActive ? '#0B63FF' : 'transparent',
+                    borderRadius: 16,
+                    borderStyle: isActive ? 'solid' : 'none',
+                    borderWidth: isActive ? 1.5 : 0,
+                    color: isActive ? '#0B63FF' : '#667085',
+                    padding: isActive ? '6px 12px' : Math.max(7, dockPadding - 3),
                     minWidth: 0,
                     boxShadow: 'none',
                   }}
                 >
-                  <span className={`absolute inset-0 bg-gradient-to-br ${tone.split(' hover:')[0]} transition duration-200 group-hover/item:opacity-75`} style={{ opacity: accentOpacity, borderRadius: itemRadius }} />
                   <ProfessionalIcon
                     slot={visualSlot}
                     fallbackName={visualIcon}
@@ -259,11 +260,11 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
                     defaultDisplayMode={showLabels ? 'icon-with-text' : 'icon-only'}
                     defaultPosition="top"
                     size={Math.max(18, iconSize * 0.58)}
-                    color={isActive ? accentColor : textColor}
-                    iconClassName={`relative flex items-center justify-center border-0 transition duration-200 ${isActive ? 'bg-[#E8DEF8]' : 'bg-transparent'}`}
-                    iconStyle={{ width: isActive ? 64 : iconSize, height: 32, borderRadius: 999, borderColor: 'transparent' }}
+                    color={isActive ? '#0B63FF' : '#667085'}
+                    iconClassName={`relative flex items-center justify-center border-0 transition duration-200 bg-transparent`}
+                    iconStyle={{ width: iconSize, height: 32, borderRadius: 999, borderColor: 'transparent' }}
                     labelClassName="relative font-black tracking-wide"
-                    labelStyle={{ fontSize: labelSize, color: isActive ? accentColor : textColor }}
+                    labelStyle={{ fontSize: labelSize, color: isActive ? '#0B63FF' : '#667085' }}
                   />
                   {showBadges && item.badge ? <span className="dock-count-badge absolute -right-1 -top-1 rounded-full border border-white px-1.5 py-0.5 text-[10px] font-black text-white shadow-[0_8px_20px_rgba(15,23,42,0.24)]" style={{ backgroundColor: accentColor }}>{item.badge > 99 ? '99+' : item.badge}</span> : null}
                 </button>

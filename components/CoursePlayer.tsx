@@ -112,6 +112,7 @@ const courseFileTypeIcon = (file: ProductFile): string => {
     case 'quiz': return '❓';
     case 'image': return '🖼️';
     case 'link': return '🔗';
+    case 'google_form': return '📝';
     default: return '📎';
   }
 };
@@ -2743,6 +2744,36 @@ const CoursePlayer: React.FC<{
       case 'doc':
       case 'ebook': return <SmartDocsWorkspace file={activeFile} productId={product.id} />;
       case 'link': return isHostedDocsFile(activeFile) ? <HostedDocumentViewer file={activeFile} /> : <ExternalResourceCard file={activeFile} />;
+      case 'google_form': {
+        const formUrl = activeFile.url || activeFile.embedUrl || '';
+        return formUrl ? (
+          <div className="flex h-full flex-col">
+            <div className="flex items-center gap-2 border-b border-[#D9E7F8] bg-white/95 px-4 py-2.5 backdrop-blur-sm">
+              <span className="text-lg">📝</span>
+              <div className="min-w-0 flex-1">
+                <h3 className="truncate text-sm font-black text-[#081A45]">{activeFile.name || 'Google Form'}</h3>
+                <p className="truncate text-[10px] font-semibold text-[#64708F]">Fill the form below — your responses are saved automatically</p>
+              </div>
+            </div>
+            <div className="relative flex-1">
+              <iframe
+                src={formUrl}
+                title={activeFile.name || 'Google Form'}
+                className="absolute inset-0 h-full w-full border-0"
+                allow="clipboard-write"
+                loading="lazy"
+                sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-modals"
+              />
+            </div>
+          </div>
+        ) : (
+          <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+            <div className="grid h-16 w-16 place-items-center rounded-2xl bg-[#EEF6FF] text-3xl shadow-sm">📝</div>
+            <h3 className="text-lg font-black text-[#081A44]">Google Form not configured</h3>
+            <p className="max-w-sm text-sm font-semibold text-[#64708F]">The form link has not been set up for this module. Please contact the course creator.</p>
+          </div>
+        );
+      }
       case 'quiz': return <QuizPlayer file={activeFile} economySettings={economySettings} canEarnEduCoins={hasPremiumAccess} eduCoinMultiplier={eduCoinMultiplier} onQuizReward={onQuizReward} />;
       case 'image': {
         const imageUrl = activeFile.url || activeFile.embedUrl || '';
