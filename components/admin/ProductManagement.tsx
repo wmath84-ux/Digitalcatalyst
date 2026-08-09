@@ -2154,16 +2154,8 @@ const ProductForm: React.FC<{
     const cloudinaryImageReady = isCloudinaryImageUploadConfigured();
     const editorContentCount = countModuleContent(modules || []);
     const editorPrimaryImage = images[0] || (productImageUrlStatus === 'valid' ? imageUrlDraft.trim() : '');
-    const editorPriceLabel = formData.salePrice
-        ? `₹${formData.salePrice}`
-        : formData.price
-            ? `₹${formData.price}`
-            : '₹0';
-    const editorSaveLabel = isSavingProduct
-        ? 'Saving to Firebase...'
-        : mode === 'add'
-            ? 'Save Product'
-            : 'Update Product';
+    const editorPriceLabel = formData.salePrice ? `₹${formData.salePrice}` : formData.price ? `₹${formData.price}` : '₹0';
+    const editorSaveLabel = isSavingProduct ? 'Saving…' : mode === 'add' ? 'Publish Product' : 'Update Product';
 
     const wizardLastStep = PRODUCT_EDITOR_WIZARD_STEPS.length - 1;
     const currentWizardStep = PRODUCT_EDITOR_WIZARD_STEPS[activeWizardStep];
@@ -2176,17 +2168,14 @@ const ProductForm: React.FC<{
     const validateWizardStep = (stepIndex: number): string => {
         if (stepIndex === 0) {
             if (!formData.title.trim()) return 'Add a product title before continuing.';
-            if (!formData.description.trim()) return 'Add a short product description before continuing.';
+            if (!formData.description.trim()) return 'Add a short description before continuing.';
         }
-
         if (stepIndex === 1 && imageUrlDraft.trim() && productImageUrlStatus !== 'valid') {
-            return 'Finish validating the pending HTTPS image URL or clear it before continuing.';
+            return 'Finish validating the pending image URL or clear it before continuing.';
         }
-
         if (stepIndex === 2 && !String(formData.price || '').trim()) {
             return 'Add the regular product price before continuing.';
         }
-
         return '';
     };
 
@@ -2199,7 +2188,6 @@ const ProductForm: React.FC<{
     };
 
     const handlePreviousWizardStep = () => openWizardStep(activeWizardStep - 1);
-
     const handleNextWizardStep = () => {
         const validationError = validateWizardStep(activeWizardStep);
         if (validationError) {
@@ -2207,7 +2195,6 @@ const ProductForm: React.FC<{
             focusWizardTop();
             return;
         }
-
         openWizardStep(activeWizardStep + 1);
     };
 
@@ -2269,23 +2256,19 @@ const ProductForm: React.FC<{
         const files: File[] = event.currentTarget.files ? Array.from(event.currentTarget.files) : [];
         event.currentTarget.value = '';
         if (!files.length) return;
-
         if (!cloudinaryImageReady) {
-            setProductImageUploadError('Cloudinary upload is not configured. Add VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET, then restart the app. You can still paste a public image URL.');
+            setProductImageUploadError('Cloudinary not configured. Paste a public image URL instead.');
             setImageMode('url');
             return;
         }
-
         const invalidFile = files.map((file) => ({ file, validation: validateProductImageUpload(file) })).find(({ validation }) => !validation.valid);
         if (invalidFile) {
-            setProductImageUploadError(`${invalidFile.file.name}: ${invalidFile.validation.error || 'Please choose a valid image file.'}`);
+            setProductImageUploadError(`${invalidFile.file.name}: ${invalidFile.validation.error || 'Invalid image.'}`);
             return;
         }
-
         setProductImageUploadError('');
         setProductImageUploadProgress(5);
         setIsUploadingProductImage(true);
-
         try {
             const hostedUrls: string[] = [];
             for (let index = 0; index < files.length; index += 1) {
@@ -2295,24 +2278,19 @@ const ProductForm: React.FC<{
             }
             appendProductImages(hostedUrls);
             setImageMode('upload');
-            setProductImageUploadError('');
         } catch (error) {
-            console.error('Cloudinary product image upload failed:', error);
-            setProductImageUploadError(error instanceof Error ? error.message : 'Cloudinary image upload failed. Try again or paste a public image URL.');
+            setProductImageUploadError(error instanceof Error ? error.message : 'Image upload failed.');
         } finally {
             setIsUploadingProductImage(false);
             window.setTimeout(() => setProductImageUploadProgress(0), 800);
         }
     };
 
-
     const handleGenerateAiImage = async () => {
         const prompt = encodeURIComponent(`${formData.title || 'Education course'} ${formData.description || 'premium learning product'}`);
         setIsGeneratingImage(true);
         try {
             const aiImageUrl = `https://image.pollinations.ai/prompt/${prompt}?width=1024&height=768&nologo=true`;
-            setProductImageUploadError('');
-            setProductImageUploadProgress(0);
             appendProductImages([aiImageUrl]);
             setImageMode('url');
         } finally {
@@ -2337,12 +2315,10 @@ const ProductForm: React.FC<{
     const handleSubmit = async (event: React.FormEvent) => {
         event.preventDefault();
         if (isSavingProduct) return;
-
         if (activeWizardStep !== wizardLastStep) {
             handleNextWizardStep();
             return;
         }
-
         for (let stepIndex = 0; stepIndex < wizardLastStep; stepIndex += 1) {
             const validationError = validateWizardStep(stepIndex);
             if (validationError) {
@@ -2352,30 +2328,22 @@ const ProductForm: React.FC<{
                 return;
             }
         }
-
         setWizardError('');
         const resolvedPaymentLink = formData.paymentLink.trim() || product?.paymentLink?.trim() || DEFAULT_PRODUCT_PAYMENT_LINK;
-
         const features = ((formData.featuresText || '').split('\n') || []).map(item => item.trim()).filter(Boolean);
         const tags = ((formData.tagsText || '').split(',') || []).map(item => item.trim()).filter(Boolean);
         const keywords = parseKeywordList(formData.searchKeywordsText);
         const formattedPrice = formData.price ? `₹${formData.price}` : '₹0';
         const formattedSalePrice = formData.salePrice ? `₹${formData.salePrice}` : undefined;
-
         const pendingImageUrl = imageUrlDraft.trim();
         if (pendingImageUrl && productImageUrlStatus !== 'valid') {
-            setProductImageUploadError('Please wait for a valid HTTPS image preview or clear the pending URL.');
+            setProductImageUploadError('Wait for valid HTTPS image preview or clear pending URL.');
             return;
         }
-
-        const productImages = Array.from(new Set(
-            [...images, ...(pendingImageUrl ? [pendingImageUrl] : [])].map((image) => String(image || '').trim()).filter(Boolean)
-        ));
+        const productImages = Array.from(new Set([...images, ...(pendingImageUrl ? [pendingImageUrl] : [])].map((image) => String(image || '').trim()).filter(Boolean)));
         setIsSavingProduct(true);
-
         const primaryImage = productImages[0];
         const productImageMap = buildProductImageMap(primaryImage);
-
         const saved = await onSave({
             imageSeed: formData.imageSeed || formData.title || `product-${Date.now()}`,
             images: productImages,
@@ -2408,335 +2376,361 @@ const ProductForm: React.FC<{
             wishlistCount: product?.wishlistCount,
             viewCount: product?.viewCount,
         });
-
-        if (!saved) {
-            setIsSavingProduct(false);
-        }
+        if (!saved) setIsSavingProduct(false);
     };
 
+    const trustedField = "w-full rounded-xl border border-[#E5E7EB] bg-white px-4 py-3 text-[14px] font-medium text-black outline-none placeholder:text-[#9CA3AF] focus:border-black focus:ring-2 focus:ring-black/10 transition";
+    const trustedLabel = "mb-1.5 block text-[11px] font-black uppercase tracking-[0.14em] text-[#6B7280]";
+    const trustedCard = "rounded-[16px] border border-[#E5E7EB] bg-white p-5 shadow-[0_4px_20px_rgba(0,0,0,0.04)]";
+    const primaryBtn = "inline-flex items-center justify-center rounded-full bg-black px-5 py-3 text-[13px] font-black text-white shadow-[0_10px_20px_rgba(0,0,0,0.15)] hover:bg-[#111111] disabled:opacity-60";
+    const secondaryBtn = "inline-flex items-center justify-center rounded-full border border-[#E5E7EB] bg-white px-5 py-3 text-[13px] font-bold text-black hover:bg-[#F9FAFB]";
+    const accentChip = "inline-flex items-center gap-1 rounded-full bg-[#EEF6FF] border border-[#BFD7FF] px-2.5 py-1 text-[10px] font-black text-[#0B63FF]";
+
     return (
-        <div ref={wizardTopRef} data-product-editor-workspace="PRODUCT_EDITOR_WIZARD_V2" className="product-editor-workspace product-editor-wizard text-slate-900">
-            <form onSubmit={handleSubmit} className="product-editor-form" noValidate>
-                <header className="product-editor-header product-editor-wizard-header">
-                    <div className="product-editor-header-main product-editor-wizard-header-main">
-                        <div className="flex min-w-0 items-center gap-3 sm:gap-4">
-                            <button type="button" onClick={onCancel} disabled={isSavingProduct} className="product-editor-back-button" aria-label="Cancel editing and return to product list">
-                                <span aria-hidden="true">←</span>
-                                <span className="hidden sm:inline">Products</span>
-                            </button>
+        <div ref={wizardTopRef} className="min-h-screen bg-[#FAFAFA] text-black">
+            <form onSubmit={handleSubmit} noValidate className="flex min-h-screen flex-col">
+                {/* Top Header - Trusted Black/White with home dock accent */}
+                <header className="sticky top-0 z-30 border-b border-[#E5E7EB] bg-white/95 backdrop-blur-xl">
+                    <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#0B63FF] via-black to-[#0B63FF]" />
+                    <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-4 px-4 py-3 sm:px-6">
+                        <div className="flex min-w-0 items-center gap-3">
+                            <button type="button" onClick={onCancel} className="grid h-10 w-10 place-items-center rounded-full bg-[#F3F4F6] text-black hover:bg-[#E5E7EB]">←</button>
                             <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <p className="product-editor-eyebrow">{mode === 'add' ? 'Create Product' : 'Edit Product'}</p>
-                                    <span className={`product-editor-state-pill ${formData.isVisible ? 'is-visible' : 'is-hidden'}`}>{formData.isVisible ? 'Visible' : 'Hidden'}</span>
-                                    <span className={`product-editor-state-pill ${formData.inStock ? 'is-stocked' : 'is-unavailable'}`}>{formData.inStock ? 'In stock' : 'Out of stock'}</span>
+                                <div className="flex items-center gap-2">
+                                    <p className="text-[10px] font-black uppercase tracking-[0.18em] text-[#0B63FF]">{mode === 'add' ? 'Create Product • Trusted Mode' : 'Edit Product • Trusted Mode'}</p>
+                                    <span className={accentChip}>✓ Secure save</span>
+                                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${formData.isVisible ? 'bg-black text-white' : 'bg-[#F3F4F6] text-[#6B7280]'}`}>{formData.isVisible ? 'Visible' : 'Hidden'}</span>
                                 </div>
-                                <h1 className="product-editor-title">{mode === 'add' ? 'New digital product' : formData.title || 'Product editor'}</h1>
-                                <p className="product-editor-subtitle">Step {activeWizardStep + 1} of {PRODUCT_EDITOR_WIZARD_STEPS.length} · {currentWizardStep.helper}</p>
+                                <h1 className="mt-1 truncate text-[18px] font-black tracking-tight text-black sm:text-[20px]">{mode === 'add' ? 'New Digital Product' : formData.title || 'Product Editor'}</h1>
+                                <p className="mt-0.5 text-[11px] font-medium text-[#6B7280]">Step {activeWizardStep + 1}/{PRODUCT_EDITOR_WIZARD_STEPS.length} • {currentWizardStep.label} • {currentWizardStep.helper}</p>
                             </div>
                         </div>
-
-                        <div className="product-editor-header-actions product-editor-wizard-actions">
-                            <button type="button" onClick={onCancel} disabled={isSavingProduct} className="product-editor-secondary-action">Cancel</button>
-                            {activeWizardStep > 0 && (
-                                <button type="button" onClick={handlePreviousWizardStep} disabled={isSavingProduct} className="product-editor-secondary-action">Previous</button>
-                            )}
+                        <div className="flex items-center gap-2">
+                            <button type="button" onClick={onCancel} className={secondaryBtn}>Cancel</button>
+                            {activeWizardStep > 0 && <button type="button" onClick={handlePreviousWizardStep} className={secondaryBtn}>Back</button>}
                             {activeWizardStep < wizardLastStep ? (
-                                <button type="button" onClick={handleNextWizardStep} disabled={isUploadingProductImage} className="product-editor-primary-action">Next</button>
+                                <button type="button" onClick={handleNextWizardStep} className={primaryBtn}>Continue →</button>
                             ) : (
-                                <button type="submit" disabled={isSavingProduct || isUploadingProductImage} className="product-editor-primary-action">{editorSaveLabel}</button>
+                                <button type="submit" disabled={isSavingProduct || isUploadingProductImage} className={primaryBtn}>{editorSaveLabel}</button>
                             )}
                         </div>
                     </div>
-
-                    <div className="product-editor-wizard-progress" aria-label="Product setup progress">
-                        <div className="product-editor-wizard-progress-track" aria-hidden="true">
-                            <span style={{ width: `${((activeWizardStep + 1) / PRODUCT_EDITOR_WIZARD_STEPS.length) * 100}%` }} />
-                        </div>
-                        <ol>
-                            {PRODUCT_EDITOR_WIZARD_STEPS.map((step, index) => (
-                                <li key={step.key} className={index === activeWizardStep ? 'is-current' : index < activeWizardStep ? 'is-complete' : ''}>
-                                    <button
-                                        type="button"
-                                        onClick={() => index <= furthestWizardStep && openWizardStep(index)}
-                                        disabled={index > furthestWizardStep || isSavingProduct}
-                                        aria-current={index === activeWizardStep ? 'step' : undefined}
-                                    >
-                                        <span>{index < activeWizardStep ? '✓' : index + 1}</span>
-                                        <strong className="hidden sm:block">{step.shortLabel}</strong>
-                                    </button>
-                                </li>
+                    {/* Progress */}
+                    <div className="mx-auto max-w-[1440px] px-4 sm:px-6 pb-3">
+                        <div className="flex gap-1.5">
+                            {PRODUCT_EDITOR_WIZARD_STEPS.map((_, idx) => (
+                                <div key={idx} className={`h-1.5 flex-1 rounded-full transition ${idx <= activeWizardStep ? 'bg-black' : 'bg-[#E5E7EB]'}`} />
                             ))}
-                        </ol>
+                        </div>
                     </div>
                 </header>
 
-                <main className="product-editor-main product-editor-wizard-main">
-                    {wizardError && <p className="product-editor-wizard-error" role="alert">{wizardError}</p>}
-
-                    {activeWizardStep === 0 && (
-                        <section className={`${glassCard} product-editor-card product-editor-wizard-panel`} aria-labelledby="product-wizard-details-title">
-                            <div className="product-editor-card-heading">
-                                <div>
-                                    <p className="product-editor-eyebrow">Step 1 · Basic details</p>
-                                    <h2 id="product-wizard-details-title">Describe the product</h2>
-                                    <p>Start with the storefront information customers need to understand the product.</p>
-                                </div>
-                                <span className="product-editor-step-badge">01</span>
+                <div className="mx-auto flex w-full max-w-[1440px] flex-1 gap-0 lg:gap-6 px-0 lg:px-6 py-0 lg:py-6">
+                    {/* Left Steps - Desktop */}
+                    <aside className="hidden w-[280px] shrink-0 lg:flex flex-col gap-3 sticky top-[92px] h-fit">
+                        <div className={trustedCard}>
+                            <p className="text-[10px] font-black uppercase tracking-[0.16em] text-[#9CA3AF]">Setup Progress</p>
+                            <div className="mt-1 flex items-center gap-2">
+                                <span className="text-[28px] font-black text-black">{activeWizardStep + 1}</span>
+                                <span className="text-[14px] font-bold text-[#6B7280]">/ {PRODUCT_EDITOR_WIZARD_STEPS.length}</span>
+                                <span className="ml-auto rounded-full bg-[#EEF6FF] px-2 py-1 text-[10px] font-black text-[#0B63FF]">{Math.round(((activeWizardStep+1)/PRODUCT_EDITOR_WIZARD_STEPS.length)*100)}% done</span>
                             </div>
-
-                            <div className="product-editor-form-grid">
-                                <div className="is-wide">
-                                    <label className={labelClass}>Product Title</label>
-                                    <input autoFocus required value={formData.title} onChange={event => setFormData(prev => ({ ...prev, title: event.target.value }))} className={fieldClass} placeholder="Masterclass, template pack, guide..." />
-                                </div>
-                                <div className="is-wide">
-                                    <label className={labelClass}>Short Description</label>
-                                    <textarea required rows={3} value={formData.description} onChange={event => setFormData(prev => ({ ...prev, description: event.target.value }))} className={fieldClass} placeholder="A concise storefront summary." />
-                                </div>
-                                <div className="is-wide">
-                                    <label className={labelClass}>Long Description</label>
-                                    <textarea rows={8} value={formData.longDescription} onChange={event => setFormData(prev => ({ ...prev, longDescription: event.target.value }))} className={fieldClass} placeholder="Deep product narrative, outcomes, curriculum promise..." />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>SKU</label>
-                                    <input value={formData.sku} onChange={event => setFormData(prev => ({ ...prev, sku: event.target.value }))} className={fieldClass} placeholder="DC-COURSE-001" />
-                                </div>
-                                <div>
-                                    <label className={labelClass}>Manual Rating</label>
-                                    <input type="number" min="0" max="5" step="0.1" value={formData.manualRating} onChange={event => setFormData(prev => ({ ...prev, manualRating: event.target.value }))} className={fieldClass} placeholder="4.8" />
-                                </div>
+                            <div className="mt-4 space-y-1.5">
+                                {PRODUCT_EDITOR_WIZARD_STEPS.map((step, index) => {
+                                    const isActive = index === activeWizardStep;
+                                    const isDone = index < activeWizardStep;
+                                    const isReachable = index <= furthestWizardStep;
+                                    return (
+                                        <button key={step.key} type="button" disabled={!isReachable} onClick={() => isReachable && openWizardStep(index)} className={`flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left transition ${isActive ? 'bg-black text-white' : isDone ? 'bg-[#F9FAFB] text-black border border-[#E5E7EB]' : 'text-[#6B7280] hover:bg-white hover:text-black'}`}>
+                                            <span className={`grid h-7 w-7 place-items-center rounded-full text-[11px] font-black ${isActive ? 'bg-white text-black' : isDone ? 'bg-black text-white' : 'bg-[#F3F4F6] text-[#9CA3AF]'}`}>{isDone ? '✓' : index+1}</span>
+                                            <span className="min-w-0 flex-1">
+                                                <span className="block text-[13px] font-bold leading-tight">{step.label}</span>
+                                                <span className="block text-[10px] font-medium opacity-70 leading-tight truncate">{step.helper}</span>
+                                            </span>
+                                        </button>
+                                    );
+                                })}
                             </div>
-                        </section>
-                    )}
+                        </div>
 
-                    {activeWizardStep === 1 && (
-                        <section className={`${glassCard} product-editor-card product-editor-wizard-panel`} aria-labelledby="product-wizard-images-title">
-                            <div className="product-editor-card-heading">
-                                <div>
-                                    <p className="product-editor-eyebrow">Step 2 · Product images</p>
-                                    <h2 id="product-wizard-images-title">Build the media gallery</h2>
-                                    <p>Add URLs, upload to Cloudinary, generate an image, then arrange the exact storefront order.</p>
-                                </div>
-                                <span className="product-editor-step-badge">02</span>
+                        <div className={trustedCard}>
+                            <p className="text-[11px] font-black uppercase tracking-wide text-[#9CA3AF]">Live Summary</p>
+                            <div className="mt-3 aspect-[16/10] overflow-hidden rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] grid place-items-center">
+                                {editorPrimaryImage ? <img src={editorPrimaryImage} alt="preview" className="h-full w-full object-contain" /> : <span className="text-2xl">▧</span>}
                             </div>
-
-                            <div className="product-editor-media-layout">
-                                <div className="product-editor-media-tools">
-                                    <div className="product-editor-segmented-control" role="group" aria-label="Choose image source">
-                                        <button type="button" onClick={() => setImageMode('url')} className={imageMode === 'url' ? 'is-active' : ''}>Image URL</button>
-                                        <button type="button" onClick={() => setImageMode('upload')} className={imageMode === 'upload' ? 'is-active' : ''}>Cloudinary</button>
-                                        <button type="button" onClick={() => setImageMode('ai')} className={imageMode === 'ai' ? 'is-active' : ''}>AI image</button>
+                            <h3 className="mt-3 truncate text-[14px] font-black text-black">{formData.title || 'Untitled product'}</h3>
+                            <p className="mt-1 line-clamp-2 text-[11px] font-medium text-[#6B7280]">{formData.description || 'Add description to preview.'}</p>
+                            <div className="mt-3 flex items-center gap-2">
+                                <span className="rounded-full bg-black px-2.5 py-1 text-[11px] font-black text-white">{editorPriceLabel}</span>
+                                {discountPercent>0 && <span className="rounded-full bg-[#EEF6FF] border border-[#BFD7FF] px-2 py-1 text-[10px] font-black text-[#0B63FF]">{discountPercent}% OFF</span>}
+                            </div>
+                            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+                                {[{k:'Images',v:images.length},{k:'Modules',v:modules.length},{k:'Content',v:editorContentCount}].map(s=>(
+                                    <div key={s.k} className="rounded-xl bg-[#F9FAFB] px-2 py-2 border border-[#F3F4F6]">
+                                        <p className="text-[14px] font-black text-black">{s.v}</p>
+                                        <p className="text-[9px] font-bold uppercase text-[#9CA3AF]">{s.k}</p>
                                     </div>
+                                ))}
+                            </div>
+                        </div>
 
-                                    <div className="product-editor-media-source">
-                                        {imageMode === 'url' ? (
-                                            <div className="space-y-3">
-                                                <PremiumImageUrlInput value={imageUrlDraft} onChange={setImageUrlDraft} onStatusChange={setProductImageUrlStatus} label="Add product image URL" previewAlt="New product image" aspect="square" compact helperText="Add one public HTTPS image at a time. Distinct images are kept in gallery order; the first image is primary." />
-                                                <button type="button" onClick={addImageUrlDraft} disabled={productImageUrlStatus !== 'valid'} className="product-editor-full-action">Add image to gallery</button>
-                                            </div>
-                                        ) : imageMode === 'upload' ? (
-                                            <div className="product-editor-upload-zone">
-                                                <span className="product-editor-upload-icon" aria-hidden="true">⇧</span>
-                                                <p className="font-black text-slate-900">Upload product images</p>
-                                                <p className="mt-2 text-xs font-bold text-slate-600">Select one or more valid images. Files upload to Cloudinary and keep their selected order.</p>
-                                                <button type="button" onClick={() => productImageInputRef.current?.click()} disabled={!cloudinaryImageReady || isUploadingProductImage} className="product-editor-full-action mt-4">{cloudinaryImageReady ? (isUploadingProductImage ? 'Uploading…' : 'Choose image(s)') : 'Cloudinary env not configured'}</button>
-                                                {!cloudinaryImageReady ? <p className="mt-3 text-xs font-bold text-rose-600">Set VITE_CLOUDINARY_CLOUD_NAME and VITE_CLOUDINARY_UPLOAD_PRESET to enable upload.</p> : null}
-                                            </div>
-                                        ) : (
-                                            <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="product-editor-ai-zone">
-                                                <span className="text-2xl" aria-hidden="true">✦</span>
-                                                <span>{isGeneratingImage ? 'Generating...' : 'Generate from title + description'}</span>
-                                            </button>
-                                        )}
-                                        <input ref={productImageInputRef} type="file" accept="image/*,.heic,.heif,image/heic,image/heif" multiple onChange={handleProductImagesUpload} className="hidden" />
-                                        {isUploadingProductImage && (
-                                            <div className="product-editor-progress" role="status" aria-live="polite">
-                                                <span style={{ width: `${productImageUploadProgress}%` }} />
-                                                <p>Uploading image(s) to Cloudinary... {productImageUploadProgress}% complete.</p>
-                                            </div>
-                                        )}
-                                        {productImageUploadError && <p className="product-editor-error" role="alert">{productImageUploadError}</p>}
-                                    </div>
+                        <div className={trustedCard + " bg-[#FFFBFE] border-[#D8E6FF]"}>
+                            <p className="text-[11px] font-black uppercase text-[#0B63FF]">Trusted Editing</p>
+                            <p className="mt-1 text-[11px] font-medium leading-5 text-[#6B7280]">Black & white UI with home dock accent #0B63FF. All dropdowns, buttons, layouts optimized for desktop ease.</p>
+                        </div>
+                    </aside>
 
+                    {/* Main Content */}
+                    <main className="flex-1 min-w-0 bg-white lg:bg-transparent p-4 lg:p-0">
+                        {wizardError && <p className="mb-4 rounded-xl border border-[#FECACA] bg-[#FEF2F2] p-3 text-[13px] font-bold text-[#DC2626]">{wizardError}</p>}
+
+                        {/* Mobile steps horizontal */}
+                        <div className="mb-4 flex gap-2 overflow-x-auto lg:hidden pb-2">
+                            {PRODUCT_EDITOR_WIZARD_STEPS.map((step, idx)=>(
+                                <button key={step.key} type="button" onClick={()=> idx<=furthestWizardStep && openWizardStep(idx)} className={`shrink-0 rounded-full px-3 py-1.5 text-[11px] font-bold ${idx===activeWizardStep?'bg-black text-white':'bg-[#F3F4F6] text-[#6B7280]'}`}>{idx+1}. {step.shortLabel}</button>
+                            ))}
+                        </div>
+
+                        {activeWizardStep === 0 && (
+                            <section className={trustedCard + " space-y-5"}>
+                                <div className="flex items-center justify-between">
                                     <div>
-                                        <label className={labelClass}>Image Seed</label>
-                                        <input value={formData.imageSeed} onChange={event => setFormData(prev => ({ ...prev, imageSeed: event.target.value }))} className={fieldClass} placeholder="Fallback image seed" />
+                                        <h2 className="text-[18px] font-black text-black">Basic Details</h2>
+                                        <p className="text-[12px] font-medium text-[#6B7280]">Title, descriptions, SKU, rating – storefront essentials.</p>
                                     </div>
+                                    <span className="grid h-8 w-8 place-items-center rounded-full bg-black text-white text-[12px]">01</span>
                                 </div>
-
-                                <div className="product-editor-gallery-panel">
-                                    <div className="product-editor-gallery-heading">
-                                        <div><h3>Gallery order</h3><p>{images.length} image{images.length === 1 ? '' : 's'} selected</p></div>
-                                        {images.length > 0 && <span>First image = Primary</span>}
-                                    </div>
-
-                                    {images.length ? (
-                                        <div className="product-editor-gallery-grid">
-                                            {images.map((image, index) => (
-                                                <article key={image} className={`product-editor-gallery-item ${index === 0 ? 'is-primary' : ''}`}>
-                                                    <div className="product-editor-gallery-image"><img src={image} alt={`Product image ${index + 1}`} className="h-full w-full object-contain" /></div>
-                                                    <div className="product-editor-gallery-meta">
-                                                        <span>{index === 0 ? 'Primary image' : `Image ${index + 1}`}</span>
-                                                        <div className="product-editor-gallery-actions">
-                                                            <button type="button" onClick={() => moveProductImage(index, -1)} disabled={index === 0} aria-label={`Move image ${index + 1} left`}>←</button>
-                                                            <button type="button" onClick={() => moveProductImage(index, 1)} disabled={index === images.length - 1} aria-label={`Move image ${index + 1} right`}>→</button>
-                                                            <button type="button" onClick={() => setImages((current) => current.filter((_, imageIndex) => imageIndex !== index))} className="is-danger" aria-label={`Remove image ${index + 1}`}>×</button>
-                                                        </div>
-                                                    </div>
-                                                </article>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="product-editor-empty-gallery">
-                                            <span aria-hidden="true">▧</span>
-                                            <strong>No product images yet</strong>
-                                            <p>Add a URL, upload files, or generate an image. The first image becomes primary.</p>
-                                        </div>
-                                    )}
-                                    <p className="product-editor-info-note">All distinct images save in gallery order. The primary image is mirrored into product display slots.</p>
-                                </div>
-                            </div>
-                        </section>
-                    )}
-
-                    {activeWizardStep === 2 && (
-                        <section className={`${glassCard} product-editor-card product-editor-wizard-panel`} aria-labelledby="product-wizard-pricing-title">
-                            <div className="product-editor-card-heading">
-                                <div>
-                                    <p className="product-editor-eyebrow">Step 3 · Pricing & purchase</p>
-                                    <h2 id="product-wizard-pricing-title">Configure checkout options</h2>
-                                    <p>Set cash pricing, EduCoin redemption, coupon access and the Razorpay destination.</p>
-                                </div>
-                                <span className="product-editor-step-badge">03</span>
-                            </div>
-
-                            {discountPercent > 0 && <p className="product-editor-discount-pill">{discountPercent}% discount active</p>}
-                            <div className="product-editor-form-grid product-editor-pricing-grid">
-                                <div><label className={labelClass}>Regular Price</label><input autoFocus required type="number" value={formData.price} onChange={event => setFormData(prev => ({ ...prev, price: event.target.value }))} className={fieldClass} placeholder="999" /></div>
-                                <div><label className={labelClass}>Sale Price</label><input type="number" value={formData.salePrice} onChange={event => setFormData(prev => ({ ...prev, salePrice: event.target.value }))} className={fieldClass} placeholder="499" /></div>
-                                <div className="product-editor-coin-panel">
-                                    <label className={labelClass}>EduCoin Price</label>
-                                    <input type="number" min="0" value={formData.coinPrice} onChange={(event) => setFormData((previous) => ({ ...previous, coinPrice: event.target.value }))} className={fieldClass} placeholder="Example: 299" />
-                                    <p>Leave empty or set 0 to disable EduCoin purchase.</p>
-                                    <label className="product-editor-inline-toggle"><input type="checkbox" checked={formData.isCoinRedeemEnabled !== false} onChange={(event) => setFormData((previous) => ({ ...previous, isCoinRedeemEnabled: event.target.checked }))} /><span>Enable Pay with EduCoin</span></label>
-                                </div>
-                                <div className="product-editor-purchase-toggle">
-                                    <label>
-                                        <span><strong>Free via coupon</strong><small>Enable the existing free-access flow</small></span>
-                                        <input type="checkbox" checked={formData.isFree} onChange={event => setFormData(prev => ({ ...prev, isFree: event.target.checked }))} />
-                                    </label>
-                                </div>
-                                <div><label className={labelClass}>Coupon Code</label><select value={formData.couponCode} onChange={event => setFormData(prev => ({ ...prev, couponCode: event.target.value }))} className={fieldClass}><option value="">No coupon</option>{(coupons || []).map(coupon => <option key={coupon.id} value={coupon.code}>{coupon.code}</option>)}</select></div>
-                                <div className="is-wide"><label className={labelClass}>Razorpay Payment Page Link</label><input value={formData.paymentLink} onChange={event => setFormData(prev => ({ ...prev, paymentLink: event.target.value }))} className={fieldClass} placeholder="https://pages.razorpay.com/..." /></div>
-                            </div>
-                        </section>
-                    )}
-
-                    {activeWizardStep === 3 && (
-                        <section className={`${glassCard} product-editor-card product-editor-wizard-panel`} aria-labelledby="product-wizard-organization-title">
-                            <div className="product-editor-card-heading">
-                                <div>
-                                    <p className="product-editor-eyebrow">Step 4 · Organization & discovery</p>
-                                    <h2 id="product-wizard-organization-title">Organize and improve search</h2>
-                                    <p>Keep the catalog structured and help customers find this product through relevant metadata.</p>
-                                </div>
-                                <span className="product-editor-step-badge">04</span>
-                            </div>
-
-                            <div className="product-editor-form-grid">
-                                <div><label className={labelClass}>Category</label><input autoFocus value={formData.category} onChange={event => setFormData(prev => ({ ...prev, category: event.target.value }))} className={fieldClass} placeholder="Design, Finance, Coding..." /></div>
-                                <div><label className={labelClass}>Department</label><select value={formData.department} onChange={event => setFormData(prev => ({ ...prev, department: event.target.value as ProductFormData['department'] }))} className={fieldClass}><option>Unisex</option><option>Men</option><option>Women</option></select></div>
-                                <div><label className={labelClass}>Dimensions</label><input value={formData.dimensions} onChange={event => setFormData(prev => ({ ...prev, dimensions: event.target.value }))} className={fieldClass} placeholder="1024x768, A4, 16:9" /></div>
-                                <div><label className={labelClass}>File Format</label><input value={formData.fileFormat} onChange={event => setFormData(prev => ({ ...prev, fileFormat: event.target.value }))} className={fieldClass} placeholder="PDF + MP4 + Docs" /></div>
-                                <div>
-                                    <label className={labelClass}>Storefront Aspect Ratio</label>
-                                    <select value={formData.aspectRatio} onChange={event => setFormData(prev => ({ ...prev, aspectRatio: event.target.value }))} className={fieldClass}>
-                                        <option value="aspect-[4/3]">Landscape 4:3</option>
-                                        <option value="aspect-video">Widescreen 16:9</option>
-                                        <option value="aspect-square">Square 1:1</option>
-                                        <option value="aspect-[3/4]">Portrait 3:4</option>
-                                    </select>
-                                </div>
-                                <div><label className={labelClass}>Tags (comma separated)</label><input value={formData.tagsText} onChange={event => setFormData(prev => ({ ...prev, tagsText: event.target.value }))} className={fieldClass} placeholder="premium, beginner, template" /></div>
-                                <div className="is-wide"><label className={labelClass}>Features (one per line)</label><textarea rows={5} value={formData.featuresText} onChange={event => setFormData(prev => ({ ...prev, featuresText: event.target.value }))} className={fieldClass} placeholder="Downloadable notes&#10;Practice quizzes&#10;Lifetime access" /></div>
-                                <div className="is-wide"><label className={labelClass}>Search Keywords</label><textarea rows={4} value={formData.searchKeywordsText} onChange={event => setFormData(prev => ({ ...prev, searchKeywordsText: event.target.value }))} className={fieldClass} placeholder="class 10, physics, pcm, neet, pdf, notes" /><p className="mt-2 text-xs font-bold text-slate-500">Add words students may search for, like class 10, physics, pcm, neet, pdf, notes.</p></div>
-                            </div>
-                        </section>
-                    )}
-
-                    {activeWizardStep === 4 && (
-                        <section className={`${glassCard} product-editor-card product-editor-wizard-panel product-editor-curriculum`} aria-labelledby="product-wizard-content-title">
-                            <div className="product-editor-card-heading product-editor-card-heading-with-action">
-                                <div>
-                                    <p className="product-editor-eyebrow">Step 5 · Course content</p>
-                                    <h2 id="product-wizard-content-title">Build modules and learning content</h2>
-                                    <p>All existing video, PDF, Open Docs, quiz, audio, Drive, link, upload and paid-update tools remain available here.</p>
-                                </div>
-                                <div className="flex flex-wrap items-center gap-3">
-                                    <span className="product-editor-count-pill">{modules.length} root module{modules.length === 1 ? '' : 's'} · {editorContentCount} item{editorContentCount === 1 ? '' : 's'}</span>
-                                    <button type="button" onClick={addRootModule} className="product-editor-secondary-primary-action">+ Add module</button>
-                                </div>
-                            </div>
-
-                            <div className="product-editor-module-list">
-                                {(modules || []).length > 0 ? (modules || []).map(module => (
-                                    <ModuleEditor key={module.id} module={module} allModules={modules || []} level={0} onUpdate={setModules} onAddChild={addChildModule} onDelete={deleteModule} productId={draftProductIdRef.current} />
-                                )) : (
-                                    <button type="button" onClick={addRootModule} className="product-editor-empty-module">
-                                        <span aria-hidden="true">＋</span>
-                                        <strong>Start with your first module</strong>
-                                        <p>Every module starts with safe empty file and submodule arrays.</p>
-                                    </button>
-                                )}
-                            </div>
-                        </section>
-                    )}
-
-                    {activeWizardStep === 5 && (
-                        <section className="product-editor-review-layout" aria-labelledby="product-wizard-review-title">
-                            <section className={`${glassCard} product-editor-card product-editor-wizard-panel`}>
-                                <div className="product-editor-card-heading">
+                                <div className="grid grid-cols-1 gap-4">
                                     <div>
-                                        <p className="product-editor-eyebrow">Step 6 · Publish & review</p>
-                                        <h2 id="product-wizard-review-title">Confirm the final product</h2>
-                                        <p>Review the live summary, choose availability, then use the single final save action in the header.</p>
+                                        <label className={trustedLabel}>Product Title *</label>
+                                        <input autoFocus required value={formData.title} onChange={e=>setFormData(p=>({...p,title:e.target.value}))} className={trustedField} placeholder="Masterclass, template pack, guide…" />
                                     </div>
-                                    <span className="product-editor-step-badge">06</span>
-                                </div>
-
-                                <div className="product-editor-review-checklist">
-                                    <div className={formData.title.trim() && formData.description.trim() ? 'is-ready' : 'is-missing'}><span>{formData.title.trim() && formData.description.trim() ? '✓' : '!'}</span><div><strong>Basic details</strong><small>{formData.title.trim() && formData.description.trim() ? 'Title and description are ready.' : 'Title and short description are required.'}</small></div><button type="button" onClick={() => openWizardStep(0)}>Edit</button></div>
-                                    <div className={images.length > 0 ? 'is-ready' : ''}><span>{images.length}</span><div><strong>Product images</strong><small>{images.length > 0 ? 'Gallery is ready; the first image is primary.' : 'No image selected. You can still save with the fallback seed.'}</small></div><button type="button" onClick={() => openWizardStep(1)}>Edit</button></div>
-                                    <div className={String(formData.price || '').trim() ? 'is-ready' : 'is-missing'}><span>{String(formData.price || '').trim() ? '✓' : '!'}</span><div><strong>Pricing & purchase</strong><small>{String(formData.price || '').trim() ? `${editorPriceLabel} configured.` : 'Regular price is required.'}</small></div><button type="button" onClick={() => openWizardStep(2)}>Edit</button></div>
-                                    <div className={modules.length > 0 ? 'is-ready' : ''}><span>{modules.length}</span><div><strong>Course content</strong><small>{modules.length} root module{modules.length === 1 ? '' : 's'} and {editorContentCount} content item{editorContentCount === 1 ? '' : 's'}.</small></div><button type="button" onClick={() => openWizardStep(4)}>Edit</button></div>
+                                    <div>
+                                        <label className={trustedLabel}>Short Description *</label>
+                                        <textarea required rows={3} value={formData.description} onChange={e=>setFormData(p=>({...p,description:e.target.value}))} className={trustedField} placeholder="Concise storefront summary…" />
+                                    </div>
+                                    <div>
+                                        <label className={trustedLabel}>Long Description</label>
+                                        <textarea rows={6} value={formData.longDescription} onChange={e=>setFormData(p=>({...p,longDescription:e.target.value}))} className={trustedField} placeholder="Deep product narrative…" />
+                                    </div>
+                                    <div className="grid grid-cols-2 gap-4">
+                                        <div>
+                                            <label className={trustedLabel}>SKU</label>
+                                            <input value={formData.sku} onChange={e=>setFormData(p=>({...p,sku:e.target.value}))} className={trustedField} placeholder="DC-001" />
+                                        </div>
+                                        <div>
+                                            <label className={trustedLabel}>Manual Rating</label>
+                                            <input type="number" min="0" max="5" step="0.1" value={formData.manualRating} onChange={e=>setFormData(p=>({...p,manualRating:e.target.value}))} className={trustedField} placeholder="4.8" />
+                                        </div>
+                                    </div>
                                 </div>
                             </section>
+                        )}
 
-                            <aside className="product-editor-review-sidebar">
-                                <section className="product-editor-summary-card">
-                                    <div className="product-editor-summary-image">{editorPrimaryImage ? <img src={editorPrimaryImage} alt={formData.title || 'Product preview'} /> : <span aria-hidden="true">▧</span>}</div>
-                                    <div className="min-w-0"><p className="product-editor-eyebrow">Live summary</p><h2>{formData.title || 'Untitled product'}</h2><p className="product-editor-summary-description">{formData.description || 'Add a short description to preview the storefront summary.'}</p></div>
-                                    <div className="product-editor-summary-price"><strong>{editorPriceLabel}</strong>{formData.salePrice && formData.price ? <span>₹{formData.price}</span> : null}{discountPercent > 0 && <em>{discountPercent}% off</em>}</div>
-                                    <div className="product-editor-summary-stats"><div><strong>{images.length}</strong><span>Images</span></div><div><strong>{modules.length}</strong><span>Modules</span></div><div><strong>{editorContentCount}</strong><span>Content</span></div></div>
-                                </section>
+                        {activeWizardStep === 1 && (
+                            <section className={trustedCard}>
+                                <div className="flex items-center justify-between mb-5">
+                                    <div>
+                                        <h2 className="text-[18px] font-black text-black">Product Images</h2>
+                                        <p className="text-[12px] font-medium text-[#6B7280]">Upload, paste URL, generate AI, arrange gallery order. First = primary.</p>
+                                    </div>
+                                    <span className="grid h-8 w-8 place-items-center rounded-full bg-black text-white text-[12px]">02</span>
+                                </div>
 
-                                <section className={`${glassCard} product-editor-card product-editor-side-card`}>
-                                    <div className="product-editor-side-heading"><div><p className="product-editor-eyebrow">Publishing</p><h2>Availability</h2></div></div>
-                                    <div className="product-editor-toggle-list">
-                                        <label><span><strong>Visible</strong><small>Show on storefront</small></span><input type="checkbox" checked={formData.isVisible} onChange={event => setFormData(prev => ({ ...prev, isVisible: event.target.checked }))} /></label>
-                                        <label><span><strong>In stock</strong><small>Purchasable now</small></span><input type="checkbox" checked={formData.inStock} onChange={event => setFormData(prev => ({ ...prev, inStock: event.target.checked }))} /></label>
-                                        <label><span><strong>Free via coupon</strong><small>Enable free access flow</small></span><input type="checkbox" checked={formData.isFree} onChange={event => setFormData(prev => ({ ...prev, isFree: event.target.checked }))} /></label>
+                                <div className="mb-4 flex gap-2 rounded-full bg-[#F3F4F6] p-1 w-fit">
+                                    {(['url','upload','ai'] as const).map(m=>(
+                                        <button key={m} type="button" onClick={()=>setImageMode(m)} className={`rounded-full px-4 py-2 text-[12px] font-bold capitalize ${imageMode===m?'bg-black text-white':'text-[#6B7280]'}`}>{m==='url'?'Image URL':m==='upload'?'Cloudinary':'AI Image'}</button>
+                                    ))}
+                                </div>
+
+                                <div className="rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-4 mb-4">
+                                    {imageMode==='url' ? (
+                                        <div>
+                                            <PremiumImageUrlInput value={imageUrlDraft} onChange={setImageUrlDraft} onStatusChange={setProductImageUrlStatus} label="Add image URL" previewAlt="preview" aspect="square" compact helperText="Public HTTPS URL. Distinct images kept in order." />
+                                            <button type="button" onClick={addImageUrlDraft} disabled={productImageUrlStatus!=='valid'} className="mt-3 w-full rounded-full bg-black py-2.5 text-[12px] font-black text-white disabled:opacity-50">Add to Gallery</button>
+                                        </div>
+                                    ) : imageMode==='upload' ? (
+                                        <div className="text-center py-6">
+                                            <p className="text-[14px] font-black text-black">Upload product images</p>
+                                            <p className="mt-1 text-[11px] font-medium text-[#6B7280]">Select valid images. Cloudinary keeps order.</p>
+                                            <button type="button" onClick={()=>productImageInputRef.current?.click()} disabled={!cloudinaryImageReady || isUploadingProductImage} className="mt-3 rounded-full bg-black px-5 py-2.5 text-[12px] font-black text-white">{cloudinaryImageReady ? (isUploadingProductImage?'Uploading…':'Choose images') : 'Env not configured'}</button>
+                                        </div>
+                                    ) : (
+                                        <button type="button" onClick={handleGenerateAiImage} disabled={isGeneratingImage} className="w-full rounded-xl border border-dashed border-[#D1D5DB] py-8 text-[13px] font-bold text-[#6B7280] hover:bg-white">{isGeneratingImage?'Generating…':'✦ Generate from title + description'}</button>
+                                    )}
+                                    <input ref={productImageInputRef} type="file" accept="image/*" multiple onChange={handleProductImagesUpload} className="hidden" />
+                                    {isUploadingProductImage && <div className="mt-3 h-1.5 w-full overflow-hidden rounded-full bg-[#E5E7EB]"><div className="h-full bg-black transition-all" style={{width:`${productImageUploadProgress}%`}} /></div>}
+                                    {productImageUploadError && <p className="mt-3 rounded-xl bg-[#FEF2F2] border border-[#FECACA] p-2 text-[11px] font-bold text-[#DC2626]">{productImageUploadError}</p>}
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+                                    {images.map((img,idx)=>(
+                                        <div key={img} className={`group relative overflow-hidden rounded-xl border bg-white ${idx===0?'border-black ring-2 ring-black/10':'border-[#E5E7EB]'}`}>
+                                            <div className="aspect-square bg-[#FAFAFA]"><img src={img} alt="" className="h-full w-full object-contain" /></div>
+                                            <div className="flex items-center justify-between p-2">
+                                                <span className="text-[10px] font-bold">{idx===0?'Primary':'Img '+(idx+1)}</span>
+                                                <div className="flex gap-1">
+                                                    <button type="button" onClick={()=>moveProductImage(idx,-1)} disabled={idx===0} className="grid h-6 w-6 place-items-center rounded-full bg-[#F3F4F6] text-[12px] disabled:opacity-30">←</button>
+                                                    <button type="button" onClick={()=>moveProductImage(idx,1)} disabled={idx===images.length-1} className="grid h-6 w-6 place-items-center rounded-full bg-[#F3F4F6] text-[12px] disabled:opacity-30">→</button>
+                                                    <button type="button" onClick={()=>setImages(c=>c.filter((_,i)=>i!==idx))} className="grid h-6 w-6 place-items-center rounded-full bg-[#FEF2F2] text-[#DC2626] text-[12px]">×</button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {images.length===0 && <div className="col-span-full rounded-xl border border-dashed border-[#D1D5DB] py-12 text-center text-[12px] font-medium text-[#9CA3AF]">No images yet. Add URL, upload, or generate AI image. First image = primary.</div>}
+                                </div>
+
+                                <div className="mt-4">
+                                    <label className={trustedLabel}>Image Seed (fallback)</label>
+                                    <input value={formData.imageSeed} onChange={e=>setFormData(p=>({...p,imageSeed:e.target.value}))} className={trustedField} placeholder="Fallback seed" />
+                                </div>
+                            </section>
+                        )}
+
+                        {activeWizardStep === 2 && (
+                            <section className={trustedCard + " space-y-5"}>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-[18px] font-black text-black">Pricing & Purchase</h2>
+                                        <p className="text-[12px] font-medium text-[#6B7280]">Cash, EduCoin, coupon, Razorpay – trusted checkout setup.</p>
+                                    </div>
+                                    <span className="grid h-8 w-8 place-items-center rounded-full bg-black text-white text-[12px]">03</span>
+                                </div>
+                                {discountPercent>0 && <div className="rounded-full bg-[#EEF6FF] border border-[#BFD7FF] px-3 py-1.5 text-[11px] font-black text-[#0B63FF] w-fit">{discountPercent}% discount active</div>}
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <label className={trustedLabel}>Regular Price *</label>
+                                        <input required type="number" value={formData.price} onChange={e=>setFormData(p=>({...p,price:e.target.value}))} className={trustedField} placeholder="999" />
+                                    </div>
+                                    <div>
+                                        <label className={trustedLabel}>Sale Price</label>
+                                        <input type="number" value={formData.salePrice} onChange={e=>setFormData(p=>({...p,salePrice:e.target.value}))} className={trustedField} placeholder="499" />
+                                    </div>
+                                    <div className="sm:col-span-2 rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-4">
+                                        <label className={trustedLabel}>EduCoin Price</label>
+                                        <input type="number" min="0" value={formData.coinPrice} onChange={e=>setFormData(p=>({...p,coinPrice:e.target.value}))} className={trustedField} placeholder="299" />
+                                        <label className="mt-3 flex items-center gap-2 text-[12px] font-bold"><input type="checkbox" checked={formData.isCoinRedeemEnabled!==false} onChange={e=>setFormData(p=>({...p,isCoinRedeemEnabled:e.target.checked}))} className="h-4 w-4 accent-black" /> Enable Pay with EduCoin</label>
+                                        <label className="mt-3 flex items-center justify-between rounded-xl border border-[#E5E7EB] bg-white p-3">
+                                            <span><strong className="block text-[13px]">Free via coupon</strong><small className="text-[11px] text-[#6B7280]">Enable free-access flow</small></span>
+                                            <input type="checkbox" checked={formData.isFree} onChange={e=>setFormData(p=>({...p,isFree:e.target.checked}))} className="h-5 w-5 accent-black" />
+                                        </label>
+                                    </div>
+                                    <div>
+                                        <label className={trustedLabel}>Coupon</label>
+                                        <select value={formData.couponCode} onChange={e=>setFormData(p=>({...p,couponCode:e.target.value}))} className={trustedField}><option value="">No coupon</option>{coupons.map(c=><option key={c.id} value={c.code}>{c.code}</option>)}</select>
+                                    </div>
+                                    <div className="sm:col-span-2">
+                                        <label className={trustedLabel}>Razorpay Link</label>
+                                        <input value={formData.paymentLink} onChange={e=>setFormData(p=>({...p,paymentLink:e.target.value}))} className={trustedField} placeholder="https://pages.razorpay.com/..." />
+                                    </div>
+                                </div>
+                            </section>
+                        )}
+
+                        {activeWizardStep === 3 && (
+                            <section className={trustedCard + " space-y-4"}>
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h2 className="text-[18px] font-black text-black">Organization & Discovery</h2>
+                                        <p className="text-[12px] font-medium text-[#6B7280]">Category, format, tags, SEO – make product findable.</p>
+                                    </div>
+                                    <span className="grid h-8 w-8 place-items-center rounded-full bg-black text-white text-[12px]">04</span>
+                                </div>
+                                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                                    <div><label className={trustedLabel}>Category</label><input value={formData.category} onChange={e=>setFormData(p=>({...p,category:e.target.value}))} className={trustedField} placeholder="Design, Finance…" /></div>
+                                    <div><label className={trustedLabel}>Department</label><select value={formData.department} onChange={e=>setFormData(p=>({...p,department:e.target.value as any}))} className={trustedField}><option>Unisex</option><option>Men</option><option>Women</option></select></div>
+                                    <div><label className={trustedLabel}>Dimensions</label><input value={formData.dimensions} onChange={e=>setFormData(p=>({...p,dimensions:e.target.value}))} className={trustedField} placeholder="1024x768" /></div>
+                                    <div><label className={trustedLabel}>File Format</label><input value={formData.fileFormat} onChange={e=>setFormData(p=>({...p,fileFormat:e.target.value}))} className={trustedField} placeholder="PDF + MP4" /></div>
+                                    <div><label className={trustedLabel}>Aspect Ratio</label><select value={formData.aspectRatio} onChange={e=>setFormData(p=>({...p,aspectRatio:e.target.value}))} className={trustedField}><option value="aspect-[4/3]">4:3</option><option value="aspect-video">16:9</option><option value="aspect-square">1:1</option><option value="aspect-[3/4]">3:4</option></select></div>
+                                    <div><label className={trustedLabel}>Tags (comma)</label><input value={formData.tagsText} onChange={e=>setFormData(p=>({...p,tagsText:e.target.value}))} className={trustedField} placeholder="premium, beginner" /></div>
+                                    <div className="sm:col-span-2"><label className={trustedLabel}>Features (one per line)</label><textarea rows={4} value={formData.featuresText} onChange={e=>setFormData(p=>({...p,featuresText:e.target.value}))} className={trustedField} placeholder="Downloadable notes&#10;Lifetime access" /></div>
+                                    <div className="sm:col-span-2"><label className={trustedLabel}>Search Keywords</label><textarea rows={3} value={formData.searchKeywordsText} onChange={e=>setFormData(p=>({...p,searchKeywordsText:e.target.value}))} className={trustedField} placeholder="class 10, physics, pcm…" /></div>
+                                </div>
+                            </section>
+                        )}
+
+                        {activeWizardStep === 4 && (
+                            <section className={trustedCard}>
+                                <div className="flex items-center justify-between mb-4">
+                                    <div>
+                                        <h2 className="text-[18px] font-black text-black">Course Content</h2>
+                                        <p className="text-[12px] font-medium text-[#6B7280]">Modules, lessons, files, paid updates – all easy dropdowns & buttons.</p>
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className="rounded-full bg-[#F3F4F6] px-2.5 py-1 text-[11px] font-bold">{modules.length} modules • {editorContentCount} items</span>
+                                        <button type="button" onClick={addRootModule} className="rounded-full bg-black px-4 py-2 text-[12px] font-black text-white">+ Add Module</button>
+                                    </div>
+                                </div>
+                                <div className="space-y-3">
+                                    {modules.length>0 ? modules.map(m=>(
+                                        <ModuleEditor key={m.id} module={m} allModules={modules} level={0} onUpdate={setModules} onAddChild={addChildModule} onDelete={deleteModule} productId={draftProductIdRef.current} />
+                                    )) : (
+                                        <button type="button" onClick={addRootModule} className="w-full rounded-xl border border-dashed border-[#D1D5DB] py-10 text-center">
+                                            <span className="text-2xl">＋</span>
+                                            <p className="mt-1 text-[13px] font-black text-black">Start with first module</p>
+                                            <p className="text-[11px] text-[#6B7280]">Empty file & submodule arrays safe.</p>
+                                        </button>
+                                    )}
+                                </div>
+                            </section>
+                        )}
+
+                        {activeWizardStep === 5 && (
+                            <div className="grid gap-4 lg:grid-cols-[1fr_340px]">
+                                <section className={trustedCard}>
+                                    <h2 className="text-[18px] font-black text-black">Review & Publish</h2>
+                                    <p className="mt-1 text-[12px] font-medium text-[#6B7280]">Confirm final product before secure save.</p>
+                                    <div className="mt-4 space-y-2">
+                                        {[
+                                            { ok: formData.title.trim() && formData.description.trim(), label: 'Basic details', desc: formData.title.trim() && formData.description.trim() ? 'Ready' : 'Title & short desc required', step: 0 },
+                                            { ok: images.length>0, label: 'Product images', desc: images.length>0 ? `${images.length} images – first is primary` : 'No image – fallback seed used', step: 1 },
+                                            { ok: String(formData.price||'').trim(), label: 'Pricing', desc: String(formData.price||'').trim() ? `${editorPriceLabel} configured` : 'Regular price required', step: 2 },
+                                            { ok: modules.length>0, label: 'Course content', desc: `${modules.length} modules, ${editorContentCount} items`, step: 4 },
+                                        ].map(item=>(
+                                            <div key={item.label} className={`flex items-center gap-3 rounded-xl border p-3 ${item.ok?'border-[#E5E7EB] bg-[#FAFAFA]':'border-[#FECACA] bg-[#FEF2F2]'}`}>
+                                                <span className={`grid h-7 w-7 place-items-center rounded-full text-[12px] font-black ${item.ok?'bg-black text-white':'bg-[#DC2626] text-white'}`}>{item.ok?'✓':'!'}</span>
+                                                <div className="min-w-0 flex-1"><p className="text-[13px] font-bold text-black">{item.label}</p><p className="text-[11px] text-[#6B7280]">{item.desc}</p></div>
+                                                <button type="button" onClick={()=>openWizardStep(item.step)} className="rounded-full border border-[#E5E7EB] bg-white px-3 py-1.5 text-[11px] font-bold">Edit</button>
+                                            </div>
+                                        ))}
                                     </div>
                                 </section>
-                            </aside>
-                        </section>
-                    )}
-                </main>
+                                <div className="space-y-4">
+                                    <div className={trustedCard}>
+                                        <div className="aspect-[16/10] overflow-hidden rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] grid place-items-center">
+                                            {editorPrimaryImage ? <img src={editorPrimaryImage} alt="" className="h-full w-full object-contain" /> : <span>▧</span>}
+                                        </div>
+                                        <h3 className="mt-3 truncate text-[14px] font-black text-black">{formData.title || 'Untitled'}</h3>
+                                        <p className="mt-1 line-clamp-2 text-[11px] text-[#6B7280]">{formData.description || 'Add description.'}</p>
+                                        <div className="mt-2 flex gap-2">
+                                            <span className="rounded-full bg-black px-2.5 py-1 text-[11px] font-black text-white">{editorPriceLabel}</span>
+                                            {discountPercent>0 && <span className="rounded-full bg-[#EEF6FF] border border-[#BFD7FF] px-2 py-1 text-[10px] font-black text-[#0B63FF]">{discountPercent}% OFF</span>}
+                                        </div>
+                                    </div>
+                                    <div className={trustedCard}>
+                                        <p className="text-[11px] font-black uppercase tracking-wide text-[#9CA3AF]">Availability</p>
+                                        <div className="mt-3 space-y-2">
+                                            {[
+                                                { k:'Visible', v:formData.isVisible, setter:(val:boolean)=>setFormData(p=>({...p,isVisible:val})), desc:'Show on storefront' },
+                                                { k:'In stock', v:formData.inStock, setter:(val:boolean)=>setFormData(p=>({...p,inStock:val})), desc:'Purchasable now' },
+                                                { k:'Free via coupon', v:formData.isFree, setter:(val:boolean)=>setFormData(p=>({...p,isFree:val})), desc:'Free-access flow' },
+                                            ].map(item=>(
+                                                <label key={item.k} className="flex items-center justify-between rounded-xl border border-[#E5E7EB] bg-[#FAFAFA] p-3 cursor-pointer">
+                                                    <span><strong className="block text-[12px] text-black">{item.k}</strong><small className="text-[10px] text-[#6B7280]">{item.desc}</small></span>
+                                                    <input type="checkbox" checked={item.v} onChange={e=>item.setter(e.target.checked)} className="h-5 w-5 accent-black" />
+                                                </label>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
             </form>
         </div>
     );
 };
-
 const ProductManagement: React.FC<{
     products: ProductWithRating[];
     users: User[];

@@ -639,7 +639,7 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
 
           <div ref={gridRef} className={`grid grid-cols-1 gap-5 sm:gap-8 md:grid-cols-12 ${settings.animations.enabled ? 'scroll-animate' : ''}`}>
             <div className="md:col-span-7">
-              <div className="sticky top-[calc(env(safe-area-inset-top)+4.25rem)] z-30 mt-0 grid grid-cols-4 gap-2 rounded-[24px] border border-white/80 bg-white/95 p-2 shadow-[0_18px_48px_rgba(37,99,235,0.14)] ring-1 ring-blue-100/70 backdrop-blur-2xl" aria-label="Product detail filters">
+              <div className="sticky top-[calc(env(safe-area-inset-top)+4.25rem)] z-30 mx-auto mt-0 max-w-[520px] grid grid-cols-4 gap-1.5 rounded-[18px] border border-[#D8E6FF] bg-[#FFFBFE]/95 p-1.5 shadow-[0_4px_12px_rgba(8,26,69,0.06)] backdrop-blur-2xl" aria-label="Product detail filters">
                 {focusToggles.map(toggle => {
                   const isActive = activeFocus === toggle.key;
                   return (
@@ -810,14 +810,15 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   </div>
                 )}
 
-                <div className="product-detail-eye-catching-actions mt-5 space-y-3 rounded-[22px] border border-white/80 bg-white/55 p-2 shadow-[inset_0_1px_0_rgba(255,255,255,0.9),0_18px_46px_rgba(37,99,235,0.10)] ring-1 ring-blue-100/70 sm:mt-6 sm:p-3">
+                <div className="product-detail-eye-catching-actions mt-5 space-y-3 rounded-[18px] border border-[#D8E6FF] bg-[#FFFBFE] p-2.5 shadow-none sm:mt-6 sm:p-3 relative overflow-hidden">
+                  <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px] bg-gradient-to-r from-[#0B63FF] via-[#7C4DFF] to-[#0B63FF]" aria-hidden="true" />
                   {!isPurchased && (
-                    <div className="product-detail-action-focus-copy flex items-center justify-between gap-3 rounded-[18px] border border-blue-100 bg-blue-50 px-4 py-3">
+                    <div className="product-detail-action-focus-copy flex items-center justify-between gap-3 rounded-[14px] border border-[#D8E6FF] bg-[#EEF6FF] px-4 py-3">
                       <span>
-                        <span className="block text-xs font-black uppercase tracking-[0.22em] text-blue-700">Ready to unlock</span>
-                        <span className="mt-1 block text-sm font-bold text-slate-600">Review the final amount, then use the blue payment button.</span>
+                        <span className="block text-xs font-black uppercase tracking-[0.22em] text-[#0B63FF]">Ready to unlock</span>
+                        <span className="mt-1 block text-sm font-bold text-[#667085]">Review the final amount, then use the blue payment button.</span>
                       </span>
-                      <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-white text-blue-700 shadow-sm" aria-hidden="true">🔒</span>
+                      <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-white text-[#0B63FF] border border-[#D8E6FF] shadow-sm" aria-hidden="true">🔒</span>
                     </div>
                   )}
                   {/* Source-contract marker only: className="product-checkout-primary product-checkout-purchased w-full rounded-2xl */}
@@ -827,63 +828,56 @@ const ProductDetailPage: React.FC<ProductDetailPageProps> = ({
                   {/* Source-contract marker only: product-checkout-secondary w-full rounded-2xl */}
                   {/* Source-contract marker only: product-checkout-primary w-full rounded-2xl */}
                   {isPurchased ? (
-                    <button type="button" onClick={() => { onOpenPurchases?.(); }} className={`product-checkout-primary product-checkout-purchased product-detail-primary-owned-button w-full ${detailActionRoundClass} border border-emerald-200 bg-gradient-to-r from-emerald-50 via-white to-cyan-50 px-6 py-4 text-base font-black text-emerald-800 shadow-[0_18px_46px_rgba(16,185,129,0.16)] ring-4 ring-emerald-500/10 transition hover:-translate-y-0.5 hover:border-emerald-300 hover:text-emerald-900 hover:shadow-[0_22px_56px_rgba(16,185,129,0.20)] active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg`}>
+                    <button type="button" onClick={() => { onOpenPurchases?.(); }} className={`product-checkout-primary product-checkout-purchased product-detail-primary-owned-button w-full ${detailActionRoundClass} border border-[#BFD7FF] bg-[#EEF6FF] px-6 py-4 text-base font-black text-[#0B63FF] shadow-none transition hover:bg-[#E3EFFF] active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg`}>
                       <span className="flex items-center justify-between gap-4">
                         <span className="text-left">
                           <span className="block">✓ Purchased · Open My Purchases</span>
-                          <span className="mt-1 block text-xs font-bold text-emerald-700/80">Complete product already owned</span>
+                          <span className="mt-1 block text-xs font-bold text-[#0B63FF]/70">Complete product already owned</span>
                         </span>
-                        <span className="flex h-11 min-w-11 items-center justify-center rounded-2xl bg-emerald-600 text-white shadow-[0_12px_30px_rgba(16,185,129,0.28)]">→</span>
+                        <span className="flex h-11 min-w-11 items-center justify-center rounded-2xl bg-[#0B63FF] text-white">→</span>
                       </span>
                     </button>
                   ) : (
-                    <LiquidMetalButton tone="blue" onClick={handleBuyClick} className={`product-checkout-primary product-detail-primary-pay-button eduvora-primary-action w-full ${detailActionRoundClass} min-h-[4.5rem] px-5 py-4 text-base font-black sm:px-7 sm:text-lg`}>
-                      <span className="flex w-full items-center justify-center gap-3 sm:gap-4">
-                        <span className="payment-card-icon" aria-hidden="true">
+                    <button onClick={handleBuyClick} className={`product-checkout-primary product-detail-primary-pay-button w-full ${detailActionRoundClass} min-h-[4rem] border-[1.5px] border-[#0B63FF] bg-[#EEF6FF] px-5 py-4 text-base font-black text-[#0B63FF] shadow-none transition hover:bg-[#E3EFFF] active:scale-[0.98] sm:px-7 sm:text-lg`}>
+                      <span className="flex w-full items-center justify-center gap-3">
+                        <span className="flex h-10 w-10 items-center justify-center rounded-[14px] bg-white border border-[#D8E6FF] text-[#0B63FF]">
                           <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/><path d="M7 15h3"/></svg>
                         </span>
                         <span className="text-center">
-                          <span className="block text-[11px] font-black uppercase tracking-[0.2em] text-white/80">Pay now</span>
-                          <span className="mt-0.5 block text-lg font-black leading-tight sm:text-xl">{product.isFree ? 'Complete free checkout' : `Pay ₹${finalTotalPrice.toFixed(2)} securely`}</span>
+                          <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-[#0B63FF]/70">Pay now</span>
+                          <span className="mt-0.5 block text-base font-black leading-tight sm:text-lg">{product.isFree ? 'Complete free checkout' : `Pay ₹${finalTotalPrice.toFixed(2)} securely`}</span>
                         </span>
                       </span>
-                    </LiquidMetalButton>
+                    </button>
                   )}
                   {!isPurchased && canShowProductCoinCheckout && (
-                    <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className={`product-detail-educoin-button w-full ${detailActionRoundClass} border border-amber-200/80 bg-gradient-to-r from-amber-50 via-white to-yellow-50 px-6 py-4 text-base font-black text-amber-900 shadow-[0_18px_48px_rgba(245,158,11,0.18)] ring-2 ring-amber-400/10 transition hover:-translate-y-0.5 hover:border-amber-300 hover:shadow-[0_22px_58px_rgba(245,158,11,0.23)] active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg`}>
+                    <button disabled={coinCheckoutDisabled} onClick={handleEduCoinButtonClick} className={`product-detail-educoin-button w-full ${detailActionRoundClass} border border-[#D8E6FF] bg-[#FFFBFE] px-6 py-4 text-base font-black text-[#667085] shadow-none transition hover:border-[#BFD7FF] hover:bg-white active:scale-95 disabled:cursor-not-allowed disabled:opacity-50 sm:px-8 sm:py-4 sm:text-lg`}>
                       <span className="flex items-center justify-between gap-4">
                         <span className="text-left">
-                          <span className="block">🪙 {coinCheckoutLabel} with EduCoins</span>
+                          <span className="block text-[#0B63FF]">🪙 {coinCheckoutLabel}</span>
                           {requiredProductCoins > 0 && (
-                            <span className="mt-2 block text-xs font-bold text-slate-600">
-                              Admin coin price: {requiredProductCoins} EduCoins · Your balance: {userCoinBalance} EduCoins
-                              {missingProductCoins > 0 ? ` · Missing: ${missingProductCoins}` : ' · Ready to unlock instantly'}
+                            <span className="mt-1 block text-xs font-bold text-[#667085]">
+                              {requiredProductCoins} coins · Balance {userCoinBalance}{missingProductCoins > 0 ? ` · Need ${missingProductCoins} more` : ' · Ready'}
                             </span>
                           )}
                         </span>
-                        <span className="flex h-11 min-w-11 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-[0_12px_30px_rgba(245,158,11,0.24)]">→</span>
+                        <span className="flex h-10 min-w-10 items-center justify-center rounded-xl bg-[#EEF6FF] border border-[#D8E6FF] text-[#0B63FF]">→</span>
                       </span>
                     </button>
                   )}
                   {hasLockedPaidUpdates && (
-                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className={`product-checkout-update product-detail-latest-update-button paid-update-primary-action eduvora-primary-action relative min-h-[5.75rem] w-full overflow-hidden ${detailActionRoundClass} border border-blue-500 px-6 py-4 text-left text-base font-black text-white shadow-[0_22px_54px_rgba(23,105,255,0.30)] ring-4 ring-blue-500/15 transition hover:-translate-y-0.5 hover:shadow-[0_26px_62px_rgba(23,105,255,0.36)] active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg`}>
+                    <button onClick={() => onPurchaseLatestUpdate?.(product)} className={`product-checkout-update product-detail-latest-update-button relative min-h-[4.75rem] w-full overflow-hidden ${detailActionRoundClass} border-[1.5px] border-[#0B63FF] bg-[#EEF6FF] px-6 py-4 text-left text-base font-black text-[#0B63FF] shadow-none transition hover:bg-[#E3EFFF] active:scale-[0.99] sm:px-8 sm:py-4 sm:text-lg`}>
                       <span className="relative flex items-center justify-between gap-4">
                         <span>
-                          <span className="sr-only">Purchase the latest update</span>
-                          <span className="sr-only">new paid content item</span>
-                          <span className="block text-[11px] font-black uppercase tracking-[0.2em] text-white/75">Paid course update</span>
-                          <span className="mt-1 block text-lg font-black">Unlock new update features</span>
-                          <span className="mt-2 block text-xs font-bold text-white/85">
-                            {lockedPaidUpdateCount} paid update{lockedPaidUpdateCount === 1 ? '' : 's'} · Review details and pay securely
-                          </span>
+                          <span className="block text-[10px] font-black uppercase tracking-[0.18em] text-[#0B63FF]/70">Paid course update</span>
+                          <span className="mt-1 block text-base font-black">Unlock new update</span>
+                          <span className="mt-1 block text-xs font-bold text-[#667085]">{lockedPaidUpdateCount} update{lockedPaidUpdateCount === 1 ? '' : 's'} · Pay securely</span>
                         </span>
-                        <span className={`payment-card-icon flex h-12 min-w-12 items-center justify-center ${detailBadgeRoundClass} border border-white/35 bg-white/15 text-xl font-black text-white shadow-inner`}>
-                          →
-                        </span>
+                        <span className={`flex h-10 min-w-10 items-center justify-center rounded-xl bg-white border border-[#D8E6FF] text-[#0B63FF]`}>→</span>
                       </span>
                     </button>
                   )}
-                  <button onClick={() => { if (isPurchased) { onOpenPurchases?.(); return; } onAddToCart(product.id, 1); }} className={`product-checkout-secondary product-detail-secondary-cart-button w-full ${detailActionRoundClass} border border-indigo-200/80 bg-white/90 px-6 py-4 text-base font-black text-indigo-700 shadow-[0_14px_36px_rgba(79,70,229,0.10)] ring-1 ring-indigo-100/80 transition hover:-translate-y-0.5 hover:border-indigo-300 hover:bg-indigo-50 hover:shadow-[0_18px_46px_rgba(79,70,229,0.16)] active:scale-95 sm:px-8 sm:py-4`}>
+                  <button onClick={() => { if (isPurchased) { onOpenPurchases?.(); return; } onAddToCart(product.id, 1); }} className={`product-checkout-secondary product-detail-secondary-cart-button w-full ${detailActionRoundClass} border border-[#D8E6FF] bg-[#FFFBFE] px-6 py-4 text-base font-black text-[#667085] shadow-none transition hover:border-[#BFD7FF] hover:bg-white active:scale-95 sm:px-8 sm:py-4`}>
                     <span className="flex items-center justify-center gap-2">
                       <span>{isPurchased ? 'Already in My Purchases' : 'Add to Cart'}</span>
                       {!isPurchased && <span aria-hidden="true">＋</span>}

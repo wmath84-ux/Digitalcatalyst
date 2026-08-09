@@ -1313,7 +1313,7 @@ const SmartDocsWorkspace: React.FC<{ file: ProductFile; productId: number; }> = 
             aria-labelledby={panelTitleId}
             aria-describedby={panelDescriptionId}
             tabIndex={-1}
-            className={`${isCompactDocs ? 'fixed inset-y-0 left-0 z-20 w-[min(92svw,24rem)] max-w-full rounded-r-[2rem] border-r border-[#D9E7F8] bg-white shadow-[0_24px_70px_rgba(8,26,69,0.24)]' : 'absolute left-4 top-4 z-20 h-[calc(100%-2rem)] w-[21rem] rounded-[1.75rem] border border-[#D9E7F8] bg-white shadow-[0_24px_70px_rgba(91,75,255,0.16)]'} flex min-h-0 flex-col overflow-hidden outline-none transition-transform duration-300`}
+            className={`${isCompactDocs ? 'fixed inset-y-0 left-0 z-20 w-[min(92svw,24rem)] max-w-full rounded-r-[2rem] border-r border-[#D9E7F8] bg-white shadow-[0_4px_12px_rgba(8,26,69,0.06)]' : 'absolute left-4 top-4 z-20 h-[calc(100%-2rem)] w-[21rem] rounded-[1.75rem] border border-[#D9E7F8] bg-white shadow-[0_4px_12px_rgba(8,26,69,0.06)]'} flex min-h-0 flex-col overflow-hidden outline-none transition-transform duration-300`}
             style={isCompactDocs ? { paddingTop: 'env(safe-area-inset-top)', paddingBottom: 'env(safe-area-inset-bottom)' } : undefined}
           >
             <div className="shrink-0 border-b border-[#E3E8F5] bg-gradient-to-br from-white via-[#F8FBFF] to-[#F1EEFF] p-4">

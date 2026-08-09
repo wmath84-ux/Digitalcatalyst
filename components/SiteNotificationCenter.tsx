@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import type {
   SiteNotification,
   SiteNotificationCategory,
@@ -89,8 +90,8 @@ const SiteNotificationCenter: React.FC<SiteNotificationCenterProps> = ({
 
   if (!isOpen) return null;
 
-  return (
-    <div className="fixed inset-0 z-[2600] flex items-end justify-center bg-slate-950/35 p-0 backdrop-blur-sm sm:items-center sm:p-5" role="dialog" aria-modal="true" aria-labelledby="site-notification-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  const notificationContent = (
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-slate-950/35 p-0 backdrop-blur-sm sm:items-center sm:p-5" role="dialog" aria-modal="true" aria-labelledby="site-notification-title" onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
       <section className="flex max-h-[92dvh] w-full flex-col overflow-hidden rounded-t-[1.6rem] border border-slate-200 bg-[#F8FAFD] shadow-[0_30px_90px_rgba(15,23,42,0.28)] sm:max-w-2xl sm:rounded-[1.6rem]">
         <header className="flex shrink-0 items-start justify-between gap-4 border-b border-slate-200 bg-white px-4 py-4 sm:px-6">
           <div className="min-w-0">
@@ -201,6 +202,12 @@ const SiteNotificationCenter: React.FC<SiteNotificationCenterProps> = ({
       </section>
     </div>
   );
+
+  if (typeof document !== 'undefined' && document.body) {
+    return createPortal(notificationContent, document.body);
+  }
+
+  return notificationContent;
 };
 
 export default SiteNotificationCenter;
