@@ -6,7 +6,10 @@ type HeroProps = {
 
 export default function Hero({ resourceCount }: HeroProps) {
   return (
-    <section className="bg-gradient-to-b from-indigo-50 via-white to-white px-4 pb-6 pt-6">
+    <section
+      className="bg-gradient-to-b from-indigo-50 via-white to-white px-4 pb-6 pt-6"
+      style={{ background: 'linear-gradient(to bottom, #eef2ff 0%, #ffffff 55%, #ffffff 100%)' }}
+    >
       <p className="text-xs font-bold uppercase tracking-widest text-indigo-600">
         Learning marketplace
       </p>
