@@ -1,34 +1,8 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { User, WebsiteSettings, ThemeName, themes } from '../App';
+import React, { useEffect, useRef, useState } from 'react';
+import { User, WebsiteSettings, ThemeName } from '../App';
 import UserAvatar from './common/UserAvatar';
 import { RememberedAuthAccount } from '../utils/rememberedAuth';
-
-const LogoIcon = ({ src, isAccountImage = false }: { src?: string; isAccountImage?: boolean }) => (
-    <img
-        src={src || "/icons/icon-192x192.svg"}
-        alt={isAccountImage ? "Signed-in account avatar" : "Digital Catalyst logo"}
-        className={`h-9 w-9 object-cover shadow-[0_8px_18px_rgba(37,99,235,0.16)] ring-1 ring-white/70 md:h-12 md:w-12 md:shadow-[0_10px_28px_rgba(37,99,235,0.22)] ${isAccountImage ? 'rounded-full' : 'rounded-xl md:rounded-2xl'}`}
-    />
-);
-
-const HeartIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 016.364 0L12 7.636l1.318-1.318a4.5 4.5 0 116.364 6.364L12 20.364l-7.682-7.682a4.5 4.5 0 010-6.364z" />
-    </svg>
-);
-
-const CartIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-    </svg>
-);
-
-const BellIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6 6 0 10-12 0v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0a3 3 0 11-6 0m6 0H9" />
-    </svg>
-);
-
+import { BellIcon, BookIcon, CartIcon, UserIcon } from './store-new/icons';
 
 interface HeaderProps {
     settings: WebsiteSettings;
@@ -101,14 +75,6 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
     if (!isLoggedIn) setIsUserMenuOpen(false);
   }, [isLoggedIn]);
 
-  const navItems = [
-    { name: 'Home', action: onHomeClick },
-    { name: 'Products', action: onNavigateToAllProducts },
-    { name: 'Services', action: () => onNavigateToHomeAndScroll('services') },
-    { name: 'FAQ', action: () => onNavigateToHomeAndScroll('faq') },
-    { name: 'Contact', action: () => onNavigateToHomeAndScroll('contact') },
-  ];
-
   const handleProfileClick = () => {
     setIsUserMenuOpen(false);
     onNavigateToProfile();
@@ -122,117 +88,79 @@ const Header: React.FC<HeaderProps> = ({ settings, wishlistCount, cartItemCount,
   const resolvedPhotoURL = currentUser?.profilePhotoSet === true ? String(currentUser.photoURL || '').trim() : '';
   const loggedOutAuthMode: 'login' | 'signup' = rememberedAccount ? 'login' : 'signup';
   const loggedOutAuthLabel = rememberedAccount ? `Continue as ${rememberedAccount.name || rememberedAccount.email.split('@')[0]}` : 'Login';
-  const authButtonClass = "rounded-xl bg-[#1557B0] px-5 py-2.5 text-sm font-bold text-white shadow-[0_8px_24px_rgba(21,87,176,0.18)] transition hover:bg-[#10213F] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#C8D7EE]";
+
   return (
     <>
-      <header className="sticky top-0 z-50 w-full max-w-full border-b border-[#DDE5EF] bg-[rgba(255,255,255,0.94)] shadow-[0_6px_24px_rgba(16,33,63,0.05)] backdrop-blur-xl">
-        <div className="container mx-auto flex h-16 w-full max-w-full items-center px-3 py-0 md:block md:h-auto md:px-6 md:py-4">
-          <div className="flex min-w-0 flex-1 items-center justify-between gap-2 md:gap-3">
-            <button onClick={onHomeClick} className="flex min-w-0 cursor-pointer items-center space-x-2 overflow-hidden md:space-x-3" aria-label="Back to Homepage">
-              <LogoIcon src={(settings.content as any).logoUrl || '/icons/icon-192x192.svg'} />
-              <span className="truncate text-base font-bold text-[#081A45] md:text-xl md:text-primary">{(settings.content as any).siteName || "Digital Catalyst"}</span>
-            </button>
-            
-            <nav className="hidden md:flex items-center justify-center gap-x-7 lg:gap-x-9">
-              {navItems.map((item) => (
-                  <button key={item.name} onClick={item.action} className="rounded-lg px-2 py-2 text-sm font-semibold text-[#526179] transition hover:bg-[#F1F5FA] hover:text-[#1557B0] focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-[#C8D7EE]">
-                    {item.name}
-                  </button>
-              ))}
-            </nav>
-
-            <div ref={accountMenuAreaRef} className="flex min-w-0 shrink-0 items-center justify-end">
-                <div className="hidden md:flex items-center gap-x-4 lg:gap-x-5">
-                    {settings.features.showFavourites && (
-                        <button onClick={onNavigateToWishlist} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your wishlist with ${wishlistCount} items`}>
-                            <HeartIcon />
-                            {wishlistCount > 0 && (
-                                <span className="absolute -top-2 -right-2 bg-red-500 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                    {wishlistCount}
-                                </span>
-                            )}
-                        </button>
-                    )}
-                    <button onClick={onCartClick} className="relative text-text-muted hover:text-primary transition-colors duration-300" aria-label={`View your cart with ${cartItemCount} items`}>
-                        <CartIcon />
-                        {cartItemCount > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                {cartItemCount}
-                            </span>
-                        )}
-                    </button>
-                    <button onClick={onOpenNotifications} className="relative text-text-muted transition-colors duration-300 hover:text-primary" aria-label={`Open notifications with ${notificationCount} unread`}>
-                        <BellIcon />
-                        {notificationCount > 0 && (
-                            <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-700 px-1 text-[10px] font-black text-white shadow-sm">
-                                {notificationCount > 99 ? '99+' : notificationCount}
-                            </span>
-                        )}
-                    </button>
-                    {isLoggedIn && currentUser ? (
-                         <div className="relative">
-                            <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex items-center gap-2 rounded-full bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 px-4 py-2 font-bold text-white shadow-[0_10px_28px_rgba(23,105,255,0.22)] transition-all duration-300 hover:-translate-y-0.5 hover:shadow-[0_14px_34px_rgba(23,105,255,0.26)]">
-                                <UserAvatar name={currentUser.name} email={currentUser.email} photoURL={resolvedPhotoURL} size={28} className="ring-2 ring-white/60" />
-                                <span className="max-w-[9rem] truncate text-sm">{currentUser.name || currentUser.email.split('@')[0]}</span>
-                            </button>
-                            {isUserMenuOpen && (
-                                <div className="absolute right-0 top-full mt-2 w-52 overflow-hidden rounded-2xl border border-slate-100 bg-white/95 py-1 shadow-[0_18px_48px_rgba(15,23,42,0.18)] backdrop-blur-xl z-[1000]">
-                                    <button onClick={handleProfileClick} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                            Profile & EduCoins
-                                        </button>
-                                        <button onClick={handleLogoutClick} className="block w-full text-left px-4 py-2 text-sm text-gray-700 hover:bg-gray-100">
-                                        Logout
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                         <button onClick={() => onAuthClick(loggedOutAuthMode)} className={authButtonClass}>
-                            {loggedOutAuthLabel}
-                        </button>
-                    )}
-                </div>
-                <div className="flex items-center gap-2 md:hidden">
-                    <button onClick={onCartClick} className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#D9E7F8] bg-white/55 text-[#081A45] transition-colors duration-300 hover:bg-white/80" aria-label={`View your cart with ${cartItemCount} items`}>
-                        <CartIcon />
-                        {cartItemCount > 0 && (
-                            <span className="absolute -top-2 -right-2 bg-gradient-to-r from-blue-700 via-indigo-700 to-violet-700 text-white text-xs rounded-full h-5 w-5 flex items-center justify-center">
-                                {cartItemCount}
-                            </span>
-                        )}
-                    </button>
-                    <button onClick={onOpenNotifications} className="relative flex h-10 w-10 items-center justify-center rounded-full border border-[#D9E7F8] bg-white/55 text-[#081A45] transition-colors duration-300 hover:bg-white/80" aria-label={`Open notifications with ${notificationCount} unread`}>
-                        <BellIcon />
-                        {notificationCount > 0 && (
-                            <span className="absolute -right-2 -top-2 flex h-5 min-w-5 items-center justify-center rounded-full bg-blue-700 px-1 text-[10px] font-black text-white">
-                                {notificationCount > 99 ? '99+' : notificationCount}
-                            </span>
-                        )}
-                    </button>
-                    {isLoggedIn && currentUser ? (
-                        <div className="relative">
-                            <button onClick={() => setIsUserMenuOpen(!isUserMenuOpen)} className="flex h-10 w-10 items-center justify-center rounded-full border border-[#D9E7F8] bg-white/55 text-[#081A45] transition-colors duration-300 hover:bg-white/80" aria-label="Open account menu">
-                                <UserAvatar name={currentUser.name} email={currentUser.email} photoURL={resolvedPhotoURL} size={36} />
-                            </button>
-                            {isUserMenuOpen && (
-                                <div className="absolute right-0 top-full mt-3 w-52 overflow-hidden rounded-2xl border border-slate-100 bg-white/95 py-1 shadow-[0_18px_48px_rgba(15,23,42,0.18)] backdrop-blur-xl z-[1000]">
-                                    <div className="px-4 py-2 text-xs font-bold text-slate-500">{currentUser.name || currentUser.email.split('@')[0]}</div>
-                                    <button onClick={handleProfileClick} className="block w-full text-left px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100">
-                                        Profile & EduCoins
-                                    </button>
-                                    <button onClick={handleLogoutClick} className="block w-full text-left px-4 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-100">
-                                        Logout
-                                    </button>
-                                </div>
-                            )}
-                        </div>
-                    ) : (
-                        <button onClick={() => onAuthClick(loggedOutAuthMode)} className="flex h-10 items-center justify-center rounded-full border border-[#D9E7F8] bg-white/75 px-3 text-xs font-black text-[#081A45] transition-colors duration-300 hover:bg-white" aria-label={loggedOutAuthLabel}>
-                            {loggedOutAuthLabel}
-                        </button>
-                    )}
-                </div>
+      <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur">
+        <div className="flex items-center justify-between gap-3">
+          <button type="button" onClick={onHomeClick} aria-label="Back to Homepage" className="flex min-w-0 cursor-pointer items-center gap-3 text-left">
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-200">
+              <BookIcon className="h-6 w-6" />
             </div>
+            <div className="min-w-0 leading-tight">
+              <h1 className="truncate text-lg font-extrabold tracking-tight text-slate-900">Eduvora</h1>
+              <p className="text-xs font-medium text-slate-400">Premium learning store</p>
+            </div>
+          </button>
+
+          <div ref={accountMenuAreaRef} className="flex items-center gap-1.5">
+            <button
+              type="button"
+              aria-label={`View your cart with ${cartItemCount} items`}
+              onClick={onCartClick}
+              className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 active:scale-95"
+            >
+              <CartIcon className="h-5 w-5" />
+              {cartItemCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[10px] font-bold text-white">
+                  {cartItemCount}
+                </span>
+              )}
+            </button>
+            <button
+              type="button"
+              aria-label={`Open notifications with ${notificationCount} unread`}
+              onClick={onOpenNotifications}
+              className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 active:scale-95"
+            >
+              <BellIcon className="h-5 w-5" />
+              {notificationCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-indigo-600 text-[10px] font-bold text-white">
+                  {notificationCount > 99 ? '99+' : notificationCount}
+                </span>
+              )}
+            </button>
+            {isLoggedIn && currentUser ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  aria-label="Open profile"
+                  onClick={() => setIsUserMenuOpen(!isUserMenuOpen)}
+                  className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 active:scale-95"
+                >
+                  <UserAvatar name={currentUser.name} email={currentUser.email} photoURL={resolvedPhotoURL} size={24} className="ring-0" />
+                </button>
+                {isUserMenuOpen && (
+                  <div className="absolute right-0 top-full z-[1000] mt-2 w-52 overflow-hidden rounded-2xl border border-slate-100 bg-white/95 py-1 shadow-[0_18px_48px_rgba(15,23,42,0.18)] backdrop-blur-xl">
+                    <button onClick={handleProfileClick} className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100">
+                      Profile & EduCoins
+                    </button>
+                    <button onClick={handleLogoutClick} className="block w-full px-4 py-2 text-left text-sm text-gray-700 hover:bg-gray-100">
+                      Logout
+                    </button>
+                  </div>
+                )}
+              </div>
+            ) : (
+              <button
+                type="button"
+                aria-label={loggedOutAuthLabel}
+                onClick={() => onAuthClick(loggedOutAuthMode)}
+                className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 active:scale-95"
+              >
+                <UserIcon className="h-5 w-5" />
+              </button>
+            )}
           </div>
         </div>
       </header>

@@ -10,13 +10,11 @@ export default function Hero({ resourceCount }: HeroProps) {
       <p className="text-xs font-bold uppercase tracking-widest text-indigo-600">
         Learning marketplace
       </p>
-
       <h2 className="mt-1 text-[28px] font-extrabold leading-tight tracking-tight text-slate-900">
         Find the right
         <br />
         resource, faster
       </h2>
-
       <p className="mt-2 max-w-sm text-sm leading-relaxed text-slate-500">
         Search focused notes, courses, PDFs, and study tools by subject, class, or format.
       </p>
@@ -26,12 +24,10 @@ export default function Hero({ resourceCount }: HeroProps) {
           <ZapIcon className="h-3.5 w-3.5 text-amber-500" />
           Instant download
         </span>
-
         <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
           <ShieldIcon className="h-3.5 w-3.5 text-emerald-500" />
           Secure checkout
         </span>
-
         <span className="inline-flex items-center gap-1.5 rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm">
           <ZapIcon className="h-3.5 w-3.5 text-amber-500" />
           Lifetime access

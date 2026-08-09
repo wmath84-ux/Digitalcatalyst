@@ -107,7 +107,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({
   };
 
   return (
-    <div className="pb-6 bg-white min-h-[60vh]">
+    <div className="pb-6">
       <Hero resourceCount={filtered.length} />
 
       <div className="space-y-4">
@@ -140,14 +140,6 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({
           <p className="text-xs text-slate-400">
             Try a different keyword or clear filters
           </p>
-
-          <button
-            type="button"
-            onClick={() => { setSearch(""); setActiveChip("All"); }}
-            className="mt-2 rounded-full bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700"
-          >
-            Clear filters
-          </button>
         </div>
       ) : (
         <div className="grid grid-cols-1 gap-4 px-4 pt-4 sm:grid-cols-2">

@@ -1,8 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useMemo } from 'react';
 import type { ProductWithRating, User, WebsiteSettings } from '../App';
 import type { DockCountDestination } from '../utils/dockNewContent';
-import ProfessionalIcon from './common/ProfessionalIcon';
 import type { CleanNeutralIconSlotId, ProfessionalIconName } from '../utils/cleanNeutralAdvancedCustomizer';
+import { BagIcon, CalendarIcon, HomeIcon, StoreIcon, WalletIcon } from './store-new/icons';
 
 interface BottomGlassDockProps {
   currentUser: User | null;
@@ -111,6 +111,14 @@ export const dockShadowMap = {
   strong: '0 24px 60px rgba(15,23,42,0.24)',
 };
 
+const TAB_ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement>>> = {
+  Home: HomeIcon,
+  'My Day': CalendarIcon,
+  Store: StoreIcon,
+  Purchases: BagIcon,
+  Wallet: WalletIcon,
+};
+
 const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, dockGlowItems = [], activeItem = '', onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenMayDay, onOpenCommunity, isAdmin = false, onAdminClick, authButtonLabel }: BottomGlassDockProps) => {
   const defaultItems = useMemo(() => ([
     { label: 'Home', action: onHomeClick, icon: 'home' as ProfessionalIconName, slot: 'nav.home' as CleanNeutralIconSlotId, badge: null },
@@ -121,67 +129,9 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
   ]), [onOpenMayDay, onHomeClick, onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onProfileClick, dockBadgeCounts.Store, dockBadgeCounts.Purchased]);
 
   const items = defaultItems;
-
-  const dockStyle = { ...defaultDockStyle, ...((settings.content as any).dockStyle || {}) };
-  const dockBackground = hexToRgba(dockStyle.backgroundColor, dockStyle.backgroundOpacity);
-  const itemBackground = hexToRgba(dockStyle.itemColor, dockStyle.itemOpacity);
-  const accentColor = normalizeHex(dockStyle.accentColor, defaultDockStyle.accentColor);
-  const textColor = normalizeHex(dockStyle.textColor, defaultDockStyle.textColor);
-  const borderColor = '#D8E6FF';
-  const accentOpacity = clampPercent(dockStyle.accentOpacity, defaultDockStyle.accentOpacity) / 100;
-  const dockHeight = 80;
-  const iconSize = 28;
-  const labelSize = 11;
-  const dockPadding = 8;
-  const dockGap = 4;
-  const dockRadius = 0;
-  const itemRadius = 28;
-  const bottomOffset = 0;
-  const blur = 0;
-  const showLabels = true;
-  const showBadges = dockStyle.showBadges !== false;
+  const showOnDesktop = settings.desktop.navigationMode === 'dock';
   // Keep the navigation dock pinned like a header; admin/user actions must remain visible while scrolling.
   const autoHideOnScroll = false;
-  const showOnDesktop = settings.desktop.navigationMode === 'dock';
-  const shadowStrength = dockStyle.shadowStrength === 'none' || dockStyle.shadowStrength === 'strong' ? dockStyle.shadowStrength : 'soft';
-  const [isAutoHidden, setIsAutoHidden] = useState(false);
-  const dockScrollRef = useRef<HTMLDivElement>(null);
-  const dockScrollLeftRef = useRef(0);
-
-  const preserveDockScroll = () => {
-    if (dockScrollRef.current) dockScrollLeftRef.current = dockScrollRef.current.scrollLeft;
-  };
-
-  useEffect(() => {
-    const dock = dockScrollRef.current;
-    if (!dock) return;
-    dock.scrollLeft = dockScrollLeftRef.current;
-  }, [items.length, currentUser?.id, isLoggedIn]);
-
-  useEffect(() => {
-    if (!autoHideOnScroll || typeof window === 'undefined') {
-      setIsAutoHidden(false);
-      return;
-    }
-
-    let previousY = window.scrollY;
-    let frame = 0;
-    const onScroll = () => {
-      if (frame) window.cancelAnimationFrame(frame);
-      frame = window.requestAnimationFrame(() => {
-        const nextY = window.scrollY;
-        if (nextY < 24 || nextY < previousY - 8) setIsAutoHidden(false);
-        else if (nextY > previousY + 8) setIsAutoHidden(true);
-        previousY = nextY;
-      });
-    };
-
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => {
-      if (frame) window.cancelAnimationFrame(frame);
-      window.removeEventListener('scroll', onScroll);
-    };
-  }, [autoHideOnScroll]);
 
   return (
     <>
@@ -195,83 +145,55 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
         }
         @media (prefers-reduced-motion: reduce) { .dock-new-content-glow { animation: none; } }
       `}</style>
-      <div
-        className={`fixed inset-x-0 z-[65] flex justify-center px-3 pointer-events-none ${showOnDesktop ? '' : 'md:hidden'}`}
-        style={{ bottom: `max(${bottomOffset}px, env(safe-area-inset-bottom))` }}
-      >
-        <div
-          className="pointer-events-auto group relative w-full max-w-none overflow-hidden transition-[transform,opacity] duration-300 data-[hidden=true]:translate-y-[calc(100%+2rem)] data-[hidden=true]:opacity-0"
+      <div className={`fixed inset-x-0 z-[65] ${showOnDesktop ? '' : 'md:hidden'}`} style={{ bottom: 'max(0px, env(safe-area-inset-bottom))' }}>
+        <nav
           id="main-bottom-dock"
           data-clean-neutral-region="navigation.mobileDock"
-          data-hidden={isAutoHidden ? 'true' : 'false'}
-          onPointerEnter={() => setIsAutoHidden(false)}
-          style={{
-            backgroundColor: '#FFFBFE',
-            minHeight: dockHeight,
-            padding: dockPadding,
-            borderRadius: dockRadius,
-            boxShadow: 'none',
-            backdropFilter: `blur(${blur}px)`,
-            WebkitBackdropFilter: `blur(${blur}px)`,
-          }}
+          className="sticky bottom-0 z-30 border-t border-slate-200 bg-white/95 px-1 pb-[env(safe-area-inset-bottom)] pt-1 backdrop-blur"
         >
-          <div className="pointer-events-none absolute inset-x-0 top-0 h-[2px]" style={{ background: 'linear-gradient(90deg, #0B63FF, #7C4DFF, #0B63FF)' }} />
-          <div className="pointer-events-none absolute inset-0" style={{ background: `radial-gradient(circle at 20% 10%, ${hexToRgba(accentColor, accentOpacity * 100)}, transparent 36%), linear-gradient(180deg, rgba(255,255,255,0.22), transparent)` }} />
-          <div ref={dockScrollRef} onScroll={preserveDockScroll} className="relative grid grid-cols-5 items-center" style={{ gap: dockGap }}>
+          <div className="flex items-stretch justify-between">
             {items.map((item) => {
+              const Icon = TAB_ICONS[item.label] || HomeIcon;
               const isLoggedOutProfileVisual = !isLoggedIn && (item.label === authButtonLabel || item.label === 'Login');
               const visualLabel = isLoggedOutProfileVisual ? 'Profile' : item.label;
               const visualIcon = isLoggedOutProfileVisual ? 'user' as ProfessionalIconName : item.icon as ProfessionalIconName;
               const visualSlot = isLoggedOutProfileVisual ? 'nav.profile' as CleanNeutralIconSlotId : item.slot as CleanNeutralIconSlotId;
               const tone = dockToneClasses[visualLabel] || dockToneClasses[item.label] || 'from-[var(--mobile-bg)] to-[var(--mobile-bg-soft)] hover:border-[var(--mobile-border-active)]';
               const hasNewGlow = dockGlowItems.includes(item.label as DockCountDestination);
-              const isActive = activeItem === item.label || (item.label === 'Purchased' && activeItem === 'Purchases') || (visualLabel === 'Profile' && activeItem === 'Profile');
+              const isActive = activeItem === item.label || (item.label === 'Purchases' && activeItem === 'Purchased') || (visualLabel === 'Profile' && activeItem === 'Profile');
+              const badge = item.badge;
 
               return (
                 <button
                   key={item.label}
+                  type="button"
                   aria-label={isLoggedOutProfileVisual ? authButtonLabel : item.label}
                   aria-current={isActive ? 'page' : undefined}
-                  onPointerDown={preserveDockScroll}
                   onClick={() => {
-                    preserveDockScroll();
                     item.action();
-                    requestAnimationFrame(() => {
-                      if (dockScrollRef.current) dockScrollRef.current.scrollLeft = dockScrollLeftRef.current;
-                    });
                   }}
-                  className={`group/item relative ${item.mobileOnly ? 'md:hidden' : ''} flex shrink-0 flex-col items-center transition duration-200 focus:outline-none focus:ring-4 ${hasNewGlow ? 'dock-new-content-glow' : ''}`}
-                  style={{
-                    backgroundColor: isActive ? '#EEF6FF' : 'transparent',
-                    borderColor: isActive ? '#0B63FF' : 'transparent',
-                    borderRadius: 16,
-                    borderStyle: isActive ? 'solid' : 'none',
-                    borderWidth: isActive ? 1.5 : 0,
-                    color: isActive ? '#0B63FF' : '#667085',
-                    padding: isActive ? '6px 12px' : Math.max(7, dockPadding - 3),
-                    minWidth: 0,
-                    boxShadow: 'none',
-                  }}
+                  className={`relative flex flex-1 flex-col items-center gap-1 rounded-xl px-1 py-2 text-[11px] font-semibold transition ${
+                    isActive ? 'text-indigo-600' : 'text-slate-400 hover:text-slate-600'
+                  } ${item.mobileOnly ? 'md:hidden' : ''} ${hasNewGlow ? 'dock-new-content-glow' : ''}`}
                 >
-                  <ProfessionalIcon
-                    slot={visualSlot}
-                    fallbackName={visualIcon}
-                    label={visualLabel}
-                    defaultDisplayMode={showLabels ? 'icon-with-text' : 'icon-only'}
-                    defaultPosition="top"
-                    size={Math.max(18, iconSize * 0.58)}
-                    color={isActive ? '#0B63FF' : '#667085'}
-                    iconClassName={`relative flex items-center justify-center border-0 transition duration-200 bg-transparent`}
-                    iconStyle={{ width: iconSize, height: 32, borderRadius: 999, borderColor: 'transparent' }}
-                    labelClassName="relative font-black tracking-wide"
-                    labelStyle={{ fontSize: labelSize, color: isActive ? '#0B63FF' : '#667085' }}
-                  />
-                  {showBadges && item.badge ? <span className="dock-count-badge absolute -right-1 -top-1 rounded-full border border-white px-1.5 py-0.5 text-[10px] font-black text-white shadow-[0_8px_20px_rgba(15,23,42,0.24)]" style={{ backgroundColor: accentColor }}>{item.badge > 99 ? '99+' : item.badge}</span> : null}
+                  <span
+                    className={`relative flex h-9 w-14 items-center justify-center rounded-full transition ${
+                      isActive ? 'bg-indigo-100' : ''
+                    }`}
+                  >
+                    <Icon className="h-5 w-5" />
+                    {!!item.badge && item.badge > 0 && (
+                      <span className="absolute -right-0.5 -top-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-rose-500 text-[9px] font-bold text-white">
+                        {item.badge > 99 ? '99+' : item.badge}
+                      </span>
+                    )}
+                  </span>
+                  {visualLabel}
                 </button>
               );
             })}
           </div>
-        </div>
+        </nav>
       </div>
     </>
   );
