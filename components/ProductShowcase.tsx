@@ -165,26 +165,26 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
         <div className={`${isMobileHome ? 'mb-5 sm:mb-8' : 'mb-7 sm:mb-9'} mx-auto max-w-6xl animate-child animate-delay-1`}>
           <div className="flex flex-col gap-5 sm:flex-row sm:items-end sm:justify-between">
             <div className="max-w-3xl">
-              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#1557B0]">Learning marketplace</p>
-              <h2 className="mt-3 text-balance text-3xl font-black tracking-tight text-[#10213F] sm:text-5xl">Find the right resource, faster</h2>
-              <p className="mt-3 max-w-2xl text-pretty text-base leading-7 text-[#526179] sm:text-lg">{isMobileHome ? 'Find courses, notes, PDFs, and learning tools instantly.' : 'Search focused notes, courses, PDFs, and study tools by subject, class, or format.'}</p>
+              <p className="text-xs font-bold uppercase tracking-[0.2em] text-[#0B63FF]">Learning marketplace</p>
+              <h2 className="mt-3 text-balance text-3xl font-black tracking-tight text-[#081A44] sm:text-5xl">Find the right resource, faster</h2>
+              <p className="mt-3 max-w-2xl text-pretty text-base leading-7 text-[#64708F] sm:text-lg">{isMobileHome ? 'Find courses, notes, PDFs, and learning tools instantly.' : 'Search focused notes, courses, PDFs, and study tools by subject, class, or format.'}</p>
               <div className="mt-5 flex flex-wrap items-center gap-2 sm:gap-2.5">
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D9E7F8] bg-white/95 px-3 py-1.5 text-xs font-black text-[#1557B0] shadow-sm">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D8E6FF] bg-white/95 px-3 py-1.5 text-xs font-black text-[#0B63FF] shadow-sm">
                   <svg className="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
                   Instant download
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D9E7F8] bg-white/95 px-3 py-1.5 text-xs font-black text-[#1557B0] shadow-sm">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D8E6FF] bg-white/95 px-3 py-1.5 text-xs font-black text-[#0B63FF] shadow-sm">
                   <svg className="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" /></svg>
                   Secure checkout
                 </span>
-                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D9E7F8] bg-white/95 px-3 py-1.5 text-xs font-black text-[#1557B0] shadow-sm">
+                <span className="inline-flex items-center gap-1.5 rounded-full border border-[#D8E6FF] bg-white/95 px-3 py-1.5 text-xs font-black text-[#0B63FF] shadow-sm">
                   <svg className="h-3.5 w-3.5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M13 2L3 14h7v8l10-12h-7l0-8z" /></svg>
                   Lifetime access
                 </span>
               </div>
             </div>
             <div className="shrink-0 space-y-2">
-              <p className="inline-flex items-center gap-2 rounded-full border border-[#D9E7F8] bg-white/95 px-4 py-2 text-sm font-black text-[#1557B0] shadow-sm" aria-live="polite">
+              <p className="inline-flex items-center gap-2 rounded-full border border-[#D8E6FF] bg-white/95 px-4 py-2 text-sm font-black text-[#0B63FF] shadow-sm" aria-live="polite">
                 <svg className="h-4 w-4 text-[#1769FF]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" /></svg>
                 {isSearching ? 'Updating results…' : `${displayProducts.length} resource${displayProducts.length === 1 ? '' : 's'} available`}
               </p>
@@ -198,7 +198,7 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
           </div>
         </div>
 
-        <div className={`store-search-sticky sticky top-2 z-20 mx-auto max-w-6xl overflow-hidden border border-white/80 bg-white/90 ring-1 ring-[#D7E7FF]/80 backdrop-blur-2xl animate-child animate-delay-2 transition-all duration-300 sm:top-4 lg:top-5 ${isStoreFilterCompact ? 'rounded-[1.35rem] p-2 sm:p-3' : 'rounded-[1.75rem] p-3.5 sm:p-5'}`}>
+        <div className={`store-search-sticky sticky top-2 z-20 mx-auto max-w-6xl overflow-hidden border border-[#D0D5DD] bg-[#F0F2F5]/95 backdrop-blur-2xl animate-child animate-delay-2 transition-all duration-300 sm:top-4 lg:top-5 ${isStoreFilterCompact ? 'rounded-[1.35rem] p-2 sm:p-3' : 'rounded-[1.75rem] p-3.5 sm:p-5'}`}>
           <div className="flex flex-col gap-3 lg:flex-row lg:items-center">
             {!hideInternalSearch && (
               <div className="store-search-field group relative min-h-[58px] flex-1">
@@ -236,10 +236,10 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({ settings, products, o
               <button type="button" onClick={clearAll} className="h-12 rounded-2xl border border-[#CFE0F7] bg-[#F8FBFF] px-5 text-sm font-black text-[#1769FF] shadow-sm transition hover:border-[#1769FF] hover:bg-white">Clear all</button>
             </div>
           </div>
-          <div className={`${isStoreFilterCompact ? 'hidden' : 'flex'} store-filter-chip-strip mt-4 items-center gap-2 overflow-x-auto border-t border-[#E4EAF2]/80 pt-4 pb-1`} aria-label="Product category filters">
-            <span className="shrink-0 rounded-full bg-[#EEF4FF] px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#1557B0]">Tags</span>
+          <div className={`${isStoreFilterCompact ? 'hidden' : 'flex'} store-filter-chip-strip mt-4 items-center gap-2 overflow-x-auto border-t border-[#D8E6FF]/80 pt-4 pb-1`} aria-label="Product category filters">
+            <button type="button" className="shrink-0 rounded-full bg-[#F2F4F7] px-3 py-2 text-[10px] font-black uppercase tracking-[0.16em] text-[#667085]">⚙ Filters</button>
             {filters.map(filter => (
-              <button key={filter} type="button" onClick={() => setActiveFilter(filter)} aria-pressed={activeFilter === filter} className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-black transition sm:text-sm ${activeFilter === filter ? 'border-[#1557B0] bg-gradient-to-r from-[#1557B0] to-[#6D5CFF] text-white shadow-[0_10px_24px_rgba(21,87,176,0.24)]' : 'border-[#DDE5EF] bg-white/85 text-[#526179] shadow-sm hover:border-[#B7CAE4] hover:bg-white hover:text-[#1557B0]'}`}>
+              <button key={filter} type="button" onClick={() => setActiveFilter(filter)} aria-pressed={activeFilter === filter} className={`shrink-0 rounded-full border px-4 py-2.5 text-xs font-black transition sm:text-sm ${activeFilter === filter ? 'border-[#D8E6FF] bg-[#EEF6FF] text-[#344054] shadow-sm' : 'border-transparent bg-[#F2F4F7] text-[#667085] hover:bg-[#E8EBF0]'}`}>
                 {activeFilter === filter && <span className="mr-1.5">✓</span>}{filter}
               </button>
             ))}

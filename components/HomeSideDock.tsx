@@ -199,8 +199,8 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
   };
 
   const defaultItems: NavigationItem[] = [
-    ...(onOpenMayDay ? [{ id: 'My Day', label: 'My Day', action: onOpenMayDay, icon: 'calendar' as ProfessionalIconName, slot: 'nav.mayDay' as CleanNeutralIconSlotId, badge: null }] : []),
     { id: 'Home', label: 'Home', action: onHomeClick, icon: 'home', slot: 'nav.home', badge: null },
+    ...(onOpenMayDay ? [{ id: 'My Day', label: 'My Day', action: onOpenMayDay, icon: 'calendar' as ProfessionalIconName, slot: 'nav.mayDay' as CleanNeutralIconSlotId, badge: null }] : []),
     { id: 'Store', label: 'Store', action: onNavigateToAllProducts, icon: 'store', slot: 'nav.store', badge: dockBadgeCounts.Store || null },
     { id: 'Purchased', label: 'Purchased', action: onNavigateToPurchases, icon: 'book-open', slot: 'nav.purchased', badge: (dockBadgeCounts.Purchased ?? purchasedProducts.length) || null },
     { id: 'Wishlist', label: 'Wishlist', action: onNavigateToWishlist, icon: 'heart', slot: 'nav.wishlist', badge: (dockBadgeCounts.Wishlist ?? wishlistCount) || null },

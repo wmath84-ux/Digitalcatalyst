@@ -844,21 +844,21 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   };
 
   const renderHeader = () => (
-    <header className="sticky top-0 z-40 border-b border-[#E7E0EC] bg-[#F8FAFD]/96 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md">
+    <header className="sticky top-0 z-40 border-b border-[#D8E6FF] bg-[#F8FAFD]/96 px-4 pb-3 pt-[calc(env(safe-area-inset-top)+0.75rem)] backdrop-blur-md">
       <div className="mx-auto flex max-w-xl items-center justify-between">
-        <button type="button" onClick={handleHeaderBack} aria-label="Go back" className="grid h-11 w-11 place-items-center rounded-2xl text-[#1D1B20] transition active:bg-[#E8DEF8]">
+        <button type="button" onClick={handleHeaderBack} aria-label="Go back to home" className="grid h-11 w-11 place-items-center rounded-2xl text-[#081A44] transition active:bg-[#EEF6FF]">
           <Icon name="back" className="h-6 w-6" />
         </button>
         <div className="text-center">
-          <h1 className="text-[17px] font-black tracking-[-0.02em] text-[#1D1B20]">{pageTitle[activeTab]}</h1>
-          <p className="mt-0.5 text-[10px] font-bold tracking-[0.18em] text-[#625B71]">LEARN • PLAN • FOCUS • GROW</p>
-          <p className="mt-0.5 text-[10px] font-bold text-[#0B63FF]">{syncLabel}</p>
+          <h1 className="text-[18px] font-black tracking-[-0.02em] text-[#081A44]">{pageTitle[activeTab]}</h1>
+          <p className="mt-0.5 text-[10px] font-bold tracking-[0.18em] text-[#64708F]">LEARN • PLAN • FOCUS • GROW</p>
+          <p className="mt-0.5 text-[11px] font-bold text-[#0B63FF]">{syncLabel}</p>
         </div>
         <div className="relative">
-          <button type="button" onClick={() => setPageMenuOpen(open => !open)} aria-label="My Day options" aria-expanded={pageMenuOpen} className="grid h-11 w-11 place-items-center rounded-2xl text-[#1D1B20] transition active:bg-[#E8DEF8]">
+          <button type="button" onClick={() => setPageMenuOpen(open => !open)} aria-label="My Day options" aria-expanded={pageMenuOpen} className="grid h-11 w-11 place-items-center rounded-2xl text-[#081A44] transition active:bg-[#EEF6FF]">
             <Icon name="more" className="h-5 w-5" />
           </button>
-          {pageMenuOpen ? <div className="absolute right-0 top-12 z-50 w-44 overflow-hidden rounded-2xl border border-black bg-white p-1.5"><button type="button" onClick={forceSync} className="w-full rounded-xl px-3 py-2.5 text-left text-[11px] font-black text-[#344054] active:bg-[#EEF2FF]">Sync now</button><button type="button" onClick={exportWorkspace} className="w-full rounded-xl px-3 py-2.5 text-left text-[11px] font-black text-[#344054] active:bg-[#EEF2FF]">Export My Day data</button></div> : null}
+          {pageMenuOpen ? <div className="absolute right-0 top-12 z-50 w-48 overflow-hidden rounded-2xl border border-[#D8E6FF] bg-white p-1.5 shadow-lg"><button type="button" onClick={forceSync} className="w-full rounded-xl px-3 py-3 text-left text-xs font-black text-[#081A44] active:bg-[#EEF6FF]">Sync now</button><button type="button" onClick={exportWorkspace} className="w-full rounded-xl px-3 py-3 text-left text-xs font-black text-[#081A44] active:bg-[#EEF6FF]">Export My Day data</button></div> : null}
         </div>
       </div>
     </header>
@@ -868,22 +868,22 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
     <section className="mt-6">
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <h2 className="text-[15px] font-black text-[#111827]">Today&apos;s Plan</h2>
-          <p className="text-[11px] font-semibold text-[#7A8499]">Small tasks, clear progress.</p>
+          <h2 className="text-[17px] font-black text-[#081A44]">Today&apos;s Plan</h2>
+          <p className="text-[12px] font-semibold text-[#64708F]">Small tasks, clear progress.</p>
         </div>
-        <span className="rounded-full bg-[#EEF3FF] px-3 py-1 text-[11px] font-black text-[#315CEB]">{completedTasks}/{todayTasks.length}</span>
+        <span className="rounded-full bg-[#EEF6FF] px-3 py-1 text-[12px] font-black text-[#0B63FF]">{completedTasks}/{todayTasks.length}</span>
       </div>
-      <div className="rounded-[20px] border border-black bg-white p-3">
+      <div className="rounded-[22px] border border-[#D8E6FF] bg-white p-4 shadow-[0_14px_36px_rgba(11,99,255,0.08)]">
         <div className="grid grid-cols-[1fr_88px] gap-2">
-          <input value={taskTitle} onChange={event => setTaskTitle(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') addTask(); }} placeholder="Add a task…" maxLength={160} className="min-w-0 rounded-2xl border border-black bg-[#FAFBFD] px-3 py-3 text-sm font-bold text-[#111827] outline-none focus:border-[#4169F6]" />
-          <input type="time" value={taskTime} onChange={event => setTaskTime(event.target.value)} className="rounded-2xl border border-black bg-[#FAFBFD] px-2 py-3 text-xs font-black text-[#344054] outline-none focus:border-[#4169F6]" />
+          <input value={taskTitle} onChange={event => setTaskTitle(event.target.value)} onKeyDown={event => { if (event.key === 'Enter') addTask(); }} placeholder="Add a task…" maxLength={160} className="min-w-0 rounded-2xl border border-[#D8E6FF] bg-[#F7FAFF] px-3 py-3.5 text-[15px] font-bold text-[#081A44] outline-none focus:border-[#0B63FF]" />
+          <input type="time" value={taskTime} onChange={event => setTaskTime(event.target.value)} className="rounded-2xl border border-[#D8E6FF] bg-[#F7FAFF] px-2 py-3.5 text-xs font-black text-[#64708F] outline-none focus:border-[#0B63FF]" />
         </div>
         <div className="mt-2 flex items-center gap-2">
           {(['Study', 'Personal', 'Break'] as const).map(category => (
-            <button key={category} type="button" onClick={() => setTaskCategory(category)} className={`rounded-full px-3 py-1.5 text-[10px] font-black ${taskCategory === category ? 'bg-[#315CEB] text-white' : 'bg-[#F2F4F8] text-[#667085]'}`}>{category}</button>
+            <button key={category} type="button" onClick={() => setTaskCategory(category)} className={`rounded-full px-3 py-1.5 text-[11px] font-black ${taskCategory === category ? 'bg-[#0B63FF] text-white' : 'bg-[#EEF6FF] text-[#64708F]'}`}>{category}</button>
           ))}
-          <button type="button" onClick={addScratchTask} className="ml-auto rounded-full bg-[#F0F4FF] px-3 py-2 text-[10px] font-black text-[#315CEB]">Scratch task</button>
-          <button type="button" onClick={addTask} className="grid h-9 w-9 place-items-center rounded-xl bg-[#315CEB] text-white" aria-label="Add task"><Icon name="plus" className="h-5 w-5" /></button>
+          <button type="button" onClick={addScratchTask} className="ml-auto rounded-full bg-[#EEF6FF] px-3 py-2 text-[11px] font-black text-[#0B63FF]">Scratch task</button>
+          <button type="button" onClick={addTask} className="grid h-10 w-10 place-items-center rounded-xl bg-[#0B63FF] text-white" aria-label="Add task"><Icon name="plus" className="h-5 w-5" /></button>
         </div>
         <div className="mt-3 divide-y divide-[#EEF1F6]">
           {todayTasks.length ? todayTasks.map(task => (
@@ -904,23 +904,23 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   const renderNoteGroup = (title: string, notes: MayDayNote[]) => (
     <section className="mt-6">
       <div className="mb-3 flex items-center justify-between">
-        <h2 className="text-[15px] font-black text-[#111827]">{title}</h2>
-        <span className="text-[11px] font-black text-[#315CEB]">{notes.length} saved</span>
+        <h2 className="text-[17px] font-black text-[#081A44]">{title}</h2>
+        <span className="text-[12px] font-black text-[#0B63FF]">{notes.length} saved</span>
       </div>
       {notes.length ? <div className="grid grid-cols-2 gap-3">{notes.map(note => (
-        <article key={note.id} className={`relative min-h-[132px] rounded-[18px] border border-black bg-white p-3.5`}>
+        <article key={note.id} className={`relative min-h-[140px] rounded-[20px] border border-[#D8E6FF] bg-white p-4 shadow-[0_10px_28px_rgba(11,99,255,0.06)]`}>
           <div className="flex items-start justify-between gap-2">
-            <h3 className="line-clamp-2 text-[12px] font-black leading-5 text-[#24304A]">{note.title}</h3>
-            {note.pinned ? <Icon name="pin" className="h-4 w-4 shrink-0 text-[#4E62E9]" /> : null}
+            <h3 className="line-clamp-2 text-[14px] font-black leading-5 text-[#081A44]">{note.title}</h3>
+            {note.pinned ? <Icon name="pin" className="h-4 w-4 shrink-0 text-[#0B63FF]" /> : null}
           </div>
-          <p className="mt-2 line-clamp-3 text-[10px] font-semibold leading-4 text-[#59647A]">{note.body}</p>
-          <p className="mt-3 text-[9px] font-bold text-[#8B94A7]">{formatNoteDate(note.updatedAt)}</p>
+          <p className="mt-2 line-clamp-3 text-[12px] font-semibold leading-4 text-[#64708F]">{note.body}</p>
+          <p className="mt-3 text-[10px] font-bold text-[#64708F]">{formatNoteDate(note.updatedAt)}</p>
           <div className="absolute bottom-2 right-2 flex gap-1 opacity-100">
-            <button type="button" onClick={() => editNote(note)} className="grid h-7 w-7 place-items-center rounded-lg bg-white text-[#536174]" aria-label={`Edit ${note.title}`}><Icon name="edit" className="h-3.5 w-3.5" /></button>
-            <button type="button" onClick={() => deleteNote(note.id)} className="grid h-7 w-7 place-items-center rounded-lg bg-white text-[#9B4B56]" aria-label={`Delete ${note.title}`}><Icon name="trash" className="h-3.5 w-3.5" /></button>
+            <button type="button" onClick={() => editNote(note)} className="grid h-8 w-8 place-items-center rounded-lg bg-[#EEF6FF] text-[#0B63FF]" aria-label={`Edit ${note.title}`}><Icon name="edit" className="h-4 w-4" /></button>
+            <button type="button" onClick={() => deleteNote(note.id)} className="grid h-8 w-8 place-items-center rounded-lg bg-red-50 text-red-500" aria-label={`Delete ${note.title}`}><Icon name="trash" className="h-4 w-4" /></button>
           </div>
         </article>
-      ))}</div> : <div className="rounded-[18px] border border-dashed border-black bg-white px-4 py-6 text-center text-xs font-bold text-[#98A2B3]">No {title.toLowerCase()} yet.</div>}
+      ))}</div> : <div className="rounded-[20px] border border-dashed border-[#D8E6FF] bg-white px-4 py-6 text-center text-sm font-bold text-[#64708F]">No {title.toLowerCase()} yet.</div>}
     </section>
   );
 
@@ -930,27 +930,27 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
     const shopping = workspace.notes.filter(note => !note.pinned && note.category === 'shopping');
     return (
       <div className="mx-auto max-w-xl px-4 pb-8 pt-4">
-        <section className="mb-4 overflow-hidden rounded-[26px] border border-black bg-white p-4">
+        <section className="mb-4 overflow-hidden rounded-[26px] border border-[#D8E6FF] bg-white p-5 shadow-[0_18px_50px_rgba(11,99,255,0.10)]">
           <div className="flex items-center gap-3">
-            <div className="grid h-12 w-12 place-items-center rounded-2xl bg-[#315CEB] text-white"><Icon name="note" className="h-7 w-7" /></div>
+            <div className="grid h-14 w-14 place-items-center rounded-2xl bg-[#0B63FF] text-white"><Icon name="note" className="h-8 w-8" /></div>
             <div className="min-w-0 flex-1">
-              <p className="text-[10px] font-black uppercase tracking-[0.26em] text-[#315CEB]">Eduvora Bond</p>
-              <h2 className="mt-1 text-xl font-black tracking-tight text-[#101828]">Your all-in-one My Day space.</h2>
-              <p className="mt-1 text-[11px] font-semibold leading-4 text-[#667085]">Notes, countdowns, reminders and streaks in one clean mobile view.</p>
+              <p className="text-[11px] font-black uppercase tracking-[0.26em] text-[#0B63FF]">Eduvora Bond</p>
+              <h2 className="mt-1 text-[22px] font-black tracking-tight text-[#081A44]">Your all-in-one My Day space.</h2>
+              <p className="mt-1 text-[13px] font-semibold leading-5 text-[#64708F]">Notes, countdowns, reminders and streaks in one clean mobile view.</p>
             </div>
           </div>
           <div className="mt-4 grid grid-cols-4 gap-2">
-            {[{ tab: 'home' as const, label: 'Learn', icon: 'note' as const }, { tab: 'goals' as const, label: 'Plan', icon: 'goal' as const }, { tab: 'focus' as const, label: 'Focus', icon: 'sparkle' as const }, { tab: 'progress' as const, label: 'Connect', icon: 'progress' as const }].map(item => <button key={item.label} type="button" onClick={() => navigateTab(item.tab)} className="rounded-2xl border border-black bg-[#FBFCFF] px-1 py-3 text-center text-[#0F1A3D] active:scale-95"><Icon name={item.icon} className="mx-auto h-5 w-5 text-[#315CEB]" /><span className="mt-1 block text-[9px] font-black">{item.label}</span></button>)}
+            {[{ tab: 'home' as const, label: 'Learn', icon: 'note' as const }, { tab: 'goals' as const, label: 'Plan', icon: 'goal' as const }, { tab: 'focus' as const, label: 'Focus', icon: 'sparkle' as const }, { tab: 'progress' as const, label: 'Connect', icon: 'progress' as const }].map(item => <button key={item.label} type="button" onClick={() => navigateTab(item.tab)} className="rounded-2xl border border-[#D8E6FF] bg-[#F7FAFF] px-1 py-3.5 text-center text-[#081A44] active:scale-95"><Icon name={item.icon} className="mx-auto h-6 w-6 text-[#0B63FF]" /><span className="mt-1.5 block text-[10px] font-black">{item.label}</span></button>)}
           </div>
         </section>
-        <section className="rounded-[20px] border border-black bg-white">
-          <textarea value={noteBody} onChange={event => setNoteBody(event.target.value)} placeholder="Write a note…" maxLength={2000} rows={4} className="w-full resize-none rounded-t-[20px] bg-transparent px-4 py-4 text-sm font-semibold leading-6 text-[#253047] outline-none placeholder:text-[#9AA3B5]" />
-          <div className="flex items-center gap-2 border-t border-black px-3 py-3">
+        <section className="rounded-[22px] border border-[#D8E6FF] bg-white shadow-[0_14px_36px_rgba(11,99,255,0.08)]">
+          <textarea value={noteBody} onChange={event => setNoteBody(event.target.value)} placeholder="Write a note…" maxLength={2000} rows={4} className="w-full resize-none rounded-t-[22px] bg-transparent px-4 py-4 text-[15px] font-semibold leading-7 text-[#253047] outline-none placeholder:text-[#9AA3B5]" />
+          <div className="flex items-center gap-2 border-t border-[#D8E6FF] px-3 py-3">
             {(['pinned', 'study', 'shopping'] as const).map(category => (
-              <button key={category} type="button" onClick={() => setNoteCategory(category)} className={`rounded-xl px-2.5 py-2 text-[10px] font-black capitalize ${noteCategory === category ? 'bg-[#EEF1FF] text-[#315CEB]' : 'text-[#667085]'}`}>{category}</button>
+              <button key={category} type="button" onClick={() => setNoteCategory(category)} className={`rounded-xl px-3 py-2 text-[11px] font-black capitalize ${noteCategory === category ? 'bg-[#EEF6FF] text-[#0B63FF]' : 'text-[#64708F]'}`}>{category}</button>
             ))}
-            {editingNoteId ? <button type="button" onClick={() => { setEditingNoteId(null); setNoteBody(''); }} className="ml-auto rounded-xl px-3 py-2 text-[10px] font-black text-[#7A8499]">Cancel</button> : <span className="ml-auto" />}
-            <button type="button" onClick={saveNote} disabled={!noteBody.trim()} className="rounded-[14px] bg-[#315CEB] px-5 py-2.5 text-xs font-black text-white disabled:opacity-40">{editingNoteId ? 'Update' : 'Save'}</button>
+            {editingNoteId ? <button type="button" onClick={() => { setEditingNoteId(null); setNoteBody(''); }} className="ml-auto rounded-xl px-3 py-2 text-[11px] font-black text-[#64708F]">Cancel</button> : <span className="ml-auto" />}
+            <button type="button" onClick={saveNote} disabled={!noteBody.trim()} className="rounded-[14px] bg-[#0B63FF] px-5 py-2.5 text-xs font-black text-white disabled:opacity-40">{editingNoteId ? 'Update' : 'Save'}</button>
           </div>
         </section>
         {renderTaskPlanner()}
@@ -968,14 +968,14 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
           const tone = goalTones[index % goalTones.length];
           const remaining = daysUntil(goal.targetDate);
           return (
-            <article key={goal.id} className="rounded-[20px] border border-black bg-white p-4">
+            <article key={goal.id} className="rounded-[22px] border border-[#D8E6FF] bg-white p-4 shadow-[0_14px_36px_rgba(11,99,255,0.08)]">
               <div className="flex items-start gap-3">
-                <div className={`grid h-11 w-11 shrink-0 place-items-center rounded-[13px] text-white ${tone.icon}`}><Icon name="goal" className="h-5 w-5" /></div>
+                <div className={`grid h-12 w-12 shrink-0 place-items-center rounded-[14px] text-white ${tone.icon}`}><Icon name="goal" className="h-6 w-6" /></div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="truncate text-[14px] font-black text-[#1D2939]">{goal.title}</h2>
-                  <p className="mt-1 line-clamp-2 text-[10px] font-semibold leading-4 text-[#7A8499]">{goal.description}</p>
+                  <h2 className="truncate text-[16px] font-black text-[#081A44]">{goal.title}</h2>
+                  <p className="mt-1 line-clamp-2 text-[12px] font-semibold leading-5 text-[#64708F]">{goal.description}</p>
                 </div>
-                <div className="text-right"><p className="text-2xl font-black tracking-tight text-[#17223B]">{remaining}</p><p className="text-[9px] font-bold text-[#7F899D]">days left</p></div>
+                <div className="text-right"><p className="text-2xl font-black tracking-tight text-[#081A44]">{remaining}</p><p className="text-[10px] font-bold text-[#64708F]">days left</p></div>
               </div>
               <div className="mt-4 flex items-center gap-3">
                 <input type="range" min="0" max="100" value={goal.progress} onChange={event => updateGoalProgress(goal.id, Number(event.target.value))} className="h-2 min-w-0 flex-1 cursor-pointer accent-[#4E63EF]" aria-label={`Progress for ${goal.title}`} />
@@ -1032,7 +1032,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
         <div className="mt-3 grid grid-cols-4 overflow-hidden rounded-[20px] border border-black bg-white">{['Study', 'Tasks', 'Habits', 'Goals'].map((category, index) => <button key={category} type="button" onClick={() => toggleReminderCategory(category)} className={`border-black px-1 py-4 text-center ${index ? 'border-l' : ''}`}><span className={`mx-auto grid h-9 w-9 place-items-center rounded-xl ${reminderCategories.includes(category) ? 'bg-[#EEF2FF] text-[#315CEB]' : 'bg-[#F6F7F9] text-[#98A2B3]'}`}><Icon name={category === 'Goals' ? 'goal' : category === 'Tasks' ? 'check' : category === 'Habits' ? 'sparkle' : 'calendar'} className="h-4 w-4" /></span><span className="mt-2 block text-[9px] font-black text-[#475467]">{category}</span><span className={`mx-auto mt-2 grid h-4 w-4 place-items-center rounded ${reminderCategories.includes(category) ? 'bg-[#315CEB] text-white' : 'border border-black text-transparent'}`}><Icon name="check" className="h-3 w-3" /></span></button>)}</div>
       </section>
 
-      <button type="button" onClick={addReminder} disabled={!reminderTitle.trim()} className="mt-5 w-full rounded-[17px] bg-[#315CEB] px-4 py-3.5 text-sm font-black text-white disabled:opacity-45">Save Reminder</button>
+      <button type="button" onClick={addReminder} disabled={!reminderTitle.trim()} className="mt-5 w-full rounded-[17px] bg-[#0B63FF] px-4 py-3.5 text-sm font-black text-white disabled:opacity-45">Save Reminder</button>
 
       {browserPermission !== 'granted' ? <section className="mt-4 rounded-[20px] border border-black bg-white p-4"><div className="flex gap-3"><div className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-[#DDF6F4] text-[#12A89C]"><Icon name="bell" className="h-5 w-5" /></div><div className="min-w-0 flex-1"><h3 className="text-[12px] font-black text-[#1D2939]">Stay on track with reminders</h3><p className="mt-1 text-[10px] font-semibold leading-4 text-[#667085]">Allow browser notifications so My Day can alert you while the app is available.</p><button type="button" onClick={requestBrowserPermission} className="mt-3 w-full rounded-xl bg-[#315CEB] px-3 py-2.5 text-[11px] font-black text-white">Allow Notifications</button></div></div></section> : null}
 
@@ -1063,8 +1063,8 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
           </div>
         </section>
         {focusMessage ? <div className="mt-4 rounded-[18px] border border-black bg-white px-4 py-3 text-center text-xs font-black text-[#101828]">{focusMessage}</div> : null}
-        <section className="mt-4 rounded-[20px] border border-black bg-white p-4"><div className="flex items-center gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#E9E0FF] text-[#704CF2]"><Icon name="sparkle" className="h-6 w-6" /></div><div className="min-w-0 flex-1"><h3 className="text-[12px] font-black text-[#101828]">{isPremium ? 'Pro / Elite study progress' : 'Go Pro / Elite'}</h3><p className="mt-1 text-[10px] font-semibold leading-4 text-[#667085]">{isPremium ? 'Your completed focus minutes feed My Day progress and premium streak insights.' : 'Unlock premium streaks, badges, EduCoin earning eligibility, and deeper insights.'}</p></div>{!isPremium ? <button type="button" onClick={onUpgrade} className="rounded-full bg-[#7147F4] px-3 py-2 text-[10px] font-black text-white">Upgrade</button> : null}</div></section>
-        <section className="mt-5 rounded-[20px] border border-black bg-white p-4"><div className="flex items-center justify-between"><div><p className="text-[11px] font-bold text-[#7A8499]">Today&apos;s focus</p><p className="mt-1 text-2xl font-black text-[#1D2939]">{todayFocusMinutes} min</p></div><div className="grid h-14 w-14 place-items-center rounded-full bg-[#EEF2FF] text-[#315CEB]"><Icon name="timer" className="h-7 w-7" /></div></div></section>
+          <section className="mt-4 rounded-[20px] border border-[#D8E6FF] bg-white p-4 shadow-[0_10px_28px_rgba(11,99,255,0.06)]"><div className="flex items-center gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#EEF6FF] text-[#0B63FF]"><Icon name="sparkle" className="h-6 w-6" /></div><div className="min-w-0 flex-1"><h3 className="text-[13px] font-black text-[#081A44]">{isPremium ? 'Pro / Elite study progress' : 'Go Pro / Elite'}</h3><p className="mt-1 text-[11px] font-semibold leading-5 text-[#64708F]">{isPremium ? 'Your completed focus minutes feed My Day progress and premium streak insights.' : 'Unlock premium streaks, badges, EduCoin earning eligibility, and deeper insights.'}</p></div>{!isPremium ? <button type="button" onClick={onUpgrade} className="rounded-full bg-[#0B63FF] px-3 py-2 text-[11px] font-black text-white">Upgrade</button> : null}</div></section>
+        <section className="mt-5 rounded-[20px] border border-[#D8E6FF] bg-white p-4 shadow-[0_10px_28px_rgba(11,99,255,0.06)]"><div className="flex items-center justify-between"><div><p className="text-[12px] font-bold text-[#64708F]">Today&apos;s focus</p><p className="mt-1 text-2xl font-black text-[#081A44]">{todayFocusMinutes} min</p></div><div className="grid h-14 w-14 place-items-center rounded-full bg-[#EEF6FF] text-[#0B63FF]"><Icon name="timer" className="h-7 w-7" /></div></div></section>
       </div>
     );
   };
@@ -1073,7 +1073,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
     <div className="mx-auto max-w-xl px-4 pb-8 pt-4">
       {isPremium ? <section className="rounded-[20px] border border-black bg-white p-4"><div className="flex items-center justify-between"><h2 className="flex items-center gap-2 text-sm font-black text-[#1D2939]"><span>🔥</span> Weekly Streak</h2><span className="text-sm font-black text-[#1D2939]">{currentStreak} days</span></div><div className="mt-5 grid grid-cols-7 gap-2">{lastSevenDays.map(day => <div key={day.key} className="text-center"><div className={`mx-auto grid h-8 w-8 place-items-center rounded-full border ${day.active ? 'border-[#12AFA3] bg-[#12AFA3] text-white' : 'border-black bg-white text-[#C5CBD5]'}`}><Icon name="check" className="h-4 w-4" /></div><p className="mt-2 text-[9px] font-black text-[#667085]">{day.label}</p></div>)}</div></section> : <section className="rounded-[20px] border border-black bg-white p-4"><div className="flex gap-3"><div className="grid h-12 w-12 shrink-0 place-items-center rounded-2xl bg-[#EAE1FF] text-[#704CF2]"><Icon name="sparkle" className="h-6 w-6" /></div><div><p className="text-[10px] font-black uppercase tracking-[0.12em] text-[#704CF2]">Premium motivation</p><h2 className="mt-1 text-sm font-black text-[#101828]">Build streaks with Pro or Elite</h2><p className="mt-1 text-[10px] font-semibold leading-4 text-[#667085]">Normal users can use tasks, notes, reminders, focus sessions, and daily progress. Premium members also unlock streaks, badges, milestones, and reward eligibility.</p><button type="button" onClick={onUpgrade} className="mt-3 rounded-full bg-[#7147F4] px-4 py-2 text-[10px] font-black text-white">Upgrade</button></div></div></section>}
 
-      <section className="mt-5"><h2 className="mb-3 text-sm font-black text-[#1D2939]">Today&apos;s Progress</h2><div className="grid grid-cols-3 overflow-hidden rounded-[20px] border border-black bg-white"><div className="border-r border-black px-2 py-4 text-center"><div className="mx-auto text-[#12AFA3]"><Icon name="check" className="mx-auto h-5 w-5" /></div><p className="mt-2 text-xl font-black text-[#1D2939]">{completedTasks}</p><p className="mt-1 text-[9px] font-bold text-[#7A8499]">Tasks Done</p></div><div className="border-r border-black px-2 py-4 text-center"><div className="mx-auto text-[#F59E0B]"><Icon name="timer" className="mx-auto h-5 w-5" /></div><p className="mt-2 text-xl font-black text-[#1D2939]">{todayFocusMinutes}</p><p className="mt-1 text-[9px] font-bold text-[#7A8499]">Min Focused</p></div><div className="px-2 py-4 text-center"><div className="mx-auto text-[#704CF2]"><Icon name="goal" className="mx-auto h-5 w-5" /></div><p className="mt-2 text-xl font-black text-[#1D2939]">{dailyGoal}%</p><p className="mt-1 text-[9px] font-bold text-[#7A8499]">Daily Goal</p></div></div></section>
+      <section className="mt-5"><h2 className="mb-3 text-[17px] font-black text-[#081A44]">Today&apos;s Progress</h2><div className="grid grid-cols-3 overflow-hidden rounded-[22px] border border-[#D8E6FF] bg-white shadow-[0_14px_36px_rgba(11,99,255,0.08)]"><div className="border-r border-[#D8E6FF] px-2 py-4 text-center"><div className="mx-auto text-[#12AFA3]"><Icon name="check" className="mx-auto h-6 w-6" /></div><p className="mt-2 text-xl font-black text-[#081A44]">{completedTasks}</p><p className="mt-1 text-[10px] font-bold text-[#64708F]">Tasks Done</p></div><div className="border-r border-[#D8E6FF] px-2 py-4 text-center"><div className="mx-auto text-[#F59E0B]"><Icon name="timer" className="mx-auto h-6 w-6" /></div><p className="mt-2 text-xl font-black text-[#081A44]">{todayFocusMinutes}</p><p className="mt-1 text-[10px] font-bold text-[#64708F]">Min Focused</p></div><div className="px-2 py-4 text-center"><div className="mx-auto text-[#0B63FF]"><Icon name="goal" className="mx-auto h-6 w-6" /></div><p className="mt-2 text-xl font-black text-[#081A44]">{dailyGoal}%</p><p className="mt-1 text-[10px] font-bold text-[#64708F]">Daily Goal</p></div></div></section>
 
       <section className="relative mt-4 overflow-hidden rounded-[22px] border border-black bg-white p-5 text-center"><div className="absolute left-3 top-3 text-xl">🎉</div><div className="absolute bottom-3 right-4 text-2xl">✨</div><h2 className="relative text-lg font-black">{dailyGoal >= 100 ? `Amazing work, ${displayName}!` : `Keep going, ${displayName}!`}</h2><p className="relative mt-2 text-xs font-semibold leading-5 text-[#667085]">{dailyGoal >= 100 ? 'You completed today’s My Day target.' : `Complete 3 tasks or study for 15 minutes to finish today's goal.`}</p><button type="button" onClick={() => navigateTab(dailyGoal >= 100 ? 'home' : 'focus')} className="relative mt-4 rounded-full border border-black bg-white px-5 py-2.5 text-xs font-black text-[#101828]">{dailyGoal >= 100 ? 'Plan tomorrow' : 'Continue progress'}</button></section>
 
@@ -1463,7 +1463,7 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
   ];
 
   return (
-    <div data-feature={MAY_DAY_MARKER} className="mayday-mobile-scope mayday-contrast-scope min-h-[100dvh] bg-[#F8F9FB] pb-[calc(env(safe-area-inset-bottom)+6.6rem)] text-[#101828]">
+    <div data-feature={MAY_DAY_MARKER} className="mayday-mobile-scope mayday-contrast-scope min-h-[100dvh] bg-[#F8FAFD] pb-[calc(env(safe-area-inset-bottom)+6.6rem)] text-[#49454F]">
       {renderHeader()}
       {activeTab === 'home' ? renderHome() : null}
       {activeTab === 'goals' ? renderGoals() : null}
@@ -1471,10 +1471,15 @@ const MayDayMobile: React.FC<MayDayMobileProps> = ({ currentUser, isLoggedIn, is
       {activeTab === 'focus' ? renderFocus() : null}
       {activeTab === 'progress' ? renderProgress() : null}
 
-      <nav aria-label="My Day sections" className="fixed inset-x-0 bottom-0 z-50 border-t border-[#E7E0EC] bg-[#FFFBFE] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
-        <div className="mx-auto grid max-w-xl grid-cols-5 gap-1">{navItems.map(item => {
+      <nav aria-label="My Day sections" className="fixed inset-x-0 bottom-0 z-50 border-t border-[#D8E6FF] bg-[#FFFBFE] px-2 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2">
+        <div className="mx-auto grid max-w-xl grid-cols-6 gap-1">
+          <button type="button" onClick={handleHeaderBack} className="flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 transition active:scale-95 text-[#64708F] hover:text-[#0B63FF]">
+            <span className="grid h-7 w-7 place-items-center rounded-xl bg-white"><Icon name="back" className="h-[18px] w-[18px]" /></span>
+            <span className="w-full truncate text-center text-[10px] font-black">Home</span>
+          </button>
+          {navItems.map(item => {
           const active = activeTab === item.tab;
-          return <button key={item.tab} type="button" onClick={() => navigateTab(item.tab)} aria-current={active ? 'page' : undefined} className={`flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 transition active:scale-95 ${active ? 'bg-[#EEF2FF] text-[#315CEB]' : 'text-[#596579]'}`}><span className={`grid h-7 w-7 place-items-center rounded-xl ${active ? 'bg-white' : ''}`}><Icon name={item.icon} className="h-[18px] w-[18px]" /></span><span className="w-full truncate text-center text-[9px] font-black">{item.label}</span></button>;
+          return <button key={item.tab} type="button" onClick={() => navigateTab(item.tab)} aria-current={active ? 'page' : undefined} className={`flex min-w-0 flex-col items-center gap-1 rounded-2xl px-1 py-2 transition active:scale-95 ${active ? 'bg-[#0B63FF]/10 text-[#0B63FF]' : 'text-[#64708F]'}`}><span className={`grid h-7 w-7 place-items-center rounded-xl ${active ? 'bg-[#0B63FF]/15' : ''}`}><Icon name={item.icon} className="h-[18px] w-[18px]" /></span><span className="w-full truncate text-center text-[10px] font-black">{item.label}</span></button>;
         })}</div>
       </nav>
     </div>

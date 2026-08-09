@@ -8,7 +8,7 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
-        allowedHosts: ['.monkeycode-ai.live'],
+        allowedHosts: ['.monkeycode-ai.live', '.e2b.app'],
       },
       plugins: [
         react(),

@@ -1130,6 +1130,7 @@ const ContentComposer: React.FC<{
         { type: 'pdf', title: 'PDF / Docs URL', description: 'Use Google Drive, hosted PDF, DOC/DOCX, or external docs links without Storage.', icon: '🌐', action: 'docsUrl' },
         { type: 'quiz', title: 'Quiz', description: 'Create interactive assessment questions.', icon: '✅' },
         { type: 'link', title: 'External Link', description: 'Reference any hosted resource.', icon: '🔗' },
+        { type: 'google_form', title: 'Google Form', description: 'Embed a Google Form for surveys, feedback, or assignments.', icon: '📝' },
         { type: 'sheet', title: 'Spreadsheet', description: 'Upload CSV/XLS study material.', icon: '📊', accept: '.csv,.xls,.xlsx' },
         { type: 'ebook', title: 'E-book', description: 'Upload EPUB or PDF book content.', icon: '📚', accept: '.epub,.pdf' },
         { type: 'image', title: 'Image / Diagram', description: 'Upload diagrams, charts and reference images for lessons.', icon: '🖼️', accept: 'image/*', action: 'imageUrl' },
@@ -1521,6 +1522,11 @@ const ContentComposer: React.FC<{
             return;
         }
 
+        if (formState.type === 'google_form' && trimmedUrl && !/^https:\/\/docs\.google\.com\/forms\//i.test(trimmedUrl)) {
+            setDocError('Please enter a valid Google Forms URL (e.g. https://docs.google.com/forms/d/e/...).');
+            return;
+        }
+
         if (isHostedDocs && provider !== 'open_docs') {
             if (!trimmedUrl) {
                 setDocError('Enter a hosted PDF/docs URL before saving.');
@@ -1777,7 +1783,7 @@ const ContentComposer: React.FC<{
                                     <div>
                                         {isMediaUrlProvider(formState.provider) ? (
                                             <PremiumMediaUrlInput kind={formState.type === 'audio' ? 'audio' : 'video'} value={formState.url} onChange={(url) => { setDocError(''); setFormState(prev => prev ? { ...prev, url } : prev); }} label={mediaProviderLabel(formState.provider, formState.type === 'audio' ? 'audio' : 'video')} helperText={mediaProviderHelper(formState.provider, formState.type === 'audio' ? 'audio' : 'video')} />
-                                        ) : (<><label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : 'Resource URL'}</label>
+                                        ) : (<><label className={labelClass}>{formState.type === 'youtube' ? 'YouTube URL' : formState.type === 'google_form' ? 'Google Form URL' : 'Resource URL'}</label>
                                         <input
                                             value={formState.url}
                                             onChange={event => {
@@ -1785,7 +1791,7 @@ const ContentComposer: React.FC<{
                                                 setFormState(prev => prev ? { ...prev, url: event.target.value } : prev);
                                             }}
                                             className={fieldClass}
-                                            placeholder={formState.type === 'youtube' ? 'https://www.youtube.com/watch?v=VIDEO_ID' : 'https://example.com/resource'}
+                                            placeholder={formState.type === 'youtube' ? 'https://www.youtube.com/watch?v=VIDEO_ID' : formState.type === 'google_form' ? 'https://docs.google.com/forms/d/e/YOUR_FORM_ID/viewform' : 'https://example.com/resource'}
                                         /></>)}
                                         {isMediaUrlProvider(formState.provider) && (
                                             <div className="mt-3 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-800">
@@ -1797,6 +1803,11 @@ const ContentComposer: React.FC<{
                                         {formState.type === 'youtube' && (
                                             <p className="mt-2 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm font-bold text-red-700">
                                                 Paste a public YouTube video link. Watch, youtu.be, embed, shorts, live, and raw video ID formats are supported.
+                                            </p>
+                                        )}
+                                        {formState.type === 'google_form' && (
+                                            <p className="mt-2 rounded-2xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm font-bold text-blue-700">
+                                                Paste a public Google Form link. The form will be embedded inside the course player as an inline frame. Make sure the form is set to "Anyone with the link can respond" for it to work without login.
                                             </p>
                                         )}
                                     </div>
