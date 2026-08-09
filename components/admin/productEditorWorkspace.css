@@ -1636,3 +1636,126 @@
     height: 19px;
   }
 }
+
+/* Premium Embedded Resource Card Styles */
+.premium-embedded-resource-card {
+  background: linear-gradient(135deg, rgba(230, 240, 255, 0.5) 0%, rgba(255, 230, 245, 0.5) 100%);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 150, 0.05);
+  padding: 20px;
+  margin-bottom: 20px;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+}
+
+.premium-embedded-resource-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 6px;
+  background: linear-gradient(90deg, #4A90E2 0%, #B66DFF 100%);
+  border-top-left-radius: 20px;
+  border-top-right-radius: 20px;
+}
+
+.resource-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.resource-type-tag {
+  background-color: #E6F0FF;
+  color: #4A90E2;
+  padding: 5px 12px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.premium-tag {
+  background-color: #FDF5E6;
+  color: #F5A623;
+  padding: 5px 12px;
+  border-radius: 10px;
+  font-size: 11px;
+  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  letter-spacing: 0.02em;
+}
+
+.resource-body {
+  background: #FFFFFF;
+  border-radius: 15px;
+  padding: 12px;
+  margin-top: 15px;
+  border: 1px solid #E6E6E6;
+  position: relative;
+}
+
+.resource-body::after {
+  content: '';
+  position: absolute;
+  top: -3px;
+  left: -3px;
+  right: -3px;
+  bottom: -3px;
+  border-radius: 18px;
+  background: linear-gradient(135deg, rgba(74, 144, 226, 0.2) 0%, rgba(182, 109, 255, 0.2) 100%);
+  z-index: -1;
+  pointer-events: none;
+}
+
+.resource-body iframe {
+  width: 100%;
+  height: 650px;
+  border: none;
+  border-radius: 12px;
+}
+
+.resource-footer {
+  font-size: 12px;
+  color: #999999;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 15px;
+  padding-top: 10px;
+  border-top: 1px solid #E6E6E6;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.resource-footer strong {
+  color: #666666;
+}
+
+.premium-embed-info {
+  margin-top: 12px;
+  padding: 10px 14px;
+  background: linear-gradient(135deg, rgba(155, 89, 182, 0.08) 0%, rgba(74, 144, 226, 0.08) 100%);
+  border-radius: 10px;
+  border-left: 3px solid #7B61FF;
+}
+
+.premium-embed-info p {
+  margin: 0;
+  font-size: 12px;
+  color: #555555;
+  line-height: 1.5;
+}
+
+.premium-embed-info p + p {
+  margin-top: 4px;
+  color: #777777;
+  font-size: 11px;
+}

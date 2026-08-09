@@ -349,6 +349,25 @@ const glassCard = 'rounded-[2rem] border border-white/50 bg-white/80 p-6 shadow-
 const fieldClass = 'w-full rounded-2xl border border-white/50 bg-white/80 px-4 py-3 text-slate-900 outline-none transition placeholder:text-slate-600 focus:border-cyan-400/70 focus:ring-4 focus:ring-cyan-400/10';
 const labelClass = 'mb-2 block text-xs font-black uppercase tracking-[0.22em] text-slate-600';
 
+// Embed content type configuration
+export const EMBED_CONTENT_TYPES = [
+  { value: '', label: 'No External Embed', helper: 'Default course content display' },
+  { value: 'google_doc', label: 'Google Doc', helper: 'Embed a Google Doc via iframe' },
+  { value: 'github_page', label: 'GitHub Page', helper: 'Embed a GitHub Pages site via iframe' },
+] as const;
+
+export type EmbedContentTypeId = typeof EMBED_CONTENT_TYPES[number]['value'];
+
+const isEmbedContentTypeId = (value?: string): value is EmbedContentTypeId => {
+  return Boolean(value) && EMBED_CONTENT_TYPES.some(t => t.value === value);
+};
+
+const getEmbedContentTypeLabel = (value?: string): string => {
+  if (!value) return '';
+  const found = EMBED_CONTENT_TYPES.find(t => t.value === value);
+  return found?.label || value;
+};
+
 
 type HostedDocsProvider = 'direct_pdf' | 'google_drive_pdf' | 'google_drive_doc' | 'external_docs_link' | 'open_docs';
 type MediaUrlProvider = 'direct_audio' | 'direct_video' | 'google_drive_audio' | 'google_drive_video' | 'external_media';
@@ -1888,6 +1907,8 @@ const ModuleEditor: React.FC<{
 }> = ({ module, allModules, level, onUpdate, onAddChild, onDelete, productId }) => {
     const [isAddingContent, setIsAddingContent] = useState(false);
     const [editingFile, setEditingFile] = useState<ProductFile | null>(null);
+    const [embedType, setEmbedType] = useState<string>(module.embedContentTypeId || '');
+    const [embedUrl, setEmbedUrl] = useState<string>(module.embedContentUrl || '');
     const files = module.files || [];
     const childModules = module.modules || [];
 
@@ -1931,6 +1952,25 @@ const ModuleEditor: React.FC<{
         ));
     };
 
+    const handleEmbedTypeChange = (value: string) => {
+        setEmbedType(value);
+        updateModule(current => ({
+            ...current,
+            embedContentTypeId: value || undefined,
+            embedContentTypeLabel: value ? getEmbedContentTypeLabel(value) : undefined,
+        }));
+    };
+
+    const handleEmbedUrlChange = (value: string) => {
+        setEmbedUrl(value);
+        updateModule(current => ({
+            ...current,
+            embedContentUrl: value || undefined,
+        }));
+    };
+
+    const showEmbedFields = embedType === 'google_doc' || embedType === 'github_page';
+
     return (
         <div data-product-module-level={level} className={`product-editor-module-card rounded-[1.75rem] border p-5 ${level === 0 ? 'border-white/50 bg-white/80' : 'border-white/50 bg-white/80'}`}>
             <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
@@ -1953,6 +1993,62 @@ const ModuleEditor: React.FC<{
             </div>
 
             <div className="mt-5 space-y-3">
+                {/* Embed Content Configuration */}
+                {module.embedContentTypeId && (
+                    <div className="product-editor-embed-config rounded-2xl border border-purple-200 bg-gradient-to-br from-purple-50 to-indigo-50/50 p-4">
+                        <div className="flex items-center gap-2 mb-3">
+                            <span className="text-lg">📎</span>
+                            <p className="text-xs font-black uppercase tracking-[0.22em] text-purple-700">External Embed Configuration</p>
+                        </div>
+                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                            <div>
+                                <label className={labelClass}>Embed Type</label>
+                                <select
+                                    value={embedType}
+                                    onChange={event => handleEmbedTypeChange(event.target.value)}
+                                    className={fieldClass}
+                                >
+                                    {EMBED_CONTENT_TYPES.map(type => (
+                                        <option key={type.value} value={type.value}>{type.label}</option>
+                                    ))}
+                                </select>
+                            </div>
+                            {showEmbedFields && (
+                                <div>
+                                    <label className={labelClass}>Embed URL</label>
+                                    <input
+                                        value={embedUrl}
+                                        onChange={event => handleEmbedUrlChange(event.target.value)}
+                                        className={fieldClass}
+                                        placeholder={embedType === 'google_doc' ? 'https://docs.google.com/document/d/...' : 'https://username.github.io/repo/'}
+                                    />
+                                    <p className="mt-1 text-xs font-bold text-slate-500">
+                                        {embedType === 'google_doc' ? 'Make sure the Google Doc is shared publicly (File > Share > Anyone with the link)' : 'GitHub Pages URL must be publicly accessible'}
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                        {embedType && (
+                            <div className="mt-3 rounded-xl bg-purple-100 px-3 py-2 text-xs font-bold text-purple-700">
+                                <p>📌 This module will display as a premium embedded resource in the course player.</p>
+                                <p className="mt-1 text-purple-600">Students will see a professional iframe-based embed instead of the standard content viewer.</p>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {/* Add Embed Button */}
+                {!module.embedContentTypeId && (
+                    <button
+                        type="button"
+                        onClick={() => handleEmbedTypeChange('google_doc')}
+                        className="flex items-center gap-3 rounded-2xl border border-dashed border-purple-300 bg-purple-50/50 px-4 py-3 text-sm font-bold text-purple-700 hover:bg-purple-100/50 hover:border-purple-400 transition"
+                    >
+                        <span className="text-xl">🔌</span>
+                        <span>Add External Embed (Google Doc / GitHub Page)</span>
+                    </button>
+                )}
+
                 {files.length > 0 ? (files || []).map(file => {
                     const accessLevel = normaliseCourseAccessLevel(file.accessLevel);
                     const badgeClass = accessLevel === 'paidUpdate'
@@ -2005,7 +2101,7 @@ const ModuleEditor: React.FC<{
                             </div>
                         </div>
                     );
-                }) : <p className="rounded-2xl border border-dashed border-white/50 p-4 text-sm text-slate-600">No content yet. Add videos, PDFs, Open Docs, quizzes, and resource links here.</p>}
+                }) : !module.embedContentTypeId ? <p className="rounded-2xl border border-dashed border-white/50 p-4 text-sm text-slate-600">No content yet. Add videos, PDFs, Open Docs, quizzes, and resource links here.</p> : null}
             </div>
 
             {(isAddingContent || editingFile) && (
