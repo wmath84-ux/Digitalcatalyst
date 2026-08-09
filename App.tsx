@@ -310,12 +310,16 @@ export interface ProductFile extends CourseAccessMeta {
   quiz?: ProductQuiz;
 }
 
-// Interface for a course module, now supporting nested modules
+// Interface for a course module, now supporting nested modules and embed content
 export interface CourseModule extends CourseAccessMeta {
   id: string;
   title: string;
   files: ProductFile[];
   modules: CourseModule[]; // For nested modules
+  // Embed content configuration for Google Docs / GitHub Pages
+  embedContentTypeId?: string; // 'google_doc' | 'github_page' | undefined
+  embedContentTypeLabel?: string; // Display label: 'Google Doc' | 'GitHub Page' | undefined
+  embedContentUrl?: string; // The embed URL
 }
 
 // New interface for price history

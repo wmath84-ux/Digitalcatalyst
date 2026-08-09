@@ -32,6 +32,12 @@ declare global {
 
 const hostedDocsProviders = ['direct_pdf', 'google_drive_pdf', 'google_drive_doc', 'external_docs_link'] as const;
 
+// Embed content types
+const EMBED_CONTENT_TYPES: Record<string, { label: string; icon: string; provider: string }> = {
+  google_doc: { label: 'Google Doc', icon: '📝', provider: 'Google' },
+  github_page: { label: 'GitHub Page', icon: '🐙', provider: 'GitHub Pages' },
+};
+
 const extractGoogleDriveFileId = (value: string) => {
   const trimmed = value.trim();
   const patterns = [
@@ -1501,6 +1507,88 @@ const ExternalResourceCard: React.FC<{ file: ProductFile }> = ({ file }) => (
   </div>
 );
 
+// Premium Embedded Resource Card Component
+const PremiumEmbeddedResourceCard: React.FC<{
+  moduleTitle: string;
+  embedType: string;
+  embedUrl: string;
+}> = ({ moduleTitle, embedType, embedUrl }) => {
+  const embedConfig = EMBED_CONTENT_TYPES[embedType];
+  const embedLabel = embedConfig?.label || embedType || 'External Embed';
+  const embedIcon = embedConfig?.icon || '🔗';
+  const providerName = embedConfig?.provider || 'External';
+
+  // Generate a subtle gradient star decoration using CSS
+  const starDecoration = `
+    <svg xmlns="http://www.w3.org/2000/svg" className="absolute top-3 right-3 w-6 h-6 opacity-30" viewBox="0 0 24 24" fill="url(#starGradient)">
+      <defs>
+        <linearGradient id="starGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#4A90E2"/>
+          <stop offset="100%" stop-color="#B66DFF"/>
+        </linearGradient>
+      </defs>
+      <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+    </svg>
+  `;
+
+  return (
+    <div className="premium-embedded-resource-card">
+      <div className="relative">
+        {/* Gradient accent band at top */}
+        <div className="absolute top-0 left-0 right-0 h-1.5 rounded-t-2xl bg-gradient-to-r from-blue-400 to-purple-500" />
+
+        {/* Decorative elements */}
+        <div className="absolute top-4 right-4 flex gap-1 opacity-40">
+          <span className="text-2xl">✦</span>
+          <span className="text-xl">✧</span>
+        </div>
+
+        <div className="resource-header flex flex-wrap items-center gap-2">
+          <span className="resource-type-tag">
+            <span>{embedIcon}</span>
+            {embedLabel}
+          </span>
+          <span className="premium-tag">
+            <svg className="w-3 h-3" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+            PREMIUM RESOURCE
+          </span>
+        </div>
+
+        <div className="resource-body mt-4">
+          {/* Decorative gradient glow */}
+          <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-br from-blue-400/20 via-purple-400/20 to-pink-400/20 opacity-50 blur-sm" />
+
+          <iframe
+            src={embedUrl}
+            title={moduleTitle || 'Embedded Resource'}
+            frameBorder="0"
+            width="100%"
+            height="700px"
+            style={{ border: 'none', borderRadius: '15px', width: '100%', height: '700px', display: 'block' }}
+            allowFullScreen
+            loading="lazy"
+          />
+        </div>
+
+        <div className="resource-footer mt-4 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <span>🏷️</span>
+            <span>Hosted via <strong>{providerName}</strong></span>
+            <span className="hidden sm:inline">·</span>
+            <span className="hidden sm:inline">Free access</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-slate-500">
+            <span>📄</span>
+            <span>Module: <strong className="text-slate-700">{moduleTitle}</strong></span>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 
 const PremiumCourseMediaCard: React.FC<{ file: ProductFile; onError?: () => void; onVideoFullscreen?: () => void; showFullscreen?: boolean; }> = ({ file, onError, onVideoFullscreen, showFullscreen = false }) => {
   const isAudio = file.type === 'audio';
@@ -2572,6 +2660,18 @@ const CoursePlayer: React.FC<{
     return null;
   }, []);
 
+  // Find the module containing a specific file
+  const findModuleContainingFile = useCallback((modules: CourseModule[] | undefined, fileId: string): CourseModule | null => {
+    for (const module of modules || []) {
+      if (module.files?.some(file => file.id === fileId)) {
+        return module;
+      }
+      const nested = findModuleContainingFile(module.modules || [], fileId);
+      if (nested) return nested;
+    }
+    return null;
+  }, []);
+
   const handleModuleSearchSelect = useCallback((item: CourseModuleSearchItem) => {
     if (item.kind === 'lesson' && !item.locked) {
       const file = orderedCourseFiles.find(candidate => candidate.id === item.id) || findFileInCourseContent(courseContent, item.id);
@@ -2663,6 +2763,21 @@ const CoursePlayer: React.FC<{
   const renderMedia = () => {
     if (!activeFile) return <div className="flex h-full items-center justify-center bg-white/70 text-slate-900/70 backdrop-blur-xl">Select content to begin.</div>;
     if (mediaHasError) return <GlassDownloadCard file={activeFile} headline="Preview unavailable" />;
+
+    // Check if the current module has embed content configured
+    const currentModule = activeFile ? findModuleContainingFile(courseContent, activeFile.id) : null;
+    const hasEmbedContent = currentModule?.embedContentTypeId && currentModule?.embedContentUrl;
+
+    if (hasEmbedContent) {
+      return (
+        <PremiumEmbeddedResourceCard
+          moduleTitle={currentModule.title || 'Embedded Resource'}
+          embedType={currentModule.embedContentTypeId || 'google_doc'}
+          embedUrl={currentModule.embedContentUrl || ''}
+        />
+      );
+    }
+
     switch (activeFile.type) {
       case 'youtube': {
         const videoId = getYouTubeVideoIdFromFile(activeFile);
