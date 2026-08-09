@@ -152,14 +152,15 @@ const ProductShowcase: React.FC<ProductShowcaseProps> = ({
       ) : (
         <div className="grid grid-cols-1 gap-4 px-4 pt-4 sm:grid-cols-2">
           {filtered.map((product) => (
-            <ProductCard
-              key={product.id}
-              product={product}
-              wishlisted={wishlist.includes(product.id)}
-              purchased={purchasedProductIds.includes(product.id)}
-              onToggleWishlist={onToggleWishlist}
-              onView={onViewProduct}
-            />
+            <React.Fragment key={product.id}>
+              <ProductCard
+                product={product}
+                wishlisted={wishlist.includes(product.id)}
+                purchased={purchasedProductIds.includes(product.id)}
+                onToggleWishlist={onToggleWishlist}
+                onView={onViewProduct}
+              />
+            </React.Fragment>
           ))}
         </div>
       )}
