@@ -6320,7 +6320,10 @@ const App: React.FC = () => {
   };
 
   const handleAdminLogout = () => {
-    void signOut(auth).catch(error => console.warn('Firebase admin sign-out failed.', error));
+    void signOut(auth).catch(error => {
+      console.warn('Firebase admin sign-out failed.', error);
+      console.warn('Firebase admin auto sign-out failed', error);
+    });
     setCurrentAdminUser(null);
     localStorage.removeItem('currentAdminUser');
     setCurrentView('home');

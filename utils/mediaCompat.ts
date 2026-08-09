@@ -75,9 +75,108 @@ export const extractGoogleDriveFileId = (value = '') => {
   }
 };
 
+// Detect if a string looks like a bare Google Drive/Docs ID (no https, no slashes)
+const isBareGoogleId = (value = '') => {
+  const trimmed = cleanUrl(value);
+  return !!trimmed && !trimmed.includes('/') && !trimmed.includes(' ') && /^[a-zA-Z0-9_-]{15,}$/.test(trimmed);
+};
+
+export const getGoogleDocsEmbedUrl = (url = '') => {
+  const trimmed = cleanUrl(url);
+  if (!trimmed) return '';
+
+  // If bare ID, assume Google Doc
+  if (isBareGoogleId(trimmed)) {
+    return `https://docs.google.com/document/d/${trimmed}/preview`;
+  }
+
+  if (!isValidHttpsUrl(trimmed)) {
+    // If not https but looks like docs id with path fragments, try to extract
+    return trimmed;
+  }
+
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+    const path = parsed.pathname.toLowerCase();
+    const fileId = extractGoogleDriveFileId(trimmed);
+
+    if (!fileId) {
+      // Not a Google URL, return original if https
+      return trimmed;
+    }
+
+    if (host.includes('docs.google.com')) {
+      if (path.includes('/document/')) {
+        // Native Google Doc -> /preview is embeddable
+        return `https://docs.google.com/document/d/${fileId}/preview`;
+      }
+      if (path.includes('/spreadsheets/')) {
+        return `https://docs.google.com/spreadsheets/d/${fileId}/preview`;
+      }
+      if (path.includes('/presentation/')) {
+        return `https://docs.google.com/presentation/d/${fileId}/embed?start=false&loop=false&delayms=3000`;
+      }
+      if (path.includes('/forms/')) {
+        // Forms: keep as is if already viewform, otherwise return as is
+        return trimmed.includes('viewform') || trimmed.includes('preview') ? trimmed : trimmed;
+      }
+      // Fallback for other docs types
+      return `https://docs.google.com/document/d/${fileId}/preview`;
+    }
+
+    if (host.includes('drive.google.com')) {
+      // Drive file -> preview
+      return `https://drive.google.com/file/d/${fileId}/preview`;
+    }
+
+    return trimmed;
+  } catch {
+    return trimmed;
+  }
+};
+
 export const normalizeDriveUrl = (url = '') => {
-  const fileId = extractGoogleDriveFileId(url);
+  const trimmed = cleanUrl(url);
+  if (!trimmed) return '';
+  // Preserve original logic but use proper embed URL builder for Docs/Sheets/Slides
+  const embedUrl = getGoogleDocsEmbedUrl(trimmed);
+  // If we got a docs embed URL, return it; otherwise fallback to drive preview if ID exists
+  if (embedUrl) return embedUrl;
+  const fileId = extractGoogleDriveFileId(trimmed);
   return fileId ? `https://drive.google.com/file/d/${fileId}/preview` : '';
+};
+
+export const isGoogleDocsNativeUrl = (url = '') => {
+  const trimmed = cleanUrl(url);
+  return /https:\/\/docs\.google\.com\/(?:document|spreadsheets|presentation)\/d\//i.test(trimmed);
+};
+
+export const getGoogleFormEmbedUrl = (url = '') => {
+  const trimmed = cleanUrl(url);
+  if (!trimmed) return '';
+  if (!isValidHttpsUrl(trimmed)) return '';
+  try {
+    const parsed = new URL(trimmed);
+    const host = parsed.hostname.toLowerCase();
+    const path = parsed.pathname;
+    if (!host.includes('docs.google.com') || !path.toLowerCase().includes('/forms/')) {
+      return trimmed;
+    }
+    // For Google Forms, the embeddable version is usually .../viewform?embedded=true
+    // If URL already has embedded=true, keep it
+    if (parsed.searchParams.has('embedded')) {
+      return trimmed;
+    }
+    // Add embedded=true param while preserving existing params? Simplest: append ?embedded=true if no query, else &embedded=true
+    // But we need to keep viewform path
+    // Example: https://docs.google.com/forms/d/e/ID/viewform -> https://docs.google.com/forms/d/e/ID/viewform?embedded=true
+    // If it already has ?usp, we add &embedded=true
+    const separator = parsed.search ? '&' : '?';
+    return `${trimmed}${separator}embedded=true`;
+  } catch {
+    return trimmed;
+  }
 };
 
 export const getGoogleDriveImageThumbnailUrl = (url = '', size = 1600) => {

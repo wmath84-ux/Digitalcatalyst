@@ -495,8 +495,15 @@ const resolveInitialMediaProvider = (file?: ProductFile | null): ContentComposer
 };
 
 const toGoogleDrivePreviewUrl = (value: string) => {
-    const fileId = extractGoogleDriveFileId(value);
-    return fileId ? `https://drive.google.com/file/d/${fileId}/preview` : value.trim();
+    const trimmed = value.trim();
+    if (!trimmed) return '';
+    const fileId = extractGoogleDriveFileId(trimmed);
+    if (!fileId) return trimmed;
+    const lower = trimmed.toLowerCase();
+    if (lower.includes('/document/')) return `https://docs.google.com/document/d/${fileId}/preview`;
+    if (lower.includes('/spreadsheets/')) return `https://docs.google.com/spreadsheets/d/${fileId}/preview`;
+    if (lower.includes('/presentation/')) return `https://docs.google.com/presentation/d/${fileId}/embed?start=false&loop=false&delayms=3000`;
+    return `https://drive.google.com/file/d/${fileId}/preview`;
 };
 
 const inferHostedDocsType = (provider: HostedDocsProvider): ProductFileType => {
