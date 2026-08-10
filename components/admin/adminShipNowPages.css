@@ -327,7 +327,6 @@
   border-color: var(--dc-admin-border) !important;
 }
 
-.shipnow-admin-page-theme[data-admin-view="adminPosts"] > div,
 .shipnow-admin-page-theme[data-admin-view="firebaseAdmin"] > div {
   max-width: none !important;
 }

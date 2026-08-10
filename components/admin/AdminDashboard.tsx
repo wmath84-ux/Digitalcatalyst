@@ -16,7 +16,6 @@ import AdminManagement from './AdminManagement';
 import NewsBlogManagement from './NewsBlogManagement';
 import CoinEconomyManagement from './CoinEconomyManagement';
 import NewsletterSubscribers from './NewsletterSubscribers';
-import AdminPostManagement from './AdminPostManagement';
 import AdminOverview from './AdminOverview';
 import './adminShipNowPages.css';
 
@@ -45,12 +44,11 @@ interface AdminDashboardProps {
     onSwitchToHome: () => void;
 }
 
-export type AdminView = 'dashboard' | 'adminPosts' | 'economy' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'subscribers' | 'analytics' | 'websiteSettings';
+export type AdminView = 'dashboard' | 'economy' | 'products' | 'newsBlog' | 'reviews' | 'reports' | 'users' | 'admins' | 'orders' | 'coupons' | 'support' | 'subscribers' | 'analytics' | 'websiteSettings';
 
 const ADMIN_VIEW_SESSION_KEY = 'eduvora.adminView.v1';
 const ADMIN_VIEWS: AdminView[] = [
     'dashboard',
-    'adminPosts',
     'economy',
     'products',
     'newsBlog',
@@ -104,7 +102,6 @@ const AdminDashboard: React.FC<AdminDashboardProps> = (props) => {
 
     const renderView = () => {
         switch (currentView) {
-            case 'adminPosts': return <AdminPostManagement />;
             case 'economy': return <CoinEconomyManagement economySettings={props.economySettings} products={props.products} websiteSettings={props.websiteSettings} />;
             case 'products': return <ProductManagement products={props.products} users={props.users} coupons={props.coupons} onAddProduct={props.onAddProduct} onUpdateProduct={props.onUpdateProduct} onDeleteProduct={props.onDeleteProduct} onEditorStateChange={setIsProductEditorOpen} />;
             case 'newsBlog': return <NewsBlogManagement settings={props.websiteSettings} onSettingsChange={props.onWebsiteSettingsChange} />;
