@@ -54,14 +54,13 @@ test('Home News and Blog fallback cards keep only the real top overlay badge', (
   assert.doesNotMatch(latestNews, /<rect x="78" y="74" width="220" height="58"/);
 });
 
-test('Admin side-panel font and visual settings remain wired to HomeSideDock', () => {
-  assert.match(settings, /Website side panel font/);
-  assert.match(settings, /Website side panel only/);
-  assert.match(settings, /Side panel transparency/);
-  assert.match(settings, /Font transparency/);
-  assert.match(settings, /updateDockStyle\('sidebarFontFamily'/);
-  assert.match(settings, /updateDockStyle\('sidebarBackgroundOpacity'/);
-  assert.match(settings, /updateDockStyle\('sidebarTextOpacity'/);
+test('Admin side-panel visual settings are removed while HomeSideDock keeps hardcoded defaults', () => {
+  assert.doesNotMatch(settings, /Website side panel font/);
+  assert.doesNotMatch(settings, /Website side panel only/);
+  assert.doesNotMatch(settings, /Side panel transparency/);
+  assert.doesNotMatch(settings, /Font transparency/);
+  assert.doesNotMatch(settings, /updateDockStyle/);
+  assert.match(homeDock, /const dockStyle = defaultDockStyle;/);
   assert.match(homeDock, /sidebarFontOptions/);
   assert.match(homeDock, /sidebarSurfaceColor/);
   assert.match(homeDock, /fontFamily: sidebarFontFamily/);

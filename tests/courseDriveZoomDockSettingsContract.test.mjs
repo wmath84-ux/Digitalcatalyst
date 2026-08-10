@@ -25,16 +25,15 @@ test('Store Config removes Round Effects without deleting public product roundne
   assert.match(app, /productRoundness/);
 });
 
-test('Dock Settings are saved once and consumed by mobile dock, desktop bottom dock and side panel', () => {
-  assert.match(settings, /store-config-dock-studio/);
-  assert.match(settings, /Real navigation deployment/);
-  assert.match(settings, /Show mobile dock/);
-  assert.match(settings, /Show numeric badges/);
-  assert.match(settings, /Auto-hide bottom dock on scroll/);
-  assert.match(settings, /Items and order/);
-  assert.match(settings, /Surface and color/);
-  assert.match(settings, /Desktop side panel preview/);
+test('Dock customization is removed from admin while the dock keeps hardcoded defaults', () => {
+  assert.doesNotMatch(settings, /case 'dock':/);
+  assert.doesNotMatch(settings, /store-config-dock-studio/);
+  assert.doesNotMatch(settings, /Dock Settings/);
+  assert.doesNotMatch(settings, /updateDockStyle/);
+  assert.doesNotMatch(settings, /toggleDockItem/);
+  assert.doesNotMatch(settings, /moveDockItem/);
 
+  // The dock components still expose their hardcoded default style and item markers.
   for (const marker of [
     'itemColor',
     'accentColor',
@@ -53,11 +52,13 @@ test('Dock Settings are saved once and consumed by mobile dock, desktop bottom d
     'desktopExpandedWidth',
     'desktopCollapsedWidth',
   ]) {
-    assert.match(app, new RegExp(marker));
     assert.match(mobileDock + desktopDock, new RegExp(marker));
   }
 
-  assert.match(mobileDock, /showOnDesktop = settings\.desktop\.navigationMode === 'dock'/);
+  // Bottom dock is hardcoded to mobile-only (default sidebar desktop navigation).
+  assert.match(mobileDock, /const showOnDesktop = false;/);
+  // Side dock reads its appearance from the hardcoded default style.
+  assert.match(desktopDock, /const dockStyle = defaultDockStyle;/);
   assert.match(desktopDock, /desktopExpandedWidth/);
 });
 

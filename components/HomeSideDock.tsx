@@ -80,7 +80,8 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
   const [sidebarState, setSidebarState] = useState<DesktopSidebarState>(() => openExpandedOnMount ? 'expanded' : readDesktopSidebarState());
   const [hoverExpanded, setHoverExpanded] = useState(false);
   const hoverCloseTimerRef = useRef<number | null>(null);
-  const dockStyle = { ...defaultDockStyle, ...((settings.content as any).dockStyle || {}) };
+  // Dock appearance is hardcoded to the default style; admin customization was removed.
+  const dockStyle = defaultDockStyle;
   const showLabels = dockStyle.showLabels !== false;
   const showBadges = dockStyle.showBadges !== false;
   const expandedWidth = clamp(dockStyle.desktopExpandedWidth, 260, 380, defaultDockStyle.desktopExpandedWidth);
@@ -214,7 +215,8 @@ const HomeSideDock = ({ settings, isLoggedIn, purchasedProducts, cartCount, wish
     ...(isAdmin && onAdminClick ? [{ id: 'Admin', label: 'Admin', action: onAdminClick, icon: 'shield' as ProfessionalIconName, slot: 'nav.admin' as CleanNeutralIconSlotId, badge: null }] : []),
   ];
 
-  const configuredBase = ((settings.content as any).dockItems || dockCustomizationItems) as string[];
+  // Dock item order is hardcoded to the default; admin customization was removed.
+  const configuredBase = dockCustomizationItems as string[];
   const configuredWithHome = configuredBase.includes('Home') ? configuredBase : ['Home', ...configuredBase];
   const configuredWithMayDay = onOpenMayDay ? ['My Day', ...configuredWithHome.filter(label => label !== 'My Day')] : configuredWithHome;
   const configuredItems = configuredWithMayDay.filter((label, index, labels) => labels.indexOf(label) === index);

@@ -16,7 +16,8 @@ test('desktop website side panel is restored for desktop-width viewports while h
   assert.match(app, /const desktopSidebarMedia = window\.matchMedia\('\(min-width: 1024px\)'\)/);
   assert.match(app, /const desktopSidebarPointerMedia = window\.matchMedia\('\(min-width: 1024px\) and \(hover: hover\) and \(pointer: fine\)'\)/);
   assert.match(homeDock, /if \(event\.pointerType === 'mouse'\) beginHoverPreview\(event\.pointerType\);/);
-  assert.match(app, /websiteSettings\.desktop\.navigationMode === 'sidebar' && isDesktopSidebarViewport/);
+  // Desktop navigation is hardcoded to the default sidebar layout since admin customization was removed.
+  assert.match(app, /const useDesktopSidebar = isDesktopSidebarViewport;/);
   assert.match(app, /useCommunityDesktopSidebar = useDesktopSidebar/);
 });
 
@@ -76,21 +77,17 @@ test('Text-only story viewer fills the space above actions and scrolls without e
   assert.doesNotMatch(community, /setExpandedStatusTextId\(expanded \? null : card\.id\)/);
 });
 
-test('Admin can customize website side panel font, colour and transparency', () => {
+test('website side panel appearance is hardcoded and admin customization is removed', () => {
   assert.match(bottomDock, /sidebarFontFamily: 'Inter'/);
   assert.match(bottomDock, /sidebarBackgroundColor: '#FBFDFF'/);
   assert.match(bottomDock, /sidebarTextOpacity: 100/);
-  assert.match(app, /sidebarFontFamily\?: string/);
-  assert.match(app, /sidebarBackgroundColor\?: string/);
-  assert.match(app, /sidebarTextOpacity\?: number/);
+  assert.match(homeDock, /const dockStyle = defaultDockStyle;/);
   assert.match(homeDock, /sidebarFontOptions/);
   assert.match(homeDock, /sidebarSurfaceColor/);
   assert.match(homeDock, /sidebarTextColor = hexToRgba\(sidebarTextBaseColor, sidebarTextOpacity\)/);
   assert.match(homeDock, /fontFamily: sidebarFontFamily/);
-  assert.match(settings, /Website side panel only/);
-  assert.match(settings, /Side panel colour/);
-  assert.match(settings, /Font transparency/);
-  assert.match(settings, /updateDockStyle\('sidebarFontFamily'/);
-  assert.match(settings, /updateDockStyle\('sidebarBackgroundColor'/);
-  assert.match(settings, /updateDockStyle\('sidebarTextOpacity'/);
+  assert.doesNotMatch(settings, /Website side panel only/);
+  assert.doesNotMatch(settings, /Side panel colour/);
+  assert.doesNotMatch(settings, /Font transparency/);
+  assert.doesNotMatch(settings, /updateDockStyle/);
 });

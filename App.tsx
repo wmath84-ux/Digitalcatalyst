@@ -771,9 +771,6 @@ export interface WebsiteSettings {
     mobile: {
         hideFooter: boolean;
     };
-    desktop: {
-        navigationMode: 'sidebar' | 'dock';
-    };
     content: {
         siteName?: string;
         heroTitle: string;
@@ -798,40 +795,6 @@ export interface WebsiteSettings {
         subscriptionPage: SubscriptionPageContent;
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
-        dockItems: ['Home','Store','Purchased','Wishlist','Cart','News','Community','Blog','Free','Profile','Subscriptions'],
-        dockStyle?: {
-            backgroundColor: string;
-            backgroundOpacity: number;
-            itemColor?: string;
-            itemOpacity: number;
-            accentColor?: string;
-            accentOpacity: number;
-            textColor?: string;
-            borderColor?: string;
-            height?: number;
-            iconSize?: number;
-            labelSize?: number;
-            padding?: number;
-            gap?: number;
-            radius?: number;
-            itemRadius?: number;
-            bottomOffset?: number;
-            blur?: number;
-            shadowStrength?: 'none' | 'soft' | 'strong';
-            showLabels?: boolean;
-            showBadges?: boolean;
-            autoHideOnScroll?: boolean;
-            persistAcrossPages?: boolean;
-            mobileEnabled?: boolean;
-            desktopExpandedWidth?: number;
-            desktopCollapsedWidth?: number;
-            sidebarFontFamily?: string;
-            sidebarBackgroundColor?: string;
-            sidebarBackgroundOpacity?: number;
-            sidebarTextColor?: string;
-            sidebarTextOpacity?: number;
-            sidebarBorderColor?: string;
-        };
         readingStyle?: {
             backgroundColor: string;
             backgroundOpacity: number;
@@ -1006,9 +969,6 @@ const defaultWebsiteSettings: WebsiteSettings = {
     mobile: {
         hideFooter: false,
     },
-    desktop: {
-        navigationMode: 'sidebar',
-    },
     content: {
         siteName: 'Digital Catalyst',
         heroTitle: "Elevate Your Digital Presence",
@@ -1046,40 +1006,6 @@ const defaultWebsiteSettings: WebsiteSettings = {
         subscriptionPage: DEFAULT_SUBSCRIPTION_PAGE_CONTENT,
         eduCoinRules: { purchase: 25, redeemRate: 10 },
         redeemRewards: [{ id: 'r1', title: '₹50 discount', cost: 100 }, { id: 'r2', title: 'Premium PDF Pack', cost: 180 }],
-        dockItems: ['Home','Store','Purchased','Wishlist','Cart','News','Community','Blog','Free','Profile','Subscriptions'],
-        dockStyle: {
-            backgroundColor: '#FBFDFF',
-            backgroundOpacity: 92,
-            itemColor: '#FFFFFF',
-            itemOpacity: 96,
-            accentColor: '#1769FF',
-            accentOpacity: 22,
-            textColor: '#334155',
-            borderColor: '#BFD7FF',
-            height: 76,
-            iconSize: 36,
-            labelSize: 11,
-            padding: 12,
-            gap: 8,
-            radius: 24,
-            itemRadius: 16,
-            bottomOffset: 8,
-            blur: 24,
-            shadowStrength: 'soft',
-            showLabels: true,
-            showBadges: true,
-            autoHideOnScroll: false,
-            persistAcrossPages: true,
-            mobileEnabled: true,
-            desktopExpandedWidth: 320,
-            desktopCollapsedWidth: 88,
-            sidebarFontFamily: 'Inter',
-            sidebarBackgroundColor: '#FBFDFF',
-            sidebarBackgroundOpacity: 92,
-            sidebarTextColor: '#334155',
-            sidebarTextOpacity: 100,
-            sidebarBorderColor: '#BFD7FF',
-        },
         communityStyle: {
             desktopLayout: 'latest',
             mobileLayout: 'latest',
@@ -1273,17 +1199,9 @@ const mergeWebsiteSettings = (settings?: Partial<WebsiteSettings> | null): Websi
       ...defaultWebsiteSettings.mobile,
       ...(incoming.mobile || {}),
     },
-    desktop: {
-      ...defaultWebsiteSettings.desktop,
-      ...(incoming.desktop || {}),
-    },
     content: {
       ...defaultWebsiteSettings.content,
       ...(incoming.content || {}),
-      dockStyle: {
-        ...defaultWebsiteSettings.content.dockStyle,
-        ...((incoming.content as any)?.dockStyle || {}),
-      },
       communityStyle: {
         ...defaultWebsiteSettings.content.communityStyle,
         ...((incoming.content as any)?.communityStyle || {}),
@@ -6670,18 +6588,18 @@ const App: React.FC = () => {
   // A single consistent mobile header + bottom dock is used on these app pages.
   // The dock never auto-hides on scroll; it is only hidden behind full-page overlays.
   const mobileAppChromeViews = new Set(['home', 'allProducts', 'myPurchases', 'profile', 'news', 'blog', 'wishlist', 'freeProducts', 'subscription']);
-  const dockPersistAcrossPages = (websiteSettings.content as any).dockStyle?.persistAcrossPages !== false;
   const dockAlwaysVisibleViews = new Set(['home', 'allProducts', 'myPurchases', 'blog', 'news', 'profile', 'wishlist', 'freeProducts', 'subscription']);
+  // Dock behavior is hardcoded to defaults: the mobile dock is enabled and persists across main pages.
   const shouldHideMainDockOnMobile =
-    (websiteSettings.content.dockStyle?.mobileEnabled === false) ||
-    (dockPersistAcrossPages ? !dockAlwaysVisibleViews.has(currentView) : currentView !== 'home') ||
+    !dockAlwaysVisibleViews.has(currentView) ||
     isCartOpen ||
     isReadingDrawerOpen ||
     isFreeModalOpen ||
     isCartPaymentModalOpen ||
     isSubscriptionModalOpen;
 
-  const useDesktopSidebar = websiteSettings.desktop.navigationMode === 'sidebar' && isDesktopSidebarViewport;
+  // Desktop navigation is hardcoded to the default "sidebar" layout.
+  const useDesktopSidebar = isDesktopSidebarViewport;
   const useCommunityDesktopSidebar = useDesktopSidebar;
   const desktopSidebarActiveItem = isCartOpen
     ? 'Cart'
@@ -6904,7 +6822,7 @@ const App: React.FC = () => {
             )}
             {currentView !== 'admin' && currentView !== 'adminLogin' && (
               <div className={`${shouldHideMainDockOnMobile ? 'max-md:hidden' : ''} ${useDesktopSidebar ? 'lg:hidden' : ''}`}>
-                <BottomGlassDock settings={websiteSettings} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} isAdmin={isPrimaryAdminUser(currentAdminUser)} onAdminClick={handleNavigateToAdminLogin} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenMayDay={handleNavigateToMayDay} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
+                <BottomGlassDock currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} isAdmin={isPrimaryAdminUser(currentAdminUser)} onAdminClick={handleNavigateToAdminLogin} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenMayDay={handleNavigateToMayDay} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>
             )}
             {currentView !== 'cart' && <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />}
