@@ -11,7 +11,7 @@ const dockUtility = fs.readFileSync('utils/dockNewContent.ts', 'utf8');
 const mobileDock = fs.readFileSync('components/BottomGlassDock.tsx', 'utf8');
 const desktopDock = fs.readFileSync('components/HomeSideDock.tsx', 'utf8');
 
-test('Reading typography is responsive, polished and controlled by Admin settings', () => {
+test('Reading typography stays responsive with runtime defaults', () => {
   assert.match(app, /newsHeadingFont: 'Merriweather'/);
   assert.match(app, /blogHeadingFont: 'Montserrat'/);
   assert.match(app, /bodyFont: 'Lato'/);
@@ -22,12 +22,9 @@ test('Reading typography is responsive, polished and controlled by Admin setting
   assert.match(reading, /reading-article-quote/);
   assert.match(reading, /reading-rich-html blockquote/);
   assert.match(reading, /--reading-content-width/);
-  assert.match(settings, /Reading typography studio/);
-  assert.match(settings, /News heading font/);
-  assert.match(settings, /Blog heading font/);
-  assert.match(settings, /Mobile title size/);
-  assert.match(settings, /Readable width/);
-  assert.match(settings, /Live Reading preview/);
+  assert.doesNotMatch(settings, /Reading typography studio/);
+  assert.doesNotMatch(settings, /Live Reading preview/);
+  assert.doesNotMatch(settings, /updateReadingStyle/);
 });
 
 test('Content purge is opt-in, configurable and manually runnable', () => {

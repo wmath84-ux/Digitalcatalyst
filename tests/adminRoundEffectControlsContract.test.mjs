@@ -29,7 +29,7 @@ test('admin Store Config removes the obsolete Round Effects workspace', () => {
   assert.doesNotMatch(websiteSettings, /Set all Round/);
   assert.doesNotMatch(websiteSettings, /updateProductRoundness/);
   assert.match(websiteSettings, /store-config-workspace/);
-  assert.match(websiteSettings, /Community.*activeTab === 'community'/s);
+  assert.doesNotMatch(websiteSettings, /activeTab === 'community'/);
 });
 
 test('public product surfaces read their own roundness keys', () => {

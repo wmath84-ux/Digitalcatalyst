@@ -49,15 +49,14 @@ test('CoursePlayer builds the exact open-close-open-exit browser Back stack', ()
   assert.match(course, /dcCourseBackStep: 'lesson-closed'/);
 });
 
-test('Community color studio is mode-specific and Social Workspace uses real surface variables', () => {
+test('Community palette stays runtime-driven without an admin color studio', () => {
   assert.match(app, /latestPalette/);
   assert.match(app, /socialPalette/);
   assert.match(app, /classicPalette/);
-  assert.match(settings, /selectedCommunityMode/);
-  assert.match(settings, /selectedCommunityPaletteKey/);
-  assert.match(settings, /updateSelectedCommunityPalette/);
-  assert.match(settings, /Social Workspace colors/);
-  assert.match(settings, /Live \{selectedCommunityMode\} preview/);
+  assert.doesNotMatch(settings, /selectedCommunityMode/);
+  assert.doesNotMatch(settings, /updateSelectedCommunityPalette/);
+  assert.doesNotMatch(settings, /Social Workspace colors/);
+  assert.doesNotMatch(settings, /Live \{selectedCommunityMode\} preview/);
   assert.match(community, /activeCommunityPaletteMode/);
   assert.match(community, /--community-header-bg/);
   assert.match(community, /--community-sidebar-bg/);
