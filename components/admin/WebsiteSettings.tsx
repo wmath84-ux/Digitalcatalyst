@@ -4,7 +4,6 @@ import { WebsiteSettings, Announcement, ProductWithRating, ProfileMilestoneConfi
 import { ServiceItem } from '../Services';
 import { FaqItem } from '../Faq';
 import { UpcomingFeatureItem } from '../UpcomingFeatures';
-import { defaultDockStyle, dockCustomizationItems } from '../BottomGlassDock';
 import PremiumImageUrlInput from '../common/PremiumImageUrlInput';
 import {
     MembershipMessage,
@@ -281,9 +280,9 @@ const statusClass = (status: string) => status === 'Active' ? 'bg-emerald-100 te
 
 
 
-type WebsiteSettingsTab = 'subscriptions' | 'profile' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations';
+type WebsiteSettingsTab = 'subscriptions' | 'profile' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations';
 const WEBSITE_SETTINGS_TAB_KEY = 'eduvora.storeConfigTab.v1';
-const WEBSITE_SETTINGS_TABS: WebsiteSettingsTab[] = ['subscriptions', 'profile', 'dock', 'announcements', 'services', 'faq', 'upcoming', 'features', 'animations'];
+const WEBSITE_SETTINGS_TABS: WebsiteSettingsTab[] = ['subscriptions', 'profile', 'announcements', 'services', 'faq', 'upcoming', 'features', 'animations'];
 
 const readInitialWebsiteSettingsTab = (): WebsiteSettingsTab => {
     if (typeof window === 'undefined') return 'subscriptions';
@@ -347,16 +346,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         const nextFeatures = subscriptionFeatures.map(feature => feature.key === featureKey ? { ...feature, ...updates } : feature);
         updateContentValue('subscriptionFeatures', nextFeatures);
     };
-    const dockItems = (((localSettings.content as any).dockItems || []) as string[]);
-    const dockStyle = { ...defaultDockStyle, ...((localSettings.content as any).dockStyle || {}) };
-    const sidebarFontFamily = String((dockStyle as any).sidebarFontFamily || 'Inter');
-    const sidebarBackgroundColor = String((dockStyle as any).sidebarBackgroundColor || dockStyle.backgroundColor || defaultDockStyle.sidebarBackgroundColor);
-    const sidebarBackgroundOpacity = Number((dockStyle as any).sidebarBackgroundOpacity ?? dockStyle.backgroundOpacity ?? defaultDockStyle.sidebarBackgroundOpacity);
-    const sidebarTextColor = String((dockStyle as any).sidebarTextColor || dockStyle.textColor || defaultDockStyle.sidebarTextColor);
-    const sidebarTextOpacity = Number((dockStyle as any).sidebarTextOpacity ?? defaultDockStyle.sidebarTextOpacity);
-    const sidebarBorderColor = String((dockStyle as any).sidebarBorderColor || dockStyle.borderColor || defaultDockStyle.sidebarBorderColor);
-    const sidebarFontOptions = ['Inter', 'Lato', 'Montserrat', 'Roboto', 'Merriweather', 'Oswald'];
-    const desktopNavigationMode = localSettings.desktop?.navigationMode === 'dock' ? 'dock' : 'sidebar';
     const profileStyle = { backgroundColor: '#e2e8f0', backgroundTint: '#e0e7ff', cardOpacity: 82, heroOverlayOpacity: 76, accentColor: '#f97316', ...((localSettings.content as any).profileStyle || {}) };
     const profileStreaks = (((localSettings.content as any).profileStreaks || []) as ProfileStreakConfig[]);
     const profileMilestones = (((localSettings.content as any).profileMilestones || []) as ProfileMilestoneConfig[]);
@@ -372,9 +361,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
             Number(milestone.coinReward || 0) < 0 ? `${milestone.title || milestone.id} cannot have negative coins.` : '',
         ].filter(Boolean)),
     ];
-    const defaultDockItems = dockCustomizationItems;
-    const selectedDockItems = dockItems.length ? dockItems : defaultDockItems;
-
     const updatePlan = (planIndex: number, updates: Partial<EditableSubscriptionPlan>) => {
         const nextPlans = subscriptionPlans.map((plan, index) => index === planIndex ? { ...plan, ...updates } : plan);
         updateContentValue('subscriptionPlans', nextPlans);
@@ -394,26 +380,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         const currentIds = plan.unlockProductIds || [];
         const nextIds = currentIds.includes(productId) ? currentIds.filter(id => id !== productId) : [...currentIds, productId];
         updatePlan(planIndex, { unlockProductIds: nextIds });
-    };
-
-    const toggleDockItem = (label: string) => {
-        if (label === 'Home') return;
-        const nextItems = selectedDockItems.includes(label)
-            ? selectedDockItems.filter(item => item !== label)
-            : [...selectedDockItems, label];
-        updateContentValue('dockItems', nextItems.includes('Home') ? nextItems : ['Home', ...nextItems]);
-    };
-
-    const moveDockItem = (index: number, direction: -1 | 1) => {
-        const nextIndex = index + direction;
-        if (index <= 0 || nextIndex <= 0 || nextIndex >= selectedDockItems.length) return;
-        const nextItems = [...selectedDockItems];
-        [nextItems[index], nextItems[nextIndex]] = [nextItems[nextIndex], nextItems[index]];
-        updateContentValue('dockItems', nextItems);
-    };
-
-    const updateDockStyle = (field: string, value: string | number | boolean) => {
-        updateContentValue('dockStyle', { ...dockStyle, [field]: value });
     };
 
     const updateProfileStyle = (field: string, value: string | number) => {
@@ -681,124 +647,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
             );
 
 
-            case 'dock': return (
-                <div className="store-config-dock-studio grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
-                    <div className="space-y-6">
-                        <section className="border border-slate-300 bg-white p-5 shadow-sm">
-                            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">Real navigation deployment</p>
-                            <h2 className="mt-1 text-2xl font-black text-slate-950">Dock Settings</h2>
-                            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Every control below is connected to the actual mobile dock and desktop navigation.</p>
-                            <div className="mt-5 grid gap-3 md:grid-cols-2">
-                                <label className="border border-slate-200 bg-slate-50 p-4">
-                                    <span className="block text-xs font-black uppercase tracking-[0.14em] text-slate-500">Desktop navigation</span>
-                                    <select value={desktopNavigationMode} onChange={e => handleNestedChange('desktop', 'navigationMode', e.target.value as 'sidebar' | 'dock')} className="mt-2 w-full border border-slate-300 bg-white px-3 py-2.5 font-bold text-slate-900">
-                                        <option value="sidebar">Expanded side panel</option>
-                                        <option value="dock">Bottom dock</option>
-                                    </select>
-                                    <span className="mt-2 block text-xs leading-5 text-slate-500">Bottom dock mode now genuinely renders on desktop with numeric badges and no glow.</span>
-                                </label>
-                                <div className="grid gap-2 border border-slate-200 bg-slate-50 p-4">
-                                    <label className="flex items-center justify-between gap-3 text-sm font-bold text-slate-800"><span>Show mobile dock</span><input type="checkbox" checked={dockStyle.mobileEnabled !== false} onChange={e => updateDockStyle('mobileEnabled', e.target.checked)} className="h-5 w-5" /></label>
-                                    <label className="flex items-center justify-between gap-3 text-sm font-bold text-slate-800"><span>Keep dock on all main pages</span><input type="checkbox" checked={dockStyle.persistAcrossPages !== false} onChange={e => updateDockStyle('persistAcrossPages', e.target.checked)} className="h-5 w-5" /></label>
-                                    <label className="flex items-center justify-between gap-3 text-sm font-bold text-slate-800"><span>Show labels</span><input type="checkbox" checked={dockStyle.showLabels !== false} onChange={e => updateDockStyle('showLabels', e.target.checked)} className="h-5 w-5" /></label>
-                                    <label className="flex items-center justify-between gap-3 text-sm font-bold text-slate-800"><span>Show numeric badges</span><input type="checkbox" checked={dockStyle.showBadges !== false} onChange={e => updateDockStyle('showBadges', e.target.checked)} className="h-5 w-5" /></label>
-                                    <label className="flex items-center justify-between gap-3 text-sm font-bold text-slate-800"><span>Auto-hide bottom dock on scroll</span><input type="checkbox" checked={dockStyle.autoHideOnScroll === true} onChange={e => updateDockStyle('autoHideOnScroll', e.target.checked)} className="h-5 w-5" /></label>
-                                </div>
-                            </div>
-                        </section>
-
-                        <section className="border border-slate-300 bg-white p-5 shadow-sm">
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-end sm:justify-between">
-                                <div><h3 className="text-lg font-black text-slate-950">Items and order</h3><p className="mt-1 text-sm text-slate-600">Home is required. Reorder the rest; the same saved order is used by mobile dock, desktop bottom dock and side panel.</p></div>
-                                <span className="text-xs font-black uppercase tracking-[0.14em] text-slate-500">{selectedDockItems.length} active</span>
-                            </div>
-                            <div className="mt-4 divide-y divide-slate-200 border border-slate-200">
-                                {selectedDockItems.map((label, index) => (
-                                    <div key={label} className="flex items-center gap-3 bg-white px-3 py-3">
-                                        <span className="flex h-8 w-8 shrink-0 items-center justify-center border border-slate-200 bg-slate-50 text-xs font-black text-slate-500">{index + 1}</span>
-                                        <span className="min-w-0 flex-1 font-black text-slate-900">{label}</span>
-                                        <button type="button" onClick={() => moveDockItem(index, -1)} disabled={index <= 1} className="border border-slate-300 px-2.5 py-1.5 text-xs font-black disabled:opacity-30" aria-label={`Move ${label} up`}>↑</button>
-                                        <button type="button" onClick={() => moveDockItem(index, 1)} disabled={index === 0 || index >= selectedDockItems.length - 1} className="border border-slate-300 px-2.5 py-1.5 text-xs font-black disabled:opacity-30" aria-label={`Move ${label} down`}>↓</button>
-                                        <button type="button" onClick={() => toggleDockItem(label)} disabled={label === 'Home'} className="border border-rose-200 px-2.5 py-1.5 text-xs font-black text-rose-700 disabled:cursor-not-allowed disabled:opacity-30">Remove</button>
-                                    </div>
-                                ))}
-                            </div>
-                            <div className="mt-4 flex flex-wrap gap-2">
-                                {defaultDockItems.filter(label => !selectedDockItems.includes(label)).map(label => <button type="button" key={label} onClick={() => toggleDockItem(label)} className="border border-blue-200 bg-blue-50 px-3 py-2 text-sm font-black text-blue-800">+ {label}</button>)}
-                            </div>
-                        </section>
-
-                        <section className="border border-slate-300 bg-white p-5 shadow-sm">
-                            <h3 className="text-lg font-black text-slate-950">Surface and color</h3>
-                            <p className="mt-1 text-sm text-slate-600">The side panel and bottom dock share these saved surfaces.</p>
-                            <div className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                {[
-                                    ['backgroundColor','Dock background',dockStyle.backgroundColor], ['itemColor','Item background',dockStyle.itemColor], ['accentColor','Active/accent',dockStyle.accentColor], ['textColor','Text',dockStyle.textColor], ['borderColor','Border',dockStyle.borderColor],
-                                ].map(([field,label,value]) => <label key={String(field)} className="border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700"><span className="mb-2 block">{label}</span><input type="color" value={String(value)} onChange={e => updateDockStyle(String(field), e.target.value)} className="h-10 w-full border p-1" /></label>)}
-                            </div>
-                            <div className="mt-4 space-y-1 border-t border-slate-200 pt-2">
-                                <FormRow label={`Background opacity (${dockStyle.backgroundOpacity}%)`}><input type="range" min="20" max="100" value={dockStyle.backgroundOpacity} onChange={e => updateDockStyle('backgroundOpacity', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label={`Item opacity (${dockStyle.itemOpacity}%)`}><input type="range" min="20" max="100" value={dockStyle.itemOpacity} onChange={e => updateDockStyle('itemOpacity', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label={`Accent strength (${dockStyle.accentOpacity}%)`}><input type="range" min="0" max="70" value={dockStyle.accentOpacity} onChange={e => updateDockStyle('accentOpacity', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label={`Backdrop blur (${dockStyle.blur}px)`}><input type="range" min="0" max="36" value={dockStyle.blur} onChange={e => updateDockStyle('blur', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label="Shadow depth"><select value={dockStyle.shadowStrength} onChange={e => updateDockStyle('shadowStrength', e.target.value)} className="w-full border border-slate-300 bg-white px-3 py-2"><option value="none">None</option><option value="soft">Soft</option><option value="strong">Strong</option></select></FormRow>
-                            </div>
-                        </section>
-
-                        <section className="border border-slate-300 bg-white p-5 shadow-sm">
-                            <h3 className="text-lg font-black text-slate-950">Sizing and spacing</h3>
-                            <div className="mt-3 space-y-1">
-                                <FormRow label={`Bottom dock height (${dockStyle.height}px)`}><input type="range" min="58" max="112" value={dockStyle.height} onChange={e => updateDockStyle('height', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label={`Icon size (${dockStyle.iconSize}px)`}><input type="range" min="28" max="52" value={dockStyle.iconSize} onChange={e => updateDockStyle('iconSize', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label={`Label size (${dockStyle.labelSize}px)`}><input type="range" min="9" max="16" value={dockStyle.labelSize} onChange={e => updateDockStyle('labelSize', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label={`Inner padding (${dockStyle.padding}px)`}><input type="range" min="8" max="22" value={dockStyle.padding} onChange={e => updateDockStyle('padding', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label={`Item gap (${dockStyle.gap}px)`}><input type="range" min="4" max="20" value={dockStyle.gap} onChange={e => updateDockStyle('gap', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label={`Dock radius (${dockStyle.radius}px)`}><input type="range" min="0" max="40" value={dockStyle.radius} onChange={e => updateDockStyle('radius', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label={`Item radius (${dockStyle.itemRadius}px)`}><input type="range" min="0" max="28" value={dockStyle.itemRadius} onChange={e => updateDockStyle('itemRadius', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label={`Bottom safe gap (${dockStyle.bottomOffset}px)`}><input type="range" min="0" max="32" value={dockStyle.bottomOffset} onChange={e => updateDockStyle('bottomOffset', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label={`Desktop expanded width (${dockStyle.desktopExpandedWidth}px)`}><input type="range" min="260" max="380" value={dockStyle.desktopExpandedWidth} onChange={e => updateDockStyle('desktopExpandedWidth', Number(e.target.value))} className="w-full" /></FormRow>
-                                <FormRow label={`Desktop collapsed width (${dockStyle.desktopCollapsedWidth}px)`}><input type="range" min="72" max="108" value={dockStyle.desktopCollapsedWidth} onChange={e => updateDockStyle('desktopCollapsedWidth', Number(e.target.value))} className="w-full" /></FormRow>
-                                <div className="mt-4 border-t border-slate-200 pt-4">
-                                    <p className="text-xs font-black uppercase tracking-[0.16em] text-slate-500">Website side panel only</p>
-                                    <div className="mt-3 grid gap-3 md:grid-cols-2">
-                                        <label className="border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700"><span className="mb-2 block">Side panel colour</span><input type="color" value={sidebarBackgroundColor} onChange={e => updateDockStyle('sidebarBackgroundColor', e.target.value)} className="h-10 w-full border p-1" /></label>
-                                        <label className="border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700"><span className="mb-2 block">Side panel text colour</span><input type="color" value={sidebarTextColor} onChange={e => updateDockStyle('sidebarTextColor', e.target.value)} className="h-10 w-full border p-1" /></label>
-                                        <label className="border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700"><span className="mb-2 block">Side panel border colour</span><input type="color" value={sidebarBorderColor} onChange={e => updateDockStyle('sidebarBorderColor', e.target.value)} className="h-10 w-full border p-1" /></label>
-                                        <FormRow label="Website side panel font" description="Custom font for the desktop website side panel labels, heading and helper text.">
-                                            <select value={sidebarFontFamily} onChange={e => updateDockStyle('sidebarFontFamily', e.target.value)} className="w-full border border-slate-300 bg-white px-3 py-2 font-bold text-slate-900">
-                                                {sidebarFontOptions.map(font => <option key={`sidebar-font-${font}`} value={font}>{font}</option>)}
-                                            </select>
-                                        </FormRow>
-                                    </div>
-                                    <div className="mt-3 space-y-1">
-                                        <FormRow label={`Side panel transparency (${sidebarBackgroundOpacity}%)`}><input type="range" min="20" max="100" value={sidebarBackgroundOpacity} onChange={e => updateDockStyle('sidebarBackgroundOpacity', Number(e.target.value))} className="w-full" /></FormRow>
-                                        <FormRow label={`Font transparency (${sidebarTextOpacity}%)`}><input type="range" min="35" max="100" value={sidebarTextOpacity} onChange={e => updateDockStyle('sidebarTextOpacity', Number(e.target.value))} className="w-full" /></FormRow>
-                                    </div>
-                                </div>
-                            </div>
-                        </section>
-                    </div>
-
-                    <aside className="space-y-4 xl:sticky xl:top-4 xl:self-start">
-                        <section className="border border-slate-300 bg-slate-950 p-4 text-white shadow-lg">
-                            <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-300">Live mobile / bottom dock</p>
-                            <div className="mt-4 overflow-hidden border" style={{ backgroundColor: `${dockStyle.backgroundColor}${Math.round((Number(dockStyle.backgroundOpacity) / 100) * 255).toString(16).padStart(2, '0')}`, borderColor: dockStyle.borderColor, borderRadius: Number(dockStyle.radius), padding: Number(dockStyle.padding), minHeight: Number(dockStyle.height), boxShadow: dockStyle.shadowStrength === 'none' ? 'none' : dockStyle.shadowStrength === 'strong' ? '0 22px 52px rgba(15,23,42,0.35)' : '0 12px 30px rgba(15,23,42,0.22)' }}>
-                                <div className="flex overflow-hidden" style={{ gap: Number(dockStyle.gap) }}>
-                                    {selectedDockItems.slice(0, 4).map((label, index) => <div key={label} className="relative min-w-[4rem] border px-2 py-2 text-center" style={{ backgroundColor: `${dockStyle.itemColor}${Math.round((Number(dockStyle.itemOpacity) / 100) * 255).toString(16).padStart(2, '0')}`, borderColor: index === 0 ? dockStyle.accentColor : dockStyle.borderColor, borderRadius: Number(dockStyle.itemRadius), color: dockStyle.textColor }}><div className="mx-auto flex items-center justify-center bg-white/90" style={{ width: Number(dockStyle.iconSize), height: Number(dockStyle.iconSize), borderRadius: Math.max(4, Number(dockStyle.itemRadius) - 4) }}>{['🏠','🛍️','📚','❤️'][index] || '•'}</div>{dockStyle.showLabels !== false && <p className="mt-1 font-black" style={{ fontSize: Number(dockStyle.labelSize) }}>{label}</p>}{dockStyle.showBadges !== false && index === 1 && <span className="absolute -right-1 -top-1 rounded-full px-1.5 py-0.5 text-[9px] font-black text-white" style={{ backgroundColor: dockStyle.accentColor }}>3</span>}</div>)}
-                                </div>
-                            </div>
-                            <p className="mt-3 text-xs leading-5 text-slate-300">Mobile unseen items keep the required glow. Desktop bottom dock uses this design with numeric badges only.</p>
-                        </section>
-
-                        <section className="border border-slate-300 bg-white p-4 shadow-sm">
-                            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">Desktop side panel preview</p>
-                            <div className="mt-4 border p-3" style={{ backgroundColor: `${dockStyle.backgroundColor}${Math.round((Number(dockStyle.backgroundOpacity) / 100) * 255).toString(16).padStart(2, '0')}`, borderColor: dockStyle.borderColor, borderRadius: Number(dockStyle.radius), fontFamily: sidebarFontFamily }}>
-                                {selectedDockItems.slice(0, 4).map((label, index) => <div key={label} className="mb-2 flex items-center border px-3 py-2 last:mb-0" style={{ gap: Number(dockStyle.gap), backgroundColor: index === 0 ? dockStyle.accentColor : `${dockStyle.itemColor}${Math.round((Number(dockStyle.itemOpacity) / 100) * 255).toString(16).padStart(2, '0')}`, borderColor: index === 0 ? dockStyle.accentColor : dockStyle.borderColor, borderRadius: Number(dockStyle.itemRadius), color: index === 0 ? '#FFFFFF' : dockStyle.textColor }}><span className="flex items-center justify-center bg-white/90" style={{ width: Number(dockStyle.iconSize), height: Number(dockStyle.iconSize), borderRadius: Math.max(4, Number(dockStyle.itemRadius) - 4) }}>{['🏠','🛍️','📚','❤️'][index] || '•'}</span>{dockStyle.showLabels !== false && <span className="font-black" style={{ fontSize: Number(dockStyle.labelSize) }}>{label}</span>}{dockStyle.showBadges !== false && index === 2 && <span className="ml-auto rounded-full px-2 py-1 text-[9px] font-black text-white" style={{ backgroundColor: dockStyle.accentColor }}>7</span>}</div>)}
-                            </div>
-                        </section>
-                    </aside>
-                </div>
-            );
             case 'announcements': return <AnnouncementManagement announcements={localSettings.content.announcements} onUpdate={announcements => handleNestedChange('content', 'announcements', announcements)} />;
             case 'services': return <ServiceManagement services={localSettings.content.services} onUpdate={services => handleNestedChange('content', 'services', services)} />;
             case 'faq': return <FaqManagement faqs={localSettings.content.faqs} onUpdate={faqs => handleNestedChange('content', 'faqs', faqs)} />;
@@ -835,7 +683,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
             <div className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-3 pt-2 custom-scrollbar">
                 <TabButton label="Subscriptions" isActive={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')} />
                 <TabButton label="Profile" isActive={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
-                <TabButton label="Dock" isActive={activeTab === 'dock'} onClick={() => setActiveTab('dock')} />
                 <TabButton label="Announcements" isActive={activeTab === 'announcements'} onClick={() => setActiveTab('announcements')} />
                 <TabButton label="Services" isActive={activeTab === 'services'} onClick={() => setActiveTab('services')} />
                 <TabButton label="FAQ" isActive={activeTab === 'faq'} onClick={() => setActiveTab('faq')} />

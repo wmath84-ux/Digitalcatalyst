@@ -11,10 +11,10 @@ const adminSettings = fs.readFileSync('components/admin/WebsiteSettings.tsx', 'u
 test('bottom dock never auto-hides on scroll and persists across main mobile pages', () => {
   assert.match(dock, /const autoHideOnScroll = false;/);
   assert.match(dock, /persistAcrossPages: true/);
-  assert.match(app, /dockPersistAcrossPages/);
   assert.match(app, /dockAlwaysVisibleViews/);
   assert.match(app, /new Set\(\['home', 'allProducts', 'myPurchases', 'blog', 'news', 'profile', 'wishlist', 'freeProducts', 'subscription'\]\)/);
-  assert.match(app, /dockPersistAcrossPages \? !dockAlwaysVisibleViews\.has\(currentView\) : currentView !== 'home'/);
+  // Dock persistence is hardcoded to the default (persist across main pages) since admin customization was removed.
+  assert.match(app, /!dockAlwaysVisibleViews\.has\(currentView\)/);
 });
 
 test('mobile side panel menu items open their matching pages', () => {
@@ -35,8 +35,9 @@ test('mobile home wires the new side panel navigation callbacks through the app 
   assert.match(app, /onOpenCommunity=\{\(\) => \{ setCurrentView\('community'\); window\.scrollTo\(0, 0\); \}\}/);
 });
 
-test('admin dock settings expose a toggle to turn off the persistent dock update', () => {
-  assert.match(adminSettings, /Keep dock on all main pages/);
-  assert.match(adminSettings, /updateDockStyle\('persistAcrossPages', e\.target\.checked\)/);
-  assert.match(adminSettings, /dockStyle\.persistAcrossPages !== false/);
+test('admin dock settings are removed so the dock persists with the hardcoded default', () => {
+  assert.doesNotMatch(adminSettings, /Keep dock on all main pages/);
+  assert.doesNotMatch(adminSettings, /updateDockStyle\('persistAcrossPages'/);
+  assert.doesNotMatch(adminSettings, /dockStyle\.persistAcrossPages !== false/);
+  assert.match(app, /!dockAlwaysVisibleViews\.has\(currentView\)/);
 });

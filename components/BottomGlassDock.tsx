@@ -1,5 +1,5 @@
 import React, { useMemo } from 'react';
-import type { ProductWithRating, User, WebsiteSettings } from '../App';
+import type { ProductWithRating, User } from '../App';
 import type { DockCountDestination } from '../utils/dockNewContent';
 import type { CleanNeutralIconSlotId, ProfessionalIconName } from '../utils/cleanNeutralAdvancedCustomizer';
 import { BagIcon, CalendarIcon, HomeIcon, StoreIcon, WalletIcon } from './store-new/icons';
@@ -28,7 +28,6 @@ interface BottomGlassDockProps {
   isAdmin?: boolean;
   onAdminClick?: () => void;
   authButtonLabel: string;
-  settings: WebsiteSettings;
 }
 
 const dockToneClasses: Record<string, string> = {
@@ -119,7 +118,7 @@ const TAB_ICONS: Record<string, React.ComponentType<React.SVGProps<SVGSVGElement
   Wallet: WalletIcon,
 };
 
-const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, dockGlowItems = [], activeItem = '', onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenMayDay, onOpenCommunity, isAdmin = false, onAdminClick, authButtonLabel }: BottomGlassDockProps) => {
+const BottomGlassDock = ({ currentUser, isLoggedIn, purchasedProducts, cartCount, wishlistCount, dockBadgeCounts = {}, dockGlowItems = [], activeItem = '', onHomeClick, onOpenBlogModal, onOpenFreeModal, onOpenAnnouncementsModal, onNavigateToAllProducts, onNavigateToWishlist, onNavigateToPurchases, onCartClick, onProfileClick, onSubscriptionClick, onOpenMayDay, onOpenCommunity, isAdmin = false, onAdminClick, authButtonLabel }: BottomGlassDockProps) => {
   const defaultItems = useMemo(() => ([
     { label: 'Home', action: onHomeClick, icon: 'home' as ProfessionalIconName, slot: 'nav.home' as CleanNeutralIconSlotId, badge: null },
     { label: 'My Day', action: onOpenMayDay || onHomeClick, icon: 'calendar' as ProfessionalIconName, slot: 'nav.mayDay' as CleanNeutralIconSlotId, badge: null },
@@ -129,7 +128,9 @@ const BottomGlassDock = ({ settings, currentUser, isLoggedIn, purchasedProducts,
   ]), [onOpenMayDay, onHomeClick, onNavigateToAllProducts, onNavigateToPurchases, purchasedProducts.length, onProfileClick, dockBadgeCounts.Store, dockBadgeCounts.Purchased]);
 
   const items = defaultItems;
-  const showOnDesktop = settings.desktop.navigationMode === 'dock';
+  // Hardcoded default: the bottom dock renders only on mobile. The desktop side panel
+  // handles desktop navigation with the default "sidebar" layout.
+  const showOnDesktop = false;
   // Keep the navigation dock pinned like a header; admin/user actions must remain visible while scrolling.
   const autoHideOnScroll = false;
 
