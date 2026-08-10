@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { WebsiteSettings, HomepageSection, Announcement, ProductWithRating, ProfileMilestoneConfig, ProfileStreakConfig, ProfileMilestoneMetric, ProfileStreakMetric } from '../../App';
+import { WebsiteSettings, Announcement, ProductWithRating, ProfileMilestoneConfig, ProfileStreakConfig, ProfileMilestoneMetric, ProfileStreakMetric } from '../../App';
 import { ServiceItem } from '../Services';
 import { FaqItem } from '../Faq';
 import { UpcomingFeatureItem } from '../UpcomingFeatures';
@@ -15,19 +15,6 @@ import {
     SubscriptionPageContent,
     SubscriptionPlanConfig,
 } from '../../utils/subscriptionAccess';
-
-const sectionNames: Record<HomepageSection['id'], string> = {
-    hero: 'Hero Section',
-    purchased: 'My Purchases',
-    topRated: 'Top Rated Products',
-    allProducts: 'All Products Showcase',
-    services: 'Services Section',
-    about: 'About Us Section',
-    trust: 'Trust Badges',
-    faq: 'FAQ Section',
-    upcoming: 'Upcoming Features',
-    news: 'Latest News',
-};
 
 const TabButton: React.FC<{ label: string, isActive: boolean, onClick: () => void }> = ({ label, isActive, onClick }) => (
     <button
@@ -271,7 +258,6 @@ interface WebsiteSettingsProps {
 }
 
 type EditableSubscriptionPlan = SubscriptionPlanConfig;
-type EditableReward = { id: string; title: string; cost: number; };
 const streakMetricOptions: ProfileStreakMetric[] = ['dailyLogin', 'studyMinutes', 'watchMinutes', 'pdfsRead', 'coursesOwned', 'completedCourses', 'quizWins', 'articlesRead', 'lifetimeCoins', 'coinTransactions', 'milestonesClaimed', 'badgesUnlocked'];
 const milestoneMetricOptions: ProfileMilestoneMetric[] = ['lifetimeCoins', 'studyMinutes', 'watchMinutes', 'coursesOwned', 'completedCourses', 'quizWins', 'articlesRead', 'pdfsRead', 'streakClaims', 'badgesUnlocked'];
 const metricLabels: Record<string, string> = {
@@ -295,17 +281,17 @@ const statusClass = (status: string) => status === 'Active' ? 'bg-emerald-100 te
 
 
 
-type WebsiteSettingsTab = 'layout' | 'content' | 'subscriptions' | 'reading' | 'profile' | 'community' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations';
+type WebsiteSettingsTab = 'subscriptions' | 'profile' | 'dock' | 'announcements' | 'services' | 'faq' | 'upcoming' | 'features' | 'animations';
 const WEBSITE_SETTINGS_TAB_KEY = 'eduvora.storeConfigTab.v1';
-const WEBSITE_SETTINGS_TABS: WebsiteSettingsTab[] = ['layout', 'content', 'subscriptions', 'reading', 'profile', 'community', 'dock', 'announcements', 'services', 'faq', 'upcoming', 'features', 'animations'];
+const WEBSITE_SETTINGS_TABS: WebsiteSettingsTab[] = ['subscriptions', 'profile', 'dock', 'announcements', 'services', 'faq', 'upcoming', 'features', 'animations'];
 
 const readInitialWebsiteSettingsTab = (): WebsiteSettingsTab => {
-    if (typeof window === 'undefined') return 'layout';
+    if (typeof window === 'undefined') return 'subscriptions';
     try {
         const stored = window.sessionStorage.getItem(WEBSITE_SETTINGS_TAB_KEY) as WebsiteSettingsTab | null;
-        return stored && WEBSITE_SETTINGS_TABS.includes(stored) ? stored : 'layout';
+        return stored && WEBSITE_SETTINGS_TABS.includes(stored) ? stored : 'subscriptions';
     } catch {
-        return 'layout';
+        return 'subscriptions';
     }
 };
 
@@ -349,21 +335,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     };
 
 
-    const handleHeroImageUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
-        const file = event.target.files?.[0];
-        if (!file) return;
-        const reader = new FileReader();
-        reader.onload = () => {
-            handleNestedChange('content', 'heroImageUrl', reader.result as string);
-        };
-        reader.readAsDataURL(file);
-        event.target.value = '';
-    };
-
-    const handleLayoutChange = (newLayout: HomepageSection[]) => {
-        setLocalSettings(prev => ({ ...prev, layout: newLayout }));
-    };
-
     const updateContentValue = (field: string, value: any) => {
         handleNestedChange('content', field, value);
     };
@@ -376,8 +347,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         const nextFeatures = subscriptionFeatures.map(feature => feature.key === featureKey ? { ...feature, ...updates } : feature);
         updateContentValue('subscriptionFeatures', nextFeatures);
     };
-    const redeemRewards = (((localSettings.content as any).redeemRewards || []) as EditableReward[]);
-    const eduCoinRules = ((localSettings.content as any).eduCoinRules || { purchase: 25, redeemRate: 10 }) as { purchase: number; redeemRate: number };
     const dockItems = (((localSettings.content as any).dockItems || []) as string[]);
     const dockStyle = { ...defaultDockStyle, ...((localSettings.content as any).dockStyle || {}) };
     const sidebarFontFamily = String((dockStyle as any).sidebarFontFamily || 'Inter');
@@ -388,96 +357,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const sidebarBorderColor = String((dockStyle as any).sidebarBorderColor || dockStyle.borderColor || defaultDockStyle.sidebarBorderColor);
     const sidebarFontOptions = ['Inter', 'Lato', 'Montserrat', 'Roboto', 'Merriweather', 'Oswald'];
     const desktopNavigationMode = localSettings.desktop?.navigationMode === 'dock' ? 'dock' : 'sidebar';
-    const baseCommunityPalette = {
-        pageBackground: '#F8FBFF',
-        surfaceColor: '#FFFFFF',
-        cardColor: '#FFFFFF',
-        softBackground: '#EEF6FF',
-        headerBackground: '#FFFFFF',
-        sidebarBackground: '#FFFFFF',
-        composerBackground: '#FFFFFF',
-        rightRailBackground: '#F8FBFF',
-        primaryColor: '#1769FF',
-        secondaryColor: '#7B61FF',
-        accentColor: '#C2E7FF',
-        headingColor: '#081A45',
-        bodyColor: '#536178',
-        mutedColor: '#7C879A',
-        borderColor: '#D9E7F8',
-        activeTabBackground: '#E8F2FF',
-        activeTabText: '#1769FF',
-        dockBackground: '#FFFFFF',
-        dockItemBackground: '#F8FBFF',
-        dockActiveBackground: '#E8F2FF',
-        dockTextColor: '#536178',
-        dockActiveTextColor: '#1769FF',
-        outgoingBubble: '#1769FF',
-        incomingBubble: '#FFFFFF',
-    };
-    const socialCommunityPalette = {
-        ...baseCommunityPalette,
-        pageBackground: '#F5F7FB',
-        softBackground: '#F1F5F9',
-        rightRailBackground: '#F8FAFC',
-        primaryColor: '#2563EB',
-        secondaryColor: '#7C3AED',
-        accentColor: '#DBEAFE',
-        headingColor: '#0F172A',
-        bodyColor: '#475569',
-        mutedColor: '#64748B',
-        borderColor: '#E2E8F0',
-        activeTabBackground: '#EFF6FF',
-        activeTabText: '#2563EB',
-        dockItemBackground: '#F8FAFC',
-        dockActiveBackground: '#EFF6FF',
-        dockTextColor: '#475569',
-        dockActiveTextColor: '#2563EB',
-        outgoingBubble: '#2563EB',
-    };
-    const storedCommunityStyle = ((localSettings.content as any).communityStyle || {});
-    const legacyCommunityPalette = {
-        ...baseCommunityPalette,
-        ...Object.fromEntries(Object.keys(baseCommunityPalette).map(key => [key, storedCommunityStyle[key] ?? (baseCommunityPalette as any)[key]])),
-    };
-    const communityStyle = {
-        desktopLayout: 'latest',
-        mobileLayout: 'latest',
-        desktopSocialLayout: false,
-        ...legacyCommunityPalette,
-        shadowOpacity: 16,
-        ...storedCommunityStyle,
-        latestPalette: {
-            ...legacyCommunityPalette,
-            ...(storedCommunityStyle.latestPalette || {}),
-        },
-        socialPalette: {
-            ...socialCommunityPalette,
-            ...(storedCommunityStyle.socialPalette || {}),
-        },
-        classicPalette: {
-            ...legacyCommunityPalette,
-            ...(storedCommunityStyle.classicPalette || {}),
-        },
-    };
-    const selectedCommunityMode: 'classic' | 'latest' | 'social' = communityStyle.desktopSocialLayout
-        ? 'social'
-        : communityStyle.desktopLayout === 'classic'
-            ? 'classic'
-            : 'latest';
-    const selectedCommunityPaletteKey = selectedCommunityMode === 'social'
-        ? 'socialPalette'
-        : selectedCommunityMode === 'classic'
-            ? 'classicPalette'
-            : 'latestPalette';
-    const selectedCommunityPalette = communityStyle[selectedCommunityPaletteKey];
-    const readingStyle = {
-        backgroundColor: '#F8FAFD', backgroundOpacity: 98, panelOpacity: 96, cardOpacity: 94, accentColor: '#C2E7FF', accentOpacity: 24,
-        newsHeadingFont: 'Merriweather', blogHeadingFont: 'Montserrat', bodyFont: 'Lato', newsHeadingColor: '#083B4C', blogHeadingColor: '#3B1D5A',
-        bodyTextColor: '#334155', metadataColor: '#64748B', linkColor: '#1769FF', quoteBackgroundColor: '#EEF6FF', quoteBorderColor: '#1769FF',
-        titleSizeMobile: 38, titleSizeDesktop: 64, bodySizeMobile: 17, bodySizeDesktop: 19, lineHeight: 1.85, contentWidth: 860,
-        ...((localSettings.content as any).readingStyle || {})
-    };
-    const readingFontMap: Record<string, string> = { Merriweather: 'Merriweather, Georgia, serif', Montserrat: 'Montserrat, Inter, sans-serif', Lato: 'Lato, Inter, sans-serif', Inter: 'Inter, sans-serif', Roboto: 'Roboto, Arial, sans-serif', Oswald: 'Oswald, Arial, sans-serif' };
     const profileStyle = { backgroundColor: '#e2e8f0', backgroundTint: '#e0e7ff', cardOpacity: 82, heroOverlayOpacity: 76, accentColor: '#f97316', ...((localSettings.content as any).profileStyle || {}) };
     const profileStreaks = (((localSettings.content as any).profileStreaks || []) as ProfileStreakConfig[]);
     const profileMilestones = (((localSettings.content as any).profileMilestones || []) as ProfileMilestoneConfig[]);
@@ -517,18 +396,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         updatePlan(planIndex, { unlockProductIds: nextIds });
     };
 
-    const updateReward = (rewardIndex: number, updates: Partial<EditableReward>) => {
-        updateContentValue('redeemRewards', redeemRewards.map((reward, index) => index === rewardIndex ? { ...reward, ...updates } : reward));
-    };
-
-    const addReward = () => {
-        updateContentValue('redeemRewards', [...redeemRewards, { id: `reward-${Date.now()}`, title: 'New Reward', cost: 100 }]);
-    };
-
-    const removeReward = (rewardIndex: number) => {
-        updateContentValue('redeemRewards', redeemRewards.filter((_, index) => index !== rewardIndex));
-    };
-
     const toggleDockItem = (label: string) => {
         if (label === 'Home') return;
         const nextItems = selectedDockItems.includes(label)
@@ -548,35 +415,6 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
     const updateDockStyle = (field: string, value: string | number | boolean) => {
         updateContentValue('dockStyle', { ...dockStyle, [field]: value });
     };
-
-    const updateCommunityStyle = (field: string, value: string | number | boolean) => {
-        updateContentValue('communityStyle', { ...communityStyle, [field]: value });
-    };
-
-    const selectCommunityMode = (mode: 'classic' | 'latest' | 'social') => {
-        updateContentValue('communityStyle', {
-            ...communityStyle,
-            desktopLayout: mode === 'classic' ? 'classic' : 'latest',
-            desktopSocialLayout: mode === 'social',
-        });
-    };
-
-    const updateSelectedCommunityPalette = (field: string, value: string) => {
-        updateContentValue('communityStyle', {
-            ...communityStyle,
-            [selectedCommunityPaletteKey]: {
-                ...selectedCommunityPalette,
-                [field]: value,
-            },
-        });
-    };
-
-    const updateReadingStyle = (field: string, value: string | number) => {
-        updateContentValue('readingStyle', { ...readingStyle, [field]: value });
-    };
-
-
-
 
     const updateProfileStyle = (field: string, value: string | number) => {
         updateContentValue('profileStyle', { ...profileStyle, [field]: value });
@@ -616,158 +454,8 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
         updateProfileMilestone(index, { active: false, draft: false, archived: true });
     };
 
-    const moveSection = (index: number, direction: 'up' | 'down') => {
-        const newLayout = [...localSettings.layout];
-        const newIndex = direction === 'up' ? index - 1 : index + 1;
-        if (newIndex < 0 || newIndex >= newLayout.length) return;
-        [newLayout[index], newLayout[newIndex]] = [newLayout[newIndex], newLayout[index]];
-        handleLayoutChange(newLayout);
-    };
-
     const renderContent = () => {
         switch (activeTab) {
-            case 'layout': return (
-                <div className="space-y-3">
-                    {localSettings.layout.map((section, index) => (
-                        <div key={section.id} className="flex items-center justify-between p-3 bg-slate-100/80 rounded-lg border">
-                            <div className="flex items-center gap-4"><div className="flex flex-col gap-1"><button onClick={() => moveSection(index, 'up')} disabled={index === 0} className="disabled:opacity-20">▲</button><button onClick={() => moveSection(index, 'down')} disabled={index === localSettings.layout.length - 1} className="disabled:opacity-20">▼</button></div><div><p className="font-semibold text-gray-700">{sectionNames[section.id]}</p>{section.hasOwnProperty('title') && (<input type="text" value={section.title} onChange={e => handleLayoutChange(localSettings.layout.map(s => s.id === section.id ? { ...s, title: e.target.value } : s))} className="text-xs p-1 border rounded mt-1 w-full" placeholder="Section Title"/>)}</div></div>
-                            <label className="relative inline-flex items-center cursor-pointer"><input type="checkbox" checked={section.visible} onChange={e => handleLayoutChange(localSettings.layout.map(s => s.id === section.id ? { ...s, visible: e.target.checked } : s))} className="sr-only peer" /><div className="w-11 h-6 bg-gray-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-green-600"></div></label>
-                        </div>
-                    ))}
-                </div>
-            );
-             case 'content': return (
-                <div>
-                    {/* Hero Section Text */}
-                    <div className="bg-blue-50 p-4 rounded-lg mb-6 border border-blue-200">
-                        <h3 className="font-bold text-blue-800 mb-2">Hero Section Text</h3>
-                        <FormRow label="Website Name"><input type="text" value={(localSettings.content as any).siteName || 'Digital Catalyst'} onChange={e => handleNestedChange('content', 'siteName', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
-                        <FormRow label="Hero Title"><input type="text" value={localSettings.content.heroTitle} onChange={e => handleNestedChange('content', 'heroTitle', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
-                        <FormRow label="Hero Subtitle"><textarea value={localSettings.content.heroSubtitle} onChange={e => handleNestedChange('content', 'heroSubtitle', e.target.value)} className="w-full p-2 border rounded" rows={3}></textarea></FormRow>
-                        <FormRow label="Hero Image URL" description="Choose a hero image, check the preview, then save settings.">
-                            <PremiumImageUrlInput
-                                value={localSettings.content.heroImageUrl || ''}
-                                onChange={(url) => handleNestedChange('content', 'heroImageUrl', url)}
-                                label="Hero image URL"
-                                previewAlt="Hero preview"
-                                aspect="video"
-                                compact
-                                helperText="Choose an image, preview it, then save settings."
-                            />
-                        </FormRow>
-                    </div>
-
-                    {/* Hero Metrics Configuration */}
-                    <div className="bg-indigo-50 p-4 rounded-lg mb-6 border border-indigo-200">
-                        <h3 className="font-bold text-indigo-800 mb-2">Hero Floating Metrics</h3>
-                        <p className="text-sm text-indigo-600 mb-4">Customize the floating cards seen on the hero image.</p>
-
-                        <FormRow label="Use Real Data" description="Automatically calculate Revenue and Users from site data.">
-                            <input
-                                type="checkbox"
-                                checked={localSettings.content.heroMetrics?.enableRealData || false}
-                                onChange={e => {
-                                    setLocalSettings(prev => ({
-                                        ...prev,
-                                        content: {
-                                            ...prev.content,
-                                            heroMetrics: { ...prev.content.heroMetrics, enableRealData: e.target.checked }
-                                        }
-                                    }));
-                                }}
-                                className="w-5 h-5"
-                            />
-                        </FormRow>
-
-                        {!localSettings.content.heroMetrics?.enableRealData && (
-                            <>
-                                <FormRow label="Custom Revenue Text" description="e.g., +128% or $50k">
-                                    <input
-                                        type="text"
-                                        value={localSettings.content.heroMetrics?.customRevenueChange || ""}
-                                        onChange={e => setLocalSettings(prev => ({...prev, content: {...prev.content, heroMetrics: {...prev.content.heroMetrics, customRevenueChange: e.target.value}}}))}
-                                        className="w-full p-2 border rounded"
-                                    />
-                                </FormRow>
-                                <FormRow label="Custom Active Users" description="e.g., 2.4k+">
-                                    <input
-                                        type="text"
-                                        value={localSettings.content.heroMetrics?.customActiveUsers || ""}
-                                        onChange={e => setLocalSettings(prev => ({...prev, content: {...prev.content, heroMetrics: {...prev.content.heroMetrics, customActiveUsers: e.target.value}}}))}
-                                        className="w-full p-2 border rounded"
-                                    />
-                                </FormRow>
-                            </>
-                        )}
-                    </div>
-
-                    {/* About Us Section */}
-                    <div className="bg-slate-100/80 p-4 rounded-lg mb-6 border border-slate-200/80">
-                        <h3 className="font-bold text-gray-800 mb-2">About Us Section</h3>
-                        <FormRow label="About Us Title"><input type="text" value={localSettings.content.aboutUsTitle} onChange={e => handleNestedChange('content', 'aboutUsTitle', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
-                        <FormRow label="About Us Text"><textarea value={localSettings.content.aboutUsText} onChange={e => handleNestedChange('content', 'aboutUsText', e.target.value)} className="w-full p-2 border rounded" rows={4}></textarea></FormRow>
-                        <FormRow label="About Us Image Seed"><input type="text" value={localSettings.content.aboutUsImageSeed} onChange={e => handleNestedChange('content', 'aboutUsImageSeed', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
-                    </div>
-
-
-                    <div className="bg-slate-100/80 rounded-lg p-4 mt-4 border border-slate-200">
-                        <div className="mb-4">
-                            <h3 className="font-bold text-gray-800">Gamification & Subscription</h3>
-                            <p className="text-sm text-slate-600 mt-1">No JSON needed — edit rewards, coins, plans, unlocked products, and dock labels directly.</p>
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                            <div className="rounded-xl border bg-white p-4">
-                                <h4 className="font-bold text-gray-800">EduCoin Rules</h4>
-                                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-                                    <label className="block text-sm font-semibold text-gray-700">Coins per purchase
-                                        <input type="number" min="0" value={eduCoinRules.purchase} onChange={e => updateContentValue('eduCoinRules', { ...eduCoinRules, purchase: Number(e.target.value) || 0 })} className="mt-1 w-full rounded border p-2" />
-                                    </label>
-                                    <label className="block text-sm font-semibold text-gray-700">Coins per ₹1 discount
-                                        <input type="number" min="1" value={eduCoinRules.redeemRate || 10} onChange={e => updateContentValue('eduCoinRules', { ...eduCoinRules, redeemRate: Number(e.target.value) || 10 })} className="mt-1 w-full rounded border p-2" />
-                                        <span className="mt-1 block text-xs text-slate-500">Default economy ratio is 10 EduCoins = ₹1.</span>
-                                    </label>
-                                </div>
-                            </div>
-
-                            <div className="rounded-xl border bg-white p-4">
-                                <div className="flex items-center justify-between gap-3">
-                                    <h4 className="font-bold text-gray-800">Rewards</h4>
-                                    <button type="button" onClick={addReward} className="rounded-lg bg-green-600 px-3 py-2 text-sm font-bold text-white">+ Add Reward</button>
-                                </div>
-                                <div className="mt-3 space-y-3">
-                                    {redeemRewards.map((reward, rewardIndex) => (
-                                        <div key={reward.id || rewardIndex} className="grid grid-cols-1 gap-2 rounded-lg border bg-slate-100/80 p-3 sm:grid-cols-[1fr_7rem_auto]">
-                                            <input value={reward.title} onChange={e => updateReward(rewardIndex, { title: e.target.value })} placeholder="Reward title" className="rounded border p-2" />
-                                            <input type="number" min="0" value={reward.cost} onChange={e => updateReward(rewardIndex, { cost: Number(e.target.value) || 0 })} placeholder="Cost" className="rounded border p-2" />
-                                            <button type="button" onClick={() => removeReward(rewardIndex)} className="rounded border border-red-200 px-3 py-2 text-sm font-bold text-red-600">Remove</button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        </div>
-
-                        <div className="mt-5 rounded-xl border border-indigo-100 bg-indigo-50/70 p-4">
-                            <h4 className="font-bold text-gray-800">Subscription Access</h4>
-                            <p className="mt-1 text-sm text-slate-600">Use the dedicated Subscriptions tab to manage Pro/Elite plans, page copy, benefits, earning power, locked messages, CTAs, and product access.</p>
-                            <button type="button" onClick={() => setActiveTab('subscriptions')} className="mt-3 rounded-lg bg-indigo-600 px-4 py-2 text-sm font-bold text-white">Open Subscription Customizer</button>
-                        </div>
-
-                    </div>
-
-                    {/* Footer & Social */}
-                    <div className="bg-slate-100/80 p-4 rounded-lg border border-slate-200/80">
-                        <h3 className="font-bold text-gray-800 mb-2">Footer & Social</h3>
-                        <FormRow label="Footer Text" description="Use {year} to automatically insert the current year."><input type="text" value={localSettings.content.footerText} onChange={e => handleNestedChange('content', 'footerText', e.target.value)} className="w-full p-2 border rounded" /></FormRow>
-                        <FormRow label="Facebook URL"><input type="url" value={localSettings.content.socialLinks.facebook} onChange={e => handleNestedChange('content', 'socialLinks', {...localSettings.content.socialLinks, facebook: e.target.value})} className="w-full p-2 border rounded" /></FormRow>
-                        <FormRow label="Twitter URL"><input type="url" value={localSettings.content.socialLinks.twitter} onChange={e => handleNestedChange('content', 'socialLinks', {...localSettings.content.socialLinks, twitter: e.target.value})} className="w-full p-2 border rounded" /></FormRow>
-                        <FormRow label="Instagram URL"><input type="url" value={localSettings.content.socialLinks.instagram} onChange={e => handleNestedChange('content', 'socialLinks', {...localSettings.content.socialLinks, instagram: e.target.value})} className="w-full p-2 border rounded" /></FormRow>
-                        <FormRow label="LinkedIn URL"><input type="url" value={localSettings.content.socialLinks.linkedin} onChange={e => handleNestedChange('content', 'socialLinks', {...localSettings.content.socialLinks, linkedin: e.target.value})} className="w-full p-2 border rounded" /></FormRow>
-                    </div>
-                </div>
-            );
-
-
             case 'subscriptions': return (
                 <div className="space-y-6">
                     <div className="rounded-2xl border border-indigo-100 bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-5">
@@ -993,194 +681,13 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
             );
 
 
-            case 'reading': return (
-                <div className="space-y-5">
-                    <div className="rounded-[1.5rem] border border-blue-100 bg-gradient-to-br from-white via-[#F8FBFF] to-[#EEF6FF] p-5 shadow-sm">
-                        <p className="text-xs font-black uppercase tracking-[0.22em] text-blue-700">Reading typography studio</p>
-                        <h4 className="mt-2 text-xl font-black text-slate-900">News and Blog article design</h4>
-                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">These controls drive the real mobile and desktop Reading page. Save Changes publishes the fonts, sizes, colors, spacing, quotes and readable content width for every user.</p>
-                    </div>
-
-                    <div className="grid gap-5 xl:grid-cols-[minmax(0,1fr)_24rem]">
-                        <div className="space-y-5">
-                            <section className="rounded-xl border bg-white p-4">
-                                <h5 className="font-black text-slate-900">Fonts and responsive sizing</h5>
-                                <div className="mt-4 space-y-4">
-                                    <FormRow label="News heading font" description="Used for News article and announcement titles/headings.">
-                                        <select value={readingStyle.newsHeadingFont} onChange={e => updateReadingStyle('newsHeadingFont', e.target.value)} className="w-full rounded border p-2">
-                                            {['Merriweather','Montserrat','Lato','Inter','Roboto','Oswald'].map(font => <option key={`news-font-${font}`} value={font}>{font}</option>)}
-                                        </select>
-                                    </FormRow>
-                                    <FormRow label="Blog heading font" description="Used for Blog titles and section headings.">
-                                        <select value={readingStyle.blogHeadingFont} onChange={e => updateReadingStyle('blogHeadingFont', e.target.value)} className="w-full rounded border p-2">
-                                            {['Montserrat','Merriweather','Lato','Inter','Roboto','Oswald'].map(font => <option key={`blog-font-${font}`} value={font}>{font}</option>)}
-                                        </select>
-                                    </FormRow>
-                                    <FormRow label="Article body font" description="Used for paragraphs, lists and long-form reading.">
-                                        <select value={readingStyle.bodyFont} onChange={e => updateReadingStyle('bodyFont', e.target.value)} className="w-full rounded border p-2">
-                                            {['Lato','Inter','Roboto','Merriweather','Montserrat'].map(font => <option key={`body-font-${font}`} value={font}>{font}</option>)}
-                                        </select>
-                                    </FormRow>
-                                    <FormRow label={`Mobile title size (${readingStyle.titleSizeMobile}px)`} description="Responsive title size on phones and compact tablets."><input type="range" min="30" max="56" step="1" value={readingStyle.titleSizeMobile} onChange={e => updateReadingStyle('titleSizeMobile', Number(e.target.value))} className="w-full" /></FormRow>
-                                    <FormRow label={`Desktop title size (${readingStyle.titleSizeDesktop}px)`} description="Maximum title size on larger screens."><input type="range" min="44" max="84" step="1" value={readingStyle.titleSizeDesktop} onChange={e => updateReadingStyle('titleSizeDesktop', Number(e.target.value))} className="w-full" /></FormRow>
-                                    <FormRow label={`Mobile body size (${readingStyle.bodySizeMobile}px)`} description="Long-form paragraph size on mobile."><input type="range" min="15" max="22" step="1" value={readingStyle.bodySizeMobile} onChange={e => updateReadingStyle('bodySizeMobile', Number(e.target.value))} className="w-full" /></FormRow>
-                                    <FormRow label={`Desktop body size (${readingStyle.bodySizeDesktop}px)`} description="Long-form paragraph size on desktop."><input type="range" min="16" max="25" step="1" value={readingStyle.bodySizeDesktop} onChange={e => updateReadingStyle('bodySizeDesktop', Number(e.target.value))} className="w-full" /></FormRow>
-                                    <FormRow label={`Line height (${Number(readingStyle.lineHeight).toFixed(2)})`} description="Controls breathing room between article lines."><input type="range" min="1.45" max="2.2" step="0.05" value={readingStyle.lineHeight} onChange={e => updateReadingStyle('lineHeight', Number(e.target.value))} className="w-full" /></FormRow>
-                                    <FormRow label={`Readable width (${readingStyle.contentWidth}px)`} description="Maximum paragraph width; narrower lines are easier to read."><input type="range" min="680" max="1080" step="20" value={readingStyle.contentWidth} onChange={e => updateReadingStyle('contentWidth', Number(e.target.value))} className="w-full" /></FormRow>
-                                </div>
-                            </section>
-
-                            <section className="rounded-xl border bg-white p-4">
-                                <h5 className="font-black text-slate-900">Article colors and surfaces</h5>
-                                <div className="mt-4 grid gap-4 sm:grid-cols-2">
-                                    {[
-                                        ['newsHeadingColor','News heading', readingStyle.newsHeadingColor],
-                                        ['blogHeadingColor','Blog heading', readingStyle.blogHeadingColor],
-                                        ['bodyTextColor','Body text', readingStyle.bodyTextColor],
-                                        ['metadataColor','Metadata', readingStyle.metadataColor],
-                                        ['linkColor','Links and bullets', readingStyle.linkColor],
-                                        ['quoteBackgroundColor','Quote background', readingStyle.quoteBackgroundColor],
-                                        ['quoteBorderColor','Quote border', readingStyle.quoteBorderColor],
-                                        ['backgroundColor','Reading background', readingStyle.backgroundColor],
-                                        ['accentColor','Accent and progress', readingStyle.accentColor],
-                                    ].map(([field,label,value]) => (
-                                        <label key={field} className="rounded-xl border border-slate-200 p-3 text-sm font-bold text-slate-700">
-                                            <span className="mb-2 block">{label}</span>
-                                            <input type="color" value={String(value)} onChange={e => updateReadingStyle(String(field), e.target.value)} className="h-10 w-full rounded border p-1" />
-                                        </label>
-                                    ))}
-                                </div>
-                                <div className="mt-4 space-y-4">
-                                    <FormRow label={`Background opacity (${readingStyle.backgroundOpacity}%)`} description="Page overlay solidity."><input type="range" min="55" max="100" step="1" value={readingStyle.backgroundOpacity} onChange={e => updateReadingStyle('backgroundOpacity', Number(e.target.value))} className="w-full" /></FormRow>
-                                    <FormRow label={`Panel opacity (${readingStyle.panelOpacity}%)`} description="Main Reading drawer panel solidity."><input type="range" min="65" max="100" step="1" value={readingStyle.panelOpacity} onChange={e => updateReadingStyle('panelOpacity', Number(e.target.value))} className="w-full" /></FormRow>
-                                    <FormRow label={`Card opacity (${readingStyle.cardOpacity}%)`} description="Article card and header surface solidity."><input type="range" min="55" max="100" step="1" value={readingStyle.cardOpacity} onChange={e => updateReadingStyle('cardOpacity', Number(e.target.value))} className="w-full" /></FormRow>
-                                    <FormRow label={`Accent softness (${readingStyle.accentOpacity}%)`} description="Strength of decorative reading glow."><input type="range" min="0" max="45" step="1" value={readingStyle.accentOpacity} onChange={e => updateReadingStyle('accentOpacity', Number(e.target.value))} className="w-full" /></FormRow>
-                                </div>
-                            </section>
-                        </div>
-
-                        <aside className="xl:sticky xl:top-4 xl:self-start">
-                            <div className="rounded-[1.5rem] border border-slate-200 bg-slate-100 p-4">
-                                <p className="text-sm font-black text-slate-700">Live Reading preview</p>
-                                <div className="mt-4 rounded-[1.5rem] border p-5 shadow-xl" style={{ backgroundColor: readingStyle.backgroundColor }}>
-                                    <div className="rounded-[1.25rem] border border-white/70 p-5" style={{ backgroundColor: `rgba(255,255,255,${Number(readingStyle.cardOpacity) / 100})`, maxWidth: `${Math.min(360, Number(readingStyle.contentWidth))}px` }}>
-                                        <p className="text-[10px] font-black uppercase tracking-[0.22em]" style={{ color: readingStyle.metadataColor }}>News desk · 6 min read</p>
-                                        <h5 className="mt-3 font-black" style={{ fontFamily: readingFontMap[readingStyle.newsHeadingFont], color: readingStyle.newsHeadingColor, fontSize: `${Math.min(32, Number(readingStyle.titleSizeMobile))}px`, lineHeight: 1.12 }}>A clear headline built for serious reading</h5>
-                                        <p className="mt-4" style={{ fontFamily: readingFontMap[readingStyle.bodyFont], color: readingStyle.bodyTextColor, fontSize: `${Math.min(18, Number(readingStyle.bodySizeMobile))}px`, lineHeight: readingStyle.lineHeight }}>Article paragraphs now follow the exact font, color, size, width and spacing configured here.</p>
-                                        <blockquote className="mt-4 border-l-4 px-4 py-3 italic" style={{ fontFamily: readingFontMap[readingStyle.newsHeadingFont], color: readingStyle.bodyTextColor, backgroundColor: readingStyle.quoteBackgroundColor, borderColor: readingStyle.quoteBorderColor }}>A focused quote style helps important ideas stand out.</blockquote>
-                                        <a className="mt-4 inline-block font-black underline" style={{ color: readingStyle.linkColor }}>Sample article link</a>
-                                    </div>
-                                </div>
-                            </div>
-                        </aside>
-                    </div>
-                </div>
-            );
-            case 'community': return (
-                <div className="space-y-6">
-                    <section className="border border-slate-300 bg-white p-5 shadow-sm">
-                        <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-700">Community workspace</p>
-                        <h2 className="mt-1 text-2xl font-black text-slate-950">Layout-aware Community customization</h2>
-                        <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Choose the real desktop Community mode first. The color studio below automatically switches to that mode's saved palette, so Social Workspace and Latest UX no longer overwrite one another.</p>
-                        <div className="mt-5 grid gap-3 md:grid-cols-3">
-                            {([
-                                ['classic', 'Classic layout', 'Preserved Community layout with its own palette.'],
-                                ['latest', 'Latest desktop UX', 'Clean modern layout without the social three-column rail.'],
-                                ['social', 'Social Workspace', 'Three-column feed, internal Community sidebar and right rail.'],
-                            ] as const).map(([mode, title, description]) => (
-                                <button
-                                    key={mode}
-                                    type="button"
-                                    onClick={() => selectCommunityMode(mode)}
-                                    aria-pressed={selectedCommunityMode === mode}
-                                    className={`border p-4 text-left transition ${selectedCommunityMode === mode ? 'border-blue-600 bg-blue-50 shadow-sm' : 'border-slate-200 bg-slate-50 hover:border-slate-400'}`}
-                                >
-                                    <span className="block font-black text-slate-950">{title}</span>
-                                    <span className="mt-1 block text-xs font-semibold leading-5 text-slate-600">{description}</span>
-                                    <span className={`mt-3 inline-flex px-2.5 py-1 text-[10px] font-black uppercase tracking-[0.14em] ${selectedCommunityMode === mode ? 'bg-blue-600 text-white' : 'bg-white text-slate-500'}`}>{selectedCommunityMode === mode ? 'Selected' : 'Choose'}</span>
-                                </button>
-                            ))}
-                        </div>
-                    </section>
-
-                    <section className="grid gap-6 xl:grid-cols-[minmax(0,1.2fr)_minmax(320px,0.8fr)]">
-                        <div className="border border-slate-300 bg-white p-5 shadow-sm">
-                            <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">{selectedCommunityMode} palette</p>
-                            <h3 className="mt-1 text-xl font-black text-slate-950">
-                                {selectedCommunityMode === 'social' ? 'Social Workspace colors' : selectedCommunityMode === 'latest' ? 'Latest desktop colors' : 'Classic Community colors'}
-                            </h3>
-                            <p className="mt-1 text-sm leading-6 text-slate-600">Every control below is connected to the active Community mode. Save Changes publishes this palette without changing the other modes.</p>
-                            <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                {([
-                                    ['pageBackground','Page background'],
-                                    ['surfaceColor','Main surface'],
-                                    ['cardColor','Feed and cards'],
-                                    ['softBackground','Soft background'],
-                                    ['headerBackground','Header background'],
-                                    ['sidebarBackground','Internal sidebar'],
-                                    ['composerBackground','Composer'],
-                                    ['rightRailBackground','Right rail'],
-                                    ['primaryColor','Primary action'],
-                                    ['secondaryColor','Secondary action'],
-                                    ['accentColor','Accent'],
-                                    ['headingColor','Heading text'],
-                                    ['bodyColor','Body text'],
-                                    ['mutedColor','Muted text'],
-                                    ['borderColor','Borders'],
-                                    ['activeTabBackground','Active navigation'],
-                                    ['activeTabText','Active navigation text'],
-                                    ['outgoingBubble','Outgoing bubble'],
-                                    ['incomingBubble','Incoming bubble'],
-                                    ['dockBackground','Mobile Community dock'],
-                                    ['dockItemBackground','Dock item'],
-                                    ['dockActiveBackground','Dock active item'],
-                                    ['dockTextColor','Dock text'],
-                                    ['dockActiveTextColor','Dock active text'],
-                                ] as const).map(([field, label]) => (
-                                    <label key={field} className="border border-slate-200 bg-slate-50 p-3 text-sm font-bold text-slate-700">
-                                        <span className="mb-2 block">{label}</span>
-                                        <input type="color" value={String(selectedCommunityPalette[field])} onChange={event => updateSelectedCommunityPalette(field, event.target.value)} className="h-10 w-full border p-1" />
-                                    </label>
-                                ))}
-                            </div>
-                            <FormRow label={`Shadow opacity (${communityStyle.shadowOpacity}%)`} description="Shared Community card shadow strength.">
-                                <input type="range" min="0" max="40" step="1" value={communityStyle.shadowOpacity} onChange={event => updateCommunityStyle('shadowOpacity', Number(event.target.value))} className="w-full" />
-                            </FormRow>
-                        </div>
-
-                        <aside className="border border-slate-300 bg-slate-100 p-4 shadow-sm">
-                            <p className="text-xs font-black uppercase tracking-[0.18em] text-slate-600">Live {selectedCommunityMode} preview</p>
-                            <div className="mt-4 overflow-hidden border shadow-sm" style={{ backgroundColor: selectedCommunityPalette.pageBackground, borderColor: selectedCommunityPalette.borderColor }}>
-                                <header className="flex items-center justify-between gap-3 border-b px-4 py-3" style={{ backgroundColor: selectedCommunityPalette.headerBackground, borderColor: selectedCommunityPalette.borderColor }}>
-                                    <div><p className="text-[10px] font-black uppercase tracking-[0.18em]" style={{ color: selectedCommunityPalette.primaryColor }}>Eduvora Community</p><h4 className="font-black" style={{ color: selectedCommunityPalette.headingColor }}>{selectedCommunityMode === 'social' ? 'Social Workspace' : selectedCommunityMode === 'latest' ? 'Latest Community' : 'Classic Community'}</h4></div>
-                                    <span className="px-3 py-1.5 text-[10px] font-black text-white" style={{ backgroundColor: selectedCommunityPalette.primaryColor }}>Action</span>
-                                </header>
-                                <div className={`grid min-h-[19rem] ${selectedCommunityMode === 'social' ? 'grid-cols-[4.5rem_minmax(0,1fr)_5.5rem]' : 'grid-cols-[4.5rem_minmax(0,1fr)]'}`}>
-                                    <aside className="border-r p-2" style={{ backgroundColor: selectedCommunityPalette.sidebarBackground, borderColor: selectedCommunityPalette.borderColor }}>
-                                        {[0,1,2,3].map(index => <span key={index} className="mb-2 flex h-9 items-center justify-center border text-xs font-black" style={{ backgroundColor: index === 0 ? selectedCommunityPalette.activeTabBackground : selectedCommunityPalette.softBackground, borderColor: selectedCommunityPalette.borderColor, color: index === 0 ? selectedCommunityPalette.activeTabText : selectedCommunityPalette.mutedColor }}>●</span>)}
-                                    </aside>
-                                    <main className="min-w-0 p-3" style={{ backgroundColor: selectedCommunityPalette.surfaceColor }}>
-                                        <article className="border p-3" style={{ backgroundColor: selectedCommunityPalette.cardColor, borderColor: selectedCommunityPalette.borderColor }}>
-                                            <h5 className="font-black" style={{ color: selectedCommunityPalette.headingColor }}>Community feed card</h5>
-                                            <p className="mt-2 text-xs font-semibold leading-5" style={{ color: selectedCommunityPalette.bodyColor }}>The selected layout uses this exact card, text, border and accent palette.</p>
-                                            <span className="mt-3 inline-flex px-2 py-1 text-[10px] font-black" style={{ backgroundColor: selectedCommunityPalette.accentColor, color: selectedCommunityPalette.primaryColor }}>Selected mode</span>
-                                        </article>
-                                        <div className="mt-3 border px-3 py-2 text-xs font-semibold" style={{ backgroundColor: selectedCommunityPalette.composerBackground, borderColor: selectedCommunityPalette.borderColor, color: selectedCommunityPalette.mutedColor }}>Write a reply…</div>
-                                    </main>
-                                    {selectedCommunityMode === 'social' ? <aside className="border-l p-2" style={{ backgroundColor: selectedCommunityPalette.rightRailBackground, borderColor: selectedCommunityPalette.borderColor }}><div className="border p-2 text-[10px] font-black" style={{ backgroundColor: selectedCommunityPalette.cardColor, borderColor: selectedCommunityPalette.borderColor, color: selectedCommunityPalette.headingColor }}>Requests</div><div className="mt-2 border p-2 text-[10px] font-black" style={{ backgroundColor: selectedCommunityPalette.cardColor, borderColor: selectedCommunityPalette.borderColor, color: selectedCommunityPalette.headingColor }}>Suggestions</div></aside> : null}
-                                </div>
-                            </div>
-                        </aside>
-                    </section>
-                </div>
-            );
             case 'dock': return (
                 <div className="store-config-dock-studio grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(320px,0.75fr)]">
                     <div className="space-y-6">
                         <section className="border border-slate-300 bg-white p-5 shadow-sm">
                             <p className="text-xs font-black uppercase tracking-[0.18em] text-blue-700">Real navigation deployment</p>
                             <h2 className="mt-1 text-2xl font-black text-slate-950">Dock Settings</h2>
-                            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Every control below is connected to the actual mobile dock and desktop navigation. Community-only controls have moved to the Community tab.</p>
+                            <p className="mt-2 max-w-3xl text-sm leading-6 text-slate-600">Every control below is connected to the actual mobile dock and desktop navigation.</p>
                             <div className="mt-5 grid gap-3 md:grid-cols-2">
                                 <label className="border border-slate-200 bg-slate-50 p-4">
                                     <span className="block text-xs font-black uppercase tracking-[0.14em] text-slate-500">Desktop navigation</span>
@@ -1326,12 +833,8 @@ const WebsiteSettingsComponent: React.FC<WebsiteSettingsProps> = ({ settings, pr
             </div>
 
             <div className="flex gap-1 overflow-x-auto border-b border-slate-200 bg-white px-3 pt-2 custom-scrollbar">
-                <TabButton label="Layout" isActive={activeTab === 'layout'} onClick={() => setActiveTab('layout')} />
-                <TabButton label="Content" isActive={activeTab === 'content'} onClick={() => setActiveTab('content')} />
                 <TabButton label="Subscriptions" isActive={activeTab === 'subscriptions'} onClick={() => setActiveTab('subscriptions')} />
-                <TabButton label="Reading" isActive={activeTab === 'reading'} onClick={() => setActiveTab('reading')} />
                 <TabButton label="Profile" isActive={activeTab === 'profile'} onClick={() => setActiveTab('profile')} />
-                <TabButton label="Community" isActive={activeTab === 'community'} onClick={() => setActiveTab('community')} />
                 <TabButton label="Dock" isActive={activeTab === 'dock'} onClick={() => setActiveTab('dock')} />
                 <TabButton label="Announcements" isActive={activeTab === 'announcements'} onClick={() => setActiveTab('announcements')} />
                 <TabButton label="Services" isActive={activeTab === 'services'} onClick={() => setActiveTab('services')} />

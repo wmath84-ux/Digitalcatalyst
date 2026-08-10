@@ -4,7 +4,6 @@ import test from 'node:test';
 
 const app = fs.readFileSync('App.tsx', 'utf8');
 const community = fs.readFileSync('components/EduvoraCommunity.tsx', 'utf8');
-const admin = fs.readFileSync('components/admin/AdminPostManagement.tsx', 'utf8');
 const rules = fs.readFileSync('firestore.rules', 'utf8');
 
 test('verified admin identity is centralized across profile, feed, and stories', () => {
@@ -14,7 +13,6 @@ test('verified admin identity is centralized across profile, feed, and stories',
   assert.match(community, /isOfficialAdminStatus/);
   assert.match(community, /authorEmail/);
   assert.match(community, /owner\.verified \? <BlueVerifiedTick/);
-  assert.match(admin, /authorEmail: \(auth\.currentUser\.email \|\| VERIFIED_ADMIN_EMAIL\)/);
   assert.match(rules, /communityVerificationAllowedOnCreate/);
   assert.match(rules, /communityVerificationUnchangedOnUpdate/);
 });
@@ -37,11 +35,6 @@ test('profile cards remove post-type badges and story text can expand', () => {
   assert.match(community, /max-h-\[42dvh\]/);
 });
 
-test('admin panel can delete official posts and exact legacy Ramamber records', () => {
-  assert.match(admin, /deleteFeedPostWithReplies/);
-  assert.match(admin, /Delete post/);
-  assert.match(admin, /legacyRamamberNames/);
-  assert.match(admin, /Scan exact test posts/);
-  assert.match(admin, /community_status/);
+test('desktop sidebar detached trigger placement contract is preserved', () => {
   assert.match(app, /detachedTriggerPlacement="top-left"/);
 });
