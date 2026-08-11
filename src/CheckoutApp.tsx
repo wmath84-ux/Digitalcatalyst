@@ -5,6 +5,7 @@ import PaymentGateway from './components/PaymentGateway';
 import VerificationSuccess from './components/VerificationSuccess';
 import { product, user, generateTransactionResult } from './data/checkoutData';
 import type { TransactionResult } from './data/checkoutData';
+import { savePurchasedCourse } from './utils/purchasedCourses';
 
 const STEPS = [
   { label: 'Review', icon: '📋' },
@@ -34,6 +35,14 @@ export default function App() {
 
   const handlePaymentSuccess = () => {
     const txn = generateTransactionResult();
+    savePurchasedCourse({
+      id: product.id,
+      title: product.name,
+      type: product.type === 'PDF' ? 'PDF' : product.type === 'eBook' ? 'Ebook' : 'Course',
+      emoji: product.thumbnail,
+      progress: 0,
+      purchasedAt: Date.now(),
+    });
     setTransaction(txn);
     setCurrentStep(3);
     console.log('[App] Step changed: 2 → 3', txn);

@@ -28,6 +28,7 @@ import type {
   PrivacySettings,
   TabId,
 } from "../types";
+import { loadPurchasedCourses } from "../../utils/purchasedCourses";
 
 interface ToastState {
   id: number;
@@ -86,7 +87,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [coins, setCoins] = useState(415);
   const [coinHistory, setCoinHistory] = useState<CoinTransaction[]>(initialCoinHistory);
   const [membership, setMembership] = useState<Membership>(initialMembership);
-  const [purchases] = useState<LibraryItem[]>(initialPurchases);
+  const [purchases] = useState<LibraryItem[]>(() => {
+    const persisted = loadPurchasedCourses();
+    const persistedIds = new Set(persisted.map((item) => item.id));
+    return [...persisted, ...initialPurchases.filter((item) => !persistedIds.has(item.id))];
+  });
   const [favorites, setFavorites] = useState<LibraryItem[]>(initialFavorites);
   const [downloads, setDownloads] = useState<DownloadItem[]>(initialDownloads);
   const [badges, setBadges] = useState<Badge[]>(initialBadges);

@@ -28,7 +28,7 @@ export default function VerificationSuccess({
       product: product.name,
       transaction: transaction.transactionId,
     });
-    alert('🎓 Redirecting to Dashboard!\n\nYour course "' + product.name + '" is now activated and ready to access.');
+    window.location.hash = '#/profile';
   };
 
   const handleStartLearning = () => {
@@ -36,7 +36,8 @@ export default function VerificationSuccess({
       productId: product.id,
       productName: product.name,
     });
-    alert('📖 Opening your course!\n\nLaunching "' + product.name + '" — Happy Learning!');
+    sessionStorage.setItem('selectedCourse', JSON.stringify({ courseId: product.id, title: product.name }));
+    window.location.hash = `#/course/${encodeURIComponent(product.id)}`;
   };
 
   const handleDownloadReceipt = () => {
