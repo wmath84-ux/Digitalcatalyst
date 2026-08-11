@@ -2,7 +2,7 @@ import { useMemo, useState } from "react";
 import Header from "./components/Header";
 import BottomNav, { type TabKey } from "./components/BottomNav";
 import StorePage from "./components/StorePage";
-import { HomeTab, MyDayTab, PurchasesTab, WalletTab } from "./components/OtherTabs";
+import { HomeTab, MyDayTab, PurchasesTab } from "./components/OtherTabs";
 import type { Product } from "./data/products";
 import { loadPurchasedCourses } from "./utils/purchasedCourses";
 
@@ -11,9 +11,10 @@ type AppProps = {
   onNavigateToMyDay: () => void;
   onNavigateToProfile: () => void;
   onNavigateToCourse: (course: { id: string; title: string }) => void;
+  onNavigateToCommunity: () => void;
 };
 
-export default function App({ onNavigateToProduct, onNavigateToMyDay, onNavigateToProfile, onNavigateToCourse }: AppProps) {
+export default function App({ onNavigateToProduct, onNavigateToMyDay, onNavigateToProfile, onNavigateToCourse, onNavigateToCommunity }: AppProps) {
   const [activeTab, setActiveTab] = useState<TabKey>(() =>
     window.location.hash.startsWith("#/store/purchases") ? "purchases" : "store"
   );
@@ -70,7 +71,6 @@ export default function App({ onNavigateToProduct, onNavigateToMyDay, onNavigate
           {activeTab === "purchases" && (
             <PurchasesTab purchased={purchased} onOpenCourse={onNavigateToCourse} />
           )}
-          {activeTab === "wallet" && <WalletTab wishlistCount={wishlist.size} />}
         </main>
 
         {toast && (
@@ -83,6 +83,7 @@ export default function App({ onNavigateToProduct, onNavigateToMyDay, onNavigate
           active={activeTab}
           onChange={(tab) => {
             if (tab === "myday") onNavigateToMyDay();
+            else if (tab === "community") onNavigateToCommunity();
             else setActiveTab(tab);
           }}
           storeBadge={1}

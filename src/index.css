@@ -193,3 +193,33 @@ body {
   box-shadow: 0 0 0 3px rgb(99 102 241 / 0.15);
   background-color: white;
 }
+
+@keyframes slideUp {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+* {
+  -webkit-tap-highlight-color: transparent;
+}
+
+::-webkit-scrollbar {
+  display: none;
+}
+
+html, body {
+  overscroll-behavior: none;
+}
