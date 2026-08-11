@@ -1,27 +1,19 @@
-import path from 'path';
-import { defineConfig, loadEnv } from 'vite';
-import react from '@vitejs/plugin-react';
+import path from "path";
+import { fileURLToPath } from "url";
+import tailwindcss from "@tailwindcss/vite";
+import react from "@vitejs/plugin-react";
+import { defineConfig } from "vite";
+import { viteSingleFile } from "vite-plugin-singlefile";
 
-export default defineConfig(({ mode }) => {
-    const env = loadEnv(mode, '.', '');
-    return {
-      server: {
-        port: 3000,
-        host: '0.0.0.0',
-        allowedHosts: ['.monkeycode-ai.live', '.e2b.app'],
-      },
-      plugins: [
-        react(),
-      ],
-      define: {
-        'process.env.API_KEY': JSON.stringify(env.GEMINI_API_KEY || ''),
-        'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY || '')
-      },
-      resolve: {
-        alias: {
-          '@': path.resolve(__dirname, '.'),
-          'react-router-dom': path.resolve(__dirname, 'utils/reactRouterDomShim.ts'),
-        }
-      }
-    };
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+// https://vite.dev/config/
+export default defineConfig({
+  plugins: [react(), tailwindcss(), viteSingleFile()],
+  resolve: {
+    alias: {
+      "@": path.resolve(__dirname, "src"),
+    },
+  },
 });
