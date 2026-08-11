@@ -79,7 +79,7 @@ const fallbackMilestoneConfigs: ProfileMilestoneConfig[] = [
   { id: 'article-reader', title: 'Article Reader', icon: '\u{1F4F0}', metric: 'articlesRead', requirement: 3, description: 'Read three learning articles or blog lessons.', actionLabel: 'Claim Reading Bonus', coinReward: 40, active: true },
   { id: 'video-hour', title: 'One Hour Video Charge', icon: '\u{1F3AC}', metric: 'watchMinutes', requirement: 60, description: 'Complete 60 minutes of course video watch time.', actionLabel: 'Claim Watch Bonus', coinReward: 60, active: true },
   { id: 'quiz-master-real', title: 'Quiz Master', icon: '\u{1F3AF}', metric: 'quizWins', requirement: 3, description: 'Claim rewards from three unique quizzes.', actionLabel: 'Claim Quiz Bonus', coinReward: 75, active: true },
-  { id: 'pdf-scholar', title: 'PDF Scholar', icon: '\u{1F4C4}', metric: 'pdfsRead', requirement: 5, description: 'Read or own five PDF/document resources.', actionLabel: 'Download Scholar Pack', coinReward: 50, downloadContent: 'Digital Catalyst PDF Scholar Pack\n\n- Reading checklist\n- Revision tracker\n- Daily active planner', active: true },
+  { id: 'pdf-scholar', title: 'PDF Scholar', icon: '\u{1F4C4}', metric: 'pdfsRead', requirement: 5, description: 'Read or own five PDF/document resources.', actionLabel: 'Download Scholar Pack', coinReward: 50, downloadContent: 'Digital Catalyst PDF Scholar Pack\n\n📚 Included Resources:\n- Reading checklist with progress tracker\n- Revision notes template with subject tags\n- Daily active planner with focus blocks\n- Quick-reference summary sheet\n- Study session log\n\nTip: Print these sheets or use them digitally — consistency beats intensity.', active: true },
   { id: 'course-finisher', title: 'Course Finisher', icon: '\u2705', metric: 'completedCourses', requirement: 1, description: 'Reach 100% completion on a course tracker.', actionLabel: 'Claim Completion Bonus', coinReward: 100, active: true },
   { id: 'wallet-elite', title: 'Wallet Elite', icon: '\u{1F48E}', metric: 'lifetimeCoins', requirement: 1000, description: 'Earn 1000 lifetime EduCoins.', actionLabel: 'Claim Elite Badge', coinReward: 125, active: true },
   { id: 'premium-unlocker', title: 'Premium Unlocker', icon: '\u{1F393}', metric: 'coursesOwned', requirement: 2, description: 'Own two premium learning products.', actionLabel: 'Unlock Bonus Access', coinReward: 80, unlockProductIds: [], active: true },
@@ -103,6 +103,86 @@ const TAB_ICONS: Record<string, string> = {
   learning: '\u{1F4DA}',
   rewards: '\u{1F3C6}',
   wallet: '\u{1F4B0}',
+};
+
+/** Build a beautiful HTML report for a claimed milestone, inspired by the My Day report format. */
+const buildMilestoneReportHtml = (reward: { id: string; title: string; description?: string; icon?: string; coinReward?: number; metric?: string; requirement?: number; downloadContent?: string }, user: User | null): string => {
+  const displayName = user?.name || user?.email?.split('@')[0] || 'Learner';
+  const now = new Date();
+  const dateStr = now.toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' });
+  const timeStr = now.toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' });
+  const escHtml = (s: string) => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const coinBalance = Math.max(0, Math.floor(Number(user?.coinBalance ?? user?.eduCoins ?? 0)));
+  const totalEarned = Math.max(0, Math.floor(Number(user?.totalCoinsEarned ?? user?.totalLifetimeCoins ?? 0)));
+  const studyMin = Math.max(0, Number(user?.studyMinutes ?? 0));
+  const watchMin = Math.max(0, Number(user?.totalWatchTimeMinutes ?? 0));
+  const purchasedCount = (user?.purchasedProductIds ?? []).length;
+  const tier = user?.subscriptionTier || 'normal';
+ ;  return `<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escHtml(reward.title)} — Milestone Report</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',system-ui,-apple-system,Roboto,Helvetica,Arial,sans-serif;background:#eef1f7;color:#17223b;line-height:1.55;padding:20px}
+.page{max-width:720px;margin:0 auto}
+.hero{position:relative;overflow:hidden;border-radius:26px;padding:42px 38px;color:#fff;background:linear-gradient(135deg,#315CEB 0%,#6255F6 55%,#7C4DFF 100%);box-shadow:0 24px 60px rgba(49,92,235,0.28)}
+.hero:before{content:"";position:absolute;width:300px;height:300px;border-radius:50%;background:rgba(255,255,255,0.09);top:-130px;right:-70px}
+.hero:after{content:"";position:absolute;width:200px;height:200px;border-radius:50%;background:rgba(255,255,255,0.07);bottom:-110px;left:-50px}
+.hero .kicker{text-transform:uppercase;letter-spacing:0.26em;font-size:11px;font-weight:800;opacity:0.92}
+.hero h1{margin-top:12px;font-size:32px;letter-spacing:-0.02em;line-height:1.15}
+.hero .sub{margin-top:10px;max-width:560px;font-size:14px;opacity:0.9}
+.hero .meta{margin-top:18px;font-size:12px;font-weight:700;opacity:0.85}
+.section{margin-top:22px;background:#fff;border-radius:22px;padding:26px 28px;box-shadow:0 14px 40px rgba(23,34,59,0.07)}
+.section h2{font-size:18px;letter-spacing:-0.01em;color:#17223b}
+.section .lead{margin-top:6px;font-size:13px;color:#5e6a7e}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:14px;margin-top:20px}
+.stat{border-radius:18px;border:1px solid #e6eaf3;background:#fafbfe;padding:16px}
+.stat .stat-value{font-size:24px;font-weight:900;letter-spacing:-0.02em}
+.stat .stat-label{margin-top:4px;font-size:11px;font-weight:800;text-transform:uppercase;letter-spacing:0.08em;color:#7a8499}
+.stat.blue .stat-value{color:#315CEB}.stat.green .stat-value{color:#12AFA3}.stat.orange .stat-value{color:#FF8A1F}.stat.purple .stat-value{color:#7C4DFF}.stat.pink .stat-value{color:#F0478A}
+.badge{display:inline-block;padding:4px 10px;border-radius:999px;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:0.04em}
+.badge-blue{background:#eef2ff;color:#315CEB}.badge-green{background:#e6faf5;color:#0c9d8c}
+.content-block{margin-top:18px;padding:18px;border-radius:16px;border:1px dashed #d5dbe7;background:#f8f9fb;white-space:pre-wrap;font-size:13px;color:#344054;line-height:1.7}
+footer{margin-top:26px;padding:18px;text-align:center;font-size:11px;font-weight:700;color:#98a2b3}
+@media(max-width:600px){.hero{padding:28px 20px}.hero h1{font-size:24px}}
+@media print{body{background:#fff;padding:0}.section,.hero{box-shadow:none}.hero{-webkit-print-color-adjust:exact;print-color-adjust:exact}}
+</style>
+</head>
+<body>
+<div class="page">
+  <header class="hero">
+    <p class="kicker">Milestone Unlocked · ${escHtml(reward.icon || '🏆')}</p>
+    <h1>${escHtml(reward.title)}</h1>
+    <p class="sub">${escHtml(reward.description || 'Congratulations on reaching this learning milestone!')}</p>
+    <p class="meta">${escHtml(displayName)} · ${escHtml(dateStr)} at ${escHtml(timeStr)}</p>
+  </header>
+
+  <section class="section">
+    <h2>Your achievement</h2>
+    <p class="lead">You unlocked <strong>${escHtml(reward.title)}</strong>${reward.coinReward ? ` and earned <strong>${reward.coinReward} EduCoins</strong>` : ''}. Here is a snapshot of your learning journey at this moment.</p>
+    <div class="stats">
+      <div class="stat blue"><div class="stat-value">${coinBalance}</div><div class="stat-label">EduCoin balance</div></div>
+      <div class="stat green"><div class="stat-value">${totalEarned}</div><div class="stat-label">Lifetime coins</div></div>
+      <div class="stat orange"><div class="stat-value">${studyMin}</div><div class="stat-label">Study minutes</div></div>
+      <div class="stat purple"><div class="stat-value">${watchMin}</div><div class="stat-label">Watch minutes</div></div>
+      <div class="stat blue"><div class="stat-value">${purchasedCount}</div><div class="stat-label">Products owned</div></div>
+      <div class="stat pink"><div class="stat-value">${escHtml(tier.charAt(0).toUpperCase() + tier.slice(1))}</div><div class="stat-label">Membership tier</div></div>
+    </div>
+  </section>
+
+  ${reward.downloadContent ? `<section class="section">
+    <h2>Pack contents</h2>
+    <p class="lead">Your exclusive download includes the resources below.</p>
+    <div class="content-block">${escHtml(reward.downloadContent)}</div>
+  </section>` : ''}
+
+  <footer>Generated by Eduvora Digital Catalyst · Milestones celebrate real learning progress.</footer>
+</div>
+</body>
+</html>`;
 };
 
 const ProfilePage: React.FC<ProfilePageProps> = ({
@@ -439,11 +519,12 @@ const ProfilePage: React.FC<ProfilePageProps> = ({
     const claimed = onClaimMilestoneReward(reward);
     if (!claimed) return;
     if (reward.downloadContent) {
-      const blob = new Blob([reward.downloadContent], { type: 'text/plain;charset=utf-8' });
+      const htmlContent = buildMilestoneReportHtml(reward, currentUser);
+      const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
       const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `${reward.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}.txt`;
+      link.download = `${reward.title.replace(/[^a-z0-9]+/gi, '-').toLowerCase()}-report.html`;
       link.click();
       URL.revokeObjectURL(url);
     }

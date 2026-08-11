@@ -39,16 +39,6 @@ export default function CartWishlistApp({
 }: CartWishlistAppProps) {
   return (
     <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-slate-50 font-[system-ui]">
-      <div className="z-40 flex shrink-0 items-center justify-between bg-white px-6 pb-1 pt-3 text-[13px] font-semibold text-slate-900">
-        <span>9:41</span>
-        <div className="flex items-center gap-1.5">
-          <span className="text-[11px]">5G</span>
-          <div className="h-2.5 w-4 rounded-[2px] border border-slate-900 relative">
-            <span className="absolute inset-y-[1px] left-[1px] right-[3px] bg-slate-900 rounded-[1px]" />
-          </div>
-        </div>
-      </div>
-
       <div className="relative flex flex-1 flex-col overflow-hidden bg-slate-50">
         <Toast message={toast} />
         {activeTab === "favorites" && (

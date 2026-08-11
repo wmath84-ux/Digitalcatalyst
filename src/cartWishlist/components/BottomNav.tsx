@@ -16,40 +16,41 @@ export default function BottomNav({
   cartCount,
 }: BottomNavProps) {
   const items: { key: TabKey; label: string; icon: ReactNode; badge?: number }[] = [
-    { key: "home", label: "Discover", icon: <Home size={22} strokeWidth={2.2} /> },
+    { key: "home", label: "Discover", icon: <Home size={20} strokeWidth={2.2} /> },
     {
       key: "favorites",
       label: "Favorites",
-      icon: <Heart size={22} strokeWidth={2.2} />,
+      icon: <Heart size={20} strokeWidth={2.2} />,
       badge: favoritesCount,
     },
     {
       key: "cart",
       label: "Cart",
-      icon: <ShoppingBag size={22} strokeWidth={2.2} />,
+      icon: <ShoppingBag size={20} strokeWidth={2.2} />,
       badge: cartCount,
     },
   ];
 
   return (
-    <div className="relative z-30 border-t border-slate-100 bg-white/95 px-2 pb-[env(safe-area-inset-bottom)] pt-2 backdrop-blur-xl">
-      <div className="flex items-center justify-around">
+    <div className="relative z-30 border-t border-slate-100 bg-white/95 pb-[env(safe-area-inset-bottom)] pt-1.5 backdrop-blur-xl">
+      <div className="mx-auto flex max-w-md items-center justify-around px-6">
         {items.map((item) => {
           const isActive = active === item.key;
           return (
             <button
               key={item.key}
               onClick={() => onChange(item.key)}
-              className="relative flex flex-1 flex-col items-center gap-1 rounded-2xl py-2 transition-all active:scale-90"
+              className="relative flex flex-col items-center gap-0.5 py-1.5 transition-all active:scale-90"
+              style={{ flex: "0 0 auto", minWidth: "72px" }}
             >
               <div
-                className={`relative flex h-9 w-14 items-center justify-center rounded-full transition-all duration-300 ${
+                className={`relative flex h-8 w-8 items-center justify-center rounded-full transition-all duration-300 ${
                   isActive ? "bg-indigo-50 text-indigo-600" : "text-slate-400"
                 }`}
               >
                 {item.icon}
                 {!!item.badge && item.badge > 0 && (
-                  <span className="absolute -right-0.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-sm">
+                  <span className="@container absolute -right-0.5 -top-1 flex h-4 min-w-[16px] items-center justify-center rounded-full bg-rose-500 px-1 text-[9px] font-bold text-white shadow-sm">
                     {item.badge > 9 ? "9+" : item.badge}
                   </span>
                 )}

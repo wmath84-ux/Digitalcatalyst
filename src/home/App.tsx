@@ -16,9 +16,10 @@ interface AppProps {
   onNavigateToProduct: (product: Product) => void;
   onNavigateToMyDay: () => void;
   onNavigateToProfile: () => void;
+  onNavigateToPurchases?: () => void;
 }
 
-export default function App({ onNavigateToStore, onNavigateToProduct, onNavigateToMyDay, onNavigateToProfile }: AppProps) {
+export default function App({ onNavigateToStore, onNavigateToProduct, onNavigateToMyDay, onNavigateToProfile, onNavigateToPurchases }: AppProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [favorites, setFavorites] = useState<Set<string>>(new Set(["p1", "p7"]));
@@ -106,6 +107,7 @@ export default function App({ onNavigateToStore, onNavigateToProduct, onNavigate
           suggestions={suggestions}
           onSelectSuggestion={handleSelectSuggestion}
           favoritesCount={favorites.size}
+          onOpenFavorites={() => handleTabChange("favorites")}
         />
 
         <main className="flex-1">
@@ -233,6 +235,7 @@ export default function App({ onNavigateToStore, onNavigateToProduct, onNavigate
                 image={continueLearningItem.image}
                 progress={continueProgress}
                 onResume={handleResume}
+                onClick={onNavigateToPurchases}
               />
 
               <section className="px-5 pt-6">

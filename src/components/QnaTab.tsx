@@ -60,7 +60,16 @@ export default function QnaTab({ questions, lessonTitle, onAskQuestion, onToggle
             className="w-full resize-none rounded-lg border border-white/10 bg-black/20 p-2.5 text-[13px] text-white placeholder:text-white/30 outline-none focus:border-cyan-400/50"
           />
         </div>
-        <div className="mt-2 flex justify-end">
+        <div className="mt-2 flex items-center justify-between">
+          <button
+            onClick={() => { window.location.hash = "#/ai-chat"; }}
+            className="flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 px-3 py-1.5 text-[12px] font-bold text-white shadow-lg shadow-fuchsia-500/30 active:scale-95 transition"
+          >
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth={2.2}>
+              <path d="M12 2L13.09 8.26L18 6L14.74 10.91L21 12L14.74 13.09L18 18L13.09 15.74L12 22L10.91 15.74L6 18L9.26 13.09L3 12L9.26 10.91L6 6L10.91 8.26L12 2Z" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Tap to Gemini 3.1 Flash
+          </button>
           <button
             onClick={handleAsk}
             disabled={!draft.trim()}

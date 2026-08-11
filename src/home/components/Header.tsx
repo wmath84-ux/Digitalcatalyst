@@ -8,6 +8,7 @@ interface HeaderProps {
   suggestions: Product[];
   onSelectSuggestion: (product: Product) => void;
   favoritesCount: number;
+  onOpenFavorites?: () => void;
 }
 
 const typeLabel: Record<string, string> = {
@@ -18,7 +19,7 @@ const typeLabel: Record<string, string> = {
 };
 
 const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
-  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount },
+  { userName, query, onQueryChange, suggestions, onSelectSuggestion, favoritesCount, onOpenFavorites },
   ref,
 ) {
   return (
@@ -42,6 +43,7 @@ const Header = forwardRef<HTMLInputElement, HeaderProps>(function Header(
           <button
             type="button"
             aria-label="Favorites"
+            onClick={onOpenFavorites}
             className="relative flex h-10 w-10 items-center justify-center rounded-full bg-white/15 backdrop-blur-sm transition active:scale-90"
           >
             <span className="text-lg">❤️</span>

@@ -19,11 +19,10 @@ import ChatsListScreen from "./screens/ChatsListScreen";
 import ChatScreen from "./screens/ChatScreen";
 import ShareToChatSheet from "./components/ShareToChatSheet";
 
-// AI Chat Icon placeholder - just the button, no functionality yet
+// AI Chat Icon – compact sparkles icon for the header
 const AIIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
-    <path d="M12 2l1.6 4.9L18.5 8l-4.9 1.6L12 14.5l-1.6-4.9L5.5 8l4.9-1.1L12 2Z" />
-    <path d="M5 19l1.2 3.6L10 24l-3.8 1.4L5 29l-1.2-3.6L0 24l3.8-1.4L5 19Z" opacity="0.5" />
+  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2}>
+    <path d="M12 2L13.09 8.26L18 6L14.74 10.91L21 12L14.74 13.09L18 18L13.09 15.74L12 22L10.91 15.74L6 18L9.26 13.09L3 12L9.26 10.91L6 6L10.91 8.26L12 2Z" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -109,6 +108,7 @@ function AppShell() {
           onOpenStory={openStory}
           onCreateStory={() => openCreate("story")}
           onOpenTag={openTag}
+          onOpenAI={() => { window.location.hash = "#/ai-chat"; }}
           unreadCount={unreadCount}
           unreadChatCount={unreadChatCount}
         />
@@ -149,15 +149,7 @@ function AppShell() {
         <BottomNav active={activeTab} onChange={changeTab} onCreate={() => openCreate("post")} />
       )}
 
-      {/* AI Chat floating button */}
-      {activeTab !== "stories" && !topOverlay && (
-        <button
-          onClick={() => setToast("🤖 AI Chat coming soon!")}
-          className="absolute right-4 bottom-20 z-20 flex h-12 w-12 items-center justify-center rounded-full bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-lg shadow-violet-200 active:scale-95 transition"
-        >
-          <AIIcon />
-        </button>
-      )}
+      {/* AI Chat floating button — moved to header */}
 
       {/* Pushed overlay stack */}
       {stack.map((entry, idx) => {

@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { openInstallPanel } from "@/utils/pwaInstall";
+import { openApp } from "@/utils/pwaInstall";
 
 export default function Header() {
   return (
@@ -23,12 +23,12 @@ export default function Header() {
 
         <button
           type="button"
-          onClick={openInstallPanel}
-          className="pulse-glow flex items-center gap-2 rounded-xl bg-gradient-to-r from-emerald-500 to-teal-400 px-3 py-2 text-xs font-bold text-slate-950 shadow-lg shadow-emerald-500/30 transition hover:brightness-110 sm:px-4 sm:text-sm"
+          onClick={openApp}
+          className="pulse-glow flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 px-3 py-2 text-xs font-bold text-white shadow-lg shadow-fuchsia-500/30 transition hover:brightness-110 sm:px-4 sm:text-sm"
         >
-          <span aria-hidden>⬇️</span>
-          <span className="hidden sm:inline">Install App</span>
-          <span className="sm:hidden">Install</span>
+          <span aria-hidden>🚀</span>
+          <span className="hidden sm:inline">Open App</span>
+          <span className="sm:hidden">Open</span>
         </button>
       </div>
     </motion.header>

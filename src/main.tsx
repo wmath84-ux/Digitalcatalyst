@@ -14,6 +14,7 @@ import CartWishlistApp from "./CartWishlistApp";
 import SubscriptionApp from "./subscription/App";
 import LandingApp from "./LandingApp";
 import AuthApp from "./AuthApp";
+import AiChatApp from "./ai-chat/App";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { PRODUCTS as CART_PRODUCTS } from "./cartWishlist/data/products";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
@@ -33,6 +34,7 @@ if ("serviceWorker" in navigator) {
 }
 
 const LANDING_HASH = "#/landing";
+const HOME_HASH = "#/home";
 const AUTH_HASH = "#/auth";
 const STORE_HASH = "#/store";
 const PRODUCT_HASH = "#/product/";
@@ -44,6 +46,7 @@ const COMMUNITY_HASH = "#/community";
 const CART_HASH = "#/cart";
 const FAVORITES_HASH = "#/favorites";
 const SUBSCRIPTION_HASH = "#/subscription";
+const AI_CHAT_HASH = "#/ai-chat";
 const CHECKOUT_CONTEXT_KEY = "checkoutContext";
 
 const INITIAL_CART = ["p1", "p3"];
@@ -221,6 +224,25 @@ function Root() {
   const favoriteProducts = SHOPPING_PRODUCTS.filter((product) => favoriteIds.has(product.id));
 
   if (!hash || hash.startsWith(LANDING_HASH)) return <LandingApp />;
+  if (hash.startsWith(HOME_HASH)) {
+    return (
+      <HomeApp
+        onNavigateToStore={() => {
+          window.location.hash = STORE_HASH;
+        }}
+        onNavigateToProduct={navigateToProduct}
+        onNavigateToMyDay={() => {
+          window.location.hash = MY_DAY_HASH;
+        }}
+        onNavigateToProfile={() => {
+          window.location.hash = PROFILE_HASH;
+        }}
+        onNavigateToPurchases={() => {
+          window.location.hash = FAVORITES_HASH;
+        }}
+      />
+    );
+  }
   if (hash.startsWith(AUTH_HASH)) return <AuthApp />;
 
   if (hash.startsWith(CART_HASH) || hash.startsWith(FAVORITES_HASH)) {
@@ -261,6 +283,7 @@ function Root() {
   }
 
   if (hash.startsWith(SUBSCRIPTION_HASH)) return <SubscriptionApp />;
+  if (hash.startsWith(AI_CHAT_HASH)) return <AiChatApp />;
   if (hash.startsWith(COMMUNITY_HASH)) return <CommunityApp />;
   if (hash.startsWith(COURSE_HASH)) return <CoursePlayerApp />;
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
@@ -303,6 +326,9 @@ function Root() {
       }}
       onNavigateToProfile={() => {
         window.location.hash = PROFILE_HASH;
+      }}
+      onNavigateToPurchases={() => {
+        window.location.hash = FAVORITES_HASH;
       }}
     />
   );
