@@ -33,6 +33,7 @@ if ("serviceWorker" in navigator) {
 }
 
 const LANDING_HASH = "#/landing";
+const HOME_HASH = "#/home";
 const AUTH_HASH = "#/auth";
 const STORE_HASH = "#/store";
 const PRODUCT_HASH = "#/product/";
@@ -221,6 +222,22 @@ function Root() {
   const favoriteProducts = SHOPPING_PRODUCTS.filter((product) => favoriteIds.has(product.id));
 
   if (!hash || hash.startsWith(LANDING_HASH)) return <LandingApp />;
+  if (hash.startsWith(HOME_HASH)) {
+    return (
+      <HomeApp
+        onNavigateToStore={() => {
+          window.location.hash = STORE_HASH;
+        }}
+        onNavigateToProduct={navigateToProduct}
+        onNavigateToMyDay={() => {
+          window.location.hash = MY_DAY_HASH;
+        }}
+        onNavigateToProfile={() => {
+          window.location.hash = PROFILE_HASH;
+        }}
+      />
+    );
+  }
   if (hash.startsWith(AUTH_HASH)) return <AuthApp />;
 
   if (hash.startsWith(CART_HASH) || hash.startsWith(FAVORITES_HASH)) {

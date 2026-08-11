@@ -1,13 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { openInstallPanel, showDesktopMaintenanceNotice } from "@/utils/pwaInstall";
+import { openApp, openInstallPanel } from "@/utils/pwaInstall";
 
 export default function CtaBanner() {
-  const goToWebsite = () => {
-    showDesktopMaintenanceNotice();
-  };
-
   return (
     <section className="relative bg-[#05060f] px-6 pb-28 sm:px-8">
       <motion.div
@@ -35,10 +31,10 @@ export default function CtaBanner() {
           <motion.button
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.96 }}
-            onClick={goToWebsite}
+            onClick={openApp}
             className="pulse-glow rounded-2xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 px-10 py-4 text-lg font-bold text-white shadow-2xl shadow-fuchsia-500/40"
           >
-            🚀 Go to the Website
+            🚀 Open App
           </motion.button>
           <motion.button
             type="button"

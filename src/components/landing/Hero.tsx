@@ -2,13 +2,9 @@
 
 import { motion } from "framer-motion";
 import HeroScene from "./HeroScene";
-import { openInstallPanel, showDesktopMaintenanceNotice } from "@/utils/pwaInstall";
+import { openApp, openInstallPanel } from "@/utils/pwaInstall";
 
 export default function Hero() {
-  const goToWebsite = () => {
-    showDesktopMaintenanceNotice();
-  };
-
   return (
     <section className="relative flex min-h-screen items-center overflow-hidden bg-[#05060f] pt-24">
       <HeroScene />
@@ -42,10 +38,10 @@ export default function Hero() {
             <motion.button
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.97 }}
-              onClick={goToWebsite}
+              onClick={openApp}
               className="pulse-glow rounded-2xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 px-8 py-4 text-base font-bold text-white shadow-2xl shadow-fuchsia-500/40 transition"
             >
-              🚀 Go to the Website
+              🚀 Open App
             </motion.button>
 
             <motion.button

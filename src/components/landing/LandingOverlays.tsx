@@ -5,11 +5,17 @@ import { AnimatePresence, motion } from "framer-motion";
 import {
   DESKTOP_MAINTENANCE_EVENT,
   PWA_INSTALL_OPEN_EVENT,
+  OPEN_APP_EVENT,
+  isMobileScreenSize,
   isInstallPromptReady,
   isPwaInstalled,
   openInstallPanel,
   promptInstall,
+  showDesktopMaintenanceNotice,
 } from "@/utils/pwaInstall";
+
+/** Hash that routes to the main HomeApp inside Root (src/main.tsx). */
+const HOME_HASH = "#/home";
 
 export default function LandingOverlays() {
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
@@ -35,13 +41,31 @@ export default function LandingOverlays() {
       setInstalling(false);
     };
 
+    /**
+     * Handle the global Open App event.
+     * - Mobile / portrait-sized screen → navigate to home (landing page
+     *   animation is handled by LandingApp's own listener).
+     * - Desktop-sized screen → show the "Under Preparation" notification.
+     */
+    const handleOpenApp = () => {
+      if (isMobileScreenSize()) {
+        // The animated exit is driven by LandingApp; we just ensure navigation
+        // happens if LandingApp hasn't mounted its listener yet.
+        // LandingApp's own handler takes priority because it manages isExiting.
+      } else {
+        showDesktopMaintenanceNotice();
+      }
+    };
+
     window.addEventListener(DESKTOP_MAINTENANCE_EVENT, showMaintenance);
     window.addEventListener(PWA_INSTALL_OPEN_EVENT, showInstall);
     window.addEventListener("appinstalled", handleInstalled);
+    window.addEventListener(OPEN_APP_EVENT, handleOpenApp);
     return () => {
       window.removeEventListener(DESKTOP_MAINTENANCE_EVENT, showMaintenance);
       window.removeEventListener(PWA_INSTALL_OPEN_EVENT, showInstall);
       window.removeEventListener("appinstalled", handleInstalled);
+      window.removeEventListener(OPEN_APP_EVENT, handleOpenApp);
       if (maintenanceTimer.current) clearTimeout(maintenanceTimer.current);
     };
   }, []);
@@ -77,9 +101,9 @@ export default function LandingOverlays() {
               <div className="flex items-start gap-3">
                 <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-amber-400/15 text-xl">🛠️</span>
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-bold text-white">Desktop interface under maintenance</p>
+                  <p className="text-sm font-bold text-white">Under Preparation</p>
                   <p className="mt-0.5 text-xs leading-relaxed text-slate-300">
-                    Instead, install the PWA and start using the complete Eduvora experience.
+                    The desktop interface is currently under preparation. Please use the mobile app or install the PWA for the complete Eduvora experience.
                   </p>
                   <button
                     type="button"

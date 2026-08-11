@@ -31,6 +31,29 @@ export function showDesktopMaintenanceNotice() {
   }
 }
 
+/**
+ * Screen-size-based mobile detection.
+ * Returns true when the viewport width is at or below the mobile/portrait
+ * breakpoint (768 px).  This is intentionally a *screen-size* check, not a
+ * device-type check, so that a desktop user running the app inside a narrow
+ * floating window (portrait-sized) is treated the same as a mobile user.
+ */
+export const MOBILE_BREAKPOINT = 768;
+
+export function isMobileScreenSize(): boolean {
+  if (typeof window === "undefined") return false;
+  return window.innerWidth <= MOBILE_BREAKPOINT;
+}
+
+/** Navigate from the landing page into the main home app. */
+export const OPEN_APP_EVENT = "eduvora-open-app";
+
+export function openApp() {
+  if (typeof window !== "undefined") {
+    window.dispatchEvent(new CustomEvent(OPEN_APP_EVENT));
+  }
+}
+
 export function isPwaInstalled() {
   if (typeof window === "undefined") return false;
   return window.matchMedia("(display-mode: standalone)").matches
