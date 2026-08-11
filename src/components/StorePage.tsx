@@ -8,13 +8,14 @@ import { BookOpenIcon } from "./icons";
 
 type StorePageProps = {
   wishlist: Set<string>;
+  cartIds: Set<string>;
   purchased: Set<string>;
   onToggleWishlist: (id: string) => void;
-  onBuy: (product: Product) => void;
+  onAddToCart: (id: string) => void;
   onView: (product: Product) => void;
 };
 
-export default function StorePage({ wishlist, purchased, onToggleWishlist, onBuy, onView }: StorePageProps) {
+export default function StorePage({ wishlist, cartIds, purchased, onToggleWishlist, onAddToCart, onView }: StorePageProps) {
   const [search, setSearch] = useState("");
   const [activeChip, setActiveChip] = useState("All");
   const [sort, setSort] = useState("Recommended");
@@ -81,9 +82,10 @@ export default function StorePage({ wishlist, purchased, onToggleWishlist, onBuy
               key={product.id}
               product={product}
               wishlisted={wishlist.has(product.id)}
+              inCart={cartIds.has(product.id)}
               purchased={purchased.has(product.id)}
               onToggleWishlist={onToggleWishlist}
-              onBuy={onBuy}
+              onAddToCart={onAddToCart}
               onView={onView}
             />
           ))}

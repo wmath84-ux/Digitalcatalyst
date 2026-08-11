@@ -25,8 +25,6 @@ import PurchasedProducts from './components/PurchasedProducts';
 import CoursePlayer from './components/CoursePlayer';
 import PolicyPage from './components/PolicyPage';
 import AuthPage from './components/auth/AuthPage';
-import WishlistPage from './components/FavouritesPage';
-import CartSidebar from './components/CartSidebar';
 import PaymentModal, { PaymentVerificationDetails } from './components/PaymentModal';
 import UpcomingFeatures, { UpcomingFeatureItem } from './components/UpcomingFeatures';
 import SubscriptionSuccessModal from './components/SubscriptionSuccessModal';
@@ -3275,15 +3273,7 @@ const App: React.FC = () => {
   // --- Cart Handlers ---
   const openCartSidebar = () => {
       acknowledgeDockDestination('Cart');
-      if (typeof window !== 'undefined' && !isMobileViewport) {
-          setCurrentView('cart');
-          window.scrollTo(0, 0);
-          return;
-      }
-      if (typeof window !== 'undefined' && !isCartOpenRef.current) {
-          window.history.pushState({ ...(window.history.state || {}), dcView: currentViewRef.current, dcOverlay: 'cart' }, '', window.location.href);
-      }
-      setIsCartOpen(true);
+      window.location.hash = '#/cart';
   };
 
   const openSiteNotificationCenter = () => {
@@ -5874,8 +5864,7 @@ const App: React.FC = () => {
 
   const handleNavigateToWishlist = () => {
     acknowledgeDockDestination('Wishlist');
-    setCurrentView('wishlist');
-    window.scrollTo(0, 0);
+    window.location.hash = '#/favorites';
   };
 
   const handleNavigateToFreeProducts = () => {
@@ -6538,8 +6527,6 @@ const App: React.FC = () => {
       case 'news':
       case 'blog': return <ReadingDrawer settings={websiteSettings} economySettings={economySettings} isOpen={true} presentation="page" view={readingDrawerView} articles={websiteSettings.content.newsArticles} announcements={websiteSettings.content.announcements} listType={currentView === 'news' ? 'news' : 'blog'} selectedArticle={selectedArticle} selectedAnnouncement={selectedAnnouncement} currentUser={effectiveAppUser} onClose={() => handleNavigateBack('home')} onSelectArticle={handleViewBlogArticle} onSelectAnnouncement={handleViewAnnouncement} onBackToList={handleBackToReadingList} onExploreFeature={handleExploreReadingFeature} promoTitle="Explore premium learning resources" promoDescription="Jump from this reading session into the store to find notes, guides, and courses that match your next study sprint." promoCtaLabel="Explore Products" onReadingReward={handleReadingReward} />;
       case 'freeProducts': return <FreeProductsPage settings={websiteSettings} products={freeProducts} onBack={() => handleNavigateBack('home')} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />;
-      case 'cart': return <CartSidebar presentation="page" isOpen={true} onClose={() => handleNavigateBack('home')} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />;
-      case 'wishlist': return <WishlistPage settings={websiteSettings} products={wishlistProducts} onViewProduct={handleViewProduct} wishlist={wishlist} onToggleWishlist={handleToggleWishlist} onNavigateToAllProducts={handleNavigateToAllProducts} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onClearWishlist={handleClearWishlist} coupons={coupons} purchasedProductIds={purchasedProductIds} />;
       case 'mayDay': return (
         <MayDayMobile
           currentUser={appUser}
@@ -6761,7 +6748,6 @@ const App: React.FC = () => {
                 <BottomGlassDock currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} isAdmin={isPrimaryAdminUser(currentAdminUser)} onAdminClick={handleNavigateToAdminLogin} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenMayDay={handleNavigateToMayDay} onOpenCommunity={() => { window.location.hash = '#/community'; }} />
               </div>
             )}
-            {currentView !== 'cart' && <CartSidebar isOpen={isCartOpen} onClose={() => setIsCartOpen(false)} cartItems={cartDetails} onUpdateQuantity={handleUpdateCartQuantity} onRemoveItem={handleRemoveFromCart} onViewProduct={handleViewProduct} onCheckout={handleInitiateCheckout} onApplyCoupon={handleApplyCartCoupon} appliedCoupon={appliedCartCoupon} couponError={cartCouponError} onRemoveCoupon={() => { setAppliedCartCoupon(null); setCartCouponError(null); }} coinBalance={cartUserCoinBalance} coinRedeemRate={eduCoinRedeemRate} applyEduCoins={applyCartEduCoins} onToggleEduCoins={setApplyCartEduCoins} appliedEduCoins={cartAppliedEduCoins} eduCoinDiscount={cartEduCoinDiscount} finalPrice={cartFinalPrice} />}
             {isCartPaymentModalOpen && <PaymentModal settings={websiteSettings} economySettings={economySettings} cartItems={cartDetails} originalPrice={cartSubtotal} couponDiscount={cartCouponDiscount} finalPrice={cartFinalPrice} eduCoinDiscount={cartEduCoinDiscount} appliedEduCoins={cartAppliedEduCoins} coinRedeemRate={eduCoinRedeemRate} onClose={() => setIsCartPaymentModalOpen(false)} onConfirm={(payment) => handleConfirmCartPurchase(appliedCartCoupon ? appliedCartCoupon.code : null, cartAppliedEduCoins, payment)} currentUser={effectiveAppUser ? { ...effectiveAppUser, coinBalance: liveWalletBalance, eduCoins: liveWalletBalance } : effectiveAppUser} coinPrice={canSpendEduCoins(effectiveAppUser) && cartDetails.every(item => resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) > 0) ? cartDetails.reduce((total, item) => total + (resolveCoinPrice(item.product.coinPrice, economySettings, 'product', item.product.id) * item.quantity), 0) : 0} onConfirmWithCoins={canSpendEduCoins(effectiveAppUser) ? handleConfirmCartCoinPurchase : undefined} onInsufficientCoins={handleInsufficientEduCoins} presentation="page" initialCheckoutStep="checkout" checkoutType="cart" checkoutUserId={effectiveAppUser?.id} checkoutTargetId="cart" />}
             {isSubscriptionModalOpen && <SubscriptionSuccessModal isOpen={isSubscriptionModalOpen} onClose={() => setIsSubscriptionModalOpen(false)} email={subscribedEmail} products={topRatedProducts} onNavigateToAllProducts={() => { setIsSubscriptionModalOpen(false); handleNavigateToAllProducts(); }} />}
             <FreeProductsModal isOpen={isFreeModalOpen} onClose={() => setIsFreeModalOpen(false)} products={freeProducts} settings={websiteSettings} onAddToCart={handleAddToCart} onBuyNow={handleBuyNowProduct} onViewProduct={handleViewProductFromModal} />

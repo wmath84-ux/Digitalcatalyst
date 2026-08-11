@@ -4,18 +4,20 @@ import { HeartIcon, StarIcon } from "./icons";
 type ProductCardProps = {
   product: Product;
   wishlisted: boolean;
+  inCart: boolean;
   purchased: boolean;
   onToggleWishlist: (id: string) => void;
-  onBuy: (product: Product) => void;
+  onAddToCart: (id: string) => void;
   onView: (product: Product) => void;
 };
 
 export default function ProductCard({
   product,
   wishlisted,
+  inCart,
   purchased,
   onToggleWishlist,
-  onBuy,
+  onAddToCart,
   onView,
 }: ProductCardProps) {
   const discount = product.originalPrice > 0
@@ -88,15 +90,18 @@ export default function ProductCard({
 
         <button
           type="button"
-          disabled={purchased}
-          onClick={() => onBuy(product)}
+          disabled={purchased || inCart}
+          onClick={(event) => {
+            event.stopPropagation();
+            onAddToCart(product.id);
+          }}
           className={`mt-1 flex w-full items-center justify-between rounded-xl px-4 py-3 text-sm font-extrabold uppercase tracking-wide transition ${
-            purchased
+            purchased || inCart
               ? "cursor-default bg-emerald-100 text-emerald-700"
               : "bg-gradient-to-r from-indigo-600 to-violet-600 text-white shadow-sm shadow-indigo-200 hover:brightness-110 active:scale-[0.98]"
           }`}
         >
-          <span>{purchased ? "Purchased" : "Details"}</span>
+          <span>{purchased ? "Purchased" : inCart ? "In Cart" : "Add to Cart"}</span>
           <span>₹{product.price}</span>
         </button>
       </div>

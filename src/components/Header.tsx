@@ -4,9 +4,10 @@ type HeaderProps = {
   cartCount: number;
   notifCount: number;
   onNavigateToProfile: () => void;
+  onNavigateToCart: () => void;
 };
 
-export default function Header({ cartCount, notifCount, onNavigateToProfile }: HeaderProps) {
+export default function Header({ cartCount, notifCount, onNavigateToProfile, onNavigateToCart }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur">
       <div className="flex items-center justify-between gap-3">
@@ -24,6 +25,7 @@ export default function Header({ cartCount, notifCount, onNavigateToProfile }: H
           <button
             type="button"
             aria-label="Cart"
+            onClick={onNavigateToCart}
             className="relative flex h-10 w-10 items-center justify-center rounded-full text-slate-700 transition hover:bg-slate-100 active:scale-95"
           >
             <CartIcon className="h-5 w-5" />

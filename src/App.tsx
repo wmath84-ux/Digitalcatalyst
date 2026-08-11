@@ -12,59 +12,57 @@ type AppProps = {
   onNavigateToProfile: () => void;
   onNavigateToCourse: (course: { id: string; title: string }) => void;
   onNavigateToCommunity: () => void;
+  cartIds: Set<string>;
+  favoriteIds: Set<string>;
+  toast: string | null;
+  onAddToCart: (id: string) => void;
+  onToggleFavorite: (id: string) => void;
+  onNavigateToCart: () => void;
 };
 
-export default function App({ onNavigateToProduct, onNavigateToMyDay, onNavigateToProfile, onNavigateToCourse, onNavigateToCommunity }: AppProps) {
+export default function App({
+  onNavigateToProduct,
+  onNavigateToMyDay,
+  onNavigateToProfile,
+  onNavigateToCourse,
+  onNavigateToCommunity,
+  cartIds,
+  favoriteIds,
+  toast,
+  onAddToCart,
+  onToggleFavorite,
+  onNavigateToCart,
+}: AppProps) {
   const [activeTab, setActiveTab] = useState<TabKey>(() =>
     window.location.hash.startsWith("#/store/purchases") ? "purchases" : "store"
   );
-  const [wishlist, setWishlist] = useState<Set<string>>(new Set());
-  const [purchased, setPurchased] = useState<Set<string>>(
+  const [purchased] = useState<Set<string>>(
     () => new Set(loadPurchasedCourses().map((item) => item.id))
   );
-  const [cartCount] = useState(0);
-  const [toast, setToast] = useState<string | null>(null);
-
-  const showToast = (message: string) => {
-    setToast(message);
-    window.setTimeout(() => setToast(null), 2200);
-  };
-
-  const toggleWishlist = (id: string) => {
-    setWishlist((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) {
-        next.delete(id);
-      } else {
-        next.add(id);
-        showToast("Added to wishlist ❤️");
-      }
-      return next;
-    });
-  };
-
-  const handleBuy = (product: Product) => {
-    if (purchased.has(product.id)) return;
-    setPurchased((prev) => new Set(prev).add(product.id));
-    showToast(product.price === 0 ? "Claimed for free 🎉" : "Purchased successfully 🎉");
-  };
+  const cartCount = cartIds.size;
 
   const purchasesBadge = useMemo(() => purchased.size, [purchased]);
 
   return (
     <div className="min-h-screen bg-slate-100 sm:py-6">
       <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
-        <Header cartCount={cartCount} notifCount={1} onNavigateToProfile={onNavigateToProfile} />
+        <Header
+          cartCount={cartCount}
+          notifCount={1}
+          onNavigateToProfile={onNavigateToProfile}
+          onNavigateToCart={onNavigateToCart}
+        />
 
         <main className="flex-1 overflow-y-auto">
           {activeTab === "home" && <HomeTab />}
           {activeTab === "myday" && <MyDayTab />}
           {activeTab === "store" && (
             <StorePage
-              wishlist={wishlist}
+              wishlist={favoriteIds}
+              cartIds={cartIds}
               purchased={purchased}
-              onToggleWishlist={toggleWishlist}
-              onBuy={handleBuy}
+              onToggleWishlist={onToggleFavorite}
+              onAddToCart={onAddToCart}
               onView={onNavigateToProduct}
             />
           )}

@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useState } from "react";
+import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import StoreApp from "./App";
@@ -9,6 +9,10 @@ import MyDayApp from "./MyDayApp";
 import ProfileApp from "./profile/App";
 import CoursePlayerApp from "./CoursePlayerApp";
 import CommunityApp from "./community/App";
+import CartWishlistApp from "./CartWishlistApp";
+import { PRODUCTS as CART_PRODUCTS } from "./cartWishlist/data/products";
+import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
+import { products as STORE_PRODUCTS } from "./data/products";
 import { product as pdpProduct } from "./data/product";
 import {
   product as checkoutProduct,
@@ -24,7 +28,30 @@ const MY_DAY_HASH = "#/my-day";
 const PROFILE_HASH = "#/profile";
 const COURSE_HASH = "#/course/";
 const COMMUNITY_HASH = "#/community";
+const CART_HASH = "#/cart";
+const FAVORITES_HASH = "#/favorites";
 const CHECKOUT_CONTEXT_KEY = "checkoutContext";
+
+const INITIAL_CART = ["p1", "p3"];
+const INITIAL_FAVORITES = ["p2", "p4", "p6"];
+const INITIAL_COINS = 480;
+
+const STORE_CART_PRODUCTS: CartProduct[] = STORE_PRODUCTS.map((product) => ({
+  id: product.id,
+  title: product.title,
+  author: product.instructor,
+  category: product.category,
+  price: product.price,
+  originalPrice: product.originalPrice,
+  rating: product.rating,
+  reviewsCount: product.reviews,
+  image: product.image,
+  hours: product.classLevel,
+  lessons: 1,
+  bestseller: product.tags.includes("BOARD"),
+}));
+
+const SHOPPING_PRODUCTS = [...CART_PRODUCTS, ...STORE_CART_PRODUCTS];
 
 type NavigableProduct = {
   id: string;
@@ -43,12 +70,89 @@ function applyCheckoutContext(context: CheckoutContext) {
 
 function Root() {
   const [hash, setHash] = useState(() => window.location.hash);
+  const [cartIds, setCartIds] = useState<Set<string>>(new Set(INITIAL_CART));
+  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set(INITIAL_FAVORITES));
+  const [userCoins, setUserCoins] = useState(INITIAL_COINS);
+  const [shoppingToast, setShoppingToast] = useState<string | null>(null);
+  const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const showShoppingToast = (message: string) => {
+    setShoppingToast(message);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setShoppingToast(null), 2000);
+  };
 
   useEffect(() => {
     const handleHashChange = () => setHash(window.location.hash);
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
+
+  useEffect(() => {
+    return () => {
+      if (toastTimer.current) clearTimeout(toastTimer.current);
+    };
+  }, []);
+
+  const handleAddToCart = (id: string) => {
+    setCartIds((previous) => {
+      if (previous.has(id)) return previous;
+      const next = new Set(previous);
+      next.add(id);
+      return next;
+    });
+    const product = SHOPPING_PRODUCTS.find((item) => item.id === id);
+    showShoppingToast(`${product ? product.title.slice(0, 28) + "…" : "Item"} added to cart`);
+  };
+
+  const handleRemoveFromCart = (id: string) => {
+    setCartIds((previous) => {
+      const next = new Set(previous);
+      next.delete(id);
+      return next;
+    });
+    showShoppingToast("Removed from cart");
+  };
+
+  const handleClearCart = () => {
+    setCartIds(new Set());
+    showShoppingToast("Cart cleared");
+  };
+
+  const handleToggleFavorite = (id: string) => {
+    setFavoriteIds((previous) => {
+      const next = new Set(previous);
+      if (next.has(id)) {
+        next.delete(id);
+        showShoppingToast("Removed from favorites");
+      } else {
+        next.add(id);
+        showShoppingToast("Added to favorites");
+      }
+      return next;
+    });
+  };
+
+  const handleRemoveFromFavorites = (id: string) => {
+    setFavoriteIds((previous) => {
+      const next = new Set(previous);
+      next.delete(id);
+      return next;
+    });
+    showShoppingToast("Removed from favorites");
+  };
+
+  const handleCheckoutComplete = (coinsUsed: number) => {
+    setUserCoins((previous) => Math.max(0, previous - coinsUsed));
+    setCartIds(new Set());
+    showShoppingToast("Order placed successfully 🎉");
+  };
+
+  const handleShoppingNavigation = (tab: CartTabKey) => {
+    if (tab === "home") window.location.hash = STORE_HASH;
+    if (tab === "favorites") window.location.hash = FAVORITES_HASH;
+    if (tab === "cart") window.location.hash = CART_HASH;
+  };
 
   const navigateToProduct = (product: NavigableProduct) => {
     sessionStorage.setItem("selectedProduct", JSON.stringify(product));
@@ -82,6 +186,29 @@ function Root() {
     window.location.hash = CHECKOUT_HASH;
   };
 
+  const cartProducts = SHOPPING_PRODUCTS.filter((product) => cartIds.has(product.id));
+  const favoriteProducts = SHOPPING_PRODUCTS.filter((product) => favoriteIds.has(product.id));
+
+  if (hash.startsWith(CART_HASH) || hash.startsWith(FAVORITES_HASH)) {
+    return (
+      <CartWishlistApp
+        activeTab={hash.startsWith(CART_HASH) ? "cart" : "favorites"}
+        cartProducts={cartProducts}
+        favoriteProducts={favoriteProducts}
+        cartIds={cartIds}
+        favoriteIds={favoriteIds}
+        userCoins={userCoins}
+        toast={shoppingToast}
+        onRemoveFromCart={handleRemoveFromCart}
+        onClearCart={handleClearCart}
+        onRemoveFromFavorites={handleRemoveFromFavorites}
+        onAddToCart={handleAddToCart}
+        onCheckoutComplete={handleCheckoutComplete}
+        onNavigate={handleShoppingNavigation}
+      />
+    );
+  }
+
   if (hash.startsWith(CHECKOUT_HASH)) {
     const savedContext = sessionStorage.getItem(CHECKOUT_CONTEXT_KEY);
     if (savedContext) {
@@ -112,6 +239,14 @@ function Root() {
         onNavigateToCourse={navigateToCourse}
         onNavigateToCommunity={() => {
           window.location.hash = COMMUNITY_HASH;
+        }}
+        cartIds={cartIds}
+        favoriteIds={favoriteIds}
+        toast={shoppingToast}
+        onAddToCart={handleAddToCart}
+        onToggleFavorite={handleToggleFavorite}
+        onNavigateToCart={() => {
+          window.location.hash = CART_HASH;
         }}
       />
     );
