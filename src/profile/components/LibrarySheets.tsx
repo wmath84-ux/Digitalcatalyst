@@ -29,7 +29,12 @@ export function PurchasesSheet({ open, onClose }: { open: boolean; onClose: () =
             </div>
             <button
               type="button"
-              onClick={() => showToast(`Resuming "${item.title}"`, "info")}
+              onClick={() => {
+                showToast(`Resuming "${item.title}"`, "info");
+                sessionStorage.setItem("selectedCourse", JSON.stringify({ courseId: item.id, title: item.title }));
+                onClose();
+                window.location.hash = `#/course/${encodeURIComponent(item.id)}`;
+              }}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-indigo-50 text-indigo-600 active:scale-90 transition"
               aria-label="Resume"
             >

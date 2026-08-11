@@ -7,6 +7,7 @@ import PdpApp from "./PdpApp";
 import CheckoutApp from "./CheckoutApp";
 import MyDayApp from "./MyDayApp";
 import ProfileApp from "./profile/App";
+import CoursePlayerApp from "./CoursePlayerApp";
 import { product as pdpProduct } from "./data/product";
 import {
   product as checkoutProduct,
@@ -20,6 +21,7 @@ const PRODUCT_HASH = "#/product/";
 const CHECKOUT_HASH = "#/checkout";
 const MY_DAY_HASH = "#/my-day";
 const PROFILE_HASH = "#/profile";
+const COURSE_HASH = "#/course/";
 const CHECKOUT_CONTEXT_KEY = "checkoutContext";
 
 type NavigableProduct = {
@@ -85,6 +87,7 @@ function Root() {
     return <CheckoutApp />;
   }
 
+  if (hash.startsWith(COURSE_HASH)) return <CoursePlayerApp />;
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
   if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
   if (hash.startsWith(PRODUCT_HASH)) return <PdpApp onCheckout={navigateToCheckout} />;
