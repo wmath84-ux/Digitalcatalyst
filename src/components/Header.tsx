@@ -3,9 +3,10 @@ import { BellIcon, BookIcon, CartIcon, UserIcon } from "./icons";
 type HeaderProps = {
   cartCount: number;
   notifCount: number;
+  onNavigateToProfile: () => void;
 };
 
-export default function Header({ cartCount, notifCount }: HeaderProps) {
+export default function Header({ cartCount, notifCount, onNavigateToProfile }: HeaderProps) {
   return (
     <header className="sticky top-0 z-30 border-b border-slate-100 bg-white/95 px-4 py-3 backdrop-blur">
       <div className="flex items-center justify-between gap-3">
@@ -47,6 +48,7 @@ export default function Header({ cartCount, notifCount }: HeaderProps) {
           <button
             type="button"
             aria-label="Profile"
+            onClick={onNavigateToProfile}
             className="flex h-10 w-10 items-center justify-center rounded-full bg-slate-100 text-slate-500 transition hover:bg-slate-200 active:scale-95"
           >
             <UserIcon className="h-5 w-5" />

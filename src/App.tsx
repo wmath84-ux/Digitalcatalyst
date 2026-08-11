@@ -8,9 +8,10 @@ import type { Product } from "./data/products";
 type AppProps = {
   onNavigateToProduct: (product: Product) => void;
   onNavigateToMyDay: () => void;
+  onNavigateToProfile: () => void;
 };
 
-export default function App({ onNavigateToProduct, onNavigateToMyDay }: AppProps) {
+export default function App({ onNavigateToProduct, onNavigateToMyDay, onNavigateToProfile }: AppProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("store");
   const [wishlist, setWishlist] = useState<Set<string>>(new Set());
   const [purchased, setPurchased] = useState<Set<string>>(new Set());
@@ -46,7 +47,7 @@ export default function App({ onNavigateToProduct, onNavigateToMyDay }: AppProps
   return (
     <div className="min-h-screen bg-slate-100 sm:py-6">
       <div className="relative mx-auto flex min-h-screen w-full max-w-md flex-col bg-white shadow-xl shadow-slate-200 sm:min-h-[calc(100vh-3rem)] sm:overflow-hidden sm:rounded-[2rem] sm:border sm:border-slate-200">
-        <Header cartCount={cartCount} notifCount={1} />
+        <Header cartCount={cartCount} notifCount={1} onNavigateToProfile={onNavigateToProfile} />
 
         <main className="flex-1 overflow-y-auto">
           {activeTab === "home" && <HomeTab />}

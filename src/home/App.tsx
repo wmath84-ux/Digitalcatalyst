@@ -15,9 +15,10 @@ interface AppProps {
   onNavigateToStore: () => void;
   onNavigateToProduct: (product: Product) => void;
   onNavigateToMyDay: () => void;
+  onNavigateToProfile: () => void;
 }
 
-export default function App({ onNavigateToStore, onNavigateToProduct, onNavigateToMyDay }: AppProps) {
+export default function App({ onNavigateToStore, onNavigateToProduct, onNavigateToMyDay, onNavigateToProfile }: AppProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [favorites, setFavorites] = useState<Set<string>>(new Set(["p1", "p7"]));
@@ -71,6 +72,10 @@ export default function App({ onNavigateToStore, onNavigateToProduct, onNavigate
   const handleTabChange = (tab: NavTab) => {
     if (tab === "myday") {
       onNavigateToMyDay();
+      return;
+    }
+    if (tab === "profile") {
+      onNavigateToProfile();
       return;
     }
     setActiveTab(tab);
