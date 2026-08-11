@@ -183,9 +183,8 @@ export default function App() {
   const isLast = currentIndex >= flat.length - 1;
 
   return (
-    <div className="min-h-screen w-full bg-[#050509] font-[system-ui] sm:flex sm:items-center sm:justify-center sm:p-6">
-      <div className="relative mx-auto flex h-screen w-full max-w-md flex-col overflow-hidden bg-[#0c0c14] text-white sm:h-[860px] sm:rounded-[2.75rem] sm:ring-[10px] sm:ring-black/70 sm:shadow-[0_30px_80px_-20px_rgba(0,0,0,0.8)]">
-        {/* Mock status bar */}
+    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0c0c14] font-[system-ui] text-white">
+      {/* Mock status bar */}
         <div className="hidden shrink-0 items-center justify-between px-6 pb-1 pt-3 text-[11px] font-semibold text-white sm:flex">
           <span>9:41</span>
           <div className="flex items-center gap-1">
@@ -355,6 +354,5 @@ export default function App() {
           </div>
         </div>
       </div>
-    </div>
   );
 }
