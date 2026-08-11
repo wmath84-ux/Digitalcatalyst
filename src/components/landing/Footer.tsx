@@ -1,6 +1,6 @@
 "use client";
 
-import { promptInstall } from "@/utils/pwaInstall";
+import { openInstallPanel } from "@/utils/pwaInstall";
 
 export default function Footer() {
   return (
@@ -23,7 +23,7 @@ export default function Footer() {
           >
             Features
           </button>
-          <button type="button" onClick={() => void promptInstall()} className="hover:text-slate-300">
+          <button type="button" onClick={openInstallPanel} className="hover:text-slate-300">
             Install App
           </button>
         </div>

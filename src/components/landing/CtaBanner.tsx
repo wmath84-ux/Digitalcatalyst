@@ -1,11 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { promptInstall } from "@/utils/pwaInstall";
+import { openInstallPanel, showDesktopMaintenanceNotice } from "@/utils/pwaInstall";
 
 export default function CtaBanner() {
   const goToWebsite = () => {
-    window.location.hash = "#/store";
+    showDesktopMaintenanceNotice();
   };
 
   return (
@@ -44,7 +44,7 @@ export default function CtaBanner() {
             type="button"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.96 }}
-            onClick={() => void promptInstall()}
+            onClick={openInstallPanel}
             className="flex items-center gap-2 rounded-2xl border border-emerald-400/40 bg-emerald-400/10 px-8 py-4 text-lg font-bold text-emerald-300 hover:bg-emerald-400/20"
           >
             ⬇️ Install the PWA

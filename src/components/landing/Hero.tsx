@@ -2,11 +2,11 @@
 
 import { motion } from "framer-motion";
 import HeroScene from "./HeroScene";
-import { promptInstall } from "@/utils/pwaInstall";
+import { openInstallPanel, showDesktopMaintenanceNotice } from "@/utils/pwaInstall";
 
 export default function Hero() {
   const goToWebsite = () => {
-    window.location.hash = "#/store";
+    showDesktopMaintenanceNotice();
   };
 
   return (
@@ -52,7 +52,7 @@ export default function Hero() {
               type="button"
               whileHover={{ scale: 1.04 }}
               whileTap={{ scale: 0.97 }}
-              onClick={() => void promptInstall()}
+              onClick={openInstallPanel}
               className="flex items-center gap-2 rounded-2xl border border-emerald-400/40 bg-emerald-400/10 px-7 py-4 text-base font-bold text-emerald-300 backdrop-blur transition hover:bg-emerald-400/20"
             >
               ⬇️ Install the PWA
