@@ -1,13 +1,15 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { Coupon, ProductWithRating, User, WebsiteSettings } from '../App';
-import { ProductImageSlot, getProductImage, getProductImageFallback } from '../utils/productImages';
-import SafeImage from './common/SafeImage';
-import { ensureUserCoinWallet, watchUserCoinWallet } from '../utils/coinWallet';
-import LiquidMetalButton from './ui/LiquidMetalButton';
-import { pillClassForProductRoundness, resolveProductRoundnessSettings } from '../utils/productRoundness';
-import MobileProductSearchPage from './MobileProductSearchPage';
-import ProfessionalIcon from './common/ProfessionalIcon';
-import type { CleanNeutralIconSlotId, ProfessionalIconName } from '../utils/cleanNeutralAdvancedCustomizer';
+import { useMemo, useRef, useState } from "react";
+import type { ProductWithRating, User, WebsiteSettings } from "../App";
+import { getProductImage } from "../utils/productImages";
+import Header from "./premiumMobile/Header";
+import HeroCarousel from "./premiumMobile/HeroCarousel";
+import CategoryNav from "./premiumMobile/CategoryNav";
+import ProductCard from "./premiumMobile/ProductCard";
+import ContinueLearning from "./premiumMobile/ContinueLearning";
+import Reviews from "./premiumMobile/Reviews";
+import BottomNav, { type NavTab } from "./premiumMobile/BottomNav";
+import { banners, categories, reviews } from "../data/premiumMobileMockData";
+import type { Product } from "./premiumMobile/types";
 
 interface MobileAppHomeProps {
   settings: WebsiteSettings;
@@ -18,7 +20,7 @@ interface MobileAppHomeProps {
   visibleProducts: ProductWithRating[];
   purchasedProductIds: number[];
   wishlist: number[];
-  coupons: Coupon[];
+  coupons: unknown[];
   onViewPurchasedProduct: (product: ProductWithRating) => void;
   onViewProduct: (product: ProductWithRating, sectionId?: string) => void;
   onToggleWishlist: (id: number) => void;
@@ -28,156 +30,279 @@ interface MobileAppHomeProps {
   onOpenNews: () => void;
 }
 
-const currency = (product: ProductWithRating) => product.salePrice || product.price || '₹0';
-const progressFor = (product: ProductWithRating, index = 0) => Math.min(92, Math.max(18, ((product.id * 17) + (index * 11)) % 100));
-const ProductCover: React.FC<{ product: ProductWithRating; compact?: boolean; slot: ProductImageSlot; priority?: boolean }> = ({ product, compact, slot, priority = false }) => {
-  const image = getProductImage(product, slot);
-  if (image) return <SafeImage src={image} fallbackSrc={getProductImageFallback(product)} alt={product.title} className="h-full w-full object-contain" fallbackTitle={product.title} fallbackBadge={product.category || 'Course'} fallbackIcon="🎓" fallbackMessage="Image preview unavailable" aspect={compact ? 'square' : 'video'} loading={priority ? 'eager' : 'lazy'} fetchPriority={priority ? 'high' : 'auto'} decoding="async" loadTimeoutMs={priority ? 7000 : 9000} />;
+const parsePrice = (value?: string) => Number((value || "0").replace(/[^0-9.]/g, "")) || 0;
+const productType = (product: ProductWithRating): Product["type"] => {
+  const category = (product.category || "").toLowerCase();
+  if (category.includes("pdf")) return "pdf";
+  if (category.includes("book")) return "ebook";
+  if (category.includes("live")) return "live";
+  return "video";
+};
+
+export default function MobileAppHome({ currentUser, purchasedProducts, visibleProducts, wishlist, onViewProduct, onViewPurchasedProduct, onToggleWishlist, onNavigateToAllProducts }: MobileAppHomeProps) {
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeCategory, setActiveCategory] = useState("all");
+  const [favorites, setFavorites] = useState<Set<string>>(new Set(wishlist.map(String)));
+  const [activeTab, setActiveTab] = useState<NavTab>("home");
+  const [continueProgress, setContinueProgress] = useState(42);
+
+  const searchInputRef = useRef<HTMLInputElement>(null);
+  const contentTopRef = useRef<HTMLDivElement>(null);
+
+  const sourceById = useMemo(() => new Map(visibleProducts.map((product) => [String(product.id), product])), [visibleProducts]);
+  const products = useMemo<Product[]>(() => visibleProducts.map((product) => {
+    const price = parsePrice(product.salePrice || product.price);
+    const mrp = parsePrice(product.price) || price;
+    return {
+      id: String(product.id), title: product.title, type: productType(product), category: productType(product),
+      author: product.category || "Digital Catalyst", price, mrp, educoins: product.coinPrice || 0,
+      rating: product.rating, ratingCount: product.reviewCount,
+      image: getProductImage(product, "card") || product.images?.[0] || "/images/product-video.jpg",
+      trending: product.rating >= 4.5,
+    };
+  }), [visibleProducts]);
+  const continueLearningItem = products.find((p) => sourceById.has(p.id) && purchasedProducts.some((owned) => String(owned.id) === p.id)) || products[0] || {
+    id: "empty", title: "Start your learning journey", author: "Digital Catalyst", image: "/images/continue-learning.jpg",
+    type: "video" as const, category: "video", price: 0, mrp: 0, educoins: 0, rating: 0, ratingCount: 0,
+  };
+
+  const toggleFavorite = (id: string) => {
+    setFavorites((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    const source = sourceById.get(id);
+    if (source) onToggleWishlist(source.id);
+  };
+
+  const normalizedQuery = searchQuery.trim().toLowerCase();
+
+  const searchResults: Product[] = useMemo(() => {
+    if (!normalizedQuery) return [];
+    return products.filter(
+      (p) =>
+        p.title.toLowerCase().includes(normalizedQuery) ||
+        p.author.toLowerCase().includes(normalizedQuery) ||
+        p.type.toLowerCase().includes(normalizedQuery) ||
+        p.category.toLowerCase().includes(normalizedQuery),
+    );
+  }, [normalizedQuery]);
+
+  const suggestions = searchResults.slice(0, 5);
+
+  const categoryFiltered: Product[] = useMemo(() => {
+    if (activeCategory === "all") return products;
+    return products.filter((p) => p.category === activeCategory);
+  }, [activeCategory]);
+
+  const favoriteProducts = useMemo(
+    () => products.filter((p) => favorites.has(p.id)),
+    [favorites],
+  );
+
+  const handleSelectSuggestion = (product: Product) => {
+    setSearchQuery(product.title);
+    searchInputRef.current?.blur();
+  };
+
+  const handleTabChange = (tab: NavTab) => {
+    setActiveTab(tab);
+    if (tab === "search") {
+      contentTopRef.current?.scrollIntoView({ behavior: "smooth" });
+      requestAnimationFrame(() => searchInputRef.current?.focus());
+    } else if (tab === "home") {
+      setSearchQuery("");
+      contentTopRef.current?.scrollIntoView({ behavior: "smooth" });
+    }
+  };
+
+  const handleResume = () => {
+    setContinueProgress((prev) => Math.min(100, prev + 14));
+  };
+
+  const isSearching = normalizedQuery.length > 0;
+
   return (
-    <div className="flex h-full w-full flex-col justify-between overflow-hidden bg-[radial-gradient(circle_at_20%_15%,#7C4DFF_0,transparent_34%),linear-gradient(135deg,#071742,#0B63FF_58%,#DCCBFF)] p-3 text-white">
-      <span className="w-fit rounded-full bg-white/18 px-2 py-1 text-[9px] font-black uppercase tracking-wider">{product.category || 'Course'}</span>
-      <div>
-        <p className={`${compact ? 'text-[11px]' : 'text-sm'} font-black leading-tight text-white line-clamp-2`}>{product.title}</p>
-        <p className="mt-1 text-[9px] font-bold text-blue-100">Digital Catalyst</p>
+    <div className="min-h-screen bg-slate-100">
+      <div className="relative mx-auto flex min-h-screen max-w-md flex-col bg-[#f4f4f8] pb-24 shadow-2xl">
+        <div ref={contentTopRef} />
+        <Header
+          ref={searchInputRef}
+          userName={currentUser?.name?.split(" ")[0] || "Learner"}
+          query={searchQuery}
+          onQueryChange={setSearchQuery}
+          suggestions={suggestions}
+          onSelectSuggestion={handleSelectSuggestion}
+          favoritesCount={favorites.size}
+        />
+
+        <main className="flex-1">
+          {isSearching ? (
+            <section className="px-5 pt-6">
+              <div className="flex items-center justify-between">
+                <h2 className="text-base font-bold text-slate-900">
+                  Results for “{searchQuery}”
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="text-xs font-semibold text-indigo-600"
+                >
+                  Clear
+                </button>
+              </div>
+              <p className="mt-1 text-xs text-slate-400">
+                {searchResults.length} item{searchResults.length !== 1 ? "s" : ""} found
+              </p>
+
+              {searchResults.length === 0 ? (
+                <div className="mt-10 flex flex-col items-center gap-2 text-center text-slate-400">
+                  <span className="text-4xl">🔎</span>
+                  <p className="text-sm">
+                    We couldn't find anything for "{searchQuery}".<br />
+                    Try searching a different keyword.
+                  </p>
+                </div>
+              ) : (
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {searchResults.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      isFavorite={favorites.has(product.id)}
+                      onToggleFavorite={toggleFavorite}
+                      onOpen={(item) => { const source = sourceById.get(item.id); if (source) onViewProduct(source); }}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : activeTab === "favorites" ? (
+            <section className="px-5 pt-6">
+              <h2 className="text-base font-bold text-slate-900">Your Saved Items</h2>
+              <p className="mt-1 text-xs text-slate-400">
+                {favoriteProducts.length} item{favoriteProducts.length !== 1 ? "s" : ""} saved for later
+              </p>
+
+              {favoriteProducts.length === 0 ? (
+                <div className="mt-10 flex flex-col items-center gap-2 text-center text-slate-400">
+                  <span className="text-4xl">💔</span>
+                  <p className="text-sm">
+                    No favorites yet. Tap the heart on any product to save it here.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => handleTabChange("home")}
+                    className="mt-2 rounded-full bg-slate-900 px-4 py-2 text-xs font-bold text-white active:scale-95"
+                  >
+                    Browse Products
+                  </button>
+                </div>
+              ) : (
+                <div className="mt-4 grid grid-cols-2 gap-3">
+                  {favoriteProducts.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      isFavorite={favorites.has(product.id)}
+                      onToggleFavorite={toggleFavorite}
+                      onOpen={(item) => { const source = sourceById.get(item.id); if (source) onViewProduct(source); }}
+                    />
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : activeTab === "profile" ? (
+            <section className="px-5 pt-6">
+              <div className="flex flex-col items-center rounded-2xl bg-white p-6 text-center shadow-sm shadow-slate-200 ring-1 ring-slate-100">
+                <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-2xl font-bold text-white">
+                  {(currentUser?.name || "Learner").charAt(0)}
+                </div>
+                <h2 className="mt-3 text-lg font-bold text-slate-900">{currentUser?.name || "Learner"}</h2>
+                <p className="text-xs text-slate-400">Learner since 2023</p>
+
+                <div className="mt-5 grid w-full grid-cols-3 gap-2">
+                  <div className="rounded-xl bg-slate-50 py-3">
+                    <p className="text-sm font-bold text-slate-900">12</p>
+                    <p className="text-[11px] text-slate-400">Courses</p>
+                  </div>
+                  <div className="rounded-xl bg-slate-50 py-3">
+                    <p className="text-sm font-bold text-slate-900">{favorites.size}</p>
+                    <p className="text-[11px] text-slate-400">Saved</p>
+                  </div>
+                  <div className="rounded-xl bg-amber-50 py-3">
+                    <p className="text-sm font-bold text-amber-600">860</p>
+                    <p className="text-[11px] text-amber-500">EduCoins</p>
+                  </div>
+                </div>
+
+                <button
+                  type="button"
+                  onClick={() => handleTabChange("home")}
+                  className="mt-5 w-full rounded-full bg-slate-900 py-2.5 text-sm font-bold text-white active:scale-95"
+                >
+                  Back to Home
+                </button>
+              </div>
+            </section>
+          ) : (
+            <>
+              <HeroCarousel banners={banners} />
+
+              <CategoryNav
+                categories={categories}
+                activeCategory={activeCategory}
+                onSelect={setActiveCategory}
+              />
+
+              <ContinueLearning
+                title={continueLearningItem.title}
+                author={continueLearningItem.author}
+                image={continueLearningItem.image}
+                progress={continueProgress}
+                onResume={() => { handleResume(); const source = sourceById.get(continueLearningItem.id); if (source) onViewPurchasedProduct(source); }}
+              />
+
+              <section className="px-5 pt-6">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-base font-bold text-slate-900">
+                    {activeCategory === "all"
+                      ? "Trending Now"
+                      : categories.find((c) => c.id === activeCategory)?.label}
+                  </h2>
+                  <span className="text-xs font-semibold text-slate-400">
+                    {categoryFiltered.length} items
+                  </span>
+                </div>
+
+                {categoryFiltered.length === 0 ? (
+                  <p className="mt-8 text-center text-sm text-slate-400">
+                    No products in this category yet.
+                  </p>
+                ) : (
+                  <div className="mt-4 grid grid-cols-2 gap-3">
+                    {categoryFiltered.map((product) => (
+                      <ProductCard
+                        key={product.id}
+                        product={product}
+                        isFavorite={favorites.has(product.id)}
+                        onToggleFavorite={toggleFavorite}
+                        onOpen={(item) => { const source = sourceById.get(item.id); if (source) onViewProduct(source); }}
+                      />
+                    ))}
+                  </div>
+                )}
+              </section>
+
+              <Reviews reviews={reviews} />
+            </>
+          )}
+        </main>
+
+        <BottomNav active={activeTab} favoritesCount={favorites.size} onChange={handleTabChange} />
       </div>
     </div>
   );
-};
-
-const SectionHead: React.FC<{ title: string; subtitle?: string; onViewAll?: () => void }> = ({ title, subtitle, onViewAll }) => (
-  <div className="mb-3 flex items-end justify-between gap-3 px-1">
-    <div>
-      <h2 className="text-[20px] font-black tracking-tight text-[#081A44]">{title}</h2>
-      {subtitle ? <p className="mt-0.5 text-[12px] font-semibold text-[#64708F]">{subtitle}</p> : null}
-    </div>
-    {onViewAll ? <button type="button" onClick={onViewAll} className="shrink-0 text-[13px] font-black text-[#0B63FF]">View All ›</button> : null}
-  </div>
-);
-
-const MobileAppHome: React.FC<MobileAppHomeProps> = ({
-  settings,
-  currentUser,
-  isLoggedIn,
-  purchasedProducts,
-  topRatedProducts,
-  visibleProducts,
-  purchasedProductIds,
-  wishlist,
-  coupons,
-  onViewPurchasedProduct,
-  onViewProduct,
-  onToggleWishlist,
-  onNavigateToAllProducts,
-  onNavigateToPurchases,
-  onNavigateToFreeProducts,
-  onOpenNews,
-}) => {
-  const [searchQuery, setSearchQuery] = useState('');
-  const [isMobileSearchOpen, setIsMobileSearchOpen] = useState(false);
-  const ownedPreview = purchasedProducts[0];
-  const allPreview = useMemo(() => visibleProducts.slice(0, 6), [visibleProducts]);
-  const topPreview = topRatedProducts.slice(0, 4);
-  const [mobileCoinBalance, setMobileCoinBalance] = useState<number | null>(null);
-  const walletUserId = currentUser?.uid || (currentUser?.id ? String(currentUser.id) : '');
-
-  useEffect(() => {
-    if (!isLoggedIn || !walletUserId) {
-      setMobileCoinBalance(null);
-      return undefined;
-    }
-
-    ensureUserCoinWallet(walletUserId).catch((error) => {
-      console.error('Mobile home coin wallet setup failed:', error);
-    });
-
-    const unsubscribe = watchUserCoinWallet(
-      walletUserId,
-      (wallet) => setMobileCoinBalance(wallet.coinBalance),
-      (error) => {
-        console.error('Mobile home coin wallet watch failed:', error);
-        setMobileCoinBalance(null);
-      }
-    );
-
-    return () => unsubscribe();
-  }, [isLoggedIn, walletUserId]);
-
-  const coins = mobileCoinBalance ?? currentUser?.eduCoins ?? 0;
-  const productRoundness = resolveProductRoundnessSettings(settings);
-  const mobileHomePreviewCardRoundClass = productRoundness.homePreviewCards !== false ? 'rounded-[26px]' : 'rounded-xl';
-  const mobileHomePreviewTileRoundClass = productRoundness.homePreviewCards !== false ? 'rounded-[24px]' : 'rounded-xl';
-  const mobileHomePreviewMediaRoundClass = productRoundness.homePreviewCards !== false ? 'rounded-[22px]' : 'rounded-lg';
-  const mobileHomeTopMediaRoundClass = productRoundness.homePreviewCards !== false ? 'rounded-[20px]' : 'rounded-lg';
-  const mobilePurchaseCardRoundClass = productRoundness.myPurchasesCards !== false ? 'rounded-[26px]' : 'rounded-xl';
-  const mobilePurchaseMediaRoundClass = productRoundness.myPurchasesCards !== false ? 'rounded-[22px]' : 'rounded-lg';
-  const productBadgeRoundClass = pillClassForProductRoundness(productRoundness.productBadges !== false);
-  const productActionButtonRoundClass = productRoundness.productActionButtons !== false ? 'rounded-2xl' : 'rounded-lg';
-  const activeCoupons = coupons.filter(coupon => coupon.isActive).slice(0, 3);
-  const scrollToMobileSection = (sectionId: string) => {
-    document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  };
-
-  const chips: Array<{ label: string; icon: ProfessionalIconName; slot: CleanNeutralIconSlotId; action: () => void; active?: boolean; count?: number }> = [
-    { label: 'My Purchases', icon: 'book-open', slot: 'nav.purchased', action: onNavigateToPurchases, active: true },
-    { label: 'Free Resources', icon: 'gift', slot: 'nav.free', action: onNavigateToFreeProducts },
-    { label: 'Top Rated', icon: 'star', slot: 'home.topRated', action: () => scrollToMobileSection('mobile-top-rated-products') },
-    { label: 'Coupons', icon: 'tag', slot: 'home.coupons', action: () => scrollToMobileSection('mobile-coupons'), count: activeCoupons.length },
-    { label: 'News', icon: 'megaphone', slot: 'nav.news', action: onOpenNews },
-  ];
-
-  return (
-    <div data-clean-neutral-workspace="mobile-home" data-clean-neutral-region="shell.page" className="min-h-[100dvh] bg-[#F8FAFD] px-4 pb-32 pt-4 font-['Roboto','Inter',system-ui,sans-serif] text-[#49454F]">
-      <section data-clean-neutral-region="content.hero" className="relative overflow-hidden rounded-[28px] bg-[linear-gradient(145deg,#F8F0FF_0%,#F0E8FF_30%,#FDF8FF_60%,#FFFBFE_100%)] p-5">
-        <div className="absolute -right-10 -top-10 h-36 w-36 rounded-full bg-[#EADDFF]/40 blur-2xl" />
-        <div className="absolute bottom-0 right-3 h-28 w-28 rounded-full bg-[#D7E3FF]/50 blur-2xl" />
-        <div className="relative grid grid-cols-[1.1fr_0.9fr] gap-2">
-          <div>
-            <span className="inline-flex items-center gap-1 rounded-full border border-[#D7E3FF]/60 bg-white/50 px-3 py-1 text-[11px] font-black uppercase tracking-wider text-[#7C4DFF]">💎 Premium Learning Store</span>
-            <h1 className="mt-4 text-[28px] font-black leading-[1.03] tracking-tight text-[#081A44]">Welcome to Digital Catalyst</h1>
-            <p className="mt-3 text-[14px] font-semibold leading-5 text-[#8B94A7]">Learn, buy and access premium notes, courses and digital products.</p>
-            <div className="mt-4 flex flex-col gap-2">
-              <LiquidMetalButton tone="blue" type="button" onClick={onNavigateToAllProducts} className="rounded-full px-4 py-3 text-sm font-black">🛍️ Explore Products</LiquidMetalButton>
-              <button type="button" onClick={onNavigateToPurchases} className="rounded-full border border-[#D8E6FF] bg-white/60 px-4 py-3 text-sm font-black text-[#49454F]">📄 My Purchases</button>
-            </div>
-          </div>
-          <div className="relative flex items-center justify-center">
-            <div className="relative h-40 w-full rounded-[26px] bg-white/30">
-              <div className="absolute left-3 top-8 h-20 w-20 rotate-[-10deg] rounded-2xl bg-gradient-to-br from-[#071742] to-[#0B63FF] shadow-xl"><span className="absolute left-3 top-3 text-4xl">🎓</span></div>
-              <div className="absolute bottom-6 right-2 h-24 w-20 rotate-6 rounded-2xl bg-gradient-to-br from-[#7C4DFF] to-[#DCCBFF] p-2 shadow-xl"><div className="h-full rounded-xl bg-white/30" /><span className="absolute bottom-2 left-4 text-3xl">📚</span></div>
-              <div className="absolute right-8 top-2 h-16 w-14 -rotate-6 rounded-xl bg-white p-2 shadow-lg"><div className="h-1.5 rounded bg-[#0B63FF]/50" /><div className="mt-2 h-1.5 rounded bg-[#D8E6FF]" /><div className="mt-2 h-1.5 rounded bg-[#D8E6FF]" /></div>
-              <svg className="absolute bottom-2 left-6 h-8 w-16 text-[#0B63FF]/25" viewBox="0 0 64 32" fill="none" stroke="currentColor" strokeWidth="2"><path d="M4 16c4-8 8-8 12 0s8 8 12 0 8-8 12 0 8 8 12 0" /></svg>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <section className="mt-5">
-        <label className="flex items-center gap-3 rounded-2xl border border-[#D0D5DD] bg-[#F0F2F5] px-4 py-3.5 shadow-[inset_0_2px_4px_rgba(0,0,0,0.06)] focus-within:border-[#0B63FF] focus-within:bg-white focus-within:shadow-none focus-within:ring-4 focus-within:ring-blue-100">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 shrink-0 text-[#667085]" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="7" /><path strokeLinecap="round" d="M20.5 20.5l-4.35-4.35" /></svg>
-          <input value={searchQuery} readOnly onFocus={() => setIsMobileSearchOpen(true)} onClick={() => setIsMobileSearchOpen(true)} placeholder="Search notes, courses, resources..." aria-label="Open product search" className="min-w-0 flex-1 cursor-pointer bg-transparent text-[15px] font-bold text-[#344054] outline-none placeholder:text-[#98A2B3]" />
-          <button type="button" onClick={() => setIsMobileSearchOpen(true)} aria-label="Voice search" className="shrink-0 text-[#667085]">
-            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.8}><path strokeLinecap="round" strokeLinejoin="round" d="M12 1a3 3 0 013 3v8a3 3 0 01-6 0V4a3 3 0 013-3z" /><path strokeLinecap="round" strokeLinejoin="round" d="M19 10v2a7 7 0 01-14 0v-2" /><line x1="12" y1="19" x2="12" y2="23" /><line x1="8" y1="23" x2="16" y2="23" /></svg>
-          </button>
-        </label>
-      </section>
-
-      <nav data-clean-neutral-region="shell.navigation" className="-mx-4 mt-4 flex gap-2 overflow-x-auto px-4 pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-        {chips.map(chip => <button key={chip.label} type="button" onClick={chip.action} className={`shrink-0 rounded-full px-4 py-2.5 text-[13px] font-black ${chip.active ? 'bg-[#EEF6FF] text-[#0B63FF]' : 'bg-[#F2F4F7] text-[#667085]'}`}><ProfessionalIcon slot={chip.slot} fallbackName={chip.icon} label={`${chip.label}${chip.count ? ` (${chip.count})` : ''}`} defaultDisplayMode="icon-with-text" defaultPosition="left" size={14} /></button>)}
-      </nav>
-
-      <section className="mt-5"><SectionHead title="Continue Learning" subtitle="Access your purchased products instantly." onViewAll={onNavigateToPurchases} />
-        {ownedPreview ? <article className={`${mobilePurchaseCardRoundClass} border border-[#D8E6FF] bg-white p-3 shadow-[0_18px_50px_rgba(11,99,255,0.10)]`}><div className="flex gap-3"><div className={`h-28 w-28 shrink-0 overflow-hidden ${mobilePurchaseMediaRoundClass}`}><ProductCover product={ownedPreview} slot="purchaseSquare" priority /></div><div className="min-w-0 flex-1"><div className="flex items-center justify-between"><span className={`${productBadgeRoundClass} bg-[#E9F8F0] px-2 py-1 text-[10px] font-black text-[#16B364]`}>Purchased</span><button className="text-[#64708F]">⋯</button></div><h3 className="mt-2 line-clamp-1 text-base font-black text-[#081A44]">{ownedPreview.title}</h3><p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[#64708F]">{ownedPreview.description}</p><p className="mt-2 text-[11px] font-black text-[#0B63FF]">{progressFor(ownedPreview)}% Completed</p><div className="mt-1 h-2 rounded-full bg-[#EEF6FF]"><div className="h-full rounded-full bg-[#0B63FF]" style={{ width: `${progressFor(ownedPreview)}%` }} /></div><button onClick={() => onViewPurchasedProduct(ownedPreview)} className={`mt-3 ${productActionButtonRoundClass} bg-[#081A44] px-3 py-2 text-xs font-black text-white`}>Access Files</button></div></div></article> : <div className="rounded-[26px] border border-dashed border-[#BFD7FF] bg-white/78 p-5 text-center shadow-[0_18px_50px_rgba(11,99,255,0.08)]"><p className="text-3xl">📚</p><h3 className="mt-2 text-lg font-black text-[#081A44]">No purchases yet</h3><p className="mt-1 text-sm font-semibold text-[#64708F]">Start with a premium course or free resource.</p><button onClick={onNavigateToAllProducts} className="mt-4 rounded-2xl bg-[#0B63FF] px-5 py-3 text-sm font-black text-white">Explore Products</button></div>}
-      </section>
-
-      {topPreview.length > 0 && <section id="mobile-top-rated-products" className="mt-7 scroll-mt-24"><SectionHead title="Top Rated Products" onViewAll={onNavigateToAllProducts} /><div className="grid grid-cols-2 gap-3">{topPreview.map(product => <article key={product.id} className={`${mobileHomePreviewTileRoundClass} border border-[#D8E6FF] bg-white p-2.5 shadow-[0_16px_42px_rgba(11,99,255,0.09)]`}><div className={`relative aspect-square overflow-hidden ${mobileHomeTopMediaRoundClass}`}><ProductCover product={product} compact slot="homeTopRated" />{purchasedProductIds.includes(product.id) && <span className={`absolute left-2 top-2 z-20 ${productBadgeRoundClass} border border-emerald-300/70 bg-white/95 px-2.5 py-1 text-[9px] font-black uppercase tracking-[0.08em] text-emerald-700 shadow`}>Purchased</span>}<button onClick={() => onToggleWishlist(product.id)} className={`absolute right-2 top-2 grid h-8 w-8 place-items-center ${productBadgeRoundClass} bg-white/90 shadow`}>{wishlist.includes(product.id) ? '❤️' : '♡'}</button></div><h3 className="mt-2 line-clamp-2 min-h-9 text-sm font-black leading-tight text-[#081A44]">{product.title}</h3><p className="mt-1 text-[11px] font-bold text-[#64708F]">⭐ <span className="text-[#FFB020]">{product.rating.toFixed(1)}</span> ({product.reviewCount})</p><div className="mt-2 flex items-center justify-between"><span className="font-black text-[#081A44]">{currency(product)}</span><button onClick={() => onViewProduct(product)} className={`${productActionButtonRoundClass} bg-[#EEF6FF] px-3 py-1.5 text-xs font-black text-[#0B63FF]`}>View</button></div></article>)}</div></section>}
-
-      <section id="mobile-coupons" className="mt-7 scroll-mt-24"><SectionHead title="Coupons" subtitle="Apply active offers during checkout." onViewAll={onNavigateToAllProducts} /><div className="space-y-3">{activeCoupons.length > 0 ? activeCoupons.map(coupon => <article key={coupon.id} className="flex items-center justify-between gap-3 rounded-[24px] border border-[#D8E6FF] bg-white p-4 shadow-[0_14px_36px_rgba(11,99,255,0.08)]"><div><p className="text-[11px] font-black uppercase tracking-[0.16em] text-[#0B63FF]">Active Coupon</p><h3 className="mt-1 text-lg font-black text-[#081A44]">{coupon.code}</h3><p className="mt-1 text-xs font-bold text-[#64708F]">{coupon.type === 'percentage' ? `${coupon.value}% off` : `₹${coupon.value} off`} • valid till {coupon.expiryDate || 'checkout'}</p></div><button type="button" onClick={onNavigateToAllProducts} className="shrink-0 rounded-2xl bg-[#EEF6FF] px-4 py-2 text-xs font-black text-[#0B63FF]">Use</button></article>) : <div className="rounded-[24px] border border-dashed border-[#BFD7FF] bg-white/78 p-5 text-center font-bold text-[#64708F]">No active coupons right now.</div>}</div></section>
-
-      <section className="mt-7"><SectionHead title="All Products" subtitle="Browse all premium learning products." onViewAll={onNavigateToAllProducts} /><div className="space-y-3">{allPreview.length > 0 ? allPreview.map(product => <article key={product.id} className={`relative ${mobileHomePreviewCardRoundClass} border border-[#D8E6FF] bg-white p-3 shadow-[0_16px_42px_rgba(11,99,255,0.08)]`}><button onClick={() => onToggleWishlist(product.id)} className={`absolute right-4 top-4 z-30 grid h-9 w-9 place-items-center ${productBadgeRoundClass} bg-white/90 shadow`}>{wishlist.includes(product.id) ? '❤️' : '♡'}</button><div className="flex gap-3"><div className={`relative w-24 shrink-0 overflow-hidden ${mobileHomePreviewMediaRoundClass} aspect-[6/7]`}><ProductCover product={product} slot="homeList" /><button type="button" onClick={() => onViewProduct(product)} aria-label={`Open ${product.title}`} className="absolute inset-0 z-10 focus-visible:outline focus-visible:outline-4 focus-visible:outline-offset-[-4px] focus-visible:outline-[#0B63FF]" /></div><div className="min-w-0 flex-1 pr-10"><div className="flex max-w-full flex-wrap items-center gap-2 overflow-visible pb-0.5">{purchasedProductIds.includes(product.id) ? (<span className={`inline-flex max-w-full shrink-0 items-center ${productBadgeRoundClass} border border-emerald-300/70 bg-emerald-500/15 px-2.5 py-1 text-[9px] font-black uppercase leading-none tracking-[0.08em] text-emerald-700 shadow-[0_6px_16px_rgba(5,150,105,0.16)] ring-1 ring-emerald-100/80`}>Purchased</span>) : (<span className={`inline-flex max-w-full items-center ${productBadgeRoundClass} border border-emerald-300/70 bg-emerald-500/15 px-2.5 py-1 text-[10px] font-black leading-none text-emerald-700 shadow-[0_6px_16px_rgba(5,150,105,0.16)] ring-1 ring-emerald-100/80`}>{product.category || 'Learning'}</span>)}</div><h3 className="mt-2 line-clamp-1 text-base font-black text-[#081A44]"><button type="button" onClick={() => onViewProduct(product)} className="block w-full truncate text-left focus-visible:rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#0B63FF]">{product.title}</button></h3><p className="mt-1 line-clamp-2 text-xs font-semibold leading-5 text-[#64708F]">{product.description}</p><div className="mt-2 flex items-center justify-between"><p className="text-[11px] font-bold text-[#64708F]">⭐ <span className="text-[#FFB020]">{product.rating.toFixed(1)}</span> ({product.reviewCount})</p><span className="font-black text-[#081A44]">{currency(product)}</span></div><button onClick={() => onViewProduct(product)} className={`mt-2 ${productActionButtonRoundClass} bg-[#0B63FF] px-3 py-2 text-xs font-black text-white`}>View Details</button></div></div></article>) : <div className="rounded-[24px] border border-[#D8E6FF] bg-white p-5 text-center font-bold text-[#64708F]">No products found. Try another search.</div>}</div></section>
-
-      {isMobileSearchOpen ? <MobileProductSearchPage source="home" products={visibleProducts} query={searchQuery} onQueryChange={setSearchQuery} onClose={() => setIsMobileSearchOpen(false)} onViewProduct={(product) => onViewProduct(product)} wishlist={wishlist} onToggleWishlist={onToggleWishlist} purchasedProductIds={purchasedProductIds} /> : null}
-    </div>
-  );
-};
-
-export default MobileAppHome;
+}

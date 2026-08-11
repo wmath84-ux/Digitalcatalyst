@@ -6557,29 +6557,24 @@ const App: React.FC = () => {
         />
       );
       case 'home': default: return (
-        <>
-          <div className="md:hidden">
-            <MobileAppHome
-              settings={websiteSettings}
-              currentUser={appUser}
-              isLoggedIn={isLoggedIn}
-              purchasedProducts={purchasedProducts}
-              topRatedProducts={topRatedProducts}
-              visibleProducts={visibleProducts}
-              purchasedProductIds={purchasedProductIds}
-              wishlist={wishlist}
-              coupons={coupons}
-              onViewPurchasedProduct={handleViewPurchasedProduct}
-              onViewProduct={handleViewProduct}
-              onToggleWishlist={handleToggleWishlist}
-              onNavigateToAllProducts={handleNavigateToAllProducts}
-              onNavigateToPurchases={handleNavigateToPurchases}
-              onNavigateToFreeProducts={handleNavigateToFreeProducts}
-              onOpenNews={() => openReadingHub('news')}
-            />
-          </div>
-          <div className="hidden md:block">{renderHomePageContent()}</div>
-        </>
+        <MobileAppHome
+          settings={websiteSettings}
+          currentUser={appUser}
+          isLoggedIn={isLoggedIn}
+          purchasedProducts={purchasedProducts}
+          topRatedProducts={topRatedProducts}
+          visibleProducts={visibleProducts}
+          purchasedProductIds={purchasedProductIds}
+          wishlist={wishlist}
+          coupons={coupons}
+          onViewPurchasedProduct={handleViewPurchasedProduct}
+          onViewProduct={handleViewProduct}
+          onToggleWishlist={handleToggleWishlist}
+          onNavigateToAllProducts={handleNavigateToAllProducts}
+          onNavigateToPurchases={handleNavigateToPurchases}
+          onNavigateToFreeProducts={handleNavigateToFreeProducts}
+          onOpenNews={() => openReadingHub('news')}
+        />
       );
     }
   };
@@ -6817,10 +6812,10 @@ const App: React.FC = () => {
               </button>
             )}
             <div className={`mobile-site-header ${mobileAppChromeViews.has(currentView) || currentView === 'mayDay' ? 'hidden md:block' : ''}`}><Header settings={websiteSettings} rememberedAccount={rememberedAuthAccount} wishlistCount={wishlist.length} cartItemCount={cartItemCount} cartToastMessage={cartToastMessage} notificationCount={siteNotifications.filter(notification => !notification.read).length} onOpenNotifications={openSiteNotificationCenter} onCartClick={openCartSidebar} onHomeClick={handleBackToHome} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToPurchases={handleNavigateToPurchases} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToProfile={handleNavigateToProfile} onNavigateToHomeAndScroll={handleNavigateToHomeAndScroll} currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} onLogout={handleLogout} onAuthClick={openAuthPage} activeTheme={activeTheme} onThemeChange={setActiveTheme} /></div>
-            {mobileAppChromeViews.has(currentView) && (
+            {currentView !== 'home' && mobileAppChromeViews.has(currentView) && (
               <MobileTopBar currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} rememberedAccount={rememberedAuthAccount} cartCount={cartItemCount} notificationCount={siteNotifications.filter(notification => !notification.read).length} currentView={currentView} onHomeClick={handleBackToHome} onNavigateToSubscriptions={handleNavigateToSubscription} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToFreeProducts={handleNavigateToFreeProducts} onOpenNews={() => openReadingHub('news')} onOpenBlog={() => openReadingHub('blog')} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} onCartClick={openCartSidebar} onOpenNotifications={openSiteNotificationCenter} onProfileClick={handleNavigateToProfile} onAuthClick={openAuthPage} onLogout={handleLogout} />
             )}
-            {currentView !== 'admin' && currentView !== 'adminLogin' && (
+            {currentView !== 'admin' && currentView !== 'adminLogin' && currentView !== 'home' && (
               <div className={`${shouldHideMainDockOnMobile ? 'max-md:hidden' : ''} ${useDesktopSidebar ? 'lg:hidden' : ''}`}>
                 <BottomGlassDock currentUser={effectiveAppUser} isLoggedIn={isLoggedIn} purchasedProducts={purchasedProducts} cartCount={cartItemCount} wishlistCount={wishlist.length} dockBadgeCounts={dockActivity.badgeCounts} dockGlowItems={dockActivity.glowItems} activeItem={desktopSidebarActiveItem} onHomeClick={handleBackToHome} onOpenBlogModal={() => openReadingHub('blog')} onOpenFreeModal={handleNavigateToFreeProducts} onOpenAnnouncementsModal={() => openReadingHub('news')} onNavigateToAllProducts={handleNavigateToAllProducts} onNavigateToWishlist={handleNavigateToWishlist} onNavigateToPurchases={handleNavigateToPurchases} onCartClick={openCartSidebar} onProfileClick={handleNavigateToProfile} isAdmin={isPrimaryAdminUser(currentAdminUser)} onAdminClick={handleNavigateToAdminLogin} authButtonLabel={authButtonLabel} onSubscriptionClick={handleNavigateToSubscription} onOpenMayDay={handleNavigateToMayDay} onOpenCommunity={() => { setCurrentView('community'); window.scrollTo(0, 0); }} />
               </div>

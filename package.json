@@ -15,10 +15,12 @@
   },
   "dependencies": {
     "@google/genai": "^0.15.0",
+    "clsx": "^2.1.1",
     "firebase": "^12.6.0",
     "firebase-admin": "^14.2.0",
     "react": "^19.2.0",
     "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.6.0",
     "web-push": "^3.6.7"
   },
   "devDependencies": {
