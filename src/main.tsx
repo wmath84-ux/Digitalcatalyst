@@ -235,6 +235,9 @@ function Root() {
         onNavigateToProfile={() => {
           window.location.hash = PROFILE_HASH;
         }}
+        onNavigateToPurchases={() => {
+          window.location.hash = FAVORITES_HASH;
+        }}
       />
     );
   }
@@ -320,6 +323,9 @@ function Root() {
       }}
       onNavigateToProfile={() => {
         window.location.hash = PROFILE_HASH;
+      }}
+      onNavigateToPurchases={() => {
+        window.location.hash = FAVORITES_HASH;
       }}
     />
   );

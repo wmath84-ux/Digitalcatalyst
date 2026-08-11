@@ -4,6 +4,7 @@ interface ContinueLearningProps {
   image: string;
   progress: number;
   onResume: () => void;
+  onClick?: () => void;
 }
 
 export default function ContinueLearning({
@@ -12,6 +13,7 @@ export default function ContinueLearning({
   image,
   progress,
   onResume,
+  onClick,
 }: ContinueLearningProps) {
   const isComplete = progress >= 100;
 
@@ -22,7 +24,11 @@ export default function ContinueLearning({
         <span className="text-xs font-semibold text-indigo-600">{Math.round(progress)}% done</span>
       </div>
 
-      <div className="mt-3 flex items-center gap-3 rounded-2xl bg-white p-3 shadow-sm shadow-slate-200 ring-1 ring-slate-100">
+      <button
+        type="button"
+        onClick={onClick || onResume}
+        className="mt-3 flex w-full items-center gap-3 rounded-2xl bg-white p-3 text-left shadow-sm shadow-slate-200 ring-1 ring-slate-100 transition active:scale-[0.98]"
+      >
         <div className="relative h-16 w-16 flex-shrink-0 overflow-hidden rounded-xl bg-slate-100">
           <img src={image} alt={title} className="h-full w-full object-cover" />
         </div>
@@ -40,7 +46,7 @@ export default function ContinueLearning({
 
         <button
           type="button"
-          onClick={onResume}
+          onClick={(e) => { e.stopPropagation(); onResume(); }}
           disabled={isComplete}
           className={`flex-shrink-0 rounded-full px-4 py-2 text-xs font-bold shadow-sm transition active:scale-95 ${
             isComplete
@@ -50,7 +56,7 @@ export default function ContinueLearning({
         >
           {isComplete ? "Completed ✓" : "Resume ▶"}
         </button>
-      </div>
+      </button>
     </section>
   );
 }

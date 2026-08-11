@@ -11,20 +11,27 @@ interface FeedScreenProps {
   onOpenStory: (storyId: string) => void;
   onCreateStory: () => void;
   onOpenTag: (tag: string) => void;
+  onOpenAI: () => void;
   unreadCount: number;
   unreadChatCount: number;
 }
 
 const BellIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2}>
+  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
     <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" strokeLinecap="round" strokeLinejoin="round" />
     <path d="M13.7 21a2 2 0 0 1-3.4 0" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
 const ChatIcon = () => (
-  <svg viewBox="0 0 24 24" className="h-6 w-6" fill="none" stroke="currentColor" strokeWidth={2}>
+  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth={2}>
     <path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5 8.4 8.4 0 0 1-3.9-.9L3 20l1-5.4A8.5 8.5 0 1 1 21 11.5Z" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+const AIIcon = () => (
+  <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth={2.2}>
+    <path d="M12 2L13.09 8.26L18 6L14.74 10.91L21 12L14.74 13.09L18 18L13.09 15.74L12 22L10.91 15.74L6 18L9.26 13.09L3 12L9.26 10.91L6 6L10.91 8.26L12 2Z" strokeLinecap="round" strokeLinejoin="round" />
   </svg>
 );
 
@@ -36,6 +43,7 @@ export default function FeedScreen({
   onOpenStory,
   onCreateStory,
   onOpenTag,
+  onOpenAI,
   unreadCount,
   unreadChatCount,
 }: FeedScreenProps) {
@@ -47,7 +55,14 @@ export default function FeedScreen({
         <h1 className="bg-gradient-to-r from-fuchsia-600 to-orange-500 bg-clip-text text-xl font-extrabold text-transparent">
           Pulse
         </h1>
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-2">
+          <button
+            onClick={onOpenAI}
+            className="flex h-8 w-8 items-center justify-center rounded-xl bg-gradient-to-br from-violet-600 to-indigo-600 text-white shadow-sm shadow-violet-200 active:scale-95 transition"
+            aria-label="AI Mentor"
+          >
+            <AIIcon />
+          </button>
           <button onClick={onOpenChats} className="relative text-slate-700">
             <ChatIcon />
             {unreadChatCount > 0 && (
