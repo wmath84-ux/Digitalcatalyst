@@ -223,3 +223,24 @@ body {
 html, body {
   overscroll-behavior: none;
 }
+
+/* Keep nested mobile scrollers from handing their momentum to the page. */
+html,
+body,
+#root {
+  overscroll-behavior: none;
+}
+
+.custom-scrollbar,
+.hide-scrollbar,
+[class~="overflow-y-auto"],
+[class~="overflow-auto"] {
+  overscroll-behavior-y: contain;
+  -webkit-overflow-scrolling: touch;
+}
+
+.no-scrollbar,
+[class~="overflow-x-auto"] {
+  overscroll-behavior-x: contain;
+  -webkit-overflow-scrolling: touch;
+}
