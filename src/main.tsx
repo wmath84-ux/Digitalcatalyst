@@ -1,6 +1,7 @@
 import { StrictMode, useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
+import "./landing.css";
 import StoreApp from "./App";
 import HomeApp from "./home/App";
 import PdpApp from "./PdpApp";
@@ -11,6 +12,9 @@ import CoursePlayerApp from "./CoursePlayerApp";
 import CommunityApp from "./community/App";
 import CartWishlistApp from "./CartWishlistApp";
 import SubscriptionApp from "./subscription/App";
+import LandingApp from "./LandingApp";
+import AuthApp from "./AuthApp";
+import { AuthProvider, useAuth } from "./context/AuthContext";
 import { PRODUCTS as CART_PRODUCTS } from "./cartWishlist/data/products";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
 import { products as STORE_PRODUCTS } from "./data/products";
@@ -22,6 +26,14 @@ import {
   type UserProfile,
 } from "./data/checkoutData";
 
+if ("serviceWorker" in navigator) {
+  window.addEventListener("load", () => {
+    void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
+  });
+}
+
+const LANDING_HASH = "#/landing";
+const AUTH_HASH = "#/auth";
 const STORE_HASH = "#/store";
 const PRODUCT_HASH = "#/product/";
 const CHECKOUT_HASH = "#/checkout";
@@ -71,6 +83,7 @@ function applyCheckoutContext(context: CheckoutContext) {
 }
 
 function Root() {
+  const { user } = useAuth();
   const [hash, setHash] = useState(() => window.location.hash);
   const [cartIds, setCartIds] = useState<Set<string>>(new Set(INITIAL_CART));
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set(INITIAL_FAVORITES));
@@ -156,6 +169,10 @@ function Root() {
     if (tab === "cart") window.location.hash = CART_HASH;
   };
 
+  const redirectToAuth = (returnHash: string) => {
+    window.location.hash = `${AUTH_HASH}?mode=login&return=${encodeURIComponent(returnHash)}`;
+  };
+
   const navigateToProduct = (product: NavigableProduct) => {
     sessionStorage.setItem("selectedProduct", JSON.stringify(product));
     window.location.hash = `${PRODUCT_HASH}${encodeURIComponent(product.id)}`;
@@ -167,6 +184,12 @@ function Root() {
   };
 
   const navigateToCheckout = (finalPrice: number) => {
+    if (!user) {
+      sessionStorage.setItem("pendingCheckoutPrice", String(finalPrice));
+      redirectToAuth(window.location.hash || PRODUCT_HASH);
+      return;
+    }
+
     const context: CheckoutContext = {
       product: {
         id: "neuralearn-pro-2026",
@@ -181,7 +204,13 @@ function Root() {
         rating: pdpProduct.rating,
         totalRatings: pdpProduct.ratingCount,
       },
-      user: { ...checkoutUser },
+      user: {
+        ...checkoutUser,
+        id: String(user.id),
+        name: user.name,
+        email: user.email,
+        eduCoins: user.coins,
+      },
     };
     applyCheckoutContext(context);
     sessionStorage.setItem(CHECKOUT_CONTEXT_KEY, JSON.stringify(context));
@@ -190,6 +219,9 @@ function Root() {
 
   const cartProducts = SHOPPING_PRODUCTS.filter((product) => cartIds.has(product.id));
   const favoriteProducts = SHOPPING_PRODUCTS.filter((product) => favoriteIds.has(product.id));
+
+  if (!hash || hash.startsWith(LANDING_HASH)) return <LandingApp />;
+  if (hash.startsWith(AUTH_HASH)) return <AuthApp />;
 
   if (hash.startsWith(CART_HASH) || hash.startsWith(FAVORITES_HASH)) {
     return (
@@ -207,6 +239,11 @@ function Root() {
         onAddToCart={handleAddToCart}
         onCheckoutComplete={handleCheckoutComplete}
         onNavigate={handleShoppingNavigation}
+        onRequireAuth={() => {
+          if (user) return true;
+          redirectToAuth(CART_HASH);
+          return false;
+        }}
       />
     );
   }
@@ -273,6 +310,8 @@ function Root() {
 
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
-    <Root />
+    <AuthProvider>
+      <Root />
+    </AuthProvider>
   </StrictMode>,
 );

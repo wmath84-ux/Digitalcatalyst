@@ -18,6 +18,7 @@ interface CartWishlistAppProps {
   onAddToCart: (id: string) => void;
   onCheckoutComplete: (coinsUsed: number) => void;
   onNavigate: (tab: TabKey) => void;
+  onRequireAuth: () => boolean;
 }
 
 export default function CartWishlistApp({
@@ -34,6 +35,7 @@ export default function CartWishlistApp({
   onAddToCart,
   onCheckoutComplete,
   onNavigate,
+  onRequireAuth,
 }: CartWishlistAppProps) {
   return (
     <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-slate-50 font-[system-ui]">
@@ -66,6 +68,7 @@ export default function CartWishlistApp({
             userCoins={userCoins}
             onCheckoutComplete={onCheckoutComplete}
             onNavigate={onNavigate}
+            onRequireAuth={onRequireAuth}
           />
         )}
       </div>

@@ -15,6 +15,7 @@ import { COURSES } from "../data/courses";
 import { FEATURES } from "../data/features";
 import { SHOWCASE_CARDS } from "../data/showcase";
 import type { BillingCycle } from "../types";
+import { useAuth } from "../../context/AuthContext";
 
 const BASE_MONTHLY = 4.99;
 const BASE_YEARLY = 29.99;
@@ -32,6 +33,8 @@ const REFERRALS: Record<string, { flat: number; label: string }> = {
 };
 
 export default function SubscriptionPage() {
+  const { user } = useAuth();
+
   // Billing
   const [cycle, setCycle] = useState<BillingCycle>("yearly");
 
@@ -141,6 +144,10 @@ export default function SubscriptionPage() {
   };
 
   const handleSubscribe = () => {
+    if (!user) {
+      window.location.hash = `#/auth?mode=login&return=${encodeURIComponent("#/subscription")}`;
+      return;
+    }
     setIsSubscribing(true);
     window.setTimeout(() => {
       setIsSubscribing(false);

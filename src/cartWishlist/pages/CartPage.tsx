@@ -13,6 +13,7 @@ interface CartPageProps {
   userCoins: number;
   onCheckoutComplete: (coinsUsed: number) => void;
   onNavigate: (tab: TabKey) => void;
+  onRequireAuth?: () => boolean;
 }
 
 const COIN_VALUE = 1; // ₹1 per EduCoin
@@ -25,6 +26,7 @@ export default function CartPage({
   userCoins,
   onCheckoutComplete,
   onNavigate,
+  onRequireAuth,
 }: CartPageProps) {
   const [useEduCoins, setUseEduCoins] = useState(false);
   const [coinsToRedeem, setCoinsToRedeem] = useState(0);
@@ -61,6 +63,7 @@ export default function CartPage({
   const totalSavings = itemSavings + coinsDiscount;
 
   const handleCheckout = () => {
+    if (onRequireAuth && !onRequireAuth()) return;
     setLastOrder({
       amount: finalTotal,
       coins: effectiveCoins,
