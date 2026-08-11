@@ -4,17 +4,23 @@ import BottomNav, { type TabKey } from "./components/BottomNav";
 import StorePage from "./components/StorePage";
 import { HomeTab, MyDayTab, PurchasesTab, WalletTab } from "./components/OtherTabs";
 import type { Product } from "./data/products";
+import { loadPurchasedCourses } from "./utils/purchasedCourses";
 
 type AppProps = {
   onNavigateToProduct: (product: Product) => void;
   onNavigateToMyDay: () => void;
   onNavigateToProfile: () => void;
+  onNavigateToCourse: (course: { id: string; title: string }) => void;
 };
 
-export default function App({ onNavigateToProduct, onNavigateToMyDay, onNavigateToProfile }: AppProps) {
-  const [activeTab, setActiveTab] = useState<TabKey>("store");
+export default function App({ onNavigateToProduct, onNavigateToMyDay, onNavigateToProfile, onNavigateToCourse }: AppProps) {
+  const [activeTab, setActiveTab] = useState<TabKey>(() =>
+    window.location.hash.startsWith("#/store/purchases") ? "purchases" : "store"
+  );
   const [wishlist, setWishlist] = useState<Set<string>>(new Set());
-  const [purchased, setPurchased] = useState<Set<string>>(new Set());
+  const [purchased, setPurchased] = useState<Set<string>>(
+    () => new Set(loadPurchasedCourses().map((item) => item.id))
+  );
   const [cartCount] = useState(0);
   const [toast, setToast] = useState<string | null>(null);
 
@@ -61,7 +67,9 @@ export default function App({ onNavigateToProduct, onNavigateToMyDay, onNavigate
               onView={onNavigateToProduct}
             />
           )}
-          {activeTab === "purchases" && <PurchasesTab purchased={purchased} />}
+          {activeTab === "purchases" && (
+            <PurchasesTab purchased={purchased} onOpenCourse={onNavigateToCourse} />
+          )}
           {activeTab === "wallet" && <WalletTab wishlistCount={wishlist.size} />}
         </main>
 

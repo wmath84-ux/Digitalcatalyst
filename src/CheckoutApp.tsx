@@ -42,6 +42,8 @@ export default function App() {
       emoji: product.thumbnail,
       progress: 0,
       purchasedAt: Date.now(),
+      instructor: product.instructor,
+      image: '/images/hero-main.jpg',
     });
     setTransaction(txn);
     setCurrentStep(3);

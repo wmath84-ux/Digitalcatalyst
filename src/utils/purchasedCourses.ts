@@ -5,6 +5,8 @@ export interface PersistedPurchasedCourse {
   emoji: string;
   progress: number;
   purchasedAt: number;
+  instructor?: string;
+  image?: string;
 }
 
 const PURCHASED_COURSES_KEY = "eduvora_purchased_courses";

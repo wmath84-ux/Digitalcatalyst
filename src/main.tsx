@@ -53,6 +53,11 @@ function Root() {
     window.location.hash = `${PRODUCT_HASH}${encodeURIComponent(product.id)}`;
   };
 
+  const navigateToCourse = (course: { id: string; title: string }) => {
+    sessionStorage.setItem("selectedCourse", JSON.stringify({ courseId: course.id, title: course.title }));
+    window.location.hash = `${COURSE_HASH}${encodeURIComponent(course.id)}`;
+  };
+
   const navigateToCheckout = (finalPrice: number) => {
     const context: CheckoutContext = {
       product: {
@@ -101,6 +106,7 @@ function Root() {
         onNavigateToProfile={() => {
           window.location.hash = PROFILE_HASH;
         }}
+        onNavigateToCourse={navigateToCourse}
       />
     );
   }

@@ -1,5 +1,6 @@
 import { products, type Product } from "../data/products";
 import { BagIcon, CalendarIcon, HeartIcon, HomeIcon, WalletIcon } from "./icons";
+import { loadPurchasedCourses } from "../utils/purchasedCourses";
 
 export function HomeTab() {
   return (
@@ -29,8 +30,32 @@ export function MyDayTab() {
   );
 }
 
-export function PurchasesTab({ purchased }: { purchased: Set<string> }) {
-  const items: Product[] = products.filter((p) => purchased.has(p.id));
+export function PurchasesTab({
+  purchased,
+  onOpenCourse,
+}: {
+  purchased: Set<string>;
+  onOpenCourse: (course: { id: string; title: string }) => void;
+}) {
+  const persistedItems: Product[] = loadPurchasedCourses().map((item) => ({
+    id: item.id,
+    title: item.title,
+    instructor: item.instructor || "Eduvora Academy",
+    image: item.image || "/images/hero-main.jpg",
+    category: item.type === "PDF" ? "PDF" : "Course",
+    classLevel: "Lifetime Access",
+    subject: "Purchased",
+    tags: [],
+    rating: 0,
+    reviews: 0,
+    originalPrice: 0,
+    price: 0,
+  }));
+  const persistedIds = new Set(persistedItems.map((item) => item.id));
+  const items: Product[] = [
+    ...persistedItems,
+    ...products.filter((product) => purchased.has(product.id) && !persistedIds.has(product.id)),
+  ];
 
   if (items.length === 0) {
     return (
@@ -52,6 +77,7 @@ export function PurchasesTab({ purchased }: { purchased: Set<string> }) {
       {items.map((item) => (
         <div
           key={item.id}
+          onClick={() => onOpenCourse({ id: item.id, title: item.title })}
           className="flex items-center gap-3 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm"
         >
           <img src={item.image} alt={item.title} className="h-16 w-24 shrink-0 rounded-xl object-cover" />

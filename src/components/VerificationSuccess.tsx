@@ -37,7 +37,7 @@ export default function VerificationSuccess({
       productName: product.name,
     });
     sessionStorage.setItem('selectedCourse', JSON.stringify({ courseId: product.id, title: product.name }));
-    window.location.hash = `#/course/${encodeURIComponent(product.id)}`;
+    window.location.hash = '#/store/purchases';
   };
 
   const handleDownloadReceipt = () => {
