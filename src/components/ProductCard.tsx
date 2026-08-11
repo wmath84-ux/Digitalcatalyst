@@ -7,6 +7,7 @@ type ProductCardProps = {
   purchased: boolean;
   onToggleWishlist: (id: string) => void;
   onBuy: (product: Product) => void;
+  onView: (product: Product) => void;
 };
 
 export default function ProductCard({
@@ -15,13 +16,17 @@ export default function ProductCard({
   purchased,
   onToggleWishlist,
   onBuy,
+  onView,
 }: ProductCardProps) {
   const discount = product.originalPrice > 0
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
 
   return (
-    <div className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md">
+    <div
+      onClick={() => onView(product)}
+      className="flex flex-col overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm transition hover:-translate-y-0.5 hover:shadow-md"
+    >
       <div className="relative aspect-[16/10] w-full overflow-hidden bg-slate-100">
         <img src={product.image} alt={product.title} className="h-full w-full object-cover" />
 
@@ -46,7 +51,10 @@ export default function ProductCard({
         <button
           type="button"
           aria-label="Toggle wishlist"
-          onClick={() => onToggleWishlist(product.id)}
+          onClick={(event) => {
+            event.stopPropagation();
+            onToggleWishlist(product.id);
+          }}
           className="absolute right-2 top-2 flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-slate-500 shadow transition hover:scale-105 active:scale-95"
         >
           <HeartIcon

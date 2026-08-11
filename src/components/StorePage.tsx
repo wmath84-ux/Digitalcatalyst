@@ -11,9 +11,10 @@ type StorePageProps = {
   purchased: Set<string>;
   onToggleWishlist: (id: string) => void;
   onBuy: (product: Product) => void;
+  onView: (product: Product) => void;
 };
 
-export default function StorePage({ wishlist, purchased, onToggleWishlist, onBuy }: StorePageProps) {
+export default function StorePage({ wishlist, purchased, onToggleWishlist, onBuy, onView }: StorePageProps) {
   const [search, setSearch] = useState("");
   const [activeChip, setActiveChip] = useState("All");
   const [sort, setSort] = useState("Recommended");
@@ -83,6 +84,7 @@ export default function StorePage({ wishlist, purchased, onToggleWishlist, onBuy
               purchased={purchased.has(product.id)}
               onToggleWishlist={onToggleWishlist}
               onBuy={onBuy}
+              onView={onView}
             />
           ))}
         </div>

@@ -5,7 +5,11 @@ import StorePage from "./components/StorePage";
 import { HomeTab, MyDayTab, PurchasesTab, WalletTab } from "./components/OtherTabs";
 import type { Product } from "./data/products";
 
-export default function App() {
+type AppProps = {
+  onNavigateToProduct: (product: Product) => void;
+};
+
+export default function App({ onNavigateToProduct }: AppProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("store");
   const [wishlist, setWishlist] = useState<Set<string>>(new Set());
   const [purchased, setPurchased] = useState<Set<string>>(new Set());
@@ -52,6 +56,7 @@ export default function App() {
               purchased={purchased}
               onToggleWishlist={toggleWishlist}
               onBuy={handleBuy}
+              onView={onNavigateToProduct}
             />
           )}
           {activeTab === "purchases" && <PurchasesTab purchased={purchased} />}

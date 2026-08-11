@@ -12,10 +12,11 @@ import type { Product } from "./types";
 const USER_NAME = "Aarav";
 
 interface AppProps {
-  onNavigateToStore: (product?: Product) => void;
+  onNavigateToStore: () => void;
+  onNavigateToProduct: (product: Product) => void;
 }
 
-export default function App({ onNavigateToStore }: AppProps) {
+export default function App({ onNavigateToStore, onNavigateToProduct }: AppProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [favorites, setFavorites] = useState<Set<string>>(new Set(["p1", "p7"]));
@@ -132,7 +133,7 @@ export default function App({ onNavigateToStore }: AppProps) {
                       product={product}
                       isFavorite={favorites.has(product.id)}
                       onToggleFavorite={toggleFavorite}
-                      onOpen={onNavigateToStore}
+                      onOpen={onNavigateToProduct}
                     />
                   ))}
                 </div>
@@ -167,7 +168,7 @@ export default function App({ onNavigateToStore }: AppProps) {
                       product={product}
                       isFavorite={favorites.has(product.id)}
                       onToggleFavorite={toggleFavorite}
-                      onOpen={onNavigateToStore}
+                      onOpen={onNavigateToProduct}
                     />
                   ))}
                 </div>
@@ -252,7 +253,7 @@ export default function App({ onNavigateToStore }: AppProps) {
                         product={product}
                         isFavorite={favorites.has(product.id)}
                         onToggleFavorite={toggleFavorite}
-                        onOpen={onNavigateToStore}
+                        onOpen={onNavigateToProduct}
                       />
                     ))}
                   </div>
