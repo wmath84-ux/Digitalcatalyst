@@ -8,7 +8,7 @@ import RelatedProducts from "./components/pdp/RelatedProducts";
 import StickyMobileCTA from "./components/pdp/StickyMobileCTA";
 import Footer from "./components/pdp/Footer";
 
-export default function App() {
+export default function App({ onCheckout }: { onCheckout: (finalPrice: number) => void }) {
   return (
     <div className="relative min-h-screen bg-[#F8F9FA] font-sans text-zinc-900 antialiased">
       {/* Ambient background accents */}
@@ -27,7 +27,7 @@ export default function App() {
             <div className="lg:sticky lg:top-20 lg:self-start">
               <Gallery />
             </div>
-            <ProductInfo />
+            <ProductInfo onCheckout={onCheckout} />
           </div>
 
           <div className="mt-14 flex flex-col gap-10">
@@ -40,7 +40,7 @@ export default function App() {
         <Footer />
       </div>
 
-      <StickyMobileCTA />
+      <StickyMobileCTA onCheckout={onCheckout} />
     </div>
   );
 }

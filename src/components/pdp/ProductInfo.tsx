@@ -28,7 +28,7 @@ const licenses = [
   { id: "team", label: "Team License", desc: "Up to 5 users · shared dashboard", multiplier: 2.5 },
 ];
 
-export default function ProductInfo() {
+export default function ProductInfo({ onCheckout }: { onCheckout: (finalPrice: number) => void }) {
   const [license, setLicense] = useState(licenses[0]);
   const discount = Math.round(
     ((product.compareAtPrice - product.price) / product.compareAtPrice) * 100
@@ -148,7 +148,7 @@ export default function ProductInfo() {
         {/* CTAs */}
         <div className="relative mt-5 flex flex-col gap-3">
           <div className="flex gap-3">
-            <button className="group relative flex-1 overflow-hidden rounded-2xl bg-gradient-to-b from-zinc-700 via-zinc-900 to-black px-6 py-3.5 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] transition active:scale-[0.98]">
+            <button onClick={() => onCheckout(Number(finalPrice))} className="group relative flex-1 overflow-hidden rounded-2xl bg-gradient-to-b from-zinc-700 via-zinc-900 to-black px-6 py-3.5 text-sm font-bold text-white shadow-[0_10px_30px_-8px_rgba(0,0,0,0.6)] transition active:scale-[0.98]">
               <span className="absolute inset-0 -translate-x-full bg-gradient-to-r from-transparent via-white/25 to-transparent transition duration-700 group-hover:translate-x-full" />
               <span className="relative flex items-center justify-center gap-2">
                 <Zap className="h-4 w-4 fill-white" /> Buy Now
