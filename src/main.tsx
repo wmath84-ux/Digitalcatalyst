@@ -14,6 +14,7 @@ import CartWishlistApp from "./CartWishlistApp";
 import SubscriptionApp from "./subscription/App";
 import LandingApp from "./LandingApp";
 import AuthApp from "./AuthApp";
+import AiChatApp from "./ai-chat/App";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { PRODUCTS as CART_PRODUCTS } from "./cartWishlist/data/products";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
@@ -45,6 +46,7 @@ const COMMUNITY_HASH = "#/community";
 const CART_HASH = "#/cart";
 const FAVORITES_HASH = "#/favorites";
 const SUBSCRIPTION_HASH = "#/subscription";
+const AI_CHAT_HASH = "#/ai-chat";
 const CHECKOUT_CONTEXT_KEY = "checkoutContext";
 
 const INITIAL_CART = ["p1", "p3"];
@@ -281,6 +283,7 @@ function Root() {
   }
 
   if (hash.startsWith(SUBSCRIPTION_HASH)) return <SubscriptionApp />;
+  if (hash.startsWith(AI_CHAT_HASH)) return <AiChatApp />;
   if (hash.startsWith(COMMUNITY_HASH)) return <CommunityApp />;
   if (hash.startsWith(COURSE_HASH)) return <CoursePlayerApp />;
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;

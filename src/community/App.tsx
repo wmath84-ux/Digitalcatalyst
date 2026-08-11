@@ -108,7 +108,7 @@ function AppShell() {
           onOpenStory={openStory}
           onCreateStory={() => openCreate("story")}
           onOpenTag={openTag}
-          onOpenAI={() => setToast("🤖 AI Chat coming soon!")}
+          onOpenAI={() => { window.location.hash = "#/ai-chat"; }}
           unreadCount={unreadCount}
           unreadChatCount={unreadChatCount}
         />
