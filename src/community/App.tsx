@@ -242,14 +242,12 @@ function AppShell() {
 
 export default function App() {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-slate-950 p-0 sm:p-6">
-      <div className="relative h-[100dvh] w-full overflow-hidden bg-white sm:h-[850px] sm:max-h-[92vh] sm:w-[420px] sm:rounded-[2.5rem] sm:shadow-2xl sm:ring-8 sm:ring-black">
-        <AppProvider>
-          <NavProvider>
-            <AppShell />
-          </NavProvider>
-        </AppProvider>
-      </div>
+    <div className="relative h-[100dvh] w-full overflow-hidden bg-white">
+      <AppProvider>
+        <NavProvider>
+          <AppShell />
+        </NavProvider>
+      </AppProvider>
     </div>
   );
 }
