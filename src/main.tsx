@@ -5,6 +5,7 @@ import StoreApp from "./App";
 import HomeApp from "./home/App";
 import PdpApp from "./PdpApp";
 import CheckoutApp from "./CheckoutApp";
+import MyDayApp from "./MyDayApp";
 import { product as pdpProduct } from "./data/product";
 import {
   product as checkoutProduct,
@@ -16,6 +17,7 @@ import {
 const STORE_HASH = "#/store";
 const PRODUCT_HASH = "#/product/";
 const CHECKOUT_HASH = "#/checkout";
+const MY_DAY_HASH = "#/my-day";
 const CHECKOUT_CONTEXT_KEY = "checkoutContext";
 
 type NavigableProduct = {
@@ -81,8 +83,18 @@ function Root() {
     return <CheckoutApp />;
   }
 
+  if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
   if (hash.startsWith(PRODUCT_HASH)) return <PdpApp onCheckout={navigateToCheckout} />;
-  if (hash.startsWith(STORE_HASH)) return <StoreApp onNavigateToProduct={navigateToProduct} />;
+  if (hash.startsWith(STORE_HASH)) {
+    return (
+      <StoreApp
+        onNavigateToProduct={navigateToProduct}
+        onNavigateToMyDay={() => {
+          window.location.hash = MY_DAY_HASH;
+        }}
+      />
+    );
+  }
 
   return (
     <HomeApp
@@ -90,6 +102,9 @@ function Root() {
         window.location.hash = STORE_HASH;
       }}
       onNavigateToProduct={navigateToProduct}
+      onNavigateToMyDay={() => {
+        window.location.hash = MY_DAY_HASH;
+      }}
     />
   );
 }

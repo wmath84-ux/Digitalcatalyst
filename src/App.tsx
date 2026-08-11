@@ -7,9 +7,10 @@ import type { Product } from "./data/products";
 
 type AppProps = {
   onNavigateToProduct: (product: Product) => void;
+  onNavigateToMyDay: () => void;
 };
 
-export default function App({ onNavigateToProduct }: AppProps) {
+export default function App({ onNavigateToProduct, onNavigateToMyDay }: AppProps) {
   const [activeTab, setActiveTab] = useState<TabKey>("store");
   const [wishlist, setWishlist] = useState<Set<string>>(new Set());
   const [purchased, setPurchased] = useState<Set<string>>(new Set());
@@ -71,7 +72,10 @@ export default function App({ onNavigateToProduct }: AppProps) {
 
         <BottomNav
           active={activeTab}
-          onChange={setActiveTab}
+          onChange={(tab) => {
+            if (tab === "myday") onNavigateToMyDay();
+            else setActiveTab(tab);
+          }}
           storeBadge={1}
           purchasesBadge={purchasesBadge}
         />

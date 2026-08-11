@@ -1,43 +1,39 @@
-export type ProductType = "video" | "pdf" | "ebook" | "live";
+export type TaskStatus = "pending" | "in-progress" | "completed";
+export type TaskPriority = "low" | "medium" | "high";
 
-export interface Product {
+export interface Task {
   id: string;
   title: string;
-  type: ProductType;
-  category: string;
-  author: string;
-  price: number;
-  mrp: number;
-  educoins: number;
-  rating: number;
-  ratingCount: number;
-  image: string;
-  trending?: boolean;
+  subject?: string;
+  time?: string;
+  priority: TaskPriority;
+  status: TaskStatus;
 }
 
-export interface Category {
-  id: string;
-  label: string;
-  icon: string;
-}
+export type EventType = "class" | "study" | "break" | "personal" | "exam";
 
-export interface Banner {
+export interface ScheduleEvent {
   id: string;
-  image: string;
-  eyebrow: string;
   title: string;
-  subtitle: string;
-  cta: string;
-  gradient: string;
+  detail?: string;
+  startTime: string; // "HH:MM" 24h
+  endTime: string;   // "HH:MM" 24h
+  type: EventType;
 }
 
-export interface Review {
+export interface QuickNote {
   id: string;
-  name: string;
-  avatarColor: string;
-  initials: string;
-  rating: number;
-  date: string;
-  comment: string;
-  course: string;
+  text: string;
+  createdAt: number;
+  color: NoteColor;
+}
+
+export type NoteColor = "amber" | "sky" | "rose" | "emerald" | "violet";
+
+export interface Reminder {
+  id: string;
+  text: string;
+  time: string;       // "HH:MM" 24h
+  done: boolean;
+  createdAt: number;
 }

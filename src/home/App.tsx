@@ -14,9 +14,10 @@ const USER_NAME = "Aarav";
 interface AppProps {
   onNavigateToStore: () => void;
   onNavigateToProduct: (product: Product) => void;
+  onNavigateToMyDay: () => void;
 }
 
-export default function App({ onNavigateToStore, onNavigateToProduct }: AppProps) {
+export default function App({ onNavigateToStore, onNavigateToProduct, onNavigateToMyDay }: AppProps) {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
   const [favorites, setFavorites] = useState<Set<string>>(new Set(["p1", "p7"]));
@@ -68,6 +69,10 @@ export default function App({ onNavigateToStore, onNavigateToProduct }: AppProps
   };
 
   const handleTabChange = (tab: NavTab) => {
+    if (tab === "myday") {
+      onNavigateToMyDay();
+      return;
+    }
     setActiveTab(tab);
     if (tab === "search") {
       contentTopRef.current?.scrollIntoView({ behavior: "smooth" });

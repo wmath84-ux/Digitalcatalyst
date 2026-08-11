@@ -1,4 +1,4 @@
-export type NavTab = "home" | "search" | "favorites" | "profile";
+export type NavTab = "home" | "myday" | "search" | "favorites" | "profile";
 
 interface BottomNavProps {
   active: NavTab;
@@ -8,6 +8,7 @@ interface BottomNavProps {
 
 const tabs: { id: NavTab; label: string; icon: string }[] = [
   { id: "home", label: "Home", icon: "🏠" },
+  { id: "myday", label: "My Day", icon: "📅" },
   { id: "search", label: "Search", icon: "🔍" },
   { id: "favorites", label: "Saved", icon: "❤️" },
   { id: "profile", label: "Profile", icon: "👤" },
