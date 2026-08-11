@@ -50,25 +50,6 @@ function Root() {
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
-  useEffect(() => {
-    const lockViewport = hash.startsWith(COMMUNITY_HASH) || hash.startsWith(COURSE_HASH);
-    if (!lockViewport) return;
-
-    const previousBodyOverflow = document.body.style.overflow;
-    const previousBodyOverscroll = document.body.style.overscrollBehavior;
-    const previousRootOverscroll = document.documentElement.style.overscrollBehavior;
-
-    document.body.style.overflow = "hidden";
-    document.body.style.overscrollBehavior = "none";
-    document.documentElement.style.overscrollBehavior = "none";
-
-    return () => {
-      document.body.style.overflow = previousBodyOverflow;
-      document.body.style.overscrollBehavior = previousBodyOverscroll;
-      document.documentElement.style.overscrollBehavior = previousRootOverscroll;
-    };
-  }, [hash]);
-
   const navigateToProduct = (product: NavigableProduct) => {
     sessionStorage.setItem("selectedProduct", JSON.stringify(product));
     window.location.hash = `${PRODUCT_HASH}${encodeURIComponent(product.id)}`;
