@@ -1,0 +1,210 @@
+import type { Module, Resource, Question } from "../types/course";
+
+export const courseTitle = "UI/UX Design Masterclass";
+export const courseSubtitle = "From Wireframes to High-Fidelity Prototypes";
+
+export const initialModules: Module[] = [
+  {
+    id: "m1",
+    title: "Getting Started",
+    lessons: [
+      {
+        id: "l1",
+        title: "Welcome to the Course",
+        duration: "3:12",
+        durationSec: 192,
+        type: "video",
+        completed: true,
+        locked: false,
+      },
+      {
+        id: "l2",
+        title: "How Design Tools Actually Work",
+        duration: "6:45",
+        durationSec: 405,
+        type: "video",
+        completed: true,
+        locked: false,
+      },
+      {
+        id: "l3",
+        title: "Setting Up Your Workspace",
+        duration: "5:20",
+        durationSec: 320,
+        type: "reading",
+        completed: false,
+        locked: false,
+      },
+    ],
+  },
+  {
+    id: "m2",
+    title: "Design Fundamentals",
+    lessons: [
+      {
+        id: "l4",
+        title: "Principles of Visual Hierarchy",
+        duration: "9:14",
+        durationSec: 554,
+        type: "video",
+        completed: false,
+        locked: false,
+      },
+      {
+        id: "l5",
+        title: "Color Theory for Interfaces",
+        duration: "11:02",
+        durationSec: 662,
+        type: "video",
+        completed: false,
+        locked: false,
+      },
+      {
+        id: "l6",
+        title: "Typography Systems",
+        duration: "8:37",
+        durationSec: 517,
+        type: "video",
+        completed: false,
+        locked: false,
+      },
+      {
+        id: "l7",
+        title: "Quiz: Fundamentals Check",
+        duration: "4:00",
+        durationSec: 240,
+        type: "quiz",
+        completed: false,
+        locked: false,
+      },
+    ],
+  },
+  {
+    id: "m3",
+    title: "Wireframing & Prototyping",
+    lessons: [
+      {
+        id: "l8",
+        title: "Low-Fidelity Wireframes",
+        duration: "7:48",
+        durationSec: 468,
+        type: "video",
+        completed: false,
+        locked: true,
+      },
+      {
+        id: "l9",
+        title: "Building Interactive Prototypes",
+        duration: "13:26",
+        durationSec: 806,
+        type: "video",
+        completed: false,
+        locked: true,
+      },
+      {
+        id: "l10",
+        title: "User Testing Your Prototype",
+        duration: "10:05",
+        durationSec: 605,
+        type: "video",
+        completed: false,
+        locked: true,
+      },
+    ],
+  },
+  {
+    id: "m4",
+    title: "Advanced Interaction Design",
+    lessons: [
+      {
+        id: "l11",
+        title: "Micro-interactions & Motion",
+        duration: "12:11",
+        durationSec: 731,
+        type: "video",
+        completed: false,
+        locked: true,
+      },
+      {
+        id: "l12",
+        title: "Design Systems at Scale",
+        duration: "14:52",
+        durationSec: 892,
+        type: "video",
+        completed: false,
+        locked: true,
+      },
+      {
+        id: "l13",
+        title: "Final Project Walkthrough",
+        duration: "16:30",
+        durationSec: 990,
+        type: "video",
+        completed: false,
+        locked: true,
+      },
+    ],
+  },
+];
+
+export const initialResources: Resource[] = [
+  { id: "r1", name: "Course Slide Deck.pdf", type: "pdf", size: "4.2 MB", lessonId: "l1" },
+  { id: "r2", name: "Workspace Setup Checklist.pdf", type: "pdf", size: "820 KB", lessonId: "l3" },
+  { id: "r3", name: "Visual Hierarchy Cheatsheet.pdf", type: "pdf", size: "1.1 MB", lessonId: "l4" },
+  { id: "r4", name: "Color Palettes Library", type: "drive", size: "Shared Folder", lessonId: "l5" },
+  { id: "r5", name: "Typography Pairing Guide.pdf", type: "pdf", size: "2.4 MB", lessonId: "l6" },
+  { id: "r6", name: "UI Kit Source Files.zip", type: "zip", size: "38 MB", lessonId: "l2" },
+  { id: "r7", name: "Recommended Reading List", type: "link", size: "External", lessonId: "l1" },
+];
+
+export const initialQuestions: Question[] = [
+  {
+    id: "q1",
+    lessonId: "l4",
+    author: "Priya Sharma",
+    avatarColor: "#f97316",
+    text: "Does visual hierarchy change a lot between mobile and desktop layouts, or are the principles basically the same?",
+    timeAgo: "2h ago",
+    likes: 12,
+    liked: false,
+    replies: [
+      {
+        id: "rp1",
+        author: "Instructor · Alex Chen",
+        avatarColor: "#6366f1",
+        text: "Great question! The principles stay the same, but spacing and size ratios need to adapt for smaller viewports.",
+        timeAgo: "1h ago",
+      },
+    ],
+  },
+  {
+    id: "q2",
+    lessonId: "l2",
+    author: "Marcus Lee",
+    avatarColor: "#10b981",
+    text: "Which tool do you recommend for beginners — Figma or Sketch?",
+    timeAgo: "1d ago",
+    likes: 27,
+    liked: true,
+    replies: [
+      {
+        id: "rp2",
+        author: "Sara N.",
+        avatarColor: "#ec4899",
+        text: "Figma, hands down. It's free and works on any OS.",
+        timeAgo: "20h ago",
+      },
+    ],
+  },
+  {
+    id: "q3",
+    lessonId: "l1",
+    author: "Dev Patel",
+    avatarColor: "#0ea5e9",
+    text: "Excited to start! Is there a Discord community for this course?",
+    timeAgo: "3d ago",
+    likes: 8,
+    liked: false,
+    replies: [],
+  },
+];
