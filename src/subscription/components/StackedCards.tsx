@@ -142,7 +142,7 @@ export default function StackedCards({ cards }: { cards: ShowcaseCard[] }) {
                     opacity: 0,
                     transition: { duration: 0.32, ease: "easeIn" },
                   }}
-                  transition={{ type: "spring", stiffness: 260, damping: 24 }}
+                  transition={{ duration: 0 }}
                 >
                   <TopCard
                     card={card}
