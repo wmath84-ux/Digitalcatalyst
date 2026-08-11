@@ -10,6 +10,7 @@ import ProfileApp from "./profile/App";
 import CoursePlayerApp from "./CoursePlayerApp";
 import CommunityApp from "./community/App";
 import CartWishlistApp from "./CartWishlistApp";
+import SubscriptionApp from "./subscription/App";
 import { PRODUCTS as CART_PRODUCTS } from "./cartWishlist/data/products";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
 import { products as STORE_PRODUCTS } from "./data/products";
@@ -30,6 +31,7 @@ const COURSE_HASH = "#/course/";
 const COMMUNITY_HASH = "#/community";
 const CART_HASH = "#/cart";
 const FAVORITES_HASH = "#/favorites";
+const SUBSCRIPTION_HASH = "#/subscription";
 const CHECKOUT_CONTEXT_KEY = "checkoutContext";
 
 const INITIAL_CART = ["p1", "p3"];
@@ -221,6 +223,7 @@ function Root() {
     return <CheckoutApp />;
   }
 
+  if (hash.startsWith(SUBSCRIPTION_HASH)) return <SubscriptionApp />;
   if (hash.startsWith(COMMUNITY_HASH)) return <CommunityApp />;
   if (hash.startsWith(COURSE_HASH)) return <CoursePlayerApp />;
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;

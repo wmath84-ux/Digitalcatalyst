@@ -16,7 +16,6 @@ import { useApp } from "../context/AppContext";
 import { membershipPlans } from "../data";
 import { EditProfileSheet } from "../components/EditProfileSheet";
 import { CoinHistorySheet } from "../components/CoinHistorySheet";
-import { UpgradeMembershipSheet } from "../components/UpgradeMembershipSheet";
 import { SettingsSheet } from "../components/SettingsSheet";
 import { PurchasesSheet, FavoritesSheet, DownloadsSheet } from "../components/LibrarySheets";
 import { ConfirmDialog } from "../components/ConfirmDialog";
@@ -24,7 +23,6 @@ import { ConfirmDialog } from "../components/ConfirmDialog";
 type SheetKey =
   | "edit"
   | "coins"
-  | "upgrade"
   | "settings"
   | "purchases"
   | "favorites"
@@ -117,7 +115,9 @@ export function ProfilePage() {
         {isBasic ? (
           <button
             type="button"
-            onClick={() => setSheet("upgrade")}
+            onClick={() => {
+              window.location.hash = "#/subscription";
+            }}
             className="flex w-full items-center justify-between rounded-2xl bg-gradient-to-r from-indigo-600 to-violet-600 px-4 py-3 text-white shadow-md shadow-indigo-200 active:scale-[0.98] transition"
           >
             <span className="flex items-center gap-2 text-xs font-bold">
@@ -130,7 +130,9 @@ export function ProfilePage() {
             <span className="text-[11px] text-neutral-500">{membership.renewalDate}</span>
             <button
               type="button"
-              onClick={() => setSheet("upgrade")}
+              onClick={() => {
+                window.location.hash = "#/subscription";
+              }}
               className="text-[11px] font-bold text-indigo-600"
             >
               Manage Plan
@@ -203,7 +205,6 @@ export function ProfilePage() {
       {/* Sheets */}
       <EditProfileSheet open={sheet === "edit"} onClose={() => setSheet(null)} />
       <CoinHistorySheet open={sheet === "coins"} onClose={() => setSheet(null)} />
-      <UpgradeMembershipSheet open={sheet === "upgrade"} onClose={() => setSheet(null)} />
       <SettingsSheet open={sheet === "settings"} onClose={() => setSheet(null)} />
       <PurchasesSheet open={sheet === "purchases"} onClose={() => setSheet(null)} />
       <FavoritesSheet open={sheet === "favorites"} onClose={() => setSheet(null)} />
