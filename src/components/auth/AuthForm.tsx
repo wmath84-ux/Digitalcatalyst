@@ -10,9 +10,9 @@ type Mode = "login" | "signup" | "admin";
 const readAuthParams = () =>
   new URLSearchParams(typeof window === "undefined" ? "" : window.location.hash.split("?")[1] || "");
 
-const destinationAfterAuth = () => {
+const destinationAfterAuth = (fallback = "#/store") => {
   const returnTo = readAuthParams().get("return");
-  return returnTo && returnTo.startsWith("#/") ? returnTo : "#/store";
+  return returnTo && returnTo.startsWith("#/") ? returnTo : fallback;
 };
 
 export default function AuthForm() {
@@ -35,10 +35,10 @@ export default function AuthForm() {
     setSuccess(null);
   };
 
-  const completeSuccess = (message: string) => {
+  const completeSuccess = (message: string, fallback?: string) => {
     setSuccess(message);
     window.setTimeout(() => {
-      window.location.hash = destinationAfterAuth();
+      window.location.hash = destinationAfterAuth(fallback);
     }, 350);
   };
 
@@ -77,7 +77,7 @@ export default function AuthForm() {
         setError(result.message);
         return;
       }
-      completeSuccess(result.message);
+      completeSuccess(result.message, mode === "admin" ? "#/admin" : "#/store");
     } finally {
       setSubmitting(false);
     }
@@ -92,7 +92,7 @@ export default function AuthForm() {
         setError(result.message);
         return;
       }
-      completeSuccess(result.message);
+      completeSuccess(result.message, mode === "admin" ? "#/admin" : "#/store");
     } finally {
       setGoogleSubmitting(false);
     }

@@ -1,4 +1,5 @@
-import { products, type Product } from "../data/products";
+import type { Product } from "../data/products";
+import { useCatalog } from "../context/CatalogContext";
 import { BagIcon, CalendarIcon, HeartIcon, HomeIcon, WalletIcon } from "./icons";
 import { loadPurchasedCourses } from "../utils/purchasedCourses";
 
@@ -37,6 +38,7 @@ export function PurchasesTab({
   purchased: Set<string>;
   onOpenCourse: (course: { id: string; title: string }) => void;
 }) {
+  const { products } = useCatalog();
   const persistedItems: Product[] = loadPurchasedCourses().map((item) => ({
     id: item.id,
     title: item.title,

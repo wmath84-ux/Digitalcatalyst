@@ -1,5 +1,6 @@
 import { useMemo, useState } from "react";
-import { products, type Product } from "../data/products";
+import type { Product } from "../data/products";
+import { useCatalog } from "../context/CatalogContext";
 import Hero from "./Hero";
 import SearchBar from "./SearchBar";
 import FilterChips from "./FilterChips";
@@ -16,6 +17,7 @@ type StorePageProps = {
 };
 
 export default function StorePage({ wishlist, cartIds, purchased, onToggleWishlist, onAddToCart, onView }: StorePageProps) {
+  const { products, loading, error } = useCatalog();
   const [search, setSearch] = useState("");
   const [activeChip, setActiveChip] = useState("All");
   const [sort, setSort] = useState("Recommended");
@@ -28,7 +30,7 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
       set.add(p.subject);
     });
     return Array.from(set);
-  }, []);
+  }, [products]);
 
   const filtered = useMemo(() => {
     let list = products.filter((p) => {
@@ -66,10 +68,14 @@ export default function StorePage({ wishlist, cartIds, purchased, onToggleWishli
       </div>
 
       <p className="px-4 pt-5 text-center text-[15px] font-semibold text-slate-500">
-        {filtered.length} resource{filtered.length === 1 ? "" : "s"} available
+        {loading ? "Syncing live catalog…" : `${filtered.length} resource${filtered.length === 1 ? "" : "s"} available`}
       </p>
 
-      {filtered.length === 0 ? (
+      {error ? (
+        <div className="mx-4 mt-6 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-8 text-center text-sm font-semibold text-rose-700">{error}</div>
+      ) : loading ? (
+        <div className="mx-4 mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2">{[0, 1, 2, 3].map((item) => <div key={item} className="h-72 animate-pulse rounded-2xl bg-slate-100" />)}</div>
+      ) : filtered.length === 0 ? (
         <div className="mx-4 mt-6 flex flex-col items-center gap-2 rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-14 text-center">
           <BookOpenIcon className="h-8 w-8 text-slate-300" />
           <p className="text-sm font-semibold text-slate-500">No resources match your search</p>
