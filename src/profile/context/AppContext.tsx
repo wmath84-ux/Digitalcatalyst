@@ -1,4 +1,4 @@
-import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
+import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   initialBadges,
   initialCoinHistory,
@@ -29,6 +29,7 @@ import type {
   TabId,
 } from "../types";
 import { loadPurchasedCourses } from "../../utils/purchasedCourses";
+import { useAuth } from "../../context/AuthContext";
 
 interface ToastState {
   id: number;
@@ -82,9 +83,16 @@ interface AppContextValue {
 const AppContext = createContext<AppContextValue | undefined>(undefined);
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [isLoggedIn, setIsLoggedIn] = useState(true);
-  const [user, setUser] = useState<EduUser>(initialUser);
-  const [coins, setCoins] = useState(415);
+  const { user: authenticatedUser, logout: firebaseLogout } = useAuth();
+  const isLoggedIn = Boolean(authenticatedUser);
+  const [user, setUser] = useState<EduUser>(() => authenticatedUser ? {
+    ...initialUser,
+    name: authenticatedUser.name,
+    email: authenticatedUser.email,
+    phone: authenticatedUser.mobile ? `+91 ${authenticatedUser.mobile}` : "",
+    initials: authenticatedUser.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
+  } : initialUser);
+  const [coins, setCoins] = useState(() => authenticatedUser?.coins ?? 0);
   const [coinHistory, setCoinHistory] = useState<CoinTransaction[]>(initialCoinHistory);
   const [membership, setMembership] = useState<Membership>(initialMembership);
   const [purchases] = useState<LibraryItem[]>(() => {
@@ -103,6 +111,18 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [activeTab, setActiveTab] = useState<TabId>("profile");
   const [toast, setToast] = useState<ToastState | null>(null);
 
+  useEffect(() => {
+    if (!authenticatedUser) return;
+    setUser((current) => ({
+      ...current,
+      name: authenticatedUser.name,
+      email: authenticatedUser.email,
+      phone: authenticatedUser.mobile ? `+91 ${authenticatedUser.mobile}` : current.phone,
+      initials: authenticatedUser.name.split(/\s+/).map((part) => part[0]).join("").slice(0, 2).toUpperCase(),
+    }));
+    setCoins(authenticatedUser.coins);
+  }, [authenticatedUser]);
+
   const showToast = useCallback((message: string, tone: ToastState["tone"] = "success") => {
     const id = Date.now();
     setToast({ id, message, tone });
@@ -112,13 +132,14 @@ export function AppProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const login = useCallback(() => {
-    setIsLoggedIn(true);
-    showToast(`Welcome back, ${user.name.split(" ")[0]}!`);
-  }, [showToast, user.name]);
+    window.location.hash = "#/auth?mode=login&return=%23%2Fprofile";
+  }, []);
 
   const logout = useCallback(() => {
-    setIsLoggedIn(false);
-  }, []);
+    void firebaseLogout().finally(() => {
+      window.location.hash = "#/auth?mode=login&return=%23%2Fprofile";
+    });
+  }, [firebaseLogout]);
 
   const updateUser = useCallback(
     (partial: Partial<EduUser>) => {
