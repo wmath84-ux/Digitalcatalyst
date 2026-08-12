@@ -22,7 +22,7 @@ import {
   updateProfile,
   type User as FirebaseUser,
 } from "firebase/auth";
-import { doc, getDoc, serverTimestamp, setDoc } from "firebase/firestore";
+import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
 
 const PRIMARY_ADMIN_EMAIL = "wmath84@gmail.com";
@@ -38,6 +38,9 @@ export interface AuthUser {
   coins: number;
   photoURL?: string;
   mobile?: string;
+  bio?: string;
+  createdAt?: string;
+  subscriptionTier?: string;
   role: "user" | "admin" | "super_admin";
   providerIds: string[];
 }
@@ -63,6 +66,7 @@ interface AuthContextValue {
   loginWithGoogle: (mode?: AuthMode) => Promise<AuthResult>;
   loginAdmin: (email: string, password: string) => Promise<AuthResult>;
   resetPassword: (email: string) => Promise<AuthResult>;
+  updateAccount: (details: { name: string; mobile: string; bio: string }) => Promise<AuthResult>;
   logout: () => Promise<void>;
   setUser: (user: AuthUser | null) => void;
 }
@@ -116,6 +120,9 @@ const readAppUser = async (firebaseUser: FirebaseUser): Promise<AuthUser> => {
     name: String(data.name || firebaseUser.displayName || email.split("@")[0] || "Learner"),
     email,
     mobile: String(data.mobile || firebaseUser.phoneNumber || ""),
+    bio: String(data.bio || ""),
+    createdAt: typeof data.createdAt?.toDate === "function" ? data.createdAt.toDate().toISOString() : String(data.createdAt || ""),
+    subscriptionTier: String(data.subscriptionTier || "basic"),
     photoURL: String(data.photoURL || firebaseUser.photoURL || ""),
     coins: Number(data.coinBalance ?? data.eduCoins ?? 300),
     role,
@@ -227,6 +234,23 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     };
   }, [commitFirebaseUser]);
 
+  useEffect(() => {
+    if (!user || !auth.currentUser || auth.currentUser.uid !== user.id) return undefined;
+    return onSnapshot(doc(db, "users", user.id), (snapshot) => {
+      if (!snapshot.exists()) return;
+      const data = snapshot.data();
+      setUser((current) => current && current.id === snapshot.id ? {
+        ...current,
+        name: String(data.name || current.name),
+        mobile: String(data.mobile || ""),
+        bio: String(data.bio || ""),
+        coins: Number(data.coinBalance ?? data.eduCoins ?? current.coins),
+        subscriptionTier: String(data.subscriptionTier || current.subscriptionTier || "basic"),
+        photoURL: String(data.photoURL || current.photoURL || ""),
+      } : current);
+    }, (error) => console.warn("Live Firebase profile sync failed", error));
+  }, [user?.id]);
+
   const login = useCallback(async (email: string, password: string): Promise<AuthResult> => {
     try {
       await setPersistence(auth, browserLocalPersistence);
@@ -298,6 +322,25 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  const updateAccount = useCallback(async (details: { name: string; mobile: string; bio: string }): Promise<AuthResult> => {
+    const firebaseUser = auth.currentUser;
+    if (!firebaseUser) return { success: false, message: "Login is required." };
+    try {
+      await updateProfile(firebaseUser, { displayName: details.name.trim() });
+      await setDoc(doc(db, "users", firebaseUser.uid), {
+        name: details.name.trim(),
+        mobile: details.mobile.replace(/\D/g, "").slice(-10),
+        bio: details.bio.trim().slice(0, 240),
+        updatedAt: serverTimestamp(),
+      }, { merge: true });
+      const updated = await readAppUser(firebaseUser);
+      setUser(updated);
+      return { success: true, message: "Profile updated successfully." };
+    } catch (error) {
+      return { success: false, message: authErrorMessage(error) };
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     await signOut(auth);
     setUser(null);
@@ -313,10 +356,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loginWithGoogle,
       loginAdmin,
       resetPassword,
+      updateAccount,
       logout,
       setUser,
     }),
-    [user, loading, refresh, login, signup, loginWithGoogle, loginAdmin, resetPassword, logout],
+    [user, loading, refresh, login, signup, loginWithGoogle, loginAdmin, resetPassword, updateAccount, logout],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
