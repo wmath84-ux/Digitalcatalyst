@@ -40,21 +40,21 @@ export default function CourseSidebar(props: SidebarProps) {
         </div>
       )}
       <div className="min-h-0 flex-1 overflow-y-auto p-3">
-        {props.modules.length === 0 ? <p className="py-10 text-center text-sm text-white/35">No course content has been published.</p> : props.modules.map((module, index) => <ModuleGroup key={module.id} module={module} index={index} depth={0} openModules={openModules} toggle={toggle} {...props} />)}
+        {props.modules.length === 0 ? <p className="py-10 text-center text-sm text-white/35">No course content has been published.</p> : props.modules.map((module, index) => <ModuleGroup key={module.id} module={module} index={index} depth={0} inheritedLocked={false} openModules={openModules} toggle={toggle} {...props} />)}
       </div>
     </div>
   );
 }
 
-function ModuleGroup({ module, index, depth, openModules, toggle, ...props }: SidebarProps & { module: CourseModule; index: number; depth: number; openModules: Set<string>; toggle: (id: string) => void }) {
+function ModuleGroup({ module, index, depth, inheritedLocked, openModules, toggle, ...props }: SidebarProps & { module: CourseModule; index: number; depth: number; inheritedLocked: boolean; openModules: Set<string>; toggle: (id: string) => void }) {
   if (module.accessLevel === "hidden") return null;
   const open = openModules.has(module.id);
-  const moduleLocked = module.accessLevel === "paidUpdate" && !props.ownedUpdateIds.has(updateId(module));
+  const moduleLocked = inheritedLocked || (module.accessLevel === "paidUpdate" && !props.ownedUpdateIds.has(updateId(module)));
   const visibleFiles = (module.files || []).filter((file) => file.accessLevel !== "hidden" && (props.mode === "curriculum" ? isLesson(file) : !isLesson(file) || ["pdf", "doc", "sheet", "google_form", "ebook", "link", "image"].includes(file.type)));
   const hasChildren = visibleFiles.length > 0 || (module.modules || []).length > 0;
 
   return <div className={`${depth ? "ml-3 border-l border-white/10 pl-2" : "mb-2"}`}>
     <button onClick={() => toggle(module.id)} className="flex w-full items-center gap-2 rounded-xl px-3 py-3 text-left hover:bg-white/5"><span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/5 text-[10px] font-black text-white/45">{index + 1}</span><span className="min-w-0 flex-1 truncate text-xs font-black">{module.title}</span>{moduleLocked && <LockKeyhole size={13} className="text-amber-400" />}{hasChildren && (open ? <ChevronDown size={15} className="text-white/40" /> : <ChevronRight size={15} className="text-white/40" />)}</button>
-    {open && <div className="space-y-1 pb-2">{visibleFiles.map((file) => { const Icon = iconFor(file); const locked = moduleLocked || (file.accessLevel === "paidUpdate" && !props.ownedUpdateIds.has(updateId(file))); return <button key={file.id} disabled={locked} onClick={() => props.onSelect(file)} className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[11px] transition ${props.selectedId === file.id ? "bg-violet-500 text-white" : locked ? "cursor-not-allowed bg-amber-400/5 text-white/35" : "text-white/65 hover:bg-white/5 hover:text-white"}`}><Icon size={15} className="shrink-0" /><span className="min-w-0 flex-1 truncate">{file.name}</span>{locked && <LockKeyhole size={12} className="text-amber-400" />}</button>; })}{(module.modules || []).map((child, childIndex) => <ModuleGroup key={child.id} module={child} index={childIndex} depth={depth + 1} openModules={openModules} toggle={toggle} {...props} />)}</div>}
+    {open && <div className="space-y-1 pb-2">{visibleFiles.map((file) => { const Icon = iconFor(file); const locked = moduleLocked || (file.accessLevel === "paidUpdate" && !props.ownedUpdateIds.has(updateId(file))); return <button key={file.id} disabled={locked} onClick={() => props.onSelect(file)} className={`flex w-full items-center gap-2 rounded-lg px-3 py-2.5 text-left text-[11px] transition ${props.selectedId === file.id ? "bg-violet-500 text-white" : locked ? "cursor-not-allowed bg-amber-400/5 text-white/35" : "text-white/65 hover:bg-white/5 hover:text-white"}`}><Icon size={15} className="shrink-0" /><span className="min-w-0 flex-1 truncate">{file.name}</span>{locked && <LockKeyhole size={12} className="text-amber-400" />}</button>; })}{(module.modules || []).map((child, childIndex) => <ModuleGroup key={child.id} module={child} index={childIndex} depth={depth + 1} inheritedLocked={moduleLocked} openModules={openModules} toggle={toggle} {...props} />)}</div>}
   </div>;
 }

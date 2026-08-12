@@ -20,6 +20,17 @@ const numericPrice = (value?: string) => { const number = Number(String(value ||
 const accessId = (item: { id: string; paidUpdateId?: string }) => String(item.paidUpdateId || item.id);
 
 const allFiles = (modules: CourseModule[]): CourseFile[] => modules.flatMap((module) => [...(module.files || []), ...allFiles(module.modules || [])]);
+const firstAccessibleFile = (modules: CourseModule[], owned: Set<string>, inheritedLocked = false): CourseFile | null => {
+  for (const module of modules) {
+    if (module.accessLevel === "hidden") continue;
+    const moduleLocked = inheritedLocked || (module.accessLevel === "paidUpdate" && !owned.has(accessId(module)));
+    const file = (module.files || []).find((item) => item.accessLevel !== "hidden" && !moduleLocked && (item.accessLevel !== "paidUpdate" || owned.has(accessId(item))));
+    if (file) return file;
+    const nested = firstAccessibleFile(module.modules || [], owned, moduleLocked);
+    if (nested) return nested;
+  }
+  return null;
+};
 
 const collectUpdates = (modules: CourseModule[]) => {
   const map = new Map<string, PaidCourseUpdate>();
@@ -71,7 +82,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
 
   useEffect(() => {
     if (selectedFile || files.length === 0) return;
-    const first = files.find((file) => file.accessLevel !== "paidUpdate" || ownedUpdateIds.has(accessId(file)));
+    const first = firstAccessibleFile(modules, ownedUpdateIds);
     if (first) setSelectedFile(first);
   }, [files, ownedUpdateIds, selectedFile]);
 
