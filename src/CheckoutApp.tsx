@@ -1,11 +1,10 @@
 import { useState, useRef, useEffect } from 'react';
 import StepIndicator from './components/StepIndicator';
 import OrderSummary from './components/OrderSummary';
-import PaymentGateway from './components/PaymentGateway';
+import PaymentGateway, { type VerifiedPayment } from './components/PaymentGateway';
 import VerificationSuccess from './components/VerificationSuccess';
-import { product, user, generateTransactionResult } from './data/checkoutData';
+import { product, user } from './data/checkoutData';
 import type { TransactionResult } from './data/checkoutData';
-import { savePurchasedCourse } from './utils/purchasedCourses';
 
 const STEPS = [
   { label: 'Review', icon: '📋' },
@@ -33,21 +32,17 @@ export default function App() {
     console.log('[App] Step changed: 1 → 2');
   };
 
-  const handlePaymentSuccess = () => {
-    const txn = generateTransactionResult();
-    savePurchasedCourse({
-      id: product.id,
-      title: product.name,
-      type: product.type === 'PDF' ? 'PDF' : product.type === 'eBook' ? 'Ebook' : 'Course',
-      emoji: product.thumbnail,
-      progress: 0,
-      purchasedAt: Date.now(),
-      instructor: product.instructor,
-      image: '/images/hero-main.jpg',
-    });
+  const handlePaymentSuccess = (payment: VerifiedPayment) => {
+    const txn: TransactionResult = {
+      transactionId: payment.paymentId,
+      orderId: payment.orderId,
+      paymentMethod: payment.paymentMethod,
+      timestamp: new Date().toLocaleString('en-IN', { dateStyle: 'medium', timeStyle: 'short' }),
+      status: 'success',
+    };
+    sessionStorage.removeItem('checkoutContext');
     setTransaction(txn);
     setCurrentStep(3);
-    console.log('[App] Step changed: 2 → 3', txn);
   };
 
   const handleGoBack = () => {
@@ -86,6 +81,7 @@ export default function App() {
 
           {currentStep === 2 && (
             <PaymentGateway
+              productId={product.id}
               finalPrice={finalPrice}
               currency={product.currency}
               productName={product.name}

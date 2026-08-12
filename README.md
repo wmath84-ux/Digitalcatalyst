@@ -15,6 +15,18 @@ The removed PostgreSQL/JWT and Next.js authentication implementations must not b
 - Deploy `firestore.rules` and `storage.rules` before using protected user/admin data.
 - The Firebase web configuration is initialized in `firebase.ts`; Firebase web API keys are public project identifiers, while all server secrets must remain in deployment environment variables.
 
+## Secure Razorpay checkout
+
+Paid checkout is server-authoritative. `/api/razorpay/create-order` verifies the Firebase ID token, reads the product and price from Firestore, and creates the Razorpay order. `/api/razorpay/verify-payment` verifies the signature and captured amount with Razorpay before writing the purchase entitlement and order through Firebase Admin.
+
+Configure these server-only deployment variables:
+
+- `RAZORPAY_KEY_ID`
+- `RAZORPAY_KEY_SECRET`
+- `FIREBASE_SERVICE_ACCOUNT` (complete service-account JSON)
+
+Free products use the same authenticated server flow but skip Razorpay. EduCoin redemption is intentionally unavailable until wallet deduction is implemented as an atomic server transaction.
+
 ## Run locally
 
 ```bash

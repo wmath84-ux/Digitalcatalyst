@@ -68,6 +68,10 @@ function applyCheckoutContext(context: CheckoutContext) {
   Object.assign(checkoutUser, context.user);
 }
 
+function InvalidCheckout({ onBack }: { onBack: () => void }) {
+  return <main className="grid min-h-[100dvh] place-items-center bg-slate-50 px-6 text-center"><div><p className="text-4xl">🛒</p><h1 className="mt-4 text-2xl font-black text-slate-900">Checkout session not found</h1><p className="mt-2 text-sm text-slate-500">Choose a live product before starting secure checkout.</p><button onClick={onBack} className="mt-6 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white">Back to store</button></div></main>;
+}
+
 const AUTH_REQUIRED_PREFIXES = [
   CHECKOUT_HASH,
   MY_DAY_HASH,
@@ -323,14 +327,14 @@ function Root() {
 
   if (hash.startsWith(CHECKOUT_HASH)) {
     const savedContext = sessionStorage.getItem(CHECKOUT_CONTEXT_KEY);
-    if (savedContext) {
-      try {
-        applyCheckoutContext(JSON.parse(savedContext) as CheckoutContext);
-      } catch {
-        sessionStorage.removeItem(CHECKOUT_CONTEXT_KEY);
-      }
+    if (!savedContext) return <InvalidCheckout onBack={() => { window.location.hash = STORE_HASH; }} />;
+    try {
+      applyCheckoutContext(JSON.parse(savedContext) as CheckoutContext);
+      return <CheckoutApp />;
+    } catch {
+      sessionStorage.removeItem(CHECKOUT_CONTEXT_KEY);
+      return <InvalidCheckout onBack={() => { window.location.hash = STORE_HASH; }} />;
     }
-    return <CheckoutApp />;
   }
 
   if (hash.startsWith(ADMIN_HASH)) return <AdminApp />;

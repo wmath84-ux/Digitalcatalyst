@@ -3,8 +3,11 @@ import { collection, onSnapshot, type DocumentData } from "firebase/firestore";
 import { db } from "../../firebase";
 import type { Product } from "../data/products";
 
+import { useAuth } from "./AuthContext";
+
 interface CatalogContextValue {
   products: Product[];
+  purchasedIds: Set<string>;
   loading: boolean;
   error: string | null;
 }
@@ -52,7 +55,9 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
 };
 
 export function CatalogProvider({ children }: { children: ReactNode }) {
+  const { user } = useAuth();
   const [products, setProducts] = useState<Product[]>([]);
+  const [purchasedIds, setPurchasedIds] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -75,7 +80,20 @@ export function CatalogProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, []);
 
-  const value = useMemo(() => ({ products, loading, error }), [products, loading, error]);
+  useEffect(() => {
+    if (!user) {
+      setPurchasedIds(new Set());
+      return undefined;
+    }
+    return onSnapshot(collection(db, "users", user.id, "purchases"), (snapshot) => {
+      setPurchasedIds(new Set(snapshot.docs.map((item) => String(item.data().productDocumentId ?? item.id))));
+    }, (purchaseError) => {
+      console.error("Purchase entitlement sync failed", purchaseError);
+      setPurchasedIds(new Set());
+    });
+  }, [user]);
+
+  const value = useMemo(() => ({ products, purchasedIds, loading, error }), [products, purchasedIds, loading, error]);
   return <CatalogContext.Provider value={value}>{children}</CatalogContext.Provider>;
 }
 

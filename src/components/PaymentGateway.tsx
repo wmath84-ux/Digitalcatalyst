@@ -1,233 +1,184 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState } from "react";
+import { CheckCircle2, CreditCard, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
+import { auth } from "../../firebase";
+
+export type VerifiedPayment = {
+  orderId: string;
+  paymentId: string;
+  paymentMethod: string;
+  free?: boolean;
+};
 
 interface PaymentGatewayProps {
+  productId: string;
   finalPrice: number;
   currency: string;
   productName: string;
-  onPaymentSuccess: () => void;
+  onPaymentSuccess: (payment: VerifiedPayment) => void;
   onGoBack: () => void;
 }
 
-type PaymentState = 'idle' | 'processing' | 'verifying' | 'success';
+type PaymentState = "idle" | "creating" | "awaiting" | "verifying" | "success" | "error";
 
-export default function PaymentGateway({
-  finalPrice,
-  currency,
-  productName,
-  onPaymentSuccess,
-  onGoBack,
-}: PaymentGatewayProps) {
-  const [paymentState, setPaymentState] = useState<PaymentState>('idle');
-  const [progressPercent, setProgressPercent] = useState(0);
-  const [selectedMethod, setSelectedMethod] = useState<string>('upi');
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+type RazorpaySuccess = {
+  razorpay_order_id: string;
+  razorpay_payment_id: string;
+  razorpay_signature: string;
+};
 
-  const paymentMethods = [
-    { id: 'upi', label: 'UPI', icon: '📱', sub: 'GPay / PhonePe / Paytm' },
-    { id: 'card', label: 'Card', icon: '💳', sub: 'Credit / Debit Card' },
-    { id: 'netbanking', label: 'Net Banking', icon: '🏦', sub: 'All Indian Banks' },
-    { id: 'wallet', label: 'Wallet', icon: '👛', sub: 'Paytm / Mobikwik' },
-  ];
+type RazorpayOptions = {
+  key: string;
+  amount: number;
+  currency: string;
+  name: string;
+  description: string;
+  order_id: string;
+  prefill?: { name?: string; email?: string };
+  theme?: { color?: string };
+  modal?: { ondismiss?: () => void };
+  handler: (response: RazorpaySuccess) => void;
+};
 
-  useEffect(() => {
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
+declare global {
+  interface Window {
+    Razorpay?: new (options: RazorpayOptions) => { open: () => void; on: (event: string, callback: (response: { error?: { description?: string } }) => void) => void };
+  }
+}
 
-  const simulatePayment = () => {
-    console.log('[Step 2] Payment initiated', {
-      method: selectedMethod,
-      amount: finalPrice,
-      product: productName,
-    });
+let razorpayScriptPromise: Promise<void> | null = null;
 
-    setPaymentState('processing');
-    setProgressPercent(0);
+const loadRazorpay = () => {
+  if (window.Razorpay) return Promise.resolve();
+  if (razorpayScriptPromise) return razorpayScriptPromise;
+  razorpayScriptPromise = new Promise((resolve, reject) => {
+    const script = document.createElement("script");
+    script.src = "https://checkout.razorpay.com/v1/checkout.js";
+    script.async = true;
+    script.onload = () => resolve();
+    script.onerror = () => reject(new Error("Razorpay Checkout could not be loaded. Check your connection and try again."));
+    document.head.appendChild(script);
+  });
+  return razorpayScriptPromise;
+};
 
-    // Simulate Razorpay overlay with progress
-    let progress = 0;
-    intervalRef.current = setInterval(() => {
-      progress += Math.random() * 15 + 5;
-      if (progress >= 100) {
-        progress = 100;
-        if (intervalRef.current) clearInterval(intervalRef.current);
+const apiRequest = async <T,>(path: string, body: Record<string, unknown>): Promise<T> => {
+  const firebaseUser = auth.currentUser;
+  if (!firebaseUser) throw new Error("Your session expired. Please log in again.");
+  const token = await firebaseUser.getIdToken(true);
+  const response = await fetch(path, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(body),
+  });
+  const data = await response.json().catch(() => ({})) as T & { error?: string };
+  if (!response.ok) throw new Error(data.error || "Secure payment request failed.");
+  return data;
+};
 
-        setProgressPercent(100);
-        setPaymentState('verifying');
+export default function PaymentGateway({ productId, finalPrice, currency, productName, onPaymentSuccess, onGoBack }: PaymentGatewayProps) {
+  const [paymentState, setPaymentState] = useState<PaymentState>("idle");
+  const [error, setError] = useState("");
 
-        console.log('[Step 2] Payment received, verifying...');
+  const verifyPayment = async (response: RazorpaySuccess) => {
+    setPaymentState("verifying");
+    setError("");
+    try {
+      const result = await apiRequest<{ ok: boolean; verified: boolean; orderId: string; paymentId: string }>("/api/razorpay/verify-payment", response);
+      if (!result.verified) throw new Error("Payment could not be verified.");
+      setPaymentState("success");
+      window.setTimeout(() => onPaymentSuccess({ orderId: result.orderId, paymentId: result.paymentId, paymentMethod: "Razorpay" }), 500);
+    } catch (verificationError) {
+      setPaymentState("error");
+      setError(verificationError instanceof Error ? verificationError.message : "Payment verification failed. If money was deducted, contact support with your payment ID.");
+    }
+  };
 
-        // Verification phase
-        setTimeout(() => {
-          console.log('[Step 2 → Step 3] Payment verified successfully!');
-          setPaymentState('success');
+  const startPayment = async () => {
+    if (paymentState === "creating" || paymentState === "verifying") return;
+    setPaymentState("creating");
+    setError("");
+    try {
+      const order = await apiRequest<{
+        ok: boolean;
+        free: boolean;
+        verified?: boolean;
+        keyId?: string;
+        orderId: string;
+        amount?: number;
+        currency?: string;
+        productName?: string;
+        customer?: { name?: string; email?: string };
+      }>("/api/razorpay/create-order", { productId });
 
-          // Auto-advance to Step 3
-          setTimeout(() => {
-            onPaymentSuccess();
-          }, 800);
-        }, 1500);
-      } else {
-        setProgressPercent(Math.round(progress));
+      if (order.free && order.verified) {
+        setPaymentState("success");
+        window.setTimeout(() => onPaymentSuccess({ orderId: order.orderId, paymentId: "FREE", paymentMethod: "Free access", free: true }), 400);
+        return;
       }
-    }, 400);
+
+      await loadRazorpay();
+      if (!window.Razorpay || !order.keyId || !order.amount) throw new Error("Razorpay Checkout is unavailable.");
+      setPaymentState("awaiting");
+      const checkout = new window.Razorpay({
+        key: order.keyId,
+        amount: order.amount,
+        currency: order.currency || "INR",
+        name: "Digital Catalyst",
+        description: order.productName || productName,
+        order_id: order.orderId,
+        prefill: order.customer,
+        theme: { color: "#4f46e5" },
+        modal: {
+          ondismiss: () => {
+            setPaymentState("idle");
+            setError("Payment window was closed. No access was granted.");
+          },
+        },
+        handler: (response) => void verifyPayment(response),
+      });
+      checkout.on("payment.failed", (response) => {
+        setPaymentState("error");
+        setError(response.error?.description || "Payment failed. Please try another method.");
+      });
+      checkout.open();
+    } catch (paymentError) {
+      setPaymentState("error");
+      setError(paymentError instanceof Error ? paymentError.message : "Could not start secure payment.");
+    }
   };
 
-  const handlePayClick = () => {
-    if (paymentState !== 'idle') return;
-    simulatePayment();
-  };
+  const busy = paymentState === "creating" || paymentState === "awaiting" || paymentState === "verifying";
 
   return (
     <div className="flex flex-col gap-4 animate-fadeIn">
-      {/* Secure Header */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4 text-center">
-        <div className="flex items-center justify-center gap-2 mb-1">
-          <span className="text-green-600 text-sm">🔒</span>
-          <span className="text-sm font-bold text-gray-700">Secure Payment Gateway</span>
-        </div>
-        <p className="text-xs text-gray-400">Powered by Razorpay • PCI DSS Compliant</p>
+      <div className="rounded-2xl border border-gray-200 bg-white p-5 text-center shadow-sm">
+        <ShieldCheck className="mx-auto h-9 w-9 text-emerald-600" />
+        <p className="mt-2 text-sm font-black text-gray-800">Server-verified secure checkout</p>
+        <p className="mt-1 text-xs text-gray-400">The payable amount comes from Firestore and is verified by Razorpay on the server.</p>
       </div>
 
-      {/* Amount Card */}
-      <div className="bg-gradient-to-br from-indigo-600 to-indigo-700 rounded-2xl p-5 text-white shadow-lg shadow-indigo-200">
-        <p className="text-xs text-indigo-200 uppercase tracking-wider font-medium mb-1">Amount to Pay</p>
-        <p className="text-3xl font-extrabold">
-          {currency}{finalPrice.toLocaleString('en-IN')}
-        </p>
-        <p className="text-xs text-indigo-200 mt-1 truncate">for {productName}</p>
+      <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 p-5 text-white shadow-lg shadow-indigo-200">
+        <p className="text-xs font-bold uppercase tracking-wider text-indigo-200">Amount to pay</p>
+        <p className="mt-1 text-3xl font-extrabold">{finalPrice === 0 ? "Free" : `${currency}${finalPrice.toLocaleString("en-IN")}`}</p>
+        <p className="mt-1 truncate text-xs text-indigo-200">{productName}</p>
       </div>
 
-      {/* Payment Methods - only show when idle */}
-      {paymentState === 'idle' && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
-          <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">
-            Select Payment Method
-          </h3>
-          <div className="grid grid-cols-2 gap-2">
-            {paymentMethods.map((method) => (
-              <button
-                key={method.id}
-                onClick={() => {
-                  setSelectedMethod(method.id);
-                  console.log(`[Payment Method] Selected: ${method.label}`);
-                }}
-                className={`
-                  p-3 rounded-xl border-2 text-left transition-all duration-150 active:scale-[0.97]
-                  ${selectedMethod === method.id
-                    ? 'border-indigo-500 bg-indigo-50'
-                    : 'border-gray-200 bg-white'
-                  }
-                `}
-              >
-                <span className="text-xl">{method.icon}</span>
-                <p className={`text-sm font-semibold mt-1 ${selectedMethod === method.id ? 'text-indigo-700' : 'text-gray-700'}`}>
-                  {method.label}
-                </p>
-                <p className="text-[10px] text-gray-400 leading-tight">{method.sub}</p>
-              </button>
-            ))}
-          </div>
-        </div>
+      {paymentState === "success" && <StatusCard icon={<CheckCircle2 className="h-10 w-10 text-emerald-600" />} title="Payment verified" detail="Access is being added to your Firebase account…" tone="emerald" />}
+      {busy && <StatusCard icon={<LoaderCircle className="h-10 w-10 animate-spin text-indigo-600" />} title={paymentState === "verifying" ? "Verifying payment" : paymentState === "awaiting" ? "Complete payment in Razorpay" : "Creating secure order"} detail={paymentState === "verifying" ? "Do not close this page while the server confirms your payment." : "Your access will unlock only after server verification."} tone="indigo" />}
+      {error && <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold leading-6 text-rose-700"><TriangleAlert className="mb-2 h-5 w-5" />{error}</div>}
+
+      {paymentState !== "success" && (
+        <button disabled={busy} onClick={startPayment} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-emerald-600 py-4 text-base font-black text-white shadow-lg shadow-emerald-200 transition active:scale-[0.98] disabled:cursor-wait disabled:opacity-60">
+          {busy ? <LoaderCircle className="h-5 w-5 animate-spin" /> : <CreditCard className="h-5 w-5" />}
+          {finalPrice === 0 ? "Unlock free access" : busy ? "Please wait…" : `Pay securely — ${currency}${finalPrice.toLocaleString("en-IN")}`}
+        </button>
       )}
-
-      {/* Processing / Verifying State */}
-      {(paymentState === 'processing' || paymentState === 'verifying' || paymentState === 'success') && (
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-6 text-center space-y-4">
-          {/* Animated Loader */}
-          <div className="flex justify-center">
-            <div
-              className={`
-                w-16 h-16 rounded-full flex items-center justify-center text-3xl
-                ${paymentState === 'success'
-                  ? 'bg-emerald-100 border-2 border-emerald-300'
-                  : 'bg-indigo-50 border-2 border-indigo-200 animate-pulse'
-                }
-              `}
-            >
-              {paymentState === 'processing' && '⏳'}
-              {paymentState === 'verifying' && '🔍'}
-              {paymentState === 'success' && '✅'}
-            </div>
-          </div>
-
-          <div>
-            <p className="text-sm font-bold text-gray-800">
-              {paymentState === 'processing' && 'Processing Payment...'}
-              {paymentState === 'verifying' && 'Verifying Transaction...'}
-              {paymentState === 'success' && 'Payment Successful!'}
-            </p>
-            <p className="text-xs text-gray-400 mt-1">
-              {paymentState === 'processing' && 'Connecting to Razorpay securely'}
-              {paymentState === 'verifying' && 'Confirming with your bank'}
-              {paymentState === 'success' && 'Redirecting you shortly...'}
-            </p>
-          </div>
-
-          {/* Progress Bar */}
-          {paymentState === 'processing' && (
-            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-              <div
-                className="h-full bg-indigo-500 rounded-full transition-all duration-300"
-                style={{ width: `${progressPercent}%` }}
-              />
-            </div>
-          )}
-          {paymentState === 'verifying' && (
-            <div className="w-full bg-gray-100 rounded-full h-2 overflow-hidden">
-              <div className="h-full bg-amber-400 rounded-full animate-pulse" style={{ width: '100%' }} />
-            </div>
-          )}
-
-          {/* Simulated transaction logs */}
-          <div className="text-[10px] text-gray-300 space-y-0.5 font-mono">
-            {paymentState !== 'processing' && <p>✓ Payment gateway connected</p>}
-            {paymentState !== 'processing' && <p>✓ Amount debited: {currency}{finalPrice}</p>}
-            {(paymentState === 'verifying' || paymentState === 'success') && (
-              <p>✓ Bank verification in progress</p>
-            )}
-            {paymentState === 'success' && <p>✓ Transaction confirmed</p>}
-          </div>
-        </div>
-      )}
-
-      {/* Trust Signals */}
-      <div className="flex items-center justify-center gap-4 py-2">
-        <span className="text-[10px] text-gray-400 flex items-center gap-1">🔒 SSL Secured</span>
-        <span className="text-[10px] text-gray-400 flex items-center gap-1">🛡️ Razorpay</span>
-        <span className="text-[10px] text-gray-400 flex items-center gap-1">✅ PCI DSS</span>
-      </div>
-
-      {/* Pay Button or Back */}
-      {paymentState === 'idle' ? (
-        <div className="space-y-3">
-          <button
-            onClick={handlePayClick}
-            className="w-full py-4 bg-emerald-600 text-white font-bold text-base rounded-2xl
-              active:scale-[0.98] transition-all duration-150 shadow-lg shadow-emerald-200
-              flex items-center justify-center gap-2"
-          >
-            🔐 Pay Securely — {currency}{finalPrice.toLocaleString('en-IN')}
-          </button>
-
-          <button
-            onClick={() => {
-              console.log('[Step 2] Going back to Order Summary');
-              onGoBack();
-            }}
-            className="w-full py-3 bg-gray-100 text-gray-600 font-medium text-sm rounded-2xl
-              active:scale-[0.98] transition-all duration-150
-              flex items-center justify-center gap-1"
-          >
-            ← Back to Order Summary
-          </button>
-        </div>
-      ) : (
-        <p className="text-center text-xs text-gray-400 animate-pulse pb-2">
-          Please do not close this page...
-        </p>
-      )}
+      {!busy && paymentState !== "success" && <button onClick={onGoBack} className="w-full rounded-2xl bg-gray-100 py-3 text-sm font-bold text-gray-600">← Back to order summary</button>}
+      <p className="text-center text-[11px] font-medium text-gray-400">Razorpay handles UPI, cards, net banking and supported wallets. Card details never touch this app.</p>
     </div>
   );
+}
+
+function StatusCard({ icon, title, detail, tone }: { icon: React.ReactNode; title: string; detail: string; tone: "emerald" | "indigo" }) {
+  return <div className={`rounded-2xl border p-6 text-center ${tone === "emerald" ? "border-emerald-200 bg-emerald-50" : "border-indigo-200 bg-indigo-50"}`}><div className="flex justify-center">{icon}</div><p className="mt-3 text-sm font-black text-gray-800">{title}</p><p className="mt-1 text-xs leading-5 text-gray-500">{detail}</p></div>;
 }

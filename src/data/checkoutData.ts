@@ -1,5 +1,3 @@
-// Mock data for the checkout flow
-
 export interface Product {
   id: string;
   name: string;
@@ -56,19 +54,3 @@ export const user: UserProfile = {
   eduCoins: 250,
   maxEduCoinsUsable: 30, // max 30% of price
 };
-
-export function generateTransactionResult(): TransactionResult {
-  const txnId = 'TXN' + Date.now().toString(36).toUpperCase() + Math.random().toString(36).substring(2, 6).toUpperCase();
-  const orderId = 'ORD-' + Math.floor(100000 + Math.random() * 900000);
-  const methods = ['UPI - Google Pay', 'UPI - PhonePe', 'Credit Card ****4242', 'Debit Card ****1881', 'Net Banking - SBI'];
-  return {
-    transactionId: txnId,
-    orderId,
-    paymentMethod: methods[Math.floor(Math.random() * methods.length)],
-    timestamp: new Date().toLocaleString('en-IN', {
-      dateStyle: 'medium',
-      timeStyle: 'short',
-    }),
-    status: 'success',
-  };
-}
