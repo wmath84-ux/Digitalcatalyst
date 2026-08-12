@@ -1,107 +1,102 @@
+// src/subscription/components/PriceSummary.tsx
+//
+// Part 9 — Order summary. The cycle / feature / coupon / min-payable
+// numbers all come from the server (or, when the user is on the
+// subscription page, from the preflight quote). All amounts are in
+// **paise** (integer); the component formats to rupees for display.
+
 import { Receipt } from "lucide-react";
+import type { SubscriptionPlanDoc } from "../utils/subscriptionCatalog";
 
 interface Props {
-  cycle: string;
-  basePrice: number;
-  coursesTotal: number;
-  coursesCount: number;
-  featuresTotal: number;
+  plan: SubscriptionPlanDoc | null;
+  cycle: "monthly" | "yearly";
+  basePricePaise: number;
+  featuresTotalPaise: number;
   featuresCount: number;
-  couponDiscount: number;
+  includedFeatureCount: number;
+  couponDiscountPaise: number;
   couponCode: string | null;
-  referralDiscount: number;
-  referralCode: string | null;
-  total: number;
+  minPayablePaise: number;
+  totalPaise: number;
 }
 
+const formatRupee = (paise: number): string =>
+  `₹${Math.max(0, Math.round(paise / 100)).toLocaleString("en-IN")}`;
+
 export default function PriceSummary({
+  plan,
   cycle,
-  basePrice,
-  coursesTotal,
-  coursesCount,
-  featuresTotal,
+  basePricePaise,
+  featuresTotalPaise,
   featuresCount,
-  couponDiscount,
+  includedFeatureCount,
+  couponDiscountPaise,
   couponCode,
-  referralDiscount,
-  referralCode,
-  total,
+  minPayablePaise,
+  totalPaise,
 }: Props) {
+  const cycleLabel = cycle === "monthly" ? "Monthly" : "Yearly";
   return (
-    <div className="px-5 pt-5">
+    <div className="px-5 pt-5" data-subscription-price-summary>
       <div className="rounded-2xl border border-slate-100 bg-white p-4 shadow-sm shadow-slate-200/50">
         <div className="mb-3 flex items-center gap-2">
           <Receipt className="h-4 w-4 text-slate-400" />
-          <h3 className="text-sm font-bold text-slate-800">Order Summary</h3>
+          <h3 className="text-sm font-bold text-slate-800">Order summary</h3>
         </div>
         <div className="space-y-2 text-sm">
           {/* Base plan */}
-          <div className="flex justify-between text-slate-500">
-            <span>Base Plan ({cycle})</span>
-            <span className="font-medium text-slate-700">
-              ${basePrice.toFixed(2)}
+          <div className="flex justify-between text-slate-500" data-subscription-row="base">
+            <span>
+              {plan ? plan.name : "Base plan"} ({cycleLabel})
             </span>
+            <span className="font-medium text-slate-700">{formatRupee(basePricePaise)}</span>
           </div>
 
-          {/* Courses */}
-          {coursesCount > 0 && (
-            <div className="flex justify-between text-slate-500">
-              <span>
-                Courses ({coursesCount})
-              </span>
-              <span className="font-medium text-slate-700">
-                ${coursesTotal.toFixed(2)}
-              </span>
+          {/* Features (paid add-ons) */}
+          {featuresCount > 0 ? (
+            <div className="flex justify-between text-slate-500" data-subscription-row="features">
+              <span>Premium features ({featuresCount})</span>
+              <span className="font-medium text-slate-700">{formatRupee(featuresTotalPaise)}</span>
             </div>
-          )}
+          ) : null}
 
-          {/* Features */}
-          {featuresCount > 0 && (
-            <div className="flex justify-between text-slate-500">
-              <span>
-                Features ({featuresCount})
-              </span>
-              <span className="font-medium text-slate-700">
-                ${featuresTotal.toFixed(2)}
-              </span>
+          {/* Included features (free with the plan) */}
+          {includedFeatureCount > 0 ? (
+            <div className="flex justify-between text-emerald-700" data-subscription-row="included">
+              <span>Included features ({includedFeatureCount})</span>
+              <span className="font-medium">Free</span>
             </div>
-          )}
-
-          {/* Subtotal line */}
-          <div className="flex justify-between border-t border-dotted border-slate-200 pt-2 text-slate-600">
-            <span className="font-medium">Subtotal</span>
-            <span className="font-semibold text-slate-800">
-              ${(basePrice + coursesTotal + featuresTotal).toFixed(2)}
-            </span>
-          </div>
+          ) : null}
 
           {/* Coupon */}
-          {couponDiscount > 0 && (
-            <div className="flex justify-between text-emerald-600">
-              <span>Coupon ({couponCode})</span>
-              <span className="font-medium">
-                -${couponDiscount.toFixed(2)}
-              </span>
+          {couponDiscountPaise > 0 ? (
+            <div
+              className="flex justify-between font-bold text-emerald-600"
+              data-subscription-row="coupon"
+              data-applied-coupon={couponCode || ""}
+            >
+              <span>Coupon discount{couponCode ? ` (${couponCode})` : ""}</span>
+              <span>− {formatRupee(couponDiscountPaise)}</span>
             </div>
-          )}
+          ) : null}
 
-          {/* Referral */}
-          {referralDiscount > 0 && (
-            <div className="flex justify-between text-emerald-600">
-              <span>Referral ({referralCode})</span>
-              <span className="font-medium">
-                -${referralDiscount.toFixed(2)}
-              </span>
+          {/* Minimum payable floor */}
+          {minPayablePaise > 0 ? (
+            <div className="flex justify-between text-slate-500" data-subscription-row="min-payable">
+              <span>Minimum payable</span>
+              <span className="font-medium text-slate-700">{formatRupee(minPayablePaise)}</span>
             </div>
-          )}
+          ) : null}
         </div>
 
-        <div className="mt-3 flex items-center justify-between border-t border-dashed border-slate-200 pt-3">
-          <span className="text-sm font-bold text-slate-900">
-            Total due today
-          </span>
-          <span className="text-lg font-extrabold text-slate-900">
-            ${total.toFixed(2)}
+        <div className="mt-3 flex items-baseline justify-between border-t border-slate-100 pt-3">
+          <span className="text-base font-black text-slate-900">Total</span>
+          <span
+            data-subscription-row="total"
+            className="text-2xl font-black text-slate-900 sm:text-3xl"
+          >
+            {formatRupee(totalPaise)}
           </span>
         </div>
       </div>

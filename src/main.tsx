@@ -5,10 +5,10 @@ import "./landing.css";
 import StoreApp from "./App";
 import HomeApp from "./home/App";
 import PdpApp from "./PdpApp";
-import CheckoutApp from "./CheckoutApp";
+import CheckoutApp from "./components/checkout/CheckoutApp";
 import MyDayApp from "./MyDayApp";
 import ProfileApp from "./profile/App";
-import CoursePlayerApp from "./CoursePlayerApp";
+import CourseRouteGuard from "./components/CourseRouteGuard";
 import CommunityApp from "./community/App";
 import CartWishlistApp from "./CartWishlistApp";
 import SubscriptionApp from "./subscription/App";
@@ -20,15 +20,14 @@ import AdminApp from "./admin/AdminApp";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
+import { CheckoutProvider } from "./checkout/CheckoutContext";
 import { clearAdminSession, hasAdminSession } from "./utils/adminSession";
+import { useOwnedUpdateIds } from "./hooks/useOwnedUpdates";
+import { type CheckoutReturnRoute } from "./checkout/types";
+import { buildCheckoutSessionRecord, writeToSessionStorage as writeCheckoutToStorage } from "../utils/checkoutSession";
+import type { CheckoutSelection } from "./types/commerce";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
 import type { PaidCourseUpdate } from "./types/course";
-import {
-  product as checkoutProduct,
-  user as checkoutUser,
-  type Product as CheckoutProduct,
-  type UserProfile,
-} from "./data/checkoutData";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -52,25 +51,27 @@ const SUBSCRIPTION_HASH = "#/subscription";
 const AI_CHAT_HASH = "#/ai-chat";
 const ADMIN_HASH = "#/admin";
 const ADMIN_LOGIN_HASH = "#/admin-login";
-const CHECKOUT_CONTEXT_KEY = "checkoutContext";
 
 type NavigableProduct = {
   id: string;
   title: string;
 };
 
-type CheckoutContext = {
-  product: CheckoutProduct;
-  user: UserProfile;
-};
-
-function applyCheckoutContext(context: CheckoutContext) {
-  Object.assign(checkoutProduct, context.product);
-  Object.assign(checkoutUser, context.user);
-}
-
 function InvalidCheckout({ onBack }: { onBack: () => void }) {
   return <main className="grid min-h-[100dvh] place-items-center bg-slate-50 px-6 text-center"><div><p className="text-4xl">🛒</p><h1 className="mt-4 text-2xl font-black text-slate-900">Checkout session not found</h1><p className="mt-2 text-sm text-slate-500">Choose a live product before starting secure checkout.</p><button onClick={onBack} className="mt-6 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white">Back to store</button></div></main>;
+}
+
+/**
+ * Wraps `PdpApp` with the live ownership state (paid-update ids the user
+ * has unlocked for this specific product). Centralising the read here means
+ * the two PdpApp call-sites (PDP route + course route when not yet owned)
+ * stay identical and the PDP doesn't have to know about Firestore.
+ */
+function PdpWithOwnership({ product, onCheckout, onBack }: { product: import("./data/products").Product | null; onCheckout: (price: number) => void; onBack: () => void }) {
+  const purchasedIds = useCatalog().purchasedIds;
+  const ownedUpdateIds = useOwnedUpdateIds(product?.id || null);
+  if (!product) return <PdpApp product={null} onCheckout={onCheckout} onBack={onBack} />;
+  return <PdpApp product={product} onCheckout={onCheckout} onBack={onBack} purchasedIds={purchasedIds} ownedUpdateIds={ownedUpdateIds} />;
 }
 
 const AUTH_REQUIRED_PREFIXES = [
@@ -86,9 +87,46 @@ const AUTH_REQUIRED_PREFIXES = [
 const requiresAuthentication = (hash: string) =>
   AUTH_REQUIRED_PREFIXES.some((prefix) => hash.startsWith(prefix));
 
+/**
+ * Start a new checkout: build a validated session record, write it to
+ * sessionStorage, and navigate to `#/checkout`. The CheckoutContext
+ * provider (mounted by `CheckoutRoute`) reads the record on mount and
+ * fetches the verified ServerPriceQuote.
+ */
+const startCheckout = ({
+  selection,
+  buyer,
+  returnRoute,
+  idempotencyKey,
+}: {
+  selection: CheckoutSelection;
+  buyer: { uid: string; name: string; email: string; mobile?: string | null; coins?: number; emailVerified?: boolean };
+  returnRoute: CheckoutReturnRoute;
+  idempotencyKey?: string | null;
+}) => {
+  if (typeof window === "undefined") return;
+  const record = buildCheckoutSessionRecord({
+    selection,
+    quote: null,
+    buyer: {
+      uid: buyer.uid,
+      name: buyer.name,
+      email: buyer.email,
+      mobile: buyer.mobile ?? null,
+      emailVerified: Boolean(buyer.emailVerified),
+      tokenVerified: Boolean(buyer.uid),
+      coins: Number(buyer.coins || 0),
+    },
+    returnRoute,
+    idempotencyKey: idempotencyKey || null,
+  });
+  if (record) writeCheckoutToStorage(record);
+  window.location.hash = CHECKOUT_HASH;
+};
+
 function Root() {
   const { user, loading, logout } = useAuth();
-  const { products: catalogProducts, purchasedIds } = useCatalog();
+  const { products: catalogProducts } = useCatalog();
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
@@ -180,59 +218,62 @@ function Root() {
 
   const handlePurchaseUpdate = (update: PaidCourseUpdate) => {
     if (!user || !selectedCourseProduct) return;
-    const context: CheckoutContext = {
-      product: {
-        id: selectedCourseProduct.id,
-        updateSelection: { productId: selectedCourseProduct.id, updateId: update.id, title: update.title, price: update.price },
-        name: update.title,
-        type: "Course",
-        description: `Update for ${selectedCourseProduct.title}: ${update.contentNames.join(", ")}`,
-        price: update.price,
-        currency: "₹",
-        thumbnail: "🆕",
-        instructor: selectedCourseProduct.instructor,
-        duration: `${update.contentNames.length} new item${update.contentNames.length === 1 ? "" : "s"}`,
-        rating: selectedCourseProduct.rating,
-        totalRatings: selectedCourseProduct.reviews,
+    startCheckout({
+      selection: {
+        purchaseKind: "paid_update",
+        productIds: [selectedCourseProduct.id],
+        moduleIds: [],
+        resourceIds: [],
+        updateId: update.id,
+        subscriptionPlanId: null,
+        billingCycle: null,
+        featureIds: [],
+        couponCode: null,
+        requestedEduCoins: 0,
+        returnRoute: null,
       },
-      user: { ...checkoutUser, id: user.id, name: user.name, email: user.email, eduCoins: user.coins },
-    };
-    applyCheckoutContext(context);
-    sessionStorage.setItem(CHECKOUT_CONTEXT_KEY, JSON.stringify(context));
-    window.location.hash = CHECKOUT_HASH;
+      buyer: {
+        uid: user.id,
+        name: user.name,
+        email: user.email,
+        mobile: null,
+        coins: user.coins,
+        emailVerified: false,
+      },
+      returnRoute: { hash: `#/course/${encodeURIComponent(selectedCourseProduct.id)}` },
+      idempotencyKey: `update:${selectedCourseProduct.id}:${update.id}:${Date.now()}`,
+    });
   };
 
   const handleCartCheckout = () => {
     if (!user) { redirectToAuth(CART_HASH); return; }
     const items = catalogProducts.filter((product) => cartIds.has(product.id));
     if (items.length === 0) return;
-    const total = items.reduce((sum, product) => sum + product.price, 0);
-    const context: CheckoutContext = {
-      product: {
-        id: items.length === 1 ? items[0].id : `bundle-${Date.now()}`,
+    startCheckout({
+      selection: {
+        purchaseKind: "cart_bundle",
         productIds: items.map((item) => item.id),
-        name: items.length === 1 ? items[0].title : `${items.length} Digital Catalyst products`,
-        type: "Course",
-        description: items.map((item) => item.title).join(", "),
-        price: total,
-        currency: "₹",
-        thumbnail: "🛒",
-        instructor: "Digital Catalyst",
-        duration: "Lifetime access",
-        rating: 0,
-        totalRatings: 0,
+        moduleIds: [],
+        resourceIds: [],
+        updateId: null,
+        subscriptionPlanId: null,
+        billingCycle: null,
+        featureIds: [],
+        couponCode: null,
+        requestedEduCoins: 0,
+        returnRoute: null,
       },
-      user: {
-        ...checkoutUser,
-        id: user.id,
+      buyer: {
+        uid: user.id,
         name: user.name,
         email: user.email,
-        eduCoins: user.coins,
+        mobile: null,
+        coins: user.coins,
+        emailVerified: false,
       },
-    };
-    applyCheckoutContext(context);
-    sessionStorage.setItem(CHECKOUT_CONTEXT_KEY, JSON.stringify(context));
-    window.location.hash = CHECKOUT_HASH;
+      returnRoute: { hash: CART_HASH },
+      idempotencyKey: `cart:${user.id}:${Date.now()}`,
+    });
   };
 
   const handleShoppingNavigation = (tab: CartTabKey) => {
@@ -269,37 +310,31 @@ function Root() {
       return;
     }
 
-    const context: CheckoutContext = {
-      product: {
-        id: checkoutCatalogProduct.id,
-        name: checkoutCatalogProduct.title,
-        type: checkoutCatalogProduct.category === "PDF" || checkoutCatalogProduct.category === "Notes"
-          ? "PDF"
-          : checkoutCatalogProduct.category === "E-book"
-            ? "eBook"
-            : checkoutCatalogProduct.category === "Live"
-              ? "Live Workshop"
-              : "Course",
-        description: checkoutCatalogProduct.description || checkoutCatalogProduct.subject,
-        price: finalPrice,
-        currency: "₹",
-        thumbnail: "📘",
-        instructor: checkoutCatalogProduct.instructor,
-        duration: checkoutCatalogProduct.classLevel,
-        rating: checkoutCatalogProduct.rating,
-        totalRatings: checkoutCatalogProduct.reviews,
+    startCheckout({
+      selection: {
+        purchaseKind: "full_product",
+        productIds: [checkoutCatalogProduct.id],
+        moduleIds: [],
+        resourceIds: [],
+        updateId: null,
+        subscriptionPlanId: null,
+        billingCycle: null,
+        featureIds: [],
+        couponCode: null,
+        requestedEduCoins: 0,
+        returnRoute: null,
       },
-      user: {
-        ...checkoutUser,
-        id: String(user.id),
+      buyer: {
+        uid: String(user.id),
         name: user.name,
         email: user.email,
-        eduCoins: user.coins,
+        mobile: null,
+        coins: user.coins,
+        emailVerified: false,
       },
-    };
-    applyCheckoutContext(context);
-    sessionStorage.setItem(CHECKOUT_CONTEXT_KEY, JSON.stringify(context));
-    window.location.hash = CHECKOUT_HASH;
+      returnRoute: { hash: `${PRODUCT_HASH}${encodeURIComponent(checkoutCatalogProduct.id)}` },
+      idempotencyKey: `full:${checkoutCatalogProduct.id}:${user.id}:${Date.now()}`,
+    });
   };
 
   const cartProducts = shoppingProducts.filter((product) => cartIds.has(product.id));
@@ -369,15 +404,11 @@ function Root() {
   }
 
   if (hash.startsWith(CHECKOUT_HASH)) {
-    const savedContext = sessionStorage.getItem(CHECKOUT_CONTEXT_KEY);
-    if (!savedContext) return <InvalidCheckout onBack={() => { window.location.hash = STORE_HASH; }} />;
-    try {
-      applyCheckoutContext(JSON.parse(savedContext) as CheckoutContext);
-      return <CheckoutApp />;
-    } catch {
-      sessionStorage.removeItem(CHECKOUT_CONTEXT_KEY);
-      return <InvalidCheckout onBack={() => { window.location.hash = STORE_HASH; }} />;
-    }
+    return (
+      <CheckoutProvider>
+        <CheckoutApp />
+      </CheckoutProvider>
+    );
   }
 
   if (hash.startsWith(ADMIN_HASH)) return user && hasAdminSession(user.id, user.email, user.role) ? <AdminApp /> : <AdminLoginApp />;
@@ -386,12 +417,18 @@ function Root() {
   if (hash.startsWith(COMMUNITY_HASH)) return <CommunityApp />;
   if (hash.startsWith(COURSE_HASH)) {
     if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = STORE_HASH; }} />;
-    if (!purchasedIds.has(selectedCourseProduct.id)) return <PdpApp product={selectedCourseProduct} onCheckout={(price) => navigateToCheckout(price, selectedCourseProduct)} onBack={() => { window.location.hash = STORE_HASH; }} />;
-    return <CoursePlayerApp product={selectedCourseProduct} onBack={() => { window.location.hash = "#/store/purchases"; }} onPurchaseUpdate={handlePurchaseUpdate} />;
+    return (
+      <CourseRouteGuard
+        product={selectedCourseProduct}
+        onCheckout={(price) => navigateToCheckout(price, selectedCourseProduct)}
+        onBack={() => { window.location.hash = STORE_HASH; }}
+        onPurchaseUpdate={handlePurchaseUpdate}
+      />
+    );
   }
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
   if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
-  if (hash.startsWith(PRODUCT_HASH)) return <PdpApp product={selectedCatalogProduct} onCheckout={navigateToCheckout} onBack={() => { window.location.hash = STORE_HASH; }} />;
+  if (hash.startsWith(PRODUCT_HASH)) return <PdpWithOwnership product={selectedCatalogProduct} onCheckout={navigateToCheckout} onBack={() => { window.location.hash = STORE_HASH; }} />;
   if (hash.startsWith(STORE_HASH)) {
     return (
       <StoreApp

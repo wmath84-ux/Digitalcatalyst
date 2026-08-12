@@ -1,13 +1,30 @@
-import { ArrowLeft, Check, Heart, ShieldCheck, ShoppingBag, Star } from "lucide-react";
+import { ArrowLeft, Heart, ShieldCheck, ShoppingBag, Star } from "lucide-react";
 import type { Product } from "./data/products";
+import type { CheckoutSelection } from "./types/commerce";
+import { computeSummary } from "../utils/pdpSelection";
+import PdpPurchaseBuilder from "./components/pdp/PdpPurchaseBuilder";
+import { useCourseAccess } from "./hooks/useCourseAccess";
 
 interface ProductDetailProps {
   product: Product | null;
   onCheckout: (finalPrice: number) => void;
   onBack: () => void;
+  /**
+   * Optional: Part 3 hooks. When `purchasedIds` is supplied the builder
+   * gates the modules/resources by already-owned state and decides which
+   * purchase modes are available. `ownedUpdateIds` is the per-product
+   * list of paid-update ids the user has unlocked.
+   */
+  purchasedIds?: Set<string>;
+  ownedUpdateIds?: Set<string>;
 }
 
-export default function ProductDetail({ product, onCheckout, onBack }: ProductDetailProps) {
+export default function ProductDetail({ product, onCheckout, onBack, purchasedIds, ownedUpdateIds }: ProductDetailProps) {
+  // Part 10 — the canonical course-access resolver. When the
+  // product is `null` we pass `null` and the hook returns the
+  // empty resolution.
+  const { resolution } = useCourseAccess({ product });
+
   if (!product) {
     return (
       <main className="grid min-h-[100dvh] place-items-center bg-slate-50 px-6 text-center">
@@ -21,9 +38,30 @@ export default function ProductDetail({ product, onCheckout, onBack }: ProductDe
     );
   }
 
+  // The resolver is the canonical source of truth. The legacy
+  // `purchasedIds` / `ownedUpdateIds` props from `main.tsx` are
+  // a fallback for tests + non-course routes; in practice the
+  // resolver subscribes to the same data.
+  const isProductOwned = purchasedIds ? purchasedIds.has(product.id) : resolution.hasFullProductAccess;
+  const updates = ownedUpdateIds || resolution.ownedUpdateIds;
+  const ownedModuleIds = resolution.ownedModuleIds;
+  const ownedResourceIds = resolution.ownedResourceIds;
+
   const discount = product.originalPrice > product.price && product.originalPrice > 0
     ? Math.round(((product.originalPrice - product.price) / product.originalPrice) * 100)
     : 0;
+
+  const handlePreview = (selection: CheckoutSelection) => {
+    // For backward compatibility, keep the legacy `onCheckout` wired up for
+    // the simple full-product path. The actual full-product price is
+    // `product.price` (which CatalogContext already applied sale-fallback
+    // for). The new builder does NOT call `onCheckout` — it stores the
+    // canonical selection in `sessionStorage["pdpPreviewSelection"]` via
+    // its own default handler.
+    if (selection.purchaseKind === "full_product") {
+      onCheckout(product.price);
+    }
+  };
 
   return (
     <div className="min-h-[100dvh] bg-slate-50 text-slate-950">
@@ -35,7 +73,7 @@ export default function ProductDetail({ product, onCheckout, onBack }: ProductDe
         </div>
       </header>
 
-      <main className="mx-auto grid max-w-6xl gap-8 px-4 py-6 sm:px-6 lg:grid-cols-2 lg:gap-12 lg:py-12">
+      <main className="mx-auto grid max-w-6xl gap-8 px-4 py-6 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:gap-12 lg:py-12">
         <section>
           <div className="aspect-[16/10] overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
             <img src={product.image} alt={product.title} className="h-full w-full object-cover" />
@@ -45,37 +83,83 @@ export default function ProductDetail({ product, onCheckout, onBack }: ProductDe
             <Trust label="Instant access" />
             <Trust label="Lifetime library" />
           </div>
+          <div className="mt-6 space-y-3 text-sm text-slate-600 lg:hidden">
+            <ProductSummary product={product} discount={discount} />
+            <ProductDescription product={product} />
+          </div>
         </section>
 
-        <section className="self-center">
+        <section className="self-start space-y-4">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-full bg-violet-100 px-3 py-1 text-xs font-black text-violet-700">{product.category}</span>
             <span className="rounded-full bg-slate-200 px-3 py-1 text-xs font-bold text-slate-600">{product.classLevel}</span>
             {product.tags.slice(0, 2).map((tag) => <span key={tag} className="rounded-full bg-amber-100 px-3 py-1 text-xs font-black text-amber-700">{tag}</span>)}
           </div>
-          <h1 className="mt-5 text-3xl font-black leading-tight tracking-tight sm:text-5xl">{product.title}</h1>
-          <p className="mt-3 text-sm font-semibold text-slate-500">Created by {product.instructor}</p>
-          <div className="mt-5 flex items-center gap-2">
+          <h1 className="text-3xl font-black leading-tight tracking-tight sm:text-5xl">{product.title}</h1>
+          <p className="text-sm font-semibold text-slate-500">Created by {product.instructor}</p>
+          <div className="flex items-center gap-2">
             <Star className="h-5 w-5 fill-amber-400 text-amber-400" />
             <span className="font-black">{product.rating.toFixed(1)}</span>
             <span className="text-sm text-slate-500">({product.reviews} verified reviews)</span>
           </div>
-          <p className="mt-6 text-base leading-7 text-slate-600">{product.description || `Get complete access to this ${product.category.toLowerCase()} resource, designed for focused learning and practical progress.`}</p>
+          <p className="text-base leading-7 text-slate-600 hidden lg:block">{product.description || `Get complete access to this ${product.category.toLowerCase()} resource, designed for focused learning and practical progress.`}</p>
 
-          <div className="mt-7 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-            <div className="flex flex-wrap items-end gap-3">
-              <span className="text-4xl font-black">{product.price === 0 ? "Free" : `₹${product.price.toLocaleString("en-IN")}`}</span>
-              {product.originalPrice > product.price && <span className="pb-1 text-lg text-slate-400 line-through">₹{product.originalPrice.toLocaleString("en-IN")}</span>}
-              {discount > 0 && <span className="mb-1 rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">SAVE {discount}%</span>}
-            </div>
-            <ul className="mt-5 space-y-3 text-sm font-semibold text-slate-600">
-              {["Access from your purchases library", "Available on mobile and desktop", "Account-linked secure delivery"].map((item) => <li key={item} className="flex items-center gap-2"><span className="grid h-5 w-5 place-items-center rounded-full bg-emerald-100 text-emerald-700"><Check size={13} /></span>{item}</li>)}
-            </ul>
-            <button onClick={() => onCheckout(product.price)} className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-violet-200 transition hover:brightness-110 active:scale-[0.99]"><ShoppingBag size={19} />{product.price === 0 ? "Get instant access" : "Continue to secure checkout"}</button>
-            <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-slate-400"><ShieldCheck size={14} /> Authentication required before checkout</p>
-          </div>
+          {/* Part 3: purchase builder. Renders the mode switcher, the module /
+              resource selector, the dynamic summary, and the CTA. Falls back
+              to the simple full-product CTA when no canonical modules or
+              resources are present (so legacy products without admin-defined
+              modules still work). */}
+          {product.canonicalModules && product.canonicalModules.length > 0 ? (
+            <PdpPurchaseBuilder
+              product={product}
+              isProductOwned={isProductOwned}
+              ownedUpdateIds={updates}
+              ownedModuleIds={ownedModuleIds}
+              ownedResourceIds={ownedResourceIds}
+              returnRoute={`#/product/${encodeURIComponent(product.id)}`}
+              onPreview={handlePreview}
+            />
+          ) : (
+            <LegacyCheckoutCard product={product} discount={discount} onCheckout={onCheckout} isProductOwned={isProductOwned} />
+          )}
+
+          <p className="mt-3 flex items-center justify-center gap-1.5 text-center text-xs font-semibold text-slate-400"><ShieldCheck size={14} /> Authentication required before checkout</p>
         </section>
       </main>
+    </div>
+  );
+}
+
+function ProductSummary({ product, discount }: { product: Product; discount: number }) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm">
+      <div className="flex flex-wrap items-end gap-3">
+        <span className="text-3xl font-black sm:text-4xl">{product.price === 0 ? "Free" : `₹${product.price.toLocaleString("en-IN")}`}</span>
+        {product.originalPrice > product.price && <span className="pb-1 text-base text-slate-400 line-through">₹{product.originalPrice.toLocaleString("en-IN")}</span>}
+        {discount > 0 && <span className="mb-1 rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">SAVE {discount}%</span>}
+      </div>
+    </div>
+  );
+}
+
+function ProductDescription({ product }: { product: Product }) {
+  return (
+    <p className="text-sm leading-6 text-slate-600">{product.description || `Get complete access to this ${product.category.toLowerCase()} resource, designed for focused learning and practical progress.`}</p>
+  );
+}
+
+function LegacyCheckoutCard({ product, discount, onCheckout, isProductOwned }: { product: Product; discount: number; onCheckout: (price: number) => void; isProductOwned: boolean }) {
+  return (
+    <div className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <div className="flex flex-wrap items-end gap-3">
+        <span className="text-4xl font-black">{isProductOwned ? "Owned" : product.price === 0 ? "Free" : `₹${product.price.toLocaleString("en-IN")}`}</span>
+        {product.originalPrice > product.price && <span className="pb-1 text-lg text-slate-400 line-through">₹{product.originalPrice.toLocaleString("en-IN")}</span>}
+        {discount > 0 && <span className="mb-1 rounded-lg bg-emerald-100 px-2 py-1 text-xs font-black text-emerald-700">SAVE {discount}%</span>}
+      </div>
+      <ul className="mt-5 space-y-3 text-sm font-semibold text-slate-600">
+        {["Access from your purchases library", "Available on mobile and desktop", "Account-linked secure delivery"].map((item) => <li key={item} className="flex items-center gap-2"><span className="grid h-5 w-5 place-items-center rounded-full bg-emerald-100 text-emerald-700"><ShieldCheck size={13} /></span>{item}</li>)}
+      </ul>
+      <button onClick={() => onCheckout(product.price)} className="mt-6 flex w-full items-center justify-center gap-2 rounded-2xl bg-gradient-to-r from-violet-600 to-fuchsia-600 px-5 py-4 text-base font-black text-white shadow-lg shadow-violet-200 transition hover:brightness-110 active:scale-[0.99]"><ShoppingBag size={19} />{isProductOwned ? "Open owned course" : product.price === 0 ? "Get instant access" : "Continue to secure checkout"}</button>
     </div>
   );
 }
@@ -83,3 +167,6 @@ export default function ProductDetail({ product, onCheckout, onBack }: ProductDe
 function Trust({ label }: { label: string }) {
   return <div className="rounded-2xl border border-slate-200 bg-white px-2 py-3 text-center text-[11px] font-black text-slate-600"><ShieldCheck className="mx-auto mb-1 h-4 w-4 text-emerald-600" />{label}</div>;
 }
+
+// Re-export the summary helper used by tests / future parts.
+export { computeSummary };

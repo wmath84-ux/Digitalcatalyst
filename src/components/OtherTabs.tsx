@@ -1,5 +1,6 @@
 import type { Product } from "../data/products";
 import { useCatalog } from "../context/CatalogContext";
+import { useOwnedProducts } from "../hooks/useCourseAccess";
 import { BagIcon, CalendarIcon, HeartIcon, HomeIcon, WalletIcon } from "./icons";
 
 export function HomeTab() {
@@ -38,7 +39,15 @@ export function PurchasesTab({
   onOpenCourse: (course: { id: string; title: string }) => void;
 }) {
   const { products } = useCatalog();
-  const items: Product[] = products.filter((product) => purchased.has(product.id));
+  // Part 10 — also surface products the user owns via the
+  // canonical entitlements collection. The Purchases
+  // library shows every product the user has any access to
+  // (full product + subscription + module / resource
+  // ownership falls back to the underlying product).
+  const { ownedProductIds: canonicalOwnedIds, signedIn } = useOwnedProducts();
+  const ownedSet = new Set<string>(signedIn ? canonicalOwnedIds : []);
+  for (const id of purchased) ownedSet.add(id);
+  const items: Product[] = products.filter((product) => ownedSet.has(product.id));
 
   if (items.length === 0) {
     return (

@@ -1,4 +1,5 @@
 import type { CourseModule } from "../types/course";
+import type { CanonicalCourseModule, CanonicalPaidUpdate } from "../types/commerce";
 
 export type Product = {
   id: string;
@@ -15,5 +16,23 @@ export type Product = {
   price: number;
   description?: string;
   paymentLink?: string;
+  /**
+   * Legacy module tree used by the existing Course Player. New consumers
+   * should read `canonicalModules` (the round-trip-safe Part 1 shape) and
+   * `paidUpdates` instead. This field is computed from the canonical tree
+   * via a one-way adapter and is preserved so the player keeps working
+   * without edits.
+   */
   courseContent?: CourseModule[];
+  /**
+   * Canonical Part 1 shape: every commerce/access field is preserved
+   * through the Admin → Firestore → Catalog → Admin round trip.
+   */
+  canonicalModules?: CanonicalCourseModule[];
+  /**
+   * Canonical Part 1 paid-update catalogue. The previous shape
+   * (`PaidCourseUpdate[]` in `src/types/course.ts`) is reverse-engineered
+   * from the module tree; this is the authoritative list.
+   */
+  paidUpdates?: CanonicalPaidUpdate[];
 };

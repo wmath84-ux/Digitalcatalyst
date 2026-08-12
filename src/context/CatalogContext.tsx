@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { collection, onSnapshot, type DocumentData } from "firebase/firestore";
 import { db } from "../../firebase";
 import type { Product } from "../data/products";
-import { sanitizeUrlOnlyCourseContent } from "../utils/courseContent";
+import { firestoreToCatalogProduct } from "../../utils/productMapping";
 
 import { useAuth } from "./AuthContext";
 
@@ -37,6 +37,15 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
   const rating = Number(data.manualRating ?? data.rating ?? data.calculatedRating ?? 0);
   const tags = Array.isArray(data.tags) ? data.tags.map(String) : [];
 
+  // Round-trip-safe Part 1 mapping: every commerce/access field on modules,
+  // resources, and paid updates is preserved end-to-end.
+  const catalogProjection = firestoreToCatalogProduct(data, documentId) || {
+    documentId,
+    canonicalModules: [],
+    paidUpdates: [],
+    courseContent: [],
+  };
+
   return {
     id: String(data.id ?? documentId),
     title: String(data.title || "Untitled product"),
@@ -52,7 +61,9 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
     price: salePrice,
     description: String(data.description || ""),
     paymentLink: String(data.paymentLink || ""),
-    courseContent: sanitizeUrlOnlyCourseContent(data.courseContent),
+    courseContent: catalogProjection.courseContent as Product["courseContent"],
+    canonicalModules: catalogProjection.canonicalModules,
+    paidUpdates: catalogProjection.paidUpdates,
   };
 };
 
