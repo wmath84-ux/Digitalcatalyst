@@ -83,6 +83,7 @@ export default function App() {
             <PaymentGateway
               productId={product.id}
               productIds={product.productIds}
+              updateSelection={product.updateSelection ? { productId: product.updateSelection.productId, updateId: product.updateSelection.updateId } : undefined}
               finalPrice={finalPrice}
               currency={product.currency}
               productName={product.name}

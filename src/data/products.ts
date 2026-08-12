@@ -1,3 +1,5 @@
+import type { CourseModule } from "../types/course";
+
 export type Product = {
   id: string;
   title: string;
@@ -13,4 +15,5 @@ export type Product = {
   price: number;
   description?: string;
   paymentLink?: string;
+  courseContent?: CourseModule[];
 };

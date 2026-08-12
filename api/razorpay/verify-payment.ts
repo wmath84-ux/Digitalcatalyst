@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { Timestamp } from 'firebase-admin/firestore';
+import { findPaidUpdate, grantCourseUpdate } from '../_lib/courseUpdates';
 import {
   adminDb,
   errorResponse,
@@ -38,7 +39,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const intentRef = db.collection('_paymentIntents').doc(orderId);
     const intentSnapshot = await intentRef.get();
     if (!intentSnapshot.exists) return res.status(404).json({ ok: false, verified: false, error: 'Secure payment intent was not found.' });
-    const intent = intentSnapshot.data() as { uid?: string; productIds?: string[]; requestedProductIds?: string[]; amountPaise?: number; status?: string; paymentId?: string };
+    const intent = intentSnapshot.data() as { uid?: string; checkoutType?: string; productId?: string; updateId?: string; productIds?: string[]; requestedProductIds?: string[]; amountPaise?: number; status?: string; paymentId?: string };
     if (intent.uid !== firebaseUser.uid) return res.status(403).json({ ok: false, verified: false, error: 'This payment belongs to a different account.' });
     if (intent.status === 'verified') {
       return res.status(200).json({ ok: true, verified: true, orderId, paymentId: intent.paymentId || paymentId, alreadyVerified: true });
@@ -65,22 +66,27 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (String(payment.order_id || '') !== orderId) return res.status(400).json({ ok: false, verified: false, error: 'Payment order mismatch.' });
     if (Number(payment.amount) !== Number(intent.amountPaise)) return res.status(400).json({ ok: false, verified: false, error: 'Payment amount mismatch.' });
 
-    const productIds = Array.isArray(intent.productIds) ? intent.productIds.map(String).filter(Boolean) : [];
-    if (productIds.length === 0) return res.status(404).json({ ok: false, verified: false, error: 'Purchased products were not recorded on the payment intent.' });
-    const productSnapshots = await db.getAll(...productIds.map((productId) => db.collection('siteProducts').doc(productId)));
-    if (productSnapshots.some((snapshot) => !snapshot.exists)) return res.status(404).json({ ok: false, verified: false, error: 'A purchased product no longer exists.' });
-
-    await grantProductEntitlements({
-      uid: firebaseUser.uid,
-      email: firebaseUser.email,
-      name: firebaseUser.name,
-      items: productSnapshots.map((snapshot) => ({ productId: snapshot.id, product: snapshot.data() as Record<string, unknown> })),
-      cartProductIds: Array.isArray(intent.requestedProductIds) ? intent.requestedProductIds.map(String) : productIds,
-      amountPaise: Number(intent.amountPaise),
-      orderId,
-      paymentId,
-      source: 'razorpay',
-    });
+    if (intent.checkoutType === 'course_update') {
+      const productId = String(intent.productId || '');
+      const updateId = String(intent.updateId || '');
+      const productSnapshot = await db.collection('siteProducts').doc(productId).get();
+      if (!productSnapshot.exists) return res.status(404).json({ ok: false, verified: false, error: 'Course no longer exists.' });
+      const product = productSnapshot.data() as Record<string, unknown>;
+      const update = findPaidUpdate(product, updateId);
+      if (!update) return res.status(409).json({ ok: false, verified: false, error: 'Course update was removed before verification. Contact support with the payment ID.' });
+      await grantCourseUpdate({ uid: firebaseUser.uid, email: firebaseUser.email, name: firebaseUser.name, productId, product, update: { ...update, pricePaise: Number(intent.amountPaise) }, orderId, paymentId, source: 'razorpay' });
+    } else {
+      const productIds = Array.isArray(intent.productIds) ? intent.productIds.map(String).filter(Boolean) : [];
+      if (!productIds.length) return res.status(404).json({ ok: false, verified: false, error: 'Purchased products were not recorded on the payment intent.' });
+      const productSnapshots = await db.getAll(...productIds.map((productId) => db.collection('siteProducts').doc(productId)));
+      if (productSnapshots.some((snapshot) => !snapshot.exists)) return res.status(404).json({ ok: false, verified: false, error: 'A purchased product no longer exists.' });
+      await grantProductEntitlements({
+        uid: firebaseUser.uid, email: firebaseUser.email, name: firebaseUser.name,
+        items: productSnapshots.map((snapshot) => ({ productId: snapshot.id, product: snapshot.data() as Record<string, unknown> })),
+        cartProductIds: Array.isArray(intent.requestedProductIds) ? intent.requestedProductIds.map(String) : productIds,
+        amountPaise: Number(intent.amountPaise), orderId, paymentId, source: 'razorpay',
+      });
+    }
     await intentRef.set({ status: 'verified', paymentId, verifiedAt: Timestamp.now() }, { merge: true });
 
     return res.status(200).json({ ok: true, verified: true, orderId, paymentId });

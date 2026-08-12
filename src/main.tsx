@@ -20,6 +20,7 @@ import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
+import type { PaidCourseUpdate } from "./types/course";
 import {
   product as checkoutProduct,
   user as checkoutUser,
@@ -85,7 +86,7 @@ const requiresAuthentication = (hash: string) =>
 
 function Root() {
   const { user, loading } = useAuth();
-  const { products: catalogProducts } = useCatalog();
+  const { products: catalogProducts, purchasedIds } = useCatalog();
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
@@ -108,6 +109,11 @@ function Root() {
 
   const selectedCatalogProduct = useMemo(() => {
     const routeId = hash.startsWith(PRODUCT_HASH) ? decodeURIComponent(hash.slice(PRODUCT_HASH.length).split("?")[0]) : "";
+    return catalogProducts.find((product) => product.id === routeId) || null;
+  }, [catalogProducts, hash]);
+
+  const selectedCourseProduct = useMemo(() => {
+    const routeId = hash.startsWith(COURSE_HASH) ? decodeURIComponent(hash.slice(COURSE_HASH.length).split("?")[0]) : "";
     return catalogProducts.find((product) => product.id === routeId) || null;
   }, [catalogProducts, hash]);
 
@@ -159,6 +165,30 @@ function Root() {
 
   const handleRemoveFromFavorites = (id: string) => {
     void toggleFavorite(id).then(() => showShoppingToast("Removed from favorites")).catch(() => showShoppingToast("Could not update favorites"));
+  };
+
+  const handlePurchaseUpdate = (update: PaidCourseUpdate) => {
+    if (!user || !selectedCourseProduct) return;
+    const context: CheckoutContext = {
+      product: {
+        id: selectedCourseProduct.id,
+        updateSelection: { productId: selectedCourseProduct.id, updateId: update.id, title: update.title, price: update.price },
+        name: update.title,
+        type: "Course",
+        description: `Update for ${selectedCourseProduct.title}: ${update.contentNames.join(", ")}`,
+        price: update.price,
+        currency: "₹",
+        thumbnail: "🆕",
+        instructor: selectedCourseProduct.instructor,
+        duration: `${update.contentNames.length} new item${update.contentNames.length === 1 ? "" : "s"}`,
+        rating: selectedCourseProduct.rating,
+        totalRatings: selectedCourseProduct.reviews,
+      },
+      user: { ...checkoutUser, id: user.id, name: user.name, email: user.email, eduCoins: user.coins },
+    };
+    applyCheckoutContext(context);
+    sessionStorage.setItem(CHECKOUT_CONTEXT_KEY, JSON.stringify(context));
+    window.location.hash = CHECKOUT_HASH;
   };
 
   const handleCartCheckout = () => {
@@ -214,14 +244,14 @@ function Root() {
     window.location.hash = `${COURSE_HASH}${encodeURIComponent(course.id)}`;
   };
 
-  const navigateToCheckout = (finalPrice: number) => {
+  const navigateToCheckout = (finalPrice: number, checkoutCatalogProduct = selectedCatalogProduct) => {
     if (!user) {
       sessionStorage.setItem("pendingCheckoutPrice", String(finalPrice));
       redirectToAuth(window.location.hash || PRODUCT_HASH);
       return;
     }
 
-    if (!selectedCatalogProduct) {
+    if (!checkoutCatalogProduct) {
       showShoppingToast("This product is no longer available");
       window.location.hash = STORE_HASH;
       return;
@@ -229,23 +259,23 @@ function Root() {
 
     const context: CheckoutContext = {
       product: {
-        id: selectedCatalogProduct.id,
-        name: selectedCatalogProduct.title,
-        type: selectedCatalogProduct.category === "PDF" || selectedCatalogProduct.category === "Notes"
+        id: checkoutCatalogProduct.id,
+        name: checkoutCatalogProduct.title,
+        type: checkoutCatalogProduct.category === "PDF" || checkoutCatalogProduct.category === "Notes"
           ? "PDF"
-          : selectedCatalogProduct.category === "E-book"
+          : checkoutCatalogProduct.category === "E-book"
             ? "eBook"
-            : selectedCatalogProduct.category === "Live"
+            : checkoutCatalogProduct.category === "Live"
               ? "Live Workshop"
               : "Course",
-        description: selectedCatalogProduct.description || selectedCatalogProduct.subject,
+        description: checkoutCatalogProduct.description || checkoutCatalogProduct.subject,
         price: finalPrice,
         currency: "₹",
         thumbnail: "📘",
-        instructor: selectedCatalogProduct.instructor,
-        duration: selectedCatalogProduct.classLevel,
-        rating: selectedCatalogProduct.rating,
-        totalRatings: selectedCatalogProduct.reviews,
+        instructor: checkoutCatalogProduct.instructor,
+        duration: checkoutCatalogProduct.classLevel,
+        rating: checkoutCatalogProduct.rating,
+        totalRatings: checkoutCatalogProduct.reviews,
       },
       user: {
         ...checkoutUser,
@@ -341,7 +371,11 @@ function Root() {
   if (hash.startsWith(SUBSCRIPTION_HASH)) return <SubscriptionApp />;
   if (hash.startsWith(AI_CHAT_HASH)) return <AiChatApp />;
   if (hash.startsWith(COMMUNITY_HASH)) return <CommunityApp />;
-  if (hash.startsWith(COURSE_HASH)) return <CoursePlayerApp />;
+  if (hash.startsWith(COURSE_HASH)) {
+    if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = STORE_HASH; }} />;
+    if (!purchasedIds.has(selectedCourseProduct.id)) return <PdpApp product={selectedCourseProduct} onCheckout={(price) => navigateToCheckout(price, selectedCourseProduct)} onBack={() => { window.location.hash = STORE_HASH; }} />;
+    return <CoursePlayerApp product={selectedCourseProduct} onBack={() => { window.location.hash = "#/store/purchases"; }} onPurchaseUpdate={handlePurchaseUpdate} />;
+  }
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
   if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
   if (hash.startsWith(PRODUCT_HASH)) return <PdpApp product={selectedCatalogProduct} onCheckout={navigateToCheckout} onBack={() => { window.location.hash = STORE_HASH; }} />;

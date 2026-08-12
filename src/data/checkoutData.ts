@@ -1,6 +1,7 @@
 export interface Product {
   id: string;
   productIds?: string[];
+  updateSelection?: { productId: string; updateId: string; title: string; price: number };
   name: string;
   type: 'PDF' | 'Course' | 'Video' | 'eBook' | 'Live Workshop';
   description: string;

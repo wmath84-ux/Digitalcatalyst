@@ -68,6 +68,14 @@ service cloud.firestore {
         allow update, delete: if isAdmin();
       }
 
+      match /courseProgress/{productId} {
+        allow read: if isOwner(uid) || isAdmin();
+        allow create, update: if isOwner(uid)
+          && request.resource.data.productId == productId
+          && !request.resource.data.keys().hasAny(['role', 'status', 'purchasedProductIds', 'purchasedProductUpdateIds', 'coinBalance', 'eduCoins']);
+        allow delete: if isOwner(uid) || isAdmin();
+      }
+
       match /session/{sessionId} {
         allow read: if sessionId == 'current' && isOwner(uid);
         allow create, update: if sessionId == 'current'

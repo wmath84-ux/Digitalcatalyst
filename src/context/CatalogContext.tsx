@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import { collection, onSnapshot, type DocumentData } from "firebase/firestore";
 import { db } from "../../firebase";
 import type { Product } from "../data/products";
+import type { CourseModule } from "../types/course";
 
 import { useAuth } from "./AuthContext";
 
@@ -51,6 +52,7 @@ const mapProduct = (documentId: string, data: DocumentData): Product => {
     price: salePrice,
     description: String(data.description || ""),
     paymentLink: String(data.paymentLink || ""),
+    courseContent: Array.isArray(data.courseContent) ? data.courseContent as CourseModule[] : [],
   };
 };
 

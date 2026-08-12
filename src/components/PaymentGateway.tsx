@@ -12,6 +12,7 @@ export type VerifiedPayment = {
 interface PaymentGatewayProps {
   productId: string;
   productIds?: string[];
+  updateSelection?: { productId: string; updateId: string };
   finalPrice: number;
   currency: string;
   productName: string;
@@ -76,7 +77,7 @@ const apiRequest = async <T,>(path: string, body: Record<string, unknown>): Prom
   return data;
 };
 
-export default function PaymentGateway({ productId, productIds, finalPrice, currency, productName, onPaymentSuccess, onGoBack }: PaymentGatewayProps) {
+export default function PaymentGateway({ productId, productIds, updateSelection, finalPrice, currency, productName, onPaymentSuccess, onGoBack }: PaymentGatewayProps) {
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
   const [error, setError] = useState("");
 
@@ -109,7 +110,7 @@ export default function PaymentGateway({ productId, productIds, finalPrice, curr
         currency?: string;
         productName?: string;
         customer?: { name?: string; email?: string };
-      }>("/api/razorpay/create-order", { productId, productIds });
+      }>("/api/razorpay/create-order", { productId, productIds, updateSelection });
 
       if (order.free && order.verified) {
         setPaymentState("success");
