@@ -24,7 +24,7 @@ const filesInModule = (module: CourseModule): CourseFile[] => [
   ...(module.embedContentUrl ? [{
     id: `${module.id}__embedded-page`,
     name: module.embedContentTypeLabel || (module.embedContentTypeId === "github_page" ? "Interactive GitHub Page" : "Embedded resource"),
-    type: module.embedContentTypeId === "google_doc" ? "doc" as const : "link" as const,
+    type: module.embedContentTypeId === "google_doc" ? "doc" as const : module.embedContentTypeId === "whimsical_mindmap" ? "mindmap" as const : "embed" as const,
     url: module.embedContentUrl,
     embedUrl: module.embedContentUrl,
     provider: module.embedContentTypeId || "external",
@@ -41,7 +41,7 @@ const firstAccessibleFile = (modules: CourseModule[], owned: Set<string>, inheri
   for (const module of modules) {
     if (module.accessLevel === "hidden") continue;
     const moduleLocked = inheritedLocked || (module.accessLevel === "paidUpdate" && !owned.has(accessId(module)));
-    const file = filesInModule(module).find((item) => item.accessLevel !== "hidden" && !moduleLocked && (item.accessLevel !== "paidUpdate" || owned.has(accessId(item))));
+    const file = filesInModule(module).find((item) => item.accessLevel !== "hidden" && Boolean(item.url || item.embedUrl || item.youtubeUrl || item.youtubeVideoId) && !moduleLocked && (item.accessLevel !== "paidUpdate" || owned.has(accessId(item))));
     if (file) return file;
     const nested = firstAccessibleFile(module.modules || [], owned, moduleLocked);
     if (nested) return nested;
@@ -71,7 +71,7 @@ const collectUpdates = (modules: CourseModule[]) => {
 export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: CoursePlayerProps) {
   const { user } = useAuth();
   const modules = product.courseContent || [];
-  const files = useMemo(() => allFiles(modules).filter((file) => file.accessLevel !== "hidden"), [modules]);
+  const files = useMemo(() => allFiles(modules).filter((file) => file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId)), [modules]);
   const [selectedFile, setSelectedFile] = useState<CourseFile | null>(null);
   const [tab, setTab] = useState<Tab>("curriculum");
   const [panelOpen, setPanelOpen] = useState(true);

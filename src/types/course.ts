@@ -1,5 +1,5 @@
 export type CourseAccessLevel = "included" | "paidUpdate" | "hidden";
-export type CourseFileType = "youtube" | "video" | "audio" | "pdf" | "doc" | "sheet" | "link" | "ebook" | "quiz" | "image" | "google_form";
+export type CourseFileType = "youtube" | "video" | "audio" | "pdf" | "doc" | "sheet" | "ebook" | "image" | "google_form" | "embed" | "mindmap";
 
 export interface CourseAccessMeta {
   accessLevel?: CourseAccessLevel;
@@ -7,12 +7,6 @@ export interface CourseAccessMeta {
   paidUpdateTitle?: string;
   paidUpdatePrice?: string;
   paidUpdateCoinPrice?: number;
-}
-
-export interface CourseDocPage {
-  id: string;
-  title: string;
-  content: string;
 }
 
 export interface CourseFile extends CourseAccessMeta {
@@ -23,8 +17,6 @@ export interface CourseFile extends CourseAccessMeta {
   embedUrl?: string;
   youtubeUrl?: string;
   youtubeVideoId?: string;
-  content?: string;
-  docPages?: CourseDocPage[];
   size?: number;
   contentType?: string;
   provider?: string;

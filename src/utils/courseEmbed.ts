@@ -37,8 +37,19 @@ const googleParts = (value: string) => {
   return null;
 };
 
-export const getCourseEmbed = (file: CourseFile): { url: string; kind: "youtube" | "pdf" | "doc" | "sheet" | "slides" | "form" | "drive" | "direct" | "none" } => {
+const whimsicalEmbedUrl = (value: string) => {
+  const url = safeUrl(value);
+  if (!url) return "";
+  const match = url.match(/whimsical\.com\/embed\/([a-km-zA-HJ-NP-Z1-9]{16,22})/i) || url.match(/whimsical\.com\/(?:[a-zA-Z0-9-]+-)?([a-km-zA-HJ-NP-Z1-9]{16,22})(?:@[a-km-zA-HJ-NP-Z1-9]+)?(?:[/?#]|$)/i);
+  return match?.[1] ? `https://whimsical.com/embed/${match[1]}` : "";
+};
+
+export const getCourseEmbed = (file: CourseFile): { url: string; kind: "youtube" | "pdf" | "doc" | "sheet" | "slides" | "form" | "drive" | "mindmap" | "embed" | "direct" | "none" } => {
   const raw = getCourseFileUrl(file);
+  if (file.type === "mindmap" || file.provider === "whimsical_mindmap" || /whimsical\.com/i.test(raw)) {
+    const url = whimsicalEmbedUrl(raw);
+    return url ? { url, kind: "mindmap" } : { url: "", kind: "none" };
+  }
   if (file.type === "youtube" || file.youtubeVideoId || /youtu(?:\.be|be\.com)/i.test(raw)) {
     const id = file.youtubeVideoId || extractYouTubeId(raw);
     return id ? { url: `https://www.youtube-nocookie.com/embed/${encodeURIComponent(id)}?rel=0&modestbranding=1&playsinline=1`, kind: "youtube" } : { url: "", kind: "none" };
@@ -56,6 +67,7 @@ export const getCourseEmbed = (file: CourseFile): { url: string; kind: "youtube"
   if (google?.kind === "drive") return { url: `https://drive.google.com/file/d/${google.id}/preview`, kind: file.type === "pdf" ? "pdf" : "drive" };
   if (file.type === "pdf" && raw) return { url: raw, kind: "pdf" };
   if ((file.type === "doc" || file.type === "sheet" || file.type === "ebook") && raw) return { url: `https://docs.google.com/gview?embedded=1&url=${encodeURIComponent(raw)}`, kind: file.type === "sheet" ? "sheet" : "doc" };
+  if (file.type === "embed" && raw) return { url: raw, kind: "embed" };
   return raw ? { url: raw, kind: "direct" } : { url: "", kind: "none" };
 };
 
@@ -67,10 +79,8 @@ export const getCourseDownload = (file: CourseFile): { url: string; label: strin
   if (google?.kind === "presentation") return { url: `https://docs.google.com/presentation/d/${google.id}/export/pdf`, label: "Download PDF", downloadable: true };
   if (google?.kind === "drive") return { url: `https://drive.google.com/uc?export=download&id=${encodeURIComponent(google.id)}`, label: "Download Drive file", downloadable: true };
   if (file.type === "google_form" || google?.kind === "forms") return { url: raw, label: "Open original form", downloadable: false };
-  return { url: raw, label: file.type === "link" || file.type === "youtube" ? "Open original" : "Download file", downloadable: !["link", "youtube"].includes(file.type) };
+  if (file.type === "mindmap" || file.type === "embed" || file.type === "youtube") return { url: raw, label: "Open original", downloadable: false };
+  return { url: raw, label: "Download file", downloadable: true };
 };
 
-export const isPreviewableCourseFile = (file: CourseFile) => {
-  const embed = getCourseEmbed(file);
-  return Boolean(file.content || file.docPages?.length || embed.url);
-};
+export const isPreviewableCourseFile = (file: CourseFile) => Boolean(getCourseEmbed(file).url);

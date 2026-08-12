@@ -17,7 +17,7 @@ const moduleFiles = (module: CourseModule): CourseFile[] => {
   const embedded = module.embedContentUrl ? [{
     id: `${module.id}__embedded-page`,
     name: module.embedContentTypeLabel || (module.embedContentTypeId === "github_page" ? "Interactive GitHub Page" : "Embedded resource"),
-    type: module.embedContentTypeId === "google_doc" ? "doc" as const : "link" as const,
+    type: module.embedContentTypeId === "google_doc" ? "doc" as const : module.embedContentTypeId === "whimsical_mindmap" ? "mindmap" as const : "embed" as const,
     url: module.embedContentUrl,
     embedUrl: module.embedContentUrl,
     provider: module.embedContentTypeId || "external",
@@ -29,7 +29,7 @@ const moduleFiles = (module: CourseModule): CourseFile[] => {
   }] : [];
   return [...embedded, ...(module.files || [])];
 };
-const isLesson = (file: CourseFile) => ["youtube", "video", "audio", "quiz"].includes(file.type);
+const isLesson = (file: CourseFile) => ["youtube", "video", "audio"].includes(file.type);
 const iconFor = (file: CourseFile) => {
   if (file.type === "youtube" || file.type === "video") return PlayCircle;
   if (file.type === "pdf") return FileText;
@@ -66,7 +66,7 @@ function ModuleGroup({ module, index, depth, inheritedLocked, openModules, toggl
   if (module.accessLevel === "hidden") return null;
   const open = openModules.has(module.id);
   const moduleLocked = inheritedLocked || (module.accessLevel === "paidUpdate" && !props.ownedUpdateIds.has(updateId(module)));
-  const visibleFiles = moduleFiles(module).filter((file) => file.accessLevel !== "hidden" && (props.mode === "curriculum" ? isLesson(file) : !isLesson(file) || ["pdf", "doc", "sheet", "google_form", "ebook", "link", "image"].includes(file.type)));
+  const visibleFiles = moduleFiles(module).filter((file) => file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId) && (props.mode === "curriculum" ? isLesson(file) : ["pdf", "doc", "sheet", "google_form", "ebook", "image", "embed", "mindmap"].includes(file.type)));
   const hasChildren = visibleFiles.length > 0 || (module.modules || []).length > 0;
 
   return <div className={`${depth ? "ml-3 border-l border-white/10 pl-2" : "mb-2"}`}>

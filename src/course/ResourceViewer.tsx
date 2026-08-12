@@ -8,11 +8,7 @@ export default function ResourceViewer({ file }: { file: CourseFile | null }) {
 
   const embed = getCourseEmbed(file);
   const download = getCourseDownload(file);
-  const pages = file.docPages?.length ? file.docPages : file.content ? [{ id: file.id, title: file.name, content: file.content }] : [];
-  const canNativeRender = pages.length > 0;
-
   const viewer = (() => {
-    if (canNativeRender) return <div className="h-full overflow-y-auto bg-slate-100 p-4 sm:p-6">{pages.map((page) => <iframe key={page.id} title={page.title} sandbox="" srcDoc={`<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width"><style>body{font-family:Inter,system-ui,sans-serif;margin:0;padding:28px;color:#1e293b;line-height:1.7}h1,h2,h3{line-height:1.2;color:#0f172a}img{max-width:100%}table{border-collapse:collapse;width:100%}td,th{border:1px solid #cbd5e1;padding:8px}</style></head><body><h2>${page.title.replace(/[<>&]/g, "")}</h2>${page.content}</body></html>`} className="mx-auto mb-4 min-h-[70vh] w-full max-w-4xl rounded-2xl border border-slate-200 bg-white shadow-sm" />)}</div>;
     if (!embed.url) return <div className="grid h-full place-items-center bg-slate-950 p-8 text-center text-white"><div><FileQuestion className="mx-auto h-12 w-12 text-amber-400" /><p className="mt-4 font-black">Preview is unavailable</p><p className="mt-1 max-w-md text-sm text-white/50">Add a public HTTPS URL in product management. Google files must be shared as “Anyone with the link”.</p></div></div>;
     if (file.type === "video" && embed.kind === "direct") return <video src={embed.url} controls playsInline className="h-full w-full bg-black object-contain" />;
     if (file.type === "audio" && embed.kind === "direct") return <div className="grid h-full place-items-center bg-gradient-to-br from-slate-950 to-violet-950 p-8"><audio src={embed.url} controls className="w-full max-w-xl" /></div>;

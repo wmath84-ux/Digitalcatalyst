@@ -24,7 +24,10 @@ import {
   X,
 } from "lucide-react";
 import { db } from "../../firebase";
+import CourseUrlBuilder from "./CourseUrlBuilder";
 import { useAuth } from "../context/AuthContext";
+import { sanitizeUrlOnlyCourseContent } from "../utils/courseContent";
+import type { CourseModule } from "../types/course";
 
 type AdminView = "overview" | "products" | "users";
 type SaveState = "idle" | "saving" | "success" | "error";
@@ -62,6 +65,7 @@ type ProductForm = {
   paymentLink: string;
   isVisible: boolean;
   inStock: boolean;
+  courseContent: CourseModule[];
 };
 
 const emptyProductForm = (): ProductForm => ({
@@ -75,6 +79,7 @@ const emptyProductForm = (): ProductForm => ({
   paymentLink: "",
   isVisible: true,
   inStock: true,
+  courseContent: [],
 });
 
 const cleanPrice = (value: string) => value.replace(/[^0-9.]/g, "");
@@ -209,6 +214,7 @@ export default function AdminApp() {
       paymentLink: String(product.raw.paymentLink || ""),
       isVisible: product.isVisible,
       inStock: product.inStock,
+      courseContent: sanitizeUrlOnlyCourseContent(product.raw.courseContent),
     });
     setFormError("");
     setSaveState("idle");
@@ -249,6 +255,7 @@ export default function AdminApp() {
         isVisible: form.isVisible,
         inStock: form.inStock,
         features: Array.isArray(existing.features) ? existing.features : [],
+        courseContent: sanitizeUrlOnlyCourseContent(form.courseContent),
         updatedAt: serverTimestamp(),
         ...(editingProduct ? {} : { createdAt: serverTimestamp() }),
       }, { merge: true });
@@ -419,6 +426,7 @@ function ProductEditor({ form, setForm, editing, saveState, error, onClose, onSu
           <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 text-sm font-bold"><input type="checkbox" checked={form.isVisible} onChange={(event) => update("isVisible", event.target.checked)} className="h-4 w-4 accent-violet-600" /> Visible in store</label>
           <label className="flex items-center gap-3 rounded-xl border border-slate-200 p-4 text-sm font-bold"><input type="checkbox" checked={form.inStock} onChange={(event) => update("inStock", event.target.checked)} className="h-4 w-4 accent-violet-600" /> Available for sale</label>
         </div>
+        <CourseUrlBuilder modules={form.courseContent} onChange={(courseContent) => update("courseContent", courseContent)} />
         {error && <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm font-semibold text-rose-700">{error}</div>}
         <div className="mt-6 flex gap-3"><button type="button" onClick={onClose} className="flex-1 rounded-xl border border-slate-200 px-4 py-3 text-sm font-black">Cancel</button><button disabled={saveState === "saving"} className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-slate-950 px-4 py-3 text-sm font-black text-white disabled:opacity-60">{saveState === "saving" && <LoaderCircle size={17} className="animate-spin" />}{saveState === "success" ? "Saved" : saveState === "saving" ? "Saving…" : "Save product"}</button></div>
       </form>
