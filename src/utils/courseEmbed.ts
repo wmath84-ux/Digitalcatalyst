@@ -46,8 +46,9 @@ export const getCourseEmbed = (file: CourseFile): { url: string; kind: "youtube"
   const google = googleParts(raw);
   if (file.type === "google_form" || google?.kind === "forms") {
     if (!raw) return { url: "", kind: "none" };
-    const separator = raw.includes("?") ? "&" : "?";
-    return { url: raw.includes("embedded=true") ? raw : `${raw}${separator}embedded=true`, kind: "form" };
+    const viewUrl = raw.replace(/\/edit(?:\?.*)?$/i, "/viewform");
+    const separator = viewUrl.includes("?") ? "&" : "?";
+    return { url: viewUrl.includes("embedded=true") ? viewUrl : `${viewUrl}${separator}embedded=true`, kind: "form" };
   }
   if (google?.kind === "document") return { url: `https://docs.google.com/document/d/${google.id}/preview`, kind: "doc" };
   if (google?.kind === "spreadsheets") return { url: `https://docs.google.com/spreadsheets/d/${google.id}/preview?widget=true&headers=false`, kind: "sheet" };

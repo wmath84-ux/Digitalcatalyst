@@ -1,14 +1,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { ArrowLeft, BookOpen, CheckCircle2, FileText, Menu, NotebookPen, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { ArrowLeft, BookOpen, Bot, CheckCircle2, FileText, Menu, NotebookPen, PanelRightClose, PanelRightOpen } from "lucide-react";
 import { db } from "../firebase";
+import AiQuestion from "./course/AiQuestion";
 import CourseSidebar from "./course/CourseSidebar";
 import ResourceViewer from "./course/ResourceViewer";
 import type { Product } from "./data/products";
 import type { CourseFile, CourseModule, PaidCourseUpdate } from "./types/course";
 import { useAuth } from "./context/AuthContext";
 
-type Tab = "curriculum" | "resources" | "notes";
+type Tab = "curriculum" | "resources" | "notes" | "ai";
 
 interface CoursePlayerProps {
   product: Product;
@@ -19,12 +20,28 @@ interface CoursePlayerProps {
 const numericPrice = (value?: string) => { const number = Number(String(value || "0").replace(/[^0-9.-]/g, "")); return Number.isFinite(number) ? Math.max(0, number) : 0; };
 const accessId = (item: { id: string; paidUpdateId?: string }) => String(item.paidUpdateId || item.id);
 
-const allFiles = (modules: CourseModule[]): CourseFile[] => modules.flatMap((module) => [...(module.files || []), ...allFiles(module.modules || [])]);
+const filesInModule = (module: CourseModule): CourseFile[] => [
+  ...(module.embedContentUrl ? [{
+    id: `${module.id}__embedded-page`,
+    name: module.embedContentTypeLabel || (module.embedContentTypeId === "github_page" ? "Interactive GitHub Page" : "Embedded resource"),
+    type: module.embedContentTypeId === "google_doc" ? "doc" as const : "link" as const,
+    url: module.embedContentUrl,
+    embedUrl: module.embedContentUrl,
+    provider: module.embedContentTypeId || "external",
+    accessLevel: module.accessLevel,
+    paidUpdateId: module.paidUpdateId,
+    paidUpdateTitle: module.paidUpdateTitle,
+    paidUpdatePrice: module.paidUpdatePrice,
+    paidUpdateCoinPrice: module.paidUpdateCoinPrice,
+  }] : []),
+  ...(module.files || []),
+];
+const allFiles = (modules: CourseModule[]): CourseFile[] => modules.flatMap((module) => [...filesInModule(module), ...allFiles(module.modules || [])]);
 const firstAccessibleFile = (modules: CourseModule[], owned: Set<string>, inheritedLocked = false): CourseFile | null => {
   for (const module of modules) {
     if (module.accessLevel === "hidden") continue;
     const moduleLocked = inheritedLocked || (module.accessLevel === "paidUpdate" && !owned.has(accessId(module)));
-    const file = (module.files || []).find((item) => item.accessLevel !== "hidden" && !moduleLocked && (item.accessLevel !== "paidUpdate" || owned.has(accessId(item))));
+    const file = filesInModule(module).find((item) => item.accessLevel !== "hidden" && !moduleLocked && (item.accessLevel !== "paidUpdate" || owned.has(accessId(item))));
     if (file) return file;
     const nested = firstAccessibleFile(module.modules || [], owned, moduleLocked);
     if (nested) return nested;
@@ -62,6 +79,7 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
   const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
   const [notes, setNotes] = useState<Array<{ id: string; text: string; createdAt: number }>>([]);
   const [noteDraft, setNoteDraft] = useState("");
+  const [aiDraft, setAiDraft] = useState("");
   const updates = useMemo(() => collectUpdates(modules).filter((update) => !ownedUpdateIds.has(update.id)), [modules, ownedUpdateIds]);
 
   useEffect(() => {
@@ -104,6 +122,13 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
     if (user) void setDoc(doc(db, "users", user.id, "courseProgress", product.id), { productId: product.id, lastOpenedFileId: file.id, lastOpenedAt: serverTimestamp() }, { merge: true });
   };
 
+  const openCommunityAi = () => {
+    const prompt = aiDraft.trim() || `Help me understand ${selectedFile?.name || product.title}.`;
+    sessionStorage.setItem("aiInitialPrompt", prompt);
+    sessionStorage.setItem("aiCourseContext", JSON.stringify({ productId: product.id, courseTitle: product.title, fileId: selectedFile?.id || "", fileName: selectedFile?.name || "" }));
+    window.location.hash = "#/ai-chat";
+  };
+
   const progress = files.length ? Math.round((completedIds.size / files.length) * 100) : 0;
 
   return (
@@ -125,8 +150,9 @@ export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: Cour
             <TabButton active={tab === "curriculum"} onClick={() => setTab("curriculum")} icon={<BookOpen size={14} />} label="Modules" />
             <TabButton active={tab === "resources"} onClick={() => setTab("resources")} icon={<FileText size={14} />} label="Resources" />
             <TabButton active={tab === "notes"} onClick={() => setTab("notes")} icon={<NotebookPen size={14} />} label="Notes" />
+            <TabButton active={tab === "ai"} onClick={() => setTab("ai")} icon={<Bot size={14} />} label="AI Q&A" />
           </div>
-          <div className="min-h-0 flex-1">{tab === "notes" ? <Notes notes={notes} draft={noteDraft} setDraft={setNoteDraft} onSave={() => void saveNote()} /> : <CourseSidebar modules={modules} selectedId={selectedFile?.id} ownedUpdateIds={ownedUpdateIds} mode={tab} updates={updates} onSelect={selectFile} onBuyUpdate={onPurchaseUpdate} />}</div>
+          <div className="min-h-0 flex-1">{tab === "notes" ? <Notes notes={notes} draft={noteDraft} setDraft={setNoteDraft} onSave={() => void saveNote()} /> : tab === "ai" ? <AiQuestion draft={aiDraft} setDraft={setAiDraft} fileName={selectedFile?.name} onOpen={openCommunityAi} /> : <CourseSidebar modules={modules} selectedId={selectedFile?.id} ownedUpdateIds={ownedUpdateIds} mode={tab} updates={updates} onSelect={selectFile} onBuyUpdate={onPurchaseUpdate} />}</div>
         </aside>
       </div>
 

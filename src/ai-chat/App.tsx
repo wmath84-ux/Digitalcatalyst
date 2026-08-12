@@ -33,7 +33,11 @@ export default function AiChatApp() {
   const [renameTarget, setRenameTarget] = useState<Chat | null>(null);
   const [deleteTarget, setDeleteTarget] = useState<Chat | null>(null);
 
-  const [draft, setDraft] = useState("");
+  const [draft, setDraft] = useState(() => {
+    const initialPrompt = sessionStorage.getItem("aiInitialPrompt") || "";
+    sessionStorage.removeItem("aiInitialPrompt");
+    return initialPrompt;
+  });
   const [isTyping, setIsTyping] = useState(false);
   const typingTimeout = useRef<number | null>(null);
 
