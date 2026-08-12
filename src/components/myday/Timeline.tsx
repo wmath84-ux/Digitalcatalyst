@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import { BookOpen, CalendarClock, Coffee, GraduationCap, Pencil, PenSquare, Plus, Trash2, User } from "lucide-react";
+import { BookOpen, CalendarClock, Coffee, GraduationCap, Pencil, PenSquare, Plus, Trash2, User, type LucideIcon } from "lucide-react";
 import type { EventType, ScheduleEvent } from "../../types";
 import { cn } from "../../utils/cn";
 
@@ -12,7 +12,7 @@ interface TimelineProps {
 
 const typeMeta: Record<
   EventType,
-  { icon: React.ElementType; text: string; dot: string; bg: string; ring: string }
+  { icon: LucideIcon; text: string; dot: string; bg: string; ring: string }
 > = {
   class: { icon: GraduationCap, text: "text-indigo-600", dot: "bg-indigo-500", bg: "bg-indigo-50", ring: "ring-indigo-200" },
   study: { icon: BookOpen, text: "text-violet-600", dot: "bg-violet-500", bg: "bg-violet-50", ring: "ring-violet-200" },

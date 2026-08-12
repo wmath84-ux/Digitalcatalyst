@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, Info, XCircle, X } from "lucide-react";
+import { CheckCircle2, Info, XCircle, X, type LucideIcon } from "lucide-react";
 import { cn } from "../../utils/cn";
 
 export type ToastType = "success" | "error" | "info";
@@ -15,7 +15,7 @@ interface ToastProps {
   onRemove: (id: string) => void;
 }
 
-const icons: Record<ToastType, React.ElementType> = {
+const icons: Record<ToastType, LucideIcon> = {
   success: CheckCircle2,
   error: XCircle,
   info: Info,

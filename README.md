@@ -2,38 +2,18 @@
 
 A Vite + React learning marketplace prototype for notes, courses, coupons, subscriptions, profile/EduCoins, and admin management.
 
-## Demo mode deployment
+## Current architecture
 
-This project is intentionally safe to deploy on Vercel **without any environment variables** while you are focusing on design.
+The browser has one Vite entry point: `index.html` loads `src/main.tsx`. Firebase Authentication is the only authentication system. Email/password login, signup, Google sign-in, password reset, admin role checks, persistent sessions, and profile hydration are provided by `src/context/AuthContext.tsx`.
 
-You do **not** need these variables for the current demo-mode app to open:
+The removed PostgreSQL/JWT and Next.js authentication implementations must not be reintroduced. Server features should verify Firebase ID tokens and store user-owned data under the authenticated Firebase UID.
 
-- `NEXTAUTH_URL`
-- `NEXTAUTH_SECRET`
-- `RAZORPAY_KEY_ID`
-- `RAZORPAY_SECRET`
-- `DATABASE_URL`
-- `MONGODB_URI`
-- `POSTGRES_URL`
-- `BLOB_READ_WRITE_TOKEN`
-- `CLOUDINARY_URL`
-- `GEMINI_API_KEY`
+### Firebase setup
 
-Current behavior in demo mode:
-
-- Auth/OTP is simulated locally in the browser.
-- Products, users, orders, coupons, settings, purchases, profile and EduCoins use browser `localStorage`.
-- Payment opens a Razorpay payment page link, but product delivery stays locked until manual/admin verification.
-- AI features show local placeholder/demo responses when `GEMINI_API_KEY` is not set.
-- Image/file uploads are stored as browser data URLs for preview/testing.
-
-## Optional variable
-
-Only add this if you want real Gemini responses instead of demo placeholder replies:
-
-```env
-GEMINI_API_KEY=your_gemini_key_here
-```
+- Enable **Email/Password** and **Google** under Firebase Console → Authentication → Sign-in method.
+- Add localhost and every deployed hostname under Authentication → Settings → Authorized domains.
+- Deploy `firestore.rules` and `storage.rules` before using protected user/admin data.
+- The Firebase web configuration is initialized in `firebase.ts`; Firebase web API keys are public project identifiers, while all server secrets must remain in deployment environment variables.
 
 ## Run locally
 
@@ -68,15 +48,7 @@ Digital Catalyst is configured as an installable PWA. To test installability aft
 
 ## Firebase Google login setup
 
-To use the in-app **Continue with Google** authentication flow (Google One Tap with a native bottom sheet account picker):
-
-- Open **Firebase Console → Authentication → Sign-in method → Google** and enable the Google provider.
-- Add a support email for the Firebase project.
-- Add authorized domains for production and local development, such as your deployed domain and `localhost`.
-- Copy the **OAuth 2.0 "Web application" client ID** from **Google Cloud Console → APIs & Services → Credentials** (the web client tied to the Firebase project) and set it as `VITE_GOOGLE_CLIENT_ID` in your environment / `.env` file.
-- Deploy after the Firebase environment/configuration is correct.
-
-The client loads Google Identity Services and opens the account picker as a native-looking bottom sheet over the current page, without navigating away or opening a new window. The returned ID token is exchanged with Firebase (`signInWithCredential`) to restore purchases and profile data.
+The current authentication page uses Firebase `signInWithPopup` with `GoogleAuthProvider` and explicitly shows the Google account chooser. Enable the Google provider, configure its support email, and authorize local/production domains in Firebase Console. No separate `VITE_GOOGLE_CLIENT_ID` is used by the current application.
 
 The app stores only safe profile metadata in Firestore (`users/{uid}`); passwords and Google credentials/tokens are never written to Firestore or localStorage.
 

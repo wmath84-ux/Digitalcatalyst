@@ -85,8 +85,21 @@ function applyCheckoutContext(context: CheckoutContext) {
   Object.assign(checkoutUser, context.user);
 }
 
+const AUTH_REQUIRED_PREFIXES = [
+  CHECKOUT_HASH,
+  MY_DAY_HASH,
+  PROFILE_HASH,
+  COURSE_HASH,
+  COMMUNITY_HASH,
+  SUBSCRIPTION_HASH,
+  AI_CHAT_HASH,
+];
+
+const requiresAuthentication = (hash: string) =>
+  AUTH_REQUIRED_PREFIXES.some((prefix) => hash.startsWith(prefix));
+
 function Root() {
-  const { user } = useAuth();
+  const { user, loading } = useAuth();
   const [hash, setHash] = useState(() => window.location.hash);
   const [cartIds, setCartIds] = useState<Set<string>>(new Set(INITIAL_CART));
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set(INITIAL_FAVORITES));
@@ -105,6 +118,11 @@ function Root() {
     window.addEventListener("hashchange", handleHashChange);
     return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
+
+  useEffect(() => {
+    if (loading || user || !requiresAuthentication(hash)) return;
+    window.location.hash = `${AUTH_HASH}?mode=login&return=${encodeURIComponent(hash)}`;
+  }, [hash, loading, user]);
 
   useEffect(() => {
     return () => {
@@ -222,6 +240,20 @@ function Root() {
 
   const cartProducts = SHOPPING_PRODUCTS.filter((product) => cartIds.has(product.id));
   const favoriteProducts = SHOPPING_PRODUCTS.filter((product) => favoriteIds.has(product.id));
+  const protectedRoutePending = requiresAuthentication(hash) && (loading || !user);
+
+  if (protectedRoutePending) {
+    return (
+      <main className="grid min-h-[100dvh] place-items-center bg-[#05060f] px-6 text-center text-white">
+        <div>
+          <span className="mx-auto block h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-violet-400" />
+          <p className="mt-4 text-sm font-semibold text-slate-300">
+            {loading ? "Restoring your secure session…" : "Taking you to secure login…"}
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   if (!hash || hash.startsWith(LANDING_HASH)) return <LandingApp />;
   if (hash.startsWith(HOME_HASH)) {
