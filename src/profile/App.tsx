@@ -23,6 +23,7 @@ import { db } from "../../firebase";
 import { useAuth } from "../context/AuthContext";
 import { useCatalog } from "../context/CatalogContext";
 import { useCommerce } from "../context/CommerceContext";
+import { useOwnedProducts } from "../hooks/useCourseAccess";
 
 type Modal = "edit" | "coins" | "settings" | null;
 type Preferences = {
@@ -53,6 +54,10 @@ export default function ProfileApp() {
   const { user, logout, updateAccount } = useAuth();
   const { products, purchasedIds } = useCatalog();
   const { favoriteIds, cartIds } = useCommerce();
+  // Part 10 — full product ownership from the canonical
+  // entitlements collection. The Profile uses this as the
+  // authoritative "Purchased" count.
+  const { ownedProductIds: canonicalOwnedIds, signedIn } = useOwnedProducts();
   const [modal, setModal] = useState<Modal>(null);
   const [coinHistory, setCoinHistory] = useState<CoinEntry[]>([]);
   const [preferences, setPreferences] = useState<Preferences>(DEFAULT_PREFERENCES);
@@ -122,7 +127,19 @@ export default function ProfileApp() {
           <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div className="grid h-11 w-11 place-items-center rounded-2xl bg-violet-100"><Crown className="text-violet-600" /></div><span className="rounded-full bg-emerald-100 px-2 py-1 text-[10px] font-black uppercase text-emerald-700">{user.subscriptionTier || "basic"}</span></div><p className="mt-4 text-xs font-bold text-slate-400">Membership</p><p className="text-xl font-black capitalize">{user.subscriptionTier === "basic" ? "Basic learner" : `${user.subscriptionTier} membership`}</p><button onClick={() => { window.location.hash = "#/subscription"; }} className="mt-4 flex items-center gap-1 text-xs font-black text-violet-700">Manage membership <ChevronRight size={14} /></button></section>
         </div>
 
-        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-xs font-black uppercase tracking-wider text-slate-400">My library</h3><div className="mt-4 grid grid-cols-3 gap-3"><LibraryStat icon={<ShoppingBag />} value={purchasedIds.size} label="Purchased" onClick={() => { window.location.hash = "#/store/purchases"; }} /><LibraryStat icon={<Heart />} value={favoriteIds.size} label="Favorites" onClick={() => { window.location.hash = "#/favorites"; }} /><LibraryStat icon={<Boxes />} value={cartIds.size} label="In cart" onClick={() => { window.location.hash = "#/cart"; }} /></div>{purchasedProducts.length > 0 && <div className="mt-5 space-y-2">{purchasedProducts.slice(0, 3).map((product) => <button key={product.id} onClick={() => { window.location.hash = `#/course/${encodeURIComponent(product.id)}`; }} className="flex w-full items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left"><img src={product.image} alt="" className="h-12 w-16 rounded-lg object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-black">{product.title}</span><span className="text-xs text-slate-400">Owned · Open course</span></span><ChevronRight size={16} className="text-slate-300" /></button>)}</div>}</section>
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><h3 className="text-xs font-black uppercase tracking-wider text-slate-400">My library</h3>
+          {(() => {
+            const ownedCount = signedIn ? Math.max(purchasedIds.size, canonicalOwnedIds.length) : purchasedIds.size;
+            return (
+              <div className="mt-4 grid grid-cols-3 gap-3">
+                <LibraryStat icon={<ShoppingBag />} value={ownedCount} label="Purchased" onClick={() => { window.location.hash = "#/store/purchases"; }} />
+                <LibraryStat icon={<Heart />} value={favoriteIds.size} label="Favorites" onClick={() => { window.location.hash = "#/favorites"; }} />
+                <LibraryStat icon={<Boxes />} value={cartIds.size} label="In cart" onClick={() => { window.location.hash = "#/cart"; }} />
+              </div>
+            );
+          })()}
+          {purchasedProducts.length > 0 && <div className="mt-5 space-y-2">{purchasedProducts.slice(0, 3).map((product) => <button key={product.id} onClick={() => { window.location.hash = `#/course/${encodeURIComponent(product.id)}`; }} className="flex w-full items-center gap-3 rounded-2xl bg-slate-50 p-3 text-left"><img src={product.image} alt="" className="h-12 w-16 rounded-lg object-cover" /><span className="min-w-0 flex-1"><span className="block truncate text-sm font-black">{product.title}</span><span className="text-xs text-slate-400">Owned · Open course</span></span><ChevronRight size={16} className="text-slate-300" /></button>)}</div>}
+        </section>
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Preferences</h3><p className="mt-1 text-xs text-slate-400">Saved securely to your account</p></div><button onClick={() => setModal("settings")} className="grid h-10 w-10 place-items-center rounded-xl bg-violet-50 text-violet-600"><Bell size={18} /></button></div></section>
 

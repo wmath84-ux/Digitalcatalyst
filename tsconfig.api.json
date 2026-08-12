@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "jsx": "preserve",
+    "types": ["node"]
+  },
+  "include": ["api/**/*.ts", "utils/serverQuotes.d.ts", "utils/commerce.d.ts", "utils/entitlements.d.ts", "utils/coupons.d.ts", "utils/subscriptions.d.ts"]
+}

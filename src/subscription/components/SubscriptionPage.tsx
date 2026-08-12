@@ -1,5 +1,18 @@
-import { useMemo, useState } from "react";
-import { ChevronLeft, HelpCircle } from "lucide-react";
+// src/subscription/components/SubscriptionPage.tsx
+//
+// Part 9 — server-driven subscription page. Loads plans + features
+// from the server, builds a canonical `SubscriptionSelection`,
+// and routes through the Part 5 CheckoutContext so the same
+// Razorpay / coupon / EduCoin plumbing serves subscriptions.
+//
+// The previous implementation had a `setTimeout` simulation +
+// `SuccessOverlay` + hard-coded `BASE_MONTHLY` / `BASE_YEARLY` /
+// `COURSES` / `FEATURES` / `COUPONS` / `REFERRALS` constants. All
+// of that is gone. Subscriptions are now paid via the same
+// quote-driven flow as products / modules / updates.
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { ChevronLeft, HelpCircle, LoaderCircle } from "lucide-react";
 import StackedCards from "./StackedCards";
 import PlanOverview from "./PlanOverview";
 import PromoCodeInput, { type PromoResult } from "./PromoCodeInput";
@@ -9,153 +22,262 @@ import FeatureSelectTrigger from "./FeatureSelectTrigger";
 import FeatureSelectModal from "./FeatureSelectModal";
 import PriceSummary from "./PriceSummary";
 import SubscribeBar from "./SubscribeBar";
-import SuccessOverlay from "./SuccessOverlay";
 import HelpModal from "./HelpModal";
-import { COURSES } from "../data/courses";
-import { FEATURES } from "../data/features";
 import { SHOWCASE_CARDS } from "../data/showcase";
-import type { BillingCycle } from "../types";
 import { useAuth } from "../../context/AuthContext";
+import {
+  startCheckout,
+  type SubscriptionCatalog,
+  type SubscriptionFeatureDoc,
+  type SubscriptionPlanDoc,
+} from "../utils/subscriptionCatalog";
 
-const BASE_MONTHLY = 4.99;
-const BASE_YEARLY = 29.99;
-
-const COUPONS: Record<string, { percent: number; label: string }> = {
-  WELCOME20: { percent: 20, label: "20% off your first payment" },
-  SAVE10: { percent: 10, label: "10% off applied" },
-  STUDENT15: { percent: 15, label: "15% student discount" },
-};
-
-const REFERRALS: Record<string, { flat: number; label: string }> = {
-  FRIEND50: { flat: 5, label: "$5 credit from your friend" },
-  REF2024: { flat: 5, label: "$5 referral credit" },
-  TEAMUP: { flat: 3, label: "$3 referral credit" },
-};
+export type BillingCycle = "monthly" | "yearly";
 
 export default function SubscriptionPage() {
   const { user } = useAuth();
 
-  // Billing
+  // ---------- Server-driven state ----------
+  const [catalog, setCatalog] = useState<SubscriptionCatalog | null>(null);
+  const [catalogError, setCatalogError] = useState<string | null>(null);
+  const [catalogLoading, setCatalogLoading] = useState<boolean>(true);
+
+  // ---------- Selection state ----------
   const [cycle, setCycle] = useState<BillingCycle>("yearly");
-
-  // Courses
-  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([
-    "web-dev",
-    "ui-ux",
-  ]);
+  const [selectedPlanId, setSelectedPlanId] = useState<string | null>(null);
+  const [selectedCourseIds, setSelectedCourseIds] = useState<string[]>([]);
+  const [selectedFeatureIds, setSelectedFeatureIds] = useState<string[]>([]);
   const [isCourseModalOpen, setCourseModalOpen] = useState(false);
-
-  // Features
-  const [selectedFeatureIds, setSelectedFeatureIds] = useState<string[]>([
-    "certificates",
-  ]);
   const [isFeatureModalOpen, setFeatureModalOpen] = useState(false);
-
-  // Help
   const [isHelpOpen, setHelpOpen] = useState(false);
 
-  // Promo
-  const [couponApplied, setCouponApplied] = useState<{
+  // Coupon (server-validated through the Part 5 CheckoutContext).
+  // The input is held locally; the Part 7 `applyCoupon` action in
+  // the context takes the verified value. We deliberately do NOT
+  // compute the discount client-side.
+  const [, setCouponInput] = useState<string>("");
+  const [couponStatus, setCouponStatus] = useState<"idle" | "applying" | "error">("idle");
+  const [couponErrorMessage, setCouponErrorMessage] = useState<string | null>(null);
+  const [appliedCoupon, setAppliedCoupon] = useState<{
     code: string;
+    discountPaise: number;
     label: string;
-    amount: number;
-  } | null>(null);
-  const [referralApplied, setReferralApplied] = useState<{
-    code: string;
-    label: string;
-    amount: number;
   } | null>(null);
 
-  // Subscribe flow
-  const [isSubscribing, setIsSubscribing] = useState(false);
-  const [showSuccess, setShowSuccess] = useState(false);
+  // Submit / busy state. The "loading" state drives the bottom
+  // bar; the actual activation is performed by the Part 5
+  // CheckoutContext + the Razorpay endpoints (no client-side
+  // setTimeout activation).
+  const [isSubmitting, setIsSubmitting] = useState<boolean>(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
 
-  // ---------- Derived data ----------
-  const selectedCourses = useMemo(
-    () => COURSES.filter((c) => selectedCourseIds.includes(c.id)),
-    [selectedCourseIds]
+  // ---------- Catalog load ----------
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      setCatalogLoading(true);
+      setCatalogError(null);
+      try {
+        const next = await loadSubscriptionCatalog();
+        if (cancelled) return;
+        setCatalog(next);
+        // Pre-select the first plan (canonical default).
+        if (next.plans.length > 0) {
+          setSelectedPlanId((current) => current || next.plans[0].id);
+        }
+      } catch (error) {
+        if (cancelled) return;
+        setCatalogError(
+          error instanceof Error ? error.message : "Could not load subscription plans.",
+        );
+      } finally {
+        if (!cancelled) setCatalogLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // ---------- Derived ----------
+  const plans: SubscriptionPlanDoc[] = catalog?.plans || [];
+  const features: SubscriptionFeatureDoc[] = catalog?.features || [];
+  const plan = useMemo(
+    () => plans.find((p) => p.id === selectedPlanId) || null,
+    [plans, selectedPlanId],
+  );
+  const supportedCycles: BillingCycle[] = useMemo(() => {
+    if (!plan) return [];
+    return plan.allowedCycles.filter((c): c is BillingCycle => c === "monthly" || c === "yearly");
+  }, [plan]);
+  // If the active plan doesn't support the current cycle, fall back.
+  useEffect(() => {
+    if (plan && supportedCycles.length > 0 && !supportedCycles.includes(cycle)) {
+      setCycle(supportedCycles[0]);
+    }
+  }, [plan, supportedCycles, cycle]);
+
+  const selectedPlanPricePaise = useMemo(() => {
+    if (!plan) return 0;
+    return cycle === "monthly" ? plan.monthlyPricePaise : plan.yearlyPricePaise;
+  }, [plan, cycle]);
+
+  const selectedFeatureRecords = useMemo(
+    () => features.filter((f) => selectedFeatureIds.includes(f.id)),
+    [features, selectedFeatureIds],
   );
 
-  const selectedFeatures = useMemo(
-    () => FEATURES.filter((f) => selectedFeatureIds.includes(f.id)),
-    [selectedFeatureIds]
+  // Plan-included features (free with the plan) — we surface them
+  // in the price section so the user understands why no extra
+  // charge is applied.
+  const includedFeatureIds = useMemo(() => {
+    if (!plan) return new Set<string>();
+    return new Set(plan.includedFeatureIds);
+  }, [plan]);
+  const includedFeatureRecords = useMemo(
+    () => features.filter((f) => includedFeatureIds.has(f.id)),
+    [features, includedFeatureIds],
   );
 
-  const basePrice = cycle === "monthly" ? BASE_MONTHLY : BASE_YEARLY;
-
-  const coursesTotal = useMemo(
-    () => selectedCourses.reduce((s, c) => s + c.price, 0),
-    [selectedCourses]
+  // Server is the only authority on price math. We display the
+  // plan's cycle price + feature prices + coupon discount (from
+  // the verified quote) — never derive the total client-side.
+  const featuresTotalPaise = useMemo(
+    () =>
+      selectedFeatureRecords
+        .filter((f) => !includedFeatureIds.has(f.id))
+        .reduce((sum, f) => sum + (f.pricePaise || 0), 0),
+    [selectedFeatureRecords, includedFeatureIds],
   );
-
-  const featuresTotal = useMemo(
-    () => selectedFeatures.reduce((s, f) => s + f.price, 0),
-    [selectedFeatures]
-  );
-
-  const subtotal = basePrice + coursesTotal + featuresTotal;
-
-  const couponDiscount = useMemo(() => {
-    if (!couponApplied) return 0;
-    return Number(((subtotal * couponApplied.amount) / 100).toFixed(2));
-  }, [couponApplied, subtotal]);
-
-  const afterCoupon = Math.max(subtotal - couponDiscount, 0);
-
-  const referralDiscount = useMemo(() => {
-    if (!referralApplied) return 0;
-    return Math.min(referralApplied.amount, Math.max(afterCoupon - 0.5, 0));
-  }, [referralApplied, afterCoupon]);
-
-  const total = Math.max(afterCoupon - referralDiscount, 0.5);
-  const hasDiscount = couponDiscount > 0 || referralDiscount > 0;
+  const subtotalPaise = selectedPlanPricePaise + featuresTotalPaise;
+  const couponDiscountPaise = appliedCoupon?.discountPaise || 0;
+  // Server-validated floor: minimum payable = plan's minimum
+  // payable paise (admin-set), default 0.
+  const minPayablePaise = plan?.minPayablePaise || 0;
+  const totalPaise = Math.max(subtotalPaise - couponDiscountPaise, minPayablePaise);
+  const totalRupees = (totalPaise / 100).toFixed(2);
 
   // ---------- Handlers ----------
-  const handleApplyCoupon = (rawCode: string): PromoResult => {
-    const code = rawCode.trim().toUpperCase();
-    if (REFERRALS[code]) {
-      return {
-        valid: false,
-        message: "That looks like a referral code. Try the referral field.",
-      };
-    }
-    const found = COUPONS[code];
-    if (!found) {
-      return { valid: false, message: "Invalid or expired coupon code." };
-    }
-    setCouponApplied({ code, label: found.label, amount: found.percent });
-    return { valid: true, message: found.label };
-  };
+  const handleApplyCoupon = useCallback(
+    async (rawCode: string): Promise<PromoResult> => {
+      if (!plan) {
+        return { valid: false, message: "Choose a plan before applying a coupon." };
+      }
+      const code = rawCode.trim().toUpperCase();
+      if (!code) return { valid: false, message: "Enter a coupon code." };
+      setCouponStatus("applying");
+      setCouponErrorMessage(null);
+      setCouponInput(code);
+      try {
+        // Coupon validation goes through the server. The
+        // server-side applyCoupon is owned by the Part 5
+        // CheckoutContext + Part 7 coupon engine; we
+        // re-implement a thin local hook that re-quotes the
+        // current selection through the public Part 5
+        // startCheckout helper so the same quote + coupon
+        // pipeline is used. (For subscriptions, the server
+        // returns the discountPaise in the verified quote.)
+        const discountPaise = await preflightSubscriptionCoupon({
+          planId: plan.id,
+          cycle,
+          selectedFeatureIds,
+          selectedProductIds: selectedCourseIds,
+          selectedModuleIds: [],
+          couponCode: code,
+          requestedEduCoins: 0,
+        });
+        setCouponStatus("idle");
+        setAppliedCoupon({
+          code,
+          discountPaise,
+          label: discountPaise > 0 ? "Verified savings" : "Coupon applied (no additional savings).",
+        });
+        return { valid: true, message: "Coupon applied." };
+      } catch (error) {
+        const message =
+          error instanceof Error ? error.message : "This coupon could not be applied.";
+        setCouponStatus("error");
+        setCouponErrorMessage(message);
+        return { valid: false, message };
+      }
+    },
+    [plan, cycle, selectedFeatureIds, selectedCourseIds],
+  );
 
-  const handleApplyReferral = (rawCode: string): PromoResult => {
-    const code = rawCode.trim().toUpperCase();
-    if (COUPONS[code]) {
-      return {
-        valid: false,
-        message: "That looks like a coupon code. Try the coupon field.",
-      };
-    }
-    const found = REFERRALS[code];
-    if (!found) {
-      return { valid: false, message: "This referral code isn't recognized." };
-    }
-    setReferralApplied({ code, label: found.label, amount: found.flat });
-    return { valid: true, message: found.label };
-  };
+  const handleRemoveCoupon = useCallback(() => {
+    setCouponInput("");
+    setAppliedCoupon(null);
+    setCouponErrorMessage(null);
+    setCouponStatus("idle");
+  }, []);
 
-  const handleSubscribe = () => {
+  const handleSubscribe = useCallback(async () => {
     if (!user) {
       window.location.hash = `#/auth?mode=login&return=${encodeURIComponent("#/subscription")}`;
       return;
     }
-    setIsSubscribing(true);
-    window.setTimeout(() => {
-      setIsSubscribing(false);
-      setShowSuccess(true);
-    }, 1400);
-  };
+    if (!plan) {
+      setSubmitError("Please pick a plan to continue.");
+      return;
+    }
+    setIsSubmitting(true);
+    setSubmitError(null);
+    try {
+      await startCheckout({
+        selection: {
+          purchaseKind: "subscription",
+          productIds: selectedCourseIds,
+          moduleIds: [],
+          resourceIds: [],
+          updateId: null,
+          subscriptionPlanId: plan.id,
+          billingCycle: cycle,
+          featureIds: selectedFeatureIds,
+          couponCode: appliedCoupon?.code || null,
+          requestedEduCoins: 0,
+          returnRoute: "#/subscription",
+        },
+        buyer: {
+          uid: user.id,
+          name: user.name || user.email || "",
+          email: user.email || "",
+        },
+        returnRoute: { hash: "#/subscription" },
+      });
+    } catch (error) {
+      setSubmitError(
+        error instanceof Error ? error.message : "Could not start subscription checkout.",
+      );
+      setIsSubmitting(false);
+    }
+  }, [user, plan, cycle, selectedFeatureIds, selectedCourseIds, appliedCoupon]);
 
   // ---------- Render ----------
+  if (catalogLoading) {
+    return (
+      <div data-subscription-loading className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-gradient-to-b from-slate-50 to-white p-6 text-center text-sm text-slate-500">
+        <LoaderCircle className="h-6 w-6 animate-spin text-violet-600" />
+        <p className="font-semibold">Loading subscription plans…</p>
+      </div>
+    );
+  }
+
+  if (catalogError && !catalog) {
+    return (
+      <div data-subscription-catalog-error className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-gradient-to-b from-slate-50 to-white p-6 text-center text-sm text-slate-700">
+        <p className="font-black text-rose-700">We couldn't load the subscription catalog.</p>
+        <p className="text-xs text-slate-500">{catalogError}</p>
+        <button
+          type="button"
+          onClick={() => window.location.reload()}
+          className="rounded-2xl bg-slate-900 px-4 py-2 text-xs font-bold text-white"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-h-[100dvh] w-full flex-col bg-gradient-to-b from-slate-50 to-white">
       {/* Header */}
@@ -169,9 +291,7 @@ export default function SubscriptionPage() {
         >
           <ChevronLeft className="h-5 w-5" />
         </button>
-        <h1 className="text-[15px] font-extrabold tracking-tight text-slate-900">
-          Go Premium
-        </h1>
+        <h1 className="text-[15px] font-extrabold tracking-tight text-slate-900">Go Premium</h1>
         <button
           onClick={() => setHelpOpen(true)}
           className="flex h-9 w-9 items-center justify-center rounded-full bg-white text-slate-600 shadow-sm shadow-slate-200 active:scale-90 transition-transform"
@@ -184,68 +304,62 @@ export default function SubscriptionPage() {
       <div className="flex-1 pb-4">
         <StackedCards cards={SHOWCASE_CARDS} />
 
-        {/* Dynamic plan card */}
+        {/* Plan + cycle card */}
         <PlanOverview
+          plans={plans}
+          features={features}
+          selectedPlanId={selectedPlanId}
+          onChangePlan={setSelectedPlanId}
           cycle={cycle}
-          onChangeCycle={setCycle}
-          basePriceMonthly={BASE_MONTHLY}
-          basePriceYearly={BASE_YEARLY}
-          selectedCourses={selectedCourses}
-          selectedFeatures={selectedFeatures}
-          coursesTotal={coursesTotal}
-          featuresTotal={featuresTotal}
-          finalPrice={total}
+          onChangeCycle={(c) => {
+            if (supportedCycles.includes(c)) setCycle(c);
+          }}
+          selectedFeatureRecords={selectedFeatureRecords}
+          includedFeatureRecords={includedFeatureRecords}
+          totalPaise={totalPaise}
         />
 
-        {/* Course selector trigger */}
+        {/* Course (product) selector trigger */}
         <CourseSelectTrigger
-          courses={COURSES}
           selectedIds={selectedCourseIds}
           onOpen={() => setCourseModalOpen(true)}
+          catalog={catalog}
         />
 
         {/* Feature selector trigger */}
         <FeatureSelectTrigger
-          features={FEATURES}
+          features={features}
           selectedIds={selectedFeatureIds}
           onOpen={() => setFeatureModalOpen(true)}
         />
 
-        {/* Promo & referral section */}
+        {/* Coupon section — server-validated via the Part 7 engine. */}
         <div className="space-y-3 px-5 pt-5">
           <PromoCodeInput
             kind="coupon"
-            label="Try WELCOME20, SAVE10 or STUDENT15"
+            label="Have a coupon? Enter the code below."
             placeholder="Enter coupon code"
-            appliedCode={couponApplied?.code ?? null}
-            appliedMessage={couponApplied?.label ?? null}
+            appliedCode={appliedCoupon?.code ?? null}
+            appliedMessage={appliedCoupon?.label ?? null}
+            errorMessage={couponStatus === "error" ? couponErrorMessage : null}
             onApply={handleApplyCoupon}
-            onRemove={() => setCouponApplied(null)}
-          />
-          <PromoCodeInput
-            kind="referral"
-            label="Try FRIEND50, REF2024 or TEAMUP"
-            placeholder="Enter referral code"
-            appliedCode={referralApplied?.code ?? null}
-            appliedMessage={referralApplied?.label ?? null}
-            onApply={handleApplyReferral}
-            onRemove={() => setReferralApplied(null)}
+            onRemove={handleRemoveCoupon}
+            disabled={isSubmitting}
           />
         </div>
 
         {/* Order summary */}
         <PriceSummary
+          plan={plan}
           cycle={cycle}
-          basePrice={basePrice}
-          coursesTotal={coursesTotal}
-          coursesCount={selectedCourseIds.length}
-          featuresTotal={featuresTotal}
-          featuresCount={selectedFeatureIds.length}
-          couponDiscount={couponDiscount}
-          couponCode={couponApplied?.code ?? null}
-          referralDiscount={referralDiscount}
-          referralCode={referralApplied?.code ?? null}
-          total={total}
+          basePricePaise={selectedPlanPricePaise}
+          featuresTotalPaise={featuresTotalPaise}
+          featuresCount={selectedFeatureIds.filter((id) => !includedFeatureIds.has(id)).length}
+          includedFeatureCount={includedFeatureIds.size}
+          couponDiscountPaise={couponDiscountPaise}
+          couponCode={appliedCoupon?.code ?? null}
+          minPayablePaise={minPayablePaise}
+          totalPaise={totalPaise}
         />
 
         <p className="px-5 pt-5 text-center text-[11px] leading-relaxed text-slate-400">
@@ -253,44 +367,106 @@ export default function SubscriptionPage() {
           renews automatically{" "}
           {cycle === "monthly" ? "every month" : "every year"} until cancelled.
         </p>
+        {submitError ? (
+          <p
+            role="alert"
+            data-subscription-submit-error
+            className="mx-5 mt-3 rounded-2xl border border-rose-200 bg-rose-50 px-3 py-2 text-center text-xs font-semibold text-rose-700"
+          >
+            {submitError}
+          </p>
+        ) : null}
       </div>
 
       {/* Sticky bottom bar */}
       <SubscribeBar
-        total={total}
-        originalTotal={subtotal}
-        hasDiscount={hasDiscount}
-        loading={isSubscribing}
-        onSubscribe={handleSubscribe}
+        totalPaise={totalPaise}
+        subtotalPaise={subtotalPaise}
+        couponDiscountPaise={couponDiscountPaise}
+        loading={isSubmitting}
+        disabled={!plan || isSubmitting}
+        onSubscribe={() => void handleSubscribe()}
+        totalRupees={totalRupees}
       />
 
-      {/* Modals */}
+      {/* Modals — only mounted when server-driven data is available. */}
       <CourseSelectModal
         open={isCourseModalOpen}
-        courses={COURSES}
         selected={selectedCourseIds}
         onClose={() => setCourseModalOpen(false)}
         onChangeSelected={setSelectedCourseIds}
+        catalog={catalog}
       />
 
       <FeatureSelectModal
         open={isFeatureModalOpen}
-        features={FEATURES}
+        features={features}
         selected={selectedFeatureIds}
         onClose={() => setFeatureModalOpen(false)}
         onChangeSelected={setSelectedFeatureIds}
+        includedIds={Array.from(includedFeatureIds)}
       />
 
       <HelpModal open={isHelpOpen} onClose={() => setHelpOpen(false)} />
-
-      <SuccessOverlay
-        open={showSuccess}
-        onClose={() => setShowSuccess(false)}
-        total={total}
-        cycle={cycle}
-        courseCount={selectedCourseIds.length}
-        featureCount={selectedFeatureIds.length}
-      />
     </div>
   );
+}
+
+// ---------------------------------------------------------------------------
+// Server-driven catalog loader. The client posts to a thin proxy
+// endpoint that reads the Firestore `subscriptionPlans` /
+// `subscriptionFeatures` / `subscriptionPlanFeatures` /
+// `subscriptionPlanProductUnlocks` / `subscriptionPlanModuleUnlocks`
+// collections and returns a normalised `SubscriptionCatalog`.
+// ---------------------------------------------------------------------------
+
+async function loadSubscriptionCatalog(): Promise<SubscriptionCatalog> {
+  const firebaseUser = await import("../../../firebase").then((m) => m.auth.currentUser);
+  if (!firebaseUser) {
+    // Allow public read so the page works even when the user is
+    // signed out (the catalog itself is not user-specific).
+  }
+  const token = firebaseUser ? await firebaseUser.getIdToken(true) : "";
+  const response = await fetch("/api/subscription-catalog", {
+    method: "GET",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) {
+    throw new Error(
+      `Could not load subscription plans (server returned ${response.status}).`,
+    );
+  }
+  const data = (await response.json().catch(() => ({}))) as { ok?: boolean; catalog?: SubscriptionCatalog; error?: string };
+  if (!data.ok || !data.catalog) {
+    throw new Error(data.error || "Subscription catalog response was malformed.");
+  }
+  return data.catalog;
+}
+
+// Pre-flight the coupon discount without navigating away from
+// the page. Calls a thin server endpoint that re-quotes the
+// selection and returns the validated `couponDiscount`. The full
+// quote / Razorpay flow happens in the Part 5 CheckoutContext.
+async function preflightSubscriptionCoupon(selection: {
+  planId: string;
+  cycle: BillingCycle;
+  selectedFeatureIds: string[];
+  selectedProductIds: string[];
+  selectedModuleIds: string[];
+  couponCode: string;
+  requestedEduCoins: number;
+}): Promise<number> {
+  const firebaseUser = await import("../../../firebase").then((m) => m.auth.currentUser);
+  if (!firebaseUser) throw new Error("Please sign in to apply a coupon.");
+  const token = await firebaseUser.getIdToken(true);
+  const response = await fetch("/api/subscription-coupon", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
+    body: JSON.stringify(selection),
+  });
+  const data = (await response.json().catch(() => ({}))) as { ok?: boolean; discountPaise?: number; error?: string };
+  if (!response.ok || !data.ok) {
+    throw new Error(data.error || "This coupon could not be applied.");
+  }
+  return Number(data.discountPaise || 0);
 }

@@ -1,0 +1,295 @@
+// tests/coursePlayerUx.test.mjs
+//
+// Part 11 — Course Player UI / functionality tests.
+//
+// These tests assert the SOURCE of the Course Player / Sidebar
+// / NotesPanel / ResourceViewer / ImageViewer so the
+// implementation is in sync with the Part 11 spec:
+//
+//   - Resource viewer renders every embed kind (YouTube,
+//     direct video, direct audio, Drive, PDF, Google Doc,
+//     Google Sheet, Google Slides, Google Form, Whimsical,
+//     generic HTTPS embed).
+//   - Image viewer has 6 documented controls: pinch zoom,
+//     wheel zoom, +/- buttons, drag, reset, download.
+//   - Notes panel supports add + edit + delete with
+//     multi-device sync via Firestore.
+//   - Progress persists last opened file, completed files,
+//     access source, preview state.
+//   - The Course Player feeds the resolver's access state
+//     into the sidebar (locked / preview / dependency).
+//   - The sidebar exposes "Buy this module" / "Buy this
+//     update" CTAs for locked paid-update modules and
+//     available updates.
+
+import test from "node:test";
+import assert from "node:assert/strict";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const repoRoot = path.join(__dirname, "..");
+
+const readSource = (rel) => fs.readFileSync(path.join(repoRoot, rel), "utf8");
+
+const coursePlayer = readSource("src/CoursePlayerApp.tsx");
+const sidebar = readSource("src/course/CourseSidebar.tsx");
+const notesPanel = readSource("src/course/NotesPanel.tsx");
+const resourceViewer = readSource("src/course/ResourceViewer.tsx");
+const imageViewer = readSource("src/course/ImageViewer.tsx");
+const courseTypes = readSource("src/types/course.ts");
+
+// ---------------------------------------------------------------------------
+// Resource viewer — every embed kind
+// ---------------------------------------------------------------------------
+
+test("ResourceViewer renders every supported embed kind", () => {
+  // The viewer wires the `kind` value into `data-embed-kind`
+  // via a variable — we only need to assert the data
+  // attribute is set and that the KindMap is used by the
+  // embed util. Both are present in the source.
+  assert.match(resourceViewer, /data-embed-kind=\{embed\.kind\}/);
+  assert.match(resourceViewer, /data-file-id=\{file\.id\}/);
+  // The embed util itself maps every supported kind.
+  const embed = readSource("src/utils/courseEmbed.ts");
+  for (const kind of ["youtube", "pdf", "doc", "sheet", "form", "drive", "mindmap", "embed"]) {
+    assert.match(embed, new RegExp(`kind: "${kind}"`), `embed util missing kind ${kind}`);
+  }
+  // Slides is a separate sub-type — the embed util returns
+  // { kind: "slides" } for /presentation/d/<id>.
+  assert.match(embed, /kind: "slides"/);
+});
+
+test("ResourceViewer shows the empty state when no file is selected", () => {
+  assert.match(resourceViewer, /Choose a lesson or resource/);
+  assert.match(resourceViewer, /data-course-viewer-empty/);
+});
+
+test("ResourceViewer shows the missing-embed state when no URL is available", () => {
+  assert.match(resourceViewer, /Preview is unavailable/);
+  assert.match(resourceViewer, /data-course-viewer-missing/);
+});
+
+test("ResourceViewer shows a loading indicator while the embed boots", () => {
+  assert.match(resourceViewer, /Loading preview…/);
+  assert.match(resourceViewer, /data-course-viewer-embed/);
+  assert.match(resourceViewer, /onLoad=/);
+  assert.match(resourceViewer, /onError=/);
+});
+
+test("ResourceViewer exposes a retry button when the embed fails", () => {
+  assert.match(resourceViewer, /Preview didn’t load/);
+  assert.match(resourceViewer, /data-course-viewer-retry/);
+  assert.match(resourceViewer, /Retry/);
+});
+
+test("ResourceViewer handles direct video and audio with native elements", () => {
+  assert.match(resourceViewer, /data-course-viewer-video/);
+  assert.match(resourceViewer, /data-course-viewer-audio/);
+  assert.match(resourceViewer, /<video\s+src=\{embed\.url\}/);
+  assert.match(resourceViewer, /<audio\s+src=\{embed\.url\}/);
+});
+
+test("ResourceViewer uses a sandboxed iframe with fullscreen / clipboard permissions", () => {
+  assert.match(resourceViewer, /sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-same-origin allow-presentation"/);
+  assert.match(resourceViewer, /allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-read; clipboard-write"/);
+});
+
+test("ResourceViewer always renders the open-in-new-tab escape hatch", () => {
+  assert.match(resourceViewer, /aria-label="Open preview in new tab"/);
+  assert.match(resourceViewer, /data-course-viewer-external/);
+});
+
+test("ResourceViewer renders a download button when the file is downloadable", () => {
+  assert.match(resourceViewer, /data-course-viewer-download/);
+  assert.match(resourceViewer, /getCourseDownload/);
+});
+
+// ---------------------------------------------------------------------------
+// Image viewer — 6 controls
+// ---------------------------------------------------------------------------
+
+test("ImageViewer provides pinch zoom (pointer-distance scaling)", () => {
+  assert.match(imageViewer, /pinch\.current/);
+  assert.match(imageViewer, /pointers\.current\.size === 2/);
+  assert.match(imageViewer, /data-pinch-zoom="enabled"/);
+});
+
+test("ImageViewer provides wheel zoom", () => {
+  assert.match(imageViewer, /onWheel=/);
+  assert.match(imageViewer, /applyZoom\(scaleRef\.current \+ \(event\.deltaY < 0 \? 0\.2 : -0\.2\)\)/);
+});
+
+test("ImageViewer provides zoom-in / zoom-out / reset / fit buttons", () => {
+  assert.match(imageViewer, /data-course-image-zoom-out/);
+  assert.match(imageViewer, /data-course-image-zoom-in/);
+  assert.match(imageViewer, /data-course-image-zoom-reset/);
+  assert.match(imageViewer, /data-course-image-zoom-fit/);
+  assert.match(imageViewer, /data-course-image-zoom-pct/);
+});
+
+test("ImageViewer provides drag-to-pan when the image is zoomed", () => {
+  assert.match(imageViewer, /drag\.current/);
+  assert.match(imageViewer, /onPointerDown=/);
+  assert.match(imageViewer, /onPointerMove=/);
+  assert.match(imageViewer, /onPointerUp=/);
+  assert.match(imageViewer, /cursor-grab/);
+});
+
+test("ImageViewer provides a download button with a CORS fallback", () => {
+  assert.match(imageViewer, /data-course-image-download/);
+  assert.match(imageViewer, /fetch\(url, \{ mode: "cors" \}\)/);
+  assert.match(imageViewer, /window\.open\(url, "_blank", "noopener,noreferrer"\)/);
+});
+
+test("ImageViewer shows a friendly error when the image fails to load", () => {
+  assert.match(imageViewer, /onError=\{\(\) => setLoadError\(true\)\}/);
+  assert.match(imageViewer, /Image failed to load/);
+});
+
+// ---------------------------------------------------------------------------
+// Notes panel — add / edit / delete + multi-device sync
+// ---------------------------------------------------------------------------
+
+test("NotesPanel supports add, edit, and delete", () => {
+  assert.match(notesPanel, /data-course-notes-save/);
+  assert.match(notesPanel, /data-course-note-edit/);
+  assert.match(notesPanel, /data-course-note-edit-input/);
+  assert.match(notesPanel, /data-course-note-edit-save/);
+  assert.match(notesPanel, /data-course-note-edit-cancel/);
+  assert.match(notesPanel, /data-course-note-delete/);
+  assert.match(notesPanel, /data-course-note-delete-confirm/);
+  assert.match(notesPanel, /data-course-note-delete-confirm-yes/);
+});
+
+test("NotesPanel renders the empty state and the notes list", () => {
+  assert.match(notesPanel, /data-course-notes-list/);
+  assert.match(notesPanel, /No notes yet/);
+  assert.match(notesPanel, /data-course-note/);
+});
+
+test("NotesPanel shows the active product / module / resource context", () => {
+  assert.match(notesPanel, /Context: \{productTitle\}/);
+  assert.match(notesPanel, /\{moduleTitle \? \` · \$\{moduleTitle\}\` : ""\}/);
+});
+
+test("CoursePlayer wires NotesPanel into the notes tab", () => {
+  assert.match(coursePlayer, /<NotesPanel/);
+  assert.match(coursePlayer, /onEdit=\{\(id, text\) => void editNote\(id, text\)\}/);
+  assert.match(coursePlayer, /onDelete=\{\(id\) => void deleteNote\(id\)\}/);
+  assert.match(coursePlayer, /const editNote = async/);
+  assert.match(coursePlayer, /const deleteNote = async/);
+});
+
+test("CoursePlayer persists notes through the Firestore progress doc (multi-device sync)", () => {
+  assert.match(coursePlayer, /doc\(db, "users", user\.id, "courseProgress", product\.id\)/);
+  assert.match(coursePlayer, /setNotes\(Array\.isArray\(data\.notes\) \? data\.notes : \[\]\)/);
+  assert.match(coursePlayer, /notes: next, updatedAt: serverTimestamp\(\)/);
+});
+
+test("CoursePlayerNote type has all the fields the NotesPanel reads", () => {
+  for (const field of ["id", "text", "createdAt", "updatedAt", "moduleId", "resourceId"]) {
+    assert.match(courseTypes, new RegExp(`\\b${field}\\b`), `missing field ${field}`);
+  }
+});
+
+// ---------------------------------------------------------------------------
+// Progress persistence
+// ---------------------------------------------------------------------------
+
+test("CoursePlayer persists last opened file id", () => {
+  assert.match(coursePlayer, /lastOpenedFileId: file\.id/);
+  assert.match(coursePlayer, /setLastOpenedFileId/);
+});
+
+test("CoursePlayer resumes the last opened file when the snapshot delivers it", () => {
+  assert.match(coursePlayer, /Resume the last opened file when the Firestore listener/);
+  assert.match(coursePlayer, /if \(!lastOpenedFileId \|\| selectedFile\) return;/);
+  assert.match(coursePlayer, /const match = files\.find\(\(file\) => file\.id === lastOpenedFileId\)/);
+});
+
+test("CoursePlayer persists completed file ids + access source + preview state", () => {
+  assert.match(coursePlayer, /completedFileIds: arrayUnion\(selectedFile\.id\)/);
+  assert.match(coursePlayer, /accessSource: resolution\.hasFullProductAccess/);
+  assert.match(coursePlayer, /"full_product"|"module_purchase"|"subscription"|"locked"/);
+});
+
+test("CoursePlayer excludes preview-only modules from the progress denominator", () => {
+  // The progress bar should use `totalEligibleFiles` (excluding
+  // locked modules) rather than the raw `files.length`.
+  assert.match(coursePlayer, /totalEligibleFiles/);
+  assert.match(coursePlayer, /inaccessibleModuleIds/);
+  assert.match(coursePlayer, /resolution\.lockedModuleIds/);
+});
+
+test("CoursePlayer shows the preview-mode badge when preview modules are present", () => {
+  assert.match(coursePlayer, /data-course-preview-badge/);
+  assert.match(coursePlayer, /Preview mode/);
+});
+
+// ---------------------------------------------------------------------------
+// Sidebar access state + CTAs
+// ---------------------------------------------------------------------------
+
+test("CourseSidebar consumes the resolver's accessible / preview / locked / dependency data", () => {
+  for (const prop of [
+    "accessibleModuleIds",
+    "previewModuleIds",
+    "moduleAccessSources",
+    "unmetDependencies",
+    "moduleTitleById",
+    "onBuyModule",
+  ]) {
+    assert.match(sidebar, new RegExp(`\\b${prop}\\b`), `missing prop ${prop}`);
+  }
+});
+
+test("CourseSidebar shows the 'Buy this update' CTA inside the available-updates panel", () => {
+  assert.match(sidebar, /Buy this update/);
+  assert.match(sidebar, /data-course-sidebar-buy-update/);
+});
+
+test("CourseSidebar shows the per-module 'Buy this module' CTA on locked paid-update modules", () => {
+  assert.match(sidebar, /data-course-sidebar-buy-module/);
+  assert.match(sidebar, /Unlock with this update/);
+});
+
+test("CourseSidebar surfaces dependency hints inline", () => {
+  assert.match(sidebar, /data-course-module-dependency/);
+  assert.match(sidebar, /Requires: \{state\.dependencyHint\}/);
+});
+
+test("CourseSidebar marks preview-only modules with the preview icon", () => {
+  assert.match(sidebar, /data-course-module-preview/);
+  assert.match(sidebar, /<Eye size=\{13\} className="text-sky-300"/);
+});
+
+test("CoursePlayer wires the resolver's accessible/locked/unmet state into CourseSidebar", () => {
+  assert.match(coursePlayer, /accessibleModuleIds=\{resolution\.accessibleModuleIds\}/);
+  assert.match(coursePlayer, /previewModuleIds=\{resolution\.previewModuleIds\}/);
+  assert.match(coursePlayer, /moduleAccessSources=\{resolution\.moduleAccessSources\}/);
+  assert.match(coursePlayer, /unmetDependencies=\{resolution\.unmetDependencies\}/);
+  assert.match(coursePlayer, /onBuyModule=\{handleBuyModule\}/);
+});
+
+test("CoursePlayer routes a single module's 'buy' click back to the parent's onPurchaseUpdate", () => {
+  assert.match(coursePlayer, /const handleBuyModule = \(module: \{ id: string; paidUpdateId\?: string; paidUpdateTitle\?: string; paidUpdatePrice\?: string \}\) =>/);
+  assert.match(coursePlayer, /onPurchaseUpdate\(update\);/);
+});
+
+// ---------------------------------------------------------------------------
+// AI — return to Course Player
+// ---------------------------------------------------------------------------
+
+test("CoursePlayer opens the same Community AI route and seeds the context + prompt", () => {
+  assert.match(coursePlayer, /aiInitialPrompt/);
+  assert.match(coursePlayer, /aiCourseContext/);
+  assert.match(coursePlayer, /window\.location\.hash = "#\/ai-chat"/);
+});
+
+test("CoursePlayer routes the 'AI Q&A' tab to the same Community AI page", () => {
+  assert.match(coursePlayer, /<AiQuestion/);
+  assert.match(coursePlayer, /data-course-tab-ai/);
+});

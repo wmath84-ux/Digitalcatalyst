@@ -1,18 +1,42 @@
+// src/components/PaymentGateway.tsx
+//
+// Part 6 — quote-driven Razorpay checkout. The component now takes
+// a single `quoteId` prop (sourced from the Part 5
+// `CheckoutContext.quote.quoteId`) and posts only `{ quoteId }` to
+// `/api/razorpay/create-order` and `/api/razorpay/verify-payment`.
+// The server-side endpoints load the canonical `ServerPriceQuote`
+// and grant the entitlements transactionally.
+//
+// The `productName` / `finalPrice` / `currency` props are still
+// used for the on-screen amount card; they are display-only and
+// never sent to the server (the server computes the amount from
+// `quote.cashPayable`).
+
 import { useState } from "react";
 import { CheckCircle2, CreditCard, LoaderCircle, ShieldCheck, TriangleAlert } from "lucide-react";
 import { auth } from "../../firebase";
 
 export type VerifiedPayment = {
   orderId: string;
-  paymentId: string;
+  paymentId: string | null;
   paymentMethod: string;
   free?: boolean;
+  grantedEntitlementIds?: string[];
 };
 
 interface PaymentGatewayProps {
-  productId: string;
-  productIds?: string[];
-  updateSelection?: { productId: string; updateId: string };
+  /**
+   * The Part 4 `ServerPriceQuote.quoteId` from the CheckoutContext.
+   * Required: the server uses this to look up the canonical price
+   * and to grant the entitlements. No client-supplied product id or
+   * price is honoured.
+   */
+  quoteId: string;
+  /**
+   * Display-only — the server has already locked the amount on the
+   * `ServerPriceQuote`. Kept as a prop so the on-screen amount
+   * card never disagrees with the server's number.
+   */
   finalPrice: number;
   currency: string;
   productName: string;
@@ -72,12 +96,33 @@ const apiRequest = async <T,>(path: string, body: Record<string, unknown>): Prom
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token}` },
     body: JSON.stringify(body),
   });
-  const data = await response.json().catch(() => ({})) as T & { error?: string };
+  const data = (await response.json().catch(() => ({}))) as T & { error?: string };
   if (!response.ok) throw new Error(data.error || "Secure payment request failed.");
   return data;
 };
 
-export default function PaymentGateway({ productId, productIds, updateSelection, finalPrice, currency, productName, onPaymentSuccess, onGoBack }: PaymentGatewayProps) {
+interface CreateOrderResponse {
+  ok: boolean;
+  free: boolean;
+  orderId: string;
+  amount?: number;
+  currency?: string;
+  keyId?: string;
+  productName?: string;
+  customer?: { name?: string; email?: string };
+}
+
+interface VerifyPaymentResponse {
+  ok: boolean;
+  verified: boolean;
+  orderId: string;
+  paymentId: string | null;
+  free?: boolean;
+  replayed?: boolean;
+  grantedEntitlementIds?: string[];
+}
+
+export default function PaymentGateway({ quoteId, finalPrice, currency, productName, onPaymentSuccess, onGoBack }: PaymentGatewayProps) {
   const [paymentState, setPaymentState] = useState<PaymentState>("idle");
   const [error, setError] = useState("");
 
@@ -85,13 +130,29 @@ export default function PaymentGateway({ productId, productIds, updateSelection,
     setPaymentState("verifying");
     setError("");
     try {
-      const result = await apiRequest<{ ok: boolean; verified: boolean; orderId: string; paymentId: string }>("/api/razorpay/verify-payment", response);
+      const result = await apiRequest<VerifyPaymentResponse>("/api/razorpay/verify-payment", {
+        ...response,
+        quoteId,
+      });
       if (!result.verified) throw new Error("Payment could not be verified.");
       setPaymentState("success");
-      window.setTimeout(() => onPaymentSuccess({ orderId: result.orderId, paymentId: result.paymentId, paymentMethod: "Razorpay" }), 500);
+      window.setTimeout(
+        () =>
+          onPaymentSuccess({
+            orderId: result.orderId,
+            paymentId: result.paymentId,
+            paymentMethod: "Razorpay",
+            grantedEntitlementIds: result.grantedEntitlementIds || [],
+          }),
+        500,
+      );
     } catch (verificationError) {
       setPaymentState("error");
-      setError(verificationError instanceof Error ? verificationError.message : "Payment verification failed. If money was deducted, contact support with your payment ID.");
+      setError(
+        verificationError instanceof Error
+          ? verificationError.message
+          : "Payment verification failed. If money was deducted, contact support with your payment ID.",
+      );
     }
   };
 
@@ -100,21 +161,37 @@ export default function PaymentGateway({ productId, productIds, updateSelection,
     setPaymentState("creating");
     setError("");
     try {
-      const order = await apiRequest<{
-        ok: boolean;
-        free: boolean;
-        verified?: boolean;
-        keyId?: string;
-        orderId: string;
-        amount?: number;
-        currency?: string;
-        productName?: string;
-        customer?: { name?: string; email?: string };
-      }>("/api/razorpay/create-order", { productId, productIds, updateSelection });
+      // Part 6: only `quoteId` is sent to the server. Product ids
+      // and prices are derived server-side from the persisted
+      // `ServerPriceQuote`.
+      const order = await apiRequest<CreateOrderResponse>("/api/razorpay/create-order", { quoteId });
 
-      if (order.free && order.verified) {
-        setPaymentState("success");
-        window.setTimeout(() => onPaymentSuccess({ orderId: order.orderId, paymentId: "FREE", paymentMethod: "Free access", free: true }), 400);
+      if (order.free) {
+        // Free path: the server-side `verify-payment` will still
+        // run via a follow-up call to grant the entitlements.
+        setPaymentState("verifying");
+        try {
+          const verify = await apiRequest<VerifyPaymentResponse>("/api/razorpay/verify-payment", {
+            orderId: order.orderId,
+            free: true,
+            quoteId,
+          });
+          setPaymentState("success");
+          window.setTimeout(
+            () =>
+              onPaymentSuccess({
+                orderId: verify.orderId,
+                paymentId: verify.paymentId,
+                paymentMethod: "Free access",
+                free: true,
+                grantedEntitlementIds: verify.grantedEntitlementIds || [],
+              }),
+            400,
+          );
+        } catch (freeError) {
+          setPaymentState("error");
+          setError(freeError instanceof Error ? freeError.message : "Free grant failed.");
+        }
         return;
       }
 
@@ -156,16 +233,17 @@ export default function PaymentGateway({ productId, productIds, updateSelection,
       <div className="rounded-2xl border border-gray-200 bg-white p-5 text-center shadow-sm">
         <ShieldCheck className="mx-auto h-9 w-9 text-emerald-600" />
         <p className="mt-2 text-sm font-black text-gray-800">Server-verified secure checkout</p>
-        <p className="mt-1 text-xs text-gray-400">The payable amount comes from Firestore and is verified by Razorpay on the server.</p>
+        <p className="mt-1 text-xs text-gray-400">The payable amount comes from the verified quote and is reconfirmed by Razorpay on the server.</p>
       </div>
 
       <div className="rounded-2xl bg-gradient-to-br from-indigo-600 to-violet-700 p-5 text-white shadow-lg shadow-indigo-200">
         <p className="text-xs font-bold uppercase tracking-wider text-indigo-200">Amount to pay</p>
         <p className="mt-1 text-3xl font-extrabold">{finalPrice === 0 ? "Free" : `${currency}${finalPrice.toLocaleString("en-IN")}`}</p>
         <p className="mt-1 truncate text-xs text-indigo-200">{productName}</p>
+        <p className="mt-2 truncate text-[10px] font-mono text-indigo-200/70">quote {quoteId}</p>
       </div>
 
-      {paymentState === "success" && <StatusCard icon={<CheckCircle2 className="h-10 w-10 text-emerald-600" />} title="Payment verified" detail="Access is being added to your Firebase account…" tone="emerald" />}
+      {paymentState === "success" && <StatusCard icon={<CheckCircle2 className="h-10 w-10 text-emerald-600" />} title="Payment verified" detail="Access is being added to your account…" tone="emerald" />}
       {busy && <StatusCard icon={<LoaderCircle className="h-10 w-10 animate-spin text-indigo-600" />} title={paymentState === "verifying" ? "Verifying payment" : paymentState === "awaiting" ? "Complete payment in Razorpay" : "Creating secure order"} detail={paymentState === "verifying" ? "Do not close this page while the server confirms your payment." : "Your access will unlock only after server verification."} tone="indigo" />}
       {error && <div role="alert" className="rounded-2xl border border-rose-200 bg-rose-50 p-4 text-sm font-semibold leading-6 text-rose-700"><TriangleAlert className="mb-2 h-5 w-5" />{error}</div>}
 
