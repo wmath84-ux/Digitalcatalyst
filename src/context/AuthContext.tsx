@@ -11,6 +11,7 @@ import {
 } from "react";
 import {
   browserLocalPersistence,
+  browserSessionPersistence,
   createUserWithEmailAndPassword,
   GoogleAuthProvider,
   onAuthStateChanged,
@@ -24,12 +25,9 @@ import {
 } from "firebase/auth";
 import { doc, getDoc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { auth, db } from "../../firebase";
-
-const PRIMARY_ADMIN_EMAIL = "wmath84@gmail.com";
+import { APPROVED_ADMIN_EMAIL, clearAdminSession, createAdminSession } from "../utils/adminSession";
 const googleProvider = new GoogleAuthProvider();
 googleProvider.setCustomParameters({ prompt: "select_account" });
-
-export type AuthMode = "user" | "admin";
 
 export interface AuthUser {
   id: string;
@@ -41,7 +39,7 @@ export interface AuthUser {
   bio?: string;
   createdAt?: string;
   subscriptionTier?: string;
-  role: "user" | "admin" | "super_admin";
+  role: "user" | "admin";
   providerIds: string[];
 }
 
@@ -63,7 +61,7 @@ interface AuthContextValue {
   refresh: () => Promise<void>;
   login: (email: string, password: string) => Promise<AuthResult>;
   signup: (details: SignupDetails) => Promise<AuthResult>;
-  loginWithGoogle: (mode?: AuthMode) => Promise<AuthResult>;
+  loginWithGoogle: () => Promise<AuthResult>;
   loginAdmin: (email: string, password: string) => Promise<AuthResult>;
   resetPassword: (email: string) => Promise<AuthResult>;
   updateAccount: (details: { name: string; mobile: string; bio: string }) => Promise<AuthResult>;
@@ -108,12 +106,7 @@ const readAppUser = async (firebaseUser: FirebaseUser): Promise<AuthUser> => {
   const profileSnapshot = await getDoc(profileRef);
   const data = profileSnapshot.exists() ? profileSnapshot.data() : {};
   const email = normalizeEmail(firebaseUser.email || String(data.email || ""));
-  const storedRole = String(data.role || "user");
-  const role: AuthUser["role"] = email === PRIMARY_ADMIN_EMAIL
-    ? (storedRole === "super_admin" ? "super_admin" : "admin")
-    : storedRole === "admin" || storedRole === "super_admin"
-      ? storedRole
-      : "user";
+  const role: AuthUser["role"] = data.role === "admin" ? "admin" : "user";
 
   return {
     id: firebaseUser.uid,
@@ -140,14 +133,13 @@ const ensureUserProfile = async (
   const email = normalizeEmail(firebaseUser.email);
 
   if (!profileSnapshot.exists()) {
-    const isPrimaryAdmin = email === PRIMARY_ADMIN_EMAIL;
     await setDoc(profileRef, {
       uid: firebaseUser.uid,
       name: signupProfile?.name || firebaseUser.displayName || email.split("@")[0] || "Learner",
       email,
       mobile: signupProfile?.mobile || firebaseUser.phoneNumber || "",
       photoURL: firebaseUser.photoURL || "",
-      role: isPrimaryAdmin ? "admin" : "user",
+      role: "user",
       status: "active",
       purchasedProductIds: [],
       coinBalance: 300,
@@ -172,9 +164,6 @@ const ensureUserProfile = async (
 
   return readAppUser(firebaseUser);
 };
-
-const isAdminUser = (user: AuthUser) =>
-  normalizeEmail(user.email) === PRIMARY_ADMIN_EMAIL || user.role === "admin" || user.role === "super_admin";
 
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<AuthUser | null>(null);
@@ -206,10 +195,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    void setPersistence(auth, browserLocalPersistence).catch((error) => {
-      console.warn("Firebase auth persistence setup failed", error);
-    });
-
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       if (!active) return;
       if (!firebaseUser) {
@@ -247,11 +232,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         coins: Number(data.coinBalance ?? data.eduCoins ?? current.coins),
         subscriptionTier: String(data.subscriptionTier || current.subscriptionTier || "basic"),
         photoURL: String(data.photoURL || current.photoURL || ""),
+        role: data.role === "admin" ? "admin" : "user",
       } : current);
     }, (error) => console.warn("Live Firebase profile sync failed", error));
   }, [user?.id]);
 
   const login = useCallback(async (email: string, password: string): Promise<AuthResult> => {
+    clearAdminSession();
     try {
       await setPersistence(auth, browserLocalPersistence);
       const credential = await signInWithEmailAndPassword(auth, normalizeEmail(email), password);
@@ -263,6 +250,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [commitFirebaseUser]);
 
   const signup = useCallback(async (details: SignupDetails): Promise<AuthResult> => {
+    clearAdminSession();
     try {
       await setPersistence(auth, browserLocalPersistence);
       const credential = await createUserWithEmailAndPassword(auth, normalizeEmail(details.email), details.password);
@@ -278,38 +266,43 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
-  const finishAdminLogin = useCallback(async (firebaseUser: FirebaseUser): Promise<AuthResult> => {
-    const appUser = await ensureUserProfile(firebaseUser);
-    if (!isAdminUser(appUser)) {
-      await signOut(auth);
-      setUser(null);
-      return { success: false, message: "इस account के पास admin access नहीं है।" };
-    }
-    setUser(appUser);
-    return { success: true, message: "Admin login successful." };
-  }, []);
-
   const loginAdmin = useCallback(async (email: string, password: string): Promise<AuthResult> => {
+    const normalizedEmail = normalizeEmail(email);
+    clearAdminSession();
+    if (normalizedEmail !== APPROVED_ADMIN_EMAIL) {
+      return { success: false, message: "This email is not approved for dashboard access." };
+    }
     try {
-      await setPersistence(auth, browserLocalPersistence);
-      const credential = await signInWithEmailAndPassword(auth, normalizeEmail(email), password);
-      return await finishAdminLogin(credential.user);
+      await setPersistence(auth, browserSessionPersistence);
+      const credential = await signInWithEmailAndPassword(auth, normalizedEmail, password);
+      await credential.user.getIdToken(true);
+      const profileSnapshot = await getDoc(doc(db, "users", credential.user.uid));
+      if (!profileSnapshot.exists() || profileSnapshot.data().role !== "admin" || normalizeEmail(credential.user.email) !== APPROVED_ADMIN_EMAIL) {
+        await signOut(auth);
+        setUser(null);
+        return { success: false, message: "Dashboard access requires the approved email and an admin role." };
+      }
+      const appUser = await readAppUser(credential.user);
+      setUser(appUser);
+      createAdminSession(appUser.id, appUser.email);
+      return { success: true, message: "Admin login successful." };
     } catch (error) {
+      clearAdminSession();
       return { success: false, message: authErrorMessage(error) };
     }
-  }, [finishAdminLogin]);
+  }, []);
 
-  const loginWithGoogle = useCallback(async (mode: AuthMode = "user"): Promise<AuthResult> => {
+  const loginWithGoogle = useCallback(async (): Promise<AuthResult> => {
+    clearAdminSession();
     try {
       await setPersistence(auth, browserLocalPersistence);
       const credential = await signInWithPopup(auth, googleProvider);
-      if (mode === "admin") return await finishAdminLogin(credential.user);
       await commitFirebaseUser(credential.user);
       return { success: true, message: "Google login successful." };
     } catch (error) {
       return { success: false, message: authErrorMessage(error) };
     }
-  }, [commitFirebaseUser, finishAdminLogin]);
+  }, [commitFirebaseUser]);
 
   const resetPassword = useCallback(async (email: string): Promise<AuthResult> => {
     const normalizedEmail = normalizeEmail(email);
@@ -342,6 +335,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    clearAdminSession();
     await signOut(auth);
     setUser(null);
   }, []);

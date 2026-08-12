@@ -13,7 +13,6 @@ import {
   LogOut,
   Pencil,
   Save,
-  ShieldCheck,
   ShoppingBag,
   Sparkles,
   UserRound,
@@ -112,7 +111,7 @@ export default function ProfileApp() {
           <div className="relative flex items-center gap-4">
             {user.photoURL ? <img src={user.photoURL} alt="" className="h-16 w-16 rounded-full object-cover ring-2 ring-white/40" /> : <div className="grid h-16 w-16 place-items-center rounded-full bg-white/20 text-xl font-black ring-2 ring-white/40">{initials}</div>}
             <div className="min-w-0 flex-1"><h2 className="truncate text-xl font-black">{user.name}</h2><p className="truncate text-xs text-white/80">{user.email}</p><p className="mt-1 text-[11px] text-white/60">Member since {memberSince}</p></div>
-            {user.role !== "user" && <span className="rounded-full bg-white/15 px-3 py-1 text-[10px] font-black uppercase">{user.role}</span>}
+
           </div>
           <p className="relative mt-4 text-sm leading-6 text-white/85">{user.bio || "Add a short bio to personalize your learner profile."}</p>
           <button onClick={() => setModal("edit")} className="relative mt-4 flex w-full items-center justify-center gap-2 rounded-2xl bg-white/15 py-3 text-sm font-black ring-1 ring-white/30"><Pencil size={15} /> Edit profile</button>
@@ -127,7 +126,6 @@ export default function ProfileApp() {
 
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm"><div className="flex items-center justify-between"><div><h3 className="text-xs font-black uppercase tracking-wider text-slate-400">Preferences</h3><p className="mt-1 text-xs text-slate-400">Saved securely to your account</p></div><button onClick={() => setModal("settings")} className="grid h-10 w-10 place-items-center rounded-xl bg-violet-50 text-violet-600"><Bell size={18} /></button></div></section>
 
-        {user.role !== "user" && <button onClick={() => { window.location.hash = "#/admin"; }} className="flex w-full items-center justify-between rounded-2xl bg-slate-950 px-5 py-4 text-sm font-black text-white"><span className="flex items-center gap-2"><ShieldCheck size={18} /> Open admin workspace</span><ChevronRight size={17} /></button>}
         <button onClick={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })} className="flex w-full items-center justify-center gap-2 rounded-2xl bg-rose-50 py-4 text-sm font-black text-rose-600 ring-1 ring-rose-100"><LogOut size={17} /> Log out</button>
       </main>
 

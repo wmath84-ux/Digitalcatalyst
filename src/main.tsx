@@ -14,11 +14,13 @@ import CartWishlistApp from "./CartWishlistApp";
 import SubscriptionApp from "./subscription/App";
 import LandingApp from "./LandingApp";
 import AuthApp from "./AuthApp";
+import AdminLoginApp from "./AdminLoginApp";
 import AiChatApp from "./ai-chat/App";
 import AdminApp from "./admin/AdminApp";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
 import { CommerceProvider, useCommerce } from "./context/CommerceContext";
+import { clearAdminSession, hasAdminSession } from "./utils/adminSession";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
 import type { PaidCourseUpdate } from "./types/course";
 import {
@@ -49,6 +51,7 @@ const FAVORITES_HASH = "#/favorites";
 const SUBSCRIPTION_HASH = "#/subscription";
 const AI_CHAT_HASH = "#/ai-chat";
 const ADMIN_HASH = "#/admin";
+const ADMIN_LOGIN_HASH = "#/admin-login";
 const CHECKOUT_CONTEXT_KEY = "checkoutContext";
 
 type NavigableProduct = {
@@ -78,14 +81,13 @@ const AUTH_REQUIRED_PREFIXES = [
   COMMUNITY_HASH,
   SUBSCRIPTION_HASH,
   AI_CHAT_HASH,
-  ADMIN_HASH,
 ];
 
 const requiresAuthentication = (hash: string) =>
   AUTH_REQUIRED_PREFIXES.some((prefix) => hash.startsWith(prefix));
 
 function Root() {
-  const { user, loading } = useAuth();
+  const { user, loading, logout } = useAuth();
   const { products: catalogProducts, purchasedIds } = useCatalog();
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
@@ -133,6 +135,14 @@ function Root() {
     if (loading || user || !requiresAuthentication(hash)) return;
     window.location.hash = `${AUTH_HASH}?mode=login&return=${encodeURIComponent(hash)}`;
   }, [hash, loading, user]);
+
+  useEffect(() => {
+    if (!hash.startsWith(ADMIN_HASH) || hash.startsWith(ADMIN_LOGIN_HASH) || loading) return;
+    if (user && hasAdminSession(user.id, user.email, user.role)) return;
+    clearAdminSession();
+    window.location.hash = ADMIN_LOGIN_HASH;
+    if (user) void logout();
+  }, [hash, loading, logout, user]);
 
   useEffect(() => {
     return () => {
@@ -330,6 +340,7 @@ function Root() {
     );
   }
   if (hash.startsWith(AUTH_HASH)) return <AuthApp />;
+  if (hash.startsWith(ADMIN_LOGIN_HASH)) return <AdminLoginApp />;
 
   if (hash.startsWith(CART_HASH) || hash.startsWith(FAVORITES_HASH)) {
     return (
@@ -367,7 +378,7 @@ function Root() {
     }
   }
 
-  if (hash.startsWith(ADMIN_HASH)) return <AdminApp />;
+  if (hash.startsWith(ADMIN_HASH)) return user && hasAdminSession(user.id, user.email, user.role) ? <AdminApp /> : <AdminLoginApp />;
   if (hash.startsWith(SUBSCRIPTION_HASH)) return <SubscriptionApp />;
   if (hash.startsWith(AI_CHAT_HASH)) return <AiChatApp />;
   if (hash.startsWith(COMMUNITY_HASH)) return <CommunityApp />;

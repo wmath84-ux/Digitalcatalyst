@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { Eye, EyeOff, ShieldCheck } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 
-type Mode = "login" | "signup" | "admin";
+type Mode = "login" | "signup";
 
 const readAuthParams = () =>
   new URLSearchParams(typeof window === "undefined" ? "" : window.location.hash.split("?")[1] || "");
@@ -28,7 +28,7 @@ export default function AuthForm() {
   const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [googleSubmitting, setGoogleSubmitting] = useState(false);
-  const { login, signup, loginAdmin, loginWithGoogle, resetPassword } = useAuth();
+  const { login, signup, loginWithGoogle, resetPassword } = useAuth();
 
   const clearMessages = () => {
     setError(null);
@@ -69,15 +69,13 @@ export default function AuthForm() {
     try {
       const result = mode === "signup"
         ? await signup({ name: name.trim(), email: normalizedEmail, mobile: normalizedMobile, password })
-        : mode === "admin"
-          ? await loginAdmin(normalizedEmail, password)
-          : await login(normalizedEmail, password);
+        : await login(normalizedEmail, password);
 
       if (!result.success) {
         setError(result.message);
         return;
       }
-      completeSuccess(result.message, mode === "admin" ? "#/admin" : "#/store");
+      completeSuccess(result.message, "#/store");
     } finally {
       setSubmitting(false);
     }
@@ -87,12 +85,12 @@ export default function AuthForm() {
     clearMessages();
     setGoogleSubmitting(true);
     try {
-      const result = await loginWithGoogle(mode === "admin" ? "admin" : "user");
+      const result = await loginWithGoogle();
       if (!result.success) {
         setError(result.message);
         return;
       }
-      completeSuccess(result.message, mode === "admin" ? "#/admin" : "#/store");
+      completeSuccess(result.message, "#/store");
     } finally {
       setGoogleSubmitting(false);
     }
@@ -137,8 +135,8 @@ export default function AuthForm() {
         </div>
       </div>
 
-      <div className="mb-6 grid grid-cols-3 rounded-2xl bg-white/5 p-1">
-        {(["login", "signup", "admin"] as Mode[]).map((item) => (
+      <div className="mb-6 grid grid-cols-2 rounded-2xl bg-white/5 p-1">
+        {(["login", "signup"] as Mode[]).map((item) => (
           <button
             key={item}
             type="button"
@@ -156,14 +154,12 @@ export default function AuthForm() {
       </div>
 
       <h1 className="text-2xl font-black text-white">
-        {mode === "login" ? "Welcome back" : mode === "signup" ? "Create your account" : "Admin access"}
+        {mode === "login" ? "Welcome back" : "Create your account"}
       </h1>
       <p className="mt-1 text-sm text-slate-400">
         {mode === "login"
           ? "Log in securely and continue your Eduvora journey."
-          : mode === "signup"
-            ? "Create your Firebase-secured learner account."
-            : "Only verified admin accounts can continue."}
+          : "Create your Firebase-secured learner account."}
       </p>
 
       <button
@@ -182,7 +178,7 @@ export default function AuthForm() {
             <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15A10.6 10.6 0 0 0 12 1a11 11 0 0 0-9.82 6.07L5.84 9.9C6.71 7.31 9.14 5.38 12 5.38Z" />
           </svg>
         )}
-        {googleSubmitting ? "Google से connect हो रहा है…" : mode === "admin" ? "Admin with Google" : "Continue with Google"}
+        {googleSubmitting ? "Google से connect हो रहा है…" : "Continue with Google"}
       </button>
 
       <div className="my-5 flex items-center gap-3">
@@ -239,7 +235,7 @@ export default function AuthForm() {
             autoComplete="email"
             value={email}
             onChange={(event) => setEmail(event.target.value)}
-            placeholder={mode === "admin" ? "Admin email" : "you@example.com"}
+            placeholder="you@example.com"
             className="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-3 text-white placeholder-slate-500 outline-none focus:border-violet-400"
           />
         </div>
@@ -299,13 +295,7 @@ export default function AuthForm() {
           disabled={busy}
           className="pulse-glow w-full rounded-xl bg-gradient-to-r from-violet-500 via-fuchsia-500 to-cyan-400 py-3.5 text-base font-bold text-white shadow-lg shadow-fuchsia-500/30 transition disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {submitting
-            ? "Please wait…"
-            : mode === "login"
-              ? "Log In"
-              : mode === "signup"
-                ? "Create Account"
-                : "Verify Admin"}
+          {submitting ? "Please wait…" : mode === "login" ? "Log In" : "Create Account"}
         </motion.button>
       </form>
 

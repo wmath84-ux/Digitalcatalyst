@@ -8,8 +8,10 @@ service firebase.storage {
 
     function isAdmin() {
       return signedIn()
+        && request.auth.token.email != null
+        && request.auth.token.email.lower() == 'wmath84@gmail.com'
         && firestore.exists(/databases/(default)/documents/users/$(request.auth.uid))
-        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role in ['admin', 'super_admin'];
+        && firestore.get(/databases/(default)/documents/users/$(request.auth.uid)).data.role == 'admin';
     }
 
     function isPrivateChatParticipant(chatId) {

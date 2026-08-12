@@ -27,6 +27,7 @@ import { db } from "../../firebase";
 import CourseUrlBuilder from "./CourseUrlBuilder";
 import { useAuth } from "../context/AuthContext";
 import { sanitizeUrlOnlyCourseContent } from "../utils/courseContent";
+import { APPROVED_ADMIN_EMAIL, hasAdminSession } from "../utils/adminSession";
 import type { CourseModule } from "../types/course";
 
 type AdminView = "overview" | "products" | "users";
@@ -117,10 +118,10 @@ function AccessDenied() {
       <div className="max-w-md rounded-3xl border border-white/10 bg-white/5 p-8 shadow-2xl backdrop-blur">
         <ShieldCheck className="mx-auto h-12 w-12 text-rose-400" />
         <h1 className="mt-4 text-2xl font-black">Admin access required</h1>
-        <p className="mt-2 text-sm leading-6 text-slate-400">This Firebase account does not have an admin or super-admin role.</p>
+        <p className="mt-2 text-sm leading-6 text-slate-400">This session does not match the approved admin email and admin role.</p>
         <div className="mt-6 grid gap-3 sm:grid-cols-2">
           <button onClick={() => { window.location.hash = "#/store"; }} className="rounded-xl border border-white/10 px-4 py-3 text-sm font-bold hover:bg-white/5">Back to store</button>
-          <button onClick={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })} className="rounded-xl bg-rose-500 px-4 py-3 text-sm font-bold">Sign out</button>
+          <button onClick={() => void logout().then(() => { window.location.hash = "#/admin-login"; })} className="rounded-xl bg-rose-500 px-4 py-3 text-sm font-bold">Sign out</button>
         </div>
       </div>
     </main>
@@ -143,7 +144,7 @@ export default function AdminApp() {
   const [saveState, setSaveState] = useState<SaveState>("idle");
   const [formError, setFormError] = useState("");
 
-  const isAdmin = user?.role === "admin" || user?.role === "super_admin";
+  const isAdmin = Boolean(user && user.email === APPROVED_ADMIN_EMAIL && user.role === "admin" && hasAdminSession(user.id, user.email, user.role));
 
   useEffect(() => {
     if (!isAdmin) return undefined;
@@ -318,7 +319,7 @@ export default function AdminApp() {
             <p className="truncate text-[11px] text-slate-500">{user.email}</p>
           </div>
           <button type="button" onClick={() => { window.location.hash = "#/store"; }} className="ml-auto hidden items-center gap-2 rounded-xl border border-slate-200 px-3 py-2 text-xs font-bold sm:flex"><ExternalLink size={15} /> Store</button>
-          <button type="button" onClick={() => void logout().then(() => { window.location.hash = "#/auth?mode=login"; })} className="grid h-10 w-10 place-items-center rounded-xl bg-slate-950 text-white" aria-label="Sign out"><LogOut size={17} /></button>
+          <button type="button" onClick={() => void logout().then(() => { window.location.hash = "#/admin-login"; })} className="grid h-10 w-10 place-items-center rounded-xl bg-slate-950 text-white" aria-label="Sign out"><LogOut size={17} /></button>
         </div>
       </header>
 
