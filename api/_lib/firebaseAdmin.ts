@@ -68,12 +68,12 @@ export const parseProductPricePaise = (data: Record<string, unknown>): number =>
   return paise;
 };
 
-export async function grantProductEntitlement(input: {
+export async function grantProductEntitlements(input: {
   uid: string;
   email?: string;
   name?: string;
-  productId: string;
-  product: Record<string, unknown>;
+  items: Array<{ productId: string; product: Record<string, unknown> }>;
+  cartProductIds?: string[];
   amountPaise: number;
   orderId: string;
   paymentId?: string;
@@ -81,21 +81,25 @@ export async function grantProductEntitlement(input: {
 }) {
   const db = adminDb();
   const userRef = db.collection('users').doc(input.uid);
-  const purchaseRef = userRef.collection('purchases').doc(input.productId);
   const siteOrderRef = db.collection('siteOrders').doc(input.orderId);
-  const title = String(input.product.title || 'Digital product');
   const now = Timestamp.now();
 
   await db.runTransaction(async (transaction) => {
-    const existing = await transaction.get(purchaseRef);
-    if (!existing.exists) {
-      transaction.set(purchaseRef, {
-        productId: Number.isFinite(Number(input.productId)) ? Number(input.productId) : input.productId,
-        productDocumentId: input.productId,
-        title,
+    const purchaseEntries = input.items.map((item) => ({
+      ...item,
+      ref: userRef.collection('purchases').doc(item.productId),
+    }));
+    const existingPurchases = await Promise.all(purchaseEntries.map((item) => transaction.get(item.ref)));
+
+    purchaseEntries.forEach((item, index) => {
+      if (existingPurchases[index].exists) return;
+      transaction.set(item.ref, {
+        productId: Number.isFinite(Number(item.productId)) ? Number(item.productId) : item.productId,
+        productDocumentId: item.productId,
+        title: String(item.product.title || 'Digital product'),
         quantity: 1,
-        total: `₹${(input.amountPaise / 100).toFixed(2)}`,
-        amountPaise: input.amountPaise,
+        total: `₹${(parseProductPricePaise(item.product) / 100).toFixed(2)}`,
+        amountPaise: parseProductPricePaise(item.product),
         currency: 'INR',
         status: 'Verified',
         source: input.source,
@@ -103,10 +107,11 @@ export async function grantProductEntitlement(input: {
         paymentId: input.paymentId || '',
         unlockedAt: now,
       });
-    }
+    });
 
     transaction.set(userRef, {
-      purchasedProductIds: FieldValue.arrayUnion(Number.isFinite(Number(input.productId)) ? Number(input.productId) : input.productId),
+      purchasedProductIds: FieldValue.arrayUnion(...input.items.map((item) => Number.isFinite(Number(item.productId)) ? Number(item.productId) : item.productId)),
+      cartProductIds: FieldValue.arrayRemove(...(input.cartProductIds || input.items.map((item) => item.productId))),
       updatedAt: now,
     }, { merge: true });
 
@@ -123,7 +128,12 @@ export async function grantProductEntitlement(input: {
       paymentStatus: 'Verified',
       paymentProvider: input.source === 'razorpay' ? 'razorpay' : 'free',
       paymentId: input.paymentId || '',
-      items: [{ id: input.productId, name: title, quantity: 1, price: `₹${(input.amountPaise / 100).toFixed(2)}` }],
+      items: input.items.map((item) => ({
+        id: item.productId,
+        name: String(item.product.title || 'Digital product'),
+        quantity: 1,
+        price: `₹${(parseProductPricePaise(item.product) / 100).toFixed(2)}`,
+      })),
       createdAt: now,
     }, { merge: true });
   });

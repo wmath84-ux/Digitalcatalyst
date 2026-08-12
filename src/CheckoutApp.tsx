@@ -82,6 +82,7 @@ export default function App() {
           {currentStep === 2 && (
             <PaymentGateway
               productId={product.id}
+              productIds={product.productIds}
               finalPrice={finalPrice}
               currency={product.currency}
               productName={product.name}

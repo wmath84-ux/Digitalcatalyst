@@ -1,5 +1,6 @@
 export interface Product {
   id: string;
+  productIds?: string[];
   name: string;
   type: 'PDF' | 'Course' | 'Video' | 'eBook' | 'Live Workshop';
   description: string;

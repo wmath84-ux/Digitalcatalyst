@@ -10,13 +10,12 @@ interface CartWishlistAppProps {
   favoriteProducts: Product[];
   cartIds: Set<string>;
   favoriteIds: Set<string>;
-  userCoins: number;
   toast: string | null;
   onRemoveFromCart: (id: string) => void;
   onClearCart: () => void;
   onRemoveFromFavorites: (id: string) => void;
   onAddToCart: (id: string) => void;
-  onCheckoutComplete: (coinsUsed: number) => void;
+  onCheckout: () => void;
   onNavigate: (tab: TabKey) => void;
   onRequireAuth: () => boolean;
 }
@@ -27,13 +26,12 @@ export default function CartWishlistApp({
   favoriteProducts,
   cartIds,
   favoriteIds,
-  userCoins,
   toast,
   onRemoveFromCart,
   onClearCart,
   onRemoveFromFavorites,
   onAddToCart,
-  onCheckoutComplete,
+  onCheckout,
   onNavigate,
   onRequireAuth,
 }: CartWishlistAppProps) {
@@ -55,8 +53,7 @@ export default function CartWishlistApp({
             cartProducts={cartProducts}
             onRemove={onRemoveFromCart}
             onClearAll={onClearCart}
-            userCoins={userCoins}
-            onCheckoutComplete={onCheckoutComplete}
+            onCheckout={onCheckout}
             onNavigate={onNavigate}
             onRequireAuth={onRequireAuth}
           />

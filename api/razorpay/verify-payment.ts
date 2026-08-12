@@ -3,7 +3,7 @@ import { Timestamp } from 'firebase-admin/firestore';
 import {
   adminDb,
   errorResponse,
-  grantProductEntitlement,
+  grantProductEntitlements,
   requireFirebaseUser,
   type VercelRequest,
   type VercelResponse,
@@ -38,7 +38,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const intentRef = db.collection('_paymentIntents').doc(orderId);
     const intentSnapshot = await intentRef.get();
     if (!intentSnapshot.exists) return res.status(404).json({ ok: false, verified: false, error: 'Secure payment intent was not found.' });
-    const intent = intentSnapshot.data() as { uid?: string; productId?: string; amountPaise?: number; status?: string; paymentId?: string };
+    const intent = intentSnapshot.data() as { uid?: string; productIds?: string[]; requestedProductIds?: string[]; amountPaise?: number; status?: string; paymentId?: string };
     if (intent.uid !== firebaseUser.uid) return res.status(403).json({ ok: false, verified: false, error: 'This payment belongs to a different account.' });
     if (intent.status === 'verified') {
       return res.status(200).json({ ok: true, verified: true, orderId, paymentId: intent.paymentId || paymentId, alreadyVerified: true });
@@ -65,16 +65,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     if (String(payment.order_id || '') !== orderId) return res.status(400).json({ ok: false, verified: false, error: 'Payment order mismatch.' });
     if (Number(payment.amount) !== Number(intent.amountPaise)) return res.status(400).json({ ok: false, verified: false, error: 'Payment amount mismatch.' });
 
-    const productId = String(intent.productId || '');
-    const productSnapshot = await db.collection('siteProducts').doc(productId).get();
-    if (!productSnapshot.exists) return res.status(404).json({ ok: false, verified: false, error: 'Purchased product no longer exists.' });
+    const productIds = Array.isArray(intent.productIds) ? intent.productIds.map(String).filter(Boolean) : [];
+    if (productIds.length === 0) return res.status(404).json({ ok: false, verified: false, error: 'Purchased products were not recorded on the payment intent.' });
+    const productSnapshots = await db.getAll(...productIds.map((productId) => db.collection('siteProducts').doc(productId)));
+    if (productSnapshots.some((snapshot) => !snapshot.exists)) return res.status(404).json({ ok: false, verified: false, error: 'A purchased product no longer exists.' });
 
-    await grantProductEntitlement({
+    await grantProductEntitlements({
       uid: firebaseUser.uid,
       email: firebaseUser.email,
       name: firebaseUser.name,
-      productId,
-      product: productSnapshot.data() as Record<string, unknown>,
+      items: productSnapshots.map((snapshot) => ({ productId: snapshot.id, product: snapshot.data() as Record<string, unknown> })),
+      cartProductIds: Array.isArray(intent.requestedProductIds) ? intent.requestedProductIds.map(String) : productIds,
       amountPaise: Number(intent.amountPaise),
       orderId,
       paymentId,

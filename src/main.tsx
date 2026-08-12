@@ -18,6 +18,7 @@ import AiChatApp from "./ai-chat/App";
 import AdminApp from "./admin/AdminApp";
 import { AuthProvider, useAuth } from "./context/AuthContext";
 import { CatalogProvider, useCatalog } from "./context/CatalogContext";
+import { CommerceProvider, useCommerce } from "./context/CommerceContext";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
 import {
   product as checkoutProduct,
@@ -48,10 +49,6 @@ const SUBSCRIPTION_HASH = "#/subscription";
 const AI_CHAT_HASH = "#/ai-chat";
 const ADMIN_HASH = "#/admin";
 const CHECKOUT_CONTEXT_KEY = "checkoutContext";
-
-const INITIAL_CART: string[] = [];
-const INITIAL_FAVORITES: string[] = [];
-const INITIAL_COINS = 0;
 
 type NavigableProduct = {
   id: string;
@@ -89,10 +86,8 @@ const requiresAuthentication = (hash: string) =>
 function Root() {
   const { user, loading } = useAuth();
   const { products: catalogProducts } = useCatalog();
+  const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
-  const [cartIds, setCartIds] = useState<Set<string>>(new Set(INITIAL_CART));
-  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set(INITIAL_FAVORITES));
-  const [userCoins, setUserCoins] = useState(INITIAL_COINS);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -140,57 +135,63 @@ function Root() {
   }, []);
 
   const handleAddToCart = (id: string) => {
-    setCartIds((previous) => {
-      if (previous.has(id)) return previous;
-      const next = new Set(previous);
-      next.add(id);
-      return next;
-    });
+    if (!user) { redirectToAuth(window.location.hash || STORE_HASH); return; }
     const product = shoppingProducts.find((item) => item.id === id);
-    showShoppingToast(`${product ? product.title.slice(0, 28) + "…" : "Item"} added to cart`);
+    void addToCart(id)
+      .then(() => showShoppingToast(`${product ? product.title.slice(0, 28) + "…" : "Item"} added to cart`))
+      .catch(() => showShoppingToast("Could not update cart"));
   };
 
   const handleRemoveFromCart = (id: string) => {
-    setCartIds((previous) => {
-      const next = new Set(previous);
-      next.delete(id);
-      return next;
-    });
-    showShoppingToast("Removed from cart");
+    void removeFromCart(id).then(() => showShoppingToast("Removed from cart")).catch(() => showShoppingToast("Could not update cart"));
   };
 
   const handleClearCart = () => {
-    setCartIds(new Set());
-    showShoppingToast("Cart cleared");
+    void clearCart().then(() => showShoppingToast("Cart cleared")).catch(() => showShoppingToast("Could not clear cart"));
   };
 
   const handleToggleFavorite = (id: string) => {
-    setFavoriteIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) {
-        next.delete(id);
-        showShoppingToast("Removed from favorites");
-      } else {
-        next.add(id);
-        showShoppingToast("Added to favorites");
-      }
-      return next;
-    });
+    if (!user) { redirectToAuth(window.location.hash || STORE_HASH); return; }
+    void toggleFavorite(id)
+      .then((added) => showShoppingToast(added ? "Added to favorites" : "Removed from favorites"))
+      .catch(() => showShoppingToast("Could not update favorites"));
   };
 
   const handleRemoveFromFavorites = (id: string) => {
-    setFavoriteIds((previous) => {
-      const next = new Set(previous);
-      next.delete(id);
-      return next;
-    });
-    showShoppingToast("Removed from favorites");
+    void toggleFavorite(id).then(() => showShoppingToast("Removed from favorites")).catch(() => showShoppingToast("Could not update favorites"));
   };
 
-  const handleCheckoutComplete = (coinsUsed: number) => {
-    setUserCoins((previous) => Math.max(0, previous - coinsUsed));
-    setCartIds(new Set());
-    showShoppingToast("Order placed successfully 🎉");
+  const handleCartCheckout = () => {
+    if (!user) { redirectToAuth(CART_HASH); return; }
+    const items = catalogProducts.filter((product) => cartIds.has(product.id));
+    if (items.length === 0) return;
+    const total = items.reduce((sum, product) => sum + product.price, 0);
+    const context: CheckoutContext = {
+      product: {
+        id: items.length === 1 ? items[0].id : `bundle-${Date.now()}`,
+        productIds: items.map((item) => item.id),
+        name: items.length === 1 ? items[0].title : `${items.length} Digital Catalyst products`,
+        type: "Course",
+        description: items.map((item) => item.title).join(", "),
+        price: total,
+        currency: "₹",
+        thumbnail: "🛒",
+        instructor: "Digital Catalyst",
+        duration: "Lifetime access",
+        rating: 0,
+        totalRatings: 0,
+      },
+      user: {
+        ...checkoutUser,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        eduCoins: user.coins,
+      },
+    };
+    applyCheckoutContext(context);
+    sessionStorage.setItem(CHECKOUT_CONTEXT_KEY, JSON.stringify(context));
+    window.location.hash = CHECKOUT_HASH;
   };
 
   const handleShoppingNavigation = (tab: CartTabKey) => {
@@ -308,13 +309,12 @@ function Root() {
         favoriteProducts={favoriteProducts}
         cartIds={cartIds}
         favoriteIds={favoriteIds}
-        userCoins={userCoins}
         toast={shoppingToast}
         onRemoveFromCart={handleRemoveFromCart}
         onClearCart={handleClearCart}
         onRemoveFromFavorites={handleRemoveFromFavorites}
         onAddToCart={handleAddToCart}
-        onCheckoutComplete={handleCheckoutComplete}
+        onCheckout={handleCartCheckout}
         onNavigate={handleShoppingNavigation}
         onRequireAuth={() => {
           if (user) return true;
@@ -396,7 +396,9 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>
       <CatalogProvider>
-        <Root />
+        <CommerceProvider>
+          <Root />
+        </CommerceProvider>
       </CatalogProvider>
     </AuthProvider>
   </StrictMode>,

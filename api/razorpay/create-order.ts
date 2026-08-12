@@ -1,8 +1,8 @@
-import { Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, Timestamp } from 'firebase-admin/firestore';
 import {
   adminDb,
   errorResponse,
-  grantProductEntitlement,
+  grantProductEntitlements,
   parseProductPricePaise,
   requireFirebaseUser,
   type VercelRequest,
@@ -16,26 +16,34 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
   try {
     const firebaseUser = await requireFirebaseUser(req);
-    const productId = cleanProductId(req.body?.productId);
-    if (!productId) return res.status(400).json({ ok: false, error: 'Missing product id.' });
+    const requestedIds = Array.isArray(req.body?.productIds) ? req.body.productIds : [req.body?.productId];
+    const productIds = Array.from(new Set(requestedIds.map(cleanProductId).filter(Boolean))).slice(0, 20);
+    if (productIds.length === 0) return res.status(400).json({ ok: false, error: 'Missing product id.' });
 
     const db = adminDb();
-    const productSnapshot = await db.collection('siteProducts').doc(productId).get();
-    if (!productSnapshot.exists) return res.status(404).json({ ok: false, error: 'Product was not found.' });
-    const product = productSnapshot.data() as Record<string, unknown>;
-    if (product.isVisible === false || product.inStock === false) {
-      return res.status(409).json({ ok: false, error: 'This product is not currently available.' });
+    const productSnapshots = await db.getAll(...productIds.map((productId) => db.collection('siteProducts').doc(productId)));
+    if (productSnapshots.some((snapshot) => !snapshot.exists)) return res.status(404).json({ ok: false, error: 'One or more products were not found.' });
+    const allItems = productSnapshots.map((snapshot) => ({ productId: snapshot.id, product: snapshot.data() as Record<string, unknown> }));
+    if (allItems.some(({ product }) => product.isVisible === false || product.inStock === false)) {
+      return res.status(409).json({ ok: false, error: 'One or more products are not currently available.' });
     }
 
-    const amountPaise = parseProductPricePaise(product);
+    const purchaseSnapshots = await db.getAll(...productIds.map((productId) => db.collection('users').doc(firebaseUser.uid).collection('purchases').doc(productId)));
+    const items = allItems.filter((_, index) => !purchaseSnapshots[index].exists);
+    if (items.length === 0) {
+      await db.collection('users').doc(firebaseUser.uid).set({ cartProductIds: FieldValue.arrayRemove(...productIds) }, { merge: true });
+      return res.status(200).json({ ok: true, free: true, verified: true, alreadyOwned: true, orderId: `OWNED-${Date.now()}` });
+    }
+
+    const amountPaise = items.reduce((sum, item) => sum + parseProductPricePaise(item.product), 0);
     if (amountPaise === 0) {
       const freeOrderId = `FREE-${Date.now()}-${firebaseUser.uid.slice(0, 8)}`;
-      await grantProductEntitlement({
+      await grantProductEntitlements({
         uid: firebaseUser.uid,
         email: firebaseUser.email,
         name: firebaseUser.name,
-        productId,
-        product,
+        items,
+        cartProductIds: productIds,
         amountPaise: 0,
         orderId: freeOrderId,
         source: 'free',
@@ -58,7 +66,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         amount: amountPaise,
         currency: 'INR',
         receipt,
-        notes: { userId: firebaseUser.uid, productId },
+        notes: { userId: firebaseUser.uid, productIds: items.map((item) => item.productId).join(',').slice(0, 250) },
       }),
     });
     const razorpayData = await razorpayResponse.json().catch(() => ({} as Record<string, unknown>)) as Record<string, any>;
@@ -68,7 +76,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     await db.collection('_paymentIntents').doc(String(razorpayData.id)).set({
       uid: firebaseUser.uid,
-      productId,
+      productIds: items.map((item) => item.productId),
+      requestedProductIds: productIds,
       amountPaise,
       currency: 'INR',
       status: 'created',
@@ -83,7 +92,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       orderId: razorpayData.id,
       amount: amountPaise,
       currency: 'INR',
-      productName: String(product.title || 'Digital product'),
+      productName: items.length === 1 ? String(items[0].product.title || 'Digital product') : `${items.length} Digital Catalyst products`,
       customer: { name: firebaseUser.name || '', email: firebaseUser.email || '' },
     });
   } catch (error) {
