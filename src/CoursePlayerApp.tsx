@@ -1,358 +1,165 @@
 import { useEffect, useMemo, useState } from "react";
-import VideoPlayer from "./components/VideoPlayer";
-import CircularProgress from "./components/CircularProgress";
-import CurriculumTab from "./components/CurriculumTab";
-import ResourcesTab from "./components/ResourcesTab";
-import NotesTab from "./components/NotesTab";
-import QnaTab from "./components/QnaTab";
-import {
-  courseSubtitle,
-  courseTitle,
-  initialModules,
-  initialQuestions,
-  initialResources,
-} from "./data/mockCourse";
-import type { Module, Note, Question } from "./types/course";
-import { cn } from "./utils/cn";
+import { arrayUnion, doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
+import { ArrowLeft, BookOpen, Bot, CheckCircle2, FileText, Menu, NotebookPen, PanelRightClose, PanelRightOpen } from "lucide-react";
+import { db } from "../firebase";
+import AiQuestion from "./course/AiQuestion";
+import CourseSidebar from "./course/CourseSidebar";
+import ResourceViewer from "./course/ResourceViewer";
+import type { Product } from "./data/products";
+import type { CourseFile, CourseModule, PaidCourseUpdate } from "./types/course";
+import { useAuth } from "./context/AuthContext";
 
-type TabKey = "curriculum" | "resources" | "notes" | "qna";
+type Tab = "curriculum" | "resources" | "notes" | "ai";
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "curriculum", label: "Curriculum" },
-  { key: "resources", label: "Resources" },
-  { key: "notes", label: "Notes" },
-  { key: "qna", label: "Q&A" },
+interface CoursePlayerProps {
+  product: Product;
+  onBack: () => void;
+  onPurchaseUpdate: (update: PaidCourseUpdate) => void;
+}
+
+const numericPrice = (value?: string) => { const number = Number(String(value || "0").replace(/[^0-9.-]/g, "")); return Number.isFinite(number) ? Math.max(0, number) : 0; };
+const accessId = (item: { id: string; paidUpdateId?: string }) => String(item.paidUpdateId || item.id);
+
+const filesInModule = (module: CourseModule): CourseFile[] => [
+  ...(module.embedContentUrl ? [{
+    id: `${module.id}__embedded-page`,
+    name: module.embedContentTypeLabel || (module.embedContentTypeId === "github_page" ? "Interactive GitHub Page" : "Embedded resource"),
+    type: module.embedContentTypeId === "google_doc" ? "doc" as const : module.embedContentTypeId === "whimsical_mindmap" ? "mindmap" as const : "embed" as const,
+    url: module.embedContentUrl,
+    embedUrl: module.embedContentUrl,
+    provider: module.embedContentTypeId || "external",
+    accessLevel: module.accessLevel,
+    paidUpdateId: module.paidUpdateId,
+    paidUpdateTitle: module.paidUpdateTitle,
+    paidUpdatePrice: module.paidUpdatePrice,
+    paidUpdateCoinPrice: module.paidUpdateCoinPrice,
+  }] : []),
+  ...(module.files || []),
 ];
+const allFiles = (modules: CourseModule[]): CourseFile[] => modules.flatMap((module) => [...filesInModule(module), ...allFiles(module.modules || [])]);
+const firstAccessibleFile = (modules: CourseModule[], owned: Set<string>, inheritedLocked = false): CourseFile | null => {
+  for (const module of modules) {
+    if (module.accessLevel === "hidden") continue;
+    const moduleLocked = inheritedLocked || (module.accessLevel === "paidUpdate" && !owned.has(accessId(module)));
+    const file = filesInModule(module).find((item) => item.accessLevel !== "hidden" && Boolean(item.url || item.embedUrl || item.youtubeUrl || item.youtubeVideoId) && !moduleLocked && (item.accessLevel !== "paidUpdate" || owned.has(accessId(item))));
+    if (file) return file;
+    const nested = firstAccessibleFile(module.modules || [], owned, moduleLocked);
+    if (nested) return nested;
+  }
+  return null;
+};
 
-function flattenLessons(modules: Module[]) {
-  return modules.flatMap((m) => m.lessons.map((l) => ({ moduleId: m.id, lesson: l })));
-}
+const collectUpdates = (modules: CourseModule[]) => {
+  const map = new Map<string, PaidCourseUpdate>();
+  const visit = (module: CourseModule) => {
+    if (module.accessLevel === "paidUpdate") add(module, module.title);
+    (module.files || []).forEach((file) => { if (file.accessLevel === "paidUpdate") add(file, file.name); });
+    (module.modules || []).forEach(visit);
+  };
+  const add = (item: CourseModule | CourseFile, contentName: string) => {
+    const id = accessId(item);
+    const current = map.get(id) || { id, title: item.paidUpdateTitle || "Course update", price: numericPrice(item.paidUpdatePrice), coinPrice: Number(item.paidUpdateCoinPrice || 0), contentNames: [] };
+    current.contentNames.push(contentName);
+    current.price = Math.max(current.price, numericPrice(item.paidUpdatePrice));
+    current.coinPrice = Math.max(current.coinPrice, Number(item.paidUpdateCoinPrice || 0));
+    map.set(id, current);
+  };
+  modules.forEach(visit);
+  return Array.from(map.values());
+};
 
-function findFirstActiveLesson(modules: Module[]) {
-  const flat = flattenLessons(modules);
-  const firstIncomplete = flat.find((f) => !f.lesson.completed && !f.lesson.locked);
-  return firstIncomplete ?? flat[0];
-}
-
-let noteIdCounter = 1;
-let questionIdCounter = 1;
-
-export default function App() {
-  const [modules, setModules] = useState<Module[]>(initialModules);
-  const initial = useMemo(() => findFirstActiveLesson(initialModules), []);
-  const [currentLessonId, setCurrentLessonId] = useState(initial.lesson.id);
-  const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set([initial.moduleId]));
-  const [activeTab, setActiveTab] = useState<TabKey>("curriculum");
-  const [searchQuery, setSearchQuery] = useState("");
-  const [notes, setNotes] = useState<Note[]>([]);
-  const [questions, setQuestions] = useState<Question[]>(initialQuestions);
-  const [toast, setToast] = useState<string | null>(null);
+export default function CoursePlayer({ product, onBack, onPurchaseUpdate }: CoursePlayerProps) {
+  const { user } = useAuth();
+  const modules = product.courseContent || [];
+  const files = useMemo(() => allFiles(modules).filter((file) => file.accessLevel !== "hidden" && Boolean(file.url || file.embedUrl || file.youtubeUrl || file.youtubeVideoId)), [modules]);
+  const [selectedFile, setSelectedFile] = useState<CourseFile | null>(null);
+  const [tab, setTab] = useState<Tab>("curriculum");
+  const [panelOpen, setPanelOpen] = useState(true);
+  const [ownedUpdateIds, setOwnedUpdateIds] = useState<Set<string>>(new Set());
+  const [completedIds, setCompletedIds] = useState<Set<string>>(new Set());
+  const [notes, setNotes] = useState<Array<{ id: string; text: string; createdAt: number }>>([]);
+  const [noteDraft, setNoteDraft] = useState("");
+  const [aiDraft, setAiDraft] = useState("");
+  const updates = useMemo(() => collectUpdates(modules).filter((update) => !ownedUpdateIds.has(update.id)), [modules, ownedUpdateIds]);
 
   useEffect(() => {
-    if (!toast) return;
-    const t = setTimeout(() => setToast(null), 2200);
-    return () => clearTimeout(t);
-  }, [toast]);
-
-  const flat = useMemo(() => flattenLessons(modules), [modules]);
-  const currentIndex = flat.findIndex((f) => f.lesson.id === currentLessonId);
-  const currentEntry = flat[currentIndex] ?? flat[0];
-  const currentModule = modules.find((m) => m.id === currentEntry.moduleId)!;
-  const currentLesson = currentEntry.lesson;
-
-  const totalLessons = flat.length;
-  const completedCount = flat.filter((f) => f.lesson.completed).length;
-  const progressPercent = totalLessons ? (completedCount / totalLessons) * 100 : 0;
-
-  const lessonTitleById = useMemo(() => {
-    const map: Record<string, string> = {};
-    flat.forEach((f) => (map[f.lesson.id] = f.lesson.title));
-    return map;
-  }, [flat]);
-
-  const currentNotes = notes
-    .filter((n) => n.lessonId === currentLesson.id)
-    .sort((a, b) => b.createdAt - a.createdAt);
-
-  const currentQuestions = questions.filter((q) => q.lessonId === currentLesson.id);
-
-  const selectLesson = (moduleId: string, lessonId: string) => {
-    const targetModule = modules.find((m) => m.id === moduleId);
-    const targetLesson = targetModule?.lessons.find((l) => l.id === lessonId);
-    if (!targetLesson) return;
-    if (targetLesson.locked) {
-      setToast("Complete previous lessons to unlock this one");
-      return;
-    }
-    setCurrentLessonId(lessonId);
-    setExpandedModules((prev) => new Set(prev).add(moduleId));
-  };
-
-  const toggleModule = (moduleId: string) => {
-    setExpandedModules((prev) => {
-      const next = new Set(prev);
-      next.has(moduleId) ? next.delete(moduleId) : next.add(moduleId);
-      return next;
+    if (!user) return undefined;
+    const progressRef = doc(db, "users", user.id, "courseProgress", product.id);
+    const unsubscribeProgress = onSnapshot(progressRef, (snapshot) => {
+      const data = snapshot.data() || {};
+      setCompletedIds(new Set(Array.isArray(data.completedFileIds) ? data.completedFileIds.map(String) : []));
+      setNotes(Array.isArray(data.notes) ? data.notes : []);
     });
-  };
-
-  const markLessonComplete = (lessonId: string, opts?: { silent?: boolean }) => {
-    setModules((prevModules) => {
-      const flatPrev = flattenLessons(prevModules);
-      const idx = flatPrev.findIndex((f) => f.lesson.id === lessonId);
-      if (idx === -1) return prevModules;
-      const nextEntry = flatPrev[idx + 1];
-
-      return prevModules.map((m) => ({
-        ...m,
-        lessons: m.lessons.map((l) => {
-          if (l.id === lessonId) return { ...l, completed: true };
-          if (nextEntry && l.id === nextEntry.lesson.id) return { ...l, locked: false };
-          return l;
-        }),
-      }));
+    const unsubscribeUser = onSnapshot(doc(db, "users", user.id), (snapshot) => {
+      const data = snapshot.data() || {};
+      const map = data.purchasedProductUpdateIds || {};
+      setOwnedUpdateIds(new Set(Array.isArray(map[product.id]) ? map[product.id].map(String) : []));
     });
-    if (!opts?.silent) setToast("Lesson marked as complete 🎉");
+    return () => { unsubscribeProgress(); unsubscribeUser(); };
+  }, [product.id, user]);
+
+  useEffect(() => {
+    if (selectedFile || files.length === 0) return;
+    const first = firstAccessibleFile(modules, ownedUpdateIds);
+    if (first) setSelectedFile(first);
+  }, [files, ownedUpdateIds, selectedFile]);
+
+  const markComplete = async () => {
+    if (!user || !selectedFile) return;
+    await setDoc(doc(db, "users", user.id, "courseProgress", product.id), { productId: product.id, completedFileIds: arrayUnion(selectedFile.id), lastOpenedFileId: selectedFile.id, updatedAt: serverTimestamp() }, { merge: true });
   };
 
-  const handleMarkComplete = () => {
-    if (currentLesson.completed) {
-      setModules((prev) =>
-        prev.map((m) => ({
-          ...m,
-          lessons: m.lessons.map((l) => (l.id === currentLesson.id ? { ...l, completed: false } : l)),
-        }))
-      );
-      setToast("Marked as incomplete");
-      return;
-    }
-    markLessonComplete(currentLesson.id);
+  const saveNote = async () => {
+    if (!user || !noteDraft.trim()) return;
+    const next = [{ id: crypto.randomUUID(), text: noteDraft.trim(), createdAt: Date.now() }, ...notes];
+    setNoteDraft("");
+    await setDoc(doc(db, "users", user.id, "courseProgress", product.id), { productId: product.id, notes: next, updatedAt: serverTimestamp() }, { merge: true });
   };
 
-  const goToOffset = (offset: number) => {
-    const targetIndex = currentIndex + offset;
-    if (targetIndex < 0 || targetIndex >= flat.length) return;
-    const target = flat[targetIndex];
-    if (target.lesson.locked) {
-      setToast("Finish the current lesson to unlock the next one");
-      return;
-    }
-    setCurrentLessonId(target.lesson.id);
-    setExpandedModules((prev) => new Set(prev).add(target.moduleId));
+  const selectFile = (file: CourseFile) => {
+    setSelectedFile(file);
+    if (window.innerWidth < 768) document.getElementById("course-viewer")?.scrollIntoView({ behavior: "smooth" });
+    if (user) void setDoc(doc(db, "users", user.id, "courseProgress", product.id), { productId: product.id, lastOpenedFileId: file.id, lastOpenedAt: serverTimestamp() }, { merge: true });
   };
 
-  const handleAddNote = (text: string) => {
-    const newNote: Note = {
-      id: `note-${noteIdCounter++}`,
-      lessonId: currentLesson.id,
-      text,
-      timestamp: new Date().toLocaleString([], { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }),
-      createdAt: Date.now(),
-    };
-    setNotes((prev) => [newNote, ...prev]);
+  const openCommunityAi = () => {
+    const prompt = aiDraft.trim() || `Help me understand ${selectedFile?.name || product.title}.`;
+    sessionStorage.setItem("aiInitialPrompt", prompt);
+    sessionStorage.setItem("aiCourseContext", JSON.stringify({ productId: product.id, courseTitle: product.title, fileId: selectedFile?.id || "", fileName: selectedFile?.name || "" }));
+    window.location.hash = "#/ai-chat";
   };
 
-  const handleUpdateNote = (id: string, text: string) => {
-    setNotes((prev) => prev.map((n) => (n.id === id ? { ...n, text } : n)));
-  };
-
-  const handleDeleteNote = (id: string) => {
-    setNotes((prev) => prev.filter((n) => n.id !== id));
-  };
-
-  const handleAskQuestion = (text: string) => {
-    const newQuestion: Question = {
-      id: `question-${questionIdCounter++}`,
-      lessonId: currentLesson.id,
-      author: "You",
-      avatarColor: "#8b5cf6",
-      text,
-      timeAgo: "Just now",
-      likes: 0,
-      liked: false,
-      replies: [],
-    };
-    setQuestions((prev) => [newQuestion, ...prev]);
-  };
-
-  const handleToggleLike = (id: string) => {
-    setQuestions((prev) => prev.map((q) => (q.id === id ? { ...q, liked: !q.liked } : q)));
-  };
-
-  const isFirst = currentIndex <= 0;
-  const isLast = currentIndex >= flat.length - 1;
+  const progress = files.length ? Math.round((completedIds.size / files.length) * 100) : 0;
 
   return (
-    <div className="relative flex h-[100dvh] w-full flex-col overflow-hidden bg-[#0c0c14] font-[system-ui] text-white">
-      {/* Mock status bar */}
-        <div className="hidden shrink-0 items-center justify-between px-6 pb-1 pt-3 text-[11px] font-semibold text-white sm:flex">
-          <span>9:41</span>
-          <div className="flex items-center gap-1">
-            <svg width="14" height="10" viewBox="0 0 16 12" fill="currentColor"><rect width="3" height="5" y="7" rx="0.5"/><rect width="3" height="7" x="4.5" y="5" rx="0.5"/><rect width="3" height="9" x="9" y="3" rx="0.5"/><rect width="3" height="12" x="13" y="0" rx="0.5"/></svg>
-            <svg width="14" height="10" viewBox="0 0 24 16" fill="currentColor"><path d="M12 4c3.5 0 6.6 1.4 8.8 3.7l-2 2A9 9 0 0 0 12 7a9 9 0 0 0-6.8 2.7l-2-2C5.4 5.4 8.5 4 12 4Zm0 5c1.8 0 3.4.7 4.6 1.9l-2 2A4 4 0 0 0 12 12a4 4 0 0 0-2.6 1l-2-2A6.5 6.5 0 0 1 12 9Zm0 4.5a1.8 1.8 0 1 1 0 3.6 1.8 1.8 0 0 1 0-3.6Z"/></svg>
-            <svg width="22" height="11" viewBox="0 0 25 12" fill="none"><rect x="0.5" y="0.5" width="20" height="11" rx="2.5" stroke="currentColor"/><rect x="2" y="2" width="16" height="8" rx="1.5" fill="currentColor"/><rect x="22" y="4" width="2" height="4" rx="1" fill="currentColor"/></svg>
+    <div className="flex h-[100dvh] flex-col overflow-hidden bg-[#090912] text-white">
+      <header className="flex h-16 shrink-0 items-center gap-3 border-b border-white/10 bg-[#10101a] px-3 sm:px-5">
+        <button onClick={onBack} className="grid h-10 w-10 place-items-center rounded-xl bg-white/5 text-white/70" aria-label="Back"><ArrowLeft size={18} /></button>
+        <div className="min-w-0 flex-1"><h1 className="truncate text-sm font-black sm:text-base">{product.title}</h1><div className="mt-1 flex items-center gap-2"><div className="h-1.5 w-24 overflow-hidden rounded-full bg-white/10"><div className="h-full bg-gradient-to-r from-violet-500 to-cyan-400" style={{ width: `${progress}%` }} /></div><span className="text-[10px] font-bold text-white/40">{progress}% complete</span></div></div>
+        <button onClick={() => setPanelOpen((value) => !value)} className="hidden h-10 items-center gap-2 rounded-xl bg-white/5 px-3 text-xs font-bold text-white/70 md:flex">{panelOpen ? <PanelRightClose size={17} /> : <PanelRightOpen size={17} />}{panelOpen ? "Hide panel" : "Course panel"}</button>
+      </header>
+
+      <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+        <section id="course-viewer" className="flex min-h-[42dvh] min-w-0 flex-1 flex-col md:min-h-0">
+          <div className="min-h-0 flex-1"><ResourceViewer file={selectedFile} /></div>
+          {selectedFile && <div className="flex shrink-0 items-center justify-between gap-3 border-t border-white/10 bg-[#10101a] px-4 py-3"><div className="min-w-0"><p className="truncate text-xs font-black">{selectedFile.name}</p><p className="text-[10px] text-white/35">Progress is saved to your Firebase account</p></div><button disabled={completedIds.has(selectedFile.id)} onClick={() => void markComplete()} className="flex shrink-0 items-center gap-1.5 rounded-xl bg-emerald-500 px-3 py-2 text-[11px] font-black text-slate-950 disabled:bg-emerald-500/15 disabled:text-emerald-300"><CheckCircle2 size={14} />{completedIds.has(selectedFile.id) ? "Completed" : "Mark complete"}</button></div>}
+        </section>
+
+        <aside className={`${panelOpen ? "h-[58dvh] md:h-auto md:w-[390px]" : "h-0 md:h-auto md:w-0"} flex min-h-0 shrink-0 flex-col overflow-hidden border-l border-white/10 bg-[#11111d] transition-[width] duration-300`}>
+          <div className="flex shrink-0 border-b border-white/10 bg-[#10101a] p-2">
+            <TabButton active={tab === "curriculum"} onClick={() => setTab("curriculum")} icon={<BookOpen size={14} />} label="Modules" />
+            <TabButton active={tab === "resources"} onClick={() => setTab("resources")} icon={<FileText size={14} />} label="Resources" />
+            <TabButton active={tab === "notes"} onClick={() => setTab("notes")} icon={<NotebookPen size={14} />} label="Notes" />
+            <TabButton active={tab === "ai"} onClick={() => setTab("ai")} icon={<Bot size={14} />} label="AI Q&A" />
           </div>
-        </div>
-
-        {/* Video Player */}
-        <VideoPlayer
-          key={currentLesson.id}
-          lesson={currentLesson}
-          moduleTitle={currentModule.title}
-          onAutoComplete={() => markLessonComplete(currentLesson.id, { silent: true })}
-        />
-
-        {/* Header: title + progress */}
-        <div className="flex shrink-0 items-center gap-3 border-b border-white/8 px-4 py-3">
-          <button
-            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-white/5 text-white/70 active:bg-white/10"
-            aria-label="Back"
-          >
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-            </svg>
-          </button>
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-[15px] font-bold leading-tight text-white">{courseTitle}</p>
-            <p className="truncate text-[11px] text-white/40">{courseSubtitle}</p>
-          </div>
-          <div className="flex shrink-0 flex-col items-center">
-            <CircularProgress percent={progressPercent} />
-          </div>
-        </div>
-
-        {/* Tabs */}
-        <div className="shrink-0 border-b border-white/8 px-2">
-          <div className="flex gap-1 overflow-x-auto no-scrollbar">
-            {TABS.map((tab) => (
-              <button
-                key={tab.key}
-                onClick={() => setActiveTab(tab.key)}
-                className={cn(
-                  "relative shrink-0 px-3.5 py-3 text-[13px] font-semibold transition-colors",
-                  activeTab === tab.key ? "text-white" : "text-white/40"
-                )}
-              >
-                {tab.label}
-                {tab.key === "notes" && currentNotes.length > 0 && (
-                  <span className="ml-1 rounded-full bg-violet-500/30 px-1.5 py-0.5 text-[9px] text-violet-200">
-                    {currentNotes.length}
-                  </span>
-                )}
-                {tab.key === "qna" && currentQuestions.length > 0 && (
-                  <span className="ml-1 rounded-full bg-cyan-500/30 px-1.5 py-0.5 text-[9px] text-cyan-200">
-                    {currentQuestions.length}
-                  </span>
-                )}
-                {activeTab === tab.key && (
-                  <span className="absolute inset-x-2 -bottom-[1px] h-[2.5px] rounded-full bg-gradient-to-r from-violet-400 to-cyan-300" />
-                )}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Tab content */}
-        <div className="flex-1 overflow-y-auto px-4 py-4">
-          {activeTab === "curriculum" && (
-            <CurriculumTab
-              modules={modules}
-              searchQuery={searchQuery}
-              onSearchChange={setSearchQuery}
-              expandedModules={expandedModules}
-              onToggleModule={toggleModule}
-              currentLessonId={currentLesson.id}
-              onSelectLesson={selectLesson}
-            />
-          )}
-          {activeTab === "resources" && (
-            <ResourcesTab
-              resources={initialResources}
-              currentLessonId={currentLesson.id}
-              lessonTitleById={lessonTitleById}
-            />
-          )}
-          {activeTab === "notes" && (
-            <NotesTab
-              notes={currentNotes}
-              lessonTitle={currentLesson.title}
-              onAddNote={handleAddNote}
-              onUpdateNote={handleUpdateNote}
-              onDeleteNote={handleDeleteNote}
-            />
-          )}
-          {activeTab === "qna" && (
-            <QnaTab
-              questions={currentQuestions}
-              lessonTitle={currentLesson.title}
-              onAskQuestion={handleAskQuestion}
-              onToggleLike={handleToggleLike}
-            />
-          )}
-        </div>
-
-        {/* Bottom progression controls */}
-        <div className="shrink-0 border-t border-white/8 bg-[#0c0c14]/95 px-4 py-3 backdrop-blur">
-          <div className="mb-2.5 flex items-center justify-between gap-2">
-            <button
-              onClick={() => goToOffset(-1)}
-              disabled={isFirst}
-              className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-2 text-[12px] font-semibold text-white/70 disabled:opacity-30 active:bg-white/10"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M15 18l-6-6 6-6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              Previous
-            </button>
-
-            <button
-              onClick={handleMarkComplete}
-              className={cn(
-                "flex flex-1 items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-[12.5px] font-bold shadow-lg transition-all active:scale-[0.98]",
-                currentLesson.completed
-                  ? "bg-emerald-500/15 text-emerald-400 ring-1 ring-emerald-400/40"
-                  : "bg-gradient-to-r from-violet-500 to-cyan-500 text-white shadow-violet-900/40"
-              )}
-            >
-              {currentLesson.completed ? (
-                <>
-                  <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3">
-                    <path d="M5 13l4 4L19 7" strokeLinecap="round" strokeLinejoin="round" />
-                  </svg>
-                  Completed
-                </>
-              ) : (
-                "Mark as Complete"
-              )}
-            </button>
-
-            <button
-              onClick={() => goToOffset(1)}
-              disabled={isLast}
-              className="flex items-center gap-1.5 rounded-lg bg-white/5 px-3 py-2 text-[12px] font-semibold text-white/70 disabled:opacity-30 active:bg-white/10"
-            >
-              Next
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <path d="M9 18l6-6-6-6" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-            </button>
-          </div>
-          <p className="text-center text-[10.5px] text-white/30">
-            Lesson {currentIndex + 1} of {flat.length} · {completedCount} completed · {Math.round(progressPercent)}% course progress
-          </p>
-        </div>
-
-        {/* Toast */}
-        <div
-          className={cn(
-            "pointer-events-none absolute inset-x-0 bottom-24 flex justify-center transition-all duration-300",
-            toast ? "translate-y-0 opacity-100" : "translate-y-3 opacity-0"
-          )}
-        >
-          <div className="rounded-full bg-white px-4 py-2 text-[12px] font-semibold text-slate-900 shadow-xl">
-            {toast}
-          </div>
-        </div>
+          <div className="min-h-0 flex-1">{tab === "notes" ? <Notes notes={notes} draft={noteDraft} setDraft={setNoteDraft} onSave={() => void saveNote()} /> : tab === "ai" ? <AiQuestion draft={aiDraft} setDraft={setAiDraft} fileName={selectedFile?.name} onOpen={openCommunityAi} /> : <CourseSidebar modules={modules} selectedId={selectedFile?.id} ownedUpdateIds={ownedUpdateIds} mode={tab} updates={updates} onSelect={selectFile} onBuyUpdate={onPurchaseUpdate} />}</div>
+        </aside>
       </div>
+
+      {!panelOpen && <button onClick={() => setPanelOpen(true)} className="fixed bottom-5 right-5 z-30 hidden items-center gap-2 rounded-full bg-violet-600 px-4 py-3 text-xs font-black shadow-xl md:flex"><Menu size={16} /> Modules & resources</button>}
+    </div>
   );
 }
+
+function TabButton({ active, onClick, icon, label }: { active: boolean; onClick: () => void; icon: React.ReactNode; label: string }) { return <button onClick={onClick} className={`flex flex-1 items-center justify-center gap-1.5 rounded-lg px-2 py-2.5 text-[11px] font-black ${active ? "bg-violet-500 text-white" : "text-white/40 hover:text-white"}`}>{icon}{label}</button>; }
+function Notes({ notes, draft, setDraft, onSave }: { notes: Array<{ id: string; text: string; createdAt: number }>; draft: string; setDraft: (value: string) => void; onSave: () => void }) { return <div className="h-full overflow-y-auto p-4"><textarea value={draft} onChange={(event) => setDraft(event.target.value)} rows={4} placeholder="Write a course note…" className="w-full rounded-xl border border-white/10 bg-white/5 p-3 text-sm text-white outline-none placeholder:text-white/25 focus:border-violet-400" /><button disabled={!draft.trim()} onClick={onSave} className="mt-2 w-full rounded-xl bg-violet-500 py-2.5 text-xs font-black disabled:opacity-40">Save note</button><div className="mt-4 space-y-2">{notes.map((note) => <div key={note.id} className="rounded-xl border border-white/10 bg-white/5 p-3"><p className="whitespace-pre-wrap text-xs leading-5 text-white/75">{note.text}</p><p className="mt-2 text-[10px] text-white/30">{new Date(note.createdAt).toLocaleString("en-IN")}</p></div>)}</div></div>; }

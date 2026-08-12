@@ -1,4 +1,4 @@
-import { StrictMode, useEffect, useRef, useState } from "react";
+import { StrictMode, useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./index.css";
 import "./landing.css";
@@ -14,12 +14,15 @@ import CartWishlistApp from "./CartWishlistApp";
 import SubscriptionApp from "./subscription/App";
 import LandingApp from "./LandingApp";
 import AuthApp from "./AuthApp";
+import AdminLoginApp from "./AdminLoginApp";
 import AiChatApp from "./ai-chat/App";
+import AdminApp from "./admin/AdminApp";
 import { AuthProvider, useAuth } from "./context/AuthContext";
-import { PRODUCTS as CART_PRODUCTS } from "./cartWishlist/data/products";
+import { CatalogProvider, useCatalog } from "./context/CatalogContext";
+import { CommerceProvider, useCommerce } from "./context/CommerceContext";
+import { clearAdminSession, hasAdminSession } from "./utils/adminSession";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
-import { products as STORE_PRODUCTS } from "./data/products";
-import { product as pdpProduct } from "./data/product";
+import type { PaidCourseUpdate } from "./types/course";
 import {
   product as checkoutProduct,
   user as checkoutUser,
@@ -47,28 +50,9 @@ const CART_HASH = "#/cart";
 const FAVORITES_HASH = "#/favorites";
 const SUBSCRIPTION_HASH = "#/subscription";
 const AI_CHAT_HASH = "#/ai-chat";
+const ADMIN_HASH = "#/admin";
+const ADMIN_LOGIN_HASH = "#/admin-login";
 const CHECKOUT_CONTEXT_KEY = "checkoutContext";
-
-const INITIAL_CART = ["p1", "p3"];
-const INITIAL_FAVORITES = ["p2", "p4", "p6"];
-const INITIAL_COINS = 480;
-
-const STORE_CART_PRODUCTS: CartProduct[] = STORE_PRODUCTS.map((product) => ({
-  id: product.id,
-  title: product.title,
-  author: product.instructor,
-  category: product.category,
-  price: product.price,
-  originalPrice: product.originalPrice,
-  rating: product.rating,
-  reviewsCount: product.reviews,
-  image: product.image,
-  hours: product.classLevel,
-  lessons: 1,
-  bestseller: product.tags.includes("BOARD"),
-}));
-
-const SHOPPING_PRODUCTS = [...CART_PRODUCTS, ...STORE_CART_PRODUCTS];
 
 type NavigableProduct = {
   id: string;
@@ -85,14 +69,55 @@ function applyCheckoutContext(context: CheckoutContext) {
   Object.assign(checkoutUser, context.user);
 }
 
+function InvalidCheckout({ onBack }: { onBack: () => void }) {
+  return <main className="grid min-h-[100dvh] place-items-center bg-slate-50 px-6 text-center"><div><p className="text-4xl">🛒</p><h1 className="mt-4 text-2xl font-black text-slate-900">Checkout session not found</h1><p className="mt-2 text-sm text-slate-500">Choose a live product before starting secure checkout.</p><button onClick={onBack} className="mt-6 rounded-xl bg-slate-950 px-5 py-3 text-sm font-black text-white">Back to store</button></div></main>;
+}
+
+const AUTH_REQUIRED_PREFIXES = [
+  CHECKOUT_HASH,
+  MY_DAY_HASH,
+  PROFILE_HASH,
+  COURSE_HASH,
+  COMMUNITY_HASH,
+  SUBSCRIPTION_HASH,
+  AI_CHAT_HASH,
+];
+
+const requiresAuthentication = (hash: string) =>
+  AUTH_REQUIRED_PREFIXES.some((prefix) => hash.startsWith(prefix));
+
 function Root() {
-  const { user } = useAuth();
+  const { user, loading, logout } = useAuth();
+  const { products: catalogProducts, purchasedIds } = useCatalog();
+  const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
-  const [cartIds, setCartIds] = useState<Set<string>>(new Set(INITIAL_CART));
-  const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set(INITIAL_FAVORITES));
-  const [userCoins, setUserCoins] = useState(INITIAL_COINS);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const shoppingProducts: CartProduct[] = useMemo(() => catalogProducts.map((product) => ({
+    id: product.id,
+    title: product.title,
+    author: product.instructor,
+    category: product.category,
+    price: product.price,
+    originalPrice: product.originalPrice,
+    rating: product.rating,
+    reviewsCount: product.reviews,
+    image: product.image,
+    hours: product.classLevel,
+    lessons: 1,
+    bestseller: product.tags.includes("BOARD"),
+  })), [catalogProducts]);
+
+  const selectedCatalogProduct = useMemo(() => {
+    const routeId = hash.startsWith(PRODUCT_HASH) ? decodeURIComponent(hash.slice(PRODUCT_HASH.length).split("?")[0]) : "";
+    return catalogProducts.find((product) => product.id === routeId) || null;
+  }, [catalogProducts, hash]);
+
+  const selectedCourseProduct = useMemo(() => {
+    const routeId = hash.startsWith(COURSE_HASH) ? decodeURIComponent(hash.slice(COURSE_HASH.length).split("?")[0]) : "";
+    return catalogProducts.find((product) => product.id === routeId) || null;
+  }, [catalogProducts, hash]);
 
   const showShoppingToast = (message: string) => {
     setShoppingToast(message);
@@ -107,63 +132,107 @@ function Root() {
   }, []);
 
   useEffect(() => {
+    if (loading || user || !requiresAuthentication(hash)) return;
+    sessionStorage.setItem("authReturnHash", hash);
+    window.location.hash = `${AUTH_HASH}?mode=login&return=${encodeURIComponent(hash)}`;
+  }, [hash, loading, user]);
+
+  useEffect(() => {
+    if (!hash.startsWith(ADMIN_HASH) || hash.startsWith(ADMIN_LOGIN_HASH) || loading) return;
+    if (user && hasAdminSession(user.id, user.email, user.role)) return;
+    clearAdminSession();
+    window.location.hash = ADMIN_LOGIN_HASH;
+    if (user) void logout();
+  }, [hash, loading, logout, user]);
+
+  useEffect(() => {
     return () => {
       if (toastTimer.current) clearTimeout(toastTimer.current);
     };
   }, []);
 
   const handleAddToCart = (id: string) => {
-    setCartIds((previous) => {
-      if (previous.has(id)) return previous;
-      const next = new Set(previous);
-      next.add(id);
-      return next;
-    });
-    const product = SHOPPING_PRODUCTS.find((item) => item.id === id);
-    showShoppingToast(`${product ? product.title.slice(0, 28) + "…" : "Item"} added to cart`);
+    if (!user) { redirectToAuth(window.location.hash || STORE_HASH); return; }
+    const product = shoppingProducts.find((item) => item.id === id);
+    void addToCart(id)
+      .then(() => showShoppingToast(`${product ? product.title.slice(0, 28) + "…" : "Item"} added to cart`))
+      .catch(() => showShoppingToast("Could not update cart"));
   };
 
   const handleRemoveFromCart = (id: string) => {
-    setCartIds((previous) => {
-      const next = new Set(previous);
-      next.delete(id);
-      return next;
-    });
-    showShoppingToast("Removed from cart");
+    void removeFromCart(id).then(() => showShoppingToast("Removed from cart")).catch(() => showShoppingToast("Could not update cart"));
   };
 
   const handleClearCart = () => {
-    setCartIds(new Set());
-    showShoppingToast("Cart cleared");
+    void clearCart().then(() => showShoppingToast("Cart cleared")).catch(() => showShoppingToast("Could not clear cart"));
   };
 
   const handleToggleFavorite = (id: string) => {
-    setFavoriteIds((previous) => {
-      const next = new Set(previous);
-      if (next.has(id)) {
-        next.delete(id);
-        showShoppingToast("Removed from favorites");
-      } else {
-        next.add(id);
-        showShoppingToast("Added to favorites");
-      }
-      return next;
-    });
+    if (!user) { redirectToAuth(window.location.hash || STORE_HASH); return; }
+    void toggleFavorite(id)
+      .then((added) => showShoppingToast(added ? "Added to favorites" : "Removed from favorites"))
+      .catch(() => showShoppingToast("Could not update favorites"));
   };
 
   const handleRemoveFromFavorites = (id: string) => {
-    setFavoriteIds((previous) => {
-      const next = new Set(previous);
-      next.delete(id);
-      return next;
-    });
-    showShoppingToast("Removed from favorites");
+    void toggleFavorite(id).then(() => showShoppingToast("Removed from favorites")).catch(() => showShoppingToast("Could not update favorites"));
   };
 
-  const handleCheckoutComplete = (coinsUsed: number) => {
-    setUserCoins((previous) => Math.max(0, previous - coinsUsed));
-    setCartIds(new Set());
-    showShoppingToast("Order placed successfully 🎉");
+  const handlePurchaseUpdate = (update: PaidCourseUpdate) => {
+    if (!user || !selectedCourseProduct) return;
+    const context: CheckoutContext = {
+      product: {
+        id: selectedCourseProduct.id,
+        updateSelection: { productId: selectedCourseProduct.id, updateId: update.id, title: update.title, price: update.price },
+        name: update.title,
+        type: "Course",
+        description: `Update for ${selectedCourseProduct.title}: ${update.contentNames.join(", ")}`,
+        price: update.price,
+        currency: "₹",
+        thumbnail: "🆕",
+        instructor: selectedCourseProduct.instructor,
+        duration: `${update.contentNames.length} new item${update.contentNames.length === 1 ? "" : "s"}`,
+        rating: selectedCourseProduct.rating,
+        totalRatings: selectedCourseProduct.reviews,
+      },
+      user: { ...checkoutUser, id: user.id, name: user.name, email: user.email, eduCoins: user.coins },
+    };
+    applyCheckoutContext(context);
+    sessionStorage.setItem(CHECKOUT_CONTEXT_KEY, JSON.stringify(context));
+    window.location.hash = CHECKOUT_HASH;
+  };
+
+  const handleCartCheckout = () => {
+    if (!user) { redirectToAuth(CART_HASH); return; }
+    const items = catalogProducts.filter((product) => cartIds.has(product.id));
+    if (items.length === 0) return;
+    const total = items.reduce((sum, product) => sum + product.price, 0);
+    const context: CheckoutContext = {
+      product: {
+        id: items.length === 1 ? items[0].id : `bundle-${Date.now()}`,
+        productIds: items.map((item) => item.id),
+        name: items.length === 1 ? items[0].title : `${items.length} Digital Catalyst products`,
+        type: "Course",
+        description: items.map((item) => item.title).join(", "),
+        price: total,
+        currency: "₹",
+        thumbnail: "🛒",
+        instructor: "Digital Catalyst",
+        duration: "Lifetime access",
+        rating: 0,
+        totalRatings: 0,
+      },
+      user: {
+        ...checkoutUser,
+        id: user.id,
+        name: user.name,
+        email: user.email,
+        eduCoins: user.coins,
+      },
+    };
+    applyCheckoutContext(context);
+    sessionStorage.setItem(CHECKOUT_CONTEXT_KEY, JSON.stringify(context));
+    window.location.hash = CHECKOUT_HASH;
   };
 
   const handleShoppingNavigation = (tab: CartTabKey) => {
@@ -173,6 +242,7 @@ function Root() {
   };
 
   const redirectToAuth = (returnHash: string) => {
+    sessionStorage.setItem("authReturnHash", returnHash);
     window.location.hash = `${AUTH_HASH}?mode=login&return=${encodeURIComponent(returnHash)}`;
   };
 
@@ -186,26 +256,38 @@ function Root() {
     window.location.hash = `${COURSE_HASH}${encodeURIComponent(course.id)}`;
   };
 
-  const navigateToCheckout = (finalPrice: number) => {
+  const navigateToCheckout = (finalPrice: number, checkoutCatalogProduct = selectedCatalogProduct) => {
     if (!user) {
       sessionStorage.setItem("pendingCheckoutPrice", String(finalPrice));
       redirectToAuth(window.location.hash || PRODUCT_HASH);
       return;
     }
 
+    if (!checkoutCatalogProduct) {
+      showShoppingToast("This product is no longer available");
+      window.location.hash = STORE_HASH;
+      return;
+    }
+
     const context: CheckoutContext = {
       product: {
-        id: "neuralearn-pro-2026",
-        name: pdpProduct.title,
-        type: "Course",
-        description: pdpProduct.tagline,
+        id: checkoutCatalogProduct.id,
+        name: checkoutCatalogProduct.title,
+        type: checkoutCatalogProduct.category === "PDF" || checkoutCatalogProduct.category === "Notes"
+          ? "PDF"
+          : checkoutCatalogProduct.category === "E-book"
+            ? "eBook"
+            : checkoutCatalogProduct.category === "Live"
+              ? "Live Workshop"
+              : "Course",
+        description: checkoutCatalogProduct.description || checkoutCatalogProduct.subject,
         price: finalPrice,
-        currency: pdpProduct.currency,
-        thumbnail: "🤖",
-        instructor: pdpProduct.brand,
-        duration: `${pdpProduct.hours} hours`,
-        rating: pdpProduct.rating,
-        totalRatings: pdpProduct.ratingCount,
+        currency: "₹",
+        thumbnail: "📘",
+        instructor: checkoutCatalogProduct.instructor,
+        duration: checkoutCatalogProduct.classLevel,
+        rating: checkoutCatalogProduct.rating,
+        totalRatings: checkoutCatalogProduct.reviews,
       },
       user: {
         ...checkoutUser,
@@ -220,13 +302,29 @@ function Root() {
     window.location.hash = CHECKOUT_HASH;
   };
 
-  const cartProducts = SHOPPING_PRODUCTS.filter((product) => cartIds.has(product.id));
-  const favoriteProducts = SHOPPING_PRODUCTS.filter((product) => favoriteIds.has(product.id));
+  const cartProducts = shoppingProducts.filter((product) => cartIds.has(product.id));
+  const favoriteProducts = shoppingProducts.filter((product) => favoriteIds.has(product.id));
+  const protectedRoutePending = requiresAuthentication(hash) && (loading || !user);
+
+  if (protectedRoutePending) {
+    return (
+      <main className="grid min-h-[100dvh] place-items-center bg-[#05060f] px-6 text-center text-white">
+        <div>
+          <span className="mx-auto block h-10 w-10 animate-spin rounded-full border-2 border-white/20 border-t-violet-400" />
+          <p className="mt-4 text-sm font-semibold text-slate-300">
+            {loading ? "Restoring your secure session…" : "Taking you to secure login…"}
+          </p>
+        </div>
+      </main>
+    );
+  }
 
   if (!hash || hash.startsWith(LANDING_HASH)) return <LandingApp />;
   if (hash.startsWith(HOME_HASH)) {
     return (
       <HomeApp
+        favoriteIds={favoriteIds}
+        onToggleFavorite={handleToggleFavorite}
         onNavigateToStore={() => {
           window.location.hash = STORE_HASH;
         }}
@@ -244,6 +342,7 @@ function Root() {
     );
   }
   if (hash.startsWith(AUTH_HASH)) return <AuthApp />;
+  if (hash.startsWith(ADMIN_LOGIN_HASH)) return <AdminLoginApp />;
 
   if (hash.startsWith(CART_HASH) || hash.startsWith(FAVORITES_HASH)) {
     return (
@@ -253,13 +352,12 @@ function Root() {
         favoriteProducts={favoriteProducts}
         cartIds={cartIds}
         favoriteIds={favoriteIds}
-        userCoins={userCoins}
         toast={shoppingToast}
         onRemoveFromCart={handleRemoveFromCart}
         onClearCart={handleClearCart}
         onRemoveFromFavorites={handleRemoveFromFavorites}
         onAddToCart={handleAddToCart}
-        onCheckoutComplete={handleCheckoutComplete}
+        onCheckout={handleCartCheckout}
         onNavigate={handleShoppingNavigation}
         onRequireAuth={() => {
           if (user) return true;
@@ -272,23 +370,28 @@ function Root() {
 
   if (hash.startsWith(CHECKOUT_HASH)) {
     const savedContext = sessionStorage.getItem(CHECKOUT_CONTEXT_KEY);
-    if (savedContext) {
-      try {
-        applyCheckoutContext(JSON.parse(savedContext) as CheckoutContext);
-      } catch {
-        sessionStorage.removeItem(CHECKOUT_CONTEXT_KEY);
-      }
+    if (!savedContext) return <InvalidCheckout onBack={() => { window.location.hash = STORE_HASH; }} />;
+    try {
+      applyCheckoutContext(JSON.parse(savedContext) as CheckoutContext);
+      return <CheckoutApp />;
+    } catch {
+      sessionStorage.removeItem(CHECKOUT_CONTEXT_KEY);
+      return <InvalidCheckout onBack={() => { window.location.hash = STORE_HASH; }} />;
     }
-    return <CheckoutApp />;
   }
 
+  if (hash.startsWith(ADMIN_HASH)) return user && hasAdminSession(user.id, user.email, user.role) ? <AdminApp /> : <AdminLoginApp />;
   if (hash.startsWith(SUBSCRIPTION_HASH)) return <SubscriptionApp />;
   if (hash.startsWith(AI_CHAT_HASH)) return <AiChatApp />;
   if (hash.startsWith(COMMUNITY_HASH)) return <CommunityApp />;
-  if (hash.startsWith(COURSE_HASH)) return <CoursePlayerApp />;
+  if (hash.startsWith(COURSE_HASH)) {
+    if (!selectedCourseProduct) return <InvalidCheckout onBack={() => { window.location.hash = STORE_HASH; }} />;
+    if (!purchasedIds.has(selectedCourseProduct.id)) return <PdpApp product={selectedCourseProduct} onCheckout={(price) => navigateToCheckout(price, selectedCourseProduct)} onBack={() => { window.location.hash = STORE_HASH; }} />;
+    return <CoursePlayerApp product={selectedCourseProduct} onBack={() => { window.location.hash = "#/store/purchases"; }} onPurchaseUpdate={handlePurchaseUpdate} />;
+  }
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
   if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
-  if (hash.startsWith(PRODUCT_HASH)) return <PdpApp onCheckout={navigateToCheckout} />;
+  if (hash.startsWith(PRODUCT_HASH)) return <PdpApp product={selectedCatalogProduct} onCheckout={navigateToCheckout} onBack={() => { window.location.hash = STORE_HASH; }} />;
   if (hash.startsWith(STORE_HASH)) {
     return (
       <StoreApp
@@ -317,6 +420,8 @@ function Root() {
 
   return (
     <HomeApp
+      favoriteIds={favoriteIds}
+      onToggleFavorite={handleToggleFavorite}
       onNavigateToStore={() => {
         window.location.hash = STORE_HASH;
       }}
@@ -337,7 +442,11 @@ function Root() {
 createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <AuthProvider>
-      <Root />
+      <CatalogProvider>
+        <CommerceProvider>
+          <Root />
+        </CommerceProvider>
+      </CatalogProvider>
     </AuthProvider>
   </StrictMode>,
 );

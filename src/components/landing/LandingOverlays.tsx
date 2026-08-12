@@ -14,9 +14,6 @@ import {
   showDesktopMaintenanceNotice,
 } from "@/utils/pwaInstall";
 
-/** Hash that routes to the main HomeApp inside Root (src/main.tsx). */
-const HOME_HASH = "#/home";
-
 export default function LandingOverlays() {
   const [maintenanceOpen, setMaintenanceOpen] = useState(false);
   const [installOpen, setInstallOpen] = useState(false);

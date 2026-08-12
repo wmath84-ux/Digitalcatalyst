@@ -6,10 +6,10 @@ import ProductCard from "./components/ProductCard";
 import ContinueLearning from "./components/ContinueLearning";
 import Reviews from "./components/Reviews";
 import BottomNav, { type NavTab } from "./components/BottomNav";
-import { banners, categories, products, reviews } from "./data/mockData";
+import { banners, categories, reviews } from "./data/mockData";
 import type { Product } from "./types";
-
-const USER_NAME = "Aarav";
+import { useCatalog } from "../context/CatalogContext";
+import { useAuth } from "../context/AuthContext";
 
 interface AppProps {
   onNavigateToStore: () => void;
@@ -17,28 +17,37 @@ interface AppProps {
   onNavigateToMyDay: () => void;
   onNavigateToProfile: () => void;
   onNavigateToPurchases?: () => void;
+  favoriteIds: Set<string>;
+  onToggleFavorite: (id: string) => void;
 }
 
-export default function App({ onNavigateToStore, onNavigateToProduct, onNavigateToMyDay, onNavigateToProfile, onNavigateToPurchases }: AppProps) {
+export default function App({ onNavigateToStore, onNavigateToProduct, onNavigateToMyDay, onNavigateToProfile, onNavigateToPurchases, favoriteIds, onToggleFavorite }: AppProps) {
+  const { user } = useAuth();
+  const { products: catalogProducts } = useCatalog();
+  const products = useMemo<Product[]>(() => catalogProducts.map((product) => ({
+    id: product.id,
+    title: product.title,
+    type: product.category === "PDF" || product.category === "Notes" ? "pdf" : product.category === "E-book" ? "ebook" : product.category === "Live" ? "live" : "video",
+    category: product.category === "PDF" || product.category === "Notes" ? "pdf" : product.category === "E-book" ? "ebook" : product.category === "Live" ? "live" : "video",
+    author: product.instructor,
+    price: product.price,
+    mrp: product.originalPrice,
+    educoins: 0,
+    rating: product.rating,
+    ratingCount: product.reviews,
+    image: product.image,
+    trending: product.tags.includes("TRENDING") || product.rating >= 4.5,
+  })), [catalogProducts]);
+  const userName = user?.name?.split(" ")[0] || "Learner";
   const [searchQuery, setSearchQuery] = useState("");
   const [activeCategory, setActiveCategory] = useState("all");
-  const [favorites, setFavorites] = useState<Set<string>>(new Set(["p1", "p7"]));
   const [activeTab, setActiveTab] = useState<NavTab>("home");
   const [continueProgress, setContinueProgress] = useState(42);
 
   const searchInputRef = useRef<HTMLInputElement>(null);
   const contentTopRef = useRef<HTMLDivElement>(null);
 
-  const continueLearningItem = products.find((p) => p.id === "p9")!;
-
-  const toggleFavorite = (id: string) => {
-    setFavorites((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-  };
+  const continueLearningItem = products[0];
 
   const normalizedQuery = searchQuery.trim().toLowerCase();
 
@@ -58,11 +67,11 @@ export default function App({ onNavigateToStore, onNavigateToProduct, onNavigate
   const categoryFiltered: Product[] = useMemo(() => {
     if (activeCategory === "all") return products;
     return products.filter((p) => p.category === activeCategory);
-  }, [activeCategory]);
+  }, [activeCategory, products]);
 
   const favoriteProducts = useMemo(
-    () => products.filter((p) => favorites.has(p.id)),
-    [favorites],
+    () => products.filter((p) => favoriteIds.has(p.id)),
+    [favoriteIds, products],
   );
 
   const handleSelectSuggestion = (product: Product) => {
@@ -101,12 +110,12 @@ export default function App({ onNavigateToStore, onNavigateToProduct, onNavigate
         <div ref={contentTopRef} />
         <Header
           ref={searchInputRef}
-          userName={USER_NAME}
+          userName={userName}
           query={searchQuery}
           onQueryChange={setSearchQuery}
           suggestions={suggestions}
           onSelectSuggestion={handleSelectSuggestion}
-          favoritesCount={favorites.size}
+          favoritesCount={favoriteIds.size}
           onOpenFavorites={() => handleTabChange("favorites")}
         />
 
@@ -143,8 +152,8 @@ export default function App({ onNavigateToStore, onNavigateToProduct, onNavigate
                     <ProductCard
                       key={product.id}
                       product={product}
-                      isFavorite={favorites.has(product.id)}
-                      onToggleFavorite={toggleFavorite}
+                      isFavorite={favoriteIds.has(product.id)}
+                      onToggleFavorite={onToggleFavorite}
                       onOpen={onNavigateToProduct}
                     />
                   ))}
@@ -178,8 +187,8 @@ export default function App({ onNavigateToStore, onNavigateToProduct, onNavigate
                     <ProductCard
                       key={product.id}
                       product={product}
-                      isFavorite={favorites.has(product.id)}
-                      onToggleFavorite={toggleFavorite}
+                      isFavorite={favoriteIds.has(product.id)}
+                      onToggleFavorite={onToggleFavorite}
                       onOpen={onNavigateToProduct}
                     />
                   ))}
@@ -190,9 +199,9 @@ export default function App({ onNavigateToStore, onNavigateToProduct, onNavigate
             <section className="px-5 pt-6">
               <div className="flex flex-col items-center rounded-2xl bg-white p-6 text-center shadow-sm shadow-slate-200 ring-1 ring-slate-100">
                 <div className="flex h-20 w-20 items-center justify-center rounded-full bg-gradient-to-br from-indigo-500 to-fuchsia-500 text-2xl font-bold text-white">
-                  {USER_NAME.charAt(0)}
+                  {userName.charAt(0)}
                 </div>
-                <h2 className="mt-3 text-lg font-bold text-slate-900">{USER_NAME} Patel</h2>
+                <h2 className="mt-3 text-lg font-bold text-slate-900">{userName} Patel</h2>
                 <p className="text-xs text-slate-400">Learner since 2023</p>
 
                 <div className="mt-5 grid w-full grid-cols-3 gap-2">
@@ -201,7 +210,7 @@ export default function App({ onNavigateToStore, onNavigateToProduct, onNavigate
                     <p className="text-[11px] text-slate-400">Courses</p>
                   </div>
                   <div className="rounded-xl bg-slate-50 py-3">
-                    <p className="text-sm font-bold text-slate-900">{favorites.size}</p>
+                    <p className="text-sm font-bold text-slate-900">{favoriteIds.size}</p>
                     <p className="text-[11px] text-slate-400">Saved</p>
                   </div>
                   <div className="rounded-xl bg-amber-50 py-3">
@@ -229,14 +238,16 @@ export default function App({ onNavigateToStore, onNavigateToProduct, onNavigate
                 onSelect={setActiveCategory}
               />
 
-              <ContinueLearning
-                title={continueLearningItem.title}
-                author={continueLearningItem.author}
-                image={continueLearningItem.image}
-                progress={continueProgress}
-                onResume={handleResume}
-                onClick={onNavigateToPurchases}
-              />
+              {continueLearningItem && (
+                <ContinueLearning
+                  title={continueLearningItem.title}
+                  author={continueLearningItem.author}
+                  image={continueLearningItem.image}
+                  progress={continueProgress}
+                  onResume={handleResume}
+                  onClick={onNavigateToPurchases}
+                />
+              )}
 
               <section className="px-5 pt-6">
                 <div className="flex items-center justify-between">
@@ -264,8 +275,8 @@ export default function App({ onNavigateToStore, onNavigateToProduct, onNavigate
                       <ProductCard
                         key={product.id}
                         product={product}
-                        isFavorite={favorites.has(product.id)}
-                        onToggleFavorite={toggleFavorite}
+                        isFavorite={favoriteIds.has(product.id)}
+                        onToggleFavorite={onToggleFavorite}
                         onOpen={onNavigateToProduct}
                       />
                     ))}
@@ -278,7 +289,7 @@ export default function App({ onNavigateToStore, onNavigateToProduct, onNavigate
           )}
         </main>
 
-        <BottomNav active={activeTab} favoritesCount={favorites.size} onChange={handleTabChange} />
+        <BottomNav active={activeTab} favoritesCount={favoriteIds.size} onChange={handleTabChange} />
       </div>
     </div>
   );

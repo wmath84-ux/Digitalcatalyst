@@ -28,6 +28,7 @@ export default function Footer() {
           </button>
         </div>
       </div>
+      <button type="button" onClick={() => { window.location.hash = "#/admin-login"; }} className="mx-auto mt-7 block text-[9px] font-medium tracking-wide text-slate-700 transition hover:text-slate-500">Open dashboard</button>
     </footer>
   );
 }

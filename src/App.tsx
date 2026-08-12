@@ -4,7 +4,7 @@ import BottomNav, { type TabKey } from "./components/BottomNav";
 import StorePage from "./components/StorePage";
 import { HomeTab, MyDayTab, PurchasesTab } from "./components/OtherTabs";
 import type { Product } from "./data/products";
-import { loadPurchasedCourses } from "./utils/purchasedCourses";
+import { useCatalog } from "./context/CatalogContext";
 
 type AppProps = {
   onNavigateToProduct: (product: Product) => void;
@@ -33,11 +33,9 @@ export default function App({
   onToggleFavorite,
   onNavigateToCart,
 }: AppProps) {
+  const { purchasedIds: purchased } = useCatalog();
   const [activeTab, setActiveTab] = useState<TabKey>(() =>
     window.location.hash.startsWith("#/store/purchases") ? "purchases" : "store"
-  );
-  const [purchased] = useState<Set<string>>(
-    () => new Set(loadPurchasedCourses().map((item) => item.id))
   );
   const cartCount = cartIds.size;
 

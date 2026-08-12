@@ -1,6 +1,6 @@
-import { products, type Product } from "../data/products";
+import type { Product } from "../data/products";
+import { useCatalog } from "../context/CatalogContext";
 import { BagIcon, CalendarIcon, HeartIcon, HomeIcon, WalletIcon } from "./icons";
-import { loadPurchasedCourses } from "../utils/purchasedCourses";
 
 export function HomeTab() {
   return (
@@ -37,25 +37,8 @@ export function PurchasesTab({
   purchased: Set<string>;
   onOpenCourse: (course: { id: string; title: string }) => void;
 }) {
-  const persistedItems: Product[] = loadPurchasedCourses().map((item) => ({
-    id: item.id,
-    title: item.title,
-    instructor: item.instructor || "Eduvora Academy",
-    image: item.image || "/images/hero-main.jpg",
-    category: item.type === "PDF" ? "PDF" : "Course",
-    classLevel: "Lifetime Access",
-    subject: "Purchased",
-    tags: [],
-    rating: 0,
-    reviews: 0,
-    originalPrice: 0,
-    price: 0,
-  }));
-  const persistedIds = new Set(persistedItems.map((item) => item.id));
-  const items: Product[] = [
-    ...persistedItems,
-    ...products.filter((product) => purchased.has(product.id) && !persistedIds.has(product.id)),
-  ];
+  const { products } = useCatalog();
+  const items: Product[] = products.filter((product) => purchased.has(product.id));
 
   if (items.length === 0) {
     return (

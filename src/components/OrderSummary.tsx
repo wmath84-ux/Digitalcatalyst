@@ -8,22 +8,11 @@ interface OrderSummaryProps {
 }
 
 export default function OrderSummary({ product, user, onProceed }: OrderSummaryProps) {
-  const maxCoinsAllowed = Math.floor((product.price * user.maxEduCoinsUsable) / 100);
-  const coinsAvailable = Math.min(user.eduCoins, maxCoinsAllowed);
-
-  const [useEduCoins, setUseEduCoins] = useState(false);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
 
-  const discount = useEduCoins ? coinsAvailable : 0;
-  const finalPrice = product.price - discount;
-
-  const handleToggleEduCoins = () => {
-    const newState = !useEduCoins;
-    setUseEduCoins(newState);
-    console.log(
-      `[EduCoins] Toggle: ${newState ? 'ON' : 'OFF'} | Coins Applied: ${newState ? coinsAvailable : 0} | Discount: ₹${newState ? coinsAvailable : 0}`
-    );
-  };
+  // EduCoin redemption remains disabled until its balance can be deducted atomically on the server.
+  const discount = 0;
+  const finalPrice = product.price;
 
   const handleProceed = () => {
     console.log('[Step 1 → Step 2] Proceeding to Payment', {
@@ -102,53 +91,7 @@ export default function OrderSummary({ product, user, onProceed }: OrderSummaryP
         </div>
       </div>
 
-      {/* EduCoins Card */}
-      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <span className="w-9 h-9 bg-amber-50 border border-amber-200 rounded-full flex items-center justify-center text-lg">
-              🪙
-            </span>
-            <div>
-              <p className="text-sm font-semibold text-gray-800">Use EduCoins</p>
-              <p className="text-[11px] text-gray-400">
-                {user.eduCoins} coins available (max {user.maxEduCoinsUsable}% usable)
-              </p>
-            </div>
-          </div>
-
-          {/* Toggle Switch */}
-          <button
-            onClick={handleToggleEduCoins}
-            className={`
-              relative w-12 h-7 rounded-full transition-colors duration-200 flex-shrink-0
-              ${useEduCoins ? 'bg-emerald-500' : 'bg-gray-300'}
-            `}
-            role="switch"
-            aria-checked={useEduCoins}
-            aria-label="Toggle EduCoins discount"
-          >
-            <span
-              className={`
-                absolute top-0.5 w-6 h-6 bg-white rounded-full shadow-md transition-transform duration-200
-                ${useEduCoins ? 'translate-x-5.5 left-0.5' : 'left-0.5'}
-              `}
-              style={{ transform: useEduCoins ? 'translateX(20px)' : 'translateX(0)' }}
-            />
-          </button>
-        </div>
-
-        {useEduCoins && (
-          <div className="mt-3 pt-3 border-t border-dashed border-gray-200 flex items-center justify-between text-sm animate-fadeIn">
-            <span className="text-emerald-600 font-medium">
-              🎉 {coinsAvailable} coins applied!
-            </span>
-            <span className="text-emerald-600 font-bold">
-              − {product.currency}{coinsAvailable.toLocaleString('en-IN')}
-            </span>
-          </div>
-        )}
-      </div>
+      {/* EduCoin redemption is intentionally hidden until server-side wallet transactions are enabled. */}
 
       {/* User Verification Card */}
       <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
@@ -176,12 +119,6 @@ export default function OrderSummary({ product, user, onProceed }: OrderSummaryP
           <span>Subtotal</span>
           <span>{product.currency}{product.price.toLocaleString('en-IN')}</span>
         </div>
-        {useEduCoins && (
-          <div className="flex justify-between text-sm text-emerald-600">
-            <span>EduCoins Discount</span>
-            <span>− {product.currency}{discount.toLocaleString('en-IN')}</span>
-          </div>
-        )}
         <div className="flex justify-between text-sm text-gray-500">
           <span>GST (18%)</span>
           <span>Inclusive</span>

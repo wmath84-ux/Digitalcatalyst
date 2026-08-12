@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import type { EventType, ScheduleEvent } from "../../types";
 import { cn } from "../../utils/cn";
 import Modal from "../ui/Modal";
-import { BookOpen, Coffee, GraduationCap, PenSquare, User } from "lucide-react";
+import { BookOpen, Coffee, GraduationCap, PenSquare, User, type LucideIcon } from "lucide-react";
 
 interface ScheduleModalProps {
   open: boolean;
@@ -20,7 +20,7 @@ const emptyEvent = (): ScheduleEvent => ({
   type: "study",
 });
 
-const eventTypes: { key: EventType; label: string; icon: React.ElementType; color: string }[] = [
+const eventTypes: { key: EventType; label: string; icon: LucideIcon; color: string }[] = [
   { key: "class", label: "Class", icon: GraduationCap, color: "border-indigo-500 bg-indigo-50 text-indigo-700" },
   { key: "study", label: "Study", icon: BookOpen, color: "border-violet-500 bg-violet-50 text-violet-700" },
   { key: "exam", label: "Exam", icon: PenSquare, color: "border-rose-500 bg-rose-50 text-rose-700" },
