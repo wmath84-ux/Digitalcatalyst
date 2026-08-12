@@ -65,6 +65,7 @@ export const getCourseDownload = (file: CourseFile): { url: string; label: strin
   if (google?.kind === "document") return { url: `https://docs.google.com/document/d/${google.id}/export?format=pdf`, label: "Download PDF", downloadable: true };
   if (google?.kind === "spreadsheets") return { url: `https://docs.google.com/spreadsheets/d/${google.id}/export?format=xlsx`, label: "Download XLSX", downloadable: true };
   if (google?.kind === "presentation") return { url: `https://docs.google.com/presentation/d/${google.id}/export/pdf`, label: "Download PDF", downloadable: true };
+  if (google?.kind === "drive") return { url: `https://drive.google.com/uc?export=download&id=${encodeURIComponent(google.id)}`, label: "Download Drive file", downloadable: true };
   if (file.type === "google_form" || google?.kind === "forms") return { url: raw, label: "Open original form", downloadable: false };
   return { url: raw, label: file.type === "link" || file.type === "youtube" ? "Open original" : "Download file", downloadable: !["link", "youtube"].includes(file.type) };
 };
