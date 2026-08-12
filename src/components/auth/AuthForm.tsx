@@ -38,7 +38,9 @@ export default function AuthForm() {
   const completeSuccess = (message: string, fallback?: string) => {
     setSuccess(message);
     window.setTimeout(() => {
-      window.location.hash = destinationAfterAuth(fallback);
+      const destination = destinationAfterAuth(fallback);
+      sessionStorage.removeItem("authReturnHash");
+      window.location.hash = destination;
     }, 350);
   };
 

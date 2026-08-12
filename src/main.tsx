@@ -133,6 +133,7 @@ function Root() {
 
   useEffect(() => {
     if (loading || user || !requiresAuthentication(hash)) return;
+    sessionStorage.setItem("authReturnHash", hash);
     window.location.hash = `${AUTH_HASH}?mode=login&return=${encodeURIComponent(hash)}`;
   }, [hash, loading, user]);
 
@@ -241,6 +242,7 @@ function Root() {
   };
 
   const redirectToAuth = (returnHash: string) => {
+    sessionStorage.setItem("authReturnHash", returnHash);
     window.location.hash = `${AUTH_HASH}?mode=login&return=${encodeURIComponent(returnHash)}`;
   };
 
