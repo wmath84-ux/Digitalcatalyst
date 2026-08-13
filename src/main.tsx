@@ -65,11 +65,60 @@ function InvalidCheckout({ onBack }: { onBack: () => void }) {
  * the two PdpApp call-sites (PDP route + course route when not yet owned)
  * stay identical and the PDP doesn't have to know about Firestore.
  */
-function PdpWithOwnership({ product, onCheckout, onBack }: { product: import("./data/products").Product | null; onCheckout: (price: number) => void; onBack: () => void }) {
-  const purchasedIds = useCatalog().purchasedIds;
+function PdpWithOwnership({
+  product,
+  onCheckout,
+  onCheckoutSelection,
+  onBack,
+  cartIds,
+  favoriteIds,
+  onAddToCart,
+  onToggleFavorite,
+  onNavigateToProduct,
+  onOpenCourse,
+  onNavigateToCart,
+  onNavigateToSubscription,
+  onNavigateToNotifications,
+  onNavigateFooter,
+}: {
+  product: import("./data/products").Product | null;
+  onCheckout: (price: number) => void;
+  onCheckoutSelection: (selection: CheckoutSelection, price: number) => void;
+  onBack: () => void;
+  cartIds: Set<string>;
+  favoriteIds: Set<string>;
+  onAddToCart: (id: string) => void;
+  onToggleFavorite: (id: string) => void;
+  onNavigateToProduct: (product: import("./data/products").Product) => void;
+  onOpenCourse: (product: import("./data/products").Product) => void;
+  onNavigateToCart: () => void;
+  onNavigateToSubscription: () => void;
+  onNavigateToNotifications: () => void;
+  onNavigateFooter: (tab: import("./components/BottomNav").TabKey) => void;
+}) {
+  const { products, purchasedIds } = useCatalog();
   const ownedUpdateIds = useOwnedUpdateIds(product?.id || null);
-  if (!product) return <PdpApp product={null} onCheckout={onCheckout} onBack={onBack} />;
-  return <PdpApp product={product} onCheckout={onCheckout} onBack={onBack} purchasedIds={purchasedIds} ownedUpdateIds={ownedUpdateIds} />;
+  return (
+    <PdpApp
+      product={product}
+      products={products}
+      cartIds={cartIds}
+      favoriteIds={favoriteIds}
+      onCheckout={onCheckout}
+      onCheckoutSelection={onCheckoutSelection}
+      onBack={onBack}
+      onAddToCart={onAddToCart}
+      onToggleFavorite={onToggleFavorite}
+      onNavigateToProduct={onNavigateToProduct}
+      onOpenCourse={onOpenCourse}
+      onNavigateToCart={onNavigateToCart}
+      onNavigateToSubscription={onNavigateToSubscription}
+      onNavigateToNotifications={onNavigateToNotifications}
+      onNavigateFooter={onNavigateFooter}
+      purchasedIds={purchasedIds}
+      ownedUpdateIds={ownedUpdateIds}
+    />
+  );
 }
 
 const AUTH_REQUIRED_PREFIXES = [
@@ -333,6 +382,32 @@ function Root() {
     });
   };
 
+  const navigatePdpSelectionToCheckout = (selection: CheckoutSelection, finalPrice: number) => {
+    if (!user) {
+      sessionStorage.setItem("pendingCheckoutPrice", String(finalPrice));
+      redirectToAuth(window.location.hash || PRODUCT_HASH);
+      return;
+    }
+    if (!selectedCatalogProduct) {
+      showShoppingToast("This product is no longer available");
+      window.location.hash = STORE_HASH;
+      return;
+    }
+    startCheckout({
+      selection,
+      buyer: {
+        uid: String(user.id),
+        name: user.name,
+        email: user.email,
+        mobile: null,
+        coins: user.coins,
+        emailVerified: false,
+      },
+      returnRoute: { hash: `${PRODUCT_HASH}${encodeURIComponent(selectedCatalogProduct.id)}` },
+      idempotencyKey: `${selection.purchaseKind}:${selectedCatalogProduct.id}:${user.id}:${Date.now()}`,
+    });
+  };
+
   const cartProducts = shoppingProducts.filter((product) => cartIds.has(product.id));
   const favoriteProducts = shoppingProducts.filter((product) => favoriteIds.has(product.id));
   const protectedRoutePending = requiresAuthentication(hash) && (loading || !user);
@@ -455,7 +530,32 @@ function Root() {
   }
   if (hash.startsWith(PROFILE_HASH)) return <ProfileApp />;
   if (hash.startsWith(MY_DAY_HASH)) return <MyDayApp />;
-  if (hash.startsWith(PRODUCT_HASH)) return <PdpWithOwnership product={selectedCatalogProduct} onCheckout={navigateToCheckout} onBack={() => { window.location.hash = STORE_HASH; }} />;
+  if (hash.startsWith(PRODUCT_HASH)) {
+    return (
+      <PdpWithOwnership
+        product={selectedCatalogProduct}
+        onCheckout={navigateToCheckout}
+        onCheckoutSelection={navigatePdpSelectionToCheckout}
+        onBack={() => { window.location.hash = STORE_HASH; }}
+        cartIds={cartIds}
+        favoriteIds={favoriteIds}
+        onAddToCart={handleAddToCart}
+        onToggleFavorite={handleToggleFavorite}
+        onNavigateToProduct={navigateToProduct}
+        onOpenCourse={navigateToCourse}
+        onNavigateToCart={() => { window.location.hash = CART_HASH; }}
+        onNavigateToSubscription={() => { window.location.hash = SUBSCRIPTION_HASH; }}
+        onNavigateToNotifications={() => { window.location.hash = NOTIFICATIONS_HASH; }}
+        onNavigateFooter={(tab) => {
+          if (tab === "home") window.location.hash = HOME_HASH;
+          else if (tab === "myday") window.location.hash = MY_DAY_HASH;
+          else if (tab === "store") window.location.hash = STORE_HASH;
+          else if (tab === "purchases") window.location.hash = `${STORE_HASH}/purchases`;
+          else if (tab === "profile") window.location.hash = PROFILE_HASH;
+        }}
+      />
+    );
+  }
   if (hash.startsWith(STORE_HASH)) {
     return (
       <StoreApp
