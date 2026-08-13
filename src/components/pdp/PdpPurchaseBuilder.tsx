@@ -339,22 +339,40 @@ export default function PdpPurchaseBuilder({
 
   // ---- Render helpers ----
 
+  const modulePicker = (
+    <>
+      <ModuleSelectTrigger
+        totalModules={purchasableModules.length}
+        selectedCount={selectedModuleIds.size}
+        selectedTotal={purchasableModules.filter((module) => selectedModuleIds.has(module.id)).reduce((sum, module) => sum + (getModuleEffectivePrice(module, fallbackModulePrice) || 0), 0)}
+        onOpen={() => setModuleModalOpen(true)}
+      />
+      <ModuleSelectModal
+        open={moduleModalOpen}
+        modules={purchasableModules}
+        selectedIds={Array.from(selectedModuleIds)}
+        ownedIds={new Set(purchasableModules.filter((module) => getIsModuleOwned(module, ownershipState)).map((module) => module.id))}
+        fallbackPrice={fallbackModulePrice}
+        onClose={() => setModuleModalOpen(false)}
+        onChangeSelected={(ids) => {
+          setSelectedModuleIds(new Set(ids));
+          setPreviewNotice(null);
+        }}
+      />
+    </>
+  );
+
   if (availableModes.length === 0) {
     return (
-      <div className="rounded-3xl border border-amber-200 bg-amber-50 p-5 text-sm text-amber-800">
-        <div className="flex items-start gap-2">
-          <Info className="mt-0.5 h-4 w-4 shrink-0" />
-          <div>
-            <p className="font-black">This course has nothing to buy yet.</p>
-            <p className="mt-1 text-xs text-amber-700/80">Come back later — the admin is still setting it up.</p>
-          </div>
-        </div>
+      <div className="space-y-4" data-pdp-purchase-builder>
+        {modulePicker}
       </div>
     );
   }
 
   return (
     <div className="space-y-4" data-pdp-purchase-builder>
+      {modulePicker}
       <ModeSwitcher modes={availableModes} mode={mode} onChange={setMode} />
 
       {mode === "full_product" && (
@@ -365,37 +383,17 @@ export default function PdpPurchaseBuilder({
         />
       )}
 
-      {mode === "selected_modules" && (
-        <>
-          <ModuleSelectTrigger
-            totalModules={purchasableModules.length}
-            selectedCount={selectedModuleIds.size}
-            selectedTotal={purchasableModules.filter((module) => selectedModuleIds.has(module.id)).reduce((sum, module) => sum + (getModuleEffectivePrice(module, fallbackModulePrice) || 0), 0)}
-            onOpen={() => setModuleModalOpen(true)}
-          />
-          <ModuleSelector
-            modules={purchasableModules}
-            allModules={modules}
-            selectedIds={selectedModuleIds}
-            expandedIds={expandedModules}
-            ownershipState={ownershipState}
-            fallbackPrice={fallbackModulePrice}
-            onToggle={toggleModule}
-            onExpand={expandModule}
-          />
-          <ModuleSelectModal
-            open={moduleModalOpen}
-            modules={purchasableModules}
-            selectedIds={Array.from(selectedModuleIds)}
-            ownedIds={new Set(purchasableModules.filter((module) => getIsModuleOwned(module, ownershipState)).map((module) => module.id))}
-            fallbackPrice={fallbackModulePrice}
-            onClose={() => setModuleModalOpen(false)}
-            onChangeSelected={(ids) => {
-              setSelectedModuleIds(new Set(ids));
-              setPreviewNotice(null);
-            }}
-          />
-        </>
+      {mode === "selected_modules" && purchasableModules.length > 0 && (
+        <ModuleSelector
+          modules={purchasableModules}
+          allModules={modules}
+          selectedIds={selectedModuleIds}
+          expandedIds={expandedModules}
+          ownershipState={ownershipState}
+          fallbackPrice={fallbackModulePrice}
+          onToggle={toggleModule}
+          onExpand={expandModule}
+        />
       )}
 
       {mode === "selected_resources" && (

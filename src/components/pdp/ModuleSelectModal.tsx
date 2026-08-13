@@ -85,7 +85,7 @@ export default function ModuleSelectModal({
           </button>
         </div>
 
-        <div className="px-5 pb-3">
+        {modules.length > 0 ? <div className="px-5 pb-3">
           <div className="flex items-center gap-2 rounded-2xl bg-slate-100 px-3.5 py-2.5">
             <Search className="h-4 w-4 shrink-0 text-slate-400" />
             <input
@@ -100,9 +100,9 @@ export default function ModuleSelectModal({
               </button>
             ) : null}
           </div>
-        </div>
+        </div> : null}
 
-        <button
+        {modules.length > 0 ? <button
           type="button"
           onClick={toggleSelectAll}
           className="mx-5 mb-2 flex items-center justify-between rounded-2xl border border-slate-100 bg-slate-50/80 px-4 py-3"
@@ -114,10 +114,16 @@ export default function ModuleSelectModal({
             <span className="text-sm font-bold text-slate-700">Select all {query ? "(filtered)" : ""}</span>
           </div>
           <span className="text-xs font-medium text-violet-600">{filtered.length} modules</span>
-        </button>
+        </button> : null}
 
         <div className="flex-1 overflow-y-auto px-5 pb-4">
-          {filtered.length === 0 ? (
+          {modules.length === 0 ? (
+            <div data-pdp-no-modules className="flex flex-col items-center justify-center rounded-3xl border border-dashed border-slate-200 bg-slate-50 px-6 py-16 text-center">
+              <PackageOpenIcon />
+              <p className="mt-3 text-base font-black text-slate-900">No modules</p>
+              <p className="mt-1 text-sm leading-relaxed text-slate-500">This course has no modules yet. Check back when the instructor publishes them.</p>
+            </div>
+          ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-14 text-center">
               <Sparkles className="mb-2 h-8 w-8 text-slate-300" />
               <p className="text-sm font-medium text-slate-400">No modules match “{query}”</p>
@@ -175,6 +181,19 @@ export default function ModuleSelectModal({
         </div>
       </div>
     </div>
+  );
+}
+
+function PackageOpenIcon() {
+  return (
+    <span className="grid h-14 w-14 place-items-center rounded-2xl bg-slate-200/70 text-slate-400">
+      <svg viewBox="0 0 24 24" className="h-7 w-7" fill="none" stroke="currentColor" strokeWidth="1.8">
+        <path d="M3 9.5 12 4l9 5.5" />
+        <path d="M3 9.5v6L12 21l9-5.5v-6" />
+        <path d="M12 21v-6.5" />
+        <path d="M7.5 12.2 12 14.8l4.5-2.6" />
+      </svg>
+    </span>
   );
 }
 

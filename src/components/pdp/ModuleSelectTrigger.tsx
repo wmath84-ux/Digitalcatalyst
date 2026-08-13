@@ -29,7 +29,9 @@ export default function ModuleSelectTrigger({ totalModules, selectedCount, selec
           <div className="min-w-0 text-left">
             <p className="text-sm font-bold text-slate-800">Select course modules</p>
             {selectedCount === 0 ? (
-              <p className="truncate text-xs text-slate-400">{totalModules} module{totalModules === 1 ? "" : "s"} available · pick what you need</p>
+              <p className="truncate text-xs text-slate-400">
+                {totalModules === 0 ? "No modules yet · tap to view" : `${totalModules} module${totalModules === 1 ? "" : "s"} available · pick what you need`}
+              </p>
             ) : (
               <p className="truncate text-xs font-medium text-violet-600">
                 {selectedCount} module{selectedCount === 1 ? "" : "s"} · {formatPrice(selectedTotal)}

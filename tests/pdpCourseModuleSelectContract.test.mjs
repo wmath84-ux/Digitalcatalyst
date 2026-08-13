@@ -17,9 +17,13 @@ test("product detail always offers a subscription-style module picker", () => {
   assert.match(builder, /ModuleSelectTrigger/);
   assert.match(builder, /ModuleSelectModal/);
   assert.match(builder, /selected_modules/);
+  assert.match(builder, /modulePicker/);
   assert.match(trigger, /Select course modules/);
+  assert.match(trigger, /No modules yet · tap to view/);
   assert.match(modal, /Select modules/);
   assert.match(modal, /data-pdp-module-pick/);
+  assert.match(modal, /data-pdp-no-modules/);
+  assert.match(modal, />No modules</);
   assert.match(modal, /Select all/);
 });
 

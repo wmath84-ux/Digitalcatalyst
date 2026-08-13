@@ -10,7 +10,7 @@ import Footer from "./components/landing/Footer";
 import LandingOverlays from "./components/landing/LandingOverlays";
 import {
   OPEN_APP_EVENT,
-  isMobileScreenSize,
+  isDesktopBrowserLocked,
   showDesktopMaintenanceNotice,
 } from "@/utils/pwaInstall";
 
@@ -22,17 +22,16 @@ export default function LandingApp() {
   const exitTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const handleOpenApp = useCallback(() => {
-    if (isMobileScreenSize()) {
-      // Mobile / portrait-sized screen → animate landing out, then navigate
-      setIsExiting(true);
-      // Wait for exit animation to finish before navigating
-      exitTimerRef.current = setTimeout(() => {
-        window.location.hash = HOME_HASH;
-      }, 650);
-    } else {
-      // Desktop-sized screen → show "Under Preparation" notification
+    if (isDesktopBrowserLocked()) {
+      // Desktop browser → keep landing open and show the PWA notice.
       showDesktopMaintenanceNotice();
+      return;
     }
+    // Mobile / installed PWA → animate landing out, then navigate
+    setIsExiting(true);
+    exitTimerRef.current = setTimeout(() => {
+      window.location.hash = HOME_HASH;
+    }, 650);
   }, []);
 
   useEffect(() => {

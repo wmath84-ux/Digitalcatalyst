@@ -32,6 +32,7 @@ import { buildCheckoutSessionRecord, writeToSessionStorage as writeCheckoutToSto
 import type { CheckoutSelection } from "./types/commerce";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
 import type { PaidCourseUpdate } from "./types/course";
+import { isDesktopBrowserLocked, showDesktopMaintenanceNotice } from "./utils/pwaInstall";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
@@ -194,9 +195,10 @@ function Root() {
   const { cartIds, favoriteIds, addToCart, removeFromCart, clearCart, toggleFavorite } = useCommerce();
   const [hash, setHash] = useState(() => window.location.hash);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
+  const [desktopLocked, setDesktopLocked] = useState(() => isDesktopBrowserLocked());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const landingRouteRequested = !hash || hash.startsWith(LANDING_HASH);
-  const redirectingSignedInUser = Boolean(user && user.role !== "admin" && landingRouteRequested);
+  const redirectingSignedInUser = Boolean(user && user.role !== "admin" && landingRouteRequested && !desktopLocked);
 
   const shoppingProducts: CartProduct[] = useMemo(() => catalogProducts.map((product) => ({
     id: product.id,
@@ -231,15 +233,29 @@ function Root() {
 
   useEffect(() => {
     const handleHashChange = () => setHash(window.location.hash);
+    const handleResize = () => setDesktopLocked(isDesktopBrowserLocked());
     window.addEventListener("hashchange", handleHashChange);
-    return () => window.removeEventListener("hashchange", handleHashChange);
+    window.addEventListener("resize", handleResize);
+    return () => {
+      window.removeEventListener("hashchange", handleHashChange);
+      window.removeEventListener("resize", handleResize);
+    };
   }, []);
 
   useEffect(() => {
-    if (loading || !user || user.role === "admin" || !landingRouteRequested) return;
+    if (!desktopLocked) return;
+    if (hash.startsWith(ADMIN_HASH) || hash.startsWith(ADMIN_LOGIN_HASH)) return;
+    if (!hash || hash.startsWith(LANDING_HASH)) return;
+    window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${LANDING_HASH}`);
+    setHash(LANDING_HASH);
+    showDesktopMaintenanceNotice();
+  }, [desktopLocked, hash]);
+
+  useEffect(() => {
+    if (loading || !user || user.role === "admin" || !landingRouteRequested || desktopLocked) return;
     window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${HOME_HASH}`);
     setHash(HOME_HASH);
-  }, [landingRouteRequested, loading, user]);
+  }, [desktopLocked, landingRouteRequested, loading, user]);
 
   useEffect(() => {
     if (!user) return undefined;
@@ -390,21 +406,7 @@ function Root() {
     window.location.hash = `${PRODUCT_HASH}${encodeURIComponent(product.id)}?section=reviews`;
   };
 
-  const navigateToCourse = (course: { id: string; title: string }) => {
-    sessionStorage.setItem("selectedCourse", JSON.stringify({ courseId: course.id, title: course.title }));
-    window.location.hash = `${COURSE_HASH}${encodeURIComponent(course.id)}`;
-  };
-
-  const navigateToCheckout = (finalPrice: number, checkoutCatalogProduct = selectedCatalogProduct) => {
-    if (!user) {
-      sessionStorage.setItem("pendingCheckoutPrice", String(finalPrice));
-      redirectToAuth(window.location.hash || PRODUCT_HASH);
-      return;
-    }
-
-    if (!checkoutCatalogProduct) {
-      showShoppingToast("This product is no longer available");
-      window.location.hash = STORE_HASH;
+  const navigateTdow.location.hash = STORE_HASH;
       return;
     }
 
@@ -464,6 +466,10 @@ function Root() {
   const cartProducts = shoppingProducts.filter((product) => cartIds.has(product.id));
   const favoriteProducts = shoppingProducts.filter((product) => favoriteIds.has(product.id));
   const protectedRoutePending = requiresAuthentication(hash) && (loading || !user);
+
+  if (desktopLocked && !hash.startsWith(ADMIN_HASH) && !hash.startsWith(ADMIN_LOGIN_HASH)) {
+    return <LandingApp />;
+  }
 
   if (loading || redirectingSignedInUser || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH))) {
     return <AppLaunchSplash label={redirectingSignedInUser ? "Opening your dashboard…" : "Preparing your learning space…"} />;
@@ -666,6 +672,29 @@ function Root() {
       }}
       onNavigateToPurchases={() => {
         window.location.hash = `${STORE_HASH}/purchases`;
+      }}
+      onNavigateToFavorites={() => {
+        window.location.hash = FAVORITES_HASH;
+      }}
+      onNavigateToNotifications={() => {
+        window.location.hash = NOTIFICATIONS_HASH;
+      }}
+    />
+  );
+}
+
+createRoot(document.getElementById("root")!).render(
+  <StrictMode>
+    <AuthProvider>
+      <CatalogProvider>
+        <CommerceProvider>
+          <Root />
+        </CommerceProvider>
+      </CatalogProvider>
+    </AuthProvider>
+  </StrictMode>,
+);
+on.hash = `${STORE_HASH}/purchases`;
       }}
       onNavigateToFavorites={() => {
         window.location.hash = FAVORITES_HASH;
