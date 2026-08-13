@@ -12,11 +12,17 @@ const referrals = fs.readFileSync("api/_lib/referrals.ts", "utf8");
 const entitlements = fs.readFileSync("api/_lib/entitlements.ts", "utf8");
 const rules = fs.readFileSync("firestore.rules", "utf8");
 
-test("home supports left/right swipe category switching like store", () => {
-  assert.match(home, /touchStartX/);
-  assert.match(home, /handleTouchStart/);
-  assert.match(home, /handleTouchEnd/);
-  assert.match(home, /switchCategory\(delta < 0 \? 1 : -1\)/);
+test("home switches category on horizontal swipe only on the filter and product areas", () => {
+  assert.match(home, /handleSwipeStart/);
+  assert.match(home, /handleSwipeEnd/);
+  assert.match(home, /switchCategory\(deltaX < 0 \? 1 : -1\)/);
+  // The swipe handlers wrap only the filter chips and the product grid…
+  assert.match(home, /<div \{\.\.\.categorySwipeHandlers\}>\s*<CategoryNav/s);
+  assert.match(home, /<section className="px-5 pt-6" \{\.\.\.categorySwipeHandlers\}>/);
+  // …not the whole page: swiping the reviews rail or hero carousel must not flip the filter.
+  assert.doesNotMatch(home, /<main[^>]*onTouchStart/);
+  // A vertical or diagonal page scroll is not a category switch.
+  assert.match(home, /Math\.abs\(deltaX\) <= Math\.abs\(deltaY\)/);
 });
 
 test("shared footer places leaderboard after profile and routes to its page", () => {
