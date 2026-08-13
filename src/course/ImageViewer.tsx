@@ -83,7 +83,7 @@ export default function ImageViewer({ url, name }: ImageViewerProps) {
 
   return (
     <div
-      className="relative h-full min-h-[420px] overflow-hidden bg-[radial-gradient(circle_at_center,#1e293b,#020617)] touch-none"
+      className="relative h-full w-full overflow-hidden bg-[radial-gradient(circle_at_center,#1e293b,#020617)] touch-none"
       data-course-image-viewer
       data-pinch-zoom="enabled"
       onWheel={(event) => {

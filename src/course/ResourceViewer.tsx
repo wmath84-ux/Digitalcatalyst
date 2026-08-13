@@ -70,26 +70,38 @@ export default function ResourceViewer({ file }: ResourceViewerProps) {
   const isImage = file.type === "image" && embed.kind === "direct";
   const isVideo = file.type === "video" && embed.kind === "direct";
   const isAudio = file.type === "audio" && embed.kind === "direct";
+  // Video-shaped content is letterboxed at 16:9 and centred so it never
+  // stretches; document-shaped content fills every available pixel.
+  const isCinematic = isVideo || embed.kind === "youtube";
 
   return (
-    <div className="flex h-full min-h-0 flex-col bg-slate-950" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind}>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-slate-950" data-course-viewer data-file-id={file.id} data-embed-kind={embed.kind}>
       <ViewerHeader file={file} embed={embed} download={download} />
-      <div className="min-h-0 flex-1">
+      <div className={`min-h-0 flex-1 overflow-hidden ${isCinematic ? "grid place-items-center bg-black p-0" : ""}`}>
         {isImage ? (
           <ImageViewer url={embed.url} name={file.name} />
         ) : isVideo ? (
-          <video
-            src={embed.url}
-            controls
-            playsInline
-            preload="metadata"
-            className="h-full w-full bg-black object-contain"
-            data-course-viewer-video
-          />
+          <div className="flex h-full w-full items-center justify-center">
+            <video
+              src={embed.url}
+              controls
+              playsInline
+              preload="metadata"
+              controlsList="nodownload"
+              className="max-h-full max-w-full bg-black object-contain"
+              data-course-viewer-video
+            />
+          </div>
         ) : isAudio ? (
           <AudioPlayer url={embed.url} name={file.name} />
         ) : !embed.url ? (
           <MissingEmbedState file={file} download={download} />
+        ) : isCinematic ? (
+          <div className="flex h-full w-full items-center justify-center">
+            <div className="aspect-video max-h-full w-full max-w-full">
+              <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} />
+            </div>
+          </div>
         ) : (
           <EmbedFrame url={embed.url} title={file.name} kind={embed.kind} supported={isSupported} />
         )}
@@ -108,7 +120,7 @@ function ViewerHeader({ file, embed, download }: { file: CourseFile; embed: { ur
     else void root.requestFullscreen?.();
   };
   return (
-    <div className="flex shrink-0 items-center gap-3 border-b border-white/10 bg-slate-950 px-4 py-3 text-white">
+    <div className="sticky top-0 z-20 flex shrink-0 items-center gap-2 border-b border-white/10 bg-slate-950/95 px-3 py-2.5 text-white backdrop-blur sm:gap-3 sm:px-4">
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-black" title={file.name}>{file.name}</p>
         <p className="text-[10px] font-bold uppercase tracking-wider text-white/40" data-course-viewer-kind>{kindLabel} preview</p>
@@ -259,7 +271,7 @@ function EmbedFrame({ url, title, kind, supported }: EmbedFrameProps) {
         key={reloadKey}
         src={url}
         title={title}
-        className="h-full min-h-[420px] w-full border-0 bg-white"
+        className="h-full w-full border-0 bg-white"
         allow="autoplay; encrypted-media; picture-in-picture; fullscreen; clipboard-read; clipboard-write"
         sandbox="allow-scripts allow-forms allow-popups allow-modals allow-downloads allow-same-origin allow-presentation"
         allowFullScreen

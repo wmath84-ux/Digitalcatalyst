@@ -53,8 +53,8 @@ function productForEditor(raw: any, documentId: string) {
   const form = firestoreToEditorForm(raw, documentId);
   if (form && (!Array.isArray(form.modules) || form.modules.length === 0)) {
     // Mirror the catalog: when a product has no course content configured,
-    // the Course Player shows the built-in demo course. Populate the editor
-    // with that same demo content so the admin sees (and can customize) the
+    // the Course Player shows the built-in starter course. Populate the editor
+    // with that same starter content so the admin sees (and can customize) the
     // exact modules/files learners actually see in the player.
     form.modules = firestoreModulesToEditorFlat(fullDemoCourseContent) as ProductModule[];
     if (!Array.isArray(form.paidUpdates) || form.paidUpdates.length === 0) {
@@ -65,7 +65,7 @@ function productForEditor(raw: any, documentId: string) {
 }
 
 /**
- * Build the editor `paidUpdates` list from the demo course's paid-update
+ * Build the editor `paidUpdates` list from the starter course’s paid-update
  * modules (grouped by their `paidUpdateId`), so the "Paid updates" tab shows
  * the same premium content the player renders.
  */
