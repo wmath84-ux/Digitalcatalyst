@@ -21,7 +21,7 @@
 //      grant is a no-op for the coupon.
 
 import { FieldValue, Timestamp, type Firestore, type Transaction } from "firebase-admin/firestore";
-import { adminDb } from "./firebaseAdmin";
+import { adminDb } from "./firebaseAdmin.js";
 import {
   buildCouponRedemptionDocId,
   normaliseCouponCode,
@@ -29,7 +29,7 @@ import {
   shouldIncrementCouponUsage,
   type CouponDoc,
   type CouponRedemptionDoc,
-} from "../../utils/coupons";
+} from "../../utils/coupons.js";
 
 const COUPONS_COLLECTION = "coupons";
 const REDEMPTIONS_COLLECTION = "couponRedemptions";

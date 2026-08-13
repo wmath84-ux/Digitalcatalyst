@@ -1,7 +1,7 @@
 import * as webpush from "web-push";
 import { Timestamp } from "firebase-admin/firestore";
-import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from "../_lib/firebaseAdmin";
-import { getRenewalReminder } from "../../utils/subscriptionRenewal";
+import { adminDb, errorResponse, type VercelRequest, type VercelResponse } from "../_lib/firebaseAdmin.js";
+import { getRenewalReminder } from "../../utils/subscriptionRenewal.js";
 
 const bearer = (req: VercelRequest) => {
   const raw = req.headers?.authorization;

@@ -18,8 +18,8 @@
 //      Razorpay capture.
 
 import { Timestamp, type Firestore, type QueryDocumentSnapshot, type Transaction } from "firebase-admin/firestore";
-import { adminDb, parseProductPricePaise } from "./firebaseAdmin";
-import { getRenewalBaseTime } from "../../utils/subscriptionRenewal";
+import { adminDb, parseProductPricePaise } from "./firebaseAdmin.js";
+import { getRenewalBaseTime } from "../../utils/subscriptionRenewal.js";
 import {
   buildSubscriptionLineItems,
   computeCycleExpiresAt,
@@ -45,7 +45,7 @@ import {
   type SubscriptionRecord,
   type ValidateSubscriptionInput,
   type ValidateSubscriptionResult,
-} from "../../utils/subscriptions";
+} from "../../utils/subscriptions.js";
 
 const PLANS_COLLECTION = "subscriptionPlans";
 const FEATURES_COLLECTION = "subscriptionFeatures";

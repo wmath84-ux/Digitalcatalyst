@@ -35,9 +35,9 @@ import {
   requireFirebaseUser,
   type VercelRequest,
   type VercelResponse,
-} from "../_lib/firebaseAdmin";
-import { loadServerQuoteForUser } from "../_lib/quotes";
-import { grantEntitlementsFromQuote, grantSubscriptionFromQuote } from "../_lib/entitlements";
+} from "../_lib/firebaseAdmin.js";
+import { loadServerQuoteForUser } from "../_lib/quotes.js";
+import { grantEntitlementsFromQuote, grantSubscriptionFromQuote } from "../_lib/entitlements.js";
 
 const cleanRazorpayId = (value: unknown) =>
   String(value || "").trim().replace(/[^a-zA-Z0-9_-]/g, "").slice(0, 100);

@@ -20,8 +20,8 @@ import {
   requireFirebaseUser,
   type VercelRequest,
   type VercelResponse,
-} from "../_lib/firebaseAdmin";
-import { loadServerQuoteForUser } from "../_lib/quotes";
+} from "../_lib/firebaseAdmin.js";
+import { loadServerQuoteForUser } from "../_lib/quotes.js";
 
 const cleanId = (value: unknown, max = 120) =>
   String(value || "").trim().replace(/[^a-zA-Z0-9_:-]/g, "").slice(0, max);

@@ -15,14 +15,14 @@ import {
   requireFirebaseUser,
   type VercelRequest,
   type VercelResponse,
-} from "./_lib/firebaseAdmin";
+} from "./_lib/firebaseAdmin.js";
 import {
   loadCouponByCode,
   loadUserCouponUsageCount,
   loadUserHasPriorPurchases,
-} from "./_lib/coupons";
-import { loadSubscriptionSelectionContext } from "./_lib/subscriptions";
-import { buildQuote } from "../utils/serverQuotes";
+} from "./_lib/coupons.js";
+import { loadSubscriptionSelectionContext } from "./_lib/subscriptions.js";
+import { buildQuote } from "../utils/serverQuotes.js";
 
 const cleanId = (value: unknown, max = 100) =>
   String(value || "").trim().replace(/[^a-zA-Z0-9_:-]/g, "").slice(0, max);

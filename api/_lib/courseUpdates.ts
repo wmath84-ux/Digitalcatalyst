@@ -1,5 +1,5 @@
 import { FieldValue, Timestamp, type Transaction } from 'firebase-admin/firestore';
-import { adminDb, parseProductPricePaise } from './firebaseAdmin';
+import { adminDb, parseProductPricePaise } from './firebaseAdmin.js';
 
 type AccessItem = Record<string, any>;
 

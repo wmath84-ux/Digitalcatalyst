@@ -1,4 +1,4 @@
-import { adminDb } from "./firebaseAdmin";
+import { adminDb } from "./firebaseAdmin.js";
 
 export type ReferralConfig = {
   enabled: boolean;

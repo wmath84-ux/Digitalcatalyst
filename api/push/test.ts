@@ -1,5 +1,5 @@
 import * as webpush from "web-push";
-import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "../_lib/firebaseAdmin";
+import { adminDb, errorResponse, requireFirebaseUser, type VercelRequest, type VercelResponse } from "../_lib/firebaseAdmin.js";
 
 const clean = (value: unknown, max: number) => String(value || "").trim().slice(0, max);
 
