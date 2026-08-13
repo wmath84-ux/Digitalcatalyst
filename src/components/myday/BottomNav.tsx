@@ -7,12 +7,12 @@ interface BottomNavProps {
 }
 
 const items = [
+  { id: "home", label: "Home", icon: Home },
   { id: "overview", label: "Day", icon: LayoutGrid },
   { id: "tasks", label: "Tasks", icon: ClipboardList },
   { id: "schedule", label: "Schedule", icon: CalendarClock },
   { id: "reminders", label: "Remind", icon: Bell },
   { id: "notes", label: "Notes", icon: NotebookPen },
-  { id: "home", label: "Home", icon: Home },
 ];
 
 export default function BottomNav({ active, onNavigate }: BottomNavProps) {

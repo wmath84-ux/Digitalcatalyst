@@ -121,7 +121,11 @@ export const loadSiteNotifications = (viewerKey: string): SiteNotification[] => 
 };
 
 export const saveSiteNotifications = (viewerKey: string, notifications: SiteNotification[]) => {
-  safeWrite(storageKey(NOTIFICATION_STORAGE_PREFIX, viewerKey), trimNotifications(notifications));
+  const next = trimNotifications(notifications);
+  safeWrite(storageKey(NOTIFICATION_STORAGE_PREFIX, viewerKey), next);
+  if (typeof window !== 'undefined') {
+    window.dispatchEvent(new CustomEvent('eduvora:notifications-updated', { detail: { viewerKey, notifications: next } }));
+  }
 };
 
 export const loadSiteNotificationPreferences = (viewerKey: string): SiteNotificationPreferences => ({
