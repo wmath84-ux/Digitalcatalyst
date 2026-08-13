@@ -19,6 +19,7 @@ interface Props {
   productsTotalPaise: number;
   couponDiscountPaise: number;
   couponCode: string | null;
+  discountLabel?: string;
   minPayablePaise: number;
   totalPaise: number;
 }
@@ -29,7 +30,7 @@ const formatRupee = (paise: number): string =>
 export default function PriceSummary({
   plan,
   cycle,
-  basePricePaise,
+  basePricePaise: _basePricePaise,
   featuresTotalPaise,
   featuresCount,
   includedFeatureCount,
@@ -37,6 +38,7 @@ export default function PriceSummary({
   productsTotalPaise,
   couponDiscountPaise,
   couponCode,
+  discountLabel = "Coupon discount",
   minPayablePaise,
   totalPaise,
 }: Props) {
@@ -87,7 +89,7 @@ export default function PriceSummary({
               data-subscription-row="coupon"
               data-applied-coupon={couponCode || ""}
             >
-              <span>Coupon discount{couponCode ? ` (${couponCode})` : ""}</span>
+              <span>{discountLabel}{couponCode ? ` (${couponCode})` : ""}</span>
               <span>− {formatRupee(couponDiscountPaise)}</span>
             </div>
           ) : null}

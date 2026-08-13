@@ -178,7 +178,7 @@ export default function SubscriptionsPage() {
             <div><h3 className="text-sm font-semibold text-slate-900">Subscriber referral program</h3><p className="mt-1 text-xs text-slate-500">Codes are generated automatically after verified subscription payment.</p></div>
             <label className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" className="h-5 w-5" checked={referralSettings.enabled} onChange={(event) => setReferralSettings({ ...referralSettings, enabled: event.target.checked })} /> Referral program enabled</label>
             <Field label="Referral discount (₹)"><input className={inputClass} type="number" min="0" value={referralSettings.discountPaise / 100} onChange={(event) => setReferralSettings({ ...referralSettings, discountPaise: Math.max(0, Math.round(Number(event.target.value || 0) * 100)) })} /></Field>
-            <Field label="Maximum redemptions per code (blank = unlimited)"><input className={inputClass} type="number" min="1" value={referralSettings.maxUsesPerReferrer ?? ""} onChange={(event) => setReferralSettings({ ...referralSettings, maxUsesPerReferrer: event.target.value ? Math.max(1, Number(event.target.value)) : null })} /></Field>
+            <p className="text-xs text-slate-500">Each referral ID can be used only once. After that it shows as Used on the leaderboard.</p>
             <PrimaryButton className="w-full" loading={saving} onClick={saveReferralSettings}>Save referral settings</PrimaryButton>
           </div>
         </RecordCard>
@@ -189,7 +189,8 @@ export default function SubscriptionsPage() {
           <div className="space-y-3">
             <Field label="Name" required><input className={inputClass} value={editingPlan.name ?? ""} onChange={(e) => setEditingPlan({ ...editingPlan, name: e.target.value })} /></Field>
             <Field label="Description"><textarea className={textareaClass} value={editingPlan.description ?? ""} onChange={(e) => setEditingPlan({ ...editingPlan, description: e.target.value })} /></Field>
-            <Field label="Monthly price (₹)">
+            <p className="text-xs text-slate-500">Plan base price is not charged. The payable total is selected features and products only.</p>
+            <Field label="Monthly price (₹) — unused">
               <input
                 className={inputClass}
                 type="number"

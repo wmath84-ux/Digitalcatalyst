@@ -163,6 +163,9 @@ const ensureUserProfile = async (
       lastLoginAt: serverTimestamp(),
       ...(signupProfile?.name ? { name: signupProfile.name } : {}),
       ...(signupProfile?.mobile ? { mobile: signupProfile.mobile } : {}),
+      ...(!String(profileSnapshot.data()?.photoURL || "").trim() && firebaseUser.photoURL
+        ? { photoURL: firebaseUser.photoURL }
+        : {}),
     }, { merge: true });
   }
 
@@ -292,7 +295,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return { success: true, message: "Admin login successful." };
     } catch (error) {
       clearAdminSession();
-      return { success: false, message: authErrorMessage(error) };
+      const code = authErrorCode(error);
+      if (code === "auth/invalid-credential" || code === "auth/wrong-password" || code === "auth/user-not-found") {
+        return {
+          success: false,
+          message: "Firebase Authentication rejected this email/password. The password must match Authentication → Users for wmath84@gmail.com — Firestore role=admin is checked only after Auth succeeds. Use Reset password below if needed.",
+          code,
+        };
+      }
+      return { success: false, message: authErrorMessage(error), code };
     }
   }, []);
 

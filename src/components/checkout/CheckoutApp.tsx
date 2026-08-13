@@ -57,6 +57,20 @@ export default function CheckoutApp({ onEditSelection }: CheckoutAppProps) {
     scrollRef.current?.scrollTo({ top: 0, behavior: "smooth" });
   }, [step]);
 
+  useEffect(() => {
+    if (step !== 2 || typeof window === "undefined") return;
+    if (!window.history.state?.eduvoraCheckoutPayment) {
+      window.history.pushState({ ...(window.history.state || {}), eduvoraCheckoutPayment: true }, "");
+    }
+    const onPopState = () => {
+      setStep(1);
+    };
+    window.addEventListener("popstate", onPopState);
+    return () => {
+      window.removeEventListener("popstate", onPopState);
+    };
+  }, [step]);
+
   const handleProceedToPayment = useCallback(() => {
     if (!checkout.quote) return;
     setStep(2);

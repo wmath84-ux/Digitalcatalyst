@@ -115,13 +115,20 @@ const trimNotifications = (notifications: SiteNotification[]) => {
     .slice(0, MAX_NOTIFICATIONS);
 };
 
+const isNewsOrBlogNotificationInternal = (notification: SiteNotification) => {
+  if (notification.category === 'reading') return true;
+  if (notification.target?.type === 'reading') return true;
+  const title = String(notification.title || '').toLowerCase();
+  return title.includes('new news update') || title.includes('new blog published');
+};
+
 export const loadSiteNotifications = (viewerKey: string): SiteNotification[] => {
   const stored = safeParse<SiteNotification[]>(storageKey(NOTIFICATION_STORAGE_PREFIX, viewerKey), []);
-  return trimNotifications(Array.isArray(stored) ? stored : []);
+  return trimNotifications(Array.isArray(stored) ? stored : []).filter((notification) => !isNewsOrBlogNotificationInternal(notification));
 };
 
 export const saveSiteNotifications = (viewerKey: string, notifications: SiteNotification[]) => {
-  const next = trimNotifications(notifications);
+  const next = trimNotifications(notifications).filter((notification) => !isNewsOrBlogNotificationInternal(notification));
   safeWrite(storageKey(NOTIFICATION_STORAGE_PREFIX, viewerKey), next);
   if (typeof window !== 'undefined') {
     window.dispatchEvent(new CustomEvent('eduvora:notifications-updated', { detail: { viewerKey, notifications: next } }));
@@ -154,7 +161,7 @@ export const mergeSiteNotifications = (
     });
   });
 
-  return trimNotifications(Array.from(merged.values()));
+  return trimNotifications(Array.from(merged.values()).filter((notification) => !isNewsOrBlogNotificationInternal(notification)));
 };
 
 const flattenCourseContent = (modules: any[] = []) => {
@@ -287,19 +294,8 @@ export const createContentNotifications = (
     });
   });
 
-  Object.entries(current.articles).forEach(([id, article]) => {
-    if (previous.articles[id]) return;
-    notifications.push({
-      id: `content:reading:${article.type}:${id}`,
-      title: article.type === 'news' ? 'New News update' : 'New Blog published',
-      body: article.title,
-      category: 'reading',
-      createdAt: now,
-      read: false,
-      source: 'content',
-      target: { type: 'reading', listType: article.type, articleId: id },
-    });
-  });
+  // News and blog pages (and their notification pipeline) have been removed.
+  // Article inventory is ignored so leftover reading alerts never reappear.
 
   Object.entries(current.announcements).forEach(([id, announcement]) => {
     if (previous.announcements[id]) return;
@@ -413,7 +409,17 @@ export const createCommunityActivityNotifications = ({
   };
 };
 
+export const isNewsOrBlogNotification = (notification: SiteNotification) => {
+  if (notification.category === 'reading') return true;
+  if (notification.target?.type === 'reading') return true;
+  const title = String(notification.title || '').toLowerCase();
+  return title.includes('new news update') || title.includes('new blog published');
+};
+
 export const isNotificationCategoryEnabled = (
   notification: SiteNotification,
   preferences: SiteNotificationPreferences,
 ) => preferences[notification.category] !== false;
+
+export const withoutNewsAndBlogNotifications = (notifications: SiteNotification[]) =>
+  notifications.filter((notification) => !isNewsOrBlogNotification(notification));

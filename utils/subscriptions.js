@@ -209,7 +209,8 @@ export const buildSubscriptionLineItems = ({
   if (!plan) return [];
   const items = [];
 
-  // Plan line — one line that represents the base plan + cycle.
+  // Plan line — access entitlement only. The plan itself has no
+  // standalone price; the payable total is selected features + products.
   items.push({
     id: `subscription:${plan.id}:${cycle}`,
     kind: "subscription",
@@ -221,9 +222,9 @@ export const buildSubscriptionLineItems = ({
     featureId: null,
     title: `${plan.name} (${cycle === "monthly" ? "Monthly" : "Yearly"})`,
     parentTitle: plan.description || "",
-    regularPrice: getPlanCyclePricePaise(plan, cycle),
+    regularPrice: 0,
     salePrice: null,
-    effectivePrice: getPlanCyclePricePaise(plan, cycle),
+    effectivePrice: 0,
     quantity: 1,
     alreadyOwned: false,
     entitlementId: `subscription:${plan.id}`,

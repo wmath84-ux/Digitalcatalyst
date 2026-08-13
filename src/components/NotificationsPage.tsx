@@ -5,6 +5,7 @@ import { db } from "../../firebase";
 import Header from "./Header";
 import BottomNav, { type TabKey } from "./BottomNav";
 import {
+  isNewsOrBlogNotification,
   loadSiteNotifications,
   mergeSiteNotifications,
   saveSiteNotifications,

@@ -15,12 +15,9 @@ import { ArrowLeft, BadgeCheck, CircleCheck, Package, ShoppingBag } from "lucide
 import { useCheckout } from "../../checkout/CheckoutContext";
 import CheckoutLineItemCard from "./CheckoutLineItemCard";
 import type { CheckoutLineItem, PurchaseKind } from "../../types/commerce";
+import { formatPaise } from "../../utils/money";
 
-const formatRupee = (value: number): string => {
-  if (!Number.isFinite(value)) return "₹0";
-  if (value === 0) return "Free";
-  return `₹${Math.round(value).toLocaleString("en-IN")}`;
-};
+const formatRupee = formatPaise;
 
 const formatTimestamp = (value: number): string => {
   if (!Number.isFinite(value)) return "";

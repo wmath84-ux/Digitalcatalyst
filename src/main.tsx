@@ -32,13 +32,18 @@ import { buildCheckoutSessionRecord, writeToSessionStorage as writeCheckoutToSto
 import type { CheckoutSelection } from "./types/commerce";
 import type { Product as CartProduct, TabKey as CartTabKey } from "./cartWishlist/types";
 import type { PaidCourseUpdate } from "./types/course";
-import { isDesktopBrowserLocked, showDesktopMaintenanceNotice } from "./utils/pwaInstall";
+import { isDesktopBrowserLocked, isInstalledMobilePwa, showDesktopMaintenanceNotice } from "./utils/pwaInstall";
+import { disablePageZoom } from "./utils/disablePageZoom";
 import { ensureSavedWebPushSubscription } from "../utils/webPush";
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
     void navigator.serviceWorker.register("/sw.js").catch(() => undefined);
   });
+}
+
+if (typeof window !== "undefined") {
+  disablePageZoom();
 }
 
 const LANDING_HASH = "#/landing";
@@ -197,9 +202,12 @@ function Root() {
   const [hash, setHash] = useState(() => window.location.hash);
   const [shoppingToast, setShoppingToast] = useState<string | null>(null);
   const [desktopLocked, setDesktopLocked] = useState(() => isDesktopBrowserLocked());
+  const [installedMobilePwa, setInstalledMobilePwa] = useState(() => isInstalledMobilePwa());
   const toastTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const landingRouteRequested = !hash || hash.startsWith(LANDING_HASH);
-  const redirectingSignedInUser = Boolean(user && user.role !== "admin" && landingRouteRequested && !desktopLocked);
+  // Mobile + installed PWA: never show landing, even if the user is logged out.
+  // Login status is intentionally ignored — install state is the only mobile rule.
+  const skipLandingForInstalledMobilePwa = Boolean(installedMobilePwa && landingRouteRequested && !desktopLocked);
 
   const shoppingProducts: CartProduct[] = useMemo(() => catalogProducts.map((product) => ({
     id: product.id,
@@ -233,13 +241,21 @@ function Root() {
   };
 
   useEffect(() => {
+    const syncInstallState = () => {
+      setDesktopLocked(isDesktopBrowserLocked());
+      setInstalledMobilePwa(isInstalledMobilePwa());
+    };
     const handleHashChange = () => setHash(window.location.hash);
-    const handleResize = () => setDesktopLocked(isDesktopBrowserLocked());
+    const displayMode = window.matchMedia("(display-mode: standalone)");
     window.addEventListener("hashchange", handleHashChange);
-    window.addEventListener("resize", handleResize);
+    window.addEventListener("resize", syncInstallState);
+    window.addEventListener("appinstalled", syncInstallState);
+    displayMode.addEventListener?.("change", syncInstallState);
     return () => {
       window.removeEventListener("hashchange", handleHashChange);
-      window.removeEventListener("resize", handleResize);
+      window.removeEventListener("resize", syncInstallState);
+      window.removeEventListener("appinstalled", syncInstallState);
+      displayMode.removeEventListener?.("change", syncInstallState);
     };
   }, []);
 
@@ -253,10 +269,10 @@ function Root() {
   }, [desktopLocked, hash]);
 
   useEffect(() => {
-    if (loading || !user || user.role === "admin" || !landingRouteRequested || desktopLocked) return;
+    if (!skipLandingForInstalledMobilePwa) return;
     window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${HOME_HASH}`);
     setHash(HOME_HASH);
-  }, [desktopLocked, landingRouteRequested, loading, user]);
+  }, [skipLandingForInstalledMobilePwa]);
 
   useEffect(() => {
     if (!user) return;
@@ -491,8 +507,8 @@ function Root() {
     return <LandingApp />;
   }
 
-  if (loading || redirectingSignedInUser || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH))) {
-    return <AppLaunchSplash label={redirectingSignedInUser ? "Opening your dashboard…" : "Preparing your learning space…"} />;
+  if (loading || skipLandingForInstalledMobilePwa || Boolean(user && user.role !== "admin" && catalogLoading && hash.startsWith(HOME_HASH))) {
+    return <AppLaunchSplash label={skipLandingForInstalledMobilePwa ? "Opening your dashboard…" : "Preparing your learning space…"} />;
   }
 
   if (protectedRoutePending) {

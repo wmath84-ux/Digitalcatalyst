@@ -6,6 +6,7 @@
 
 import { BadgeCheck, CircleCheck, Package, PackageOpen, Unlock } from "lucide-react";
 import type { CheckoutLineItem } from "../../types/commerce";
+import { formatPaise } from "../../utils/money";
 
 const KIND_LABEL: Record<CheckoutLineItem["kind"], string> = {
   full_product: "Course",
@@ -29,10 +30,7 @@ const KIND_ICON: Record<CheckoutLineItem["kind"], typeof Package> = {
   subscription_features: PackageOpen,
 };
 
-const formatRupee = (value: number): string => {
-  if (!Number.isFinite(value) || value <= 0) return "Free";
-  return `₹${Math.round(value).toLocaleString("en-IN")}`;
-};
+const formatRupee = formatPaise;
 
 export interface CheckoutLineItemCardProps {
   line: CheckoutLineItem;

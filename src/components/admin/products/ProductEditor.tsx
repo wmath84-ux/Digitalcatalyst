@@ -404,6 +404,8 @@ export function ProductEditor({ productId }: { productId?: string }) {
               <Field label="Sale price (₹)">
                 <input className={inputClass} type="number" value={form.salePrice ?? ""} onChange={(e) => update("salePrice", e.target.value === "" ? null : e.target.value)} />
               </Field>
+"salePrice", e.target.value === "" ? null : e.target.value)} />
+              </Field>
             </div>
             <p className="text-xs text-slate-500">
               Effective price: <strong>₹{Number(form.salePrice ?? form.regularPrice).toLocaleString("en-IN")}</strong>
@@ -413,8 +415,20 @@ export function ProductEditor({ productId }: { productId?: string }) {
             </p>
             <div className="flex items-center justify-between rounded-lg border border-slate-200 p-3">
               <span className="text-sm font-medium text-slate-700">Free product</span>
-              <ToggleSwitch checked={form.isFree} onChange={(v) => update("isFree", v)} />
+              <ToggleSwitch
+                checked={form.isFree}
+                onChange={(v) => {
+                  update("isFree", v);
+                  if (v) {
+                    setForm((prev) => ({ ...prev, isFree: true, regularPrice: "0", salePrice: null, minPayableAmount: "0" }));
+                    setDirty(true);
+                  }
+                }}
+              />
             </div>
+            {form.isFree ? (
+              <p className="text-xs text-emerald-700">Free products checkout at ₹0. Regular / sale prices are ignored until this toggle is turned off.</p>
+            ) : null}
             <Field label="Minimum payable amount (₹)" hint="Floor after coupon discount">
               <input className={inputClass} type="number" value={form.minPayableAmount} onChange={(e) => update("minPayableAmount", e.target.value)} />
             </Field>
@@ -799,5 +813,8 @@ function PaidUpdatesEditor({
         </div>
       ))}
     </div>
+  );
+}
+div>
   );
 }

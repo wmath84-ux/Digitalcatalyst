@@ -214,6 +214,7 @@ export const errorResponse = (response: VercelResponse, error: unknown, fallback
 };
 
 export const parseProductPricePaise = (data: Record<string, unknown>): number => {
+  if (data.isFree === true) return 0;
   const source = data.salePrice === undefined || data.salePrice === null || data.salePrice === '' ? data.price : data.salePrice;
   const amount = Number(String(source ?? '0').replace(/[^0-9.-]/g, ''));
   const paise = Math.round(amount * 100);

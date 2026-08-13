@@ -34,9 +34,25 @@ test("shared footer places leaderboard after profile and routes to its page", ()
 });
 
 test("leaderboard distinguishes used, available and unavailable codes", () => {
-  assert.match(leaderboard, /Used \$\{row\.usedCount\}×/);
+  assert.match(leaderboard, /"Used"/);
   assert.match(leaderboard, /"Use now"/);
-  assert.match(leaderboard, /"Unavailable"/);
+  assert.match(leaderboard, /Unused IDs/);
+});
+
+test("leaderboard toggles all users versus subscribers with referral IDs", () => {
+  assert.match(leaderboard, /All users/);
+  assert.match(leaderboard, /Subscribers/);
+  assert.match(leaderboard, /Unused IDs/);
+  assert.match(leaderboard, /Referral ID/);
+  assert.match(leaderboard, /photoURL/);
+});
+
+test("a referral ID can be redeemed only once", () => {
+  assert.match(referrals, /globalLimit: 1/);
+  assert.match(referrals, /maxUsesPerReferrer: 1/);
+  const apply = fs.readFileSync("api/subscription-referral.ts", "utf8");
+  assert.match(apply, /Referral ID already used/);
+  assert.match(apply, /usedCount \|\| 0\) >= 1/);
 });
 
 test("subscription has a separate server-validated referral input", () => {
