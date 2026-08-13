@@ -20,7 +20,7 @@
 //      doc is the idempotency key: re-running the entitlement
 //      grant is a no-op for the coupon.
 
-import { FieldValue, Timestamp, type Firestore } from "firebase-admin/firestore";
+import { FieldValue, Timestamp, type Firestore, type Transaction } from "firebase-admin/firestore";
 import { adminDb } from "./firebaseAdmin";
 import {
   buildCouponRedemptionDocId,
@@ -171,7 +171,7 @@ export const buildCouponOrderContext = ({
  * `false` when the redemption was a replay (no-op).
  */
 export const applyCouponRedemption = async (
-  tx: FirebaseFirestore.Transaction,
+  tx: Transaction,
   args: {
     uid: string;
     coupon: CouponDoc;

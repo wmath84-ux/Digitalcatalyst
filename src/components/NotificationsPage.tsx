@@ -59,6 +59,11 @@ export default function NotificationsPage({
     setItems(loadSiteNotifications(viewerKey));
   }, [viewerKey]);
 
+  useEffect(() => {
+    if (!user) return;
+    void ensureSavedWebPushSubscription(user.id);
+  }, [user]);
+
   // App-open fallback: users still receive the correct one-time reminder
   // even when a scheduled cron or push delivery was delayed.
   useEffect(() => {

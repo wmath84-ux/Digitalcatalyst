@@ -17,7 +17,7 @@
 //      user's subscription record after a successful
 //      Razorpay capture.
 
-import { Timestamp, type Firestore } from "firebase-admin/firestore";
+import { Timestamp, type Firestore, type QueryDocumentSnapshot, type Transaction } from "firebase-admin/firestore";
 import { adminDb, parseProductPricePaise } from "./firebaseAdmin";
 import { getRenewalBaseTime } from "../../utils/subscriptionRenewal";
 import {
@@ -136,7 +136,7 @@ export const loadPlanModuleUnlocks = async (
     .where("planId", "==", planId)
     .get();
   return snap.docs
-    .map((doc) => {
+    .map((doc: QueryDocumentSnapshot) => {
       const data = doc.data() || {};
       return {
         planId: String(data.planId || planId),
@@ -257,7 +257,7 @@ export const loadSubscriptionSelectionContext = async (
  * doc so existing readers (profile, admin) keep working.
  */
 export const writeSubscriptionAfterPayment = async (
-  tx: FirebaseFirestore.Transaction,
+  tx: Transaction,
   args: {
     uid: string;
     plan: SubscriptionPlanDoc;

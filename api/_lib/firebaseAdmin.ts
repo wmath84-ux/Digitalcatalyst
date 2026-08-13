@@ -1,6 +1,6 @@
 import { applicationDefault, cert, getApp, getApps, initializeApp, type App, type ServiceAccount } from 'firebase-admin/app';
 import { getAuth, type DecodedIdToken } from 'firebase-admin/auth';
-import { FieldValue, getFirestore, Timestamp } from 'firebase-admin/firestore';
+import { FieldValue, getFirestore, Timestamp, type Firestore, type Transaction } from 'firebase-admin/firestore';
 
 export type VercelRequest = {
   method?: string;
@@ -104,7 +104,7 @@ export const getFirebaseAdminApp = (): App => {
   }
 };
 
-export const adminDb = () => getFirestore(getFirebaseAdminApp());
+export const adminDb = (): Firestore => getFirestore(getFirebaseAdminApp());
 
 const readAuthorization = (request: VercelRequest) => {
   const raw = request.headers?.authorization;
@@ -185,7 +185,7 @@ export async function grantProductEntitlements(input: {
   const siteOrderRef = db.collection('siteOrders').doc(input.orderId);
   const now = Timestamp.now();
 
-  await db.runTransaction(async (transaction) => {
+  await db.runTransaction(async (transaction: Transaction) => {
     const purchaseEntries = input.items.map((item) => ({
       ...item,
       ref: userRef.collection('purchases').doc(item.productId),
