@@ -5,9 +5,11 @@ import {
   editorModulesToFirestoreTree,
   editorPaidUpdateToFirestore,
   editorToFirestoreBody,
+  firestoreModulesToEditorFlat,
   firestoreToEditorForm,
 } from "../../../utils/productMapping";
-import type { ProductModule, ProductResource } from "./types";
+import { fullDemoCourseContent } from "../../data/demoCourseContent";
+import type { PaidUpdate, ProductModule, ProductResource } from "./types";
 
 export class ApiError extends Error { status: number; constructor(message: string, status = 400) { super(message); this.status = status; } }
 const bodyOf = (init?: RequestInit) => init?.body ? JSON.parse(String(init.body)) as Record<string, any> : {};
@@ -48,7 +50,49 @@ function productForEditor(raw: any, documentId: string) {
   // form (modules, paid updates, images, pricing) from the Firestore doc.
   // For docs written by the editor (which carry the `adminProduct` blob)
   // the mapping prefers the blob because it is the editor's own submission.
-  return firestoreToEditorForm(raw, documentId);
+  const form = firestoreToEditorForm(raw, documentId);
+  if (form && (!Array.isArray(form.modules) || form.modules.length === 0)) {
+    // Mirror the catalog: when a product has no course content configured,
+    // the Course Player shows the built-in demo course. Populate the editor
+    // with that same demo content so the admin sees (and can customize) the
+    // exact modules/files learners actually see in the player.
+    form.modules = firestoreModulesToEditorFlat(fullDemoCourseContent) as ProductModule[];
+    if (!Array.isArray(form.paidUpdates) || form.paidUpdates.length === 0) {
+      form.paidUpdates = demoPaidUpdatesFromContent(fullDemoCourseContent);
+    }
+  }
+  return form;
+}
+
+/**
+ * Build the editor `paidUpdates` list from the demo course's paid-update
+ * modules (grouped by their `paidUpdateId`), so the "Paid updates" tab shows
+ * the same premium content the player renders.
+ */
+function demoPaidUpdatesFromContent(content: Array<{ id: string; accessLevel?: string; paidUpdateId?: string; paidUpdateTitle?: string; paidUpdatePrice?: string; paidUpdateCoinPrice?: number }>): PaidUpdate[] {
+  const map = new Map<string, PaidUpdate>();
+  for (const module of content) {
+    if (module.accessLevel !== "paidUpdate") continue;
+    const id = module.paidUpdateId || module.id;
+    let update = map.get(id);
+    if (!update) {
+      update = {
+        id,
+        title: module.paidUpdateTitle || "Course update",
+        description: "",
+        includedIds: [],
+        cashPrice: Number(String(module.paidUpdatePrice || "0").replace(/[^0-9.-]/g, "")) || 0,
+        coinPrice: Number(module.paidUpdateCoinPrice || 0),
+        active: true,
+        publishDate: null,
+        visibility: "visible",
+        sortOrder: map.size,
+      };
+      map.set(id, update);
+    }
+    if (!update.includedIds.includes(module.id)) update.includedIds.push(module.id);
+  }
+  return Array.from(map.values());
 }
 
 async function productsRequest(url: URL, init?: RequestInit) {
